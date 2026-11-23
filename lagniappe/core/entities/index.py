@@ -35,9 +35,6 @@ class IndexOptions(CollectionOptions, total=False):
     entity: Entity | None
 
 
-# @testable true
-# @tests tests_unit/test_010_task_index.py::test_index_base_cursor_limit_user_and_append_state
-# @matrix index : pagination state user-scope
 class Index(Site):
     """Paginated list view for an entity type. Provides cursor-based
     pagination, user-scoped permission filtering, and table column config.
@@ -94,9 +91,6 @@ class Index(Site):
         self._limit = value
 
 
-# @testable true
-# @tests tests_unit/test_010_task_index.py::test_task_index
-# @pair task-index:table
 class TaskIndex(Index):
     """Task list view for a project or global task index.
 
@@ -112,10 +106,6 @@ class TaskIndex(Index):
     _kind = "task"
     _tasks: list[Task] | None = None
 
-    # @testable true
-    # @tests tests_unit/test_010_task_index.py::test_task_index_paginates_dated_then_undated_tasks_with_restrictions
-    # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
-    # @matrix task-index : assignee-visibility undated
     def __init__(self, *args: object, undated: bool = False, **kwargs: Unpack[IndexOptions]) -> None:
         super().__init__(*args, **kwargs)
         self._undated = bool(undated)
@@ -133,13 +123,6 @@ class TaskIndex(Index):
     def route(self) -> str:
         return url_for("tasks.rows")
 
-    # @testable true
-    # @tests tests_unit/test_010_task_index.py::test_task_index_paginates_dated_then_undated_tasks_with_restrictions
-    # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
-    # @matrix task-index : pagination restrictions undated
-    # @pair task-index:assignee-visibility
-    # @tests tests_unit/test_010b_index_user_scope.py::test_task_index_visibility_uses_explicit_viewer
-    # @matrix task-index : explicit-user permissions
     def undated_tasks(self) -> list[Task]:
         db = database_get.tasks_without_due_dates(
             start_cursor=self.cursor,
@@ -164,13 +147,6 @@ class TaskIndex(Index):
             if task.allowed(Action.VIEW, user=self.user)
         ]
 
-    # @testable true
-    # @tests tests_unit/test_010_task_index.py::test_task_index_paginates_dated_then_undated_tasks_with_restrictions
-    # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
-    # @matrix task-index : dated pagination restrictions undated
-    # @pair task-index:assignee-visibility
-    # @tests tests_unit/test_010b_index_user_scope.py::test_task_index_visibility_uses_explicit_viewer
-    # @matrix task-index : explicit-user permissions
     def dated_tasks(self) -> list[Task]:
         db = database_get.tasks_with_due_dates(
             start_cursor=self.cursor,
@@ -196,9 +172,6 @@ class TaskIndex(Index):
             if task.allowed(Action.VIEW, user=self.user)
         ]
 
-    # @testable true
-    # @tests tests_unit/test_010_task_index.py::test_task_index_paginates_dated_then_undated_tasks_with_restrictions
-    # @pair task-index:pagination
     @property
     def tasks(self) -> list[Task]:
         if self._tasks is not None:
@@ -211,9 +184,6 @@ class TaskIndex(Index):
 
         return self._tasks
 
-    # @testable true
-    # @tests tests_unit/test_021_refresh.py::test_task_index_refresh_roots_uses_both_ordered_query_streams
-    # @matrix reconnect-refresh task-index : ordering root-depth
     def refresh_roots(self) -> list[Task]:
         """Return the complete task-index membership without relationships.
 
@@ -242,9 +212,6 @@ class TaskIndex(Index):
         return sort_tasks([task for task in roots if isinstance(task, Entities.TASK)])
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/index.py::TaskHistoryTable
-# @reason table property owns task history list rendering; this entity only selects the table property
 class TaskHistoryIndex(Index):
     """Task history list view for a task."""
 
@@ -259,9 +226,6 @@ class TaskHistoryIndex(Index):
         }
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/index.py::PageIndex.pages
-# @reason page index query/filter behavior is owned by the pages property
 class PageIndex(Index):
     """Page list view for a category."""
 
@@ -285,12 +249,6 @@ class PageIndex(Index):
     def route(self) -> str:
         return url_for("categories.rows", key=self._category.urlsafe_key)
 
-    # @testable true
-    # @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_restricted_page_is_not_listed_for_outsider_on_category_index
-    # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
-    # @matrix pages : access-restrictions cursor-pagination index-filter
-    # @tests tests_unit/test_010b_index_user_scope.py::test_page_index_visibility_uses_explicit_viewer
-    # @matrix pages : explicit-user permissions
     @property
     def pages(self) -> list[Page]:
         if self._pages is not None:
@@ -322,9 +280,6 @@ class PageIndex(Index):
 
         return self._pages
 
-    # @testable true
-    # @tests tests_unit/test_021_refresh.py::test_page_index_refresh_roots_reuses_restricted_collection_query
-    # @matrix category-index reconnect-refresh : membership root-depth
     def refresh_roots(self) -> list[Page]:
         """Return every page in this category at root depth."""
         restrictions = self._viewer.properties.restrictions.unrestricted_pages(self._category)
@@ -341,9 +296,6 @@ class PageIndex(Index):
         ]
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/index.py::FormIndex.forms
-# @reason form index behavior is owned by the forms collection property
 class FormIndex(Index):
     """Form list view with related category/project resolution."""
 
@@ -362,14 +314,6 @@ class FormIndex(Index):
     def route(self) -> str:
         return url_for("forms.rows")
 
-    # @testable true
-    # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_index_lists_group_restricted_form_only_for_group_member
-    # @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_form_index_lists_forms_but_hides_create_without_forms_create
-    # @matrix forms : index-filter index-view
-    # @tests tests_unit/test_010b_index_user_scope.py::test_form_index_visibility_uses_explicit_viewer
-    # @matrix forms : explicit-user permissions
-    # @tests tests_unit/test_010b_index_user_scope.py::test_form_index_related_models_use_explicit_viewer
-    # @pair forms:related-entities
     @property
     def forms(self) -> list[Form]:
         if self._forms is not None:
@@ -420,9 +364,6 @@ class FormIndex(Index):
         return self._forms
 
 
-# @testable true
-# @tests tests_unit/test_009_user_index.py::test_user_index
-# @pair user-index:table
 class UserIndex(Index):
     """User list view with group management."""
 
@@ -454,13 +395,6 @@ class UserIndex(Index):
             return url_for("users.rows", mode=self._public_mode)
         return url_for("users.rows")
 
-    # @testable true
-    # @tests tests_unit/test_009_user_index.py::test_user_index_loads_users_groups_public_group_and_append_cursor
-    # @tests tests_unit/test_009_user_index.py::test_user_index_regular_mode_excludes_public_users
-    # @tests tests_unit/test_009_user_index.py::test_user_index_public_mode_loads_public_group_users_and_preserves_append_mode
-    # @tests tests_unit/test_009_user_index.py::test_user_index_public_mode_returns_empty_when_public_users_disabled
-    # @matrix public-users : disabled enabled mode pagination public-mode public-users
-    # @matrix user-index : disabled mode pagination public-mode public-users regular-mode restrictions
     @property
     def users(self) -> list[User]:
         if self._users is not None:
@@ -471,9 +405,6 @@ class UserIndex(Index):
 
         return self._load_regular_users()
 
-    # @testable false
-    # @covered-by lagniappe/core/entities/index.py::UserIndex.users
-    # @reason helper keeps mode-specific query paths readable
     def _load_regular_users(self) -> list[User]:
         restrictions = self._viewer.properties.restrictions.users
 
@@ -494,9 +425,6 @@ class UserIndex(Index):
 
         return self._users
 
-    # @testable false
-    # @covered-by lagniappe/core/entities/index.py::UserIndex.users
-    # @reason helper keeps mode-specific query paths readable
     def _load_public_users(self) -> list[User]:
         if not self.public_users_enabled:
             self._users = []
@@ -525,9 +453,6 @@ class UserIndex(Index):
 
         return self._users
 
-    # @testable true
-    # @tests tests_unit/test_021_refresh.py::test_user_index_refresh_roots_preserves_regular_and_public_modes
-    # @matrix reconnect-refresh user-index : mode root-depth page-canonical
     def refresh_roots(self) -> list[Page]:
         """Return the Pages represented by authorized User rows at root depth."""
         if self.mode == self._public_mode:
@@ -564,9 +489,6 @@ class UserIndex(Index):
     def mode(self) -> str:
         return self._mode
 
-    # @testable true
-    # @tests tests_unit/test_009_user_index.py::test_user_index_public_mode_returns_empty_when_public_users_disabled
-    # @matrix user-index : enabled public-users
     @property
     def public_users_enabled(self) -> bool:
         if getattr(self, "_public_users_enabled", None) is not None:
@@ -576,11 +498,6 @@ class UserIndex(Index):
 
         return self._public_users_enabled
 
-    # @testable true
-    # @tests tests_unit/test_009_user_index.py::test_user_index_loads_users_groups_public_group_and_append_cursor
-    # @matrix user-index : groups restrictions
-    # @tests tests_unit/test_010b_index_user_scope.py::test_user_index_groups_use_explicit_viewer
-    # @matrix user-index : explicit-user permissions
     @property
     def groups(self) -> list[UserGroup]:
         if cached := getattr(self, "_groups", None):
@@ -605,9 +522,6 @@ class UserIndex(Index):
 
         return self._groups
 
-    # @testable true
-    # @tests tests_unit/test_009_user_index.py::test_user_index_loads_users_groups_public_group_and_append_cursor
-    # @pair user-index:public-group
     @property
     def public_group(self) -> PublicGroup:
         if getattr(self, "_public_group", None) is not None:

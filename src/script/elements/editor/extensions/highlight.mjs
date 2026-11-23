@@ -2,20 +2,11 @@ import { Decoration, Extension } from "@tiptap/core";
 
 const SELECTION_RANGE = "selectionHighlight";
 
-// @testable false
-// @covered-by src/script/elements/editor/extensions/highlight.mjs::SelectionHighlight
-// @reason storage lookup is exercised through the selection highlight contract
 const selectionRange = (editor) => {
 	const range = editor?.storage?.trackedRanges?.ranges?.get(SELECTION_RANGE);
 	return range ? { ...range } : null;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_041_editor_decorations.mjs::test_selection_highlight_decorations_and_range_mapping
- * @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_replaces_selection_and_posts_selected_text
- * @matrix ai editor : replace-selection selected-text
- */
 export const SelectionHighlight = Extension.create({
 	name: "selectionHighlight",
 

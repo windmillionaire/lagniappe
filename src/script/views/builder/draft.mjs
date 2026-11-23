@@ -1,8 +1,3 @@
-/**
- * @testable true
- * @tests tests_js/test_036b_builder_draft.mjs::test_builder_draft_history_and_generation
- * @matrix forms : draft-history stable-identity schema-generation stale-acknowledgement
- */
 export class BuilderDraft {
 	constructor(state, baseline = null) {
 		this.state = structuredClone(state);

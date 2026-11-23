@@ -38,7 +38,6 @@ function setupErrorTracking(
 	return { captured, dsn, inits, options, processors };
 }
 
-/** @matrix error-tracking login : login-context shared-capture */
 test("test_login_error_delegates_to_shared_capture", async (t) => {
 	createBrowser(t);
 	const navigatorObject = navigator;
@@ -79,7 +78,6 @@ test("test_login_error_delegates_to_shared_capture", async (t) => {
 	assert.ok(calls[0][2].login.timestamp);
 });
 
-/** @matrix error-tracking : normalization sentry-context */
 test("test_capture_error_normalizes_sentry_context_values", (t) => {
 	const { captured } = setupErrorTracking(t);
 	captureError(new Error("boom"), null, {
@@ -110,7 +108,6 @@ test("test_capture_error_normalizes_sentry_context_values", (t) => {
 	}
 });
 
-/** @matrix error-tracking : malformed-blocking-operation sentry-context */
 test("test_configure_sentry_drops_malformed_blocking_operation_warning", (t) => {
 	const { processors } = setupErrorTracking(t);
 	configureSentry();
@@ -133,7 +130,6 @@ test("test_configure_sentry_drops_malformed_blocking_operation_warning", (t) => 
 	assert.equal(result, null);
 });
 
-/** @matrix error-tracking : sentry-context trace-normalization */
 test("test_configure_sentry_removes_invalid_trace_context_without_dropping_event", (t) => {
 	const { processors } = setupErrorTracking(t);
 	configureSentry();
@@ -153,7 +149,6 @@ test("test_configure_sentry_removes_invalid_trace_context_without_dropping_event
 	assert.equal(result.contexts.browser.name, "Chrome");
 });
 
-/** @matrix error-tracking : blocking-operation notification-transaction */
 test("test_configure_sentry_filters_notification_long_task_spans", (t) => {
 	const { options } = setupErrorTracking(t);
 	configureSentry();
@@ -176,7 +171,6 @@ test("test_configure_sentry_filters_notification_long_task_spans", (t) => {
 	assert.equal(result.spans[0].op, "http.client");
 });
 
-/** @matrix error-tracking : payload-bounds privacy redaction request-context */
 test("test_configure_sentry_redacts_browser_request_and_context_payloads", (t) => {
 	const { processors } = setupErrorTracking(t);
 	configureSentry();
@@ -264,7 +258,6 @@ test("test_configure_sentry_redacts_browser_request_and_context_payloads", (t) =
 	assert.equal(result.spans[0].data["http.response.status_code"], 500);
 });
 
-/** @matrix error-tracking : malformed-breadcrumbs privacy */
 test("test_configure_sentry_drops_malformed_breadcrumb_container", (t) => {
 	const { processors } = setupErrorTracking(t);
 	configureSentry();
@@ -275,7 +268,6 @@ test("test_configure_sentry_drops_malformed_breadcrumb_container", (t) => {
 	assert.equal("breadcrumbs" in result, false);
 });
 
-/** @matrix error-tracking : configured-dsn privacy */
 test("test_configure_sentry_uses_installation_dsn_without_default_pii", (t) => {
 	const { dsn, inits } = setupErrorTracking(t, { initialized: false });
 	configureSentry();
@@ -284,7 +276,6 @@ test("test_configure_sentry_uses_installation_dsn_without_default_pii", (t) => {
 	assert.equal(inits[0].sendDefaultPii, false);
 });
 
-/** @matrix error-tracking : configured-dsn disabled */
 test("test_configure_sentry_does_not_initialize_without_dsn", (t) => {
 	const { inits, processors } = setupErrorTracking(t, {
 		dsn: null,

@@ -27,7 +27,6 @@ type PortableValue = str | int | float | bool | None | Sequence[PortableValue] |
 
 type NativeValue = str | int | float | bool | None | date | bytes | GeoPoint | PortableReference | MissingReference | DecodedEntity | list[NativeValue] | dict[str, NativeValue]
 
-# @testable infrastructure
 class ShardDescriptor(TypedDict):
     type: NotRequired[str]
     path: str
@@ -78,7 +77,6 @@ PORTABLE_CHILD_ROLES = {
 }
 
 
-# @testable infrastructure
 @dataclass(frozen=True, order=True)
 class PortableIdentity:
     namespace: str
@@ -89,7 +87,6 @@ class PortableIdentity:
         return {"type": self.type, "id": self.id, "namespace": self.namespace}
 
 
-# @testable infrastructure
 @dataclass(frozen=True)
 class PortableReference:
     type: str
@@ -106,7 +103,6 @@ class PortableReference:
         return {"$ref": value}
 
 
-# @testable infrastructure
 @dataclass(frozen=True)
 class MissingReference:
     type: str
@@ -123,16 +119,12 @@ class MissingReference:
         }
 
 
-# @testable infrastructure
 @dataclass(frozen=True)
 class DecodedEntity:
     properties: Mapping[str, object]
     exclude_from_indexes: tuple[str, ...]
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_portable_names_and_reference_strings_are_lossless
-# @matrix portable-json : path-safety reference-escaping
 def portable_name(value: str) -> str:
     """Encode arbitrary display text as one collision-stable portable component."""
     value = str(value or "")
@@ -151,9 +143,6 @@ def portable_name(value: str) -> str:
     return result
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_portable_names_and_reference_strings_are_lossless
-# @matrix portable-json : path-safety reference-escaping
 def unportable_name(value: str) -> str:
     """Decode one component produced by :func:`portable_name`."""
     value = str(value or "")
@@ -183,9 +172,6 @@ def unportable_name(value: str) -> str:
     return decoded
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_portable_names_and_reference_strings_are_lossless
-# @pair portable-json:reference-escaping
 def reference_string(reference: PortableReference) -> str:
     parts = [TEXT_REFERENCE_PREFIX.removesuffix(":")]
     if reference.namespace:
@@ -196,9 +182,6 @@ def reference_string(reference: PortableReference) -> str:
     return ":".join(parts)
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_portable_names_and_reference_strings_are_lossless
-# @pair portable-json:reference-escaping
 def parse_reference_string(value: str) -> PortableReference:
     """Parse one canonical typed reference string without accepting literals."""
     value = str(value or "")
@@ -218,9 +201,6 @@ def parse_reference_string(value: str) -> PortableReference:
     return reference
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_portable_names_and_reference_strings_are_lossless
-# @pair portable-json:reference-escaping
 def escape_reference_string(value: str) -> str:
     value = str(value)
     if value.startswith((TEXT_REFERENCE_PREFIX, TEXT_ESCAPE_PREFIX)):
@@ -228,17 +208,11 @@ def escape_reference_string(value: str) -> str:
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_portable_names_and_reference_strings_are_lossless
-# @pair portable-json:reference-escaping
 def unescape_reference_string(value: str) -> str:
     value = str(value)
     return value[len(TEXT_ESCAPE_PREFIX) :] if value.startswith(TEXT_ESCAPE_PREFIX) else value
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_value_codec_round_trips_every_supported_value
-# @matrix portable-json : round-trip value-codec
 class ValueCodec:
     """Canonical JSON codec for every supported Datastore value."""
 
@@ -425,9 +399,6 @@ class ValueCodec:
         )
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_value_codec_round_trips_every_supported_value
-# @pair portable-json:canonical-encoding
 def canonical_json(value: object) -> bytes:
     try:
         return json.dumps(
@@ -441,9 +412,6 @@ def canonical_json(value: object) -> bytes:
         raise DataLifecycleError(f"Value is not canonical JSON: {error}") from error
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_shard_writer_enforces_count_bytes_and_ordering
-# @matrix portable-json : deterministic-order sharding
 class ShardWriter:
     """Stream sorted per-type JSON-array shards within both v1 limits."""
 
@@ -505,9 +473,6 @@ class ShardWriter:
         return descriptors
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_shard_writer_enforces_count_bytes_and_ordering
-# @pair portable-json:entity-envelope
 def validate_entity_record(record: dict[str, Any]) -> PortableIdentity:
     if not isinstance(record, dict) or set(record) - {
         "identity", "exclude_from_indexes", "properties", "children"
@@ -586,10 +551,6 @@ def validate_entity_record(record: dict[str, Any]) -> PortableIdentity:
     return portable_identity
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_history_and_messages_are_nested_and_replanned_under_their_owners
-# @tests tests_tooling/test_008_data_lifecycle.py::test_archive_validation_counts_children_without_separate_identity_pages
-# @matrix portable-archive portable-json : owner-scoped-children
 def validate_child_record(child_type: str, child: dict[str, Any]) -> dict[str, Any]:
     """Validate one owner-scoped history or message row."""
     if child_type not in {
@@ -621,9 +582,6 @@ def validate_child_record(child_type: str, child: dict[str, Any]) -> dict[str, A
     return key
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason the bundled schema is consumed and validated by the archive workflow
 def load_schema() -> dict[str, Any]:
     path = Path(__file__).with_name("schema_v1.json")
     return json.loads(path.read_text(encoding="utf-8"))

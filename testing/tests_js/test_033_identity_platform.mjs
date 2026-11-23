@@ -3,7 +3,6 @@ import { test } from "node:test";
 import { IdentityPlatformClient } from "../../src/script/login/identity.mjs";
 import { mockFetch } from "../utility/js/environment.mjs";
 
-/** @matrix login : action-codes auth-errors browser-fetch email-password identity-platform */
 test("test_identity_platform_rest_client_contract", async (t) => {
 	const responses = [
 		{ idToken: "signup-token", email: "user@example.test" },

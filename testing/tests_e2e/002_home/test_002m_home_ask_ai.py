@@ -361,11 +361,6 @@ def _medical_project(owner, case, slug):
     return project, matching, distractor
 
 
-# @source src/script/widgets/home/lists.mjs::ToolReportList
-# @matrix ai-report : ask async deferred-refresh live-provider operation-poll persistence stage-labels usable-answer workspace-tools
-# @matrix deferred-jobs : polling progress status
-# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
-# @matrix polling : operation owner progress timing
 @pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
 def test_ask_answers_from_attached_corpus_receipt(get_admin, get_user, request, live_ai_job_quota):
     user = get_admin()
@@ -415,9 +410,6 @@ def test_ask_answers_from_attached_corpus_receipt(get_admin, get_user, request, 
     expect(report_page.execute_button).not_to_be_visible()
 
 
-# @matrix ai-report : ask async live-provider persistence structured-filter usable-answer workspace-tools
-# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
-# @matrix polling : operation owner progress timing
 @pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
 def test_ask_uses_structured_filter_for_form_submission_query(
     get_admin, get_user, request, live_ai_job_quota,

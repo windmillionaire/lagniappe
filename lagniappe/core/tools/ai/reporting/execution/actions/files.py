@@ -22,11 +22,6 @@ from .results import (
 )
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_and_records_manual_page_cleanup
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_by_exact_source_attachment_name
-# @matrix ai-report : deterministic-run move-file readable-file-fallback
-# @matrix files : deterministic-run manual-cleanup move-file readable-file-fallback
 def _move_file(action, _report, user, created):
     data = _data(action)
     source = _resolve_file_endpoint(data, created, endpoint="source")
@@ -64,19 +59,6 @@ def _move_file(action, _report, user, created):
     return file, [file], metadata
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_rejects_file_as_attachment_target_without_guessing_prior_page
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_rejects_attachment_target_guessing_from_page_name
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_rejects_category_used_as_attachment_page
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_targets_created_task
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_attach_file_preserves_single_owner
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_attach_file_repeated_destination_is_noop
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_rejects_second_file_owner
-# @matrix ai-report : attachment attachments deterministic-run exact-page-name page-reference partial-result prior-task-page repair validation created-task persistence submission-completion task-attachment
-# @matrix files : attachment deterministic-run exact-page-name page-reference partial-result prior-task-page repair validation
-# @matrix files tasks : task-attachment
 def _attach_file(action, report, user, created):
     data = _data(action)
     target = _resolve_entity(
@@ -106,10 +88,6 @@ def _attach_file(action, report, user, created):
     return file, writes, {"file_summary": _file_summary_result(file), "target": _entity_result(target)}
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_resolves_report_file_by_exact_url_and_file_prefix
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
-# @pair ai-report:file-summary
 def _summarize_file(action, report, _user, created):
     data = _data(action)
     file = _resolve_report_file(

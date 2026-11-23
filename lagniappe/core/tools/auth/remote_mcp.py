@@ -87,16 +87,12 @@ if not LOGGER.handlers:
     LOGGER.addHandler(_outcome_handler)
 
 
-# @testable true
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_oauth_outcomes_log_only_closed_categories_after_workload_verification
-# @matrix mcp-oauth : observability privacy
 def log_outcome(outcome: str) -> None:
     """Emit only a fixed outcome category through this subsystem's own handler."""
     if isinstance(outcome, str) and outcome in _LOG_OUTCOMES:
         LOGGER.info(outcome)
 
 
-# @testable infrastructure
 class OAuthError(ValueError):
     def __init__(self, code: str = "invalid_grant", status: int = 400) -> None:
         super().__init__(code)
@@ -104,8 +100,6 @@ class OAuthError(ValueError):
         self.status = status
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 def settings() -> dict[str, str]:
     if (
         not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED
@@ -119,28 +113,20 @@ def settings() -> dict[str, str]:
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 def _now(now: datetime | None = None) -> datetime:
     return now or datetime.now(UTC)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 def _secret(kind: str) -> str:
     return f"lgmo_{kind}_{secrets.token_urlsafe(32)}"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 def _name(token, kind):
     if not isinstance(token, str) or not _TOKEN.fullmatch(token) or token[5] != kind:
         raise OAuthError()
     return f"{kind}-{hashlib.sha256(token.encode('ascii')).hexdigest()}"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 def _live[T: dict](row: T | None, now: datetime) -> TypeGuard[T]:
     return bool(
         row
@@ -150,8 +136,6 @@ def _live[T: dict](row: T | None, now: datetime) -> TypeGuard[T]:
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 def _bound(row, config):
     return (
         all(row.get(key) == config[key] for key in ("issuer", "resource"))
@@ -160,9 +144,6 @@ def _bound(row, config):
     )
 
 
-# @testable true
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_oauth_user_and_workload_identity_are_both_required
-# @matrix mcp-oauth : user-binding site-policy
 def eligible_user(user: object) -> TypeGuard[User]:
     settings()
     return bool(
@@ -173,8 +154,6 @@ def eligible_user(user: object) -> TypeGuard[User]:
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/remote_mcp.py::authenticate_access
 def _user(row):
     user = Entities.fetch_one(row.get("user"), request=Fetch.direct())
     if not eligible_user(user) or user.key != row.get("user"):
@@ -182,10 +161,6 @@ def _user(row):
     return user
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/remote_mcp.py::client_metadata
-# @covered-by lagniappe/core/tools/auth/remote_mcp.py::_certificate_request
-# @reason duplicate JSON keys are rejected through both bounded metadata readers
 def _unique_object(pairs):
     value = {}
     for key, item in pairs:
@@ -195,10 +170,6 @@ def _unique_object(pairs):
     return value
 
 
-# @testable true
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_workload_certificates_are_bounded_cached_and_fail_closed
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_cached_certificates_still_verify_each_signature_and_user_grant
-# @matrix mcp-oauth : oidc certificate-cache
 def _certificate_request(url, method="GET"):
     """Adapt one bounded public certificate response to Google's verifier."""
     global _certificate_cache
@@ -233,9 +204,6 @@ def _certificate_request(url, method="GET"):
         return SimpleNamespace(status=200, data=body)
 
 
-# @testable true
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_cimd_is_exact_bounded_cached_and_accepts_public_method_intersection
-# @matrix mcp-oauth : cimd validation
 def client_metadata(client_id: str) -> dict[str, str]:
     """Fetch only supported CIMD documents, with no DCR or client secret."""
     global _client_cache
@@ -285,10 +253,6 @@ def client_metadata(client_id: str) -> dict[str, str]:
         return metadata
 
 
-# @testable true
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_authorization_requires_exact_bindings_state_and_s256
-# @matrix mcp-oauth : authorization validation loopback client-isolation
 def begin_authorization(parameters: Mapping[str, str], *, now: datetime | None = None) -> str:
     config = settings()
     if (
@@ -339,8 +303,6 @@ def begin_authorization(parameters: Mapping[str, str], *, now: datetime | None =
     return pending
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/remote_mcp.py::consent
 def pending_authorization(pending: str, *, now: datetime | None = None) -> dict[str, object]:
     row = store.read(_name(pending, "p"))
     if not _live(row, _now(now)) or row.get("consumed") or not _bound(row, settings()):
@@ -348,11 +310,6 @@ def pending_authorization(pending: str, *, now: datetime | None = None) -> dict[
     return row
 
 
-# @testable true
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_code_is_single_use_and_refresh_replay_revokes_the_family
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_consent_deny_and_pending_replay_do_not_issue_tokens
-# @matrix mcp-oauth : consent transaction client-isolation
 def consent(pending: str, user: User, *, allow: bool, now: datetime | None = None) -> tuple[str, dict[str, str]]:
     if not eligible_user(user):
         raise OAuthError("access_denied", 403)
@@ -360,9 +317,6 @@ def consent(pending: str, user: User, *, allow: bool, now: datetime | None = Non
     config = settings()
     code = _secret("c")
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/auth/remote_mcp.py::consent
-    # @reason atomic pending consumption and code creation are one consent transition
     def transition(records):
         name = _name(pending, "p")
         row = records.get(name)
@@ -393,8 +347,6 @@ def consent(pending: str, user: User, *, allow: bool, now: datetime | None = Non
     return store.atomic(transition)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 def _grant_name(user, client_id: str | None = None) -> str:
     # Preserve existing ChatGPT and Codex grants when adding independent client grants.
     suffix = {
@@ -404,11 +356,6 @@ def _grant_name(user, client_id: str | None = None) -> str:
     return "grant-" + credential_id(user) + suffix
 
 
-# @testable true
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_code_is_single_use_and_refresh_replay_revokes_the_family
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion
-# @matrix mcp-oauth : token pkce refresh replay transaction
 def exchange_token(parameters: Mapping[str, str], *, now: datetime | None = None) -> dict[str, str | int]:
     config = settings()
     now = _now(now)
@@ -454,9 +401,6 @@ def exchange_token(parameters: Mapping[str, str], *, now: datetime | None = None
     access, refresh = _secret("a"), _secret("r")
     family = secrets.token_hex(16)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/auth/remote_mcp.py::exchange_token
-    # @reason token consumption and family rotation must share the transaction
     def transition(records):
         row = records.get(name)
         grant = records.get(grant_name)
@@ -520,11 +464,6 @@ def exchange_token(parameters: Mapping[str, str], *, now: datetime | None = None
     return result
 
 
-# @testable true
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_oauth_user_and_workload_identity_are_both_required
-# @matrix mcp-oauth : authentication expiry revocation user-binding site-policy existing-grants
 def authenticate_access(token: str, *, now: datetime | None = None) -> tuple[User, dict[str, object]]:
     config, now = settings(), _now(now)
     row = store.read(_name(token, "a"))
@@ -554,11 +493,6 @@ def authenticate_access(token: str, *, now: datetime | None = None) -> tuple[Use
     }
 
 
-# @testable true
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_oauth_user_and_workload_identity_are_both_required
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_cached_certificates_still_verify_each_signature_and_user_grant
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_oauth_outcomes_log_only_closed_categories_after_workload_verification
-# @matrix mcp-oauth : oidc audience service-identity token-separation authentication revocation
 def authenticate_envelope(workload_token: str, user_token: str) -> tuple[User, dict[str, object]]:
     config = settings()
     if not isinstance(workload_token, str) or not 1 <= len(workload_token) <= 8192:
@@ -583,10 +517,6 @@ def authenticate_envelope(workload_token: str, user_token: str) -> tuple[User, d
     return authenticate_access(user_token)
 
 
-# @testable true
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_revocation_is_private_and_reconnect_replaces_only_the_old_family
-# @matrix mcp-oauth : revocation reconnect privacy
 def revoke_token(token: str, client_id: str) -> None:
     config = settings()
     if not client_allowed(client_id):
@@ -599,9 +529,6 @@ def revoke_token(token: str, client_id: str) -> None:
     except OAuthError:
         return
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/auth/remote_mcp.py::revoke_token
-    # @reason private family revocation is exercised through token possession
     def transition(records):
         row = records.get(name)
         if not row or not _bound(row, config) or row.get("client_id") != client_id:
@@ -613,10 +540,6 @@ def revoke_token(token: str, client_id: str) -> None:
     store.atomic(transition)
 
 
-# @testable true
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_codex_loopback_grants_coexist_and_cannot_cross_clients
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_revocation_is_private_and_reconnect_replaces_only_the_old_family
-# @matrix mcp-oauth : revocation user-binding
 def connection_status(user: User, *, client_id: str | None = None, revoke: bool = False, now: datetime | None = None) -> Mapping[str, object]:
     config = settings()
     client_id = client_id or CLIENT_ID
@@ -624,9 +547,6 @@ def connection_status(user: User, *, client_id: str | None = None, revoke: bool 
         raise OAuthError("invalid_client")
     name, now = _grant_name(user, client_id), _now(now)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/auth/remote_mcp.py::connection_status
-    # @reason connection status and optional revocation operate on one user grant
     def transition(records):
         grant = records.get(name)
         if not grant or grant.get("user") != user.key:

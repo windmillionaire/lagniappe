@@ -20,7 +20,6 @@ poll = import_module("lagniappe.web.routes.home.poll")
 pytestmark = pytest.mark.e2e
 
 
-# @matrix polling : document read-path
 @pytest.mark.parametrize("entity_type", [Page, Project], ids=["page", "project"])
 @pytest.mark.parametrize("legacy_html", [False, True], ids=["ydoc", "legacy-html"])
 def test_document_poll_loads_storage_only_on_cache_miss(
@@ -90,7 +89,6 @@ def test_document_poll_loads_storage_only_on_cache_miss(
         documents.cache.redis.delete(document_key, presence_key)
 
 
-# @matrix polling : authorization document unavailable
 @pytest.mark.parametrize("unavailable", ["missing", "forbidden", "wrong-document", "no-document"])
 def test_document_poll_rejects_unavailable_documents_before_loading_state(monkeypatch, unavailable):
     viewer = SimpleNamespace(details={"hash": "viewer"})

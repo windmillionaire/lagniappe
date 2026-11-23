@@ -7,13 +7,6 @@ from ..mixins import AIMixin, ColumnMixin, FilterMixin
 from .base_schema import SchemaProperty
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_checkbox
-# @tests tests_unit/test_004e_submission_behavior.py::test_missing_stored_checkbox_is_unset_and_omitted
-# @tests tests_unit/test_004e_submission_behavior.py::test_full_form_submit_missing_checkbox_persists_explicit_false
-# @tests tests_unit/test_004e_submission_behavior.py::test_stored_explicit_checkbox_false_survives_load_save
-# @tests tests_unit/test_004e_submission_behavior.py::test_stored_null_checkbox_normalizes_away_on_resave
-# @matrix checkbox : ai-value explicit-false filter-value form-submit import load-save missing-field normalization projection stored-false stored-null unset
 class Checkbox(ColumnMixin, AIMixin, FilterMixin, SchemaProperty[bool]):
     """Boolean checkbox field.
 

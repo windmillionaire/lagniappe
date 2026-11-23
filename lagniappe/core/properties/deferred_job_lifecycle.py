@@ -129,9 +129,6 @@ class Delivery(JSONValue):
     _id = "delivery"
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lifecycle_normalizes_timestamps_and_elapsed_time
-# @pair deferred-jobs:timestamp-normalization
 def datetime_value(value: object) -> datetime | None:
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=UTC)
@@ -144,21 +141,11 @@ def datetime_value(value: object) -> datetime | None:
     return None
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lifecycle_normalizes_timestamps_and_elapsed_time
-# @pair deferred-jobs:elapsed-time
 def elapsed_seconds(start: object, now: datetime) -> int:
     start = datetime_value(start)
     return max(int((now - start).total_seconds()), 0) if start else 0
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_status_projection_is_bounded_and_marks_stale_work
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_dependency_status_distinguishes_form_waits_from_recovery
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_terminal_job_elapsed_time_stays_fixed_after_completion
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_active_job_elapsed_time_advances_with_the_clock
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_terminal_job_elapsed_time_uses_stored_fallbacks
-# @matrix deferred-jobs : privacy progress stale-state status timing dependency-wait recovery
 def status_projection(job: models.DeferredJob, *, now: datetime) -> JobStatus:
     progress = dict(getattr(job, "progress", None) or {})
     client = dict(getattr(job, "client", None) or {})
@@ -243,10 +230,6 @@ def status_projection(job: models.DeferredJob, *, now: datetime) -> JobStatus:
     return result
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_admin_projection_exposes_diagnostics_without_payload_content
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_terminal_job_elapsed_time_stays_fixed_after_completion
-# @matrix deferred-jobs : diagnostics privacy timing
 def admin_projection(job: models.DeferredJob, *, now: datetime) -> AdminJobStatus:
     """Extend owner-visible status with bounded operational diagnostics."""
     projection = status_projection(job, now=now)

@@ -26,10 +26,6 @@ STATE_SCHEMA_VERSION = 1
 _ACTIVE_JOURNAL = None
 
 
-# @testable false
-# @covered-by installer/state.py::SetupProcessLock
-# @covered-by installer/state.py::OperationJournal
-# @reason platform permission adapter is owned by setup state persistence
 def _restrict_state_file(path):
     if os.name != "nt":
         os.chmod(path, 0o600)
@@ -66,9 +62,6 @@ def _restrict_state_file(path):
     return True
 
 
-# @testable false
-# @covered-by installer/state.py::setup_operation
-# @reason state-path selection is exercised through setup operation journaling
 def _state_dir():
     override = os.environ.get("LAGNIAPPE_SETUP_STATE_DIR")
     path = (
@@ -80,9 +73,6 @@ def _state_dir():
     return path
 
 
-# @testable false
-# @covered-by installer/state.py::OperationJournal
-# @reason atomic journal serialization is exercised through the journal contract
 def _write_json(path, payload):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -114,9 +104,6 @@ def _write_json(path, payload):
         temporary.unlink(missing_ok=True)
 
 
-# @testable false
-# @covered-by installer/state.py::SetupProcessLock
-# @reason process probe is owned by the setup lock contract
 def _pid_running(pid):
     if not pid:
         return False
@@ -127,9 +114,6 @@ def _pid_running(pid):
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @pair setup:process-lock
 class SetupProcessLock:
     """Cross-platform single-process lock based on atomic file creation."""
 
@@ -199,9 +183,6 @@ class SetupProcessLock:
         self.release()
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @matrix setup : operation-journal recovery
 class OperationJournal:
     """Persist the last safe setup boundary without settings or credentials."""
 
@@ -255,17 +236,11 @@ class OperationJournal:
         self.save()
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @pair setup:operation-journal
 def record_step(name: str) -> None:
     if _ACTIVE_JOURNAL is not None:
         _ACTIVE_JOURNAL.step(name)
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @matrix setup : operation-journal recovery
 def record_mutation(
     step: str,
     *,
@@ -284,16 +259,10 @@ def record_mutation(
         )
 
 
-# @testable false
-# @covered-by installer/state.py::setup_operation
-# @reason platform signal adapter exercised through the setup operation boundary
 @contextmanager
 def _interrupt_handlers():
     previous = {}
 
-    # @testable false
-    # @covered-by installer/state.py::setup_operation
-    # @reason signal callback raises the typed interruption owned by its context
     def interrupt(signum, _frame):
         raise SetupInterrupted(f"Setup interrupted by signal {signum}.")
 
@@ -311,9 +280,6 @@ def _interrupt_handlers():
             signal.signal(signum, handler)
 
 
-# @testable false
-# @covered-by installer/state.py::setup_operation
-# @reason console rendering is exercised through interrupted operation recovery
 def _print_recovery(journal, prefix):
     print(f"{prefix} after: {journal.payload['last_step'] or 'start'}")
     mutations = journal.payload["mutations"]
@@ -338,9 +304,6 @@ def _print_recovery(journal, prefix):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @matrix setup : operation-journal process-lock recovery
 @contextmanager
 def setup_operation(
     mode: str,

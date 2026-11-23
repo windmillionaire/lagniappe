@@ -9,11 +9,6 @@ from ..mixins import ColumnMixin
 from .base_property import Property, build_field
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/index.py::TaskTable
-# @covered-by lagniappe/core/properties/index.py::FormTable
-# @covered-by lagniappe/core/properties/index.py::UserTable
-# @covered-by lagniappe/core/properties/category.py::CategoryTable
 class Columns[Owner: Entity | Site = "Entity"](Property["Columns", Owner, "Columns | None"]):
     """Table column configuration for an entity's list view.
 

@@ -64,17 +64,14 @@ SHA = re.compile(r"[0-9a-f]{40}")
 VERSION = re.compile(r"[1-9][0-9]*")
 
 
-# @testable infrastructure
 class CloudSettingsError(RuntimeError):
     """A secret-free diagnostic suitable for an operator console."""
 
 
-# @testable infrastructure
 def _json(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-# @testable infrastructure
 def _read(root: Path, path: Path) -> str | None:
     target = root / path
     if target.resolve() != target:
@@ -85,13 +82,11 @@ def _read(root: Path, path: Path) -> str | None:
         return None
 
 
-# @testable infrastructure
 def _receipt(root):
     raw = _read(root, RECEIPT)
     return json.loads(raw) if raw is not None else {}
 
 
-# @testable infrastructure
 def _source(root: Path) -> str:
     result = subprocess.run(
         [GIT_CLI or "git", "-C", str(root), "rev-parse", "HEAD"],
@@ -107,9 +102,6 @@ def _source(root: Path) -> str:
     return sha
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_bundle_round_trip
-# @matrix config setup : secrets project-identity redis-tls
 def validate_bundle(
     bundle: object, project: str
 ) -> tuple[dict[str, object], DeveloperSettings]:
@@ -167,7 +159,6 @@ def validate_bundle(
     return app, dev
 
 
-# @testable infrastructure
 def _local_bundle(root, project, receipt):
     bundle = {
         "schema": 1,
@@ -197,7 +188,6 @@ def _local_bundle(root, project, receipt):
     return bundle
 
 
-# @testable infrastructure
 def _same_settings(left, right):
     return (
         left["schema"] == right["schema"]
@@ -210,14 +200,12 @@ def _same_settings(left, right):
     )
 
 
-# @testable infrastructure
 def _snapshot(root: Path) -> str:
     return hashlib.sha256(
         _json([_read(root, path) for path in (APP, DEV, CA)]).encode()
     ).hexdigest()
 
 
-# @testable infrastructure
 def _record(
     root: Path, project: str, version: str, source: str, **extra: object
 ) -> dict[str, object]:
@@ -233,7 +221,6 @@ def _record(
     return receipt
 
 
-# @testable infrastructure
 def cli_token(
     project: str, configuration: str, account: str, *, env: dict[str, str] | None = None
 ) -> str:
@@ -287,7 +274,6 @@ def cli_token(
     return auth.stdout.strip()
 
 
-# @testable infrastructure
 class SecretManager:
     """Use only the explicitly selected CLI identity. Never log provider bodies."""
 
@@ -330,9 +316,6 @@ class SecretManager:
         return number, json.loads(raw)
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_publish_rejects_stale_writers
-# @matrix config setup : secrets transactional-state
 def publish(
     root: Path,
     project: str,
@@ -382,9 +365,6 @@ def publish(
     return _record(root, project, version, source, **overlay)
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_deploy_requires_pinned_experiments_target
-# @matrix deploy setup : project-identity
 def verify_operator_target(root: Path, project: str, draft: SettingsDraft) -> None:
     from config.experiments import normalize_experiments_config
 
@@ -407,7 +387,6 @@ def verify_operator_target(root: Path, project: str, draft: SettingsDraft) -> No
         )
 
 
-# @testable infrastructure
 def _restore_paths():
     # Use the same output locations and permissions as installer generation.
     generated = (
@@ -426,7 +405,6 @@ def _restore_paths():
     return paths
 
 
-# @testable infrastructure
 def _recover(root):
     raw = _read(root, JOURNAL)
     if raw is None:
@@ -446,9 +424,6 @@ def _recover(root):
     (root / JOURNAL).unlink()
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_restore_preserves_previous_installation
-# @matrix config deploy : config-files transactional-state recovery
 def restore(
     root: Path,
     project: str,
@@ -542,9 +517,6 @@ def restore(
         raise
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_cloud_settings_cli
-# @matrix config setup : cli-routing project-identity
 def main(arguments: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="run.py cloud-settings")
     commands = parser.add_subparsers(dest="action", required=True)

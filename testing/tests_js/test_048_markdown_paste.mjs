@@ -10,7 +10,6 @@ import {
 } from "../../src/script/elements/editor/extensions/paste.mjs";
 import { TrackedRanges } from "../../src/script/elements/editor/extensions/trackedRanges.mjs";
 
-/** @matrix editor markdown : detection paste soft-wrap */
 test("test_markdown_detection_is_conservative", () => {
 	for (const source of [
 		"# Heading",
@@ -34,7 +33,6 @@ test("test_markdown_detection_is_conservative", () => {
 	}
 });
 
-/** @matrix editor markdown : source-block */
 test("test_markdown_source_schema_is_distinct_from_code_blocks", () => {
 	const schema = getSchema([StarterKit, MarkdownSource]);
 	const source = schema.nodes.markdownSource.create(
@@ -52,7 +50,6 @@ test("test_markdown_source_schema_is_distinct_from_code_blocks", () => {
 	);
 });
 
-/** @matrix editor markdown : inserted-range paste source-block */
 test("test_source_insertion_tracks_the_inserted_block", () => {
 	const schema = getSchema([StarterKit, MarkdownSource]);
 	const doc = schema.nodeFromJSON({

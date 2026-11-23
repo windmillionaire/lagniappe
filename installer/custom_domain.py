@@ -9,9 +9,6 @@ from installer import wrap_text
 from .verify import prepare_existing_installation
 
 
-# @testable false
-# @covered-by installer/custom_domain.py::_setup_custom_domain
-# @reason entrypoint verification/deploy wrapper around custom-domain setup
 def add_custom_domain() -> int:
     """Configure a custom domain for an existing installation."""
     prepare_existing_installation()
@@ -54,10 +51,6 @@ def add_custom_domain() -> int:
     return 0
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_custom_domain_uses_provider_records_and_dns_only_cloudflare
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_custom_domain_supports_manual_dns
-# @matrix setup : cloudflare-dns custom-domain disabled-provider dns-only idempotence provider-records
 def _setup_custom_domain(*, configure_auth=True):
     """Create the domain mapping and optionally update existing authentication."""
     from config import SETTINGS
@@ -78,9 +71,6 @@ def _setup_custom_domain(*, configure_auth=True):
 
     f = FORMATTER.initialize()
 
-    # @testable false
-    # @covered-by installer/custom_domain.py::_setup_custom_domain
-    # @reason local input accessor delegates deterministic validation
     @validate_input(
         "Enter your custom domain (for example app.example.com)",
         validation_fn=validate_domain,

@@ -28,26 +28,17 @@ def stored_file_identifiers(entity: Entity) -> list[Identifier]:
     return identifiers
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_ask_submission_allows_hash_token_in_named_link_destination
-# @pairs ai-report:answer-only markdown:html-sanitization
 def render_ai_markdown(text: str) -> SafeHTML:
     """Render model Markdown after resolving known AI references for browser use."""
     return render_markdown(normalize_hash_references(text))
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_hash_reference_normalizer_batches_lookup
-# @matrix ai : batched-cache hash-reference normalization
 def hash_reference(entity: object) -> str | None:
     """Return the explicit AI reference token for an entity hash."""
     entity_hash = getattr(entity, "hash", None)
     return f"hash:{entity_hash}" if entity_hash else None
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_list_workspace_resources_caches_inventory
-# @pairs ai:resource-inventory permissions:personal-page
 def personal_page_reference(user: User) -> dict[str, object]:
     """Return the authenticated user's guaranteed editable Page reference."""
     page = user.page
@@ -61,9 +52,6 @@ def personal_page_reference(user: User) -> dict[str, object]:
     }
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_hash_reference_normalizer_batches_lookup
-# @matrix ai : batched-cache hash-reference normalization
 @overload
 def normalize_hash_references[V](value: dict[str, V], *, resolved_details: dict[str, CachedDetail] | None = None) -> dict[str, V]: ...
 @overload
@@ -103,9 +91,6 @@ def normalize_hash_references(value: object, *, resolved_details: dict[str, Cach
     return _replace_hash_references(value, replacements)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/references.py::normalize_hash_references
-# @reason recursive collection is covered through normalizer behavior
 def _collect_hash_references(value):
     hashes = []
     if isinstance(value, dict):
@@ -120,9 +105,6 @@ def _collect_hash_references(value):
     return list(dict.fromkeys(hashes))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/references.py::normalize_hash_references
-# @reason recursive collection is covered through normalizer behavior
 def _collect_hash_prefixed_ids(value):
     ids = []
     if isinstance(value, dict):
@@ -137,9 +119,6 @@ def _collect_hash_prefixed_ids(value):
     return list(dict.fromkeys(ids))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/references.py::normalize_hash_references
-# @reason recursive replacement is covered through normalizer behavior
 def _replace_hash_references(value, replacements):
     if isinstance(value, dict):
         return {

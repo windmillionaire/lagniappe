@@ -1,15 +1,5 @@
 import { EmbeddedTable } from "../elements/base/baseTable.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_appears_after_completion_cycle
- * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload
- * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_expands_table_submission_cell
- * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
- * @matrix tasks : completion-cycle history reload
- * @matrix task-completion : history readonly generation
- * @pair embedded-table:table-cell-expand
- */
 export class TaskHistory extends EmbeddedTable {
 	constructor(attributes) {
 		super(attributes);

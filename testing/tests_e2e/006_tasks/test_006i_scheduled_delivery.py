@@ -14,8 +14,6 @@ from lagniappe.web.routes.process import main as process_routes
 pytestmark = pytest.mark.e2e
 
 
-# @pairs task-completion:uncomplete task-scheduling:schedule-queue
-# @pair task-scheduling:delivery-auth
 @pytest.mark.parametrize("delivery", [
     "token", "legacy", "stale-token", "legacy-stale-date", "inactive",
     "already-open", "no-schedule", "missing", "unauthenticated",

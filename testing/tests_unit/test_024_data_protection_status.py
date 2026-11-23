@@ -67,7 +67,6 @@ class _Admin:
 
 
 # @covers lagniappe.core.tools.site.data_protection::data_protection_status
-# @matrix admin disaster-recovery : human-readable-timestamps native-backups recovery-catalog sanitization schedules
 def test_data_protection_status_is_sanitized_and_read_only(monkeypatch):
     monkeypatch.setattr(protection.CONFIG, "GOOGLE_CLOUD_PROJECT", "project-1")
     monkeypatch.setattr(

@@ -14,17 +14,14 @@ if TYPE_CHECKING:
     from google.cloud.resourcemanager_v3 import ProjectsClient
     from google.cloud.storage import Bucket
 
-# @testable infrastructure
 class _Policy(Protocol):
     @property
     def bindings(self) -> Iterable[object]: ...
 
-# @testable infrastructure
 class _PermissionResult(Protocol):
     @property
     def permissions(self) -> Iterable[str]: ...
 
-# @testable infrastructure
 class _PermissionClient(Protocol):
     def test_iam_permissions(
         self, *, request: dict[str, object], timeout: float
@@ -34,9 +31,6 @@ class _PermissionClient(Protocol):
 PROJECT_OWNER_ROLE = "roles/owner"
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_iam_principal_member_classifies_google_identities
-# @matrix iam setup : identity
 def principal_member(email: str) -> str:
     """Return the IAM member string for a Google user or service account."""
     principal_type = (
@@ -47,18 +41,12 @@ def principal_member(email: str) -> str:
     return f"{principal_type}:{email}"
 
 
-# @testable false
-# @covered-by installer/iam.py::reconcile_member_roles
-# @reason provider binding-shape adapter owned by policy reconciliation
 def _binding_value(binding, key, default=None):
     if isinstance(binding, dict):
         return binding.get(key, default)
     return getattr(binding, key, default)
 
 
-# @testable false
-# @covered-by installer/iam.py::reconcile_member_roles
-# @reason provider binding-shape adapter owned by policy reconciliation
 def _set_binding_value(binding, key, value):
     if isinstance(binding, dict):
         binding[key] = value
@@ -71,9 +59,6 @@ def _set_binding_value(binding, key, value):
             setattr(binding, key, value)
 
 
-# @testable false
-# @covered-by installer/iam.py::reconcile_member_roles
-# @reason condition-shape adapter owned by policy reconciliation
 def _is_conditional(binding):
     condition = _binding_value(binding, "condition")
     if not condition:
@@ -86,9 +71,6 @@ def _is_conditional(binding):
     )
 
 
-# @testable false
-# @covered-by installer/iam.py::reconcile_member_roles
-# @reason provider policy-shape adapter owned by policy reconciliation
 def _replace_bindings(policy, bindings):
     try:
         policy.bindings = bindings
@@ -97,9 +79,6 @@ def _replace_bindings(policy, bindings):
         policy.bindings.extend(bindings)
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_iam_reconciliation_is_idempotent_and_preserves_conditions_and_etag
-# @matrix iam setup : conditions etag idempotence unrelated-members
 def reconcile_member_roles(
     policy: _Policy,
     member: str,
@@ -171,9 +150,6 @@ def reconcile_member_roles(
     return changed
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_handoff_policy_helpers_remove_only_the_target_member
-# @matrix iam : conditions policy-inspection unrelated-members
 def policy_member_roles(
     policy: _Policy, member: str, *, include_conditions: bool = True
 ) -> set[str]:
@@ -187,9 +163,6 @@ def policy_member_roles(
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_permanent_owner_preflight_requires_direct_project_owner_binding
-# @matrix setup : delegated-install owner preflight project-iam
 def require_permanent_owner_binding(
     project_id: str, owner_email: str, *, client: ProjectsClient | None = None
 ) -> bool:
@@ -224,9 +197,6 @@ def require_permanent_owner_binding(
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_handoff_policy_helpers_remove_only_the_target_member
-# @matrix iam : conditions empty-bindings member-removal unrelated-members
 def remove_member_bindings(policy: _Policy, member: str) -> bool:
     """Remove one direct member from every binding, including conditional ones."""
     changed = False
@@ -246,9 +216,6 @@ def remove_member_bindings(policy: _Policy, member: str) -> bool:
     return changed
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_operator_permission_preflight_reports_missing_boundaries
-# @matrix iam setup : deployer installer preflight
 def inspect_operator_permissions(
     project_id: str,
     *,
@@ -323,9 +290,6 @@ def inspect_operator_permissions(
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_operator_permission_preflight_reports_missing_boundaries
-# @matrix iam setup : failure-reporting preflight
 def require_operator_permissions(
     project_id: str,
     *,
@@ -360,9 +324,6 @@ def require_operator_permissions(
     raise RuntimeError("\n".join(lines))
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_installer_bucket_permission_preflight_uses_bucket_resource
-# @matrix iam setup storage : bucket-scope failure-reporting installer preflight
 def require_installer_bucket_permissions(bucket: Bucket) -> list[str]:
     """Require human installer permissions used to reconcile one bucket."""
     required = sorted(set(constants.INSTALLER_BUCKET_PERMISSIONS))
@@ -384,9 +345,6 @@ def require_installer_bucket_permissions(bucket: Bucket) -> list[str]:
     raise RuntimeError("\n".join(lines))
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_runtime_project_policy_preserves_unmanaged_bindings_and_is_idempotent
-# @matrix iam setup : idempotence operator-preservation
 def reconcile_runtime_project_policy(project_id: str, runtime_email: str) -> bool:
     """Apply current runtime project roles without changing unmanaged grants."""
     install_if_missing(
@@ -420,9 +378,6 @@ def reconcile_runtime_project_policy(project_id: str, runtime_email: str) -> boo
     return changed
 
 
-# @testable false
-# @covered-by installer/gcloud.py::configure_service_account
-# @reason provider client composition over the tested policy reconciler
 def reconcile_runtime_service_account_policy(
     project_id: str,
     runtime_email: str,
@@ -467,9 +422,6 @@ def reconcile_runtime_service_account_policy(
     return changed
 
 
-# @testable false
-# @covered-by installer/gcloud.py::create_deferred_job_reconciler
-# @reason provider client composition over the tested policy reconciler
 def reconcile_project_service_agent(project_id: str, member: str, role: str) -> bool:
     """Ensure one Google-managed service agent project role idempotently."""
     install_if_missing(

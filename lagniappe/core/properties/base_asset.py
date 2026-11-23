@@ -8,7 +8,6 @@ if TYPE_CHECKING:
 from .base_property import Property, UNSET
 
 
-# @testable infrastructure
 class AssetProperty[Owner: Entity = "Entity", Read = object, Write = object](Property[Read, Owner, Write]):
     """Property backed by a stored asset (image, document, file, etc.).
 

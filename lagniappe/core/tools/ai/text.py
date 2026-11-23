@@ -28,9 +28,6 @@ class DocumentGenerationContext(TypedDict, total=False):
 GENERIC_MESSAGE = "Generation failed. Please try again. "
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/text.py::text_generation_prompt
-# @reason provider-call wrapper; editor text-generation E2E story is still an explicit source gap
 def generate_ai_text(prompt: Prompt) -> str:
     """Generate Markdown text content from a Prompt."""
     try:
@@ -46,9 +43,6 @@ def generate_ai_text(prompt: Prompt) -> str:
         raise exceptions.AIException(f"{GENERIC_MESSAGE} {str(e)}") from e
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_document_generation_context_builds_form_page_and_project_payloads
-# @matrix ai : document-context project-context
 def document_generation_context(entity: Entity, user: User, field: str | None = None) -> DocumentGenerationContext:
     """Build text-generation context for collaborative and form documents."""
     context_data: DocumentGenerationContext = {"user": user}
@@ -73,9 +67,6 @@ def document_generation_context(entity: Entity, user: User, field: str | None = 
     return context_data
 
 
-# @testable true
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
-# @matrix ai : output-format project-context prompt-builders search selected-text tools
 def text_generation_prompt(user_prompt: str, context_data: DocumentGenerationContext) -> Prompt:
     """Build the AI prompt for text generation from page context.
 

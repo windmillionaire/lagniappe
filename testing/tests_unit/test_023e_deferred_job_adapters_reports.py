@@ -19,7 +19,6 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 pytestmark = pytest.mark.unit
 
 
-# @pair ai-access:provider-boundary
 @pytest.mark.parametrize("tier", [AI.NONE, AI.ASK, AI.CREATE])
 @pytest.mark.parametrize("corrective", [False, True])
 def test_corrective_report_generation_requires_create_access(monkeypatch, tier, corrective):
@@ -45,7 +44,6 @@ def test_corrective_report_generation_requires_create_access(monkeypatch, tier, 
         adapter.authorize(context)
 
 
-# @matrix ai-report : input-files no-extra-read fresh-read
 @pytest.mark.parametrize(
     "phase",
     [
@@ -142,8 +140,6 @@ def test_report_phases_reuse_current_report_without_loading_input_files(
     assert events.count("report-read") == 1
 
 
-# @source lagniappe/core/tools/deferred_jobs/adapters/reports.py::AIReportAdapter
-# @pair deferred-jobs:cancellation
 def test_organize_prepare_stops_before_report_save_after_cancellation(monkeypatch):
     adapter = report_adapters.AIReportAdapter()
     report = SimpleNamespace(summary=None, instructions="Question", input_files=[])
@@ -182,8 +178,6 @@ def test_organize_prepare_stops_before_report_save_after_cancellation(monkeypatc
     assert saved == []
 
 
-# @matrix deferred-jobs : cancellation report-execution
-# @pair ai-report:deterministic-run
 def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
     adapter = report_adapters.ReportExecutionAdapter()
     assert adapter.notification_policy == "none"
@@ -316,7 +310,6 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
     assert saved
 
 
-# @matrix agent-api ai-report deferred-jobs : browser-review cas report-execution
 def test_external_report_execution_start_rejects_stale_browser_snapshot(monkeypatch):
     adapter = report_adapters.ReportExecutionAdapter()
 
@@ -406,7 +399,6 @@ def test_external_report_execution_start_rejects_stale_browser_snapshot(monkeypa
     }
 
 
-# @matrix agent-api ai-report deferred-jobs : browser-review cas report-execution terminal-delivery
 def test_external_report_duplicate_cleanup_cannot_overwrite_new_api_proposal(
     monkeypatch,
 ):
@@ -493,7 +485,6 @@ def test_external_report_duplicate_cleanup_cannot_overwrite_new_api_proposal(
     assert authoritative["process"] == "execution-cleaned-up"
 
 
-# @pairs ai-report:recovery deferred-jobs:report-execution
 def test_report_execution_failure_preserves_a_retryable_ledger(monkeypatch):
     adapter = report_adapters.ReportExecutionAdapter()
 
@@ -558,8 +549,6 @@ def test_report_execution_failure_preserves_a_retryable_ledger(monkeypatch):
     assert report.result["failed_at"] == 2
 
 
-# @matrix ai-report : active-operation failure-isolation
-# @pair deferred-jobs:superseded
 def test_report_replacement_supersedes_old_job_and_ignores_old_failure(monkeypatch):
     adapter = report_adapters.AIReportAdapter()
     events = []
@@ -626,8 +615,6 @@ def test_report_replacement_supersedes_old_job_and_ignores_old_failure(monkeypat
     ]
 
 
-# @matrix ai-report : plan-resume proposal-publication status
-# @matrix deferred-jobs : quota retry service-tier
 @pytest.mark.parametrize("changes", [False, True])
 @pytest.mark.parametrize("revision", [False, True])
 def test_ai_report_resumes_prepared_proposal(monkeypatch, changes, revision):

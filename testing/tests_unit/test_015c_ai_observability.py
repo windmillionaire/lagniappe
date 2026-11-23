@@ -117,7 +117,6 @@ def _capture(monkeypatch):
     return persisted, pruned
 
 
-# @matrix observability : cache deferred-context privacy provider-calls tokens tools validation
 @pytest.mark.unit
 def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
     monkeypatch,
@@ -216,7 +215,6 @@ def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
     assert summary["success"] is True
 
 
-# @matrix observability : validation
 @pytest.mark.parametrize("marked_outcome", [None, "local_repair", "model_repair"])
 def test_ask_formatting_is_normalization_and_preserves_explicit_repairs(
     monkeypatch, marked_outcome
@@ -261,7 +259,6 @@ def test_ask_formatting_is_normalization_and_preserves_explicit_repairs(
     assert workflow["rows"][0]["outcomes"] == [{"name": expected_label, "count": 1}]
 
 
-# @matrix observability : empty-response error-normalization quota
 @pytest.mark.unit
 def test_generation_summary_records_empty_retry_and_bounded_quota_error(monkeypatch):
     persisted, _ = _capture(monkeypatch)
@@ -321,7 +318,6 @@ def test_generation_summary_records_empty_retry_and_bounded_quota_error(monkeypa
     )
 
 
-# @matrix observability : correlation in-flight privacy provider-stage
 def test_deferred_generation_overwrites_correlated_live_snapshots(monkeypatch):
     persisted, pruned = _capture(monkeypatch)
 
@@ -359,7 +355,6 @@ def test_deferred_generation_overwrites_correlated_live_snapshots(monkeypatch):
     assert "PRIVATE-GENERATED-RESULT" not in json.dumps(persisted, default=str)
 
 
-# @matrix observability : correlation model-repair nested-generation review-fallback
 @pytest.mark.unit
 def test_nested_model_repair_gets_its_own_summary(monkeypatch):
     persisted, _ = _capture(monkeypatch)
@@ -416,7 +411,6 @@ def test_nested_model_repair_gets_its_own_summary(monkeypatch):
     assert persisted[-1]["outcome"] == "review_fallback"
 
 
-# @matrix observability : disabled exception-transparency persistence-failure pruning-failure
 @pytest.mark.unit
 def test_observability_failures_never_change_generation_result_or_error(monkeypatch):
     warnings = []
@@ -516,7 +510,6 @@ class _Query:
         return self.records[:limit]
 
 
-# @matrix datastore : index-exclusions retention-bound uuid-key
 @pytest.mark.unit
 def test_summary_persistence_uses_uuid_key_and_bounded_pruning(monkeypatch):
     old_records = [SimpleNamespace(key=f"old-{index}") for index in range(700)]
@@ -574,8 +567,6 @@ def test_summary_persistence_uses_uuid_key_and_bounded_pruning(monkeypatch):
     assert query.filters[0].value == now - timedelta(days=30)
 
 
-# @matrix analytics : groups outcomes query-limit
-# @pair observability:aggregation
 @pytest.mark.unit
 def test_ai_observability_dashboard_aggregation():
     records = [
@@ -658,7 +649,6 @@ def test_ai_observability_dashboard_aggregation():
     ]
 
 
-# @matrix ai-observability : job-correlation privacy
 def test_operation_diagnostic_payload_is_correlated_and_privacy_bounded():
     created = datetime(2026, 1, 2, 3, 4, tzinfo=UTC)
     operation = {
@@ -707,7 +697,6 @@ def test_operation_diagnostic_payload_is_correlated_and_privacy_bounded():
     assert "private_prompt" not in str(payload)
 
 
-# @matrix observability : in-flight deferred-context exception-transparency
 def test_report_telemetry_marks_lost_attempts_interrupted():
     now = datetime(2026, 9, 17, tzinfo=UTC)
     base = {"state": "running", "deferred_job_type": "report-ai", "deferred_job_attempt": 1, "telemetry_id": "job", "created": now}

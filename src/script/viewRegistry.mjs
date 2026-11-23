@@ -30,21 +30,11 @@ export const VIEW_ENTRIES = Object.freeze(
 	),
 );
 
-/**
- * @testable true
- * @tests tests_js/test_032_build_configuration.mjs::test_frontend_entries_and_startup_budget_contract
- * @tests tests_js/test_032_build_configuration.mjs::test_templates_preload_registered_view_and_interaction_foundations
- * @pair frontend-build:view-registry
- */
 export const viewEntryUrl = (kind) => {
 	const entry = VIEW_REGISTRY[kind]?.entry;
 	return entry ? `./chunks/views/${entry}.js?v=${BUILD_ID}` : null;
 };
 
-/**
- * @testable infrastructure
- * @covered-by src/script/viewRegistry.mjs::viewEntryUrl
- */
 export const loadView = (kind) => {
 	const url = viewEntryUrl(kind);
 	if (!url) return null;

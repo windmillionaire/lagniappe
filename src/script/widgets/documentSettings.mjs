@@ -10,14 +10,6 @@ const VISIBILITY = {
 	private: "This page is private.",
 };
 
-/**
- * @testable true
- * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_document_visibility_can_toggle_public_private
- * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
- * @matrix pages : document-visibility private public
- * @matrix public-pages : metadata preview
- * @pair public-directory:category
- */
 export class DocumentSettings extends FormWidget {
 	constructor(attributes) {
 		super(attributes);

@@ -6,9 +6,6 @@ import { DueDate } from "./dueDate.mjs";
 import { formatting } from "./formatting.mjs";
 import { TaskUpload } from "./taskUpload.mjs";
 
-/**
- * @testable infrastructure
- */
 const clearButton = (open) => {
 	const clearButton = document.createElement("button");
 	clearButton.dataset.role = "clear";
@@ -23,9 +20,6 @@ const clearButton = (open) => {
 	return clearButton;
 };
 
-/**
- * @testable infrastructure
- */
 const dueDateText = (parent) => {
 	if (!parent.active) {
 		return formatting.text({
@@ -59,9 +53,6 @@ const dueDateText = (parent) => {
 	return formatting.text({ kind: parent.kind, text: displayText });
 };
 
-/**
- * @testable infrastructure
- */
 const detailsText = (parent) => {
 	if (!parent.active) {
 		return formatting.text({
@@ -73,9 +64,6 @@ const detailsText = (parent) => {
 	return formatting.name({ ...parent.details, link: !parent.readonly });
 };
 
-/**
- * @testable infrastructure
- */
 const fileText = (parent) => {
 	const firstAsset = Object.values(parent.assets || {})[0];
 	const filename =
@@ -97,10 +85,6 @@ const fileText = (parent) => {
 	});
 };
 
-/**
- * @testable false
- * @covered-by src/script/elements/sectionToggle.mjs::FacetControl
- */
 const detailsLinkRow = (details) => {
 	if (!details?.name) return null;
 	const kind = details.kind || details.index || details.type || "default";
@@ -122,11 +106,6 @@ const detailsLinkRow = (details) => {
 	return row;
 };
 
-/**
- * @testable true
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_project
- * @pair tasks:select-toggle-layout
- */
 export class SectionToggle {
 	static facet(widget, element) {
 		return new FacetControl(widget, element);
@@ -235,17 +214,6 @@ export class SectionToggle {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_category_to_page
- * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_switch_page_form
- * @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
- * @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_viewer_opens_readonly_settings
- * @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_add_due_date
- * @matrix categories : default-form readonly
- * @matrix pages : form-switch readonly
- * @pairs pages:category-add task-assignment:assignee-preservation task-scheduling:due-date
- */
 class FacetControl {
 	constructor(widget, element) {
 		this.widget = widget;

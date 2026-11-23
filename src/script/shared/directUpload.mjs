@@ -8,11 +8,6 @@ const RETRYABLE_DIRECT_UPLOAD_STATUSES = new Set([
 	408, 429, 500, 502, 503, 504,
 ]);
 
-/**
- * @testable false
- * @covered-by src/script/shared/directUpload.mjs::createDirectUploadSession
- * @reason route derivation is exercised through session creation
- */
 const directUploadRoute = (route) => {
 	if (!route) return null;
 
@@ -21,11 +16,6 @@ const directUploadRoute = (route) => {
 	return `${url.pathname}${url.search}`;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_014_direct_upload_retry.mjs::test_builder_direct_upload_failure_preserves_owner_page
- * @matrix direct-upload forms : retryable-action persistent-error
- */
 const createDirectUploadSession = async ({
 	route,
 	file,
@@ -48,40 +38,20 @@ const createDirectUploadSession = async ({
 	return response;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/directUpload.mjs::uploadDirectFile
- * @reason small timing helper is exercised through the retry contract
- */
 const directUploadRetryDelay = (attempt, baseDelay) =>
 	baseDelay * 2 ** Math.max(0, attempt - 1);
 
-/**
- * @testable false
- * @covered-by src/script/shared/directUpload.mjs::uploadDirectFile
- * @reason sleep wrapper lets retry tests use a zero delay
- */
 const wait = (delayMs) =>
 	delayMs > 0
 		? new Promise((resolve) => setTimeout(resolve, delayMs))
 		: Promise.resolve();
 
-/**
- * @testable false
- * @covered-by src/script/shared/directUpload.mjs::uploadDirectFile
- * @reason GCS resumable uploads report persisted bytes through Range headers
- */
 const directUploadOffset = (response) => {
 	const range = response.headers.get("Range") || "";
 	const match = /^bytes=0-(\d+)$/i.exec(range.trim());
 	return match ? Number.parseInt(match[1], 10) + 1 : 0;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/directUpload.mjs::uploadDirectFile
- * @reason resumable upload status probing is part of retry recovery
- */
 const directUploadStatusOffset = async ({ file, sessionUrl }) => {
 	const response = await fetch(sessionUrl, {
 		method: "PUT",
@@ -100,19 +70,9 @@ const directUploadStatusOffset = async ({ file, sessionUrl }) => {
 	throw new Error(message || "Could not resume direct upload");
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/directUpload.mjs::uploadDirectFile
- * @reason retryability rules are shared by thrown fetch failures and storage 5xxs
- */
 const shouldRetryDirectUpload = (response) =>
 	RETRYABLE_DIRECT_UPLOAD_STATUSES.has(response.status);
 
-/**
- * @testable false
- * @covered-by src/script/shared/directUpload.mjs::uploadDirectFile
- * @reason recovery needs to sync the browser offset with the storage session
- */
 const resumeDirectUpload = async ({
 	file,
 	sessionUrl,
@@ -140,11 +100,6 @@ const resumeDirectUpload = async ({
 	throw lastError || new Error("Could not resume direct upload");
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/directUpload.mjs::uploadDirectFile
- * @reason browser-to-GCS chunk PUT is exercised through the retry contract
- */
 const directUploadChunk = ({ file, sessionUrl, offset, end }) =>
 	fetch(sessionUrl, {
 		method: "PUT",
@@ -155,11 +110,6 @@ const directUploadChunk = ({ file, sessionUrl, offset, end }) =>
 		body: file.slice(offset, end + 1),
 	});
 
-/**
- * @testable true
- * @tests tests_js/test_014_direct_upload_retry.mjs::test_direct_upload_resumes_after_network_reset
- * @matrix direct-upload : resumable-range retry
- */
 const uploadDirectFile = async ({
 	file,
 	sessionUrl,

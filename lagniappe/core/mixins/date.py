@@ -27,11 +27,6 @@ type UTCDate = datetime | None | list[UTCDate]
 OLD_FORMAT = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_entity.py::Modified
-# @covered-by lagniappe/core/properties/user_entity.py::LastLogin
-# @covered-by lagniappe/core/properties/form_inputs.py::DateInput
-# @covered-by lagniappe/core/properties/task_dates.py::DueDate.value
 class DateMixin(_DateHost):
     """Adds UTC datetime storage with timezone conversion.
 

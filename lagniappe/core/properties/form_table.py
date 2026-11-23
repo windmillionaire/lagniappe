@@ -23,9 +23,6 @@ class TableValue(TypedDict):
     rows: list[dict[str, object]]
 
 
-# @testable true
-# @tests tests_unit/test_003e_tables.py::test_table_ai_rejects_malformed_rows_without_losing_values
-# @matrix form-table : ai-value validation
 def validate_ai_table(
     value: object, columns: list[FieldDefinition] | None = None
 ) -> None:
@@ -42,16 +39,6 @@ def validate_ai_table(
             raise ValueError(f"Table row {index} contains unknown column ids; use the exact ids from the form schema.")
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/form_table.py::Table.value
-# @covered-by lagniappe/core/properties/form_table.py::Table.fields
-# @covered-by lagniappe/core/properties/form_table.py::Table.links
-# @covered-by lagniappe/core/properties/form_table.py::Table.validate_import
-# @covered-by lagniappe/core/properties/form_table.py::Table.validate_row_submission
-# @covered-by lagniappe/core/properties/form_table.py::Table.ai_value
-# @covered-by lagniappe/core/properties/form_table.py::Table.filter_value
-# @covered-by lagniappe/core/properties/form_table.py::Table.search_value
-# @reason table behavior is owned by row construction and projection properties
 class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty[TableValue]):
     """Inline table field with column definitions and row submissions.
 
@@ -82,11 +69,6 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty[Table
         self._import_process: ImportSettings | None = None
 
     # Property Attributes
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_form_single_row
-    # @tests tests_unit/test_003e_tables.py::test_table_form_empty
-    # @tests tests_unit/test_003e_tables.py::test_table_form_mixed_column_types
-    # @matrix form-table : db-value empty form-submission mixed-columns
     @property
     def value(self) -> TableValue:
         if self.is_set:
@@ -117,9 +99,6 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty[Table
         self._rows = []
         return self._rows
 
-    # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_table_fields
-    # @pair form-table:table-fields
     @property
     def fields(self) -> dict[str, ColumnField]:
         if self._fields is not None:
@@ -130,9 +109,6 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty[Table
         self._fields = {f.id: f for f in fields if f is not None}
         return self._fields
 
-    # @testable true
-    # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_links_internal_top_level_and_table_row
-    # @matrix form-table : internal links row-submission
     @property
     def links(self) -> list[Link]:
         return [
@@ -150,16 +126,6 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty[Table
         self._import_process = import_process
 
     # Ingress Attributes
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_import_single_row
-    # @tests tests_unit/test_003e_tables.py::test_table_import_multiple_rows
-    # @tests tests_unit/test_003e_tables.py::test_table_import_mixed_column_types
-    # @tests tests_unit/test_003e_tables.py::test_table_import_row_length_mismatch
-    # @tests tests_unit/test_003e_tables.py::test_table_validate_import_row_length_mismatch_raises_value_error
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_exact_match
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_fuzzy_match_warning
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_no_match_records_error
-    # @matrix form-table link submission : entity-resolution fuzzy-match import internal no-match validation weak-match
     def validate_import(self, rows: object) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] -- preserve the existing keyword for this table validator.
         # rows should be a list of lists, each list containing the values for a single row
         # rows should be in the same order as the column fields
@@ -183,11 +149,6 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty[Table
             self.unset()
 
     # AI Attributes
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_ai_multiple_rows
-    # @tests tests_unit/test_003e_tables.py::test_table_ai_rejects_malformed_rows_without_losing_values
-    # @matrix form-table : ai-value multiple-rows
-    # @pair form-table:validation
     def validate_ai(self, ai_submission: object) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] -- preserve the existing keyword for this table validator.
         validate_ai_table(ai_submission, self.columns)
         self.reset()
@@ -206,12 +167,6 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty[Table
         else:
             self.unset()
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_ai_multiple_rows
-    # @tests tests_unit/test_003e_tables.py::test_table_import_multiple_rows
-    # @tests tests_unit/test_015_ai_tools.py::test_get_schema_preserves_collection_rows_and_typed_cells
-    # @matrix form-table : ai-value multiple-rows
-    # @pair form-table:typed-values
     @property
     def ai_value(self) -> TableValue | None:
         rows = []
@@ -226,20 +181,12 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty[Table
             rows.append(row_dict)
         return {"rows": rows} if rows else None
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_row_submission_text_email_checkbox
-    # @tests tests_unit/test_003e_tables.py::test_table_row_submission_external_link_column
-    # @tests tests_unit/test_003e_tables.py::test_table_row_submission_internal_link_column
-    # @matrix form-table link : row-submission
     def validate_row_submission(self, values: dict[str, object]) -> dict[str, object]:
         # values are sent from the frontend as a single row submission
         # they are returned and the form is submitted with a complete "rows" list
         new_row = RowSubmission.validate_submission(self, values)
         return {field_id: f.form_value for field_id, f in new_row.fields.items()}
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_validate_submission_invalid_json
-    # @matrix form-table : form-submission validation
     def validate_submission(self, value: object) -> None:
         # values are sent from the frontend as a complete "rows" list from a json-formatted hidden input
         # the rows have already been validated, so we can just add them to the list
@@ -253,11 +200,6 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty[Table
     def sort_value(self) -> bool:
         return bool(self.value)
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_form_single_row
-    # @tests tests_unit/test_003e_tables.py::test_table_form_empty
-    # @tests tests_unit/test_003e_tables.py::test_table_form_mixed_column_types
-    # @matrix form-table : column empty mixed-columns
     @property
     def column_value(self) -> dict[str, int] | None:
         num_rows = len(self.value.get("rows", []))
@@ -266,9 +208,6 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty[Table
         return {"num_rows": num_rows}
 
     # Filter Attributes
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_import_multiple_rows
-    # @matrix form-table : filter-value multiple-rows
     @property
     def filter_value(self) -> dict[str, list[object]]:
         # returns a dict with the field ids as keys and a list of filter values for each row
@@ -293,11 +232,6 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty[Table
     def search_key(self) -> list[str | None]:
         return [key for key, _value in self._search_pairs()]
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_form_mixed_column_types
-    # @tests tests_unit/test_004e_submission_behavior.py::test_submission_search_value_merges_table_column_labels
-    # @tests tests_unit/test_004e_submission_behavior.py::test_table_search_keys_match_multiple_row_values
-    # @matrix form-table : multiple-rows search-value
     @property
     def search_value(self) -> list[object]:
         return [value for _key, value in self._search_pairs()]
@@ -314,16 +248,10 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty[Table
                     pairs.append((field.search_key, value))
         return pairs
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_form_empty
-    # @matrix form-table : empty form-submission
     @property
     def form_value(self) -> TableValue | None:
         return {"rows": [r.form_value for r in self.rows]} if self.rows else None
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_form_single_row
-    # @pair form-table:db-value
     @property
     def db_value(self) -> TableValue | None:
         rows = []

@@ -23,9 +23,6 @@ MESSAGE_BODY_LIMIT = 1000
 OPERATION_ID_LIMIT = 128
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @pair messaging:body-validation
 def normalize_body(value: object) -> str:
     if not isinstance(value, str):
         raise ValidationError("Message body is required.")
@@ -39,9 +36,6 @@ def normalize_body(value: object) -> str:
     return body
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @pair messaging:idempotency
 def normalize_operation_id(value: object) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValidationError("Message operation ID is required.")
@@ -51,17 +45,11 @@ def normalize_operation_id(value: object) -> str:
     return operation_id
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @pair messaging:deterministic-key
 def message_identity(sender: models.User | Key, operation_id: str) -> str:
     identity = f"{participant_id(sender)}\0{operation_id}"
     return hashlib.sha256(identity.encode()).hexdigest()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::send_message_record
-# @reason exact raw message construction is exercised through the transaction boundary
 def initial_values(conversation: models.MessageConversation | DatastoreEntity, actor: models.User, recipient: models.User, body: str, operation_id: str, sequence: int, now: datetime) -> dict[str, object]:
     return {
         "type": "message",
@@ -81,9 +69,6 @@ def initial_values(conversation: models.MessageConversation | DatastoreEntity, a
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::send_message_record
-# @reason replay comparison is exercised through idempotent send behavior
 def payload_matches(row: Mapping[str, object], actor: models.User, recipient: models.User, body: str, operation_id: str) -> bool:
     return bool(
         row.get("sender") == actor.key
@@ -93,9 +78,6 @@ def payload_matches(row: Mapping[str, object], actor: models.User, recipient: mo
     )
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @pair messaging:chronological-display
 def projection(row: DatastoreEntity, viewer: models.User) -> dict[str, object]:
     created = row.get("created")
     sender_id = encoded_identifier(row.get("sender"))

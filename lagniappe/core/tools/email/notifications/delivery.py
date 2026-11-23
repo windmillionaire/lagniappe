@@ -14,17 +14,11 @@ from . import dispatch, policy, presence, presentation
 from .errors import NotificationEmailError
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason direct recipient loading is internal to queued delivery
 def _load_user(row):
     user = Entities.fetch_one(row.get("recipient"), request=Fetch.direct())
     return user if isinstance(user, Entities.USER) else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason send-time opt-out enforcement is exercised through delivery
 def _valid_for_user(row, user):
     return bool(
         policy.eligible_user(user)
@@ -33,9 +27,6 @@ def _valid_for_user(row, user):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason immediate suppression and send behavior is owned by public delivery
 def _deliver_immediate(row, now):
     if row.get("due_at") and row["due_at"] > now:
         if row.get("record_type") != "message-candidate":
@@ -88,9 +79,6 @@ def _deliver_immediate(row, now):
         raise
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason digest selection and send behavior is owned by public delivery
 def _deliver_digest(batch, now):
     if batch.get("due_at") and batch["due_at"] > now:
         raise NotificationEmailError("Notification email digest is not due yet.")
@@ -132,14 +120,6 @@ def _deliver_digest(batch, now):
         raise
 
 
-# @testable true
-# @tests tests_unit/test_029b_notification_email_events.py::test_immediate_notification_is_delayed_escaped_and_delivered
-# @tests tests_unit/test_029b_notification_email_events.py::test_document_mention_email_uses_concise_copy_and_document_tab
-# @tests tests_unit/test_029b_notification_email_events.py::test_task_assignment_email_uses_task_copy_without_headers
-# @tests tests_unit/test_029c_notification_email_messages.py::test_immediate_messages_wait_for_conversation_quiet
-# @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_uses_next_local_eight_and_batches
-# @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_groups_messages_and_uses_named_completion_links
-# @matrix notification-email : clear-suppression digest document-mention hide-suppression html idempotency immediate item-cap message message-grouping opt-out-suppression presence-suppression read-suppression reply-suppression retry-release task-assignment
 def deliver(delivery_identifier: str, *, now: datetime | None = None) -> Mapping[str, object]:
     """Deliver, suppress, or reschedule one opaque queued delivery."""
     now = policy.utc(now)

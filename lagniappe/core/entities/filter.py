@@ -25,8 +25,6 @@ if TYPE_CHECKING:
     from .project import Project
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/filter.py::Filter.conditions
 class Filter(Entity):
     if TYPE_CHECKING:
         parent: Category | Project | None
@@ -55,9 +53,6 @@ class Filter(Entity):
     def is_filter(self) -> bool:
         return True
 
-    # @testable true
-    # @tests tests_unit/test_011_filters.py::test_filter_fingerprint_uses_loaded_parent_fingerprint
-    # @matrix filter : fingerprint parent
     @property
     def fingerprint(self) -> str:
         fingerprint = super().fingerprint
@@ -115,21 +110,11 @@ class Filter(Entity):
 
         return self._filter_parent.allowed(action, user=user)
 
-    # @testable true
-    # @tests tests_unit/test_011_filters.py::test_filter_related_entities_allowed_checks_referenced_entities
-    # @tests tests_unit/test_011_filters.py::test_filter_related_entities_allowed_keeps_model_and_form_access_separate
-    # @matrix filter permissions : model-task related-entities restricted-access saved-filters
     def related_entities_allowed(self, user: FieldUser = None) -> bool:
         user = current_context_user(user)
         related = Entities.fetch(*self.related, request=Fetch.direct())
         return all(e.allowed(Action.VIEW, user=user) for e in related)
 
-    # @testable true
-    # @tests tests_unit/test_011_filters.py::test_filter_conditions_string
-    # @tests tests_unit/test_011_filters.py::test_filter_conditions_boolean
-    # @tests tests_unit/test_011_filters.py::test_filter_conditions_entity_valued
-    # @tests tests_unit/test_011_filters.py::test_filter_conditions_multiple_types
-    # @matrix filter : boolean conditions entity-valued mixed-types string
     @property
     def conditions(self) -> list[Condition]:
         if cached := getattr(self, "_conditions", None):
@@ -171,9 +156,6 @@ class Filter(Entity):
             [definition.description for definition in definitions]
         )
 
-    # @testable true
-    # @tests tests_unit/test_011c_filter_contract.py::test_saved_filter_compiles_legacy_data_per_viewer
-    # @matrix filters permissions : authorization legacy saved-filter validation
     def compile(self, user: FieldUser = None) -> CompiledFilter:
         """Validate saved data for the current viewer before it can be queried."""
         from ..tools.filters.contract import compile_saved_filter

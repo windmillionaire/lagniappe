@@ -10,12 +10,10 @@ import threading
 from runner.test_session import inspect_process_identity
 
 
-# @testable infrastructure
 def context():
     return json.loads(Path(os.environ["LAGNIAPPE_E2E_WORKER_CONTEXT"]).read_text(encoding="utf-8"))
 
 
-# @testable infrastructure
 def assert_owner(record):
     from lagniappe.core.tools.hosted_e2e.lease import e2e_lease_active
 
@@ -23,11 +21,6 @@ def assert_owner(record):
         raise RuntimeError("E2E worker coordinator or lease is no longer active")
 
 
-# @testable true
-# @tests tests_unit/test_030_hosted_e2e.py::test_worker_inherits_run_cookie_without_replaying_bootstrap
-# @tests tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task
-# @matrix hosted-e2e : authentication cookie
-# @matrix testing : parallel-e2e
 @contextmanager
 def worker_runtime():
     from lagniappe import CONFIG
@@ -75,9 +68,6 @@ def worker_runtime():
         watcher.join(timeout=2)
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_worker_progress_counts_cases_without_double_counting_phases
-# @matrix testing : parallel-e2e
 def write_progress(outcomes, nodeid):
     record = context()
     counts = {state: sum(row["outcome"] == state for row in outcomes.values())
@@ -89,7 +79,6 @@ def write_progress(outcomes, nodeid):
     temporary.replace(path)
 
 
-# @testable infrastructure
 def write_results(session, outcomes, exitstatus):
     record = context()
     selected = [item.nodeid for item in session.items]

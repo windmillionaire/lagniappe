@@ -20,9 +20,6 @@ from lagniappe.core.tools.database.utility import ExactEntityState
 from .entity_updates import _fingerprint
 
 
-# @testable true
-# @tests tests_unit/test_032g_entity_patches.py::test_correction_snapshot_and_approval_reject_changed_source
-# @matrix ai-report : correction ownership supersession
 def link_correction(
     report: models.AIReport, source: models.AIReport, user: models.User
 ) -> models.AIReport:
@@ -36,9 +33,6 @@ def link_correction(
     return report
 
 
-# @testable true
-# @tests tests_unit/test_032g_entity_patches.py::test_correction_snapshot_and_approval_reject_changed_source
-# @matrix ai-report : correction ownership supersession
 def approve_correction(report: models.AIReport, user: models.User) -> None:
     """Atomically fence source retries when the browser approves a correction."""
     correction = report.db.get("correction")
@@ -57,10 +51,6 @@ def approve_correction(report: models.AIReport, user: models.User) -> None:
     Entities.save(source, report)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/corrections.py::link_correction
-# @covered-by lagniappe/core/tools/ai/reporting/corrections.py::approve_correction
-# @reason correction creation and approval enforce the same stopped creator-owned source
 def _check_source(source, user):
     if not isinstance(source, Entities.REPORT) or not source.available or source.properties.user.key != user.key:
         raise ValidationError("Choose an available plan that you created.")
@@ -73,9 +63,6 @@ def _check_source(source, user):
         raise ValidationError("Finish or recover the active Form migration before correcting this plan.")
     if any(record.get("status") == "applying" or (record.get("status") == "failed" and record.get("expected")) for record in cast(list[dict[str, object]], source.result.get("actions", []))):
         raise ValidationError("Reconcile the interrupted execution with Retry before creating a correction.")
-# @testable true
-# @tests tests_unit/test_032g_entity_patches.py::test_corrections_share_evidence_across_origins_and_fence_source_retries
-# @matrix ai-report : correction ownership supersession
 def save_correction(report: models.AIReport, source: models.AIReport) -> None:
     guards = [(source.key, ExactEntityState(deepcopy(dict(source.db))))]
     children = source.db.get("correction_children", [])
@@ -92,9 +79,6 @@ def save_correction(report: models.AIReport, source: models.AIReport) -> None:
     Entities.save(source, report, *report.input_files)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/corrections.py::link_correction
-# @reason correction snapshots must exclude nested answer and execution content from indexes
 def _unindexed_snapshot(value):
     """Exclude every embedded snapshot property, including long answer HTML."""
     if isinstance(value, dict):

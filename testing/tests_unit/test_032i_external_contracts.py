@@ -13,7 +13,6 @@ from lagniappe.core.tools.ai.reporting.uploads import (
 )
 
 
-# @pair agent-api:contract
 def test_openapi_publishes_runtime_defaults_limits_and_independent_documents():
     document = build_openapi_document(app_name="Example", server_url="https://example.test")
     assert document["info"]["title"] == "Example External Agent API"
@@ -51,7 +50,6 @@ def test_openapi_publishes_runtime_defaults_limits_and_independent_documents():
     assert build_openapi_document(app_name="Example", server_url="https://example.test") == original
 
 
-# @matrix agent-api : checkpoint concurrency
 @pytest.mark.parametrize("failure,reason,disposition", [
     ("prepare", None, CHECKPOINT_NOT_COMMITTED),
     ("transaction", None, CHECKPOINT_AMBIGUOUS),
@@ -93,7 +91,6 @@ def test_claimed_save_preserves_definite_and_ambiguous_checkpoint_failures(monke
         assert caught.value.reason == reason
 
 
-# @matrix agent-api : checkpoint concurrency
 def test_claimed_save_advances_snapshot_and_isolates_post_commit_failure(monkeypatch):
     report = SimpleNamespace(key="report", db={"revision": 1})
     actor = object()

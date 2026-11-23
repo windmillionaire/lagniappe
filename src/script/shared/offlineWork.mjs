@@ -3,9 +3,6 @@
  * startup closure. Database enumeration avoids opening or creating storage for
  * users who have never used offline behavior.
  *
- * @testable false
- * @covered-by src/script/views/base/services.mjs::initializeCoreServices
- * @reason lazy capability probe controls manager loading without changing queue semantics
  */
 export const inspectOfflineWork = async (view) => {
 	const fallback = {

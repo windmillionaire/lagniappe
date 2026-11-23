@@ -2,9 +2,6 @@ import { Extension } from "@tiptap/core";
 
 const TRACKED_RANGE_META = "trackedRanges";
 
-// @testable false
-// @covered-by src/script/elements/editor/extensions/trackedRanges.mjs::TrackedRanges
-// @reason validation and clamping are exercised through tracked range mapping
 const normalizedRange = (range, docEnd) => {
 	if (!range) return null;
 	const from = Math.max(0, Math.min(Number(range.from), docEnd));
@@ -15,9 +12,6 @@ const normalizedRange = (range, docEnd) => {
 	return { from, to };
 };
 
-// @testable false
-// @covered-by src/script/elements/editor/extensions/trackedRanges.mjs::TrackedRanges
-// @reason transaction metadata composition is exercised through tracked ranges
 const addOperation = (transaction, operation) => {
 	const meta = transaction.getMeta(TRACKED_RANGE_META) || { operations: [] };
 	transaction.setMeta(TRACKED_RANGE_META, {
@@ -29,9 +23,6 @@ const addOperation = (transaction, operation) => {
 /**
  * Associate a named range with the document produced by a transaction.
  *
- * @testable true
- * @tests tests_js/test_041_editor_decorations.mjs::test_named_tracked_ranges_map_independently
- * @matrix editor : inserted-range range-mapping
  */
 export const setTrackedRangeInTransaction = (transaction, key, range) =>
 	addOperation(transaction, { type: "set", key, range });
@@ -40,9 +31,6 @@ export const setTrackedRangeInTransaction = (transaction, key, range) =>
  * Keep independently named document ranges current across local, remote, and
  * appended ProseMirror transactions.
  *
- * @testable true
- * @tests tests_js/test_041_editor_decorations.mjs::test_named_tracked_ranges_map_independently
- * @matrix ai editor markdown : inserted-range range-mapping
  */
 export const TrackedRanges = Extension.create({
 	name: "trackedRanges",

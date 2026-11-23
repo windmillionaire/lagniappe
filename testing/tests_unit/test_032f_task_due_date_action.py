@@ -3,7 +3,6 @@ import pytest
 from lagniappe.core import exceptions
 from lagniappe.core.tools.ai.reporting.schedules import validate_task_due_date
 
-# @matrix ai-report task-scheduling : due-date validation
 @pytest.mark.unit
 @pytest.mark.parametrize("value,valid", [
     (None, True), ("2026-09-12", True), ("2028-02-29", True),

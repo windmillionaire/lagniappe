@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 from ..contracts import ProposalActionDisplay, ProposalActionGrouping
 
 
-# @testable infrastructure
 def create_form_details(
     details: ProposalDetailCollector,
     data: ActionData,
@@ -21,8 +20,6 @@ def create_form_details(
     details.add("Form Type", data.get("form_type") or data.get("form-type"))
 
 
-# @testable true
-# @matrix ai-report form-schema : details proposal
 def schema_details(
     details: ProposalDetailCollector,
     data: ActionData,

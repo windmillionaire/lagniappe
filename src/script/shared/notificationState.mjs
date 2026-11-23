@@ -8,9 +8,6 @@ let invalidStateReported = false;
  * Publish the notification badge's count, visibility, and accessible state as
  * one DOM commit.
  *
- * @testable true
- * @tests tests_js/test_036_notification_state.mjs::test_notification_state_updates_badge_and_reports_cache_miss
- * @matrix notifications : accessible-state badge
  */
 export const renderNotificationBadge = (count) => {
 	const normalized = Number.isInteger(Number(count)) ? Number(count) : 0;
@@ -29,11 +26,6 @@ export const renderNotificationBadge = (count) => {
 	return normalized;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/notificationState.mjs::applyNotificationState
- * @reason input normalization is exercised through the public state publisher
- */
 const _normalized = (raw) => {
 	if (typeof raw === "string") {
 		try {
@@ -67,9 +59,6 @@ const _normalized = (raw) => {
 /**
  * Publish compact notification state before the lazy menu module is loaded.
  *
- * @testable true
- * @tests tests_js/test_036_notification_state.mjs::test_notification_state_updates_badge_and_reports_cache_miss
- * @matrix notifications : badge cold-seed redis-projection
  */
 export const applyNotificationState = (raw) => {
 	const state = _normalized(raw);
@@ -98,11 +87,6 @@ export const applyNotificationState = (raw) => {
 	return state;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_036_notification_state.mjs::test_notification_state_updates_badge_and_reports_cache_miss
- * @pair notifications:response-header
- */
 export const applyNotificationStateHeader = (headers) => {
 	const raw = headers?.get?.(NOTIFICATION_STATE_HEADER);
 	return raw ? applyNotificationState(raw) : null;

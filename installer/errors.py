@@ -13,9 +13,6 @@ NPM_TIMEOUT = 900
 PLAYWRIGHT_TIMEOUT = 1200
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
-# @matrix setup : errors exit-status
 class SetupError(RuntimeError):
     """Base failure mapped to a nonzero process status by ``python -m installer``."""
 
@@ -42,9 +39,6 @@ class ProviderError(SetupError):
     category = "provider"
 
 
-# @testable false
-# @covered-by installer/errors.py::google_service_terms_error
-# @reason typed provider detail container is exercised through terms-error normalization
 class ProviderTermsNotAccepted(ProviderError):
     category = "terms-not-accepted"
 
@@ -92,10 +86,6 @@ _GOOGLE_SERVICE_TERMS_NAMES = {
 }
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_guides_maps_terms_then_retries_activation
-# @matrix setup : error-guidance google-service-terms identity provider-errors
 def google_service_terms_error(
     detail: object, *, account: str | None = None
 ) -> ProviderTermsNotAccepted | None:
@@ -134,9 +124,6 @@ def google_service_terms_error(
     )
 
 
-# @testable false
-# @covered-by installer/errors.py::classify_provider_error
-# @reason provider status adapter exercised through public classification
 def _status_code(error: object) -> int | None:
     status = getattr(error, "status_code", None)
     if status is None:
@@ -152,9 +139,6 @@ def _status_code(error: object) -> int | None:
         return None
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
-# @matrix setup : classification provider-errors
 def classify_provider_error(
     error: object,
     *,
@@ -219,9 +203,6 @@ def classify_provider_error(
     return ProviderError(detail)
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
-# @matrix setup : provider-errors retry timeout
 def retry_provider_call[T](
     operation: Callable[[], T],
     *,

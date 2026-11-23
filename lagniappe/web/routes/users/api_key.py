@@ -20,9 +20,6 @@ from lagniappe.web.auth import authenticated_user, logged_in
 from . import users
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/users/api_key.py::api_key
-# @reason user eligibility is owned by the public key-management route
 def _enabled_actor():
     if (
         not CONFIG.AI_ENABLED
@@ -34,9 +31,6 @@ def _enabled_actor():
     return authenticated_user()
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/users/api_key.py::api_key
-# @reason shared rate-limiter plumbing is owned by the key-management route
 def _rotation_limit(actor):
     try:
         state = check_limit(
@@ -64,10 +58,6 @@ def _rotation_limit(actor):
     return None
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_user_can_rotate_and_revoke_external_agent_api_key
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_without_provider_access_can_manage_external_agent_api_key
-# @matrix agent-api user-settings : entitlement-independent expiry revoke rotate shown-once
 @users.route("/me/api-key", methods=["GET", "POST", "DELETE"])
 @logged_in
 def api_key() -> ResponseReturnValue:

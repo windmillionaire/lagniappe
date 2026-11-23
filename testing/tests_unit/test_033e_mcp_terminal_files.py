@@ -26,7 +26,6 @@ def _manifest():
     }
 
 
-# @matrix mcp-upload : terminal validation token-separation
 def test_manifest_allows_only_validated_storage_writes_and_never_oauth_secrets():
     manifest = _manifest()
     assert (
@@ -54,7 +53,6 @@ def test_manifest_allows_only_validated_storage_writes_and_never_oauth_secrets()
             terminal_files.validate_manifest(value, bearer="oauth-secret")
 
 
-# @matrix mcp-upload : terminal finalize-once upload-batch-identity
 @pytest.mark.parametrize(
     "raw",
     [

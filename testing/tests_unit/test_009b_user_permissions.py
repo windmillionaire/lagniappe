@@ -55,7 +55,6 @@ def test_resource_only_permission_checks_the_resource_for_keyed_requests(monkeyp
                 handler(key="example")
 
 
-# @matrix permissions : action-lattice admin aliases anonymous default-deny resource-gates
 @pytest.mark.unit
 def test_resource_allowed_direct_contract():
     """Direct contract for permission action ordering and resource gates."""
@@ -101,8 +100,6 @@ def test_resource_allowed_direct_contract():
     assert not Resource.USERS.allowed(Action.VIEW, missing)
 
 
-# @matrix permissions : empty-permissions fingerprint stored-permissions
-# @pair cache:role
 @pytest.mark.unit
 def test_user_permissions_fingerprint_tracks_permissions_and_owner_state():
     viewer = TestEntities.get(
@@ -140,7 +137,6 @@ def test_user_permissions_fingerprint_tracks_permissions_and_owner_state():
     assert admin.authorization_fingerprint != ordinary_authorization
 
 
-# @matrix permissions cache : authorization-fingerprint group-membership
 @pytest.mark.unit
 def test_authorization_fingerprint_tracks_group_membership():
     user = TestEntities.get("USER", {"hash": "membershipviewer", "permissions": {"models": "VIEW"}})
@@ -154,8 +150,6 @@ def test_authorization_fingerprint_tracks_group_membership():
     assert user.permissions_fingerprint == permissions
 
 
-# @matrix admin : delete edit page privileged-account view personal-page
-# @pair owner:owner-only
 @pytest.mark.unit
 def test_privileged_user_rows_are_owner_managed():
     """Only the primary Owner can mutate an Owner or additional Admin account."""
@@ -193,7 +187,6 @@ def test_privileged_user_rows_are_owner_managed():
     assert not other_admin.allowed(Action.DELETE, other_admin)
 
 
-# @matrix permissions : global-resources owner resource-gates
 @pytest.mark.unit
 def test_global_resources(get_permissions_test_data):
     """Test has_permission() with Resource enums (global resource access).
@@ -219,7 +212,6 @@ def test_global_resources(get_permissions_test_data):
             )
 
 
-# @matrix permissions : entity-resources requires
 @pytest.mark.unit
 def test_entity_permissions(get_permissions_test_data):
     """Test has_permission() with Entity instances (requires chain).
@@ -240,7 +232,6 @@ def test_entity_permissions(get_permissions_test_data):
             )
 
 
-# @matrix users : group-view owner restriction-independence users-view
 @pytest.mark.unit
 def test_user_visibility_uses_users_and_group_permissions_without_page_restrictions():
     """A user row is governed by Users/group permissions, not its page or form."""
@@ -299,7 +290,6 @@ def test_user_visibility_uses_users_and_group_permissions_without_page_restricti
     )
 
 
-# @matrix category permissions users : models-scope users-category
 @pytest.mark.unit
 def test_users_category_uses_users_scope_not_models_scope():
     """Generic Models permission must not grant access to the reserved Users category."""
@@ -345,7 +335,6 @@ def test_users_category_uses_users_scope_not_models_scope():
     assert viewer.has_permission(users_category, Action.VIEW) is False
 
 
-# @matrix permissions users : models-scope user-page users-scope
 @pytest.mark.unit
 def test_user_page_permissions_follow_users_only_or_attached_categories():
     """Users-only pages use Users access; categorized user pages use model/category access."""
@@ -404,7 +393,6 @@ def test_user_page_permissions_follow_users_only_or_attached_categories():
     assert category_viewer.has_permission(categorized_user_page, Action.VIEW) is True
 
 
-# @matrix permissions user-groups : combine-groups highest-permission restricted
 @pytest.mark.unit
 def test_combine_groups(get_permissions_test_data):
     """Test that combine_group_permissions takes the highest permission level.

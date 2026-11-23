@@ -168,7 +168,6 @@ def test_uv_bootstrap_path_guard_recognizes_imports_not_unrelated_attributes(
     assert bool(_bootstrap_path_lookup_lines(ast.parse(source))) is prohibited
 
 
-# @matrix mcp-package setup : bootstrap manifest managed-path platform-pin url-policy version-pin
 def test_uv_bootstrap_manifest_and_managed_context_path():
     from runner import context, uv_bootstrap
 
@@ -221,7 +220,6 @@ def test_uv_bootstrap_manifest_and_managed_context_path():
     assert "uv" not in context.TOOL_PATHS
 
 
-# @matrix mcp-package setup : bootstrap macos platform-pin portability
 def test_uv_bootstrap_manifest_preserves_supported_macos_development_hosts():
     from runner import uv_bootstrap
 
@@ -310,7 +308,6 @@ def test_mcp_containers_isolate_production_source_and_test_dependencies():
 
 
 
-# @matrix mcp-package setup : bootstrap manifest url-policy validation
 def test_uv_bootstrap_rejects_malformed_manifest(tmp_path):
     from runner.uv_bootstrap import UvBootstrapError, load_manifest
 
@@ -337,7 +334,6 @@ def test_uv_bootstrap_rejects_malformed_manifest(tmp_path):
         load_manifest(manifest_path)
 
 
-# @matrix mcp-package setup : bootstrap platform-selection portability wsl
 def test_uv_bootstrap_rejects_unsupported_host():
     from runner.uv_bootstrap import UvBootstrapError, load_manifest, select_artifact
 
@@ -358,7 +354,6 @@ def test_uv_bootstrap_rejects_unsupported_host():
         )
 
 
-# @matrix mcp-package setup : atomic-install bootstrap diagnostics digest executable-permissions idempotence repair tar-safety version-verification
 def test_uv_bootstrap_installs_idempotently_and_repairs_corrupt_copy(tmp_path):
     from runner.uv_bootstrap import check_uv, install_uv
 
@@ -397,7 +392,6 @@ def test_uv_bootstrap_installs_idempotently_and_repairs_corrupt_copy(tmp_path):
     assert len(opener.requests) == 2
 
 
-# @matrix mcp-package setup : bootstrap diagnostics executable-digest executable-permissions version-verification
 def test_uv_bootstrap_check_rejects_wrong_version_and_permissions(tmp_path):
     from runner.uv_bootstrap import UvBootstrapError, check_uv, install_uv
 
@@ -472,7 +466,6 @@ def test_uv_bootstrap_check_rejects_wrong_version_and_permissions(tmp_path):
         )
 
 
-# @matrix mcp-package setup : atomic-install bootstrap tar-safety url-policy
 @pytest.mark.parametrize(
     "unsafe_member",
     [
@@ -566,7 +559,6 @@ def test_uv_bootstrap_rejects_unsafe_or_untrusted_archives_without_replacing(
     assert executable.read_bytes() == original
 
 
-# @matrix mcp-package setup : atomic-install bootstrap digest download-bounds repair
 @pytest.mark.parametrize(
     "failure",
     ["digest", "member-digest", "truncated", "oversized", "replace"],
@@ -643,7 +635,6 @@ def test_uv_bootstrap_preserves_existing_copy_on_download_or_replace_failure(
     assert executable.read_bytes() == original
 
 
-# @matrix mcp-package setup : bootstrap fail-closed managed-path tar-safety
 def test_uv_bootstrap_rejects_unsafe_destination(tmp_path):
     from runner.uv_bootstrap import UvBootstrapError, install_uv
 
@@ -670,7 +661,6 @@ def test_uv_bootstrap_rejects_unsafe_destination(tmp_path):
     assert opener.requests == []
 
 
-# @matrix mcp-package setup : bootstrap cli diagnostics non-interactive
 def test_uv_bootstrap_cli_is_noninteractive_and_actionable(monkeypatch, capsys):
     from runner import uv_bootstrap
 
@@ -778,8 +768,6 @@ def _mcp_environment_runner(
     return run
 
 
-# @matrix mcp-package : bootstrap environment-sync fail-closed interpreter isolation locked-dependencies managed-path version-verification
-# @matrix testing : environment-sync fail-closed interpreter isolation locked-dependencies
 def test_mcp_environment_uses_managed_uv_lock_and_isolated_python(
     monkeypatch,
     tmp_path,
@@ -842,7 +830,6 @@ def test_mcp_environment_uses_managed_uv_lock_and_isolated_python(
     assert events[1][0][:2] == [str(python), "-I"]
 
 
-# @matrix hosted-e2e mcp-package testing : environment-check isolation
 def test_mcp_environment_checks_prebuilt_environment_without_uv(
     monkeypatch,
     tmp_path,
@@ -879,7 +866,6 @@ def test_mcp_environment_checks_prebuilt_environment_without_uv(
     assert events[0][0][:2] == [str(python), "-I"]
 
 
-# @matrix mcp-package : bootstrap fail-closed managed-path repair-guidance
 def test_mcp_environment_rejects_unmanaged_uv_with_repair_command(
     monkeypatch,
     tmp_path,
@@ -912,7 +898,6 @@ def test_mcp_environment_rejects_unmanaged_uv_with_repair_command(
         mcp_environment.verify_managed_uv()
 
 
-# @matrix mcp-package testing : environment-sync fail-closed locked-dependencies repair-guidance
 def test_mcp_environment_sync_failure_is_actionable(monkeypatch, tmp_path):
     mcp_environment, project, environment, python = _configure_mcp_environment(
         monkeypatch,
@@ -932,8 +917,6 @@ def test_mcp_environment_sync_failure_is_actionable(monkeypatch, tmp_path):
         mcp_environment.sync_environment(run=runner)
 
 
-# @matrix mcp-package : command-bridge environment-sync isolation pytest-config
-# @matrix testing : command-bridge environment-sync isolation pytest-config
 def test_mcp_environment_builds_isolated_adapter_and_pytest_commands(
     monkeypatch,
     tmp_path,
@@ -962,8 +945,6 @@ def test_mcp_environment_builds_isolated_adapter_and_pytest_commands(
     ]
 
 
-# @matrix mcp-package testing : command-bridge isolation
-# @matrix mcp-package testing traceability : result-aggregation test-evidence
 def test_mcp_environment_builds_result_transport_command(monkeypatch, tmp_path):
     mcp_environment, project, environment, python = _configure_mcp_environment(
         monkeypatch,

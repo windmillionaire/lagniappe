@@ -30,7 +30,6 @@ def _is_keyed_entity(identifier: Identifier) -> TypeGuard[Entity | DatastoreEnti
     return hasattr(identifier, "key")
 
 
-# @testable infrastructure
 class EntityRegistry:
     """Global type registry and public entity persistence facade."""
 
@@ -93,11 +92,6 @@ class EntityRegistry:
         factory = cast("type[Entity]", self._types[entity_type.upper()].value)
         return factory(entity)
 
-    # @testable true
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_preserves_explicit_root_over_shallow_attached_copy
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_reuses_cached_attached_relations
-    # @matrix entities relations : attached-cache load no-extra-read
-    # @pairs entities:explicit-fetch-depth relations:root-precedence
     def _load(
         self, *identifiers: Identifier, related: bool = True,
         _fetch: Fetch | None = None, _fetch_stage: str | None = None,
@@ -190,17 +184,6 @@ class EntityRegistry:
         )
         return list(primary_entities.values())
 
-    # @testable true
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_applies_total_depth_to_key_and_typed_entity
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_batches_unresolved_roots_once
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_deduplicates_mixed_roots_and_skips_missing
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_attaches_survivors_from_fully_resolved_relation
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_root_does_not_attach_cross_root_relations
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_root_reuses_typed_entity_without_database_fetch
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_reuses_attached_direct_relations
-    # @matrix entities : batch explicit-fetch-depth
-    # @matrix relations : direct nested root
-    # @pairs entities:fetch entities:no-extra-read entities:typed-entity relations:stale-key
     @timed("entity", "fetch")
     def fetch(self, *identifiers: Identifier, request: Fetch) -> list[Entity]:
         """Load unique roots in caller order, then expand to the requested depth.
@@ -247,17 +230,10 @@ class EntityRegistry:
         self, identifier: DatastoreEntity | Key | str | None, *, request: Fetch
     ) -> Entity | None: ...
 
-    # @testable true
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_one_returns_entity_or_none
-    # @pairs entities:explicit-fetch-depth relations:root
     def fetch_one(self, identifier: Identifier, *, request: Fetch) -> Entity | None:
         fetched = self.fetch(identifier, request=request)
         return fetched[0] if fetched else None
 
-    # @testable true
-    # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
-    # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_project_cascades_models_forms_filters_and_cache
-    # @matrix entities : assets cache cascade database delete forms
     def delete(self, *entities: Entity, preserve_user_pages: bool = False) -> MutationOutcome:
         return execute_mutation(
             plan_delete(
@@ -267,9 +243,6 @@ class EntityRegistry:
             )
         )
 
-    # @testable true
-    # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_save_persists_relations_process_payloads_and_cache
-    # @matrix entities : cache database dependent-owner process-state save
     def save(self, *entities: Entity) -> MutationOutcome:
         outcome = execute_mutation(
             plan_mutation(MutationOperation.SAVE, *entities, registry=self)
@@ -282,20 +255,12 @@ class EntityRegistry:
             raise ValidationError("Saved, but permission/cache updates failed. Retry saving.")
         return outcome
 
-    # @testable true
-    # @tests tests_unit/test_022_mutation_contracts.py::test_save_root_persists_full_exclusions_without_lifecycle_intents_or_cache
-    # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_masked_timezone_save_preserves_newer_user_state
-    # @matrix mutations : cache-isolation direct-save exclusions intent-isolation lifecycle-isolation root-save
-    # @matrix cache session timezone : concurrent-permissions property-mask
     def save_root(
         self, entity: Entity, *, property_mask: Iterable[str] | None = None
     ) -> MutationOutcome:
         """Persist one root, optionally updating only selected properties."""
         return execute_mutation(plan_root(entity, property_mask=property_mask))
 
-    # @testable true
-    # @tests tests_unit/test_022_mutation_contracts.py::test_touch_uses_masked_root_save_and_only_updates_modified
-    # @matrix mutations : exclusions modified property-mask root-save touch
     def touch(self, *entities: Entity) -> MutationOutcome:
         entities = tuple(entity for entity in entities if hasattr(entity, "db"))
         return execute_mutation(
@@ -306,9 +271,6 @@ class EntityRegistry:
             )
         )
 
-    # @testable true
-    # @tests tests_unit/test_022_mutation_contracts.py::test_document_checkpoint_masks_parent_state_and_optionally_advances_lists
-    # @matrix mutations sync : checkpoint document history parent-fingerprint property-mask
     def save_document_checkpoint(
         self, entity: Entity, *, advance_parent: bool = False,
         expected_state: Mapping[str, object] | None = None,
@@ -323,9 +285,6 @@ class EntityRegistry:
                 raise ValueError("A guarded document checkpoint needs a persisted key.")
         return execute_mutation(plan)
 
-    # @testable true
-    # @tests tests_unit/test_022_mutation_contracts.py::test_document_parent_touch_only_advances_parent_and_list_fingerprints
-    # @matrix mutations sync : document list-owner parent-fingerprint property-mask
     def advance_document_parent(self, entity: Entity) -> MutationOutcome:
         """Advance document ownership metadata through masked writes."""
         return execute_mutation(
@@ -335,8 +294,5 @@ class EntityRegistry:
 Entities = EntityRegistry()
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_initialized
-# @pair entities:initialization
 def initialize() -> None:
     Entities.initialize()

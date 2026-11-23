@@ -2,9 +2,6 @@ from collections.abc import Sequence
 
 from .field_host import FieldHost
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/form_inputs.py::TextInput
-# @covered-by lagniappe/core/properties/form_textarea.py::Textarea
 class SearchMixin(FieldHost):
     """Adds full-text search content. Indexed for text search.
 

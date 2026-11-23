@@ -7,9 +7,6 @@ from runner.console import format_prompt, wrap_text
 from .verify import prepare_existing_installation
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_security_cli_configures_and_optionally_deploys_redis_tls
-# @matrix setup : cli deploy redis-tls
 def configure_security() -> int:
     """Configure optional Redis transport security for an installation."""
     prepare_existing_installation()

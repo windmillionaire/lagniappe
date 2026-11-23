@@ -1,11 +1,6 @@
 import { EmbeddedTable } from "../elements/base/baseTable.mjs";
 import { STYLES } from "../generated/styles.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_results_expands_table_submission_cell
- * @matrix embedded-table : horizontal-scroll run-results table-cell-expand
- */
 export class FilterResults extends EmbeddedTable {
 	constructor(attributes) {
 		super(attributes);
@@ -37,12 +32,6 @@ export class FilterResults extends EmbeddedTable {
 		return this.tbody.querySelector("tr[data-role='empty']");
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
-	 * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name
-	 * @matrix filters : run-results results-layout
-	 */
 	postreconcile() {
 		if (!this.table || this.target.contains(this.table)) return;
 

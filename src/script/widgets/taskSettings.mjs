@@ -13,9 +13,6 @@ const TASK_BUTTONS = {
 	uploadFile: "upload",
 };
 
-/**
- * @testable infrastructure
- */
 export class BaseTaskSettings extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
@@ -24,14 +21,6 @@ export class BaseTaskSettings extends FormWidget {
 		this._formUpdatedListener = this._formUpdatedListener.bind(this);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_model_task
-	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_model_task_replaces_form_on_reopened_create_draft
-	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_model_task_selection_replaces_form_and_preserves_later_manual_choice
-	 * @matrix tasks : attach-form create model-task-link
-	 * @matrix tasks : retained-draft manual-form-choice
-	 */
 	_formUpdatedListener(e) {
 		const project = e.detail.options
 			? Object.values(e.detail.options)[0]
@@ -83,11 +72,6 @@ export class BaseTaskSettings extends FormWidget {
 		await this._initActions();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_task_settings_awaits_action_controls_and_cleans_up
-	 * @matrix tasks : action-control-lifecycle teardown
-	 */
 	async _initActions() {
 		const actions = this.actions;
 		if (!actions) return;
@@ -179,11 +163,6 @@ export class BaseTaskSettings extends FormWidget {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_update_page_task_settings_from_row
- * @matrix tasks : settings-form update
- */
 export class TaskSettings extends BaseTaskSettings {
 	constructor(attributes) {
 		super(attributes);
@@ -195,11 +174,6 @@ export class TaskSettings extends BaseTaskSettings {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_can_move_to_another_page
- * @matrix tasks : completed move title-menu
- */
 export class TaskMove extends BaseTaskSettings {
 	constructor(attributes) {
 		super(attributes);
@@ -215,12 +189,6 @@ export class TaskMove extends BaseTaskSettings {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
- * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
- * @matrix task-combine : checkbox-submit delta lazy-form
- */
 export class TaskCombine extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
@@ -232,13 +200,6 @@ export class TaskCombine extends FormWidget {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_create_task_form
- * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_create_personal_task_due_today
- * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_create_personal_task_due_in_four_days
- * @matrix tasks : create-form create-personal due-date
- */
 export class CreateUserTask extends BaseTaskSettings {
 	constructor(attributes) {
 		super(attributes);
@@ -273,12 +234,6 @@ export class CreateUserTask extends BaseTaskSettings {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_while_another_task_is_open_keeps_rows_clear
- * @matrix tasks : basic create list-state while-open
- */
 export class CreateTask extends BaseTaskSettings {
 	constructor(attributes) {
 		super(attributes);

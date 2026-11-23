@@ -3,9 +3,6 @@ import { withTransition } from "../../shared/transitions.mjs";
 import { debounce } from "../../shared/utilities.mjs";
 import Core from "./core.mjs";
 
-/**
- * @testable infrastructure
- */
 export default class Entity extends Core {
 	constructor(node) {
 		super(node);
@@ -38,11 +35,6 @@ export default class Entity extends Core {
 		return null;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_page_url_tab_overrides_saved_tab
-	 * @matrix entity-layout : persistence query-tab
-	 */
 	_initialTabId() {
 		return (
 			this.querySlug(this.queryParam("tab")) ||
@@ -50,11 +42,6 @@ export default class Entity extends Core {
 		);
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity._prerender
-	 * @reason tab lookup is part of pre-render validation
-	 */
 	_tabElement(tabId) {
 		if (!tabId) return null;
 		return (
@@ -64,13 +51,6 @@ export default class Entity extends Core {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_resize_from_mobile_filters_to_desktop_preserves_selected_tab
-	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_selected_section_persists_after_reload
-	 * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_selection_persists_after_reload
-	 * @matrix entity-layout : page-mobile persistence project-mobile reload resize
-	 */
 	_tabChange(event) {
 		const { subcomponent } = event.detail;
 		if (subcomponent.elt.dataset.tab !== "true") return;
@@ -78,14 +58,6 @@ export default class Entity extends Core {
 		localStorage.setItem(`${this.hash}-active`, subcomponent.name);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_nav_visibility_changes_with_viewport
-	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_flipper_reveals_section_toggles
-	 * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_nav_replaces_desktop_tabs
-	 * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_flipper_reveals_sections
-	 * @matrix entity-layout : flipper nav page-mobile project-mobile visibility
-	 */
 	get mobileNav() {
 		if (!this._mobileNav) {
 			const tabs = this.getComponent(this.tabsCard);
@@ -95,11 +67,6 @@ export default class Entity extends Core {
 		return this._mobileNav;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity.updateLayout
-	 * @reason component lookup normalization supports the public layout updater
-	 */
 	_componentElement(component) {
 		if (!component) return null;
 		if (component.elt) return component.elt;
@@ -111,11 +78,6 @@ export default class Entity extends Core {
 		return element && this.elt.contains(element) ? element : null;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity.updateLayout
-	 * @reason root width and card persistence are coordinated by the public layout updater
-	 */
 	setSecondaryCardActive(component, active) {
 		const element = this._componentElement(component);
 		if (!element) return;
@@ -127,11 +89,6 @@ export default class Entity extends Core {
 		element.dataset.persistent = active ? "true" : "false";
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity.updateLayout
-	 * @reason callers use this to decide whether widget-only transitions should run separately
-	 */
 	isSecondaryCardVisible(component = this.secondaryCard) {
 		const element = this._componentElement(component);
 		return (
@@ -141,11 +98,6 @@ export default class Entity extends Core {
 		);
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity.updateLayout
-	 * @reason transition-result metadata compares before/after layout state
-	 */
 	_layoutSnapshot(component = null) {
 		const element = this._componentElement(component);
 		return {
@@ -158,23 +110,10 @@ export default class Entity extends Core {
 		};
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity.updateLayout
-	 * @reason transition-result metadata compares before/after layout state
-	 */
 	_layoutChanged(before, after) {
 		return Object.keys(before).some((key) => before[key] !== after[key]);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_012_entity_layout_frontend.mjs::test_dynamic_mobile_secondary_uses_final_layout_state
-	 * @tests tests_js/test_012_entity_layout_frontend.mjs::test_overlapping_mobile_layout_updates_keep_secondary_nonpersistent
-	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
-	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_model_tasks_rejoins_section_switching
-	 * @matrix entity-layout : dynamic-secondary nested-layout page-mobile project-mobile
-	 */
 	async updateLayout({
 		secondary = null,
 		secondaryActive = null,
@@ -228,25 +167,10 @@ export default class Entity extends Core {
 		};
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity.mobileNav
-	 * @covered-by src/script/views/base/entity.mjs::Entity._tabChange
-	 * @covered-by src/script/views/base/entity.mjs::Entity._reconcileTabsCard
-	 * @covered-by src/script/views/base/entity.mjs::Entity._reconcileSecondaryCard
-	 * @reason layout render coordinates narrower mobile nav, tab, persistence, and secondary-card owners
-	 */
 	async _renderLayout() {
 		return await this.updateLayout();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_012_entity_layout_frontend.mjs::test_entity_layout_ignores_already_consumed_reconcile_callback
-	 * @tests tests_js/test_012_entity_layout_frontend.mjs::test_initial_entity_layout_prepares_widget_before_one_transition
-	 * @matrix entity-layout : nested-layout reconcile-callback
-	 * @pair startup:view-ready
-	 */
 	async _renderLayoutBody() {
 		const prepared = await this._prepareLayoutBody();
 		await withTransition(() => this._commitLayoutBody(prepared), {
@@ -295,14 +219,6 @@ export default class Entity extends Core {
 		return activeTabId;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_section_switching_updates_visible_cards_and_title
-	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_resize_from_mobile_filters_to_desktop_preserves_selected_tab
-	 * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_section_switching_updates_visible_panel_and_title
-	 * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_create_task_opens_from_tasks_section
-	 * @matrix entity-layout : page-mobile project-mobile resize section-switch task-create
-	 */
 	_reconcileTabsCard(tabs, tabId) {
 		tabs.reconcile = () => {
 			tabs.nav.element.dataset.visible = this.mobile ? "false" : "true";
@@ -317,13 +233,6 @@ export default class Entity extends Core {
 		};
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_create_model_form_opens_from_model_tasks_section
-	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_model_task_info_still_opens_in_models_section
-	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_resize_from_mobile_models_to_desktop_restores_dual_card_layout
-	 * @matrix entity-layout : project-mobile resize secondary-card secondary-create secondary-info
-	 */
 	_reconcileSecondaryCard(secondary, tabId) {
 		secondary.reconcile = () => {
 			if (this.mobile) {
@@ -341,12 +250,6 @@ export default class Entity extends Core {
 		};
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity._renderLayout
-	 * @covered-by src/script/views/base/entity.mjs::Entity.updateLayout
-	 * @reason pre-render selection feeds the annotated mobile layout reconciliation
-	 */
 	_prerender(tabId, secondaryElement = undefined) {
 		tabId ??= this._defaultTabId;
 		const tabs = this.getComponent(this.tabsCard);

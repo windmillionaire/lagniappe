@@ -86,9 +86,6 @@ def _columns(field: Mapping[str, object]) -> list[FieldDefinition]:
     return cast("list[FieldDefinition]", field.get("columns", []))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/conversions.py::classify_changes
-# @reason effective kinds are shared by schema classification and pure conversion
 def field_kind(field: Mapping[str, object]) -> str | None:
     kind = cast(str | None, field.get("type"))
     if kind == "input":
@@ -100,9 +97,6 @@ def field_kind(field: Mapping[str, object]) -> str | None:
     return kind
 
 
-# @testable true
-# @tests tests_unit/test_004j_form_conversions.py::test_capabilities_are_schema_only
-# @matrix form-migration : capabilities no-submission-read
 def conversion_rule(
     source: FieldDefinition, target: FieldDefinition | None
 ) -> Rule | None:
@@ -129,13 +123,9 @@ def conversion_rule(
     return None
 
 
-# @testable true
-# @tests tests_unit/test_004j_form_conversions.py::test_capabilities_are_schema_only
-# @matrix form-migration : capabilities no-submission-read
 def conversion_catalog() -> dict[str, object]:
     """Project the same code-owned capabilities to the builder without I/O."""
 
-    # @testable infrastructure
     def schema(kind: str) -> FieldDefinition:
         if kind in {"text", "email", "tel", "number", "date", "time"}:
             return {"type": "input", "input": kind}
@@ -161,9 +151,6 @@ def conversion_catalog() -> dict[str, object]:
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/conversions.py::classify_changes
-# @reason fingerprints exclude presentation and only identify representation changes
 def representation(field: Mapping[str, object]) -> dict[str, object]:
     return {
         "kind": field_kind(field),
@@ -174,9 +161,6 @@ def representation(field: Mapping[str, object]) -> dict[str, object]:
     }
 
 
-# @testable true
-# @tests tests_unit/test_004j_form_conversions.py::test_schema_diff_preserves_ids_and_rejects_unsupported_changes
-# @matrix form-migration : schema-diff identity validation
 def classify_changes(
     previous: Iterable[FieldDefinition],
     proposed: Iterable[FieldDefinition],
@@ -265,9 +249,6 @@ def classify_changes(
     return changes
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/conversions.py::convert_value
-# @reason text extraction is a provider-free part of the conversion contract
 def _text(value: object, source: FieldDefinition, zone: str) -> str:
     kind = field_kind(source)
     if kind in CHOICE:
@@ -329,9 +310,6 @@ def _text(value: object, source: FieldDefinition, zone: str) -> str:
     return str(value)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/conversions.py::convert_value
-# @reason destination parsing is deliberately separate from coercing AI/import validators
 def _parse(text: str, target: FieldDefinition, zone: str) -> object:
     kind = field_kind(target)
     value = text.strip()
@@ -397,10 +375,6 @@ def _parse(text: str, target: FieldDefinition, zone: str) -> object:
     return MISSING
 
 
-# @testable true
-# @tests tests_unit/test_004j_form_conversions.py::test_scalar_conversions_and_invalid_values
-# @tests tests_unit/test_004j_form_conversions.py::test_table_and_collection_conversions
-# @matrix form-migration : conversion invalid-value presence nested-columns provider-free
 def convert_value(
     value: object,
     source: FieldDefinition,
@@ -496,9 +470,6 @@ def convert_value(
         return MISSING, "invalid"
 
 
-# @testable true
-# @tests tests_unit/test_004j_form_conversions.py::test_submission_notice_preserves_first_values_and_unrelated_answers
-# @matrix form-migration : notice preservation presence repeated-change
 def convert_submission(
     values: dict[str, object],
     changes: Iterable[FieldChange],
@@ -556,9 +527,6 @@ def convert_submission(
     return result, notice
 
 
-# @testable true
-# @tests tests_unit/test_004l_form_schema_updates.py::test_ai_candidates_validate_exact_shapes_without_truthiness_coercion
-# @matrix form-migration : ai-value strict-validation table todo
 def validate_ai_candidate(candidate: object, target: FieldDefinition | None) -> object:
     """Accept exact destination values or an explicit unresolved outcome."""
     if not isinstance(candidate, dict):

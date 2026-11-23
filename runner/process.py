@@ -9,9 +9,6 @@ from runner.context import REPOSITORY_ROOT, format_command
 from runner.presentation import output as print
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_visible_subprocess_output_pauses_progress
-# @matrix setup : spinner subprocess-output
 def run_command(
     command: Sequence[str | Path],
     check: bool = True,

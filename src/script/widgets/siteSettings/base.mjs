@@ -1,8 +1,6 @@
 /**
  * Shared lifecycle and section helpers for site-settings child widgets.
  *
- * @testable infrastructure
- * @covered-by src/script/widgets/siteSettings.mjs::SiteSettings
  */
 export class SiteSetting {
 	constructor(attributes) {

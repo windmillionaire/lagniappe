@@ -5,9 +5,6 @@ from collections.abc import MutableMapping
 from .base import MigrationChange
 
 
-# @testable true
-# @tests tests_unit/test_027a_messaging_properties.py::test_notification_discriminator_migration_is_idempotent
-# @matrix migrations : idempotency notification-discriminator
 def canonicalize_notification_record(
     row: MutableMapping[str, object],
 ) -> MigrationChange:

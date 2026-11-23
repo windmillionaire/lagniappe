@@ -86,7 +86,6 @@ async function setupBaseUpload(t) {
 	return { BaseUpload, directUpload, errors };
 }
 
-/** @matrix direct-upload : resumable-range retry */
 test("test_direct_upload_resumes_after_network_reset", async (t) => {
 	const context = await setupDirectUpload(t);
 	const file = new File(["abcdefghijkl"], "file.txt", { type: "text/plain" });
@@ -111,7 +110,6 @@ test("test_direct_upload_resumes_after_network_reset", async (t) => {
 	);
 });
 
-/** @matrix direct-upload forms : retryable-action persistent-error */
 test("test_builder_direct_upload_failure_preserves_owner_page", async (t) => {
 	const context = await setupDirectUpload(t);
 	context.setPost(async (route, _body, options) => {
@@ -130,7 +128,6 @@ test("test_builder_direct_upload_failure_preserves_owner_page", async (t) => {
 	);
 });
 
-/** @matrix direct-upload : compatibility multipart-fallback single-file */
 test("test_single_file_keeps_compatibility_multipart_fallback", async (t) => {
 	const { BaseUpload, directUpload, errors } = await setupBaseUpload(t);
 	const file = new File(["one"], "one.txt", { type: "text/plain" });
@@ -147,7 +144,6 @@ test("test_single_file_keeps_compatibility_multipart_fallback", async (t) => {
 	assert.deepEqual(instance.directUploads, []);
 });
 
-/** @matrix upload : directory-rejection drag-drop */
 test("test_directory_drop_is_rejected_before_file_processing", async (t) => {
 	const { BaseUpload, errors } = await setupBaseUpload(t);
 	let dropHandler;
@@ -181,7 +177,6 @@ test("test_directory_drop_is_rejected_before_file_processing", async (t) => {
 	assert.deepEqual(errors, ["Only individual files are supported"]);
 });
 
-/** @pair upload:async-file-snapshot */
 test("test_file_drop_survives_async_directory_check", async (t) => {
 	const { BaseUpload } = await setupBaseUpload(t);
 	let dropHandler;
@@ -217,7 +212,6 @@ test("test_file_drop_survives_async_directory_check", async (t) => {
 	assert.deepEqual(received, [file]);
 });
 
-/** @matrix direct-upload : aggregate-limit multipart-fallback partial-resume */
 test("test_large_multi_file_retry_preserves_completed_direct_uploads", async (t) => {
 	const { BaseUpload, directUpload, errors } = await setupBaseUpload(t);
 	const files = Array.from(

@@ -6,7 +6,6 @@ from lagniappe.core.properties.form_table import Table
 pytestmark = pytest.mark.unit
 
 
-# @pair submission:db-value
 def test_submission_value(get_test_entities, get_schema):
     """Test that submission.value loads saved submission from entity.db."""
 
@@ -26,7 +25,6 @@ def test_submission_value(get_test_entities, get_schema):
             entity.properties.submission.db_value = {}
 
 
-# @pair submission:fields
 def test_submission_fields(get_test_entities, get_schema):
     """Test that submission.fields returns fields matching the form schema."""
     for entity in get_test_entities():
@@ -39,7 +37,6 @@ def test_submission_fields(get_test_entities, get_schema):
         assert set(fields.keys()) == {el["id"] for el in schema}
 
 
-# @pair submission:patch
 def test_submission_patch(get_test_entities, get_schema):
     """Test that submission.patch updates a field and returns it."""
     for entity in get_test_entities():
@@ -57,7 +54,6 @@ def test_submission_patch(get_test_entities, get_schema):
         assert submission.db_value == {field_id: "patched value"}
 
 
-# @pair submission:save
 def test_submission_save(get_test_entities, get_schema):
     """Test that assigning submission.value persists aggregated field db_values."""
 
@@ -75,7 +71,6 @@ def test_submission_save(get_test_entities, get_schema):
         assert saved == {field_id: "test value"}
 
 
-# @matrix submission : condition-matching visibility
 def test_submission_is_visible(get_test_entities, get_schema):
     """Test submission.is_visible for single- and multi-condition checkbox gates."""
 
@@ -95,7 +90,6 @@ def test_submission_is_visible(get_test_entities, get_schema):
             )
 
 
-# @pair submission:tables
 def test_submission_tables(get_test_entities, get_schema):
     """Test that submission.tables returns only Table fields."""
 

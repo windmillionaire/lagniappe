@@ -65,7 +65,6 @@ def _saved_permission_form(monkeypatch, *, name, identity):
     return form
 
 
-# @matrix mutations : write-identity dependency-order
 @pytest.mark.parametrize("report_first", [False, True])
 def test_mutation_write_order_preserves_distinct_roots_and_dependencies(report_first):
     user = TestEntities.get("USER", {"hash": "ordered-report-user"})
@@ -86,7 +85,6 @@ def test_mutation_write_order_preserves_distinct_roots_and_dependencies(report_f
     assert keys.index(page.key) < keys.index(attached.key)
 
 
-# @matrix ai-report mutations : input-files no-database-read owner-touch
 def test_report_save_does_not_touch_input_files(monkeypatch):
     user = TestEntities.get("USER", {"hash": "report-planner-user"})
     file = TestEntities.get("FILE", {"hash": "report-planner-file"})
@@ -103,7 +101,6 @@ def test_report_save_does_not_touch_input_files(monkeypatch):
     assert all(effect.entity is not file for effect in plan.effects)
 
 
-# @matrix permissions : invalidation-retry
 @pytest.mark.parametrize("kind", ["PAGE", "FORM"])
 def test_permission_source_marker_is_consumed_only_after_durable_success(monkeypatch, kind):
     from lagniappe.core.tools.database import get as database_get
@@ -130,8 +127,6 @@ def test_permission_source_marker_is_consumed_only_after_durable_success(monkeyp
     assert source._permission_sources_changed is False
 
 
-# @source lagniappe/core/mutations/executor.py::consume_mutation_intents
-# @matrix mutations : repeated-save property-mask guards
 @pytest.mark.parametrize("mask", [None, ("modified",)])
 def test_successful_save_consumes_guards_before_reusing_entity(monkeypatch, mask):
     source = TestEntities.get("PROJECT", {"hash": "guarded-working-entity"})
@@ -154,7 +149,6 @@ def test_successful_save_consumes_guards_before_reusing_entity(monkeypatch, mask
     assert attempted[2] == []
 
 
-# @matrix permissions mutations : owner-reuse no-extra-read repeated-save
 @pytest.mark.parametrize("kind", ["PAGE", "FORM"])
 def test_permission_save_reuses_resolved_collection_owner_keys(monkeypatch, kind):
     source = (_saved_permission_form(monkeypatch, name="Permission source", identity="owner-source")
@@ -200,7 +194,6 @@ def test_permission_save_reuses_resolved_collection_owner_keys(monkeypatch, kind
     assert len(reads) == 3
 
 
-# @matrix mutations : full-root masked-touch instance-precedence cache
 @pytest.mark.parametrize("file_first", [True, False])
 def test_full_page_save_wins_over_file_owner_touch_in_either_order(file_first, monkeypatch):
     monkeypatch.setattr(Entities, "fetch", lambda *entities, request: list(entities))
@@ -231,8 +224,6 @@ def test_full_page_save_wins_over_file_owner_touch_in_either_order(file_first, m
     assert write.entity.name == "Current contact"
 
 
-# @source lagniappe/core/mutations/executor.py::execute_post_commit
-# @matrix mutations : full-root masked-touch cache
 @pytest.mark.parametrize("note_first", [True, False])
 def test_full_owner_save_supersedes_note_revision_invalidation(note_first, monkeypatch):
     from lagniappe.core.tools.cache import restrictions
@@ -254,8 +245,6 @@ def test_full_owner_save_supersedes_note_revision_invalidation(note_first, monke
     assert invalidated == [author]
 
 
-# @matrix mutations task-scheduling : durable-first post-commit
-# @source lagniappe/core/definitions/mutations.py::MutationIntent.dispatch_scheduled_uncomplete
 def test_scheduled_uncomplete_dispatch_is_planned_after_task_write():
     task = TestEntities.get(
         "TASK",
@@ -289,8 +278,6 @@ def test_scheduled_uncomplete_dispatch_is_planned_after_task_write():
     assert task_write < dispatch
 
 
-# @matrix mutations : durable-first
-# @matrix public-pages public-directory sitemap : invalidation
 def test_public_discovery_invalidation_runs_after_durable_write(monkeypatch):
     page = TestEntities.get(
         "PAGE",
@@ -333,7 +320,6 @@ def test_public_discovery_invalidation_runs_after_durable_write(monkeypatch):
     assert outcome.complete is True
 
 
-# @matrix categories public-directory : invalidation save
 def test_category_save_plans_public_discovery_invalidation():
     category = TestEntities.get(
         "CATEGORY",
@@ -351,7 +337,6 @@ def test_category_save_plans_public_discovery_invalidation():
     assert discovery[0].reasons == ("category-save",)
 
 
-# @matrix mutations : completeness contract lookup planner-registry serialization validation
 def test_mutation_contract_registry_covers_persisted_entities_and_relations(capsys):
     assert mutation_contracts._registry_errors() == []
     assert registered_kinds() == frozenset(ENTITY_MUTATION_CONTRACTS)
@@ -364,7 +349,6 @@ def test_mutation_contract_registry_covers_persisted_entities_and_relations(caps
     assert "task -> task" in output
 
 
-# @matrix mutations : durable-first plan save serialization typed-intent-preservation
 def test_save_plan_is_serializable_and_preserves_intents_until_commit(monkeypatch):
     page = TestEntities.get("PAGE", {"name": "Plan Page", "hash": "plan-page"})
     category = TestEntities.get(
@@ -399,7 +383,6 @@ def test_save_plan_is_serializable_and_preserves_intents_until_commit(monkeypatc
     assert page.mutation_intents == [intent]
 
 
-# @matrix mutations : cache-isolation direct-save exclusions intent-isolation lifecycle-isolation plan root-save serialization
 def test_save_root_persists_full_exclusions_without_lifecycle_intents_or_cache(
     monkeypatch,
 ):
@@ -447,7 +430,6 @@ def test_save_root_persists_full_exclusions_without_lifecycle_intents_or_cache(
     assert outcome.complete is True
 
 
-# @matrix mutations : exclusions modified property-mask root-save touch
 def test_touch_uses_masked_root_save_and_only_updates_modified(monkeypatch):
     category = TestEntities.get(
         "CATEGORY", {"name": "Touched category", "hash": "touched-category"}
@@ -470,7 +452,6 @@ def test_touch_uses_masked_root_save_and_only_updates_modified(monkeypatch):
     assert outcome.complete is True
 
 
-# @matrix mutations sync : checkpoint document history list-owner parent-fingerprint property-mask
 def test_document_checkpoint_masks_parent_state_and_optionally_advances_lists(
     monkeypatch,
 ):
@@ -529,7 +510,6 @@ def test_document_checkpoint_masks_parent_state_and_optionally_advances_lists(
     assert writes["document-category"].property_mask == ("modified",)
 
 
-# @matrix mutations sync : document list-owner parent-fingerprint property-mask
 def test_document_parent_touch_only_advances_parent_and_list_fingerprints(
     monkeypatch,
 ):
@@ -572,7 +552,6 @@ def test_document_parent_touch_only_advances_parent_and_list_fingerprints(
     assert outcome.complete is True
 
 
-# @matrix notifications : cache-failure-isolation cache-isolation mutation personal-activity
 def test_notification_save_updates_projection_without_touching_user(monkeypatch):
     modified = datetime(2026, 7, 30, tzinfo=UTC)
     user = User(testing=True)
@@ -648,7 +627,6 @@ def test_notification_save_updates_projection_without_touching_user(monkeypatch)
     assert failed_outcome.errors == ["redis unavailable"]
 
 
-# @matrix deferred-jobs : cache-isolation mutation redis-projection
 def test_job_save_updates_operation_projection_without_touching_relations(monkeypatch):
     modified = datetime(2026, 8, 5, tzinfo=UTC)
     user = User(testing=True)
@@ -702,7 +680,6 @@ def test_job_save_updates_operation_projection_without_touching_relations(monkey
     assert outcome.complete is True
 
 
-# @pairs deferred-jobs:redis-projection mutations:delete
 def test_job_delete_removes_operation_projection_after_commit(monkeypatch):
     job = DeferredJob(testing=True)
     job._key = "deleted-operation-job"
@@ -731,8 +708,6 @@ def test_job_delete_removes_operation_projection_after_commit(monkeypatch):
     assert outcome.complete is True
 
 
-# @source lagniappe/core/mutations/executor.py::execute_mutation
-# @pair mutations:durable-first
 def test_mixed_delete_keeps_form_archive_atomic_and_deletes_other_root_once(monkeypatch):
     form_key = datastore.Key("models", "mixed-form", project="unit-project")
     form_row = datastore.Entity(key=form_key)
@@ -775,7 +750,6 @@ def test_mixed_delete_keeps_form_archive_atomic_and_deletes_other_root_once(monk
     assert outcome.completed_effects.count(MutationEffectType.DELETE) == 1
 
 
-# @matrix mutations : cache-failure durable-first mutation-plan post-commit-outcome save
 def test_save_executes_datastore_before_cache_and_reports_cache_failure(monkeypatch):
     entity = TestEntities.get(
         "CATEGORY", {"name": "Ordered Save", "hash": "ordered-save"}
@@ -803,7 +777,6 @@ def test_save_executes_datastore_before_cache_and_reports_cache_failure(monkeypa
     assert outcome.errors == ["redis down"]
 
 
-# @matrix mutations : multiple-explicit-roots property-mask save standard-lifecycle
 def test_each_explicit_save_argument_is_a_standard_root(monkeypatch):
     page = TestEntities.get("PAGE", {"name": "Root page", "hash": "root-page"})
     category = TestEntities.get(
@@ -833,7 +806,6 @@ def test_each_explicit_save_argument_is_a_standard_root(monkeypatch):
     assert looked_up == [page, category]
 
 
-# @matrix mutations user : canonical-page intent-isolation save
 def test_existing_user_save_does_not_implicitly_mutate_canonical_page():
     user = TestEntities.get(
         "USER",
@@ -850,7 +822,6 @@ def test_existing_user_save_does_not_implicitly_mutate_canonical_page():
     assert [effect.entity for effect in _writes(plan)] == [user]
 
 
-# @matrix mutations : delete mergeable-unlinks overlapping-roots plan property-mask
 def test_delete_survivor_merge_combines_relation_removals():
     page_a = TestEntities.get("PAGE", {"name": "A", "hash": "merge-page-a"})
     page_b = TestEntities.get("PAGE", {"name": "B", "hash": "merge-page-b"})
@@ -873,9 +844,6 @@ def test_delete_survivor_merge_combines_relation_removals():
     assert task_a.db.get("linked_pages") is None
 
 
-# @pairs file:delete file:reverse-link mutations:delete mutations:unlink
-# @pairs tasks:delete tasks:list-owner-fingerprint tasks:reverse-link
-# @pairs tasks:task-history tasks:unlink
 def test_file_delete_unlinks_task_references_and_list_owners(monkeypatch):
     page = TestEntities.get(
         "PAGE",

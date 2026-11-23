@@ -131,7 +131,6 @@ def scope(monkeypatch):
     )
 
 
-# @matrix form-migration : schema-operations stable-identity validation
 def test_operations_preserve_identity_and_validate_final_schema(scope):
     original = deepcopy(scope.form.schema)
     assert [field["id"] for field in scope.target] == ["notes", "count"]
@@ -174,7 +173,6 @@ def test_operations_preserve_identity_and_validate_final_schema(scope):
     assert scope.form.schema == original
 
 
-# @matrix form-migration : complete-scope permissions affected-values pagination
 def test_scope_is_exhaustive_permission_checked_and_projects_only_affected_values(
     scope,
 ):
@@ -201,8 +199,6 @@ def test_scope_is_exhaustive_permission_checked_and_projects_only_affected_value
         updates.inspect_scope(scope.form, scope.changes[1:], scope.actor)
 
 
-# @source lagniappe/core/tools/forms/schema_updates.py::inspect_scope
-# @matrix form-migration : affected-values pagination
 @pytest.mark.parametrize("before, after, clears", [("000", 0, False), ("007", 7, False), ("unknown", None, True)])
 def test_scalar_preview_reports_exact_conversion_and_clearing(scope, before, after, clears):
     scope.tasks[0].db["submission"] = json.dumps({"count": before, "private": "unaffected"})
@@ -238,7 +234,6 @@ def candidates_for(scope):
     ]
 
 
-# @matrix form-migration : candidate-validation stale-value complete-scope
 def test_external_candidates_require_exact_coverage_and_source_fingerprints(scope):
     preview, candidates = candidates_for(scope)
     assert updates.validate_candidates(candidates, preview, scope.changes) == candidates
@@ -256,7 +251,6 @@ def test_external_candidates_require_exact_coverage_and_source_fingerprints(scop
         updates.validate_candidates(candidates, fresh, scope.changes)
 
 
-# @matrix form-migration : ai-value strict-validation table todo
 def test_ai_candidates_validate_exact_shapes_without_truthiness_coercion():
     table = {
         "type": "table",
@@ -308,7 +302,6 @@ def test_ai_candidates_validate_exact_shapes_without_truthiness_coercion():
         )
 
 
-# @matrix form-migration ai : utility-provider strict-output permission
 def test_utility_conversion_is_bounded_strict_and_tool_free(scope, monkeypatch):
     calls = []
     request = [
@@ -354,7 +347,6 @@ def test_utility_conversion_is_bounded_strict_and_tool_free(scope, monkeypatch):
         )
 
 
-# @matrix form-migration ai : utility-provider strict-output permission
 def test_utility_table_conversion_omits_blanks_and_repairs_invalid_numbers(scope):
     target = {
         "id": "notes", "type": "table", "title": "Notes",
@@ -412,7 +404,6 @@ def test_utility_table_conversion_omits_blanks_and_repairs_invalid_numbers(scope
         assert failure.value.context == {"form_conversion_field": "notes"}
 
 
-# @matrix form-migration : status recovery permissions
 def test_conversion_failure_status_names_columns_and_checks_target_visibility(scope):
     job = SimpleNamespace(status="failed", progress={}, error={
         "message": "Invalid converted table cell for column quantity-private-id.",
@@ -453,7 +444,6 @@ def test_conversion_failure_status_names_columns_and_checks_target_visibility(sc
     assert "Retry to resume" in form_changes.change_response(scope.form, scope.actor)["pending_change"]["error"]
 
 
-# @matrix form-migration ai : preview pagination read-only complete-scope
 def test_preview_paginates_and_rejects_stale_cursor(scope):
     scope.tasks[1].completed = True
     snapshot = [deepcopy(entity.db) for entity in [scope.form, *scope.tasks]]
@@ -484,7 +474,6 @@ def test_preview_paginates_and_rejects_stale_cursor(scope):
     )
 
 
-# @matrix ai-report form-migration : preview preparation approval external
 def test_report_schema_preparation_binds_impact_and_external_candidates(scope):
     preview, candidates = candidates_for(scope)
     action = {
@@ -557,7 +546,6 @@ def test_report_schema_preparation_binds_impact_and_external_candidates(scope):
         schema_updates.prepare_schema_updates(new_form_proposal, scope.actor)
 
 
-# @matrix ai-report form-migration : preview preparation approval external
 def test_schema_preparation_assigns_missing_ids_without_collisions(scope):
     preview, candidates = candidates_for(scope)
     proposal = {"actions": [
@@ -592,7 +580,6 @@ def test_schema_preparation_assigns_missing_ids_without_collisions(scope):
     assert legacy["actions"][0]["data"] == prepared["actions"][0]["data"]
 
 
-# @matrix ai-report : structured-output
 @pytest.mark.parametrize("external", [False, True])
 def test_report_conversion_schema_rejects_flattened_items(external):
     from lagniappe.core.tools.ai.external.validation import _schema_errors
@@ -635,7 +622,6 @@ def test_report_conversion_schema_rejects_flattened_items(external):
         assert _schema_errors(proposal, schema, schema, "proposal"), outcome
 
 
-# @matrix ai-report : schema-update
 @pytest.mark.parametrize("invalid_kind", ["flattened", "boolean", "missing", "stale"])
 @pytest.mark.parametrize("repair_succeeds", [True, False])
 def test_organize_repairs_prepared_conversions_before_returning_plan(
@@ -729,7 +715,6 @@ def test_organize_repairs_prepared_conversions_before_returning_plan(
     assert {key: entity.db for key, entity in scope.rows.items()} == snapshot
 
 
-# @matrix ai-report form-migration : review links pagination permissions
 def test_report_impact_redacts_revoked_access_and_paginates(scope):
     preview, candidates = candidates_for(scope)
     proposal = {
@@ -759,7 +744,6 @@ def test_report_impact_redacts_revoked_access_and_paginates(scope):
     assert not last["has_more"]
 
 
-# @matrix ai-report form-migration : review links pagination permissions
 @pytest.mark.parametrize("action_id", [None, "custom-schema-action"])
 def test_report_impact_matches_positions_without_action_ids(scope, action_id):
     preview, candidates = candidates_for(scope)
@@ -783,8 +767,6 @@ def test_report_impact_matches_positions_without_action_ids(scope, action_id):
     assert proposal == snapshot
 
 
-# @matrix form-migration : ai-checkpoint external-provider-free retry
-# @pair form-migration:ai-telemetry
 def test_worker_checkpoints_ai_before_write_and_external_execution_is_provider_free(
     scope, monkeypatch
 ):
@@ -866,7 +848,6 @@ def test_worker_checkpoints_ai_before_write_and_external_execution_is_provider_f
     assert len(calls) == 1
 
 
-# @matrix form-migration : permissions preflight ownership
 def test_preflight_rejection_releases_only_unapplied_change(scope, monkeypatch):
     import lagniappe.core.mutations as mutations
     from lagniappe.core.tools.database import assets
@@ -896,8 +877,6 @@ def test_preflight_rejection_releases_only_unapplied_change(scope, monkeypatch):
     assert len(writes) == 1 and scope.form.db[form_changes.PENDING]
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
-# @matrix ai-report form-schema : deterministic-run schema-update
 @pytest.mark.parametrize("rejected", [True, False])
 def test_report_does_not_complete_a_migration_without_publication(
     scope, monkeypatch, rejected

@@ -19,17 +19,10 @@ from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.web import responses
 
 
-# @testable false
-# @covered-by lagniappe/web/direct_uploads.py::direct_upload_response
-# @reason request payload normalization is exercised through route helpers
 def _request_data():
     return request.get_json(silent=True) or request.form or {}
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report_direct
-# @covered-by lagniappe/web/routes/pages/main.py::update_direct
-# @reason route response is thin plumbing over tested storage session creation
 def direct_upload_response() -> ResponseReturnValue:
     """Create a resumable GCS upload session for the current authorized route."""
     data = _request_data()
@@ -47,9 +40,6 @@ def direct_upload_response() -> ResponseReturnValue:
     return responses.json_response(session)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::_report_upload_manifest
-# @reason request form parser is route-local glue around direct-upload finalization
 def direct_upload_records(
     form: Mapping[str, object], input_name: str | None = None
 ) -> list[dict[str, object]]:
@@ -75,9 +65,6 @@ def direct_upload_records(
     return [record for record in records if record.get("input_name") == input_name]
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::update
-# @reason storage validation is covered by database asset helper tests
 def direct_upload_files(
     input_name: str | None = None, *, consumer: FileConsumer | None = None
 ) -> list[DirectUploadFile]:
@@ -93,9 +80,6 @@ def direct_upload_files(
     return uploads
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::update
-# @reason single-file convenience wrapper delegates to the list helper
 def direct_upload_file(
     input_name: str, *, consumer: FileConsumer | None = None
 ) -> DirectUploadFile | None:
@@ -104,9 +88,6 @@ def direct_upload_file(
     return uploads[0] if uploads else None
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::update
-# @reason best-effort temp cleanup is exercised through Form draft publication
 def cleanup_direct_uploads(
     form: Mapping[str, object], input_name: str | None = None
 ) -> None:

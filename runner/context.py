@@ -32,9 +32,6 @@ NPM_CLI = TOOL_PATHS["npm"]
 UV_CLI = managed_uv_path()
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_portable_runtime_paths_commands_and_virtualenv_instructions
-# @matrix setup : portability repository-root virtualenv
 def project_virtualenv_active(
     *, prefix: str | Path | None = None, base_prefix: str | Path | None = None
 ) -> bool:
@@ -54,9 +51,6 @@ def project_virtualenv_active(
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_portable_runtime_paths_commands_and_virtualenv_instructions
-# @matrix setup : generated-command portability
 def format_command(
     command: Sequence[object], *, windows: bool | None = None
 ) -> str:
@@ -66,9 +60,6 @@ def format_command(
     return subprocess.list2cmdline(command) if windows else shlex.join(command)
 
 
-# @testable false
-# @covered-by runner/context.py::setup_command
-# @reason generic adapter is exercised through generated setup commands
 def python_command(
     script: str | Path, *arguments: str | Path, windows: bool | None = None
 ) -> str:
@@ -79,9 +70,6 @@ def python_command(
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_portable_runtime_paths_commands_and_virtualenv_instructions
-# @matrix setup : generated-command portability
 def setup_command(*arguments: str | Path, windows: bool | None = None) -> str:
     """Return the supported setup launcher invocation for the user's platform."""
     windows = os.name == "nt" if windows is None else windows
@@ -89,9 +77,6 @@ def setup_command(*arguments: str | Path, windows: bool | None = None) -> str:
     return format_command([launcher, *arguments], windows=windows)
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_portable_runtime_paths_commands_and_virtualenv_instructions
-# @matrix setup : instructions portability virtualenv
 def virtualenv_instructions() -> str:
     """Return both supported environment-bootstrap/setup command forms."""
     return (

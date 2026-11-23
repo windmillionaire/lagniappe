@@ -27,10 +27,6 @@ MODEL_BUSY_MESSAGE = "The model is too busy right now. Try again later."
 
 
 
-# @testable true
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_retries_sdk_timeout
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_retries_sdk_5xx_and_persists_clean_terminal_message
-# @matrix deferred-jobs : provider-errors provider-timeout retry
 def _retryable(error):
     transient = (
         DeferredJobDeadlineError,
@@ -53,7 +49,6 @@ def _retryable(error):
 
 
 
-# @testable infrastructure
 def _quota_error(error):
     """Return a wrapped provider-quota error, when present."""
     seen = set()
@@ -68,7 +63,6 @@ def _quota_error(error):
 
 
 
-# @testable infrastructure
 def _retry_delays(error):
     """Choose stronger application backoff after provider quota exhaustion."""
     if _quota_error(error):
@@ -78,9 +72,6 @@ def _retry_delays(error):
 
 
 
-# @testable true
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_waits_for_dependency_without_consuming_provider_retry
-# @matrix deferred-jobs : dependency-wait provider-attempt-isolation
 def _provider_retry_attempt(job):
     """Return the provider attempt number after excluding dependency-only runs."""
     parameters = getattr(job, "parameters", None) or {}
@@ -90,9 +81,6 @@ def _provider_retry_attempt(job):
 
 
 
-# @testable true
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_retries_sdk_5xx_and_persists_clean_terminal_message
-# @pair deferred-jobs:terminal-message
 def _terminal_error(error, *, requires_ai=False):
     """Replace exhausted provider details with a concise user-facing message."""
     quota_error = _quota_error(error)
@@ -111,9 +99,6 @@ def _terminal_error(error, *, requires_ai=False):
 
 
 
-# @testable true
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_increases_later_quota_backoff_without_adding_attempts
-# @matrix deferred-jobs : backoff jitter quota
 def _retry_delay(error, attempt):
     delays = _retry_delays(error)
     delay = delays[int(attempt) - 1]

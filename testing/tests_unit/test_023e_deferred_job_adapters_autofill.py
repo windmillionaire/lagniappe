@@ -21,7 +21,6 @@ def test_autofill_lifetime_uses_four_minute_total_budget():
     assert autofill_adapters.AutofillAdapter.max_lifetime_seconds == 4 * 60
 
 
-# @pair ai:autofill
 def test_snapshot_checkpoint_needs_proposal_but_not_file_attachment():
     adapter = autofill_adapters.AutofillAdapter()
     context = SimpleNamespace(
@@ -33,7 +32,6 @@ def test_snapshot_checkpoint_needs_proposal_but_not_file_attachment():
     assert not adapter.checkpoint_ready(context)
 
 
-# @pairs ai:autofill deferred-jobs:form-revision
 def test_autofill_revision_tracks_only_form_apply_state():
     class Target(SubmitterMixin):
         pass
@@ -71,7 +69,6 @@ def test_autofill_revision_tracks_only_form_apply_state():
     assert target.autofill_revision != original
 
 
-# @pairs ai:collaboration deferred-jobs:status
 def test_autofill_status_is_visible_to_target_editor(monkeypatch):
     actor = SimpleNamespace(urlsafe_key="editor-key")
     checked = []
@@ -99,7 +96,6 @@ def test_autofill_status_is_visible_to_target_editor(monkeypatch):
     assert fetches[0].reason is FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION
 
 
-# @matrix deferred-jobs : form-lock terminal-cleanup
 def test_autofill_terminal_cleanup_releases_target_lock(monkeypatch):
     target = SimpleNamespace(urlsafe_key="page-key", deferred_job=None)
     context = SimpleNamespace(
@@ -153,8 +149,6 @@ def test_autofill_terminal_cleanup_releases_target_lock(monkeypatch):
     assert released[-1] == ("lock:deleted-page-key", "missing-job-key")
 
 
-# @matrix deferred-jobs : active-operation compare-and-delete terminal-cleanup
-# @pair pages:create-autofill
 def test_autofill_page_operation_reference_is_persisted_and_compare_cleared(
     monkeypatch,
 ):
@@ -227,7 +221,6 @@ def test_autofill_page_operation_reference_is_persisted_and_compare_cleared(
     assert saved[-1] == (page, {"property_mask": ("deferred_job",)})
 
 
-# @matrix ai deferred-jobs files : autofill failed pending summary-dependency
 def test_autofill_prepare_does_not_wait_for_attached_file_summaries(monkeypatch):
     adapter = autofill_adapters.AutofillAdapter()
     phases = []
@@ -254,7 +247,6 @@ def test_autofill_prepare_does_not_wait_for_attached_file_summaries(monkeypatch)
     assert phases[-1] == (DeferredJobPhase.GENERATING, {})
 
 
-# @matrix ai files : autofill original-prompt staged-upload model-input
 def test_autofill_snapshot_passes_prompt_and_staged_original_to_model(monkeypatch):
     adapter = autofill_adapters.AutofillAdapter()
     actor = SimpleNamespace()
@@ -322,7 +314,6 @@ def test_autofill_snapshot_passes_prompt_and_staged_original_to_model(monkeypatc
     assert phases == [DeferredJobPhase.GENERATING, DeferredJobPhase.VALIDATING]
 
 
-# @matrix ai deferred-jobs files : autofill checkpoint resume upload
 def test_autofill_upload_checkpoint_records_durable_attachment(monkeypatch):
     adapter = autofill_adapters.AutofillAdapter()
     target = SimpleNamespace()
@@ -390,8 +381,6 @@ def test_autofill_upload_checkpoint_records_durable_attachment(monkeypatch):
     assert phases == [(DeferredJobPhase.PREPARING_INPUTS, {})]
 
 
-# @matrix ai deferred-jobs files pages tasks : attachment autofill idempotency inspection naming upload
-# @pair deferred-jobs:loaded-input
 @pytest.mark.parametrize("target_kind", ["page", "task"])
 def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
     class Relation:

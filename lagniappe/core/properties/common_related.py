@@ -35,10 +35,6 @@ type _Page = Page
 type _GroupOwner = Form | Page | Task
 
 
-# @testable true
-# @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_category_and_form
-# @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_model_project_form
-# @matrix form : model parent related-entities
 class AttachedForm(
     RelatedEntityMixin["Form"], ColumnMixin, FilterMixin, AIMixin, DBProperty["Form"]
 ):
@@ -118,9 +114,6 @@ class AttachedForm(
         return details
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_task_history_returns_dates_submissions_and_files
-# @matrix ai tasks : context files task-history
 class AttachedTask(RelatedEntityMixin["Task"], FilterMixin, AIMixin, Property["Task"]):
     """A task attached to an entity (used in task history)."""
 
@@ -149,9 +142,6 @@ class AttachedTask(RelatedEntityMixin["Task"], FilterMixin, AIMixin, Property["T
 
 
 
-# @testable true
-# @tests tests_unit/test_007_category_properties.py::test_category_filters_related_forms
-# @matrix category filters form : entity-fields related-forms
 class RelatedForm(RelatedEntityMixin["Form"], FilterMixin, Property["Form"]):
     """A form related to an entity (used in filter conditions).
 
@@ -184,9 +174,6 @@ class RelatedForm(RelatedEntityMixin["Form"], FilterMixin, Property["Form"]):
         return details
 
 
-# @testable true
-# @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_model_project_form
-# @matrix task : model related-entities
 class AttachedModelTask(
     RelatedEntityMixin["ModelTask"], ColumnMixin, FilterMixin, AIMixin, DBProperty["ModelTask"]
 ):
@@ -208,10 +195,6 @@ class AttachedModelTask(
         return details
 
 
-# @testable true
-# @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_project
-# @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_model_project_form
-# @matrix project : model parent related-entities
 class AttachedProject(
     RelatedEntityMixin["Project"], ColumnMixin, FilterMixin, AIMixin, DBProperty["Project"]
 ):
@@ -235,9 +218,6 @@ class AttachedProject(
         return "project"
 
 
-# @testable true
-# @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_category_and_form
-# @matrix category : parent related-entities
 class AttachedCategory(
     RelatedEntityMixin["Category"], ColumnMixin, FilterMixin, AIMixin, DBProperty["Category"]
 ):
@@ -250,9 +230,6 @@ class AttachedCategory(
     _kind: str | None = "category"
 
 
-# @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_attached_page_details_key_uses_parent
-# @matrix tasks : attached-page history parent-details
 class AttachedPage(
     RelatedEntityMixin[_Page], DetailsMixin, ColumnMixin, FilterMixin, AIMixin, DBProperty[_Page]
 ):
@@ -276,9 +253,6 @@ class AttachedPage(
         return "page"
 
 
-# @testable true
-# @tests tests_unit/test_004a_form_index.py::test_form_index_table
-# @pair form-index:columns
 class Categories(
     RelatedEntityListMixin["Category"], FilterMixin, ColumnMixin, Property[list["Category"]]
 ):
@@ -304,9 +278,6 @@ class Categories(
         return {entity.hash: entity.name for entity in self.value}
 
 
-# @testable true
-# @tests tests_unit/test_004a_form_index.py::test_form_index_table
-# @pair form-index:columns
 class Projects(
     RelatedEntityListMixin["Project"], FilterMixin, ColumnMixin, Property[list["Project"]]
 ):
@@ -342,9 +313,6 @@ class ModelTasks(RelatedEntityListMixin["ModelTask"], ColumnMixin, Property[list
     _kind: str | None = "model"
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/common_related.py::RelatedForms.add
-# @reason duplicate prevention and relation registration are owned by add()
 class RelatedForms(RelatedEntityListMixin["Form"], DBProperty[list["Form"], "Category"]):
     """Additional forms related to an entity (beyond the primary attached form).
 
@@ -374,11 +342,6 @@ class RelatedForms(RelatedEntityListMixin["Form"], DBProperty[list["Form"], "Cat
 
         self._write_related_list(value)
 
-    # @testable true
-    # @tests tests_unit/test_007_category_properties.py::test_related_forms_add_skips_primary_form_and_registers_relation
-    # @tests tests_unit/test_007_category_properties.py::test_related_forms_add_rejects_value_without_key
-    # @tests tests_unit/test_007_category_properties.py::test_related_forms_add_existing_key_does_not_load_other_forms
-    # @matrix category form : add duplicate-primary related-forms relation-registration validation
     def add(self, value: Form) -> bool:
         key = getattr(value, "key", None)
         if not key:
@@ -410,9 +373,6 @@ class RelatedForms(RelatedEntityListMixin["Form"], DBProperty[list["Form"], "Cat
         return False
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/common_related.py::Groups.attach
-# @reason inherited relation mechanics are exercised through local restriction attachment
 class Groups(RelatedEntityListMixin["UserGroup"], DBProperty[list["UserGroup"], _GroupOwner]):
     """Groups that have access to a form."""
 
@@ -421,10 +381,6 @@ class Groups(RelatedEntityListMixin["UserGroup"], DBProperty[list["UserGroup"], 
     _icon = "group"
     _kind: str | None = "user"
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_direct_fetch_materializes_local_restrictions_from_attached_groups
-    # @tests tests_unit/test_002_entity_general_properties.py::test_task_file_restrictions_use_stored_hashes_without_group_reads
-    # @matrix permissions relations : attached-groups local-restrictions materialization stored-restrictions no-extra-read
     def attach(self, key_map: Mapping[Key, UserGroup]) -> None:
         super().attach(key_map)
         # With no Group references, the stored local hashes remain authoritative.

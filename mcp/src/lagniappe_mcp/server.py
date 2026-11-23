@@ -87,16 +87,11 @@ _LOG_METHODS = {
 }
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_hosted_configuration_and_public_discovery_are_exact
-# @matrix mcp-remote : configuration discovery
 @dataclass(frozen=True)
 class HostedConfig:
     issuer: str
     resource: str
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::HostedConfig
     def __post_init__(self) -> None:
         for value in (self.issuer, self.resource):
             parsed = urlsplit(value)
@@ -125,20 +120,14 @@ class HostedConfig:
                 "Hosted MCP requires separate issuer and /mcp origins.",
             )
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::HostedConfig
     @property
     def origin(self) -> str:
         return self.resource.removesuffix("/mcp")
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::HostedConfig
     @property
     def audience(self) -> str:
         return self.issuer + "/api/v1"
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::HostedConfig
     @property
     def challenge(self) -> str:
         return (
@@ -146,22 +135,15 @@ class HostedConfig:
         )
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin
-# @matrix mcp-remote : service-identity token-separation
 class WorkloadIdentity:
     """Cache only this service's short-lived Google identity, never a user token."""
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::WorkloadIdentity
     def __init__(self, audience: str) -> None:
         self.audience = audience
         self._token: str | None = None
         self._until = 0.0
         self._lock = asyncio.Lock()
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::WorkloadIdentity
     async def token(self) -> str:
         async with self._lock:
             if self._token and time.monotonic() < self._until:
@@ -226,12 +208,7 @@ class _ClientOptions(TypedDict, total=False):
     default_encoding: str | Callable[[bytes], str]
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin
-# @matrix mcp-remote : service-identity token-separation
 class EnvelopeClient(httpx.AsyncClient):
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::EnvelopeClient
     def __init__(
         self, config: ConnectionConfig, identity: WorkloadIdentity, **kwargs: Unpack[_ClientOptions],
     ) -> None:
@@ -240,8 +217,6 @@ class EnvelopeClient(httpx.AsyncClient):
         self.identity = identity
         self.workload_token: str | None = None
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::EnvelopeClient
     async def send(
         self, request: httpx.Request, *, stream: bool = False,
         auth: AuthTypes | UseClientDefault | None = httpx.USE_CLIENT_DEFAULT,
@@ -258,16 +233,12 @@ class EnvelopeClient(httpx.AsyncClient):
         return await super().send(request, stream=stream, auth=auth, follow_redirects=follow_redirects)
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/server.py::create_app
 class RequestREST(RESTClient):
     """Reuse the actor preflight within this HTTP request only."""
 
     actor_preflight: JsonObject | None = None
     api_json_calls = 0
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::RequestREST
     async def request_json(
         self, method: str, target: str, *, body: object = None,
         max_bytes: int = MAX_STRUCTURED_RESULT_BYTES,
@@ -278,17 +249,9 @@ class RequestREST(RESTClient):
         return await super().request_json(method, target, body=body, max_bytes=max_bytes)
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_remote_catalog_and_calls_reuse_adapter_behavior_and_isolate_users
-# @tests tests_unit/test_033c_mcp_server.py::test_hosted_catalog_and_error_results_cannot_reflect_workload_identity
-# @tests tests_unit/test_033c_mcp_server.py::test_remote_attachment_uses_shared_upload_and_preserves_pending_failure
-# @matrix mcp-remote : catalog isolation parity privacy token-separation
-# @matrix mcp-upload : remote cleanup partial-failure upload-all finalize-once
 class HostedAdapter(LagniappeAdapter):
     _remote_initialized = False
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::HostedAdapter
     async def initialize(self) -> None:
         if self._remote_initialized:
             return
@@ -328,9 +291,6 @@ class HostedAdapter(LagniappeAdapter):
         )
         self._remote_initialized = True
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/terminal_files.py::prepare_uploads
-    # @covered-by mcp/src/lagniappe_mcp/terminal_files.py::finalize_uploads
     async def execute(self, name: str, arguments: object) -> AdapterResult:
         if name not in {"prepare_file_uploads", "finalize_file_uploads"}:
             return await super().execute(name, arguments)
@@ -350,8 +310,6 @@ class HostedAdapter(LagniappeAdapter):
         self._enforce_result_limits(result)
         return result
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::HostedAdapter
     async def _upload_files(self, arguments: dict[str, object]) -> AdapterResult:
         try:
             async with asyncio.timeout(UPLOAD_OPERATION_TIMEOUT_SECONDS):
@@ -374,21 +332,12 @@ class HostedAdapter(LagniappeAdapter):
             ) from None
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_hosted_configuration_and_public_discovery_are_exact
-# @tests tests_unit/test_033c_mcp_server.py::test_remote_catalog_and_calls_reuse_adapter_behavior_and_isolate_users
-# @tests tests_unit/test_033c_mcp_server.py::test_http_authentication_preflights_every_request_and_reconnects_on_revocation
-# @tests tests_unit/test_033c_mcp_server.py::test_http_errors_are_private_and_mid_request_expiry_requests_reconnect
-# @tests tests_unit/test_033c_mcp_server.py::test_hosted_catalog_and_error_results_cannot_reflect_workload_identity
-# @matrix mcp-remote : discovery authentication isolation parity bounds privacy token-separation
 def create_app(
     config: HostedConfig, *,
     adapter_factory: Callable[[str], AbstractAsyncContextManager[HostedAdapter]] | None = None,
 ) -> Starlette:
     identity = WorkloadIdentity(config.audience)
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
     @asynccontextmanager
     async def request_adapter(token: str) -> AsyncIterator[HostedAdapter]:
         connection = ConnectionConfig(normalize_site_url(config.issuer), api_key=token)
@@ -402,8 +351,6 @@ def create_app(
 
     factory = adapter_factory or request_adapter
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
     async def list_tools(
         ctx: ServerRequestContext[dict[str, object], Request], _params: PaginatedRequestParams | None,
     ) -> ListToolsResult:
@@ -420,8 +367,6 @@ def create_app(
             tools.append(Tool(**values))
         return ListToolsResult(tools=tools, result_type="complete")
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
     async def call_tool(
         ctx: ServerRequestContext[dict[str, object], Request], params: CallToolRequestParams,
     ) -> CallToolResult:
@@ -514,8 +459,6 @@ def create_app(
     )
     server.middleware.clear()
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
     async def chatgpt_metadata(
         ctx: ServerRequestContext[dict[str, object], Request], call_next: CallNext,
     ) -> HandlerResult:
@@ -568,8 +511,6 @@ def create_app(
         ),
     )
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
     async def metadata(_request: Request) -> JSONResponse:
         return JSONResponse(
             {
@@ -580,23 +521,15 @@ def create_app(
             }
         )
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
     async def health(_request: Request) -> JSONResponse:
         return JSONResponse({"status": "ok"})
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
     @asynccontextmanager
     async def lifespan(_app: Starlette) -> AsyncIterator[None]:
         async with manager.run():
             yield
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
     class ProtectedMCP:
-        # @testable false
-        # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
         async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
             started, correlation = time.monotonic(), uuid.uuid4().hex
             request = Request(scope, receive)
@@ -609,8 +542,6 @@ def create_app(
             headers = {"Cache-Control": "no-store", "X-Request-ID": correlation}
             status, method, adapter = 500, "other", None
 
-            # @testable false
-            # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
             async def annotate(message: Message) -> None:
                 nonlocal status
                 if message["type"] == "http.response.start":
@@ -704,8 +635,6 @@ def create_app(
                         sent = False
                         original_receive = receive
 
-                        # @testable false
-                        # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
                         async def replay() -> Message:
                             nonlocal sent
                             if not sent:
@@ -766,7 +695,6 @@ def create_app(
     )
 
 
-# @testable infrastructure
 def main() -> None:
     import uvicorn
 
@@ -774,8 +702,6 @@ def main() -> None:
     for name in ("httpx", "httpcore", "httpx2", "httpcore2", "mcp", "mcp.server"):
         logging.getLogger(name).setLevel(logging.CRITICAL)
     if os.environ.get("LAGNIAPPE_MCP_ENABLED", "false") != "true":
-        # @testable false
-        # @covered-by mcp/src/lagniappe_mcp/server.py::main
         async def unavailable(_request: Request) -> JSONResponse:
             return JSONResponse({"status": "unavailable"}, 503)
 

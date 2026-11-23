@@ -23,9 +23,6 @@ class GeneratedFormChanges(TypedDict):
 NEW_IDENTITY = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/form_draft.py::prepare_generated_changes
-# @reason exact operation members are part of the generated-proposal validation contract
 def _members(value, required, optional=()):
     if not isinstance(value, dict) or set(value) - set(required) - set(optional):
         raise ValidationError("The generated change contains unsupported settings.")
@@ -33,9 +30,6 @@ def _members(value, required, optional=()):
         raise ValidationError("The generated change is missing a required setting.")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/form_draft.py::prepare_generated_changes
-# @reason exact identity resolution is owned by proposal validation
 def _find(items, identity, key="id"):
     if not isinstance(identity, str) or not identity:
         raise ValidationError("Generated edits require an exact existing identity.")
@@ -45,18 +39,12 @@ def _find(items, identity, key="id"):
     return matches[0]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/form_draft.py::prepare_generated_changes
-# @reason generated text values are validated at the proposal boundary
 def _text(value, *, empty=False):
     if not isinstance(value, str) or (not empty and not value.strip()):
         raise ValidationError("Generated labels must be non-empty text.")
     return value if empty else value.strip()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/form_draft.py::prepare_generated_changes
-# @reason new provider identities must work with existing asset paths and UI selectors
 def _new_identities(field):
     identities = [field.get("id")]
     identities.extend(option.get("value") for option in field.get("options", []))
@@ -66,9 +54,6 @@ def _new_identities(field):
         _new_identities(column)
 
 
-# @testable true
-# @tests tests_unit/test_004f_form_draft_generation.py::*
-# @matrix forms ai : draft-generation stable-identity validation no-side-effects
 def prepare_generated_changes(result: object, draft: FormDraft, *, form_type: str, image_sources: Mapping[str, Iterable[tuple[str, str]]] | None = None) -> GeneratedFormChanges:
     """Validate an entire proposal without mutating its draft or any entity.
 

@@ -24,9 +24,6 @@ from lagniappe.web import responses
 from . import users
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
-# @matrix users : index-mode-toggle refresh table-row
 @users.route("/index", methods=["GET"])
 @permission(Resource.USERS, Action.RESTRICTED)
 def user_index() -> ResponseReturnValue:
@@ -35,13 +32,6 @@ def user_index() -> ResponseReturnValue:
     return responses.index("users", user_index)
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
-# @tests tests_unit/test_009_user_index.py::test_user_index_loads_users_groups_public_group_and_append_cursor
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
-# @matrix users : index-mode-toggle refresh table-row
-# @pair user-index:page-canonical
-# @pair user-index:public-group
 @users.route("/rows", methods=["GET"])
 @permission(Resource.USERS, Action.VIEW)
 def rows() -> ResponseReturnValue:
@@ -51,9 +41,6 @@ def rows() -> ResponseReturnValue:
     return responses.rows(users, user_index)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/users/main.py::create
-# @reason form parsing helper owned by user create route
 def user_data(request: Request) -> UserCreationData:
     if "ai_access" in request.form and not current_user.is_admin:
         abort(403)
@@ -73,10 +60,6 @@ def user_data(request: Request) -> UserCreationData:
     return data
 
 
-# @testable false
-# @manual true
-# @covered-by lagniappe/web/routes/users/main.py::delete
-# @reason Identity Platform cleanup is provider-facing route glue; missing accounts are a valid no-op
 def _delete_identity_login_account(user):
     if not user or CONFIG.testing or getattr(user, "is_test_user", False):
         return
@@ -88,12 +71,6 @@ def _delete_identity_login_account(user):
     identity_platform.delete_account_by_email(email)
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_from_index
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_owner_create_adopts_public_user_and_resets_form
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_non_owner_cannot_set_ai_access_when_creating_user
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_attached_to_existing_page_preserves_page_info_form
-# @matrix users : ai-access attach-existing-page create-submit created-row owner-only page-form-preserved public-user-adoption submitted-form-data
 @users.route("/create", methods=["POST"])
 @permission(Resource.USERS, Action.CREATE)
 def create() -> ResponseReturnValue:
@@ -114,10 +91,6 @@ def create() -> ResponseReturnValue:
     return responses.rows(new_user, index.UserIndex())
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
-# @matrix pages users : category-fallback default-cascade delete preserve-page
-# @pair user-index:delete
 @users.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.USERS, Action.DELETE)
 def delete(
@@ -155,10 +128,6 @@ def delete(
     return responses.ok()
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
-# @tests tests_unit/test_009a_user.py::test_user_groups_membership_changes_recalculate_permissions
-# @pairs user-groups:membership-change user-settings:owner-other-page
 @users.route("<key>/add-groups", methods=["PUT"])
 @permission(Resource.USER, Action.PERMISSIONS)
 def add_groups(

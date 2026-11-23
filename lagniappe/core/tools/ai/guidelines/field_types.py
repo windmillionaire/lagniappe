@@ -12,8 +12,6 @@ class GuidanceField(TypedDict, total=False):
     columns: list[GuidanceField]
 
 
-# @testable true
-# @pair ai:autofill
 def schema_type_guidance(field_types: Iterable[str | None]) -> str:
     """Select complete type sections, including the shared radio/select section."""
     wanted = set(field_types)
@@ -28,8 +26,6 @@ def schema_type_guidance(field_types: Iterable[str | None]) -> str:
     return "\n\n".join(selected)
 
 
-# @testable true
-# @pair ai:autofill
 def schema_guidance(schema: Iterable[GuidanceField] | None) -> str:
     """Include column types as well as the top-level fields' types."""
     pending = list(schema or ())

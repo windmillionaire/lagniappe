@@ -17,16 +17,10 @@ from ...properties import notification_aggregate
 from lagniappe.core.tools.database import notifications as database_notifications
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/notification_aggregate.py::counts
-# @reason thin service spelling preserves an explicit value/service boundary
 def aggregate_counts(row: DatastoreRow | None) -> notification_aggregate.NotificationCounts:
     return notification_aggregate.counts(row)
 
 
-# @testable true
-# @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @pair notifications:cache-failure-isolation
 def publish_notification_aggregate(user: User, aggregate: DatastoreRow | None) -> NotificationState | None:
     """Best-effort Redis mirroring after a durable aggregate commit."""
     if aggregate is None:
@@ -42,9 +36,6 @@ def publish_notification_aggregate(user: User, aggregate: DatastoreRow | None) -
         return None
 
 
-# @testable true
-# @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @matrix notifications : idempotency ordinary-count revision
 def apply_ordinary_mutations(*, upserts: Iterable[Notification] = (), deletes: Iterable[Notification] = ()) -> dict[str, DatastoreRow]:
     """Advance durable aggregate rows for committed entity mutations."""
     deltas = defaultdict(int)
@@ -73,10 +64,6 @@ def apply_ordinary_mutations(*, upserts: Iterable[Notification] = (), deletes: I
     return aggregates
 
 
-# @testable true
-# @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @matrix notifications : aggregate-count idempotency ordinary-create
-# @matrix notification-email notifications : failure-isolation idempotency
 def create_ordinary_notification(user: User, *, identifier: str, body: str, target: Entity | None = None) -> tuple[Notification | None, bool]:
     from ...definitions import Fetch
     from ...entities import Entities
@@ -106,9 +93,6 @@ def create_ordinary_notification(user: User, *, identifier: str, body: str, targ
     return notification, created
 
 
-# @testable true
-# @tests tests_unit/test_032b_agent_plan_notifications.py::test_publication_delivery_retries_cache_and_email_without_recreating_dismissed_alerts
-# @matrix agent-api notifications : idempotency cache-failure-isolation target
 def publish_plan_notification(report: AIReport, user: User) -> None:
     """Replay supplementary delivery of an already committed publication alert."""
     identity = (report.agent_manifest or {}).get("publication_notification")
@@ -150,9 +134,6 @@ def publish_plan_notification(report: AIReport, user: User) -> None:
         capture(error, context={"operation": "plan-notification-email"})
 
 
-# @testable true
-# @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @matrix notifications : aggregate-count ordinary-delete
 def delete_ordinary_notification(user: User, notification_key: Key) -> bool:
     deleted, _aggregate = database_notifications.delete_ordinary_notification_record(
         user, notification_key
@@ -160,17 +141,11 @@ def delete_ordinary_notification(user: User, notification_key: Key) -> bool:
     return deleted
 
 
-# @testable true
-# @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @matrix notifications : aggregate-count ordinary-clear
 def clear_ordinary_notifications(user: User, keys: Iterable[Key]) -> int:
     cleared, _aggregate = database_notifications.clear_ordinary_notification_records(user, keys)
     return cleared
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_process_notification_requires_a_valid_user
-# @matrix notifications : body create task-queue
 def create_process_notification(payload: Mapping[str, str], body: str) -> Notification | None:
     """Create a notification for the valid user named by a process payload."""
     from ...definitions import Fetch

@@ -1,11 +1,6 @@
 import { primitives } from "../../../elements/primitives.mjs";
 import { ConditionTarget } from "./base.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_status_message_condition_editor
- * @pair forms:builder-status-message
- */
 export default class Status extends ConditionTarget {
 	constructor(builder) {
 		super(builder);

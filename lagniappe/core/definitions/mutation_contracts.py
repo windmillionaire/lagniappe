@@ -11,9 +11,6 @@ from .mutations import (
 )
 
 
-# @testable false
-# @covered-by lagniappe/core/definitions/mutation_contracts.py::validate_mutation_contracts
-# @reason contract construction is covered by registry completeness validation
 def relation(
     name: str,
     *targets: str,
@@ -329,16 +326,10 @@ ENTITY_MUTATION_CONTRACTS = {
 PERSISTED_ENTITY_KINDS = frozenset(ENTITY_MUTATION_CONTRACTS)
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
-# @matrix mutations : contract lookup
 def mutation_contract(kind: str) -> EntityMutationContract | None:
     return ENTITY_MUTATION_CONTRACTS.get(kind)
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
-# @matrix mutations : completeness contract validation
 def validate_mutation_contracts() -> list[str]:
     """Return stable validation messages for registry drift."""
     errors = []

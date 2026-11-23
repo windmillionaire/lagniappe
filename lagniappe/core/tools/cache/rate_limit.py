@@ -16,9 +16,6 @@ class RateLimit(TypedDict):
     retry_after: int
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/rate_limit.py::check_limit
-# @reason client identifier selection is exercised through the live limiter path
 def client_ip(request: Request) -> str:
     """Return the most useful client IP from App Engine / proxy headers."""
     forwarded = request.headers.get("X-Forwarded-For", "")
@@ -31,9 +28,6 @@ def client_ip(request: Request) -> str:
     return request.remote_addr or "unknown"
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_login_identity_returns_rate_limit_response
-# @matrix login : identity-platform rate-limit
 def check_limit(
     scope: str, identifier: object, limit: int, window_seconds: int
 ) -> RateLimit:

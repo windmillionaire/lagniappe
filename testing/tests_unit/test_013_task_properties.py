@@ -15,7 +15,6 @@ from lagniappe.core.mixins import ColumnMixin
 from testing.utility.test_entities import TestEntities, TestUser as UtilityTestUser
 
 
-# @matrix task : ai-value cache column description filter-value html-stripping
 @pytest.mark.unit
 def test_task_description(get_test_entities):
     """Test Description property for Task entities.
@@ -61,7 +60,6 @@ def test_task_description(get_test_entities):
             assert task.properties.description.cache_value is None
 
 
-# @matrix task : ai-value column date due-date filter-value
 @pytest.mark.unit
 def test_task_due_date(get_test_entities):
     """Test DueDate property for Task entities.
@@ -111,7 +109,6 @@ def test_task_due_date(get_test_entities):
                 assert task.to_ai().get("Due Date") is None
 
 
-# @matrix task : column completed details filter-value
 @pytest.mark.unit
 def test_task_completed(get_test_entities):
     """Test Completed property for Task entities.
@@ -154,7 +151,6 @@ def test_task_completed(get_test_entities):
             assert "completed" not in task.details
 
 
-# @pair task:completed-on
 @pytest.mark.unit
 def test_task_completed_on_stores_timestamp():
     task = TestEntities.get(
@@ -174,7 +170,6 @@ def test_task_completed_on_stores_timestamp():
     assert task.db["completed_on"] == completed_on
 
 
-# @matrix filters signature task : filter-value schema-field
 @pytest.mark.unit
 def test_task_has_signature_filter_value(get_schema):
     """Task-level signature filter distinguishes signed, unsigned, and inapplicable tasks."""
@@ -237,7 +232,6 @@ def test_task_has_signature_filter_value(get_schema):
     assert "has_signature" not in plain.to_filter_index()
 
 
-# @matrix filters status task : filter-value schema-field
 @pytest.mark.unit
 def test_task_has_status_filter_value(get_schema):
     """Task-level status filter distinguishes active, inactive, and inapplicable tasks."""
@@ -298,7 +292,6 @@ def test_task_has_status_filter_value(get_schema):
     assert "has_status" not in plain.to_filter_index()
 
 
-# @matrix signature submission task : asset-lifecycle db-value
 @pytest.mark.unit
 def test_task_signature_form_submission_saves_asset_id():
     """Submitting a signature file saves it as a task asset and stores the field id."""
@@ -337,7 +330,6 @@ def test_task_signature_form_submission_saves_asset_id():
     assert task.to_filter_index()["has_signature"] is True
 
 
-# @matrix signature submission task : asset-lifecycle db-value multiple-fields schema-id
 @pytest.mark.unit
 def test_task_signature_form_submission_saves_multiple_assets_by_field_id():
     """Multiple signature uploads are matched by each field's schema id."""
@@ -400,7 +392,6 @@ def test_task_signature_form_submission_saves_multiple_assets_by_field_id():
     assert saved[task.assets["signature-witness"]["path"]] == b"witness signature"
 
 
-# @matrix task : categories filter-value parent-derived
 @pytest.mark.unit
 def test_task_categories_follow_parent_page_categories():
     """Task categories are derived from the parent page, including filter details."""
@@ -439,7 +430,6 @@ def test_task_categories_follow_parent_page_categories():
     assert "text" not in details
 
 
-# @matrix filter-index permissions task : column-view permission-neutral related-values
 @pytest.mark.unit
 def test_task_filter_index_includes_restricted_related_values():
     """Filter index export includes related values hidden from column display."""
@@ -470,7 +460,6 @@ def test_task_filter_index_includes_restricted_related_values():
     assert task.to_filter_index(user=outsider)["assigned_to"] == "upg013r"
 
 
-# @matrix task : assigned-by assignee assignment
 @pytest.mark.unit
 def test_task_assignment_records_assigned_by_user_page():
     """Assigning to a user stores page keys and records the authenticated assigner."""
@@ -515,7 +504,6 @@ def test_task_assignment_records_assigned_by_user_page():
     assert "assigned_by" not in task.db
 
 
-# @matrix task : linked-pages related-files replacement unloaded-fallback
 @pytest.mark.unit
 def test_task_related_lists_replace_linked_pages_and_report_unloaded_files(
     monkeypatch,
@@ -580,7 +568,6 @@ def test_task_related_lists_replace_linked_pages_and_report_unloaded_files(
     assert context["keys"] == ["fil013"]
 
 
-# @matrix task : attach details model page
 @pytest.mark.unit
 def test_task_model_and_page_details_attach_from_key_map():
     """Task model/page related properties expose filter and parent-detail contracts."""
@@ -608,7 +595,6 @@ def test_task_model_and_page_details_attach_from_key_map():
     assert task.properties.page.details_value == page.reference_details
 
 
-# @matrix task : inheritance model-form
 @pytest.mark.unit
 def test_task_model_tracking_inherits_model_form():
     """Tasks inherit loaded model forms without lazy-loading missing relations."""
@@ -652,7 +638,6 @@ def test_task_model_tracking_inherits_model_form():
     assert lazy_task.form is None
 
 
-# @matrix permissions task : allowed assignee-override
 @pytest.mark.unit
 def test_task_allowed_assigned_user_page_override():
     """Assigned users can view/edit tasks even when base permissions deny access."""
@@ -689,8 +674,6 @@ def test_task_allowed_assigned_user_page_override():
         assert not task.allowed(Action.VIEW, user=other)
 
 
-# @matrix permissions : source-clauses inherited-restrictions
-# @matrix task permissions : source-clauses assignee-override parent-page restricted-access
 @pytest.mark.parametrize("groups,allowed", [
     (Restriction.BELONGS_TO_NONE, False), (["a"], False), (["b"], False),
     (["a", "d"], False), (["b", "d"], True), (["a", "c", "e"], True),
@@ -722,9 +705,6 @@ def test_task_restrictions_require_each_source_with_any_group(groups, allowed):
     assert task.allowed(Action.DELETE, user=viewer) is False
 
 
-# @matrix task permissions : source-clauses admin-only
-# @source lagniappe/core/properties/common_entity.py::RestrictedTo.value
-# @source lagniappe/core/entities/entity.py::Entity.restricted_access
 @pytest.mark.parametrize("admin_source", ["page", "page_form", "task_form"])
 def test_task_restrictions_preserve_other_sources_when_one_requires_admin(admin_source):
     page = TestEntities.get("PAGE", {"hash": "adminpage", "restricted_to": ["a"]})
@@ -745,8 +725,6 @@ def test_task_restrictions_preserve_other_sources_when_one_requires_admin(admin_
     assert task.allowed(Action.VIEW, user=UtilityTestUser(owner=True)) is True
 
 
-# @matrix permissions relations : deleted-form recalculation
-# @source lagniappe/core/properties/common_entity.py::RestrictedTo.value
 @pytest.mark.unit
 def test_deleted_task_form_recalculates_remaining_restrictions():
     page = TestEntities.get("PAGE", {"hash": "deletedformpage", "restricted_to": ["staff"]})
@@ -766,7 +744,6 @@ def test_deleted_task_form_recalculates_remaining_restrictions():
         _ = task.restricted_to
 
 
-# @matrix permissions task : lazy-parent-check shallow-page stored-requires
 @pytest.mark.unit
 def test_task_allowed_requires_loaded_page_even_with_stored_permission():
     task = TestEntities.get(
@@ -784,7 +761,6 @@ def test_task_allowed_requires_loaded_page_even_with_stored_permission():
     assert task.properties.page.is_set is False
 
 
-# @matrix permissions task : allowed parent-page restricted-access
 @pytest.mark.unit
 def test_task_allowed_restricted_form_blocks_page_permission():
     """Task/form restrictions are a ceiling even when the parent page is visible."""
@@ -818,7 +794,6 @@ def test_task_allowed_restricted_form_blocks_page_permission():
         assert not task.allowed(Action.EDIT, user=outsider)
 
 
-# @matrix permissions task users : allowed models-scope user-page
 @pytest.mark.unit
 def test_task_allowed_models_view_requires_models_marker():
     """Models VIEW only grants task access when the task requirements include models."""
@@ -867,7 +842,6 @@ def test_task_allowed_models_view_requires_models_marker():
     assert category_task.allowed(Action.VIEW, user=model_viewer) is True
 
 
-# @matrix permissions task : assignment restricted-access
 @pytest.mark.unit
 def test_task_update_rejects_assignee_without_restricted_task_access():
     """Assignment cannot grant access through a restricted task form."""
@@ -917,7 +891,6 @@ def test_task_update_rejects_assignee_without_restricted_task_access():
     assert "assigned_to" not in task.db
 
 
-# @matrix task task-scheduling : due-date postpone
 @pytest.mark.unit
 def test_task_postpone_preserves_original_due_date_once():
     """Postponing preserves the original due date across later postponements."""
@@ -940,7 +913,6 @@ def test_task_postpone_preserves_original_due_date_once():
     assert task.due_date == second_postponed
 
 
-# @matrix task : tracking update uploaded-files
 @pytest.mark.unit
 def test_task_update_tracks_project_model_and_uploaded_file():
     """Task updates track project/model transitions and uploaded file relations."""
@@ -1013,7 +985,6 @@ def test_task_update_tracks_project_model_and_uploaded_file():
     assert task.model is None
 
 
-# @matrix task : file-assets file-details preload update uploaded-files
 @pytest.mark.unit
 def test_task_update_saves_file_relations_from_upload_assets():
     """Task upload saves file relations while preloading file details."""
@@ -1055,7 +1026,6 @@ def test_task_update_saves_file_relations_from_upload_assets():
     assert file_entity.details["id"] == file_entity.urlsafe_key
 
 
-# @matrix task : create entity-lifecycle list-owner-fingerprint readonly save
 @pytest.mark.unit
 def test_task_entity_lifecycle_readonly_and_save_relations():
     """Task lifecycle helpers expose readonly and save relation contracts."""

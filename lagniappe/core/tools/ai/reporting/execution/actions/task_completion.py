@@ -12,9 +12,6 @@ from .references import _resolve_entity
 from .results import _entity_result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/task_completion.py::_complete_task
-# @reason recovery compare only the completion-owned state
 def _completion_state(task):
     return {
         "completed": bool(task.completed),
@@ -29,10 +26,6 @@ def _completion_state(task):
     }
 
 
-# @testable true
-# @tests tests_unit/test_020h_ai_report_execution.py::test_complete_task_action_preserves_details_and_retries
-# @tests tests_unit/test_020h_ai_report_execution.py::test_complete_task_action_requires_permission_and_required_fields
-# @matrix ai-report task-completion : complete preservation permissions required-fields recovery
 def _complete_task(action, report, user, created, context=None):
     task = _resolve_entity(_data(action).get("task"), created, expected=Entities.TASK)
     _require_allowed(

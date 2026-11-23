@@ -28,10 +28,6 @@ TASK_LIMIT_SCHEMA = {
 }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_page_tasks.py::execute_get_page_tasks
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_page_details.py::execute_get_page_details
-# @reason shared compact projection and continuation are exercised through both read tools
 def compact_task_list(
     page: Page, user: User, *, include_completed: object, limit: object = DEFAULT_TASK_LIMIT,
     cursor: object = None, view: object = None,
@@ -148,9 +144,6 @@ def compact_task_list(
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/task_lists.py::compact_task_list
-# @reason compact fields are exercised through page task discovery
 def _compact_task(task, user, tz):
     description = task.description or ""
     result = {

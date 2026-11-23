@@ -27,18 +27,10 @@ from lagniappe.web.auth import authenticated_user, logged_in
 from . import internal
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/sync.py::sync
-# @reason durable document fallback normalization is exercised through sync persistence
 def _document_seed(entity):
     return document_seed(entity)
 
 
-# @testable true
-# @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
-# @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
-# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_edits_document_without_ai_or_image_tools
-# @matrix sync : checkpoint delta document offline-replay persistence revision
 @internal.route("/sync", methods=["POST"])
 @logged_in
 def sync() -> ResponseReturnValue:
@@ -73,9 +65,6 @@ def sync() -> ResponseReturnValue:
     return responses.json_response({"updates": acknowledgements})
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/sync.py::sync
-# @reason one locked checkpoint operation in the authenticated sync route
 def _sync_document(update, entity):
     seed = _document_seed(entity)
     documents.current_document_state(update["sync_id"], seed=seed)

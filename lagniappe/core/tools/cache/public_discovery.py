@@ -37,17 +37,10 @@ SITEMAP_TTL_SECONDS = 60 * 60
 PUBLIC_DISCOVERY_EPOCH_TTL_SECONDS = 7 * 24 * 60 * 60
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/public_discovery.py::cached_sitemap
-# @covered-by lagniappe/core/tools/cache/public_discovery.py::invalidate_public_discovery
-# @reason cache variants are exercised through cache publication and invalidation
 def _sitemap_cache_key(public_manual):
     return f"{Keys.SITEMAP.value}:MANUAL:{int(bool(public_manual))}"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/public_discovery.py::cached_public_directory
-# @reason malformed cache rejection is exercised through the public cache reader
 def _decode_directory(value: str | bytes) -> DirectorySnapshot | None:
     if isinstance(value, bytes):
         value = value.decode("utf-8")
@@ -84,10 +77,6 @@ def _decode_directory(value: str | bytes) -> DirectorySnapshot | None:
     return cast(DirectorySnapshot, snapshot)  # Every nested field is validated above.
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/public_discovery.py::cached_public_directory
-# @covered-by lagniappe/core/tools/cache/public_discovery.py::cached_sitemap
-# @reason shared revision publication is covered through both public cache APIs
 def _cached_revision[T: (str, DirectorySnapshot)](
     key: str,
     builder: Callable[[], T],
@@ -132,10 +121,6 @@ def _cached_revision[T: (str, DirectorySnapshot)](
     return builder()
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_public_directory_cache_only_publishes_for_unchanged_epoch
-# @tests tests_unit/test_017_cache_query.py::test_public_directory_publish_failure_does_not_repeat_durable_build
-# @matrix cache public-directory : durable-fallback epoch json redis-failure redis-race single-rebuild ttl
 def cached_public_directory(
     builder: Callable[[], DirectorySnapshot],
 ) -> DirectorySnapshot:
@@ -150,9 +135,6 @@ def cached_public_directory(
     )
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_sitemap_cache_only_publishes_for_unchanged_epoch
-# @matrix cache sitemap : epoch public-manual-variant redis-race ttl
 def cached_sitemap(builder: Callable[[], str], *, public_manual: bool = False) -> str:
     """Return cached XML, publishing newly built XML only for a stable epoch."""
     return _cached_revision(
@@ -167,9 +149,6 @@ def cached_sitemap(builder: Callable[[], str], *, public_manual: bool = False) -
     )
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_public_discovery_invalidation_advances_epoch_and_deletes_outputs
-# @matrix cache public-directory sitemap : invalidation redis-failure shared-epoch
 def invalidate_public_discovery() -> bool:
     """Expire cached discovery outputs without blocking the durable mutation."""
     try:

@@ -67,9 +67,6 @@ CHECKPOINT_DELTA_COUNT = 64
 MAX_TRANSACTION_ATTEMPTS = 8
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_document_write_lock_is_scoped_and_bounded
-# @matrix editor sync : document append write-lock
 @contextmanager
 def document_write_lock(sync_id: str) -> Iterator[None]:
     """Serialize checkpoint preparation; durable CAS still fences expired locks."""
@@ -77,16 +74,10 @@ def document_write_lock(sync_id: str) -> Iterator[None]:
         yield
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_publish_checkpoint_preserves_live_updates
-# @matrix editor sync : document append cache-recovery offline-replay
 def publish_document_checkpoint(sync_id: str, *, seed: DocumentSeed) -> DocumentState:
     """Reconcile a committed checkpoint, retaining any uncheckpointed CRDT work."""
     from lagniappe.core.tools.document_crdt import merge_documents
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/cache/documents.py::publish_document_checkpoint
-    # @reason isolated transaction callback
     def transform(state):
         state["ydoc"] = merge_documents(seed.get("ydoc"), state.get("ydoc"), *(item["update"] for item in state.get("updates", [])))
         state["generation"] = str(uuid.uuid4())
@@ -102,9 +93,6 @@ def publish_document_checkpoint(sync_id: str, *, seed: DocumentSeed) -> Document
     return state
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_publish_checkpoint_preserves_live_updates
-# @matrix editor sync : document append cache-recovery offline-replay
 def current_document_state(
     sync_id: str, *, seed: DocumentSeed, reconcile: bool = True
 ) -> DocumentState:
@@ -115,10 +103,6 @@ def current_document_state(
     return state
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/documents.py::poll_document
-# @covered-by lagniappe/core/tools/cache/documents.py::apply_document_update
-# @reason stored-state normalization is exercised through the public cache operations
 def _new_state(seed: DocumentSeed) -> DocumentState:
     seed = seed or {}
     return {
@@ -134,10 +118,6 @@ def _new_state(seed: DocumentSeed) -> DocumentState:
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/documents.py::poll_document
-# @covered-by lagniappe/core/tools/cache/documents.py::apply_document_update
-# @reason Redis byte decoding is exercised through public document-state operations
 def _decode(value):
     if not value:
         return None
@@ -146,9 +126,6 @@ def _decode(value):
     return json.loads(value)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/documents.py::apply_document_update
-# @reason author projection is exercised through the public document update contract
 def _author_projection(author: object) -> dict[str, str] | None:
     """Return the minimal identity needed to attribute a transient revision."""
     if not isinstance(author, dict):
@@ -162,10 +139,6 @@ def _author_projection(author: object) -> dict[str, str] | None:
     return {"hash": author_hash, "name": name.strip()}
 
 
-# @testable true
-# @tests tests_unit/test_010_sync_cache.py::test_document_transactions_are_key_isolated_and_expiring
-# @tests tests_unit/test_010_sync_cache.py::test_document_poll_initialization_conflict_keeps_winning_generation
-# @matrix polling sync : concurrency document isolation ttl
 def _mutate[T](
     sync_id: str, seed: DocumentSeed, transform: Callable[[DocumentState], T]
 ) -> tuple[DocumentState, T]:
@@ -192,15 +165,6 @@ def _mutate[T](
     raise RuntimeError("Collaborative document state changed too frequently.")
 
 
-# @testable true
-# @tests tests_unit/test_010_sync_cache.py::test_existing_document_poll_refreshes_ttl_without_full_write
-# @tests tests_unit/test_010_sync_cache.py::test_document_poll_does_not_overwrite_a_concurrent_update
-# @tests tests_unit/test_010_sync_cache.py::test_missing_document_poll_initializes_from_durable_seed
-# @tests tests_unit/test_010_sync_cache.py::test_document_poll_initialization_conflict_keeps_winning_generation
-# @tests tests_unit/test_010_sync_cache.py::test_document_poll_lazy_seed_recovers_after_eviction
-# @tests tests_unit/test_010_sync_cache.py::test_document_poll_preserves_generation_created_while_loading_seed
-# @tests tests_unit/test_010_sync_cache.py::test_document_poll_seed_failure_leaves_cache_uninitialized
-# @matrix polling : concurrency document initialization read-path ttl write-amplification
 def _read_document_state(
     sync_id: str, seed: DocumentSeed | Callable[[], DocumentSeed]
 ) -> DocumentState:
@@ -223,9 +187,6 @@ def _read_document_state(
     return state
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/documents.py::poll_document
-# @reason presence serialization is exercised through the public poll contract
 def _presence_payload(client_id, user):
     return json.dumps(
         {**dict(user or {}), "client_id": client_id},
@@ -234,9 +195,6 @@ def _presence_payload(client_id, user):
     )
 
 
-# @testable true
-# @tests tests_unit/test_010_sync_cache.py::test_presence_uses_expiring_client_hash_fields
-# @matrix polling sync : hash-field presence ttl
 def _register_presence(sync_id, client_id, user):
     presence_key = Sync.PRESENCE.key(sync_id)
     with cache.pipeline() as pipe:
@@ -268,12 +226,6 @@ def _register_presence(sync_id, client_id, user):
     return users, digest
 
 
-# @testable true
-# @tests tests_unit/test_010_sync_cache.py::test_revisioned_document_poll_returns_snapshot_then_deltas
-# @tests tests_unit/test_010_sync_cache.py::test_document_generation_change_returns_all_retained_deltas
-# @tests tests_unit/test_010_sync_cache.py::test_existing_document_poll_refreshes_ttl_without_full_write
-# @tests tests_unit/test_010_sync_cache.py::test_document_poll_does_not_overwrite_a_concurrent_update
-# @matrix polling sync : author-attribution delta document presence revision snapshot
 def poll_document(
     sync_id: str,
     *,
@@ -342,10 +294,6 @@ def poll_document(
     return payload
 
 
-# @testable true
-# @tests tests_unit/test_010_sync_cache.py::test_revisioned_document_update_preserves_stale_branch_delta
-# @tests tests_unit/test_010_sync_cache.py::test_revisioned_document_poll_returns_snapshot_then_deltas
-# @matrix polling sync : author-attribution compaction concurrency document revision
 def apply_document_update(
     sync_id: str,
     *,
@@ -360,9 +308,6 @@ def apply_document_update(
     projected_author = _author_projection(author)
     author_hash = projected_author["hash"] if projected_author else None
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/cache/documents.py::apply_document_update
-    # @reason transaction-local state mutation is asserted through update acknowledgements
     def transform(state: DocumentState) -> DocumentAcknowledgement:
         previous_revision = int(state.get("revision") or 0)
         current_client = (
@@ -415,15 +360,9 @@ def apply_document_update(
     return result
 
 
-# @testable true
-# @tests tests_unit/test_010_sync_cache.py::test_revisioned_document_asset_refresh_keeps_live_generation
-# @matrix polling sync : document fingerprint persistence
 def update_document_asset(sync_id: str, *, seed: DocumentSeed) -> DocumentState:
     """Refresh durable document metadata without discarding live revisions."""
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/cache/documents.py::update_document_asset
-    # @reason transaction-local asset refresh is asserted through the public operation
     def transform(state):
         state["fingerprint"] = seed.get("fingerprint")
         state["markup"] = seed.get("markup")
@@ -433,9 +372,6 @@ def update_document_asset(sync_id: str, *, seed: DocumentSeed) -> DocumentState:
     return state
 
 
-# @testable true
-# @tests tests_unit/test_010_sync_cache.py::test_revisioned_presence_close_removes_client
-# @matrix polling sync : document lifecycle presence
 def close_presence(client_id: str, sync_ids: Iterable[str] | None) -> None:
     """Remove a browser client from the supplied collaborative documents."""
     if not client_id:
@@ -447,9 +383,6 @@ def close_presence(client_id: str, sync_ids: Iterable[str] | None) -> None:
         pipe.execute()
 
 
-# @testable false
-# @covered-by lagniappe/core/mutations/executor.py::execute_post_commit
-# @reason external entity invalidation calls this one-command cache boundary
 def clear_document(sync_id: str) -> None:
     """Discard an externally invalidated live generation."""
     cache.redis.delete(Sync.DOCUMENTS.key(sync_id))

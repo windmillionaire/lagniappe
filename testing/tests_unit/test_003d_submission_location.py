@@ -46,7 +46,6 @@ def _location_field(existing=None):
     )
 
 
-# @matrix location : coordinates session-bias validation
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "value",
@@ -70,25 +69,21 @@ def test_normalize_location_coordinates_rejects_malformed_values(value):
     ) == {"latitude": 29.0, "longitude": -90.0}
 
 
-# @pair location:suite-stripping
 def test_simplify_address_for_search_comma_suite():
     """Comma-separated suite clause should be stripped for retry."""
     out = loc.simplify_address_for_search("123 Main St, Suite 400, City, ST")
     assert out == "123 Main St"
 
 
-# @pair location:suite-stripping
 def test_simplify_address_for_search_trailing_suite():
     out = loc.simplify_address_for_search("123 Main St Suite 4")
     assert out == "123 Main St"
 
 
-# @pair location:suite-stripping
 def test_simplify_address_for_search_no_change():
     assert loc.simplify_address_for_search("123 Main St") is None
 
 
-# @matrix location : retry suite-stripping
 def test_resolve_location_query_retries_after_simplify():
     """Second search uses simplified query when first returns empty."""
     with patch.object(
@@ -102,7 +97,6 @@ def test_resolve_location_query_retries_after_simplify():
     ]
 
 
-# @pair location:first-hit
 def test_resolve_location_query_first_hit_wins():
     with patch.object(
         loc,
@@ -114,7 +108,6 @@ def test_resolve_location_query_first_hit_wins():
     search_places.assert_called_once_with("Some Cafe")
 
 
-# @matrix location : api-cache oauth
 @pytest.mark.unit
 def test_get_places_access_token_reuses_cached_token_until_refresh_window(monkeypatch):
     """OAuth credentials should refresh only when the cached token is near expiry."""
@@ -154,7 +147,6 @@ def test_get_places_access_token_reuses_cached_token_until_refresh_window(monkey
     ]
 
 
-# @matrix location : api-request response-mapping session-bias
 @pytest.mark.unit
 def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypatch):
     """Autocomplete should send a biased request and return compact suggestions."""
@@ -218,7 +210,6 @@ def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypat
     )
 
 
-# @matrix location : address2 api-request name-normalization
 @pytest.mark.unit
 def test_get_place_details_formats_address2_and_meaningful_name():
     response = _outbound(
@@ -258,7 +249,6 @@ def test_get_place_details_formats_address2_and_meaningful_name():
     )
 
 
-# @pair location:name-normalization
 @pytest.mark.unit
 def test_get_place_details_omits_street_address_display_name():
     response = _outbound(
@@ -285,7 +275,6 @@ def test_get_place_details_omits_street_address_display_name():
     }
 
 
-# @matrix location : deadline degradation diagnostics provider-failure
 @pytest.mark.unit
 def test_places_provider_failures_capture_once_and_degrade(monkeypatch):
     captured = []
@@ -329,7 +318,6 @@ def test_places_provider_failures_capture_once_and_degrade(monkeypatch):
     }
 
 
-# @matrix location : degradation diagnostics provider-contract
 @pytest.mark.unit
 def test_places_malformed_provider_payload_captures_once(monkeypatch):
     captured = []
@@ -371,7 +359,6 @@ def test_places_malformed_provider_payload_captures_once(monkeypatch):
     assert captured[0][1] == {"context": "get_place_details", "method": "GET"}
 
 
-# @matrix location : column free-text
 @pytest.mark.unit
 def test_location_address_only_value_and_column():
     field = _location_field()
@@ -385,7 +372,6 @@ def test_location_address_only_value_and_column():
     assert cv["title"] == "123 Main St Suite 4"
 
 
-# @matrix location : address2 ai-value column filter-value
 @pytest.mark.unit
 def test_location_place_value_preserves_address2():
     field = _location_field()
@@ -410,7 +396,6 @@ def test_location_place_value_preserves_address2():
     assert field.ai_value == "Mock Place, 123 Main St, Suite 400, City"
 
 
-# @matrix location : address2 column free-text
 @pytest.mark.unit
 def test_location_free_text_value_preserves_address2():
     field = _location_field()
@@ -429,7 +414,6 @@ def test_location_free_text_value_preserves_address2():
     assert field.column_value["title"] == "123 Main St, Apt 5"
 
 
-# @matrix location : address2 no-refetch
 @pytest.mark.unit
 def test_location_same_id_updates_address2_without_refetch():
     field = _location_field(
@@ -457,7 +441,6 @@ def test_location_same_id_updates_address2_without_refetch():
     }
 
 
-# @matrix location : fallback free-text provider-failure warnings
 @pytest.mark.unit
 def test_location_place_detail_failure_falls_back_to_submitted_text():
     field = _location_field()
@@ -483,7 +466,6 @@ def test_location_place_detail_failure_falls_back_to_submitted_text():
     assert any("text" in warning.lower() for warning in field.warnings)
 
 
-# @matrix location : fallback warnings
 @pytest.mark.unit
 def test_location_validate_ai_fallback():
     field = _location_field()
@@ -502,7 +484,6 @@ def test_location_validate_ai_fallback():
     )
 
 
-# @matrix location : fallback import
 @pytest.mark.unit
 def test_location_validate_import_fallback():
     field = _location_field()

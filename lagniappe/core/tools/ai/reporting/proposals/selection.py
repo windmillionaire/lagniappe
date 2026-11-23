@@ -14,9 +14,6 @@ from .references import _referenced_action_ids
 from .validation import validate_proposal
 
 
-# @testable true
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_skip_proposal_actions_marks_dependencies
-# @matrix ai-report : dependencies proposal skip
 def skip_proposal_actions(proposal: object, index: int) -> list[int]:
     """Mark one proposal action and all dependent actions as skipped."""
     proposal = validate_proposal(proposal)
@@ -31,9 +28,6 @@ def skip_proposal_actions(proposal: object, index: int) -> list[int]:
     return sorted(action_index + 1 for action_index in skipped_indexes)
 
 
-# @testable true
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_toggle_proposal_action_skip_restores_dependencies
-# @matrix ai-report : dependencies proposal restore skip
 def toggle_proposal_action_skip(proposal: object, index: int) -> dict[str, list[int]]:
     """Toggle skipped state for an action and its dependent actions."""
     proposal = validate_proposal(proposal)
@@ -45,9 +39,6 @@ def toggle_proposal_action_skip(proposal: object, index: int) -> dict[str, list[
     return _set_proposal_action_skip(actions, index, changed_indexes)
 
 
-# @testable true
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_toggle_proposal_action_skip_restores_dependencies
-# @matrix ai-report : dependencies exact-indexes grouped-display proposal restore schema-section skip
 def toggle_proposal_action_indexes(
     proposal: object,
     index: int,
@@ -76,10 +67,6 @@ def toggle_proposal_action_indexes(
     return _set_proposal_action_skip(actions, index, changed_indexes)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/selection.py::toggle_proposal_action_skip
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/selection.py::toggle_proposal_action_indexes
-# @reason shared skip state mutation is verified through public toggle helpers
 def _set_proposal_action_skip(actions, index, changed_indexes):
     skip = actions[index].get("skip") is not True
     for action_index in changed_indexes:
@@ -98,10 +85,6 @@ def _set_proposal_action_skip(actions, index, changed_indexes):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/selection.py::skip_proposal_actions
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/selection.py::toggle_proposal_action_skip
-# @reason dependency walk is verified through public proposal mutation helpers
 def _dependent_action_indexes(actions, index):
     skipped_ids = set()
     skipped_indexes = {index}

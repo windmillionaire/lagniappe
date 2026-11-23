@@ -18,9 +18,6 @@ if TYPE_CHECKING:
 BATCH_SIZE = 50
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/changes.py::apply_target
-# @reason application and preflight use the same uncapped membership query, one bounded page at a time
 def target_batch(form: Form, cursor: str | None = None) -> Results[DatastoreEntity]:
     return (
         Query(KINDS.instances)
@@ -32,10 +29,6 @@ def target_batch(form: Form, cursor: str | None = None) -> Results[DatastoreEnti
     )
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_form_authority_migrates_restricted_submissions
-# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_form_editor_migrates_restricted_submissions
-# @matrix form-migration : form-authority restricted-submissions
 def load_target(raw: DatastoreEntity) -> Page | Task | None:
     if raw.get("type") not in {"page", "task"}:
         return None

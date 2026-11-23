@@ -135,7 +135,6 @@ test("test_unmocked_queue_graph_imports_with_browser_environment", async (t) => 
 	assert.equal(await queue.replay(), 0);
 });
 
-/** @pair style-build:runtime-parity */
 test("test_registry_generation_is_idempotent_and_repairs_missing_outputs", async () => {
 	const { generateStyleModules, STYLE_PIPELINE } = await import(
 		"../../build/utility.mjs"

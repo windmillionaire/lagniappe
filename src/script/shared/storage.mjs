@@ -2,9 +2,6 @@
  * Best-effort access to browser storage that never makes application behavior
  * depend on storage availability.
  *
- * @testable true
- * @tests tests_js/test_020_shared_utilities.mjs::test_safe_storage_adapters_handle_browser_failures_and_json
- * @matrix browser-storage : availability json
  */
 class StorageAdapter {
 	constructor(name) {
@@ -76,11 +73,6 @@ class StorageAdapter {
 export const localStore = new StorageAdapter("localStorage");
 export const sessionStore = new StorageAdapter("sessionStorage");
 
-/**
- * @testable true
- * @tests tests_js/test_020_shared_utilities.mjs::test_safe_storage_adapters_handle_browser_failures_and_json
- * @matrix browser-storage : recent-search-cleanup
- */
 export const clearRecentSearchResults = () => {
 	const recentKeys = Array.from({ length: localStorage.length }, (_, index) =>
 		localStorage.key(index),

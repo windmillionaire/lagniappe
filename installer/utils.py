@@ -9,11 +9,6 @@ from .errors import SetupCancelled
 from .package_install import install_if_missing
 
 
-# @testable false
-# @covered-by installer/image.py::get_images
-# @covered-by installer/upgrade.py::_update_custom_images
-# @covered-by installer/upgrade.py::_update_deployment_settings
-# @reason shared dependency guard exercised through image/deployment restore flows
 def ensure_datastore_dependency() -> None:
     install_if_missing(
         "google.cloud.datastore",
@@ -22,10 +17,6 @@ def ensure_datastore_dependency() -> None:
     )
 
 
-# @testable false
-# @covered-by installer/image.py::save_images
-# @covered-by installer/upgrade.py::_update_custom_images
-# @reason shared dependency guard exercised through image restore flows
 def ensure_storage_dependency() -> None:
     install_if_missing(
         "google.cloud.storage",
@@ -34,9 +25,6 @@ def ensure_storage_dependency() -> None:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_validate_input_retries_allows_empty_and_exits
-# @pair setup:interactive-input
 def validate_input[**P, T](
     prompt: str,
     validation_fn: Callable[[str], object] | None = None,
@@ -46,13 +34,7 @@ def validate_input[**P, T](
 ) -> Callable[[Callable[Concatenate[str, P], T]], Callable[P, T]]:
     """Decorator factory for validated input with an optional Enter default."""
 
-    # @testable false
-    # @covered-by installer/utils.py::validate_input
-    # @reason closure returned by the validate_input decorator factory
     def decorator(func: Callable[Concatenate[str, P], T]) -> Callable[P, T]:
-        # @testable false
-        # @covered-by installer/utils.py::validate_input
-        # @reason interactive retry loop exercised through validate_input
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
             from installer import FORMATTER
@@ -85,9 +67,6 @@ def validate_input[**P, T](
     return decorator
 
 
-# @testable false
-# @covered-by installer/deploy.py::deploy_to_app_engine
-# @reason older upgrade processes reload utils after replacing source but retain their old caller
 def deploy_to_app_engine(
     *,
     print_final_summary: bool = True,

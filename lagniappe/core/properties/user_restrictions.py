@@ -46,14 +46,6 @@ class RestrictionState(TypedDict):
     user_message: QueryHashes
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.value
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.search
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.task
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.form
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.user_assign_restrictions
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.can_initiate_messages
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.users
 class Restrictions(Property[list[str], "User"]):
     """Computed access restrictions for a user.
 
@@ -99,27 +91,15 @@ class Restrictions(Property[list[str], "User"]):
         }
     ) | frozenset(_access_fields)
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @matrix permissions restrictions : facets
     @property
     def value(self) -> list[str]:  # pyright: ignore[reportIncompatibleMethodOverride] -- access restrictions are computed and read-only.
         self._ensure_loaded()
         return cast(list[str], self._value)
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_only_project_permissions_that_imply_view
-    # @tests tests_unit/test_009d_user_restrictions.py::test_administrator_search_membership_bypasses_restrictions
-    # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_one_category_permissions
-    # @matrix permissions restrictions : search
     @property
     def search(self) -> QueryHashes:
         return self._state_value("search")
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @matrix permissions restrictions : facets
     @property
     def task(self) -> QueryHashes:
         return self._state_value("task")
@@ -130,9 +110,6 @@ class Restrictions(Property[list[str], "User"]):
 
         return self._ensure_loaded()["pages_by_category"].get(category.hash, [])
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @matrix permissions restrictions : facets
     @property
     def form(self) -> QueryHashes:
         return self._state_value("form")
@@ -145,17 +122,10 @@ class Restrictions(Property[list[str], "User"]):
     def models(self) -> QueryHashes:
         return self._state_value("models")
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @pair restrictions:page-list
     @property
     def page(self) -> QueryHashes:
         return self._state_value("page")
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_user_assign_search_permission_filter_returns_assignable_users
-    # @matrix permissions restrictions : assign search
     @property
     def user_assign_restrictions(self) -> QueryHashes:
         return self._state_value("user_assign")
@@ -165,36 +135,20 @@ class Restrictions(Property[list[str], "User"]):
         """Users eligible for direct messages and mention suggestions."""
         return self._state_value("user_message")
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_session_blob_and_fingerprint
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_empty_list_is_loaded_state
-    # @pair messaging:compose-eligibility
     @property
     def can_initiate_messages(self) -> bool:
         """Session-backed capability for rendering new-message entry points."""
         return self._ensure_loaded()["can_initiate_messages"]
 
-    # @testable true
-# @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_category_search_permission_filter_returns_editable_categories
-# @tests tests_e2e/002_home/test_002k_home_pages.py::test_home_page_create_visible_for_category_editor
-    # @matrix permissions restrictions : category-edit search
     @property
     def category_edit_restrictions(self) -> QueryHashes:
         return self._state_value("category_edit")
 
-    # @testable true
-    # @tests tests_unit/test_020b_ai_planner.py::test_action_catalog_uses_create_update_delete_permissions
-    # @matrix ai-report : action-capabilities permissions
-    # @pair permissions:own-page
     @property
     def ai_action_capabilities(self) -> dict[str, bool]:
         """Live create/update/delete hints for action discovery, never target authorization."""
         return self._ai_action_capabilities()
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @matrix permissions restrictions : facets
     @property
     def users(self) -> QueryHashes:
         return self._state_value("users")
@@ -203,21 +157,10 @@ class Restrictions(Property[list[str], "User"]):
     def category(self) -> QueryHashes:
         return self._state_value("category")
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_builds_group_membership_from_stored_requires
-    # @tests tests_unit/test_009d_user_restrictions.py::test_administrator_search_membership_bypasses_restrictions
-    # @tests tests_unit/test_009d_user_restrictions.py::test_session_membership_refreshes_without_permission_map_change
-    # @matrix permissions restrictions : group-membership session-blob
-    # @matrix permissions : group-membership stored-requires
-    # @pair restrictions:search
-    # @pair restrictions:root-fetch
     @property
     def belongs_to(self) -> GroupMembership:
         return self._ensure_loaded()["belongs_to"]
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_clear_removes_session_blob
-    # @matrix permissions restrictions : clear session-blob
     def clear(self) -> None:
         if has_request_context():
             session.pop(self._session_key, None)
@@ -226,9 +169,6 @@ class Restrictions(Property[list[str], "User"]):
         self._permission_details = {}
         self._value_details = {}
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_empty_list_is_loaded_state
-    # @matrix permissions restrictions : empty-access loaded-state
     def _ensure_loaded(self) -> RestrictionState:
         if self._state is not None and self.is_set:
             return self._state
@@ -255,9 +195,6 @@ class Restrictions(Property[list[str], "User"]):
         except RuntimeError:
             return False
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_session_blob_and_fingerprint
-    # @matrix permissions restrictions : empty-access session-blob stale-session
     def _session_state(self) -> RestrictionState | None:
         if not self._session_enabled():
             return None
@@ -289,9 +226,6 @@ class Restrictions(Property[list[str], "User"]):
             state[key] = Restriction.from_session(state[key])
         return cast(RestrictionState, state)
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restriction_session_markers_validate_their_own_scope
-    # @matrix permissions restrictions : session-blob validation
     @classmethod
     def _session_blob_types_valid(cls, stored: Mapping[str, object]) -> bool:
         return (
@@ -331,9 +265,6 @@ class Restrictions(Property[list[str], "User"]):
             blob[key] = Restriction.to_session(blob[key])
         return blob
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_session_membership_refreshes_without_permission_map_change
-    # @matrix permissions restrictions : group-membership session-blob
     def _fingerprint(self) -> str:
         return self.entity.authorization_fingerprint
 
@@ -379,9 +310,6 @@ class Restrictions(Property[list[str], "User"]):
             return ["models"]
         return self._sorted_hashes(self._value_details, "page", "category")
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.ai_action_capabilities
-    # @reason resource-level hints are exercised through action discovery and session tests
     def _ai_action_capabilities(self) -> dict[str, bool]:
         self._ensure_loaded()
         self._ensure_permission_details()

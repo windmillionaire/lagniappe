@@ -8,12 +8,6 @@ import { buttons } from "../../buttons.mjs";
  * Own the nonmodal decision and asynchronous replacement for one pasted
  * Markdown source block at a time.
  *
- * @testable true
- * @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_markdown_table_preserves_table_after_reload
- * @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_plain_html_inserts_safe_formatted_content
- * @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_common_markdown_preserves_formatting
- * @tests tests_e2e/004_projects/test_004d_document.py::test_keeping_pasted_markdown_preserves_source_block
- * @matrix editor markdown : conversion paste source-block
  */
 export class MarkdownPastePrompt {
 	constructor(toolbar) {

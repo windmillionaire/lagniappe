@@ -44,11 +44,6 @@ const POLL_CHANNELS = new Set([
 ]);
 const POLL_STATUSES = new Set(["changed", "unchanged", "unavailable", "error"]);
 
-/**
- * @testable false
- * @covered-by src/script/shared/polling.mjs::PollingCoordinator
- * @reason safe field diagnostics are exercised through coordinator contract coverage
- */
 class PollContractError extends TypeError {
 	constructor(path, reason) {
 		super(`${path}: ${reason}`);
@@ -58,11 +53,6 @@ class PollContractError extends TypeError {
 	}
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/polling.mjs::PollingCoordinator
- * @reason exact object shape checks are exercised through coordinator contract coverage
- */
 const exactFields = (value, path, required, optional = []) => {
 	if (!value || typeof value !== "object" || Array.isArray(value)) {
 		throw new PollContractError(path, "type");
@@ -81,11 +71,6 @@ const exactFields = (value, path, required, optional = []) => {
 	return value;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/polling.mjs::PollingCoordinator
- * @reason bounded string checks are exercised through coordinator contract coverage
- */
 const boundedString = (value, path, maximum, { nullable = false } = {}) => {
 	if (nullable && value === null) return null;
 	if (typeof value !== "string") throw new PollContractError(path, "type");
@@ -94,11 +79,6 @@ const boundedString = (value, path, maximum, { nullable = false } = {}) => {
 	return value;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/polling.mjs::PollingCoordinator
- * @reason integer cursor checks are exercised through coordinator contract coverage
- */
 const integerRevision = (value, path) => {
 	if (!Number.isInteger(value)) throw new PollContractError(path, "type");
 	if (value < 0) throw new PollContractError(path, "state");
@@ -106,11 +86,6 @@ const integerRevision = (value, path) => {
 	return value;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/polling.mjs::PollingCoordinator
- * @reason document identity checks are exercised through coordinator contract coverage
- */
 const documentId = (value, path) => {
 	value = boundedString(value, path, MAX_KEY_LENGTH);
 	if (!value.endsWith(":document")) {
@@ -119,11 +94,6 @@ const documentId = (value, path) => {
 	return value;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/polling.mjs::PollingCoordinator
- * @reason descriptor normalization is exercised through coordinator requests
- */
 const normalizedDescriptor = (raw, path = "descriptor") => {
 	exactFields(
 		raw,
@@ -179,11 +149,6 @@ const normalizedDescriptor = (raw, path = "descriptor") => {
 	return descriptor;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/polling.mjs::PollingCoordinator
- * @reason notification request modes are exercised through coordinator requests
- */
 const normalizedNotificationState = (raw, path = "notification_state") => {
 	exactFields(raw, path, ["generation", "revision", "seed"]);
 	if (typeof raw.seed !== "boolean") {
@@ -205,11 +170,6 @@ const normalizedNotificationState = (raw, path = "notification_state") => {
 	return { generation, revision, seed: raw.seed };
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/polling.mjs::PollingCoordinator
- * @reason final request normalization is exercised through coordinator requests
- */
 const normalizedRequest = (raw) => {
 	exactFields(
 		raw,
@@ -277,11 +237,6 @@ const normalizedRequest = (raw) => {
 	return requestBody;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/polling.mjs::PollingCoordinator
- * @reason result normalization is exercised through coordinator response coverage
- */
 const normalizedResult = (raw, descriptor, path) => {
 	exactFields(
 		raw,
@@ -375,11 +330,6 @@ const normalizedResult = (raw, descriptor, path) => {
 	};
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/polling.mjs::PollingCoordinator
- * @reason page-scoped client identity creation is exercised through coordinator requests
- */
 function clientId() {
 	let value = null;
 	try {
@@ -411,11 +361,6 @@ function clientId() {
 	return value;
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/polling.mjs::PollingCoordinator
- * @reason bounded scheduling jitter is exercised through coordinator cadence
- */
 function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
 	return Math.max(Math.round(delay * factor), 250);
 }
@@ -423,18 +368,6 @@ function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
 /**
  * One view-scoped scheduler for every server-state subscription.
  *
- * @testable true
- * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_batches_due_subscriptions_and_applies_results
- * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_limits_visible_blur_to_eligible_operations
- * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_enqueues_reentrant_followup_without_waiting
- * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_schedules_modes_and_notification_seed
- * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_captures_and_isolates_contract_failures
- * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_temporarily_boosts_a_subscription
- * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_retries_cold_seed_until_warm_acknowledgement
- * @tests tests_js/test_034_polling_coordinator.mjs::test_polling_coordinator_treats_failed_transport_as_retryable
- * @matrix notifications : acknowledgement bounded-backoff cold-seed zero-subscriptions
- * @matrix polling : acknowledgement batching blur cadence coalescing diagnostics foreground freshness lifecycle presence protocol reentrancy requested-cycle revision scheduled-initial terminal-operation-order transport-error validation visibility
- * @pairs deferred-jobs:polling messaging:active-polling
  */
 export class PollingCoordinator {
 	constructor(view) {

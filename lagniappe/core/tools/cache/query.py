@@ -73,9 +73,6 @@ STOPWORDS = frozenset(
 )
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_search_prunes_stale_rows_without_entity_details
-# @pairs cache:self-repair search:stale-row
 def _current_search_results(results):
     """Hydrate results and remove projections whose entity details are gone."""
     entities = iter(hydrate_search_results([result for result in results if result.get("kind") != "help"]))
@@ -91,9 +88,6 @@ def _current_search_results(results):
     return [result for result in hydrated if result.get("details")], len(stale)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/query.py::_add_snippet
-# @reason pipe decoding is owned by highlighted form-value snippets
 def _unescape_pipe(text):
     """Unescape pipe and backslash after splitting."""
     if not isinstance(text, str):
@@ -102,9 +96,6 @@ def _unescape_pipe(text):
     return text.replace("\\|", "|").replace("\\\\", "\\")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/query.py::_add_snippet
-# @reason Redis highlight markers are normalized by snippet formatting
 def _split_first_highlight(text):
     """Return text around the first generated highlight marker pair."""
     if not isinstance(text, str):
@@ -126,9 +117,6 @@ def _split_first_highlight(text):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/query.py::_add_snippet
-# @reason Redis highlight markers are normalized by snippet formatting
 def _highlighted_html(text):
     """Escape snippet text and preserve only generated highlight tags."""
     if not isinstance(text, str):
@@ -150,13 +138,6 @@ def _highlighted_html(text):
     return Markup("").join(parts)
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_search_term_list_normalizes_stopwords_and_special_characters
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_exact_match
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_partial_match
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_special_characters
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_primary_name_matches_rank_above_file_name_and_description_matches
-# @matrix search : exact-match partial-match primary-name-ranking special-characters stopwords term-normalization
 def _build_term_list(user_query, expanded=False):
     normalized = SUBSTITUTE.sub(" ", user_query)
     terms = [t for t in normalized.split() if len(t) > 1 and t.lower() not in STOPWORDS]
@@ -179,9 +160,6 @@ def _build_term_list(user_query, expanded=False):
     return expanded_terms
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_search_permission_fragments_validate_scope_and_membership
-# @matrix search : permissions validation
 def _add_required(required):
     if not isinstance(required, list):
         raise TypeError("Required must be a list of hashes")
@@ -190,12 +168,6 @@ def _add_required(required):
     return f"(@requires:{{ {' | '.join(required)} }})"
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_search_permission_fragments_validate_scope_and_membership
-# @tests tests_unit/test_017_cache_query.py::test_search_restrictions_require_membership_in_each_source
-# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_redis_search_matches_each_restriction_source_before_pagination
-# @matrix search permissions : source-clauses canonical-policy
-# @matrix search : permissions validation
 def _add_restricted_to(belongs_to):
     """Match any group within every present restriction source before paging."""
     if belongs_to is Restriction.BELONGS_TO_ALL:
@@ -215,11 +187,6 @@ def _add_restricted_to(belongs_to):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/query.py::search
-# @covered-by lagniappe/core/tools/cache/query.py::kind_search
-# @covered-by lagniappe/core/tools/cache/query.py::entity_search
-# @reason result formatting belongs to outward search workflows
 def _format_result(doc, snippets=False):
     if doc.kind == "help":
         from lagniappe.reference import get_topic
@@ -251,11 +218,6 @@ def _format_result(doc, snippets=False):
     return result
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_search_snippet_extracts_highlighted_text_and_form_values
-# @tests tests_unit/test_017_cache_query.py::test_search_snippet_skips_highlighted_value_without_matching_key
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_result_snippets
-# @matrix search : form-value highlighted-text html-escaping malformed-cache pipe-escaping snippets
 def _add_snippet(result, doc):
     if hasattr(doc, "desc") and _split_first_highlight(doc.desc):
         result["text"] = _highlighted_html(doc.desc)
@@ -299,9 +261,6 @@ def _add_snippet(result, doc):
         break
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_task_facet_includes_task_and_model_results_with_links
-# @matrix search : facet-filter task-model
 def _expand_result_kinds(kinds):
     """Return cache kinds represented by the requested search facets."""
     expanded = []
@@ -312,9 +271,6 @@ def _expand_result_kinds(kinds):
     return list(dict.fromkeys(expanded))
 
 
-# @testable infrastructure
-# @tests tests_unit/test_017_cache_query.py::test_search_empty_access_returns_without_querying_redis
-# @matrix search : empty-access permissions
 def entity_search(
     query_string: str, restrictions: QueryHashes, belongs_to: GroupScope
 ) -> list[SearchRecord]:
@@ -341,9 +297,6 @@ def entity_search(
         return []
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_model_expansion_keeps_viewer_restrictions
-# @matrix search permissions : model-expansion restricted-access
 def _add_models(results, project_hashes, restriction_clause):
     if not project_hashes:
         return [doc for doc in results.docs]
@@ -367,10 +320,6 @@ def _add_models(results, project_hashes, restriction_clause):
     return expanded_results
 
 
-# @testable infrastructure
-# @tests tests_unit/test_017_cache_query.py::test_search_queries_use_redis_cloud_compatible_tag_syntax
-# @tests tests_unit/test_017_cache_query.py::test_search_empty_access_returns_without_querying_redis
-# @matrix search : empty-access permissions redis-cloud tag-syntax
 def kind_search(
     query_string: str,
     kind: str,
@@ -420,16 +369,6 @@ def kind_search(
     return _current_search_results(formatted_results)[0]
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_search_queries_use_redis_cloud_compatible_tag_syntax
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_returns_results
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_no_results
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_primary_name_matches_rank_above_file_name_and_description_matches
-# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_search_matches_explicit_denial_and_administrator_content_access
-# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_redis_search_matches_each_restriction_source_before_pagination
-# @tests tests_unit/test_017_cache_query.py::test_search_empty_access_returns_without_querying_redis
-# @matrix search permissions : source-clauses pagination restricted-access
-# @matrix search : empty-access no-results permissions primary-name-ranking redis-cloud results tag-syntax
 def search(
     user_query: str,
     required: QueryHashes,
@@ -486,9 +425,6 @@ def search(
         return [], 0
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_exact_name_search_is_bounded_permission_and_parent_scoped
-# @matrix search : exact-name parent-scope permissions bounded-query
 def exact_name_search(
     name: str,
     required: QueryHashes,
@@ -538,13 +474,6 @@ def exact_name_search(
     return exact[: max(1, int(limit or 1))]
 
 
-# @testable true
-# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_search_groups_relaxed_terms_inside_access_scope
-# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_search_ranks_exact_strict_and_name_coverage
-# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_search_skips_unnecessary_or_queries
-# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_search_keeps_default_search_and_stale_repair
-# @tests tests_e2e/009_search/test_009d_ai_candidate_search.py::test_candidate_search_keeps_redis_scope_and_ranks_partial_names
-# @matrix search : candidate-ranking term-relaxation permissions bounded-query cached-details
 def candidate_search(
     user_query: str,
     required: QueryHashes,
@@ -607,9 +536,6 @@ def candidate_search(
     return ordered[:limit]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/query.py::candidate_search
-# @reason bounded Redis retrieval and cached hydration belong to candidate search
 def _candidate_query(clauses, limit):
     redis_query = (
         Query(" ".join(filter(None, clauses)))
@@ -633,9 +559,6 @@ def _candidate_query(clauses, limit):
     return _current_search_results(formatted)[0]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/query.py::candidate_search
-# @reason rank complete names and strict matches without treating snippets as full text
 def _candidate_rank(result, normalized_name, terms, strict_ids):
     name = " ".join(str(result.get("name") or "").split()).casefold()
     name_words = SUBSTITUTE.sub(" ", name).split()

@@ -1,42 +1,17 @@
 import { request } from "./request.mjs";
 
-/**
- * @testable false
- * @covered-by src/script/shared/analytics.mjs::AnalyticsManager
- * @reason metadata lookup is private analytics payload plumbing
- */
 const meta = (name) =>
 	document.querySelector(`meta[name="${name}"]`)?.getAttribute("content") || "";
 
-/**
- * @testable false
- * @covered-by src/script/shared/analytics.mjs::AnalyticsManager
- * @reason CSRF token lookup is private analytics request plumbing
- */
 const token = () => document.getElementById("token")?.value || "";
 
-/**
- * @testable false
- * @covered-by src/script/shared/analytics.mjs::AnalyticsManager
- * @reason analytics enablement is owned by the shared manager contract
- */
 const analyticsEnabled = () => meta("analytics") === "true";
 
-/**
- * @testable false
- * @covered-by src/script/shared/analytics.mjs::AnalyticsManager
- * @reason browser navigation metadata is private analytics payload plumbing
- */
 const navigationType = () => {
 	const navigation = performance.getEntriesByType?.("navigation")?.[0];
 	return navigation?.type || "";
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/analytics.mjs::AnalyticsManager
- * @reason analytics title lookup prefers entity view headers without requiring every route to add metadata
- */
 const pageTitle = () =>
 	meta("analytics-title") ||
 	document
@@ -44,11 +19,6 @@ const pageTitle = () =>
 		?.textContent?.trim() ||
 	document.title.trim();
 
-/**
- * @testable false
- * @covered-by src/script/shared/analytics.mjs::AnalyticsManager
- * @reason view payload construction is owned by the shared analytics manager
- */
 const viewData = (action) => {
 	const view = document.querySelector("[lp-view]");
 	return {
@@ -66,13 +36,6 @@ const viewData = (action) => {
 	};
 };
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
- * @tests tests_js/test_009_request_csrf.mjs::test_analytics_skips_internal_requests
- * @pair analytics:page-load
- * @pair analytics:internal-request-exclusion
- */
 class AnalyticsManager {
 	get enabled() {
 		return analyticsEnabled();

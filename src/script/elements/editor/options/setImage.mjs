@@ -2,9 +2,6 @@ import { STYLES } from "../../../generated/styles.mjs";
 import { IMAGE_GROUPS } from "../config.mjs";
 import { ToolbarButton } from "./toolbarButtons.mjs";
 
-/**
- * @testable infrastructure
- */
 class ImageOptions {
 	constructor(toolbar) {
 		this.toolbar = toolbar;

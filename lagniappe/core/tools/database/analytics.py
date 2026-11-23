@@ -11,9 +11,6 @@ from config.datastore import encode_urlsafe_key
 from .core import DATA, KINDS
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::_save_event
-# @reason event persistence is exercised through the route-owned write boundary
 def create_event(data: Mapping[str, object]) -> Entity:
     """Persist one application analytics event."""
     key = DATA.datastore.allocate_ids(DATA.datastore.key(KINDS.analytics.value), 1)[0]
@@ -23,9 +20,6 @@ def create_event(data: Mapping[str, object]) -> Entity:
     return event
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::_events
-# @reason event queries are exercised through the owner analytics dashboard
 def events(*, start: datetime | None = None, limit: int = 1000) -> list[Entity]:
     """Fetch analytics events newest first, optionally within a time window."""
     query = DATA.datastore.query(kind=KINDS.analytics.value)
@@ -37,9 +31,6 @@ def events(*, start: datetime | None = None, limit: int = 1000) -> list[Entity]:
     return list(query.fetch(limit=limit))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/observability.py::_write_summary
-# @reason summary persistence is exercised through the typed observability boundary
 def create_ai_observability(
     identifier: str,
     payload: Mapping[str, object],
@@ -57,9 +48,6 @@ def create_ai_observability(
     return entity
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::_ai_records
-# @reason summary queries are exercised through the owner analytics dashboard
 def ai_observability_records(
     *, start: datetime | None = None, limit: int = 1000
 ) -> list[Entity]:
@@ -73,18 +61,11 @@ def ai_observability_records(
     return list(query.fetch(limit=limit))
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::_delete_events
-# @reason event cleanup is exercised through the analytics retention route
 def delete_events(*, before: datetime | None = None, batch_size: int = 500) -> int:
     """Delete analytics events in bounded key-only batches."""
     return _delete_records(KINDS.analytics, before=before, batch_size=batch_size)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/observability.py::prune_old_records
-# @covered-by lagniappe/web/routes/analytics/main.py::_delete_ai_records
-# @reason summary cleanup is exercised through retention and owner-clear workflows
 def delete_ai_observability(
     *, before: datetime | None = None, batch_size: int = 500, once: bool = False
 ) -> int:
@@ -97,10 +78,6 @@ def delete_ai_observability(
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/analytics.py::delete_events
-# @covered-by lagniappe/core/tools/database/analytics.py::delete_ai_observability
-# @reason bounded deletion mechanics are owned by the dataset-specific entry points
 def _delete_records(kind, *, before, batch_size, once=False):
     batch_size = max(int(batch_size), 1)
     deleted = 0

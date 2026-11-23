@@ -7,9 +7,6 @@ import re
 from ...observability import mark_outcome
 from .references import _first_data_reference, _proposal_string, _strip_action_reference
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/repair.py::complete_proposal_structure
-# @reason safe schema-id completion is asserted through proposal repair behavior
 def _schema_field_title(field):
     """Return or derive a readable title without inventing field meaning."""
     for key in ("title", "label", "name"):
@@ -37,9 +34,6 @@ def _schema_field_title(field):
     return None
 
 
-# @testable true
-# @matrix ai-report : deterministic-repair form-type schema-field-id schema-update
-# @matrix form-schema : deterministic-repair form-type schema-update
 def _complete_form_schema_fields(proposal):
     """Complete safe mechanical parts of proposed create/add field definitions."""
     if not isinstance(proposal, dict):
@@ -150,9 +144,6 @@ def _complete_form_schema_fields(proposal):
 
 
 
-# @testable true
-# @tests tests_unit/test_020b_ai_planner.py::test_generate_report_validates_answers_actions_and_file_usage
-# @matrix ai-report : validation generate
 def complete_proposal_structure[T](proposal: T) -> T:
     """Fill unambiguous schema IDs and references without another model call."""
     repaired = _complete_form_schema_fields(proposal)

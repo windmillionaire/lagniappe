@@ -33,9 +33,6 @@ GET_CATEGORY_DETAILS = types.FunctionDeclaration(
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_category_details_uses_canonical_id_and_checks_permission
-# @matrix ai categories : category-details permissions tool-context
 def execute_get_category_details(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
     if not isinstance(identifier, str) or not identifier:

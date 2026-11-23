@@ -10,21 +10,15 @@ from .transactions import retry_aborted
 from .utility import create_named_key
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/remote_mcp.py::atomic
 class Records:
     def __init__(self, transaction: Transaction | None = None) -> None:
         self.transaction = transaction
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/remote_mcp.py::atomic
     def get(self, name: str) -> DatastoreEntity | None:
         return DATA.datastore.get(
             create_named_key("mcp_oauth", name), transaction=self.transaction
         )
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/remote_mcp.py::atomic
     def put(self, name: str, value: Mapping[str, object]) -> None:
         # No OAuth record needs a query index. Expiry is enforced on every read.
         row = DatastoreEntity(
@@ -36,16 +30,11 @@ class Records:
         self.transaction.put(row)
 
 
-# @testable true
-# @tests tests_unit/test_034_remote_mcp_oauth.py::test_oauth_store_uses_one_transaction_and_unindexed_records
-# @matrix mcp-oauth : persistence transaction
 @retry_aborted
 def atomic[R](operation: Callable[[Records], R]) -> R:
     with DATA.datastore.transaction() as transaction:
         return operation(Records(transaction))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/remote_mcp.py::authenticate_access
 def read(name: str) -> DatastoreEntity | None:
     return Records().get(name)

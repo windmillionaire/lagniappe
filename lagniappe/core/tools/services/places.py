@@ -42,9 +42,6 @@ _UNIT_LABEL = re.compile(
 )
 
 
-# @testable true
-# @tests tests_unit/test_003d_submission_location.py::test_normalize_location_coordinates_rejects_malformed_values
-# @matrix location : coordinates session-bias validation
 def normalize_location_coordinates(value: object) -> dict[str, float] | None:
     """Return normalized finite latitude/longitude coordinates, or ``None``."""
     if isinstance(value, str):
@@ -77,10 +74,6 @@ def normalize_location_coordinates(value: object) -> dict[str, float] | None:
     return {"latitude": latitude, "longitude": longitude}
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/services/places.py::search_places
-# @covered-by lagniappe/core/tools/services/places.py::get_place_details
-# @reason fixed-host provider transport is exercised through both public Places operations
 def _request_places_json(method, path, *, operation, policy, params=None, data=None):
     status = None
     try:
@@ -123,10 +116,6 @@ def _request_places_json(method, path, *, operation, policy, params=None, data=N
         return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/services/places.py::search_places
-# @covered-by lagniappe/core/tools/services/places.py::get_place_details
-# @reason provider-shape failures share the same sanitized diagnostic boundary
 def _capture_contract_failure(operation, method):
     exceptions.capture(
         exceptions.NetworkError("Places response did not match its contract."),
@@ -134,11 +123,6 @@ def _capture_contract_failure(operation, method):
     )
 
 
-# @testable true
-# @tests tests_unit/test_003d_submission_location.py::test_simplify_address_for_search_comma_suite
-# @tests tests_unit/test_003d_submission_location.py::test_simplify_address_for_search_trailing_suite
-# @tests tests_unit/test_003d_submission_location.py::test_simplify_address_for_search_no_change
-# @pair location:suite-stripping
 def simplify_address_for_search(query: str | None) -> str | None:
     """Strip one secondary-address clause for a follow-up Places search.
 
@@ -165,10 +149,6 @@ def simplify_address_for_search(query: str | None) -> str | None:
     return None
 
 
-# @testable true
-# @tests tests_unit/test_003d_submission_location.py::test_resolve_location_query_retries_after_simplify
-# @tests tests_unit/test_003d_submission_location.py::test_resolve_location_query_first_hit_wins
-# @matrix location : first-hit retry suite-stripping
 def resolve_location_query(query: str | None) -> dict[str, str] | None:
     """Autocomplete a query; if empty, retry once with simplified address text.
 
@@ -193,9 +173,6 @@ def resolve_location_query(query: str | None) -> dict[str, str] | None:
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/services/places.py::get_place_details
-# @reason address component parsing is private Places response normalization
 def _address_component(address_components, component_type, text_key="longText"):
     for component in address_components or []:
         if component_type in component.get("types", []):
@@ -203,9 +180,6 @@ def _address_component(address_components, component_type, text_key="longText"):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/services/places.py::get_place_details
-# @reason unit label formatting is private Places response normalization
 def _format_address2(value):
     if not value:
         return None
@@ -217,9 +191,6 @@ def _format_address2(value):
     return f"Unit {text}"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/services/places.py::get_place_details
-# @reason place-name filtering is private Places response normalization
 def _meaningful_place_name(name, formatted_address, address_components):
     if not name:
         return None
@@ -243,9 +214,6 @@ def _meaningful_place_name(name, formatted_address, address_components):
     return text
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/services/places.py::get_place_details
-# @reason address cleanup is private Places response normalization
 def _formatted_address_without_unit(formatted_address, address2):
     if not formatted_address:
         return None
@@ -260,9 +228,6 @@ def _formatted_address_without_unit(formatted_address, address2):
     return ", ".join(filtered) or address
 
 
-# @testable true
-# @tests tests_unit/test_003d_submission_location.py::test_get_places_access_token_reuses_cached_token_until_refresh_window
-# @matrix location : api-cache oauth
 def get_places_access_token() -> str:
     """Get a cached OAuth2 access token for the Places API."""
     now = time.time()
@@ -291,11 +256,6 @@ def get_places_access_token() -> str:
     return credentials.token
 
 
-# @testable true
-# @tests tests_unit/test_003d_submission_location.py::test_get_place_details_formats_address2_and_meaningful_name
-# @tests tests_unit/test_003d_submission_location.py::test_get_place_details_omits_street_address_display_name
-# @tests tests_unit/test_003d_submission_location.py::test_places_provider_failures_capture_once_and_degrade
-# @matrix location : address2 api-request deadline degradation diagnostics name-normalization provider-failure
 def get_place_details(place_id: str | None) -> dict[str, str] | None:
     """Fetch place details (name, address) from Google Places API."""
     if not place_id:
@@ -364,11 +324,6 @@ def get_place_details(place_id: str | None) -> dict[str, str] | None:
     return place
 
 
-# @testable true
-# @tests tests_unit/test_003d_submission_location.py::test_search_places_uses_session_location_bias_and_maps_suggestions
-# @tests tests_unit/test_003d_submission_location.py::test_places_provider_failures_capture_once_and_degrade
-# @tests tests_unit/test_003d_submission_location.py::test_places_malformed_provider_payload_captures_once
-# @matrix location : api-request deadline degradation diagnostics provider-contract provider-failure response-mapping session-bias
 def search_places(query: str | None) -> list[dict[str, str]]:
     """Autocomplete a place query, biased to the user's session location."""
     if not query or len(query) < 3:

@@ -27,10 +27,6 @@ from lagniappe.web import responses
 from . import projects
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/projects/tasks.py::create_model
-# @covered-by lagniappe/web/routes/projects/tasks.py::update_model
-# @reason form parsing helper owned by model-task create/update routes
 def create_update_data(
     form: MultiDict[str, str], model_task: models.ModelTask | None = None
 ) -> ModelTaskData:
@@ -54,11 +50,6 @@ def create_update_data(
     return data
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/projects/tasks.py::update_model
-# @covered-by lagniappe/web/routes/projects/tasks.py::delete_model
-# @covered-by lagniappe/web/routes/projects/tasks.py::status
-# @reason route-scoped model resolution is exercised through model-task routes
 def _project_model(project: models.Project, task_key: str) -> models.ModelTask | None:
     try:
         return SubmittedReferenceResolver(authenticated_user(), task_key).one(
@@ -74,13 +65,6 @@ def _project_model(project: models.Project, task_key: str) -> models.ModelTask |
         return None
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004a_project.py::test_create_model_task
-# @tests tests_e2e/004_projects/test_004a_project.py::test_create_model_task_with_form
-# @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_create_model_form_opens_from_model_tasks_section
-# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_editor_can_open_model_task_creation
-# @matrix model-tasks : attach-form create permission-gates
-# @pair entity-layout:project-mobile
 @projects.route("<key>/create-model", methods=["POST"])
 @permission(Resource.PROJECT, Action.EDIT)
 def create_model(
@@ -98,8 +82,6 @@ def create_model(
     return responses.new_model_task(model_task)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::new_model_task
 @projects.route("<key>/models/<task_key>/replace", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
 def model_info(
@@ -113,12 +95,6 @@ def model_info(
     return responses.new_model_task(model_task)
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_edit_model_task_name
-# @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_change_model_task_form
-# @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task_form
-# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_model_task_mutations_require_route_project_membership
-# @matrix model-tasks : form-change form-clear name parent-membership update
 @projects.route("<key>/update-model/<task_key>", methods=["PUT"])
 @permission(Resource.PROJECT, Action.EDIT)
 def update_model(
@@ -140,10 +116,6 @@ def update_model(
     return responses.new_model_task(model_task)
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004k_model_task_ordering.py::test_model_task_arrows_preserve_open_edits_and_saved_order
-# @tests tests_e2e/004_projects/test_004k_model_task_ordering.py::test_model_order_rejects_invalid_membership_and_readonly_users
-# @matrix model-tasks : ordering persistence permission-gates parent-membership
 @projects.route("<key>/reorder-models", methods=["PUT"])
 @permission(Resource.PROJECT, Action.EDIT)
 def reorder_models(
@@ -169,10 +141,6 @@ def reorder_models(
     )
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task
-# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_model_task_mutations_require_route_project_membership
-# @matrix model-tasks : delete parent-membership
 @projects.route("<key>/delete-model/<task_key>", methods=["DELETE"])
 @permission(Resource.PROJECT, Action.EDIT)
 def delete_model(
@@ -197,9 +165,6 @@ def delete_model(
     return responses.ok()
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/projects/tasks.py::status
-# @reason temporary filter construction is exercised through the model-task status route
 def _status_filter(project, model, completed):
     compiled = compile_filter_contract(
         project,
@@ -232,12 +197,6 @@ def _status_filter(project, model, completed):
     return filter
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_completed_button
-# @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_in_progress_button
-# @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_status_filter_loads_task_page_form_permissions
-# @matrix model-tasks : completed in-progress status-filter
-# @pair model-tasks:nested-relations
 @projects.route("<key>/status/<task_key>", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
 def status(

@@ -7,13 +7,6 @@ import { compatibleField } from "../representation.mjs";
 import { renderReviewBar } from "../reviewBar.mjs";
 import { loadRevisionPreview } from "./preview.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_form_submission_reconciliation_uses_latest_schema
- * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_offline_submission_conflict_keeps_queue_until_choice
- * @matrix forms : latest-schema queued-conflict readonly-preview submission-choice
- * @pair forms:autofill-review
- */
 export class FormRevisionModal extends Modal {
 	constructor(
 		reconciler,
@@ -33,11 +26,6 @@ export class FormRevisionModal extends Modal {
 		this.openSnapshot = widget.revisionSnapshot();
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
-	 * @reason capture selectable values without poll identities or progress ticks
-	 */
 	_reviewSnapshot() {
 		const response = this.state.response;
 		if (!response) return null;
@@ -51,11 +39,6 @@ export class FormRevisionModal extends Modal {
 		});
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
-	 * @reason revalidate modal choices after any in-flight revision comparison
-	 */
 	async _isCurrent() {
 		await Promise.all([this.state.probePromise, this.state.conflictPromise]);
 		return (
@@ -64,11 +47,6 @@ export class FormRevisionModal extends Modal {
 		);
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
-	 * @reason private schema-summary copy is part of the reconciliation modal
-	 */
 	_schemaSummary() {
 		const before = new Map(
 			(this.state.record?.renderer_schema ?? this.widget.schema ?? []).map(
@@ -90,11 +68,6 @@ export class FormRevisionModal extends Modal {
 		return parts.length ? `Schema update: ${parts.join(", ")}.` : null;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
-	 * @reason private readonly value extraction is part of the reconciliation modal
-	 */
 	_value(element) {
 		const rendered = element?.elt?.cloneNode(true);
 		if (!rendered || element.hasSubmission === false) {
@@ -124,11 +97,6 @@ export class FormRevisionModal extends Modal {
 		return rendered;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
-	 * @reason private changed-field projection is part of the reconciliation modal
-	 */
 	async _differences(localResponse) {
 		const localSnapshot = this.state.record
 			? (this.state.record.renderer_submission ?? {})
@@ -355,13 +323,7 @@ export class FormRevisionModal extends Modal {
 		}
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
-	 * @reason empty controls and absent saved values have the same displayed meaning
-	 */
 	_sameValue(left, right, field = null) {
-		/** @testable infrastructure */
 		const comparable = (value) => {
 			if (
 				value == null ||
@@ -389,11 +351,6 @@ export class FormRevisionModal extends Modal {
 		return areEqual(comparable(left), comparable(right));
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/forms/revisions/modals.mjs::FormRevisionModal
-	 * @reason private per-field choice composition is part of the reconciliation modal
-	 */
 	_choice(field, { source, label, compatible, value }) {
 		const button = document.createElement(compatible ? "button" : "div");
 		if (compatible) {
@@ -598,7 +555,6 @@ export class FormRevisionModal extends Modal {
 		return true;
 	}
 
-	/** @testable infrastructure */
 	_selectedSubmission() {
 		const review = this.state.response.form_state ?? {};
 		const preserveTabDraft = !this.state.record && review.reviews?.length;
@@ -630,7 +586,6 @@ export class FormRevisionModal extends Modal {
 		);
 	}
 
-	/** @testable infrastructure */
 	_refinement(body) {
 		const url = this.state.response.form_state?.refine_url;
 		if (
@@ -704,11 +659,6 @@ export class FormRevisionModal extends Modal {
 	}
 }
 
-/**
- * @testable false
- * @covered-by src/script/forms/revisions/reconciler.mjs::EditReconciler
- * @reason private whole-form conflict UI is selected by capability-aware reconciliation state
- */
 export class WholeFormRevisionModal extends Modal {
 	constructor(reconciler, marker, widget) {
 		super(reconciler.view, marker.querySelector("[data-role='edited-reset']"));

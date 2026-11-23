@@ -10,9 +10,6 @@ const ROUTES = {
 	form: "forms",
 };
 
-/**
- * @testable infrastructure
- */
 const date = (date) => {
 	if (!date) return "";
 	if (typeof date === "string") {
@@ -26,9 +23,6 @@ const date = (date) => {
 	});
 };
 
-/**
- * @testable infrastructure
- */
 const time = (timeValue) => {
 	if (!timeValue) return null;
 
@@ -40,24 +34,11 @@ const time = (timeValue) => {
 	return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`;
 };
 
-/**
- * @testable infrastructure
- */
 const tel = (telValue) => {
 	if (!telValue) return null;
 	return telValue.replace(/(\d{3})(\d{3})(\d{4})/, "($1) $2-$3");
 };
 
-/**
- * @testable infrastructure
- */
-/**
- * @testable true
- * @tests tests_js/test_023_entity_name_formatting.mjs::test_group_name_uses_canonical_user_index_url
- * @tests tests_js/test_023_entity_name_formatting.mjs::test_model_task_link_opens_in_progress_filter
- * @pair model-task:reference-links
- * @pair user-groups:query-route
- */
 const url = (data) => {
 	let url = null;
 	if (data.kind === "model" && data.parent) {
@@ -87,9 +68,6 @@ const url = (data) => {
 	return url;
 };
 
-/**
- * @testable infrastructure
- */
 const email = (email) => {
 	const emailElement = document.createElement("a");
 	emailElement.href = `mailto:${email}`;
@@ -98,9 +76,6 @@ const email = (email) => {
 	return emailElement;
 };
 
-/**
- * @testable infrastructure
- */
 const icon = (data) => {
 	if (data.icon || data.kind) {
 		const iconElement = document.createElement("span");
@@ -115,7 +90,6 @@ const icon = (data) => {
  * Keep a decorative leading icon on the first line without reserving an
  * icon-sized column for every wrapped line of its label.
  *
- * @testable infrastructure
  */
 const iconLabel = ({
 	icon: iconName,
@@ -147,12 +121,6 @@ const iconLabel = ({
 	return container;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_023_entity_name_formatting.mjs::test_formatting_name_uses_a_text_separator_and_shared_wrapping_structure
- * @tests tests_js/test_023_entity_name_formatting.mjs::test_recent_combobox_results_reuse_shared_parent_name_formatting
- * @matrix entity-name : accessibility parent-separator wrapping
- */
 const name = (data) => {
 	const kind = data.kind || data.index || data.type;
 	const container = document.createElement("span");
@@ -191,9 +159,6 @@ const name = (data) => {
 	return container;
 };
 
-/**
- * @testable infrastructure
- */
 const text = (data) => {
 	const { kind = "default", text } = data;
 	const textElement = document.createElement("span");
@@ -203,9 +168,6 @@ const text = (data) => {
 	return textElement;
 };
 
-/**
- * @testable infrastructure
- */
 const working = (button, newText) => {
 	const iconWrapper = document.createElement("span");
 	iconWrapper.dataset.role = "icon";

@@ -19,9 +19,6 @@ from .base_process import ProcessProperty
 from .base_property import Property
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/task_scheduling.py::ScheduleType.generate
-# @covered-by lagniappe/core/properties/task_scheduling.py::ScheduleType.create
 class ScheduleType(ProcessProperty):
     """Base class for all schedule types."""
 
@@ -31,10 +28,6 @@ class ScheduleType(ProcessProperty):
     _prompt: Prompt | None = None
     _user_prompt: str | None = None
 
-    # @testable true
-    # @tests tests_unit/test_013a_task_scheduling.py::test_task_scheduled
-    # @tests tests_unit/test_013a_task_scheduling.py::test_task_periodic
-    # @pair task-scheduling:ai-generation
     @property
     def generate(self) -> bool:
         return not (self.error or not self.prompt)
@@ -52,12 +45,6 @@ class ScheduleType(ProcessProperty):
         self._user_prompt = value
         self._prompt = ai_dates.scheduling_prompt(mode=mode, user_prompt=value)
 
-    # @testable true
-    # @tests tests_unit/test_013a_task_scheduling.py::test_task_scheduled
-    # @tests tests_unit/test_013a_task_scheduling.py::test_task_periodic
-    # @pair task-scheduling:ai-generation
-    # @tests tests_unit/test_013a_task_scheduling.py::test_generated_schedule_prompt_survives_reload_and_avoids_regeneration
-    # @matrix task-scheduling : periodic scheduled prompt-reuse
     def create(self) -> None:
         if not self.prompt or self._user_prompt == self.user_prompt:
             return
@@ -77,8 +64,6 @@ class ScheduleType(ProcessProperty):
         self.complete = True
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/task_scheduling.py::Recurring.update
 class Recurring(ScheduleType):
     """Simple recurring schedule (e.g. every N days/weeks/months).
 
@@ -89,10 +74,6 @@ class Recurring(ScheduleType):
     section_id = "recurring"
     attributes = ("interval", "unit")
 
-    # @testable true
-    # @tests tests_unit/test_013a_task_scheduling.py::test_task_recurring
-    # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_add_recurring
-    # @matrix task-scheduling : add recurring update validation
     def update(self, form_data: Mapping[str, object]) -> None:
         try:
             interval = int(cast("str | int", form_data.get("interval")))
@@ -106,11 +87,6 @@ class Recurring(ScheduleType):
         self.complete = True
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/task_scheduling.py::Periodic.update
-# @covered-by lagniappe/core/properties/task_scheduling.py::Periodic.create
-# @covered-by lagniappe/core/properties/task_scheduling.py::ScheduleType.generate
-# @covered-by lagniappe/core/properties/task_scheduling.py::ScheduleType.create
 class Periodic(ScheduleType):
     """AI-generated periodic schedule from a natural-language description.
 
@@ -126,9 +102,6 @@ class Periodic(ScheduleType):
     _mode = "periodic"
     _start_date: datetime | None = None
 
-    # @testable true
-    # @tests tests_unit/test_013a_task_scheduling.py::test_task_periodic
-    # @matrix task-scheduling : periodic update validation
     def update(self, form_data: Mapping[str, object]) -> None:
         user_prompt = form_data.get("periodic-description")
         start_date = form_data.get("start-date")
@@ -144,18 +117,11 @@ class Periodic(ScheduleType):
             self.error = "Please provide a description"
             return
 
-    # @testable true
-    # @tests tests_unit/test_013a_task_scheduling.py::test_task_periodic
-    # @matrix task-scheduling : ai-generation periodic
     def create(self) -> None:
         super().create()
         self.entity.due_date = self._start_date
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/task_scheduling.py::Scheduled.update
-# @covered-by lagniappe/core/properties/task_scheduling.py::ScheduleType.generate
-# @covered-by lagniappe/core/properties/task_scheduling.py::ScheduleType.create
 class Scheduled(ScheduleType):
     """Calendar-based schedule (daily, weekly, monthly, yearly).
 
@@ -178,10 +144,6 @@ class Scheduled(ScheduleType):
         "month",
     )
 
-    # @testable true
-    # @tests tests_unit/test_013a_task_scheduling.py::test_task_scheduled
-    # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_add_schedule
-    # @matrix task-scheduling : add scheduled update validation
     def update(self, form_data: Mapping[str, object]) -> None:
         self.mode = form_data.get("schedule-type")
 
@@ -202,12 +164,6 @@ class Scheduled(ScheduleType):
             self.error = "Please provide a description"
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.value
-# @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.update
-# @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.active
-# @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.skipped
-# @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.set_next_due_date
 class Schedule(Property[dict[str, object], "Task"]):
     """Orchestrator for task scheduling (recurring, periodic, scheduled).
 
@@ -226,9 +182,6 @@ class Schedule(Property[dict[str, object], "Task"]):
     _schedule = None
     _types = ("recurring", "periodic", "scheduled")
 
-    # @testable true
-    # @tests tests_unit/test_013a_task_scheduling.py::test_task_schedule
-    # @matrix task-scheduling : active-process coordinator
     @property
     def value(self) -> dict[str, object]:  # pyright: ignore[reportIncompatibleMethodOverride] -- The coordinator exposes its live section read-only.
         if self.is_set:
@@ -238,9 +191,6 @@ class Schedule(Property[dict[str, object], "Task"]):
 
         return self._value
 
-    # @testable true
-    # @tests tests_unit/test_013a_task_scheduling.py::test_task_schedule
-    # @matrix task-scheduling : active-process coordinator update
     def update(self, form_data: Mapping[str, object]) -> ScheduleType | None:
         new_schedule = None
 
@@ -265,9 +215,6 @@ class Schedule(Property[dict[str, object], "Task"]):
 
         return new_schedule
 
-    # @testable true
-    # @tests tests_unit/test_013a_task_scheduling.py::test_task_schedule
-    # @matrix task-scheduling : active-process coordinator
     @property
     def active(self) -> ScheduleType | None:
         schedule = next(
@@ -281,12 +228,6 @@ class Schedule(Property[dict[str, object], "Task"]):
 
         return None
 
-    # @testable true
-    # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_recurring
-    # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled
-    # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled_counts_only_occurrences_between_baseline_and_today
-    # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled_preserves_earliest_due_date_baseline
-    # @matrix task-scheduling : periodic recurring scheduled skipped
     @property
     def skipped(self) -> int:
         active = self.active
@@ -303,11 +244,6 @@ class Schedule(Property[dict[str, object], "Task"]):
             )
         return 0
 
-    # @testable true
-    # @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_recurring
-    # @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_scheduled
-    # @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_periodic
-    # @matrix task-scheduling : next-due-date periodic postponed recurring scheduled
     def set_next_due_date(self) -> None:
         task: Task = self.entity
         active = self.active
@@ -336,9 +272,6 @@ class Schedule(Property[dict[str, object], "Task"]):
         task.due_date = max(next_due_date, scheduling.user_today())
         task.db.pop("postponed_from", None)
 
-    # @testable true
-    # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_remove_schedule
-    # @matrix task-scheduling : remove scheduled
     def clear(self) -> None:
         clear_pending = getattr(self.entity, "_clear_scheduled_uncomplete", None)
         if clear_pending:

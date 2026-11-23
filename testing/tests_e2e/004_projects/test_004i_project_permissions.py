@@ -29,7 +29,6 @@ from testing.utility.network import manual_mutation_headers
 pytestmark = pytest.mark.e2e
 
 
-# @pair projects:wrong-entity-type
 def test_project_url_rejects_model_task_key(get_admin, browser_failures):
     owner = get_admin()
     model = ModelTasks.test_create_model_task.get(owner)
@@ -40,7 +39,6 @@ def test_project_url_rejects_model_task_key(get_admin, browser_failures):
         expect(owner.page).to_have_title("Error 404")
 
 
-# @pair projects:permission-gates
 def test_project_is_forbidden_without_model_permission(get_admin, get_user, browser_failures):
     owner = get_admin()
     project = Projects.test_create_project_manual_mode.get(owner)
@@ -51,7 +49,6 @@ def test_project_is_forbidden_without_model_permission(get_admin, get_user, brow
         expect(blocked.page).to_have_title("Error 403")
 
 
-# @matrix projects : load permission-gates readonly
 def test_project_viewer_reads_project_without_editing_controls(get_admin, get_user):
     owner = get_admin()
     model_task = ModelTasks.test_create_model_task.get(owner)
@@ -101,7 +98,6 @@ def test_project_viewer_reads_project_without_editing_controls(get_admin, get_us
     expect(condition).to_be_visible()
 
 
-# @matrix projects : document-tab readonly
 # @template projects/project.html::main
 def test_project_viewer_can_read_document_content(get_admin, get_user):
     owner = get_admin()
@@ -130,7 +126,6 @@ def test_project_viewer_can_read_document_content(get_admin, get_user):
     expect(document).to_contain_text(marker)
 
 
-# @matrix model-tasks : create permission-gates
 def test_project_editor_can_open_model_task_creation(get_admin, get_user):
     owner = get_admin()
     project = Projects.test_create_project_manual_mode.get(owner)
@@ -144,7 +139,6 @@ def test_project_editor_can_open_model_task_creation(get_admin, get_user):
     expect(create_form.locator("[data-role='form-select']")).to_be_visible()
 
 
-# @pair model-tasks:parent-membership
 def test_model_task_mutations_require_route_project_membership(get_admin):
     owner = get_admin()
     route_project = Projects.test_create_project_manual_mode.get(owner)

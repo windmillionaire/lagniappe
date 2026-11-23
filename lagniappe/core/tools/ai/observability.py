@@ -108,9 +108,6 @@ EXCLUDE_FROM_INDEXES = (
 )
 
 
-# @testable true
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
-# @matrix observability : attempt contract-version job-type no-job-key
 @dataclass(frozen=True)
 class AIExecutionContext:
     """Allowlisted deferred-job metadata available during one preparation pass."""
@@ -127,9 +124,6 @@ _EXECUTION_CONTEXT = ContextVar("ai_execution_context", default=_EMPTY_CONTEXT)
 _CURRENT_OBSERVER: ContextVar[GenerationObserver | None] = ContextVar("ai_generation_observer", default=None)
 
 
-# @testable true
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
-# @pair deferred-jobs:preparation-context
 @contextmanager
 def ai_execution_context(
     *,
@@ -156,19 +150,11 @@ def ai_execution_context(
         _EXECUTION_CONTEXT.reset(token)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/observability.py::ai_execution_context
-# @reason context lookup is exercised through deferred provider/tool boundaries
 def current_execution_control() -> DeferredExecutionControl | None:
     """Return the ephemeral deferred execution controller, when present."""
     return _EXECUTION_CONTEXT.get().execution_control
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_observability.py::test_summary_persistence_uses_uuid_key_and_bounded_pruning
-# @tests tests_unit/test_015c_ai_observability.py::test_generation_summary_aggregates_visible_calls_and_redacts_payload
-# @matrix datastore : index-exclusions uuid-key
-# @pair observability:privacy
 @dataclass
 class GenerationSummaryV1:
     """Exact allowlist for the version-1 persisted summary contract."""
@@ -217,17 +203,11 @@ class GenerationSummaryV1:
     duration_ms: int = 0
     outcome: str = "not_validated"
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationSummaryV1
-    # @reason dataclass serialization is exercised through the typed summary contract
     def payload(self) -> dict[str, object]:
         """Return only fields declared by this typed contract."""
         return asdict(self)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/observability.py::operation_diagnostic_payload
-# @reason the public correlation helper owns the typed serialization allowlist
 def diagnostic_record(record: Mapping[str, object]) -> dict[str, object]:
     """Serialize only fields declared by the persisted summary contract."""
     result = {}
@@ -241,9 +221,6 @@ def diagnostic_record(record: Mapping[str, object]) -> dict[str, object]:
     return result
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_observability.py::test_operation_diagnostic_payload_is_correlated_and_privacy_bounded
-# @matrix ai-observability : job-correlation privacy
 def operation_diagnostic_payload(operation: Mapping[str, object], records: Sequence[Mapping[str, object]], *, query_limit: int = QUERY_LIMIT) -> dict[str, object]:
     """Build a transferable, privacy-bounded job/provider snapshot."""
     records = reconcile_generation_records(records, [operation])
@@ -264,16 +241,10 @@ def operation_diagnostic_payload(operation: Mapping[str, object], records: Seque
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-# @reason enablement is exercised through observer construction and disabled-mode tests
 def enabled(config: Config = CONFIG) -> bool:
     return bool(getattr(config, "AI_OBSERVABILITY", False))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-# @reason bounded dimensions are exercised through persisted generation summaries
 @overload
 def _bounded_contract(value: object, fallback: str = "unknown") -> str: ...
 @overload
@@ -296,9 +267,6 @@ def _counter(value: object) -> int:
     return int(cast("int | str | None", value) or 0)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-# @reason aggregate-only result sizing is exercised through generation summaries
 def _size(value):
     if isinstance(value, str):
         return len(value)
@@ -308,9 +276,6 @@ def _size(value):
         return 0
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-# @reason ephemeral validation comparison is exercised through local-repair outcomes
 def _fingerprint(value):
     try:
         serialized = json.dumps(
@@ -321,9 +286,6 @@ def _fingerprint(value):
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-# @reason error normalization is exercised through bounded terminal summaries
 def _error_class(error):
     name = type(error).__name__.lower()
     if "quota" in name:
@@ -339,9 +301,6 @@ def _error_class(error):
     return "other"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-# @reason error normalization is exercised through bounded terminal summaries
 def _error_category(error):
     if _error_class(error) == "quota":
         return "quota"
@@ -360,14 +319,6 @@ def _error_category(error):
     return "internal"
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_observability.py::test_generation_summary_aggregates_visible_calls_and_redacts_payload
-# @tests tests_unit/test_015c_ai_observability.py::test_generation_summary_records_empty_retry_and_bounded_quota_error
-# @tests tests_unit/test_015c_ai_observability.py::test_nested_model_repair_gets_its_own_summary
-# @tests tests_unit/test_015c_ai_observability.py::test_observability_failures_never_change_generation_result_or_error
-# @tests tests_unit/test_015c_ai_observability.py::test_deferred_generation_overwrites_correlated_live_snapshots
-# @tests tests_unit/test_015c_ai_observability.py::test_ask_formatting_is_normalization_and_preserves_explicit_repairs
-# @matrix observability : cache correlation deferred-context disabled empty-response error-normalization exception-transparency in-flight nested-generation persistence-failure privacy provider-calls provider-stage pruning-failure quota review-fallback tokens tools validation
 class GenerationObserver:
     """Mutable in-memory reducer for one public ``generate_content`` call."""
 
@@ -409,9 +360,6 @@ class GenerationObserver:
             ),
         )
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason runtime routing is exercised through the public generation boundary
     def resolution(self, *, model: str, location: str) -> None:
         if not self.active:
             return
@@ -419,22 +367,13 @@ class GenerationObserver:
         self.summary.location = _bounded_contract(location)
         self._persist_live()
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason context lifecycle is exercised through nested public generations
     def install(self) -> Token[GenerationObserver | None]:
         return _CURRENT_OBSERVER.set(self)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason context lifecycle is exercised through nested public generations
     @staticmethod
     def reset(token: Token[GenerationObserver | None]) -> None:
         _CURRENT_OBSERVER.reset(token)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason reducer method is exercised through the public generation boundary
     def request(self, stage: str) -> None:
         if self.active:
             self.summary.provider_requests += 1
@@ -445,9 +384,6 @@ class GenerationObserver:
                 self.summary.structured_final_used = True
             self._persist_live()
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason reducer method is exercised through the public generation boundary
     def response(self, response: types.GenerateContentResponse) -> None:
         if not self.active:
             return
@@ -475,9 +411,6 @@ class GenerationObserver:
             self.summary.traffic_types.append(normalized)
         self._persist_live()
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason reducer method is exercised through the public generation boundary
     def provider_error(self, error: BaseException, stage: str, *, quota: bool = False) -> None:
         if not self.active or not quota:
             return
@@ -485,16 +418,10 @@ class GenerationObserver:
         if stage not in self.summary.surfaced_quota_stages:
             self.summary.surfaced_quota_stages.append(stage)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason reducer method is exercised through the public generation boundary
     def empty_retry(self) -> None:
         if self.active:
             self.summary.empty_response_retries += 1
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason reducer method is exercised through the public generation boundary
     def tool_round(self, function_calls: Sequence[types.FunctionCall], trace: Sequence[Mapping[str, object]]) -> None:
         if not self.active:
             return
@@ -519,16 +446,10 @@ class GenerationObserver:
         self.summary.tool_names.sort()
         self._persist_live()
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason reducer method is exercised through the public generation boundary
     def provider_result(self, value: object) -> None:
         if self.active:
             self.summary.provider_result_chars = _size(value)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason reducer method is exercised through the public generation boundary
     def validated_result(self, after: object) -> None:
         if not self.active:
             return
@@ -536,17 +457,11 @@ class GenerationObserver:
         changed = self.validation_fingerprint != _fingerprint(after)
         self.outcome("normalized" if changed else "validated")
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason reducer method is exercised through the public generation boundary
     def begin_validation(self, value: object) -> None:
         if self.active:
             self.validation_started = True
             self.validation_fingerprint = _fingerprint(value)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason reducer method is exercised through the public generation boundary
     def outcome(self, value: str) -> None:
         if not self.active or value not in KNOWN_OUTCOMES:
             return
@@ -554,9 +469,6 @@ class GenerationObserver:
         if OUTCOME_PRIORITY[value] >= OUTCOME_PRIORITY[current]:
             self.summary.outcome = value
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason reducer method is exercised through the public generation boundary
     def finish(self, *, error: BaseException | None = None) -> None:
         if not self.active:
             return
@@ -574,9 +486,6 @@ class GenerationObserver:
             }:
                 self.outcome("validation_failed")
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-    # @reason best-effort persistence is exercised through public generation results
     def _persist_live(self):
         if not self.live:
             return
@@ -604,25 +513,16 @@ class GenerationObserver:
                 )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
-# @reason context lookup is exercised through provider and nested generation paths
 def current_observer() -> GenerationObserver | None:
     return _CURRENT_OBSERVER.get()
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_observability.py::test_nested_model_repair_gets_its_own_summary
-# @matrix observability : model-repair review-fallback
 def mark_outcome(value: str) -> None:
     observer = current_observer()
     if observer is not None:
         observer.outcome(value)
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_observability.py::test_summary_persistence_uses_uuid_key_and_bounded_pruning
-# @matrix datastore : index-exclusions uuid-key
 def _write_summary(summary):
     return analytics_database.create_ai_observability(
         summary.correlation_id,
@@ -631,9 +531,6 @@ def _write_summary(summary):
     )
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_observability.py::test_summary_persistence_uses_uuid_key_and_bounded_pruning
-# @pair datastore:retention-bound
 def prune_old_records(*, now: datetime | None = None, limit: int = PRUNE_LIMIT) -> int:
     cutoff = (now or datetime.now(UTC)) - timedelta(days=RETENTION_DAYS)
     return analytics_database.delete_ai_observability(
@@ -643,24 +540,14 @@ def prune_old_records(*, now: datetime | None = None, limit: int = PRUNE_LIMIT) 
     )
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_observability.py::test_ai_observability_dashboard_aggregation
-# @matrix analytics : groups outcomes query-limit
-# @pair observability:aggregation
 def aggregate_records(records: Iterable[Mapping[str, object]], *, query_limit: int = QUERY_LIMIT) -> dict[str, object]:
     """Build the owner dashboard view model from already-windowed summaries."""
     records = list(records)
     count = len(records)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::aggregate_records
-    # @reason local aggregation helper is exercised through the dashboard contract
     def total(name):
         return sum(max(_counter(record.get(name)), 0) for record in records)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/observability.py::aggregate_records
-    # @reason local aggregation helper is exercised through the dashboard contract
     def percent(numerator, denominator):
         return round((100 * numerator / denominator), 1) if denominator else 0.0
 
@@ -754,9 +641,6 @@ def aggregate_records(records: Iterable[Mapping[str, object]], *, query_limit: i
     }
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_observability.py::test_report_telemetry_marks_lost_attempts_interrupted
-# @matrix observability : in-flight deferred-context exception-transparency
 def reconcile_generation_records(records: Iterable[Mapping[str, object]], operations: Iterable[Mapping[str, object]], *, now: datetime | None = None) -> list[dict[str, object]]:
     """Project orphaned report attempts as interrupted using durable job state."""
     now = now or datetime.now(UTC)

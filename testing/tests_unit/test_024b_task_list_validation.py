@@ -11,7 +11,6 @@ from lagniappe.core.tools.polling import task_lists
 pytestmark = pytest.mark.unit
 
 
-# @matrix tasks cache : conditional-response durable-revision job-lifecycle
 @pytest.mark.parametrize("change", [
     "quiet", "busy", "delivery", "missing-control", "old-schema", "missing-channel",
     "deferred-channel", "empty-channel", "missing-membership", "bad-generation",
@@ -63,7 +62,6 @@ def test_snapshot_requires_complete_quiet_durable_state(monkeypatch, change):
     assert task_lists.quiet_snapshot() != snapshot
 
 
-# @matrix tasks cache : conditional-response durable-revision job-lifecycle
 @pytest.mark.parametrize("complete", [True, False])
 def test_snapshot_reuses_supplied_records_without_reading(monkeypatch, complete):
     def key(kind, name):
@@ -86,7 +84,6 @@ def test_snapshot_reuses_supplied_records_without_reading(monkeypatch, complete)
     assert task_lists.quiet_snapshot(rows) == (expected if complete else None)
 
 
-# @matrix tasks cache : conditional-response viewer-scope concurrent-load
 def test_validator_covers_viewer_and_preloaded_context():
     related = SimpleNamespace(urlsafe_key="form", fingerprint="form-before")
     page = SimpleNamespace(urlsafe_key="page", fingerprint="page-before", related_entities={"form": related})
@@ -102,7 +99,6 @@ def test_validator_covers_viewer_and_preloaded_context():
     assert before != task_lists.quiet_fingerprint(("revision", 2), page, user)
 
 
-# @matrix tasks cache : conditional-response operation-retention form-migration
 @pytest.mark.parametrize("dependency", ["none", "retained-job", "private-review", "migration"])
 def test_operation_references_prevent_quiet_validator(dependency):
     task = SimpleNamespace(deferred_job=None, db={}, form=SimpleNamespace(db={}))

@@ -52,9 +52,6 @@ class JobCreation(TypedDict, total=False):
     delivery: dict[str, object]
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_property_split_preserves_persisted_schema
-# @matrix deferred-jobs : index-exclusion json-encoding persisted-schema property-ownership
 class DeferredJob(Entity):
     """Internal versioned job record; domain entities remain the UI contract."""
     if TYPE_CHECKING:
@@ -93,7 +90,6 @@ class DeferredJob(Entity):
     entity_kind = "job"
 
     @property
-    # @testable infrastructure
     def exclude_from_index(self) -> frozenset[str]:
         return frozenset(
             {
@@ -117,16 +113,13 @@ class DeferredJob(Entity):
         )
 
     @property
-    # @testable infrastructure
     def to_cache(self) -> dict[str, object]:
         return {}
 
     @property
-    # @testable infrastructure
     def required(self) -> list[str]:
         return [self.actor.hash] if self.actor else []
 
-    # @testable infrastructure
     def _get_properties(self) -> EntityProperties:
         properties = super()._get_properties()
         properties.update(
@@ -163,7 +156,6 @@ class DeferredJob(Entity):
         return properties
 
     @classmethod
-    # @testable infrastructure
     def create(cls, data: JobCreation) -> Self:
         actor = data["actor"]
         job = cls(data.get("key")) if data.get("key") else cls(parent=actor)

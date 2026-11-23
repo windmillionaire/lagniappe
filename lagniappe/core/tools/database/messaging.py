@@ -24,9 +24,6 @@ if TYPE_CHECKING:
     from .get import Identifier
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @pair messaging:deterministic-key
 def conversation_key(first: User, second: User) -> Key:
     return create_named_key(
         "message_conversation",
@@ -34,9 +31,6 @@ def conversation_key(first: User, second: User) -> Key:
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::send_message_record
-# @reason deterministic message identity is asserted through idempotent send
 def message_key(conversation: Key, sender: User, operation_id: str) -> Key:
     return create_named_key(
         "message",
@@ -45,19 +39,11 @@ def message_key(conversation: Key, sender: User, operation_id: str) -> Key:
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/messaging/views.py::get_conversation
-# @reason shared authorization guard is exercised by public read and write boundaries
 def require_participant(conversation: Row | None, user: User) -> None:
     if not conversation or not conversation_values.participant(conversation, user):
         raise PermissionError("Conversation is unavailable.")
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @matrix messaging : idempotency unread-count
-# @pair notifications:aggregate-count
 @retry_aborted
 def send_message_record(
     actor: User,
@@ -123,9 +109,6 @@ def send_message_record(
     return message, conversation, aggregate, True
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @pair messaging:read-race
 @retry_aborted
 def mark_conversation_read(
     user: User, key: Key, expected_revision: int | None = None
@@ -151,9 +134,6 @@ def mark_conversation_read(
     return conversation, aggregate
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @pair messaging:per-copy-delete
 @retry_aborted
 def hide_message_for_user(user: User, key: Key) -> tuple[Row | None, Row | None]:
     with DATA.datastore.transaction() as transaction:
@@ -180,9 +160,6 @@ def hide_message_for_user(user: User, key: Key) -> tuple[Row | None, Row | None]
     return conversation, aggregate
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @pair messaging:clear-horizon
 @retry_aborted
 def clear_message_conversation(user: User, key: Key) -> tuple[Row, Row | None]:
     with DATA.datastore.transaction() as transaction:
@@ -202,17 +179,11 @@ def clear_message_conversation(user: User, key: Key) -> tuple[Row, Row | None]:
     return conversation, aggregate
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/messaging/views.py::get_conversation
-# @reason direct lookup is exercised by the authorized view boundary
 def get_conversation(identifier: Identifier) -> Row | None:
     key = datastore_key(identifier)
     return DATA.datastore.get(key) if key else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/messaging/views.py::conversations
-# @reason indexed query plumbing is exercised through conversation listing
 def conversations_page(
     user: User, cursor: str | None = None, limit: int = 25
 ) -> Results[Row]:
@@ -226,9 +197,6 @@ def conversations_page(
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/messaging/views.py::conversation_history
-# @reason indexed query plumbing is exercised through bounded history
 def messages_page(
     conversation: Row, cursor: str | None = None, limit: int = 50
 ) -> Results[Row]:
@@ -241,9 +209,6 @@ def messages_page(
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/mutations/delete.py::DeleteCollector.user_messages
-# @reason user-deletion lookup is exercised through the delete mutation plan
 def message_conversation_keys(participant: Identifier) -> list[Key]:
     participant_key = datastore_key(participant)
     if not participant_key:
@@ -257,9 +222,6 @@ def message_conversation_keys(participant: Identifier) -> list[Key]:
     return [stored_key(record) for record in records]
 
 
-# @testable false
-# @covered-by lagniappe/core/mutations/delete.py::DeleteCollector.finalize_message_conversations
-# @reason orphan purging is exercised through the delete mutation plan
 def message_keys(conversation: Identifier) -> list[Key]:
     current_key = datastore_key(conversation)
     if not current_key:

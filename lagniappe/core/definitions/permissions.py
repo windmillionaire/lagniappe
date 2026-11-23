@@ -14,8 +14,6 @@ from ..restrictions import Restriction  # noqa: F401 - re-exported by definition
 from .default import DefaultEnum
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/definitions/permissions.py::Action.implies
 class Action(Enum, metaclass=DefaultEnum):
     """Hierarchical permission actions in ascending order of privilege.
 
@@ -36,16 +34,11 @@ class Action(Enum, metaclass=DefaultEnum):
 
     DEFAULT = NONE
 
-    # @testable true
-    # @tests tests_unit/test_009b_user_permissions.py::test_resource_allowed_direct_contract
-    # @pair permissions:action-lattice
     def implies(self, action: Action) -> bool:
         """Check if this action implies (includes) another action."""
         return self.value >= action.value if self.value else False
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/definitions/permissions.py::Resource.allowed
 class Resource(Enum):
     """Resource types for permission checking.
 
@@ -82,9 +75,6 @@ class Resource(Enum):
     TASK_HISTORY = TASKS
     REPORT = MODELS
 
-    # @testable true
-    # @tests tests_unit/test_009b_user_permissions.py::test_resource_allowed_direct_contract
-    # @matrix permissions : anonymous default-deny resource-gates
     def allowed(self, action: Action, user: User | None = None) -> bool:
         """Check if the user has at least the given action on this resource."""
         from ..tools.auth.context import current_context_user
@@ -105,18 +95,9 @@ class Resource(Enum):
 
         return False
 
-    # @testable true
-    # @tests tests_unit/test_009b_user_permissions.py::test_resource_allowed_direct_contract
-    # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_admin_permissions
-    # @matrix permissions : admin owner
     def _admin_resource_allowed(self, user):
         return bool(getattr(user, "is_admin", getattr(user, "is_owner", False)))
 
-    # @testable false
-    # @covered-by lagniappe/core/definitions/permissions.py::Resource._models_resource_allowed
-    # @covered-by lagniappe/core/definitions/permissions.py::Resource._forms_resource_allowed
-    # @covered-by lagniappe/core/definitions/permissions.py::Resource._users_resource_allowed
-    # @reason shared global-resource action lookup used by the resource-specific branches
     def _global_resource_allowed(self, action, user):
         return (
             True
@@ -124,38 +105,16 @@ class Resource(Enum):
             else Action[user.permissions.get(self.value)].implies(action)
         )
 
-    # @testable true
-    # @tests tests_unit/test_009b_user_permissions.py::test_resource_allowed_direct_contract
-    # @tests tests_unit/test_009b_user_permissions.py::test_global_resources
-    # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_directory_general_models_view_only
-    # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_create_toggles_require_global_models_create
-    # @matrix permissions : aliases global-resources
     def _models_resource_allowed(self, action, user):
         return self._global_resource_allowed(action, user)
 
-    # @testable true
-    # @tests tests_unit/test_009b_user_permissions.py::test_resource_allowed_direct_contract
-    # @tests tests_unit/test_009b_user_permissions.py::test_global_resources
-    # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_directory_general_forms_view_only
-    # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_create_category_hides_form_picker_without_forms_view
-    # @matrix permissions : global-resources resource-gates
     def _forms_resource_allowed(self, action, user):
         return self._global_resource_allowed(action, user)
 
-    # @testable true
-    # @tests tests_unit/test_009b_user_permissions.py::test_global_resources
-    # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_admin_permissions
-    # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_directory_general_users_view_only
-    # @pair permissions:global-resources
     def _users_resource_allowed(self, action, user):
         return self._global_resource_allowed(action, user)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/mixins/permissions.py::PermissionsMixin.create_permissions
-# @covered-by lagniappe/core/mixins/permissions.py::UserPermissionsMixin.permissions_form
-# @covered-by lagniappe/core/mixins/permissions.py::PublicPermissionsMixin.permissions_form
-# @covered-by lagniappe/core/mixins/permissions.py::GroupPermissionsMixin.permissions_form
 class Levels(Enum):
     """Permission levels for the UI form. Includes boolean variants
     (FALSE/TRUE) for checkbox-style permissions like admin status.
@@ -173,11 +132,6 @@ class Levels(Enum):
     CREATE = "CREATE"
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/mixins/permissions.py::PermissionsMixin.get_specific_permissions
-# @covered-by lagniappe/core/mixins/permissions.py::UserPermissionsMixin.permissions_form
-# @covered-by lagniappe/core/mixins/permissions.py::PublicPermissionsMixin.permissions_form
-# @covered-by lagniappe/core/mixins/permissions.py::GroupPermissionsMixin.permissions_form
 class Specific(Enum):
     """Entity-level permission sections (individual categories, projects, etc.).
 
@@ -276,9 +230,6 @@ class Specific(Enum):
         return [Specific.CATEGORIES, Specific.PROJECTS, Specific.PAGES]
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/mixins/permissions.py::PermissionsMixin.create_permissions
-# @covered-by lagniappe/core/mixins/permissions.py::PublicPermissionsMixin.permissions_form
 class Site(Enum):
     """Site-wide boolean permission flags (public)."""
 
@@ -313,11 +264,6 @@ class Site(Enum):
         }
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/mixins/permissions.py::PermissionsMixin.create_permissions
-# @covered-by lagniappe/core/mixins/permissions.py::UserPermissionsMixin.permissions_form
-# @covered-by lagniappe/core/mixins/permissions.py::PublicPermissionsMixin.permissions_form
-# @covered-by lagniappe/core/mixins/permissions.py::GroupPermissionsMixin.permissions_form
 class General(Enum):
     """Global permission sections (users, models, forms).
 

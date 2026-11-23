@@ -23,9 +23,6 @@ BOOTSTRAP_GOOGLE_CLOUD_APIS = {
 BOOTSTRAP_API_TIMEOUT = 300
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_target_preflight_selects_billing_and_reports_required_apis
-# @matrix setup : billing preflight provider-apis
 def _load_gcloud_json(command, description):
     result = run_gcloud_command(command, check=False)
     if result.returncode != 0:
@@ -37,10 +34,6 @@ def _load_gcloud_json(command, description):
         raise RuntimeError(f"{description} returned invalid JSON") from error
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_billing_selection_defers_to_project_console_when_cli_returns_no_open_account
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_target_preflight_selects_billing_and_reports_required_apis
-# @matrix setup : billing gcloud-config interactive-input
 def _select_billing_account(accounts):
     from installer import FORMATTER
 
@@ -92,9 +85,6 @@ def _select_billing_account(accounts):
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_project_billing_authorization_uses_existing_account_and_project_console
-# @matrix setup : billing browser interactive-input
 def _authorize_project_billing(project_id):
     """Open the target's billing page and verify its existing-account link."""
     from installer import FORMATTER
@@ -146,10 +136,6 @@ def _authorize_project_billing(project_id):
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_target_preflight_selects_billing_and_reports_required_apis
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_target_preflight_defers_billing_discovery_until_new_project_exists
-# @matrix setup : billing preflight project-create provider-apis
 def _target_preflight(target: setup_target.SetupTarget):
     """Run read-only target, billing, and Service Usage checks."""
     from config import constants
@@ -213,12 +199,6 @@ def _target_preflight(target: setup_target.SetupTarget):
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_apply_target_preflight_creates_and_bills_confirmed_project
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_apply_target_preflight_authorizes_billing_after_project_creation_when_cli_list_is_empty
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_apply_target_preflight_rediscovers_and_links_existing_billing_account
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_google_cloud_terms_failure_has_account_specific_repair
-# @matrix setup : billing browser preflight project-create provider-apis
 def _apply_target_preflight(
     target: setup_target.SetupTarget, preflight, project_ready=None
 ):

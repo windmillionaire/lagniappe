@@ -4,9 +4,6 @@ import { SectionToggle } from "../elements/sectionToggle.mjs";
 import { captureError, Modal, request } from "../shared/index.mjs";
 import { FormWidget } from "./base/formWidget.mjs";
 
-/**
- * @testable infrastructure
- */
 export class UserSettings extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
@@ -28,12 +25,6 @@ export class UserSettings extends FormWidget {
 		this._initApiKey();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_044_agent_api_settings.mjs::test_agent_api_key_controls_keep_secret_ephemeral
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
-	 * @matrix agent-api : copy-control expiry revoke rotate shown-once status
-	 */
 	_initApiKey() {
 		if (this.revisionPreview) return;
 		const section = this.target.querySelector("[data-role='api-key-settings']");
@@ -98,12 +89,6 @@ export class UserSettings extends FormWidget {
 		target.dataset.visible = Boolean(message).toString();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_without_provider_access_can_manage_external_agent_api_key
-	 * @tests tests_js/test_044_agent_api_settings.mjs::test_agent_api_key_confirmation_uses_app_modal
-	 * @matrix agent-api user-settings : confirmation-modal revoke rotate
-	 */
 	async _confirmApiKeyAction(section, trigger, options) {
 		const template = section.querySelector(
 			"template[data-role='api-key-confirmation-template']",
@@ -202,11 +187,6 @@ export class UserSettings extends FormWidget {
 		this._renderApiKey(section, response.credential);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
-	 * @matrix user-settings : edit-groups group-selector owner-other-page
-	 */
 	_initGroups() {
 		const groupInput = this.target.querySelector(
 			"[data-role='user-groups'] [name='group']",
@@ -278,13 +258,6 @@ export class UserSettings extends FormWidget {
 		return field;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
-	 * @matrix user-settings : editable-email owner-other-page owner-own-page personal-page readonly-email
-	 */
 	get userEmailElement() {
 		return this.target.querySelector("[data-role='user-email']");
 	}
@@ -310,14 +283,6 @@ export class UserSettings extends FormWidget {
 		return field;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
-	 * @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
-	 * @matrix notification-email : default-daily public-user user-only user-setting
-	 */
 	get notificationEmailElement() {
 		if (this.target.dataset.canEditNotificationEmail !== "true") return null;
 		const field = new RadioElement(
@@ -341,22 +306,10 @@ export class UserSettings extends FormWidget {
 		return field;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
-	 * @matrix user-settings : owner-own-page personal-page sign-out
-	 */
 	get userActionsElement() {
 		return this.target.querySelector("[data-role='user-actions']");
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
-	 * @matrix user-settings : group-selector-hidden owner-own-page personal-page
-	 */
 	get userGroupsElement() {
 		return this.target.querySelector("[data-role='user-groups']");
 	}
@@ -385,14 +338,6 @@ export class UserSettings extends FormWidget {
 		return this.target.querySelector("[data-role='remove-page']");
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
-	 * @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
-	 * @pair user-settings:field-order
-	 */
 	get html() {
 		const card = this.userCardElement;
 		const fields = card?.querySelector("[data-role='user-fields']");
@@ -424,13 +369,6 @@ export class UserSettings extends FormWidget {
 		].filter(Boolean);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
-	 * @pair public-users:email-consent
-	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_submit_preserves_attached_form_and_categories
-	 * @pair user-settings:restrictions
-	 */
 	get formData() {
 		const fields = super.formData;
 		const data = new FormData();
@@ -502,11 +440,6 @@ export class UserSettings extends FormWidget {
 		return data;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_044_agent_api_settings.mjs::test_agent_api_key_controls_keep_secret_ephemeral
-	 * @matrix agent-api user-settings : poll-reconcile status
-	 */
 	postreconcile() {
 		const updated = this._updated;
 		super.postreconcile();

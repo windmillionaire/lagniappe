@@ -3,9 +3,6 @@ import { primitives } from "../../../elements/primitives.mjs";
 import { STYLES } from "../../../generated/styles.mjs";
 import { CONFIG } from "../config.mjs";
 
-/**
- * @testable infrastructure
- */
 export class ModelPanel {
 	constructor(builder) {
 		this.builder = builder;
@@ -70,11 +67,6 @@ export class ModelPanel {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_drag_component
-	 * @pair forms:builder-drag-component
-	 */
 	_addElement(event) {
 		const item = this.builder.createElement({
 			type: event.item.dataset.type,
@@ -85,11 +77,6 @@ export class ModelPanel {
 		this.builder.selectElement(item.id);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_drag_component
-	 * @pair forms:builder-drag-component
-	 */
 	_moveElement() {
 		this.builder.updateSchemaOrder();
 	}
@@ -113,20 +100,11 @@ export class ModelPanel {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @matrix forms : builder-lifecycle
-	 */
 	deselectItem() {
 		const selected = this.builder.selectedElement;
 		if (selected) selected.item.dataset.selected = "false";
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_signature_field_builder_unique_component
-	 * @matrix forms signature : unique-component
-	 */
 	hasUniqueElement(type) {
 		return (
 			this.uniqueElements.includes(type) &&
@@ -136,10 +114,6 @@ export class ModelPanel {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @matrix forms : builder-lifecycle
-	 */
 	focusItem() {
 		const selected = this.builder.selectedElement.item;
 		this.elements.forEach((element) => {
@@ -149,10 +123,6 @@ export class ModelPanel {
 		this.defaultPanel.dataset.visible = "false";
 	}
 
-	/**
-	 * @testable true
-	 * @matrix forms : builder-lifecycle
-	 */
 	blurItem() {
 		this.elements.forEach((element) => {
 			element.dataset.visible = "true";
@@ -169,9 +139,6 @@ export class ModelPanel {
 	}
 }
 
-/**
- * @testable infrastructure
- */
 const _model = (schema) => {
 	const element = document.createElement("div");
 	element.id = schema.id;
@@ -181,11 +148,6 @@ const _model = (schema) => {
 	return element;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_019_form_sync_frontend.mjs::test_builder_model_defaults_are_presentation_only
- * @matrix form-schema forms : builder immutable-schema presentation-defaults
- */
 const _presentation = (schema) => {
 	const defaults = CONFIG.PRESENTATION_DEFAULTS[schema.type] || {};
 	return {
@@ -196,9 +158,6 @@ const _presentation = (schema) => {
 	};
 };
 
-/**
- * @testable infrastructure
- */
 const checkbox = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -216,9 +175,6 @@ const checkbox = (schema) => {
 	return element;
 };
 
-/**
- * @testable infrastructure
- */
 const html = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -232,9 +188,6 @@ const html = (schema) => {
 	return element;
 };
 
-/**
- * @testable infrastructure
- */
 const input = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -253,9 +206,6 @@ const input = (schema) => {
 	return element;
 };
 
-/**
- * @testable infrastructure
- */
 const link = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -280,9 +230,6 @@ const link = (schema) => {
 	return element;
 };
 
-/**
- * @testable infrastructure
- */
 const bookmark = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -296,9 +243,6 @@ const bookmark = (schema) => {
 	return element;
 };
 
-/**
- * @testable infrastructure
- */
 const location = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -318,9 +262,6 @@ const location = (schema) => {
 	return element;
 };
 
-/**
- * @testable infrastructure
- */
 const select = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -339,9 +280,6 @@ const select = (schema) => {
 	return element;
 };
 
-/**
- * @testable infrastructure
- */
 const radio = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -378,11 +316,6 @@ const radio = (schema) => {
 	return element;
 };
 
-/**
- * @testable true
- * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_signature_field_builder_unique_component
- * @matrix forms signature : builder-preview builder-signature-field
- */
 const signature = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -397,9 +330,6 @@ const signature = (schema) => {
 	return element;
 };
 
-/**
- * @testable infrastructure
- */
 const status = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -414,9 +344,6 @@ const status = (schema) => {
 	return element;
 };
 
-/**
- * @testable infrastructure
- */
 const textarea = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -434,9 +361,6 @@ const textarea = (schema) => {
 	return element;
 };
 
-/**
- * @testable infrastructure
- */
 const todo = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -451,9 +375,6 @@ const todo = (schema) => {
 	return element;
 };
 
-/**
- * @testable infrastructure
- */
 const table = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);

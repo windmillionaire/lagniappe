@@ -47,9 +47,6 @@ PRIVATE_ARCHIVE_NOTICE = (
 )
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason terminal animation wraps tested archive phases without changing their contracts
 @contextmanager
 def _progress(formatter, message):
     with formatter.progress(text=message) as spinner:
@@ -61,24 +58,15 @@ def _progress(formatter, message):
         spinner.ok()
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason timestamp formatting is an internal archive-orchestration detail
 def _now():
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason default path selection is exercised through archive publication
 def _default_output(backup_id, zip_output):
     suffix = ".zip" if zip_output else ""
     return REPOSITORY_ROOT / "archives" / f"{backup_id}{suffix}"
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason output normalization is exercised through archive publication
 def _output_path(path, *, zip_output):
     path = Path(path).expanduser().resolve()
     if zip_output and path.suffix.casefold() != ".zip":
@@ -86,9 +74,6 @@ def _output_path(path, *, zip_output):
     return path
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason overwrite protection is part of the public archive workflow
 def _validate_output(path, *, zip_output):
     path = _output_path(path, zip_output=zip_output)
     if path.exists() and (
@@ -99,18 +84,12 @@ def _validate_output(path, *, zip_output):
     return path
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason scratch naming is validated through the resumable archive workflow
 def _scratch_database_id(backup_id, checkpoint_identity):
     stamp = backup_id[:8].casefold()
     value = f"lag-archive-{stamp}-{checkpoint_identity[:8]}"
     return validate_database_id(value, allow_default=False)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason conflict recovery is exercised through the resumable archive workflow
 def _wait_for_scratch_database(context, database_id, *, timeout=600):
     """Wait for an already-started scratch creation operation to become visible."""
     deadline = context.monotonic() + timeout
@@ -128,9 +107,6 @@ def _wait_for_scratch_database(context, database_id, *, timeout=600):
             attempt += 1
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason private file creation is exercised by archive publication and validation
 def _write_private(path, payload, *, binary=False):
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     if binary:
@@ -141,18 +117,12 @@ def _write_private(path, payload, *, binary=False):
         os.chmod(path, 0o600)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason provider response extraction is an internal orchestration adapter
 def _provider_operation(payload):
     if not isinstance(payload, dict):
         return None
     return str(payload.get("name") or "").strip() or None
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_asset_bucket_preserves_original_generation_identity
-# @matrix portable-archive : recovery-copy generation-binding
 class _RecoveryAssetBlob:
     """Read an immutable recovery copy under its original generation identity."""
 
@@ -197,9 +167,6 @@ class _RecoveryAssetBlob:
         )
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_asset_bucket_preserves_original_generation_identity
-# @matrix portable-archive : recovery-copy generation-binding
 class _RecoveryAssetBucket:
     """Present immutable recovery objects through their original asset identity."""
 
@@ -234,9 +201,6 @@ class _RecoveryAssetBucket:
         )
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason exact recovery bindings are exercised through portable archive asset collection
 def _recovery_buckets(context, backup):
     from config import SETTINGS
     from config.storage import storage_bucket_names
@@ -258,9 +222,6 @@ def _recovery_buckets(context, backup):
     }
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason warning projection is exercised through archive publication and validation
 def _warnings(state):
     values = []
     for row in state.database.execute("SELECT id, code, details FROM warnings ORDER BY id"):
@@ -272,9 +233,6 @@ def _warnings(state):
     return values
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_archive_readme_explains_conversion_notices
-# @matrix portable-archive : conversion-notices owner-readable-readme
 def _write_bundle(
     bundle,
     *,
@@ -431,9 +389,6 @@ uses the manual backup retained in Google Cloud, not this directory.
     return catalog, html_result
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason completion-manifest assembly is exercised through archive validation
 def _root_manifest(bundle, *, backup, catalog, warnings, html_result, created_at):
     files = sorted(
         (
@@ -471,9 +426,6 @@ def _root_manifest(bundle, *, backup, catalog, warnings, html_result, created_at
     }
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason atomic directory publication is part of the public archive workflow
 def _publish_directory(bundle, output):
     temporary_parent = Path(
         tempfile.mkdtemp(prefix=f".{output.name}.publishing-", dir=output.parent)
@@ -486,9 +438,6 @@ def _publish_directory(bundle, output):
     temporary_parent.rmdir()
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason atomic ZIP publication is part of the public archive workflow
 def _publish_zip(bundle, output, manifest):
     temporary_parent = Path(
         tempfile.mkdtemp(prefix=f".{output.name}.publishing-", dir=output.parent)
@@ -506,9 +455,6 @@ def _publish_zip(bundle, output, manifest):
     temporary_parent.rmdir()
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason final permission hardening is exercised through archive publication
 def _restrict_tree(root):
     if os.name == "nt":
         secure_directory(root)
@@ -518,9 +464,6 @@ def _restrict_tree(root):
     os.chmod(root, 0o700)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason cleanup and retained failure state are archive workflow invariants
 def _cleanup_successful_archive(context, checkpoint, output):
     scratch_database = checkpoint.payload.get("scratch_database")
     work = Path(checkpoint.payload.get("work_directory") or checkpoint.root)
@@ -538,9 +481,6 @@ def _cleanup_successful_archive(context, checkpoint, output):
     checkpoint.remove()
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_archive_build_publishes_manifest_last_and_retains_failed_scratch_state
-# @matrix portable-archive : cleanup publication workflow
 def build_archive(
     backup_id: str | None = None,
     *,

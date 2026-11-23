@@ -44,17 +44,11 @@ from lagniappe.core.properties.deferred_job_lock import Operation
 from lagniappe.web import direct_uploads, responses
 
 
-# @testable false
-# @covered-by lagniappe/web/deferred_autofill.py::locked_response
-# @reason browser projection wrapper delegates to the durable lock resolver
 def active_lock(entity: Entity) -> dict[str, object] | None:
     """Return the browser-safe active autofill descriptor for ``entity``."""
     return deferred_job_lock_descriptor(entity)
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-# @matrix deferred-jobs : conflict form-lock
 def locked_response(
     entity: Entity, form: Mapping[str, object] | None = None
 ) -> tuple[Response, int] | None:
@@ -80,7 +74,6 @@ def locked_response(
     )
 
 
-# @testable infrastructure
 def prepare_form_states(
     entities: Iterable[models.Task | models.Page], user: models.User
 ) -> None:
@@ -106,9 +99,6 @@ def prepare_form_states(
         statuses.update({status["key"]: status for status in DeferredJobs.statuses(keys[index:index + 50], user)})
 
 
-# @testable true
-# @pair ai:autofill
-# @matrix ai tasks : autofill reload
 def form_state(
     entity: models.Page | models.Task, user: models.User | None = None
 ) -> dict[str, object]:
@@ -162,8 +152,6 @@ def form_state(
     return result
 
 
-# @testable true
-# @pair ai:autofill
 def form_fingerprint(entity: models.Page | models.Task, user: models.User) -> str:
     """Operation revisions invalidate initial-form HTTP caches, not answer revisions."""
     state = form_state(entity, user)
@@ -176,12 +164,6 @@ def form_fingerprint(entity: models.Page | models.Task, user: models.User) -> st
     ], default=str).encode()).hexdigest()
 
 
-# @testable true
-# @tests tests_e2e/006_tasks/test_006j_task_list_validation.py::test_unchanged_task_list_skips_loading_and_invalidates_on_save
-# @tests tests_e2e/006_tasks/test_006j_task_list_validation.py::test_task_list_job_boundaries_and_render_race
-# @tests tests_e2e/006_tasks/test_006j_task_list_validation.py::test_task_list_rechecks_restrictions_for_cached_viewer
-# @matrix tasks cache : conditional-response durable-revision job-lifecycle viewer-scope
-# @matrix tasks cache permissions : conditional-response immediate-revocation inherited-restrictions
 def page_tasks_fingerprint(page: models.Page, user: models.User) -> str:
     """Validate proven quiet fragments before loading their Task graph."""
     from lagniappe.web.auth import _etag_fingerprint
@@ -210,9 +192,6 @@ def page_tasks_fingerprint(page: models.Page, user: models.User) -> str:
     return hashlib.sha256(json.dumps(["full-task-list-v1", page_tasks_revision(page, user), user.urlsafe_key, operations]).encode()).hexdigest()
 
 
-# @testable true
-# @tests tests_e2e/006_tasks/test_006j_task_list_validation.py::test_task_list_job_boundaries_and_render_race
-# @matrix tasks cache : conditional-response concurrent-render
 def finish_task_list_validation(page: models.Page) -> None:
     """Do not label a raced render as reusable quiet HTML."""
     snapshot = g.get("task_list_snapshot")
@@ -228,7 +207,6 @@ def finish_task_list_validation(page: models.Page) -> None:
         g.NO_CACHE = True
 
 
-# @testable infrastructure
 def conflict_response(entity: models.Page | models.Task) -> tuple[Response, int]:
     """Return fresh typed values for the shared online/offline review flow."""
     loaded = Entities.fetch_one(entity.key, request=Fetch.direct())
@@ -244,11 +222,6 @@ def conflict_response(entity: models.Page | models.Task) -> tuple[Response, int]
     return response
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-# @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_autofill_start_snapshots_draft_and_stages_file_without_saving_them
-# @pair ai:autofill
-# @matrix ai files tasks : autofill rejected-suggestion staged-upload-cleanup
 def staged_upload_for_update(
     entity: models.Page | models.Task, actor: models.User, form: MultiDict[str, str]
 ) -> tuple[models.File | None, list[dict[str, object]]]:
@@ -336,7 +309,6 @@ def staged_upload_for_update(
     return file, cleanup
 
 
-# @testable infrastructure
 def cleanup_staged_uploads(records: Iterable[Mapping[str, object]]) -> None:
     for record in records:
         if not storage_assets.delete_direct_upload(record):
@@ -346,13 +318,6 @@ def cleanup_staged_uploads(records: Iterable[Mapping[str, object]]) -> None:
             )
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-# @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
-# @matrix ai notifications pages tasks : autofill deferred
-# @matrix ai tasks : retry original-prompt staged-upload
-# @pair deferred-jobs:hosted-e2e
 def start_deferred_autofill(
     entity: models.Page | models.Task,
     user: models.User,

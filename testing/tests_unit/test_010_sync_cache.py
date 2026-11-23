@@ -84,7 +84,6 @@ class _DocumentRedis:
         return value
 
 
-# @matrix polling sync : concurrency document isolation ttl
 @pytest.mark.unit
 def test_document_transactions_are_key_isolated_and_expiring(monkeypatch):
     redis = _DocumentRedis()
@@ -121,7 +120,6 @@ def _without_presence(monkeypatch):
     )
 
 
-# @matrix polling : document read-path ttl write-amplification
 @pytest.mark.unit
 def test_existing_document_poll_refreshes_ttl_without_full_write(monkeypatch):
     redis = _DocumentRedis()
@@ -150,8 +148,6 @@ def test_existing_document_poll_refreshes_ttl_without_full_write(monkeypatch):
     seed.assert_not_called()
 
 
-# @matrix polling : concurrency document read-path
-# @matrix sync : document revision
 @pytest.mark.unit
 def test_document_poll_does_not_overwrite_a_concurrent_update(monkeypatch):
     redis = _DocumentRedis()
@@ -190,7 +186,6 @@ def test_document_poll_does_not_overwrite_a_concurrent_update(monkeypatch):
     assert redis.sets == []
 
 
-# @matrix polling : document initialization ttl
 @pytest.mark.unit
 def test_missing_document_poll_initializes_from_durable_seed(monkeypatch):
     redis = _DocumentRedis()
@@ -215,7 +210,6 @@ def test_missing_document_poll_initializes_from_durable_seed(monkeypatch):
     assert redis.expirations[document_key] == documents.DOCUMENT_TTL_SECONDS
 
 
-# @matrix polling : concurrency document initialization
 @pytest.mark.unit
 def test_document_poll_initialization_conflict_keeps_winning_generation(monkeypatch):
     redis = _DocumentRedis()
@@ -253,7 +247,6 @@ def test_document_poll_initialization_conflict_keeps_winning_generation(monkeypa
     seed.assert_called_once_with()
 
 
-# @matrix polling : document initialization read-path
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "durable_seed",
@@ -301,7 +294,6 @@ def test_document_poll_lazy_seed_recovers_after_eviction(monkeypatch, durable_se
     assert recovered["fingerprint"] == durable_seed.get("fingerprint")
 
 
-# @matrix polling : concurrency document initialization
 @pytest.mark.unit
 def test_document_poll_preserves_generation_created_while_loading_seed(monkeypatch):
     redis = _DocumentRedis()
@@ -330,7 +322,6 @@ def test_document_poll_preserves_generation_created_while_loading_seed(monkeypat
     assert documents._decode(redis.values[document_key]) == winning_state
 
 
-# @matrix polling : document initialization
 @pytest.mark.unit
 def test_document_poll_seed_failure_leaves_cache_uninitialized(monkeypatch):
     redis = _DocumentRedis()
@@ -378,7 +369,6 @@ class _PresenceRegistrationPipeline:
         return [1, True, 1, [1], {b"client-1"}]
 
 
-# @matrix polling sync : hash-field presence ttl
 @pytest.mark.unit
 def test_presence_uses_expiring_client_hash_fields(monkeypatch):
     pipeline = _PresenceRegistrationPipeline()
@@ -438,7 +428,6 @@ def document_state(monkeypatch):
     return state
 
 
-# @matrix polling sync : author-attribution delta document presence revision snapshot
 @pytest.mark.unit
 def test_revisioned_document_poll_returns_snapshot_then_deltas(document_state):
     initial = documents.poll_document(
@@ -539,7 +528,6 @@ def test_revisioned_document_poll_returns_snapshot_then_deltas(document_state):
     assert "authors" not in mixed_authors
 
 
-# @matrix polling sync : author-attribution delta document revision snapshot
 @pytest.mark.unit
 @pytest.mark.parametrize("old_revision", [1, 99])
 def test_document_generation_change_returns_all_retained_deltas(document_state, old_revision):
@@ -575,7 +563,6 @@ def test_document_generation_change_returns_all_retained_deltas(document_state, 
     assert current["updates"] == []
 
 
-# @matrix polling sync : compaction concurrency document revision
 @pytest.mark.unit
 def test_revisioned_document_update_preserves_stale_branch_delta(document_state):
     current = documents.apply_document_update(
@@ -604,7 +591,6 @@ def test_revisioned_document_update_preserves_stale_branch_delta(document_state)
     ]
 
 
-# @matrix polling sync : document fingerprint persistence
 @pytest.mark.unit
 def test_revisioned_document_asset_refresh_keeps_live_generation(document_state):
     generation = document_state["generation"]
@@ -639,7 +625,6 @@ class _PresencePipeline:
         return [True] * len(self.commands)
 
 
-# @matrix polling sync : document lifecycle presence
 @pytest.mark.unit
 def test_revisioned_presence_close_removes_client(monkeypatch):
     pipeline = _PresencePipeline()

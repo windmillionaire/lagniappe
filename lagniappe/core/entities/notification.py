@@ -25,9 +25,6 @@ class NotificationCreation(TypedDict, total=False):
     sender_name: str | None
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/notification.py::Notification.create
-# @reason notification entity shell metadata is exercised through the process notification create path
 class Notification(Entity):
     if TYPE_CHECKING:
         event_type: str | None
@@ -84,16 +81,10 @@ class Notification(Entity):
             raise AttributeError(f"{type(self).__name__} requires an attached parent")
         return [parent.hash]
 
-    # @testable false
-    # @covered-by lagniappe/web/routes/home/main.py::clear_notifications
-    # @reason notification ownership and deletion are exercised through the route
     @classmethod
     def keys_for_parent(cls, parent: Entity | Key) -> list[Key]:
         return database_notifications.notification_keys(parent)
 
-    # @testable true
-    # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_renders_target_and_preserves_pending_state
-    # @matrix notifications : body create
     @classmethod
     def create(cls, data: NotificationCreation) -> Self:
         parent = data.get("parent")

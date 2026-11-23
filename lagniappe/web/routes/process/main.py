@@ -26,13 +26,6 @@ from . import process
 
 
 # Validate OIDC token from Cloud Tasks
-# @testable true
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-# @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
-# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc provider-delivery
 def authenticate_task(request: Request) -> dict[str, object] | None:
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
@@ -69,13 +62,6 @@ def authenticate_task(request: Request) -> dict[str, object] | None:
         return None
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-# @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
-# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
 @process.route("/jobs", methods=["POST"])
 def deferred_job_process() -> ResponseReturnValue:
     """Run one durable job; Cloud Tasks carries only its Datastore key."""
@@ -100,10 +86,6 @@ def deferred_job_process() -> ResponseReturnValue:
     ), 200
 
 
-# @testable false
-# @manual true
-# @reason requires Cloud Tasks OIDC authentication and delayed delivery
-# @matrix deferred-jobs notifications : feedback long-running
 @process.route("/jobs/feedback", methods=["POST"])
 def deferred_job_feedback() -> ResponseReturnValue:
     """Publish a user-facing update if a deferred job is still active."""
@@ -121,10 +103,6 @@ def deferred_job_feedback() -> ResponseReturnValue:
     )
 
 
-# @testable false
-# @manual true
-# @reason requires Cloud Scheduler OIDC authentication and production queue state
-# @matrix deferred-jobs : reconciliation recovery scheduler
 @process.route("/jobs/reconcile", methods=["POST"])
 def deferred_job_reconcile() -> ResponseReturnValue:
     """Recover stranded deferred work from durable dispatch metadata."""
@@ -136,10 +114,6 @@ def deferred_job_reconcile() -> ResponseReturnValue:
     return jsonify({"success": True, **DeferredJobs.reconcile()}), 200
 
 
-# @testable false
-# @manual true
-# @reason requires Cloud Tasks OIDC authentication and SMTP provider delivery
-# @matrix notification-email : delayed-delivery process-route
 @process.route("/notification-email", methods=["POST"])
 def notification_email_delivery() -> ResponseReturnValue:
     """Deliver one opaque event-driven notification email task."""
@@ -165,10 +139,6 @@ def notification_email_delivery() -> ResponseReturnValue:
     return jsonify({"success": True, **result}), 200
 
 
-# @testable true
-# @tests tests_e2e/006_tasks/test_006i_scheduled_delivery.py::test_scheduled_uncompletion_delivery_guards_and_preserves_due_date
-# @pair task-scheduling:delivery-auth
-# @pairs task-completion:uncomplete task-scheduling:schedule-queue
 @process.route("/uncomplete-task", methods=["POST"])
 def uncomplete_task() -> ResponseReturnValue:
     payload = authenticate_task(request)
@@ -231,10 +201,6 @@ def uncomplete_task() -> ResponseReturnValue:
     return make_response("", 200)
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-# @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_save_persists_relations_process_payloads_and_cache
-# @pairs cache:redis-connection entities:save
 @process.route("/update-cache", methods=["POST"])
 def update_cache() -> ResponseReturnValue:
     payload = authenticate_task(request)
@@ -278,10 +244,6 @@ def update_cache() -> ResponseReturnValue:
     return jsonify({"success": True}), 200
 
 
-# @testable true
-# @tests tests_unit/test_006b_ingress_entity.py::test_importer_story_processes_page_rows_into_entities_and_results
-# @tests tests_unit/test_006b_ingress_entity.py::test_completed_ingress_shows_results
-# @pair ingress:row-results
 @process.route("/ingress", methods=["POST"])
 def ingress() -> ResponseReturnValue:
     payload = authenticate_task(request)
@@ -352,10 +314,6 @@ def ingress() -> ResponseReturnValue:
     return jsonify({"success": True}), 200
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_form_restrictions_reconcile_existing_descendants
-# @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_restriction_worker_retries_and_continues
-# @matrix permissions search : reconciliation queue retry continuation authentication
 @process.route("/reconcile-restrictions", methods=["POST"])
 def reconcile_restrictions() -> ResponseReturnValue:
     from lagniappe.core.tools.cache.restrictions import reconcile_batch, enqueue

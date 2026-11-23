@@ -61,11 +61,6 @@ GET_TASK_HISTORY = types.FunctionDeclaration(
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_task_history_returns_dates_submissions_and_files
-# @tests tests_unit/test_015_ai_tools.py::test_get_task_history_original_answers_use_saved_schema_and_permissions
-# @matrix ai tasks : original-completion permissions schema-version
-# @matrix ai tasks : files task-history tool-context
 def execute_get_task_history(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
     if not isinstance(identifier, str) or not identifier:
@@ -100,9 +95,6 @@ def execute_get_task_history(args: Mapping[str, object], user: User) -> Mapping[
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_task_history.py::execute_get_task_history
-# @reason original snapshot selection and safe projection are exercised through the public read
 def _original_answers(task: Task, user: User) -> dict[str, object]:
     original = original_completion(task)
     definition = original["definition"]
@@ -135,9 +127,6 @@ def _original_answers(task: Task, user: User) -> dict[str, object]:
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_task_history.py::execute_get_task_history
-# @reason defensive argument normalization is covered through the public handler
 def _history_limit(value):
     try:
         limit = int(value)

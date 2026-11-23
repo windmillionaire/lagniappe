@@ -73,7 +73,6 @@ def _set_forms_permission(user, action):
     user.entity = entity
 
 
-# @pair forms:builder-preview
 # @template forms/builder.html::header
 def test_preview_panel(get_admin, get_user):
     user = get_admin()
@@ -159,7 +158,6 @@ def test_preview_panel(get_admin, get_user):
     expect(user.locate(builder.SAVE_BUTTON)).to_be_enabled()
 
 
-# @pair forms:builder-delete-components
 # @template forms/builder.html::main
 def test_delete_components(get_admin, get_user):
     user = get_admin()
@@ -209,8 +207,6 @@ def test_delete_components(get_admin, get_user):
     ).to_be_visible()
 
 
-# @matrix forms : builder-field-title builder-select-options
-# @pair frontend-icons:material-icon-preservation
 def test_change_select_options(get_admin, get_user):
     user = get_admin()
     form = Forms.test_change_select_options.get(user)
@@ -273,7 +269,6 @@ def test_change_select_options(get_admin, get_user):
     ]
 
 
-# @pair forms:builder-field-visibility
 def test_field_visibility(get_admin, get_user):
     user = get_admin()
     form = Forms.test_field_visibility.get(user)
@@ -310,7 +305,6 @@ def test_field_visibility(get_admin, get_user):
     )
 
 
-# @matrix forms : builder-field-visibility select-or-values
 def test_field_visibility_select_multiple_values(get_admin, get_user):
     user = get_admin()
     form = Forms.test_field_visibility_select_multiple_values.get(user)
@@ -351,7 +345,6 @@ def test_field_visibility_select_multiple_values(get_admin, get_user):
     expect(target).to_have_attribute("data-visible", "true")
 
 
-# @pair forms:builder-table-column
 def test_table_column_condition_editor(get_admin, get_user):
     user = get_admin()
     form = Forms.test_table_column_condition_editor.get(user)
@@ -398,7 +391,6 @@ def test_table_column_condition_editor(get_admin, get_user):
     expect(saved_column.locator("[data-icon='number']")).to_be_visible()
 
 
-# @pair forms:builder-status-message
 def test_status_message_condition_editor(get_admin, get_user):
     user = get_admin()
     form = Forms.test_status_message_condition_editor.get(user)
@@ -460,7 +452,6 @@ def test_status_message_condition_editor(get_admin, get_user):
     )
 
 
-# @matrix forms signature : builder-preview builder-signature-field unique-component
 def test_signature_field_builder_unique_component(get_admin, get_user):
     user = get_admin()
     form = Forms.test_signature_field_builder_unique_component.get(user)
@@ -491,8 +482,6 @@ def test_signature_field_builder_unique_component(get_admin, get_user):
     expect(builder.model.locator(f"[id='{signature.id}']")).to_be_visible()
 
 
-# @matrix html-field : asset-lifecycle builder-html-field form-asset html-fields image-upload render-fetch submitter-key unsaved-schema
-# @matrix security : html-sanitization inner-html
 def test_html_field(get_admin, get_user):
     user = get_admin()
     form = Forms.test_html_field.get(user)
@@ -587,8 +576,6 @@ def test_html_field(get_admin, get_user):
     )
 
 
-# @matrix editor : authoritative-content error-reporting intentional-clear retry server-acknowledgement
-# @matrix html-field : authoritative-content builder-html-field error-reporting form-asset intentional-clear retry server-acknowledgement
 # @style message
 # @style editor.container
 def test_html_editor_recovers_from_failed_load_and_save(
@@ -666,7 +653,6 @@ def test_html_editor_recovers_from_failed_load_and_save(
     assert not cleared_form.get_html_field(html.id)
 
 
-# @pair forms:builder-drag-component
 def test_drag_component(get_admin, get_user):
     user = get_admin()
     form = Forms.test_drag_component.get(user)

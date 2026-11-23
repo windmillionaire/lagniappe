@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 from ..contracts import ProposalActionDisplay, ProposalActionGrouping
 
 
-# @testable infrastructure
 def move_file_details(
     details: ProposalDetailCollector,
     data: ActionData,
@@ -39,7 +38,6 @@ def move_file_details(
     )
 
 
-# @testable infrastructure
 def attachment_details(
     details: ProposalDetailCollector,
     data: ActionData,
@@ -49,7 +47,6 @@ def attachment_details(
     details.reference("File", data, "file")
 
 
-# @testable infrastructure
 def summary_details(
     details: ProposalDetailCollector,
     data: ActionData,
@@ -59,11 +56,6 @@ def summary_details(
     details.add("Summary", data.get("summary"))
 
 
-# @testable true
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_move_files_under_target_page
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_existing_page_category_for_attachments
-# @matrix ai-report : details move-file proposal
-# @matrix files : attachment-grouping details existing-page-category move-file proposal
 def file_action_displays() -> tuple[ProposalActionDisplay, ...]:
     return (
         ProposalActionDisplay(

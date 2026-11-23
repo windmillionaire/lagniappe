@@ -138,7 +138,6 @@ async function loadPageTaskList() {
 	});
 }
 
-/** @matrix form-migration : informational-notice */
 test("test_migration_notice_survives_form_replacement_and_discard", async (t) => {
 	createBrowser(t);
 	const modals = [];
@@ -209,7 +208,6 @@ test("test_migration_notice_survives_form_replacement_and_discard", async (t) =>
 	assert.equal(modals[1].destroyed, 1);
 });
 
-/** @matrix offline : database-upgrade legacy-record-discard mutation-store */
 test("test_offline_database_upgrade_discards_legacy_activity_records", async (t) => {
 	createBrowser(t, { formData: "native" });
 	const factory = installIndexedDB(t);
@@ -243,7 +241,6 @@ test("test_offline_database_upgrade_discards_legacy_activity_records", async (t)
 	upgraded.close();
 });
 
-/** @matrix deferred-jobs forms submission : deliberate-submit form-lock no-live-sync */
 test("test_form_submit_is_blocked_by_schema_migration_but_not_autofill", async (t) => {
 	createBrowser(t);
 	const { FormWidget } = await loadFormWidget();
@@ -298,7 +295,6 @@ test("test_form_submit_is_blocked_by_schema_migration_but_not_autofill", async (
 	assert.equal(await widget.prepareSubmit(), false);
 });
 
-/** @matrix deferred-jobs : form-lock reload */
 test("test_active_deferred_form_waits_for_root_operation_scan", async (t) => {
 	createBrowser(t);
 	const scans = [];
@@ -339,7 +335,6 @@ test("test_active_deferred_form_waits_for_root_operation_scan", async (t) => {
 	assert.deepEqual(scans, [widget.target]);
 });
 
-/** @matrix edited-entity-notice form-schema forms : latest-schema local-values no-schema-version-choice remote-added-values */
 test("test_local_revision_uses_latest_schema_and_merges_submission_values", async (t) => {
 	createBrowser(t);
 	const { FormWidget } = await loadFormWidget();
@@ -386,7 +381,6 @@ test("test_local_revision_uses_latest_schema_and_merges_submission_values", asyn
 	]);
 });
 
-/** @matrix offline : fingerprint immutable-command queue-submit */
 test("test_offline_submit_record_keeps_originating_entity_fingerprint", async (t) => {
 	createBrowser(t, {
 		formData: "native",
@@ -420,7 +414,6 @@ test("test_offline_submit_record_keeps_originating_entity_fingerprint", async (t
 	assert.deepEqual(stored.fields[0], ["name", "Offline edit"]);
 });
 
-/** @matrix offline : reload renderer-snapshot replay-payload */
 test("test_offline_submit_record_keeps_renderer_snapshot_out_of_replay_payload", async (t) => {
 	createBrowser(t, {
 		formData: "native",
@@ -489,7 +482,6 @@ function offlineRecord() {
 	};
 }
 
-/** @matrix offline : conflict-durability dispatch fingerprint-precondition */
 test("test_offline_replay_keeps_stale_submission_queued_for_reconciliation", async (t) => {
 	createBrowser(t, { formData: "native" });
 	const deleted = [];
@@ -526,7 +518,6 @@ test("test_offline_replay_keeps_stale_submission_queued_for_reconciliation", asy
 	assert.equal(payload.options.acknowledgeEntities, false);
 });
 
-/** @pairs edited-entity-notice:replayed-response offline:replay-reconciliation */
 test("test_offline_replay_polls_mounted_form_without_direct_acknowledgement", async (t) => {
 	createBrowser(t, { formData: "native" });
 	const events = [];
@@ -577,7 +568,6 @@ test("test_offline_replay_polls_mounted_form_without_direct_acknowledgement", as
 	assert.equal(events[2].key, "page-one");
 });
 
-/** @matrix offline : conflict-rebase replay */
 test("test_offline_replay_retries_a_conflict_rebased_by_the_form", async (t) => {
 	createBrowser(t, { formData: "native" });
 	const deleted = [];
@@ -614,7 +604,6 @@ test("test_offline_replay_retries_a_conflict_rebased_by_the_form", async (t) => 
 	assert.deepEqual(queue.records, []);
 });
 
-/** @matrix edited-entity-notice : active-state latest-schema local-values renderer-capability schema-only submission-choice whole-form-selection */
 test("test_edit_watcher_separates_schema_and_renderer_value_changes", async (t) => {
 	createBrowser(t);
 	const events = [];
@@ -819,7 +808,6 @@ test("test_edit_watcher_separates_schema_and_renderer_value_changes", async (t) 
 	assert.equal(queued.state.submissionChoice, true);
 });
 
-/** @matrix edited-entity-notice forms : mixed-submission per-field-selection saved-default */
 test("test_edit_watcher_reconciles_independent_field_selections", async (t) => {
 	createBrowser(t);
 	const applied = [];
@@ -871,7 +859,6 @@ test("test_edit_watcher_reconciles_independent_field_selections", async (t) => {
 	assert.equal(applied[0].options.markUnsaved, true);
 });
 
-/** @matrix deferred-jobs edited-entity-notice : active-operation form-lock reload */
 test("test_edit_watcher_restores_active_autofill_without_form_sync", async (t) => {
 	createBrowser(t);
 	const locked = [];
@@ -935,10 +922,6 @@ test("test_edit_watcher_restores_active_autofill_without_form_sync", async (t) =
 	assert.equal(tracked[2].options.node, form);
 });
 
-/**
- * @matrix edited-entity-notice : active-state dirty-state owned-deferred-completion
- * @pair deferred-jobs:owned-deferred-completion
- */
 test("test_owned_deferred_completion_replaces_clean_active_form", async (t) => {
 	createBrowser(t);
 	const applications = [];
@@ -1056,10 +1039,6 @@ test("test_owned_deferred_completion_replaces_clean_active_form", async (t) => {
 	assert.equal(watcher._reconciler._state(dirty.marker).mode, "reset");
 });
 
-/**
- * @matrix offline : background-replay dirty-form-preservation
- * @matrix polling : catch-up nonblocking
- */
 test("test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay", async (t) => {
 	createBrowser(t);
 	const events = [];
@@ -1114,7 +1093,6 @@ test("test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_
 	assert.equal(events.at(-1), "refresh:undefined:undefined");
 });
 
-/** @matrix collections forms reconnect-refresh : explicit-collection-scope form-exclusion */
 test("test_component_refresh_only_loads_collection_widgets", async (t) => {
 	createBrowser(t);
 	const events = [];
@@ -1161,7 +1139,6 @@ test("test_component_refresh_only_loads_collection_widgets", async (t) => {
 	assert.deepEqual(events, ["load:/clean", "refresh:clean"]);
 });
 
-/** @matrix tasks : active-form-preservation dirty-form-preservation stale-widget */
 test("test_task_list_refresh_preserves_rows_with_local_form_state", async () => {
 	const { PageTaskList } = await loadPageTaskList();
 	const removed = {
@@ -1259,10 +1236,6 @@ test("test_task_list_refresh_preserves_rows_with_local_form_state", async () => 
 	assert.equal(incompatibleReplacement.dataset.open, "false");
 });
 
-/**
- * @source src/script/widgets/pageTaskList.mjs::PageTaskList
- * @pair tasks:refresh-order
- */
 test("test_task_list_refresh_keeps_open_task_in_place", async (t) => {
 	createBrowser(t);
 	const { PageTaskList } = await loadPageTaskList();
@@ -1292,7 +1265,6 @@ test("test_task_list_refresh_keeps_open_task_in_place", async (t) => {
 	assert.deepEqual(order(), ["open", "first", "last"]);
 });
 
-/** @matrix tasks : delta concurrent-create dirty-form-preservation */
 test("test_task_delta_loads_unknown_rows_without_discarding_local_edits", async (t) => {
 	createBrowser(t);
 	const { PageTaskList } = await loadPageTaskList();
@@ -1354,9 +1326,6 @@ test("test_task_delta_loads_unknown_rows_without_discarding_local_edits", async 
 	assert.equal(requests, 2, "Complete deltas should not request the full list");
 });
 
-/**
- * @pair tasks:refresh-order
- */
 test("test_task_list_refresh_does_not_reinsert_unchanged_rows", async (t) => {
 	createBrowser(t);
 	const { PageTaskList } = await loadPageTaskList();
@@ -1398,7 +1367,6 @@ test("test_task_list_refresh_does_not_reinsert_unchanged_rows", async (t) => {
 	);
 });
 
-/** @matrix tasks : create dedupe refresh */
 test("test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh", async () => {
 	const { PageTaskList } = await loadPageTaskList();
 	const rows = [];
@@ -1444,7 +1412,6 @@ test("test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh
 	assert.deepEqual(list._created, []);
 });
 
-/** @pair tasks:initial-render */
 test("test_task_list_initial_reconciliation_publishes_list_visibility", async () => {
 	const { PageTaskList } = await loadPageTaskList();
 	const attributes = new Set();
@@ -1474,7 +1441,6 @@ test("test_task_list_initial_reconciliation_publishes_list_visibility", async ()
 	assert.equal(completedHeader.dataset.visible, "false");
 });
 
-/** @matrix tasks : delegated-title-click */
 test("test_task_title_click_is_left_to_view_delegate", async () => {
 	const { PageTaskList } = await loadPageTaskList();
 	let scrolls = 0;
@@ -1508,7 +1474,6 @@ test("test_task_title_click_is_left_to_view_delegate", async () => {
 	assert.equal(scrolls, 0);
 });
 
-/** @matrix tasks : open-scroll delegated-title-click */
 test("test_task_open_scrolls_row_only_when_mostly_outside_viewport", async (t) => {
 	createBrowser(t);
 	Object.defineProperty(window, "innerHeight", {
@@ -1592,7 +1557,6 @@ test("test_task_open_scrolls_row_only_when_mostly_outside_viewport", async (t) =
 	assert.equal(calls.length, 0, "Only the task-title action may scroll");
 });
 
-/** @matrix tasks : active-widget complete route-override */
 test("test_task_completion_keeps_component_update_route_when_history_is_active", async (t) => {
 	createBrowser(t);
 	const { PageTaskList } = await loadPageTaskList();
@@ -1621,7 +1585,6 @@ test("test_task_completion_keeps_component_update_route_when_history_is_active",
 	assert.equal(submitted.detail.update, true);
 });
 
-/** @matrix tasks : completed-only create-close empty-state */
 test("test_task_list_empty_marker_requires_closed_create_form_and_no_tasks", async () => {
 	const { PageTaskList } = await loadPageTaskList();
 	const marker = { dataset: {} };
@@ -1674,7 +1637,6 @@ test("test_task_list_empty_marker_requires_closed_create_form_and_no_tasks", asy
 	assert.equal(activeTasks.dataset.visible, "true");
 });
 
-/** @pair tasks:detached-structure */
 test("test_task_list_reconciliation_rejects_incomplete_structure", async () => {
 	const { PageTaskList } = await loadPageTaskList();
 	const list = Object.create(PageTaskList.prototype);
@@ -1700,7 +1662,6 @@ test("test_task_list_reconciliation_rejects_incomplete_structure", async () => {
 	list._setListVisibility();
 });
 
-/** @matrix forms : clear direct-fields input textarea */
 test("test_direct_form_controls_clear_inputs_and_textareas", async (t) => {
 	createBrowser(t);
 	const { BaseElement } = await import(

@@ -23,7 +23,6 @@ _AUDITED_DIRECT_IMPORTS = {
 }
 
 
-# @matrix outbound-http tooling : direct-call-guard provider-ownership source-inventory
 def test_runtime_direct_http_imports_match_shared_boundary_and_audited_providers():
     """New direct runtime HTTP dependencies require an explicit owner decision."""
     found = runtime_direct_http_imports(
@@ -33,7 +32,6 @@ def test_runtime_direct_http_imports_match_shared_boundary_and_audited_providers
     assert found == _AUDITED_DIRECT_IMPORTS
 
 
-# @matrix outbound-http tooling : import-syntax source-inventory
 @pytest.mark.parametrize(
     "code, expected",
     [

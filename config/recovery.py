@@ -36,18 +36,10 @@ _SECRET_KEY_MARKERS = (
 _PROJECT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
 
 
-# @testable false
-# @covered-by config/recovery.py::validate_recovery_document
-# @covered-by config/recovery.py::materialize_recovery_redis_ca
-# @reason recovery-specific validation type exercised through its public raisers
 class RecoveryConfigurationError(ValueError):
     """Raised when a recovery snapshot cannot be trusted or restored."""
 
 
-# @testable false
-# @covered-by config/recovery.py::validate_recovery_document
-# @covered-by config/recovery.py::redact_settings_for_display
-# @reason structured-value parser owned by public recovery validation and redaction
 def _mapping(value, name):
     if isinstance(value, Mapping):
         return dict(value)
@@ -63,10 +55,6 @@ def _mapping(value, name):
     raise RecoveryConfigurationError(f"{name} must be a mapping.")
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_recovery_snapshot_is_complete_flat_and_merges_live_settings
-# @matrix config : current-schema messaging-removal recovery-export
-# @pair public-pages:recovery-export
 def build_recovery_snapshot(
     settings: Mapping[str, object],
     *,
@@ -154,15 +142,9 @@ def build_recovery_snapshot(
     return snapshot
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_recovery_display_redacts_nested_and_flat_secrets_without_mutation
-# @matrix config : recovery-display secrets
 def redact_settings_for_display(settings: Mapping[str, object]) -> dict[str, object]:
     """Return a redacted browser-display copy without mutating the source mapping."""
 
-    # @testable false
-    # @covered-by config/recovery.py::redact_settings_for_display
-    # @reason nested key classifier exercised through the public redaction helper
     def secret_key(key: object) -> bool:
         normalized = re.sub(r"[^A-Z0-9]+", "_", str(key).upper()).strip("_")
         compact = normalized.replace("_", "")
@@ -170,9 +152,6 @@ def redact_settings_for_display(settings: Mapping[str, object]) -> dict[str, obj
             marker.replace("_", "") in compact for marker in _SECRET_KEY_MARKERS
         )
 
-    # @testable false
-    # @covered-by config/recovery.py::redact_settings_for_display
-    # @reason recursive implementation exercised through the public redaction helper
     def redact(value: object, key: object = "") -> object:
         if secret_key(key):
             return REDACTED_VALUE
@@ -195,9 +174,6 @@ def redact_settings_for_display(settings: Mapping[str, object]) -> dict[str, obj
     return {key: redact(value, key) for key, value in dict(settings).items()}
 
 
-# @testable false
-# @covered-by config/recovery.py::validate_recovery_document
-# @reason URL hostname extraction is exercised through recovery identity validation
 def _hostname(value, name):
     parsed = urlparse(str(value or ""))
     if parsed.scheme != "https" or not parsed.hostname:
@@ -205,9 +181,6 @@ def _hostname(value, name):
     return parsed.hostname.casefold()
 
 
-# @testable false
-# @covered-by config/recovery.py::validate_recovery_document
-# @reason project-qualified resource comparison is owned by recovery validation
 def _require_project_resource(value, name, project_id):
     if not value:
         return
@@ -231,14 +204,6 @@ def _require_project_resource(value, name, project_id):
         )
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_recovery_document_cross_checks_all_persisted_project_identities
-# @tests tests_tooling/test_003_config.py::test_recovery_rejects_current_configuration_identity_mismatch
-# @tests tests_tooling/test_003_config.py::test_recovery_requires_complete_current_configuration
-# @tests tests_tooling/test_003_config.py::test_recovery_validates_and_normalizes_auth_email_smtp
-# @tests tests_tooling/test_003_config.py::test_recovery_upgrades_schema_2_and_discards_legacy_messaging_config
-# @tests tests_tooling/test_003_config.py::test_recovery_accepts_and_redacts_optional_ai_email_config
-# @matrix config : site-policy ai-email authentication-email current-schema messaging-removal project-identity project-number recovery-validation required-settings schema-upgrade secrets
 def validate_recovery_document(settings: Mapping[str, object]) -> dict[str, object]:
     """Validate and normalize a canonical recovery document before provider access."""
     from config.locations import (
@@ -461,9 +426,6 @@ def validate_recovery_document(settings: Mapping[str, object]) -> dict[str, obje
     return recovered
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_recovery_redis_ca_round_trips_through_one_file
-# @matrix config : recovery-export redis-tls
 def read_recovery_redis_ca(
     settings: Mapping[str, object], *, app_dir: str | Path | None = None
 ) -> str | None:
@@ -477,9 +439,6 @@ def read_recovery_redis_ca(
     return cert_path.read_text(encoding="utf-8")
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_recovery_redis_ca_round_trips_through_one_file
-# @matrix config : certificate-validation recovery-restore redis-tls
 def materialize_recovery_redis_ca(
     settings: MutableMapping[str, object], *, app_dir: str | Path | None = None
 ) -> Path | None:

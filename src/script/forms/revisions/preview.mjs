@@ -5,7 +5,6 @@ import { loadWidget } from "../../widgets/loader.mjs";
  * comparison. The response document is cloned so the original remains
  * available if the user chooses to apply it.
  *
- * @testable infrastructure
  */
 export async function loadRevisionPreview(
 	liveWidget,

@@ -57,9 +57,6 @@ from ...restrictions import QueryHashes, Restriction
 from .core import DATA, KINDS
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_results_use_normal_list_indexing_and_keep_cursor_metadata
-# @matrix database : indexing pagination query-results slicing
 class Results[Row]:
     """
     Container for query results with optional pagination cursor.
@@ -120,9 +117,6 @@ class _FilterState(Enum):
 _DENY_ALL_FILTER = _FilterState.DENY_ALL
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_filter_preserves_explicit_deny_all_through_composition
-# @matrix database permissions : deny-all filter-composition
 class Filter:
     """
     Fluent builder for Datastore filters.
@@ -221,9 +215,6 @@ class Filter:
             self.eq(prop, value)
         return self
 
-    # @testable true
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_database_filter_requires_rejects_invalid_hashes_type
-    # @matrix database : filter validation
     def requires(self, hashes: QueryHashes | None) -> Filter:
         """
         Add a requires filter for permission-based access.
@@ -319,9 +310,6 @@ class Filter:
         )
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_denied_query_terminals_do_not_create_datastore_query
-# @matrix database permissions : deny-all query-short-circuit terminal-results
 class Query:
     """
     Fluent query builder for Datastore.
@@ -500,12 +488,6 @@ class Query:
             return iter(())
         return q.fetch(start_cursor=self._cursor, limit=self._limit)
 
-    # @testable true
-    # @tests tests_unit/test_018_database_utility.py::test_query_count_uses_aggregation_without_fetching_entities
-    # @tests tests_unit/test_018_database_utility.py::test_denied_query_terminals_do_not_create_datastore_query
-    # @tests tests_e2e/002_home/test_002o_home_task_count.py::test_user_task_count_aggregates_owned_and_assigned_tasks_once
-    # @matrix database : count aggregation deduplication
-    # @matrix permissions : deny-all query-short-circuit terminal-results
     def count(self) -> int:
         """Count all matching entities in Datastore, ignoring pagination."""
         self._keys_only = True

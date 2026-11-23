@@ -45,11 +45,6 @@ FileData = TypedDict(
 )
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_records_metadata_before_asset_save
-# @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_lists_pages_that_reference_it
-# @tests tests_unit/test_006_file_properties.py::test_file_reverse_task_links_drive_permissions_and_references
-# @matrix file : asset-lifecycle attached-pages attached-tasks badges permissions references reverse-links task-history upload
 class File(AssetMixin, Entity):
     if TYPE_CHECKING:
         @property
@@ -89,10 +84,6 @@ class File(AssetMixin, Entity):
 
     entity_kind = "file"
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_report_file_is_searchable_only_after_workspace_attachment
-    # @tests tests_unit/test_006_file_properties.py::test_unattached_upload_is_private_to_its_uploader_and_admin
-    # @pairs ai-report:pre-execution files:search-visibility
     @property
     def searchable(self) -> bool:
         """Keep staged uploads out of workspace search until attachment."""
@@ -116,16 +107,10 @@ class File(AssetMixin, Entity):
             return cast("Task", permission_relation(self, "task", required=True))
         return cast("Page | None", permission_relation(self, "page"))
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_file_save_normalizes_task_page_and_restriction_fingerprint
-    # @matrix files : ownership parent-key fingerprint restrictions
     @property
     def fingerprint(self) -> str:
         return restricted_fingerprint(super().fingerprint, self.restricted_to)
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_file_save_normalizes_task_page_and_restriction_fingerprint
-    # @matrix files : ownership parent-key restrictions
     def normalize_owner(self) -> None:
         """Keep direct ownership separate from the primary Task's Page."""
         if self.properties.task.key:
@@ -143,11 +128,6 @@ class File(AssetMixin, Entity):
     def has_references(self) -> bool:
         return bool(self.db.get("page") or self.db.get("task"))
 
-    # @testable true
-    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_file_move_preserves_single_ownership
-    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_file_move_does_not_load_previous_task_attachments
-    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_file_move_does_not_load_destination_task_attachments
-    # @matrix files : ownership move reverse-links unloaded-relation
     def move_to(self, owner: Page | Task) -> bool:
         if getattr(owner, "entity_kind", None) not in {"page", "task"}:
             raise ValueError("A File must belong to a Page or a live Task")
@@ -219,11 +199,6 @@ class File(AssetMixin, Entity):
         )
         return properties
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_unattached_upload_is_private_to_its_uploader_and_admin
-    # @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_lists_pages_that_reference_it
-    # @matrix files : uploads temporary-view-ownership
-    # @matrix file : attached-pages permissions
     def allowed(self, action: Action, user: FieldUser = None) -> bool:
         user = current_context_user(user)
         action = Action.EDIT if action.implies(Action.EDIT) else action
@@ -264,11 +239,6 @@ class File(AssetMixin, Entity):
 
         return new_file
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_file_description_form_field_populates_search_cache
-    # @tests tests_unit/test_006_file_properties.py::test_file_update_preserves_processing_options_when_controls_absent
-    # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-    # @matrix file : cache deferred-dispatch description option-preservation
     def update(self, data: FileData | Mapping[str, str | None]) -> None:
         self.name = data.get("name") or data.get("display-name")
         self.summary = data.get("summary") or data.get("description")
@@ -288,12 +258,6 @@ class File(AssetMixin, Entity):
             else None
         )
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-    # @matrix deferred-jobs file : deferred-dispatch post-save-dispatch summary-first
-    # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatch_uses_explicit_actor
-    # @tests tests_unit/test_006_file_properties.py::test_file_processing_preserves_pending_request_when_dispatch_fails
-    # @matrix file deferred-jobs : explicit-actor retry
     def dispatch_pending_processing(self, *, actor: User) -> file_options.Extract | file_options.Summarize | None:
         """Dispatch processing selected by the last update after persistence."""
         request = getattr(self, "_pending_file_processing", None)

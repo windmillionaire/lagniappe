@@ -7,7 +7,6 @@
 import pytest
 
 
-# @matrix category-index : columns table
 @pytest.mark.unit
 def test_category_index(get_test_entities):
     """Test CategoryTable produces correct column structure for UI.

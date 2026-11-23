@@ -47,16 +47,10 @@ PACKAGE_IMPORTS = {
 }
 
 
-# @testable false
-# @covered-by runner/deploy.py::runtime_deploy_surface_issues
-# @reason small normalization helper for requirements/import comparison
 def _canonical_package_name(name):
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-# @testable false
-# @covered-by runner/deploy.py::runtime_deploy_surface_issues
-# @reason requirements parser branch owned by deploy surface verification
 def _requirements_packages(app_dir):
     requirements_path = app_dir / "requirements.txt"
     if not requirements_path.exists():
@@ -74,9 +68,6 @@ def _requirements_packages(app_dir):
     return packages
 
 
-# @testable false
-# @covered-by runner/deploy.py::runtime_deploy_surface_issues
-# @reason .gcloudignore parser branch owned by deploy surface verification
 def _gcloudignore_patterns(app_dir):
     ignore_path = app_dir / ".gcloudignore"
     if not ignore_path.exists():
@@ -97,9 +88,6 @@ def _gcloudignore_patterns(app_dir):
     return patterns
 
 
-# @testable false
-# @covered-by runner/deploy.py::runtime_deploy_surface_issues
-# @reason local root discovery branch owned by deploy surface verification
 def _local_import_roots(app_dir):
     roots = {
         path.stem
@@ -114,9 +102,6 @@ def _local_import_roots(app_dir):
     return roots
 
 
-# @testable false
-# @covered-by runner/deploy.py::runtime_deploy_surface_issues
-# @reason ignore matching branch owned by deploy surface verification
 def _matches_ignore_pattern(relative_path, pattern):
     path = relative_path.as_posix()
     anchored = pattern.startswith("/")
@@ -139,18 +124,12 @@ def _matches_ignore_pattern(relative_path, pattern):
     return fnmatch.fnmatch(path, normalized)
 
 
-# @testable false
-# @covered-by runner/deploy.py::runtime_deploy_surface_issues
-# @reason ignore matching branch owned by deploy surface verification
 def _is_ignored_runtime_path(relative_path, ignored_patterns):
     return any(
         _matches_ignore_pattern(relative_path, pattern) for pattern in ignored_patterns
     )
 
 
-# @testable false
-# @covered-by runner/deploy.py::runtime_deploy_surface_issues
-# @reason file selection branch owned by deploy surface verification
 def _runtime_python_files(app_dir, ignored_patterns):
     for path in app_dir.rglob("*.py"):
         relative_path = path.relative_to(app_dir)
@@ -161,9 +140,6 @@ def _runtime_python_files(app_dir, ignored_patterns):
         yield path
 
 
-# @testable false
-# @covered-by runner/deploy.py::runtime_deploy_surface_issues
-# @reason relative import resolution branch owned by deploy surface verification
 def _module_name_for_path(app_dir, path):
     relative_path = path.relative_to(app_dir)
     parts = list(relative_path.with_suffix("").parts)
@@ -172,9 +148,6 @@ def _module_name_for_path(app_dir, path):
     return ".".join(parts)
 
 
-# @testable false
-# @covered-by runner/deploy.py::runtime_deploy_surface_issues
-# @reason relative import resolution branch owned by deploy surface verification
 def _resolve_import_from_module(path, app_dir, node):
     if node.level == 0:
         return node.module
@@ -191,9 +164,6 @@ def _resolve_import_from_module(path, app_dir, node):
     return ".".join(base_parts)
 
 
-# @testable false
-# @covered-by runner/deploy.py::runtime_deploy_surface_issues
-# @reason AST extraction branch owned by deploy surface verification
 def _imported_modules(path, app_dir):
     try:
         tree = ast.parse(
@@ -221,9 +191,6 @@ def _imported_modules(path, app_dir):
     return modules
 
 
-# @testable false
-# @covered-by runner/deploy.py::runtime_deploy_surface_issues
-# @reason local module path branch owned by deploy surface verification
 def _local_module_path(app_dir, module_name):
     parts = module_name.split(".")
     for length in range(len(parts), 0, -1):
@@ -235,9 +202,6 @@ def _local_module_path(app_dir, module_name):
     return None
 
 
-# @testable false
-# @covered-by runner/deploy.py::runtime_deploy_surface_issues
-# @reason package mapping branch owned by deploy surface verification
 def _required_package_for_import(module_name):
     for import_prefix in sorted(PACKAGE_IMPORTS, key=len, reverse=True):
         if module_name == import_prefix or module_name.startswith(f"{import_prefix}."):
@@ -245,19 +209,12 @@ def _required_package_for_import(module_name):
     return module_name.split(".", 1)[0]
 
 
-# @testable false
-# @covered-by runner/deploy.py::runtime_deploy_surface_issues
-# @reason stdlib predicate branch owned by deploy surface verification
 def _is_stdlib_module(root):
     return root in sys.builtin_module_names or root in getattr(
         sys, "stdlib_module_names", set()
     )
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirements
-# @tests tests_tooling/test_003_config.py::test_runtime_upload_boundary_has_no_local_orchestration_imports
-# @matrix deploy : deploy-surface gcloudignore imports package-boundary requirements
 def runtime_deploy_surface_issues(app_dir: Path | None = None) -> list[str]:
     """Return import issues that would break after App Engine upload/install."""
     app_dir = Path(app_dir or Directory.APP.value)
@@ -307,9 +264,6 @@ def runtime_deploy_surface_issues(app_dir: Path | None = None) -> list[str]:
     return issues
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirements
-# @matrix deploy : deploy-surface gcloudignore imports requirements
 def verify_runtime_deploy_surface(app_dir: Path | None = None) -> bool:
     issues = runtime_deploy_surface_issues(app_dir)
     if not issues:
@@ -321,9 +275,6 @@ def verify_runtime_deploy_surface(app_dir: Path | None = None) -> bool:
     raise RuntimeError(message)
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_deploy_version_update_keeps_package_lock_in_sync
-# @matrix deploy : package-lock transactional-state utf8 version
 def update_package_lock_version(version: str, lock_path: Path | None = None) -> bool:
     """Keep package-lock root metadata aligned with package.json."""
     path = lock_path or File.PACKAGE_JSON.value.with_name("package-lock.json")
@@ -361,9 +312,6 @@ def increment_version() -> str:
     return new_version
 
 
-# @testable false
-# @covered-by installer/config_builders.py::build_manifest
-# @reason manifest naming and icon versioning shared by setup generation and deployment
 def update_manifest(
     *,
     app_settings: Mapping[str, object] | None = None,
@@ -391,9 +339,6 @@ def update_manifest(
             icon["src"] = f"{base_src}?v={image_version}"
 
 
-# @testable false
-# @covered-by runner/deploy.py::deploy
-# @reason gcloud deployment adapter is exercised through publish-mode deployment
 def _deploy_app_yaml(file_ref, quiet=False, *, capture_output=False):
     command = [GCLOUD_CLI or "gcloud", "app", "deploy", str(file_ref.value)]
     if quiet:
@@ -419,10 +364,6 @@ def _deploy_app_yaml(file_ref, quiet=False, *, capture_output=False):
         raise RuntimeError(message)
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
-# @matrix frontend-build : freshness no-op rebuild
-# @pair deploy:build
 def ensure_production_frontend_bundle(*, announce_progress: bool = True) -> bool:
     """Build production assets only when their sources or outputs are stale."""
     validation, issues = inspect_frontend_build(
@@ -447,11 +388,6 @@ def ensure_production_frontend_bundle(*, announce_progress: bool = True) -> bool
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
-# @tests tests_tooling/test_016_cloud_operator.py::test_deploy_requires_pinned_experiments_target
-# @pair deploy:project-identity
-# @matrix deploy : app-yaml build capture-output explicit-project failure-output index-yaml progress version app-failure update-order
 def deploy(
     *,
     build_assets: bool = True,

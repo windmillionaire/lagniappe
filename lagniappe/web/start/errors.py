@@ -18,8 +18,6 @@ from werkzeug.exceptions import HTTPException
 from lagniappe.core import exceptions
 
 
-# @testable false
-# @reason Flask error handler registration is exercised through E2E app boot and error-page behavior
 def initialize(app: Flask) -> None:
     app.register_error_handler(GoogleAPIError, handle_datastore_error)
     app.register_error_handler(TemplateError, handle_template_error)
@@ -27,15 +25,6 @@ def initialize(app: Flask) -> None:
     app.register_error_handler(Exception, handle_exception)
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_csrf_exempt_surfaces_reach_replacement_authentication_gates
-# @tests tests_e2e/001_site/test_001a_environment.py::test_error_handling
-# @tests tests_e2e/001_site/test_001b_login.py::test_login_returns_to_requested_url_after_redirect
-# @tests tests_e2e/001_site/test_001b_login.py::test_csrf_failure_is_identified_for_targeted_retry
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix error-handling : csrf http-404
-# @matrix agent-api : error-envelope routing
-# @pair login:redirect-target
 def handle_http_error(error: HTTPException) -> ResponseReturnValue:
     """Handle HTTP exceptions (4xx and 5xx errors)."""
     code = error.code or 500 if hasattr(error, "code") else 500
@@ -73,8 +62,6 @@ def handle_http_error(error: HTTPException) -> ResponseReturnValue:
     return _handle_error_with_context(error, code=code, header_msg=f"Error {code}")
 
 
-# @testable false
-# @reason Datastore errors require live Google exceptions and rendered app context
 def handle_datastore_error(error: GoogleAPIError) -> ResponseReturnValue:
     """Handle Google Datastore/API errors."""
     if "index for this query is not ready to serve" in str(error).casefold():
@@ -96,29 +83,20 @@ def handle_datastore_error(error: GoogleAPIError) -> ResponseReturnValue:
     return _handle_error_with_context(error, code=500, header_msg="Google API Error")
 
 
-# @testable false
-# @reason Flask error handler wrappers are exercised through E2E error-page behavior
 def handle_template_error(error: TemplateError) -> ResponseReturnValue:
     """Handle Jinja2 template errors."""
     return _handle_error_with_context(error, code=500, header_msg="Template Error")
 
 
-# @testable false
-# @reason Flask error handler wrappers are exercised through E2E error-page behavior
 def handle_exception(error: Exception) -> ResponseReturnValue:
     """Handle uncaught exceptions."""
     return _handle_error_with_context(error, code=500, header_msg="Exception")
 
 
-# @testable false
-# @reason debug-context visibility is part of Flask error-page behavior exercised through E2E
 def _should_show_debug():
     return CONFIG.local
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001a_environment.py::test_error_handling
-# @pair error-handling:error-page
 def _handle_error_with_context(
     error,
     code=500,

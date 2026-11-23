@@ -38,19 +38,11 @@ SORTS = frozenset(
 )
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_filter_query.py::test_describe_filter_fields_exposes_parent_relations_and_form_fields
-# @tests tests_unit/test_015c_ai_filter_query.py::test_describe_filter_fields_uses_real_project_and_form_filter_surfaces
-# @matrix ai-filter : integration permissions schema
 def describe_filter_fields(parent: FilterParent, user: User) -> dict[str, object]:
     """Describe filterable fields visible to ``user`` under a project/category."""
     return describe_filter_contract(parent, user)
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_filter_query.py::test_compile_filter_definitions_normalizes_dates_numbers_and_booleans
-# @tests tests_unit/test_015c_ai_filter_query.py::test_compile_filter_definitions_rejects_unknown_fields_comparators_and_values
-# @matrix ai-filter : compilation permissions validation
 def compile_filter_definitions(parent: FilterParent, conditions: object, user: User) -> list[FilterDefinition]:
     """Compile AI condition DTOs through the shared filter contract."""
     compiled = compile_filter_contract(
@@ -62,9 +54,6 @@ def compile_filter_definitions(parent: FilterParent, conditions: object, user: U
     return list(compiled.definitions)
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_filter_query.py::test_query_workspace_filter_uses_shared_cache_and_permission_filters_results
-# @matrix ai-filter : cache-query output permissions
 def query_workspace_filter(
     parent: FilterParent,
     conditions: object,
@@ -136,9 +125,6 @@ def query_workspace_filter(
     }
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_filter_query.py::test_query_workspace_filter_reports_bounded_row_serialization_errors
-# @matrix ai-filter : legacy-record bounded-error output
 def _serialize_results(results, user):
     """Serialize rows independently so one legacy record cannot hide all matches."""
     serialized = []
@@ -172,9 +158,6 @@ def _serialize_results(results, user):
     return serialized, errors
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/ai_query.py::query_workspace_filter
-# @reason bounded output is asserted through public query behavior
 def _result_limit(value):
     try:
         limit = int(value)
@@ -183,9 +166,6 @@ def _result_limit(value):
     return max(1, min(limit, MAX_LIMIT))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/ai_query.py::query_workspace_filter
-# @reason result ordering is asserted through public query behavior
 def _sort_results(results, sort):
     if sort not in SORTS:
         raise exceptions.ValidationError(f"Unknown filter result sort: {sort}.")
@@ -212,10 +192,6 @@ def _sort_results(results, sort):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/ai_query.py::describe_filter_fields
-# @covered-by lagniappe/core/tools/filters/ai_query.py::query_workspace_filter
-# @reason compact references are asserted through public schema and query output
 def _entity_reference(entity):
     return {
         "kind": entity.kind,

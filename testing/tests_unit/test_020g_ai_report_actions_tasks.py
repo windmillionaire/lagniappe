@@ -28,10 +28,6 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.test_entities import TestEntities
 
 
-# @source lagniappe/core/tools/ai/reporting/contracts/permissions.py::allowed_report_actions
-# @source lagniappe/core/tools/ai/reporting/execution/actions/entities.py::_move_task
-# @matrix ai-report : action-capabilities permissions
-# @pair ai-report:moves
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "source_permission,target_permission,error",
@@ -70,8 +66,6 @@ def test_task_move_catalog_preserves_exact_source_and_destination_permissions(
             assert metadata["moved"]["to"]["id"] == target.urlsafe_key
 
 
-# @matrix ai-report : created-task deterministic-run persistence submission-completion task-attachment
-# @matrix files tasks : task-attachment
 @pytest.mark.unit
 def test_run_report_attach_file_targets_created_task(monkeypatch, get_schema):
     _patch_fake_keys(monkeypatch)
@@ -162,7 +156,6 @@ def test_run_report_attach_file_targets_created_task(monkeypatch, get_schema):
 
 
 
-# @matrix ai-report task-scheduling : normalization periodic recurring scheduled structured-output validation
 @pytest.mark.unit
 def test_report_task_schedule_contract_validates_supported_patterns():
     schema = report_proposal_response_schema(("create_task",))
@@ -204,7 +197,6 @@ def test_report_task_schedule_contract_validates_supported_patterns():
 
 
 
-# @matrix ai-report task-scheduling : persistence recurring
 @pytest.mark.unit
 def test_run_report_creates_task_with_reviewed_schedule(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -278,7 +270,6 @@ def test_run_report_creates_task_with_reviewed_schedule(monkeypatch):
 
 
 
-# @matrix ai-report task-completion tasks : attachments completed-task description name older-event submission
 @pytest.mark.unit
 def test_run_report_records_older_completed_event_without_mutating_live_task(
     monkeypatch,
@@ -452,7 +443,6 @@ def test_run_report_records_older_completed_event_without_mutating_live_task(
 
 
 
-# @matrix ai-report : attachments completed-task
 @pytest.mark.unit
 def test_run_report_records_dateless_historical_task_completion(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -536,7 +526,6 @@ def test_run_report_records_dateless_historical_task_completion(monkeypatch):
 
 
 
-# @matrix ai-report task-completion tasks : completed-task history-name live-task newest-completion
 @pytest.mark.unit
 def test_run_report_promotes_newer_completed_event_to_live_task(
     monkeypatch,
@@ -663,7 +652,6 @@ def test_run_report_promotes_newer_completed_event_to_live_task(
 
 
 
-# @matrix ai-report task-completion tasks : completed-task duplicate-task-prevention explicit-task-identity
 @pytest.mark.unit
 @pytest.mark.parametrize("actor_zone", ["UTC", "America/Los_Angeles"])
 def test_run_report_reuses_one_created_task_for_multiple_completed_events(
@@ -844,7 +832,6 @@ def test_run_report_reuses_one_created_task_for_multiple_completed_events(
 
 
 
-# @matrix ai-report task-completion tasks : completed-task distinct-task explicit-task-identity same-model
 @pytest.mark.unit
 def test_run_report_keeps_untargeted_same_model_tasks_distinct(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -947,7 +934,6 @@ def test_run_report_keeps_untargeted_same_model_tasks_distinct(monkeypatch):
 
 
 
-# @matrix ai-report task-completion tasks : completed-task lazy-load model-form submission
 @pytest.mark.unit
 def test_run_report_loads_model_task_form_from_stored_key_for_history(
     monkeypatch,
@@ -1084,7 +1070,6 @@ def test_run_report_loads_model_task_form_from_stored_key_for_history(
 
 
 
-# @matrix ai-report task-completion tasks : completed-task existing-task explicit-task-identity
 @pytest.mark.unit
 def test_run_report_reuses_existing_task_for_completed_event(
     monkeypatch,
@@ -1183,7 +1168,6 @@ def test_run_report_reuses_existing_task_for_completed_event(
 
 
 
-# @matrix ai-report task-completion tasks : automatic-task-family completed-task period-name same-report
 @pytest.mark.unit
 def test_run_report_automatically_reuses_dated_completed_task_family(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -1285,7 +1269,6 @@ def test_run_report_automatically_reuses_dated_completed_task_family(monkeypatch
 
 
 
-# @matrix ai-report task-completion tasks : ambiguity automatic-task-family completed-task
 @pytest.mark.unit
 def test_run_report_keeps_ambiguous_completed_task_families_distinct(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -1374,7 +1357,6 @@ def test_run_report_keeps_ambiguous_completed_task_families_distinct(monkeypatch
 
 
 
-# @matrix ai-report task-completion tasks : completed-task explicit-task-identity page-validation
 @pytest.mark.unit
 def test_run_report_rejects_completed_task_target_from_another_page(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -1443,7 +1425,6 @@ def test_run_report_rejects_completed_task_target_from_another_page(monkeypatch)
 
 
 
-# @matrix ai-report task-completion tasks : completed-task continue missing-submission task-form
 @pytest.mark.unit
 def test_run_report_warns_but_continues_when_task_form_submission_missing(
     monkeypatch,
@@ -1572,7 +1553,6 @@ def test_run_report_warns_but_continues_when_task_form_submission_missing(
 
 
 
-# @matrix ai-report forms tasks : continue deterministic-run mismatched-form recoverable
 @pytest.mark.unit
 def test_run_report_skips_task_that_references_page_form_and_continues(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -1648,7 +1628,6 @@ def test_run_report_skips_task_that_references_page_form_and_continues(monkeypat
 
 
 
-# @matrix ai-report task-completion tasks : page-reference repair task-history
 @pytest.mark.unit
 def test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wrong_kind(
     monkeypatch,
@@ -1753,7 +1732,6 @@ def test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wron
 
 
 
-# @matrix ai-report files : attachment page-reference prior-task-page repair
 @pytest.mark.unit
 def test_run_report_rejects_file_as_attachment_target_without_guessing_prior_page(
     monkeypatch,
@@ -1878,7 +1856,6 @@ def test_run_report_rejects_file_as_attachment_target_without_guessing_prior_pag
 
 
 
-# @matrix ai-report : completed-task continue recoverable validation
 @pytest.mark.unit
 def test_run_report_skips_invalid_completed_task_events_and_continues(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -1960,7 +1937,6 @@ def test_run_report_skips_invalid_completed_task_events_and_continues(monkeypatc
         assert result["actions"][1]["entity"]["name"] == "Still Runs"
 
 
-# @matrix ai-report : completed-task validation
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "date_text,utc_hour",

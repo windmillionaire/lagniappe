@@ -18,9 +18,6 @@ from .user_entity import Email, LastLogin
 from ..mixins import ColumnMixin
 
 
-# @testable true
-# @tests tests_unit/test_010_task_index.py::test_task_index
-# @matrix task-index : columns table
 class TaskTable(Columns["Entity | Site"]):
     _id = "table"
     _kind = "task"
@@ -43,12 +40,6 @@ class TaskTable(Columns["Entity | Site"]):
                 field.selected = True
 
 
-# @testable true
-# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_appears_after_completion_cycle
-# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload
-# @tests tests_unit/test_010_task_index.py::test_task_history_index_includes_attachments_column
-# @tests tests_unit/test_010_task_index.py::test_task_history_index_includes_snapshot_columns
-# @matrix tasks : attachments columns completion-cycle description history name reload table
 class TaskHistoryTable(Columns["Task | TaskHistory"]):
     _id = "table"
     _kind = "task"
@@ -96,9 +87,6 @@ class TaskHistoryTable(Columns["Task | TaskHistory"]):
         return self._fields
 
 
-# @testable true
-# @tests tests_unit/test_004a_form_index.py::test_form_index_table
-# @matrix form-index : columns table
 class FormTable(Columns["Entity | Site"]):
     _id = "table"
     _kind = "form"
@@ -111,9 +99,6 @@ class FormTable(Columns["Entity | Site"]):
             field.selected = True
 
 
-# @testable true
-# @tests tests_unit/test_009_user_index.py::test_user_index
-# @matrix user-index : columns table
 class UserTable(Columns["Entity | Site"]):
     _id = "table"
     _kind = "user"

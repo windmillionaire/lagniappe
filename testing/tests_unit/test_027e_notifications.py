@@ -17,9 +17,6 @@ from testing.utility.messaging_fakes import MemoryDatastore, managed_user
 pytestmark = pytest.mark.unit
 
 
-# @matrix notifications : aggregate-count aggregate-repair cache-failure-isolation idempotency ordinary-clear ordinary-count ordinary-create ordinary-delete revision transaction-retry
-# @matrix notifications : body html-stripping
-# @matrix notification-email notifications : failure-isolation idempotency
 def test_ordinary_notification_service_mutates_aggregate_once(monkeypatch):
     store = MemoryDatastore()
     monkeypatch.setattr(notification_database.DATA, "_datastore_client", store)

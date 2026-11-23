@@ -3,11 +3,6 @@ import { captureError } from "./errors.mjs";
 import { createIcon } from "./icons.mjs";
 import { withTransition } from "./transitions.mjs";
 
-/**
- * @testable false
- * @covered-by src/script/shared/deferredOperations.mjs::DeferredOperationManager
- * @reason server-rendered revision parsing is exercised through manager registration
- */
 function operationRevision(value) {
 	if (typeof value === "number") return value;
 	if (typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value)) {
@@ -16,11 +11,6 @@ function operationRevision(value) {
 	return value;
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/deferredOperations.mjs::DeferredOperationManager
- * @reason coordinator-owned bounded elapsed-time presentation
- */
 function elapsedLabel(seconds) {
 	seconds = Math.max(Number(seconds) || 0, 0);
 	if (seconds < 10) return "just now";
@@ -31,22 +21,12 @@ function elapsedLabel(seconds) {
 	return `${hours} hr ${minutes % 60} min`;
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/deferredOperations.mjs::DeferredOperationManager
- * @reason coordinator-owned DOM lookup for operation decorations
- */
 function operationNodes(key) {
 	return Array.from(document.querySelectorAll("[data-operation]")).filter(
 		(node) => node.dataset.operation === key,
 	);
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/deferredOperations.mjs::DeferredOperationManager
- * @reason rendered operation eligibility is exercised through manager subscriptions
- */
 function operationNodeVisible(node) {
 	if (!node || node.isConnected === false) return false;
 	if (node.closest?.("[hidden], .hidden, [data-visible='false']")) return false;
@@ -54,11 +34,6 @@ function operationNodeVisible(node) {
 	return rects ? rects.length > 0 : true;
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/deferredOperations.mjs::DeferredOperationManager
- * @reason terminal autofill bootstrap is exercised through manager registration
- */
 function completedAutofillInMarkup(node, status) {
 	if (
 		node.dataset.widget !== "TaskForm" ||
@@ -84,13 +59,6 @@ function completedAutofillInMarkup(node, status) {
 /**
  * Reconcile every visible deferred operation through the shared poll contract.
  *
- * @testable true
- * @tests tests_js/test_023_deferred_operations.mjs::test_deferred_operation_manager_batches_orders_and_renders_status
- * @tests tests_js/test_023_deferred_operations.mjs::test_deferred_operation_manager_reconciles_server_rendered_terminal_status
- * @tests tests_js/test_023_deferred_operations.mjs::test_cold_task_operations_wait_for_activation_and_completed_reviews_need_no_poll
- * @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
- * @matrix deferred-jobs : backoff decoration-opt-out lazy-watcher polling progress rendered-autofill rendered-visibility revision status teardown terminal-ownership timing visible-blur
- * @pair deferred-jobs:review-probe
  */
 export class DeferredOperationManager {
 	constructor(view) {

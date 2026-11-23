@@ -22,11 +22,6 @@ import { FormSettings } from "./panels/formSettings.mjs";
 import { Header } from "./panels/header.mjs";
 import { ModelElement, ModelPanel } from "./panels/model.mjs";
 
-/**
- * @testable true
- * @tests tests_js/test_046_async_query_lifecycle.mjs::test_builder_destroys_owned_search_modal_and_panels_during_startup
- * @matrix forms : builder-lifecycle late-publication listener-teardown
- */
 class FormBuilder {
 	constructor(node) {
 		this._destroyed = false;
@@ -128,15 +123,6 @@ class FormBuilder {
 		return searchBox;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_036_form_builder_frontend.mjs::test_builder_sync_uses_shared_connectivity_without_orphaned_global_state
-	 * @tests tests_js/test_045_browser_persistence.mjs::test_builder_owns_independent_editor_lifecycle_flushes
-	 * @tests tests_js/test_036c_form_migrations.mjs::test_builder_resumes_migration_polling_and_clears_completed_status
-	 * @matrix editor html-field : teardown
-	 * @matrix forms offline : builder-lifecycle
-	 * @matrix form-migration : progress recovery
-	 */
 	async sync({
 		hidden = document.hidden,
 		blurred = false,
@@ -184,12 +170,6 @@ class FormBuilder {
 		);
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/builder/builder.mjs::FormBuilder.sync
-	 * @covered-by src/script/views/builder/panels/header.mjs::Header.saveForm
-	 * @reason builder connectivity controls are applied through the shared view lifecycle
-	 */
 	offline(offline) {
 		const search = document.querySelector("[lp-search]");
 		if (this.offlineIndicator) {
@@ -279,10 +259,6 @@ class FormBuilder {
 		};
 	}
 
-	/**
-	 * @testable true
-	 * @matrix forms : draft-history
-	 */
 	setHtml(fieldId, html) {
 		this.htmlFields[fieldId] = this.canonicalHtml(html);
 		if (this.draft.updateHtml(fieldId, this.htmlFields[fieldId]))
@@ -405,11 +381,6 @@ class FormBuilder {
 		if (redo) redo.disabled = !this.draft.future.length;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_036b_builder_draft.mjs::test_builder_save_restores_unsubmitted_condition_buffer
-	 * @matrix forms : draft-history stale-acknowledgement focus-recovery
-	 */
 	restoreDraft({ preserveFocus = false } = {}) {
 		const active = document.activeElement;
 		const condition = this.conditions.condition;
@@ -534,11 +505,6 @@ class FormBuilder {
 		if (inputFocus) return restoreInput();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_generated_document_uses_editor_undo_before_first_open
-	 * @matrix html-field : generated-document-undo retained-editor
-	 */
 	async prepareGeneratedDocuments(htmlFields) {
 		const { default: HtmlEditor } = await import("./conditions/html.mjs");
 		for (const [id, html] of Object.entries(htmlFields || {})) {
@@ -588,12 +554,6 @@ class FormBuilder {
 		return this.draft?.saved.schema.find((field) => field.id === id);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
-	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
-	 * @matrix forms : builder-defaults page-form task-form
-	 */
 	async createFormElements() {
 		const recentSchema = this.schemaElt.value;
 		const schemaJSON = this.bootstrap
@@ -646,12 +606,6 @@ class FormBuilder {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
-	 * @matrix forms : builder-copy navigation schema
-	 * @pair entity-menu:builder-copy
-	 */
 	async copyForm(button) {
 		if (this._destroyed || !button?.dataset.route || button.disabled) return;
 
@@ -749,10 +703,6 @@ class FormBuilder {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @matrix forms : builder-lifecycle draft-history
-	 */
 	deselectElement() {
 		this.model.deselectItem();
 		this.settings.deselectItem();
@@ -760,11 +710,6 @@ class FormBuilder {
 		if (this.draft) this.draft.state.selected_id = null;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_036_form_builder_frontend.mjs::test_table_creation_defaults_columns_for_unsaved_preview
-	 * @matrix form-table forms : builder-defaults empty-columns unsaved-preview
-	 */
 	createElement(schema) {
 		schema.id = schema.id ?? generateElementId(schema.type);
 		if (schema.type === "html" && !Object.hasOwn(this.htmlFields, schema.id))
@@ -869,11 +814,6 @@ class FormBuilder {
 		this.updateSchema();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_delete_components
-	 * @pair forms:builder-delete-components
-	 */
 	removeElement() {
 		delete this.htmlFields[this.selectedElement.schema.id];
 		if (this.selectedElement.destroy) this.selectedElement.destroy();

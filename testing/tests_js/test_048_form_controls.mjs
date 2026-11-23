@@ -60,7 +60,6 @@ async function setupFormWidget(t, { name = "Original", loaded = true } = {}) {
 	};
 }
 
-/** @matrix user-groups forms : initialization conditional-response single-reconciliation */
 test("test_form_shell_waits_for_html_and_visibility_does_not_rebuild", async (t) => {
 	const { controllers, widget } = await setupFormWidget(t, {
 		name: "",
@@ -83,7 +82,6 @@ test("test_form_shell_waits_for_html_and_visibility_does_not_rebuild", async (t)
 	assert.equal(controllers.length, 1);
 });
 
-/** @matrix forms user-groups : rebuild-serialization single-reconciliation */
 test("test_form_replacements_serialize_and_adopt_only_latest_controls", async (t) => {
 	const { controllers, widget, setInitialize } = await setupFormWidget(t);
 	await widget.init();
@@ -133,12 +131,6 @@ test("test_form_replacements_serialize_and_adopt_only_latest_controls", async (t
 	);
 });
 
-/**
- * @source src/script/widgets/base/formWidget.mjs::FormWidget
- * @source src/script/forms/reviewBar.mjs::currentReviewOperation
- * @pair forms:autofill-completion-review
- * @pair forms:reset
- */
 test("test_form_replacement_keeps_running_operation_and_refreshes_saved_baseline", async (t) => {
 	const { widget, setInitialize } = await setupFormWidget(t);
 	const scans = [];
@@ -206,7 +198,6 @@ test("test_form_replacement_keeps_running_operation_and_refreshes_saved_baseline
 	);
 });
 
-/** @matrix forms user-groups : rebuild-serialization single-reconciliation */
 test("test_queued_commit_waits_for_newer_replacement", async (t) => {
 	const { widget, setInitialize } = await setupFormWidget(t);
 	await widget.init();
@@ -247,7 +238,6 @@ test("test_queued_commit_waits_for_newer_replacement", async (t) => {
 	);
 });
 
-/** @matrix forms : teardown reset unsaved-preservation */
 test("test_form_discard_and_failure_leave_live_controls_intact", async (t) => {
 	const { controllers, widget, setInitialize } = await setupFormWidget(t);
 	await widget.init();
@@ -289,7 +279,6 @@ test("test_form_discard_and_failure_leave_live_controls_intact", async (t) => {
 	);
 });
 
-/** @matrix forms : reset unsaved-preservation */
 test("test_explicit_revision_reset_can_replace_dirty_form", async (t) => {
 	const { widget } = await setupFormWidget(t);
 	await widget.init();
@@ -305,7 +294,6 @@ test("test_explicit_revision_reset_can_replace_dirty_form", async (t) => {
 	assert.equal(widget.revisionBaseline, widget.revisionSnapshot());
 });
 
-/** @matrix user-groups : conditional-response initialization */
 test("test_validated_html_initializes_cold_widget_without_rebuilding_loaded_widget", async () => {
 	const calls = [];
 	const widget = {
@@ -326,7 +314,6 @@ test("test_validated_html_initializes_cold_widget_without_rebuilding_loaded_widg
 	assert.equal(calls.length, 1);
 });
 
-/** @matrix forms : initialization teardown readonly */
 test("test_declared_controls_are_lazy_owned_and_cleaned_on_failed_initialization", async (t) => {
 	createBrowser(t);
 	const controls = [];
@@ -393,7 +380,6 @@ test("test_declared_controls_are_lazy_owned_and_cleaned_on_failed_initialization
 	assert.equal(controls[1].destroyed, 1);
 });
 
-/** @matrix forms : review-notice-placement */
 test("test_form_review_notice_stays_above_expanded_autofill_context", async (t) => {
 	createBrowser(t);
 	const { FormController } = await import(

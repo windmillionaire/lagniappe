@@ -11,9 +11,6 @@ from . import GCLOUD_CLI
 from .errors import GCLOUD_TIMEOUT, SetupError, classify_provider_error
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_prerequisite_gcloud_and_deploy_helpers
-# @pair setup:gcloud-command
 def check_gcloud_cli() -> None:
     if not GCLOUD_CLI:
         print(
@@ -26,10 +23,6 @@ def check_gcloud_cli() -> None:
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_prerequisite_gcloud_and_deploy_helpers
-# @pair setup:gcloud-command
-# @pair setup:timeout
 @overload
 def run_gcloud_command(command: list[str], check: Literal[True] = True, timeout: float = GCLOUD_TIMEOUT) -> subprocess.CompletedProcess[str]: ...
 
@@ -76,18 +69,12 @@ def run_gcloud_command(
 GOOGLE_CLOUD_TERMS_URL = "https://console.developers.google.com/terms/cloud"
 
 
-# @testable false
-# @covered-by installer/create_config.py::verify_application_config
-# @reason small typed-failure adapter exercised through configuration validation
 def _fail(
     message: str = "Setup configuration failed.", *, repair_action: str | None = None
 ) -> Never:
     raise SetupError(message, repair_action=repair_action)
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_google_cloud_terms_failure_has_account_specific_repair
-# @matrix setup : error-guidance google-cloud-terms
 def _is_google_cloud_terms_error(detail: object) -> bool:
     """Recognize Google's account-level Cloud service-terms rejection."""
     normalized = str(detail or "").casefold()
@@ -101,9 +88,6 @@ def _is_google_cloud_terms_error(detail: object) -> bool:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_google_cloud_terms_failure_has_account_specific_repair
-# @matrix setup : error-guidance google-cloud-terms identity
 def _google_cloud_terms_repair_action(account: str) -> str:
     """Return safe first-use guidance for the exact selected Cloud identity."""
     from runner.context import setup_command

@@ -18,9 +18,6 @@ from ..properties import mention
 from lagniappe.core.tools.database import utility as database_utility
 
 
-# @testable true
-# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-# @matrix mentions : entity-contract idempotency
 class MentionMarker(Entity):
     if TYPE_CHECKING:
         document: Key | None
@@ -34,9 +31,6 @@ class MentionMarker(Entity):
 
     entity_kind = "mention_marker"
 
-    # @testable true
-    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-    # @pair mentions:index-exclusion
     @property
     def exclude_from_index(self) -> frozenset[str]:
         return frozenset({"occurrence_id", "display_name"})

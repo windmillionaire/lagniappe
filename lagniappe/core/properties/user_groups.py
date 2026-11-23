@@ -15,9 +15,6 @@ if TYPE_CHECKING:
     from ..mixins.field_host import FieldUser
 
 
-# @testable true
-# @tests tests_unit/test_009e_user_groups.py::test_group_permissions
-# @matrix permissions user-groups : form-data restricted views
 def get_view_hashes(permissions: Mapping[str, str]) -> list[str]:
     return [
         hash
@@ -26,8 +23,6 @@ def get_view_hashes(permissions: Mapping[str, str]) -> list[str]:
     ]
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/user_groups.py::GroupPermissions.create
 class GroupPermissions(GroupPermissionsMixin, Permissions["UserGroup"]):
     """Permission map for a group entity. Only Administrators can create/edit.
 
@@ -38,12 +33,6 @@ class GroupPermissions(GroupPermissionsMixin, Permissions["UserGroup"]):
         value (dict): {resource_hash: Action.name}.
     """
 
-    # @testable true
-    # @tests tests_unit/test_009e_user_groups.py::test_group_permissions
-    # @tests tests_unit/test_009e_user_groups.py::test_group_permissions_require_admin_and_handle_anonymous
-    # @tests tests_unit/test_009e_user_groups.py::test_general_forms_none_round_trips_for_default_view_permission
-    # @matrix permissions user-groups : default-denial form-data restricted unauthenticated views
-    # @pair user-groups:admin
     def create(
         self, form_data: Mapping[str, str] | None = None, user: FieldUser = None
     ) -> None:
@@ -62,8 +51,6 @@ class GroupPermissions(GroupPermissionsMixin, Permissions["UserGroup"]):
         self._write_db_value(permissions)
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/user_groups.py::PublicPermissions.create
 class PublicPermissions(PublicPermissionsMixin, Permissions["PublicGroup"]):
     """Permission map for the public group.
 
@@ -77,9 +64,6 @@ class PublicPermissions(PublicPermissionsMixin, Permissions["PublicGroup"]):
         value (dict): {resource_hash: Action.name}.
     """
 
-    # @testable true
-    # @tests tests_unit/test_009e_user_groups.py::test_public_group_get_create_and_enabled_state
-    # @matrix public-groups : enabled permissions
     @property
     def enabled(self) -> bool:
         return (
@@ -100,13 +84,6 @@ class PublicPermissions(PublicPermissionsMixin, Permissions["PublicGroup"]):
     def value(self, value: dict[str, str] | None) -> None:
         self._write_db_value(self._with_defaults(value))
 
-    # @testable true
-    # @tests tests_unit/test_009e_user_groups.py::test_public_permissions
-    # @tests tests_unit/test_009e_user_groups.py::test_public_permissions_default_forms_view_is_stored
-    # @tests tests_unit/test_009e_user_groups.py::test_group_permissions_require_admin_and_handle_anonymous
-    # @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_public_permissions
-    # @matrix permissions public-groups user-groups : active default-forms-view explicit-none permissions public storage unauthenticated
-    # @pairs permissions:admin public-groups:default-forms-view
     def create(
         self, form_data: Mapping[str, str] | None = None, user: FieldUser = None
     ) -> None:

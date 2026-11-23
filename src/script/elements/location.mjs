@@ -6,21 +6,11 @@ import { primitives } from "./primitives.mjs";
 
 const MAPS_SEARCH = "https://www.google.com/maps/search/";
 
-/**
- * @testable false
- * @covered-by src/script/elements/location.mjs::LocationElement
- * @reason text cleanup is private location value normalization
- */
 function cleanText(value) {
 	if (value === null || value === undefined) return "";
 	return String(value).trim();
 }
 
-/**
- * @testable false
- * @covered-by src/script/elements/location.mjs::LocationElement
- * @reason address/unit display is private location value normalization
- */
 function addressWithUnit(location = {}) {
 	const address = cleanText(location.address);
 	const address2 = cleanText(location.address2);
@@ -32,11 +22,6 @@ function addressWithUnit(location = {}) {
 	return `${address.slice(0, index)}, ${address2}${address.slice(index)}`;
 }
 
-/**
- * @testable false
- * @covered-by src/script/elements/location.mjs::LocationElement
- * @reason display text is private location value normalization
- */
 function displayText(location = {}) {
 	const name = cleanText(location.name);
 	const address = addressWithUnit(location);
@@ -46,11 +31,6 @@ function displayText(location = {}) {
 	return address || name;
 }
 
-/**
- * @testable true
- * @tests tests_js/test_026_location_urls.mjs::test_location_maps_url_uses_search_contract_and_place_id
- * @matrix location : encoding maps-url place-id
- */
 function mapsUrl(location = {}) {
 	const query = displayText(location);
 	if (!query) return "#";
@@ -63,9 +43,6 @@ function mapsUrl(location = {}) {
 	return url.toString();
 }
 
-/**
- * @testable infrastructure
- */
 export class LocationElement extends BaseElement {
 	constructor(renderer, schema, submission) {
 		super(renderer, schema, submission);
@@ -104,10 +81,6 @@ export class LocationElement extends BaseElement {
 		return true;
 	}
 
-	/**
-	 * @testable true
-	 * @pair location:read-layout
-	 */
 	get read() {
 		if (this._read) return this._read;
 

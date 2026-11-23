@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createBrowser } from "../utility/js/environment.mjs";
 
-/** @matrix login : loading-state submit-button */
 test("test_login_action_button_uses_fixed_icon_and_text_slots", async (t) => {
 	createBrowser(t, {
 		html: `
@@ -73,7 +72,6 @@ test("test_login_action_button_uses_fixed_icon_and_text_slots", async (t) => {
 	);
 });
 
-/** @matrix login : disabled-provider owner-bootstrap */
 test("test_owner_setup_supports_password_only_mode", async (t) => {
 	createBrowser(t, {
 		html: `

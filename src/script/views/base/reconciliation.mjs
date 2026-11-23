@@ -8,11 +8,6 @@ const FORM_ALREADY_RECONCILED_CHANGE_TYPES = new Set([
 	"entity-poll",
 ]);
 
-/**
- * @testable false
- * @covered-by src/script/views/base/reconciliation.mjs::reconcileChange
- * @reason destination loading is a private stage of change reconciliation
- */
 const loadChangeDestination = async (view, destination) => {
 	if (!destination) return null;
 	const [componentId, widgetName] = destination.split(":");
@@ -21,11 +16,6 @@ const loadChangeDestination = async (view, destination) => {
 	return component ? await component.loadWidget(widgetName) : null;
 };
 
-/**
- * @testable false
- * @covered-by src/script/views/base/reconciliation.mjs::reconcileChange
- * @reason mounted-owner discovery is a private stage of change reconciliation
- */
 const loadMountedCollectionOwners = async (view, keys) => {
 	const requested = new Set(keys);
 	const targets = new Set();
@@ -42,11 +32,6 @@ const loadMountedCollectionOwners = async (view, keys) => {
 	);
 };
 
-/**
- * @testable false
- * @covered-by src/script/views/base/reconciliation.mjs::reconcileChange
- * @reason DOM removal is committed through the enclosing reconciliation contract
- */
 const removeDeletedEntity = (view, key) => {
 	for (const element of view.elt.querySelectorAll("[data-key]")) {
 		if (element.dataset.key !== key) continue;
@@ -55,10 +40,6 @@ const removeDeletedEntity = (view, key) => {
 	}
 };
 
-/**
- * @testable infrastructure
- * @covered-by src/script/views/base/core.mjs::Core.reconcileChange
- */
 export const reconcileChange = (view, change = {}) => {
 	view._pendingChanges.push({ ...change });
 	if (view._reconcilePromise) return view._reconcilePromise;
@@ -126,11 +107,6 @@ export const reconcileChange = (view, change = {}) => {
 	return view._reconcilePromise;
 };
 
-/**
- * @testable false
- * @covered-by src/script/views/base/reconciliation.mjs::refreshCollectionComponents
- * @reason target collection is owned by the batched refresh contract
- */
 export const collectRefreshTargets = (_view, components) => {
 	const targets = new Map();
 	for (const component of components) {
@@ -152,10 +128,6 @@ export const collectRefreshTargets = (_view, components) => {
 	return targets;
 };
 
-/**
- * @testable infrastructure
- * @covered-by src/script/views/base/core.mjs::Core._refreshCollectionComponents
- */
 export const refreshCollectionComponents = async (
 	view,
 	components,

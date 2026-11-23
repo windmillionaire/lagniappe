@@ -35,17 +35,6 @@ PATCH_FIELDS = {
 }
 
 
-# @testable true
-# @tests tests_unit/test_032g_entity_patches.py::test_task_patch_preserves_omitted_values_and_source
-# @tests tests_unit/test_032g_entity_patches.py::test_reassignment_requires_complete_values_and_reviews_removals
-# @tests tests_unit/test_032g_entity_patches.py::test_patch_rejects_completed_locked_invalid_and_unauthorized_targets
-# @tests tests_unit/test_032g_entity_patches.py::test_model_and_project_patches_preserve_defaults_and_validate_order
-# @tests tests_unit/test_032g_entity_patches.py::test_page_patch_preserves_omitted_membership
-# @tests tests_unit/test_032g_entity_patches.py::test_patch_validates_classification_assignee_and_explicit_clears
-# @tests tests_unit/test_032g_entity_patches.py::test_page_form_registration_is_detached_and_pending_checklist_stays_unchecked
-# @tests tests_unit/test_032g_entity_patches.py::test_page_form_registration_preserves_unloaded_category_forms
-# @tests tests_unit/test_032g_entity_patches.py::test_patch_schedule_and_form_type_and_permission_validation
-# @matrix entity-patch : preservation validation preparation permissions
 def prepare_patch(
     entity: Entity, changes: dict[str, Any], actor: User
 ) -> PreparedPatch:
@@ -222,9 +211,6 @@ def prepare_patch(
     return PreparedPatch(candidate, tuple(writes), tuple(guards), before, _projection(candidate), removed, tuple(source for source in sources.values() if source.entity_kind == "form"))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason typed preparation result carries review values and transaction inputs
 @dataclass(frozen=True)
 class PreparedPatch:
     entity: Entity
@@ -236,9 +222,6 @@ class PreparedPatch:
     forms: tuple[Entity, ...]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason detached copies preserve storage and already-loaded relations
 def _copy_entity(entity):
     cls = {"task": Entities.TASK, "page": Entities.PAGE, "project": Entities.PROJECT, "model": Entities.MODEL_TASK, "category": Entities.CATEGORY, "file": Entities.FILE}[entity.entity_kind]
     result = cls(entity.key)
@@ -252,34 +235,22 @@ def _copy_entity(entity):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason exact entity types and permissions are validated before edits
 def _reference(entity, kind, actor, *, edit=False):
     if getattr(entity, "entity_kind", None) != kind or not getattr(entity, "key", None):
         raise ValidationError(f"Expected an exact {kind} reference.")
     _require(entity, actor, Action.EDIT if edit else Action.VIEW)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason shared authorization guard applies to source and proposed state
 def _require(entity, actor, action):
     if actor is None or not entity.allowed(action, user=actor):
         raise ValidationError("You do not have permission to make this edit.")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason migration locks are checked on both old and new Forms
 def _unlocked(form):
     if form.db.get("pending_form_change"):
         raise ValidationError("Wait for the Form update to finish before editing its tasks or answers.")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason selected fields are validated on detached candidates before assignment
 def _patch_answers(entity, values, actor, *, complete):
     if not isinstance(values, dict):
         raise ValidationError("Submission must be an object.")
@@ -299,9 +270,6 @@ def _patch_answers(entity, values, actor, *, complete):
     entity.save_submission()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason review uses exact answer IDs and complete editable values
 def _projection(entity):
     result = {}
     for field in PATCH_FIELDS[entity.entity_kind]:

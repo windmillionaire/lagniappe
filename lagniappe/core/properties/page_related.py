@@ -24,11 +24,6 @@ from .base_db import DBProperty
 from .base_property import Property
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_categories_model_restricted_and_cache_invalidation
-# @tests tests_unit/test_008_page_properties.py::test_page_categories_preserve_users_model_and_default_after_removing_only_model
-# @tests tests_unit/test_008_page_properties.py::test_page_categories_reject_invalid_related_values
-# @matrix page : cache-invalidation categories default-category model-category model-removal restrictions users-model validation
 class PageCategories(
     RelatedEntityListMixin["Category"], FilterMixin, ColumnMixin, AIMixin, DBProperty["list[Category]", "Page"]
 ):
@@ -55,9 +50,6 @@ class PageCategories(
         super().__init__(*args, entity=entity, **kwargs)
         self._all_categories: list[Category] | None = None
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/page_related.py::PageCategories
-    # @reason page-category projection tests exercise the domain cache through the owning property
     def _invalidate_projections(self) -> None:
         self._all_categories = None
         super()._invalidate_projections()
@@ -169,10 +161,6 @@ class PageCategories(
         return "page_categories"
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_files_loads_database_files
-# @tests tests_unit/test_008_page_properties.py::test_page_files_reloads_query_results_and_skips_unlinked_files
-# @matrix page : db-load files stale-query
 class PageFiles(RelatedEntityListMixin["File"], Property["list[File]", "Page"]):
     """Files attached to a page. Loaded from the database on first access.
 
@@ -214,9 +202,6 @@ class PageFiles(RelatedEntityListMixin["File"], Property["list[File]", "Page"]):
         return len(self.value) if self.value else None
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_user_and_model_category_parent_keys
-# @pair page:user-key
 class PageUser(RelatedEntityMixin["User"], DBProperty["User", "Page"]):
     """The user who owns this page (only set for user pages).
 
@@ -236,10 +221,6 @@ class PageUser(RelatedEntityMixin["User"], DBProperty["User", "Page"]):
         return database_get.urlsafe_key(cast("Key | None", self.entity.db.get(self.id)))
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_details
-# @tests tests_unit/test_008_page_properties.py::test_page_user_and_model_category_parent_keys
-# @matrix page : attach cache-parent details fallback-parent
 class PageModelCategory(RelatedEntityMixin["Category"], DetailsMixin, DBProperty["Category", "Page"]):
     """The primary/model category for a page.
 

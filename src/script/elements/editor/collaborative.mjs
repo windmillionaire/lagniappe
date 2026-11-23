@@ -11,15 +11,6 @@ import { DocumentReadCache } from "./readCache.mjs";
 import { Toolbar } from "./toolbar.mjs";
 import { DocumentVersions } from "./versions.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004d_document.py::test_editor_loads_and_saves_text
- * @tests tests_e2e/004_projects/test_004d_document.py::test_untouched_document_does_not_save_or_touch_project
- * @tests tests_e2e/004_projects/test_004d_document.py::test_formatting_persists
- * @tests tests_e2e/004_projects/test_004d_document.py::test_inline_code_style_formats_selected_text_and_persists
- * @matrix editor : reload text-save
- * @pair sync:save-guard
- */
 export class CollaborativeDocument {
 	constructor(attributes) {
 		Object.assign(this, attributes);
@@ -45,13 +36,6 @@ export class CollaborativeDocument {
 		this.initialStateReady = Promise.resolve(null);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_collaborative_document_renders_before_initial_state
-	 * @tests tests_js/test_029_core_startup.mjs::test_document_loading_status_tracks_content_and_teardown
-	 * @matrix sync : editor-readiness state-only
-	 * @matrix editor : loading-feedback
-	 */
 	init() {
 		this._initContainer();
 		if (!this.headless) this._startLoading();
@@ -91,11 +75,6 @@ export class CollaborativeDocument {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_document_loading_status_tracks_content_and_teardown
-	 * @matrix editor : loading-feedback lifecycle
-	 */
 	_startLoading() {
 		this.container.inert = true;
 		this.container.setAttribute("aria-busy", "true");
@@ -116,11 +95,6 @@ export class CollaborativeDocument {
 		}, 150);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_document_loading_status_tracks_content_and_teardown
-	 * @matrix editor : loading-feedback empty-content failure lifecycle
-	 */
 	_finishLoading() {
 		clearTimeout(this._loadingTimer);
 		if (this._destroyed || this.headless) return;
@@ -242,11 +216,6 @@ export class CollaborativeDocument {
 	 * Treat the hydrated editor as the initial baseline so Tiptap/Yjs setup
 	 * transactions cannot be mistaken for user-authored empty content.
 	 *
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_collaborative_document_does_not_save_untouched_empty_state
-	 * @tests tests_e2e/004_projects/test_004d_document.py::test_untouched_document_does_not_save_or_touch_project
-	 * @matrix editor : empty-content initialization save-guard
-	 * @matrix sync : empty-content initialization parent-modified save-guard
 	 */
 	_commitInitialBaseline() {
 		this.snapshot = this._packageState();
@@ -258,9 +227,6 @@ export class CollaborativeDocument {
 	 * Accept a persisted checkpoint without discarding an edit made while its
 	 * request was in flight. Remote-only changes do not make the document dirty.
 	 *
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_collaborative_document_does_not_save_untouched_empty_state
-	 * @matrix sync : checkpoint concurrent-edit dirty-state
 	 */
 	commitSavedBaseline(snapshot, mentions = []) {
 		this.snapshot = snapshot;
@@ -294,13 +260,6 @@ export class CollaborativeDocument {
 		return uint8ArrayToBase64(Y.encodeStateAsUpdate(this.ydoc));
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_collaborative_document_does_not_save_untouched_empty_state
-	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
-	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
-	 * @matrix sync : collaboration document offline-replay replay-order response-contract
-	 */
 	get syncData() {
 		if (this._versionBusy) return null;
 		if (
@@ -316,12 +275,6 @@ export class CollaborativeDocument {
 		};
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_collaborative_document_does_not_save_untouched_empty_state
-	 * @tests tests_e2e/004_projects/test_004d_document.py::test_untouched_document_does_not_save_or_touch_project
-	 * @matrix sync : empty-content intentional-clear parent-modified save-guard
-	 */
 	get saveData() {
 		if (this._versionBusy) return null;
 		if (!this.initialized || this._initialStateError || !this._dirty)
@@ -348,15 +301,6 @@ export class CollaborativeDocument {
 		};
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
-	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_presence_appears_and_clears
-	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
-	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
-	 * @tests tests_js/test_029_core_startup.mjs::test_document_loading_status_tracks_content_and_teardown
-	 * @matrix sync : collaboration concurrency document lifecycle merge offline-replay presence replay-order
-	 */
 	async sync() {
 		if (
 			(this.remote?.ydoc || this.remote?.updates?.length) &&

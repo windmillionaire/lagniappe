@@ -14,7 +14,6 @@ async function loadPreview(t, getDocument = t.mock.fn()) {
 	});
 }
 
-/** @matrix file : loading-state pdf-preview view-transition */
 test("test_pdf_preview_loading_does_not_block_widget_reconciliation", async (t) => {
 	createBrowser(t, {
 		html: `
@@ -43,7 +42,6 @@ test("test_pdf_preview_loading_does_not_block_widget_reconciliation", async (t) 
 	assert.equal(target.getAttribute("aria-busy"), "true");
 });
 
-/** @matrix file : pdf-preview revisit view-transition */
 test("test_pdf_preview_revisit_does_not_await_pending_rasterization", async (t) => {
 	createBrowser(t);
 	const { PDFPreview } = await loadPreview(t);

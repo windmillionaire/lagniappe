@@ -26,8 +26,6 @@ def _unique(label):
     return f"{label} {uuid4().hex[:8]}"
 
 
-# @matrix notes cache : masked-touch preserved-fields no-extra-read filter-invalidation
-# @matrix mutations notes : delete photo-cleanup post-commit
 def test_note_delete_completes_with_root_only_owners(get_admin, monkeypatch):
     owner = get_admin()
     with app.test_request_context("/"):
@@ -124,8 +122,6 @@ def _open_note_composer(user):
     return composer
 
 
-# @matrix notes pages : load owner private shared viewer
-# @matrix permissions : load owner private shared viewer
 # @template pages/page.html::view_header
 # @template pages/notes.html::notes_section
 # @template pages/notes.html::note_list
@@ -172,8 +168,6 @@ def test_page_notes_visibility_and_title_menu(get_admin, get_user):
     expect(owner.locate("#page-notes")).to_be_hidden()
 
 
-# @matrix notes pages : body create photo scope validation visibility
-# @pair request-errors:plain-validation
 # @template pages/page.html::view_header
 # @template pages/notes.html::notes_section
 # @template pages/notes.html::note_list
@@ -242,8 +236,6 @@ def test_page_note_text_photo_and_delete_modal(get_admin, browser_failures):
     expect(notes_section).to_be_hidden()
 
 
-# @source lagniappe/web/routes/pages/notes.py::get_notes
-# @matrix notes : empty-presence revision-bound etag load
 # @template pages/notes.html::notes_section
 # @template pages/notes.html::note_list
 # @template notes.html::composer

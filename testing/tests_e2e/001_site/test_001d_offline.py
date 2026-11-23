@@ -28,7 +28,6 @@ from playwright.sync_api import expect
 pytestmark = pytest.mark.e2e
 
 OFFLINE_INDICATOR = "[data-role='offline']"
-# @matrix offline : browser-state indicator
 def test_offline_indicator_toggles(get_admin, browser_failures):
     """
     Test that the offline indicator responds to offline state changes.
@@ -57,7 +56,6 @@ def test_offline_indicator_toggles(get_admin, browser_failures):
     expect(indicator).to_be_hidden()
 
 
-# @matrix offline : indicator server-health
 def test_failed_ping_marks_view_offline_until_next_sync_event(
     get_admin,
     browser_failures,
@@ -122,7 +120,6 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
     expect(indicator).to_be_hidden()
 
 
-# @matrix offline : browser-state indicator reconnect server-health
 def test_offline_poll_recovers_without_online_event(get_admin, browser_failures):
     """
     Test that retry polling recovers after the native online event fails.
@@ -189,7 +186,6 @@ def test_offline_poll_recovers_without_online_event(get_admin, browser_failures)
     expect(indicator).to_be_hidden()
 
 
-# @matrix sync : offline-replay queue-clear
 def test_offline_prevents_sync_requests(get_admin, browser_failures):
     """
     Test that going offline prevents sync network requests and that
@@ -234,7 +230,6 @@ def test_offline_prevents_sync_requests(get_admin, browser_failures):
     )
 
 
-# @matrix offline : indicator view-reset
 def test_testing_mode_navigation_resets_offline_state(get_admin, browser_failures):
     """
     Test that a new testing-mode view rechecks server state after navigation.
@@ -262,9 +257,6 @@ def test_testing_mode_navigation_resets_offline_state(get_admin, browser_failure
     expect(indicator).to_be_hidden()
 
 
-# @source src/script/shared/upstreamUnavailable.mjs::showUpstreamUnavailable
-# @matrix e2e : server-failure upstream-unavailable
-# @matrix request-errors : banner dom-preservation server-failure upstream-unavailable
 def test_upstream_unavailable_preserves_current_form_state(
     get_admin,
     browser_failures,

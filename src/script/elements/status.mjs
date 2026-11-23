@@ -2,9 +2,6 @@ import { STYLES } from "../generated/styles.mjs";
 import { BaseElement } from "./base/baseElement.mjs";
 import { primitives } from "./primitives.mjs";
 
-/**
- * @testable infrastructure
- */
 export class StatusElement extends BaseElement {
 	constructor(renderer, schema, submission) {
 		super(renderer, schema, submission);

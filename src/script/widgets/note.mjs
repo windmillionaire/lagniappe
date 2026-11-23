@@ -1,13 +1,5 @@
 import { FormWidget } from "./base/formWidget.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002a_home.py::test_create_note_composer_keeps_text_and_photo_from_home
- * @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
- * @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_note_text_photo_and_delete_modal
- * @matrix notes : body-create combined-input photo-picker preview remove
- * @pair notes:photo
- */
 export class CreateNote extends FormWidget {
 	constructor(attributes) {
 		super(attributes);

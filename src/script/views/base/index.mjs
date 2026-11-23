@@ -2,15 +2,6 @@ import { withTransition } from "../../shared/transitions.mjs";
 import { TableVisibilityState } from "../../widgets/tables/visibilityState.mjs";
 import Core from "./core.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_controls_open_with_page_columns
- * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_controls_open_with_task_columns
- * @tests tests_e2e/003_forms/test_003e_form_index_mobile_ui.py::test_form_index_mobile_tools_and_column_controls_are_exclusive
- * @tests tests_e2e/008_users/test_008a_user_index.py::test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load
- * @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
- * @matrix table-controls : columns cursor-continuation mobile-controls mobile-startup mobile-tools mutual-exclusion sorting
- */
 export default class EntityIndex extends Core {
 	constructor(node) {
 		super(node);
@@ -128,20 +119,10 @@ export default class EntityIndex extends Core {
 		super._click(e);
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/index.mjs::EntityIndex._defaultToolTarget
-	 * @reason query parsing is owned by the target resolver
-	 */
 	_defaultToolSlug() {
 		return this.querySlug(this.queryParam("tool"));
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_url_tool_opens_saved_filters
-	 * @matrix filters : query-tool saved-filters
-	 */
 	_defaultToolTarget(tools) {
 		const tool = this._defaultToolSlug();
 		if (!tool) return null;
@@ -175,11 +156,6 @@ export default class EntityIndex extends Core {
 		};
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/index.mjs::EntityIndex._defaultToolTarget
-	 * @reason render helper is driven by the resolved query target
-	 */
 	async _renderDefaultTool(tools) {
 		const target = this._defaultToolTarget(tools);
 		if (!target) return;
@@ -199,11 +175,6 @@ export default class EntityIndex extends Core {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003e_form_index_mobile_ui.py::test_form_index_mobile_tools_and_column_controls_are_exclusive
-	 * @matrix table-controls : mobile-controls mobile-tools mutual-exclusion
-	 */
 	_setMobileControlsDropdownOpen(open) {
 		const mobileControls = this.elt.querySelector("#mobile-controls");
 		if (!mobileControls) return;
@@ -212,13 +183,6 @@ export default class EntityIndex extends Core {
 		mobileControls.classList.toggle("pointer-events-none", open);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
-	 * @tests tests_e2e/003_forms/test_003e_form_index_mobile_ui.py::test_form_index_mobile_tools_and_column_controls_are_exclusive
-	 * @matrix pages : category-index create mobile-tools
-	 * @matrix table-controls : mobile-controls mobile-tools mutual-exclusion
-	 */
 	async _createDropdown() {
 		if (this.dropdown) return;
 		if (this._dropdownPromise) return this._dropdownPromise;

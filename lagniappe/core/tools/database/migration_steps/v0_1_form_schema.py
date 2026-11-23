@@ -14,11 +14,6 @@ from config.form_schema import (
 from .base import MigrationDataError
 
 
-# @testable true
-# @tests tests_unit/test_018b_database_migrations.py::test_form_schema_transform_is_idempotent_and_preserves_history_membership
-# @tests tests_unit/test_018b_database_migrations.py::test_form_schema_transform_repairs_invalid_legacy_fields
-# @tests tests_unit/test_018b_database_migrations.py::test_form_schema_transform_rejects_unreadable_rows_without_mutation
-# @matrix form-schema : canonicalization copy-on-write history-snapshot idempotence legacy-repair malformed-data
 def canonicalize_form_schema_record(
     entity: MutableMapping[str, object],
     *,

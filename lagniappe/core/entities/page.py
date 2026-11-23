@@ -61,9 +61,6 @@ PageData = TypedDict(
 )
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_to_cache_public_user
-# @matrix cache page : public-user
 class Page(AssetMixin, SubmitterMixin, Entity):
     if TYPE_CHECKING:
         @property
@@ -159,10 +156,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             self._state["markup"] = self.properties.document.html
         return self._state
 
-    # @testable true
-    # @tests tests_unit/test_009b_user_permissions.py::test_user_page_permissions_follow_users_only_or_attached_categories
-    # @tests tests_unit/test_009f_page_view_access.py::test_user_page_uses_users_permissions_not_models_permissions
-    # @matrix page permissions users : models-scope user-page users-scope
     @property
     def required(self) -> list[str]:
         required = []
@@ -188,9 +181,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             return {}
         return super().to_cache
 
-    # @testable true
-    # @tests tests_unit/test_008_page_properties.py::test_page_details
-    # @matrix page : details kind parent
     def _get_properties(self) -> EntityProperties:
         properties = super()._get_properties()
         properties.update(
@@ -214,9 +204,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
         )
         return properties
 
-    # @testable true
-    # @tests tests_unit/test_009f_page_view_access.py::test_page_tasks_filtered_by_task_allowed
-    # @matrix page permissions task : restricted-access task-visibility
     def _load_tasks(self) -> None:
         results = database_get.page_tasks(self)
         entities = {
@@ -243,9 +230,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             assert self._tasks is not None
         return self._tasks
 
-    # @testable false
-    # @covered-by lagniappe/core/entities/page.py::Page._load_tasks
-    # @reason shares the permission-filtered task collection load
     @property
     def completed_tasks(self) -> list[Task]:
         if self._completed is None:
@@ -253,10 +237,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             assert self._completed is not None
         return self._completed
 
-    # @testable true
-    # @tests tests_unit/test_002j_notes.py::test_empty_notes_hint_is_bound_to_the_page_revision
-    # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_empty_notes_skip_fetch_without_hiding_new_notes
-    # @matrix notes : empty-presence revision-bound
     @property
     def has_notes(self) -> bool:
         """Unknown or stale presence requires a read; only proven empty skips it."""
@@ -266,10 +246,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             and self.db.get("notes_checked_revision") == self.modified
         )
 
-    # @testable true
-    # @tests tests_unit/test_002j_notes.py::test_empty_notes_hint_is_bound_to_the_page_revision
-    # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_empty_notes_skip_fetch_without_hiding_new_notes
-    # @matrix notes : empty-presence revision-bound
     def remember_empty_notes(self) -> None:
         """Cache an unfiltered empty query without changing content or revisions."""
         if not self.has_notes or self.modified is None:
@@ -280,14 +256,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
         # cannot suppress its notes, even when this masked write commits last.
         Entities.save_root(self, property_mask=("has_notes", "notes_checked_revision"))
 
-    # @testable true
-    # @tests tests_unit/test_009f_page_view_access.py::test_page_restricted_access_group_match
-    # @tests tests_unit/test_009b_user_permissions.py::test_privileged_user_rows_are_owner_managed
-    # @tests tests_unit/test_009f_page_view_access.py::test_page_view_does_not_require_loaded_owner
-    # @matrix admin : page privileged-account personal-page
-    # @matrix page : group-match restricted-access view-owner-short-circuit
-    # @matrix page permissions users : models-scope user-page
-    # @pair owner:owner-only
     def allowed(self, action: Action, user: FieldUser = None) -> bool:
         user = current_context_user(user)
         if self.restricted_access(user):
@@ -309,9 +277,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
                 return False
         return super().allowed(action, user=user)
 
-    # @testable true
-    # @tests tests_unit/test_032h_report_batches.py::test_create_batch_reserves_one_key_per_output_and_reuses_receipts
-    # @matrix ai-report : id-allocation identity
     @classmethod
     def create(cls, data: PageData, *, key: Key | None = None) -> Self:
         new_page = cls(key)
@@ -321,9 +286,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
         return new_page
 
-    # @testable true
-    # @tests tests_unit/test_008_page_properties.py::test_page_update_tracks_old_and_current_category_owners_for_save
-    # @matrix category page : save-relations
     @property
     def page_list_owners(self) -> list[Category | User]:
         owners = [self.user, self.model, *self.categories]
@@ -337,14 +299,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             unique.append(owner)
         return unique
 
-    # @testable true
-    # @tests tests_unit/test_008_page_properties.py::test_page_update_registers_form_with_model_category_for_filters
-    # @tests tests_unit/test_008_page_properties.py::test_page_update_skips_uncategorized_form_registration
-    # @tests tests_unit/test_008_page_properties.py::test_page_update_tracks_old_and_current_category_owners_for_save
-    # @tests tests_unit/test_008_page_properties.py::test_page_update_keeps_current_user_before_page_without_dependency_cycle
-    # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_select_includes_form_from_created_page
-    # @matrix category filters page : form-registration related-forms save-relations
-    # @pair page:default-category
     def update(self, data: PageData) -> None:
         previous_owners = self.page_list_owners
 
@@ -395,20 +349,10 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             ]
         )
 
-    # @testable true
-    # @tests tests_unit/test_008_page_properties.py::test_page_update_defaults_empty_category_state_to_uncategorized
-    # @pair page:default-category
     def _ensure_category(self) -> None:
         if not self.model and not self.categories:
             self.model = Entities.CATEGORY.get_uncategorized_pages()
 
-    # @testable true
-    # @tests tests_unit/test_009a_user.py::test_page_update_user_authorization_rules
-    # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
-    # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_reassign_and_remove_user_from_page
-    # @matrix notification-email : preference user-only
-    # @matrix user-settings : ai-access email-edit owner-other-page owner-own-page page-preservation page-reassign page-remove
-    # @pairs cache:invalidation-acknowledgement permissions:permission-recalc public-users:email-consent
     def update_user(self, data: PageData, user: FieldUser = None) -> None:
         user = current_context_user(user)
         target_user = self.user
@@ -537,16 +481,10 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             self.properties.categories.remove(previous_users_category)
             target_user.properties.permissions.create()
 
-    # @testable true
-    # @tests tests_unit/test_009a_user.py::test_user_page_default_form_submission_keeps_email_on_user
-    # @matrix user-settings : default-form email-canonical submission-preservation
     def save_submission(self) -> None:
         super().save_submission()
         self._sync_default_user_form_email()
 
-    # @testable false
-    # @covered-by lagniappe/core/entities/page.py::Page.save_submission
-    # @reason helper identifies the reserved default user form for the user-email mirror
     def _uses_default_user_form(self) -> bool:
         if not self.user or not isinstance(self.model, Entities.USERS) or not self.form:
             return False
@@ -562,9 +500,6 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             and fields["email"].get("input") == "email"
         )
 
-    # @testable false
-    # @covered-by lagniappe/core/entities/page.py::Page.save_submission
-    # @reason helper keeps default user-form email data aligned with the user entity
     def _sync_default_user_form_email(self) -> None:
         if not self._uses_default_user_form():
             return

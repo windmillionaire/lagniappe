@@ -1,13 +1,9 @@
 /**
  * Compare field representations without importing form controllers or UI.
  *
- * @testable true
- * @tests tests_js/test_036c_form_migrations.mjs::test_incompatible_local_values_require_review
- * @matrix form-migration : stale-input representation-aware
  */
 export const compatibleField = (before, after) => {
 	if (!before || !after) return false;
-	/** @testable infrastructure */
 	const kind = (field) =>
 		field.type === "input"
 			? field.input || "text"
@@ -33,11 +29,6 @@ export const compatibleField = (before, after) => {
 			),
 	);
 };
-/**
- * @testable true
- * @tests tests_js/test_036c_form_migrations.mjs::test_incompatible_local_values_require_review
- * @matrix form-migration : stale-input representation-aware
- */
 export const incompatibleSchema = (before, after) =>
 	(before || []).some(
 		(field) =>

@@ -13,11 +13,6 @@ from ..entities import Entities
 from . import cache
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @matrix messaging : managed-user public-exclusion
-# @pair messaging:new-after-clear
 def managed_user(user: object) -> bool:
     return bool(
         user
@@ -26,10 +21,6 @@ def managed_user(user: object) -> bool:
     )
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_inbound_message_allows_reply_without_compose_permission
-# @matrix messaging : compose-eligibility owner-opt-in
 def can_initiate_messages(user: User | None) -> bool:
     """Return whether a managed user has any possible new-message recipient."""
     return bool(
@@ -38,9 +29,6 @@ def can_initiate_messages(user: User | None) -> bool:
     )
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
-# @pair messaging:recipient-resolution
 def resolve_user(identifier: Identifier) -> User | None:
     """Resolve either a canonical User key or its personal Page selector key."""
     entity = Entities.fetch_one(identifier, request=Fetch.direct())
@@ -51,9 +39,6 @@ def resolve_user(identifier: Identifier) -> User | None:
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/collaboration.py::recipient_allowed
-# @reason restriction-set math is exercised through the final recipient predicate
 def _ordinary_restriction_allows(recipient, restrictions):
     if Restriction.is_unrestricted(restrictions):
         return True
@@ -63,12 +48,6 @@ def _ordinary_restriction_allows(recipient, restrictions):
     return bool(required & set(restrictions or ()))
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @matrix messaging : owner-opt-in permission self-exclusion
-# @matrix task-assignment : owner-opt-in permission self-assignment
-# @pair task-assignment:permission
 def recipient_allowed(
     actor: User | None, recipient: User | None, *, channel: str
 ) -> bool:
@@ -100,9 +79,6 @@ def recipient_allowed(
     return _ordinary_restriction_allows(recipient, restrictions)
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
-# @matrix mentions : document-view permission
 def mention_recipient_allowed(
     actor: User | None, recipient: User | None, document: Entity | None
 ) -> bool:
@@ -113,12 +89,6 @@ def mention_recipient_allowed(
     )
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_collaboration_search_excludes_self_owner_and_stale_rows
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
-# @matrix messaging : owner-search recipient-key self-exclusion
-# @matrix owner-projection : deduplication normalization
-# @pair mentions:recipient-search
 def collaboration_user_results(
     results: list[SearchRecord],
     query: str,

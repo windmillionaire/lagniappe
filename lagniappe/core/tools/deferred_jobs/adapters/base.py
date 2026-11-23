@@ -26,11 +26,6 @@ from ..errors import DeferredJobDriftError
 type StartWrites = tuple[Sequence[tuple[Entity, tuple[str, ...] | None]], Sequence[tuple[Key, Mapping[str, object] | ExactEntityState | None]]]
 
 
-# @testable true
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_waits_for_dependency_without_consuming_provider_retry
-# @matrix ai-access deferred-jobs : tier-declaration
-# @matrix deferred-jobs : dependency-wait backoff
 class DeferredJobAdapter:
     """Domain boundary plugged into the shared job lifecycle."""
 
@@ -53,7 +48,6 @@ class DeferredJobAdapter:
     resume_preparation = True
     cancellable_provider = False
 
-    # @testable infrastructure
     def authorization(self, spec: DeferredJobSpec) -> dict[str, object]:
         assert self.job_type is not None
         authorization: dict[str, object] = {
@@ -70,7 +64,6 @@ class DeferredJobAdapter:
             authorization["fingerprints"] = fingerprints
         return authorization
 
-    # @testable infrastructure
     def load(self, context: DeferredJobContext) -> DeferredJobContext:
         context.inputs = {
             name: _load_reference(reference)
@@ -78,10 +71,6 @@ class DeferredJobAdapter:
         }
         return context
 
-    # @testable true
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_ai_adapters_reject_restricted_actor_before_prepare
-    # @matrix ai : access-gate authorization provider-boundary
-    # @pair deferred-jobs:authorization
     def authorize(self, context: DeferredJobContext) -> None:
         required = self.required_ai_access
         if required and not getattr(
@@ -93,9 +82,6 @@ class DeferredJobAdapter:
                 "This user does not have the required AI access."
             )
 
-    # @testable true
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_rejects_changed_target_fingerprint_before_apply
-    # @matrix deferred-jobs : no-apply target-fingerprint
     def validate_apply(self, context: DeferredJobContext) -> None:
         """Reject generated output when an apply target changed in the queue."""
         expected = (context.job.authorization or {}).get("fingerprints") or {}
@@ -110,7 +96,6 @@ class DeferredJobAdapter:
                     "The target changed while this operation was running."
                 )
 
-    # @testable infrastructure
     def prepare(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         return {}
 
@@ -118,70 +103,54 @@ class DeferredJobAdapter:
         """Return whether preparation has produced its final apply checkpoint."""
         return bool(context.checkpoint)
 
-    # @testable infrastructure
     def started(self, context: DeferredJobContext) -> None:
         """Persist domain metadata after the job exists and before dispatch."""
         return None
 
-    # @testable infrastructure
     def start_lock(self, spec: DeferredJobSpec, job: DeferredJob) -> DeferredJobLock | None:
         """Return an optional target-scoped lock created with the job."""
         return None
 
-    # @testable infrastructure
     def start_writes(self, spec: DeferredJobSpec, job: DeferredJob) -> StartWrites:
         """Optional guarded domain writes committed atomically with job creation."""
         return (), ()
 
-    # @testable infrastructure
     def before_cancel(self, job: DeferredJob) -> None:
         """Allow domains with partially applied work to retain their write fence."""
         return None
 
-    # @testable infrastructure
     def can_view_status(self, job: DeferredJob, actor: User) -> bool:
         """Authorize a non-owner for the bounded browser status projection."""
         return False
 
-    # @testable infrastructure
     def inspect(self, context: DeferredJobContext) -> DeferredJobInspection:
         return DeferredJobInspection.NOT_APPLIED
 
-    # @testable infrastructure
     def committed_result(self, job: DeferredJob) -> dict[str, object] | None:
         """Return an atomically committed result, or None if work is unfinished."""
         return None
 
-    # @testable infrastructure
     def apply(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         raise NotImplementedError
 
-    # @testable infrastructure
     def cleanup(self, context: DeferredJobContext, *, terminal: bool) -> None:
         return None
 
-    # @testable infrastructure
     def failure(self, context: DeferredJobContext, error: BaseException | str) -> None:
         return None
 
-    # @testable infrastructure
     def terminal_message(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> str:
         if succeeded:
             return self.success_message
         message = str(error or "").strip()
         return f"{self.failure_prefix} {message}".strip()
 
-    # @testable infrastructure
     def notification_target(self, context: DeferredJobContext) -> Entity | None:
         return None
 
-    # @testable true
-    # @tests tests_unit/test_028_ai_email.py::test_report_terminal_feedback_uses_generic_notification_delivery
-    # @matrix ai-email : generic-delivery terminal-delivery
     def external_delivery_required(self, context: DeferredJobContext) -> bool:
         """Return whether this terminal job owns an external delivery step."""
         return False
 
-    # @testable infrastructure
     def external_delivery(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> dict[str, object] | None:
         return None

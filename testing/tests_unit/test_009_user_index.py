@@ -7,7 +7,6 @@ from lagniappe.core.definitions import Fetch, FetchReason, Restriction
 from testing.utility.test_entities import TestEntities
 
 
-# @matrix user-index : columns table
 @pytest.mark.unit
 def test_user_index(get_test_entities):
     """Test UserTable produces correct column structure for UI.
@@ -80,7 +79,6 @@ def test_user_index(get_test_entities):
         ]
 
 
-# @matrix user-index : groups pagination public-group restrictions
 @pytest.mark.unit
 def test_user_index_loads_users_groups_public_group_and_append_cursor():
     """UserIndex loads restricted users/groups and public-group state."""
@@ -192,7 +190,6 @@ def test_user_index_loads_users_groups_public_group_and_append_cursor():
     assert index.public_group is public_group
 
 
-# @matrix user-index : mode public-users regular-mode
 @pytest.mark.unit
 def test_user_index_regular_mode_excludes_public_users():
     """Default user index mode keeps public users out of the regular table."""
@@ -254,7 +251,6 @@ def test_user_index_regular_mode_excludes_public_users():
     assert index.append == "/users.rows&cursor=next-regular"
 
 
-# @matrix public-users user-index : mode pagination public-mode
 @pytest.mark.unit
 def test_user_index_public_mode_loads_public_group_users_and_preserves_append_mode():
     """Public user index mode queries the public group and preserves mode in append."""
@@ -348,7 +344,6 @@ def test_user_index_public_mode_loads_public_group_users_and_preserves_append_mo
     assert index.append == "/users.rows&cursor=next-public&mode=public"
 
 
-# @matrix public-users user-index : disabled enabled public-mode public-users
 @pytest.mark.unit
 def test_user_index_public_mode_returns_empty_when_public_users_disabled():
     """Public user index mode is empty when public login is not enabled."""

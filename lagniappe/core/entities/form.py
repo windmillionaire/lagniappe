@@ -28,11 +28,6 @@ if TYPE_CHECKING:
     from .project import Project
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/form.py::Form.update
-# @covered-by lagniappe/core/mutations/save.py::FormMutation.plan_save
-# @covered-by lagniappe/core/properties/form.py::SchemaVersion
-# @reason focused methods/properties own the durable Form behavior
 class Form(Entity, AssetMixin):
     if TYPE_CHECKING:
         @property
@@ -93,8 +88,6 @@ class Form(Entity, AssetMixin):
     def table_fields(self) -> dict[str, ColumnField]:
         return self.properties.schema.table_fields
 
-    # @testable true
-    # @matrix forms html-field : draft no-write
     def get_html_field(self, field_id: str) -> str | None:
         pending = getattr(self, "_pending_html", {})
         if field_id in pending:
@@ -104,9 +97,6 @@ class Form(Entity, AssetMixin):
             return None
         return cast("HTMLAsset", html_asset).html()
 
-    # @testable true
-    # @tests tests_unit/test_004f_form_drafts.py::test_builder_draft_and_staged_html_are_read_only
-    # @matrix forms html-field : draft baseline no-write
     def set_html_field(self, field_id: str, html: str | None) -> None:
         if not isinstance(field_id, str) or not isinstance(html, (str, type(None))):
             raise ValueError("HTML fields require a field ID and text content.")
@@ -114,9 +104,6 @@ class Form(Entity, AssetMixin):
             self._pending_html = {}
         self._pending_html[field_id] = html or ""
 
-    # @testable true
-    # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
-    # @matrix html-field : asset-lifecycle image-upload unsaved-schema
     def add_html_field_image(self, field_id: str, image: AssetUpload, visibility: str = "private") -> str | None:
         field = self.fields.get(field_id)
         if not field:
@@ -130,10 +117,6 @@ class Form(Entity, AssetMixin):
     def html_fields(self) -> list[form_special.HTML]:
         return self.properties.schema.html_fields
 
-    # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_save_refreshes_users_with_edited_form_schema
-    # @matrix forms cache : owner-reuse no-extra-read
-    # @pair form-schema:cache
     @property
     def used_by(self) -> list[Entity]:
         return [
@@ -143,9 +126,6 @@ class Form(Entity, AssetMixin):
             if entity.key != self.key
         ]
 
-    # @testable true
-    # @tests tests_unit/test_032h_report_batches.py::test_dependent_creations_share_one_commit
-    # @matrix ai-report : identity
     @classmethod
     def create(cls, data: Mapping[str, object], *, key: Key | None = None) -> Self:
         form = cls(key)
@@ -154,18 +134,12 @@ class Form(Entity, AssetMixin):
 
         return form
 
-    # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_schema_write_gateway_canonicalizes_without_adding_page_fields
-    # @matrix form-schema : canonicalization membership write-gateway
     def set_schema(self, value: object) -> list[dict[str, object]]:
         """Apply the one canonical durable schema write contract."""
 
         self.properties.schema.value = value
         return self.schema
 
-    # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_update_sets_name_form_type_and_schema
-    # @matrix form : form-type schema update
     def update(self, data: Mapping[str, object]) -> None:
         if data.get("name"):
             self.name = cast("str | list[object]", data["name"])

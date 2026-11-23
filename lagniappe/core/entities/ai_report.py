@@ -50,11 +50,6 @@ class ReportCreation(TypedDict, total=False):
     pending: bool
 
 
-# @testable true
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_create_and_file_cleanup
-# @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
-# @matrix ai-report : create delete files status
-# @pair agent-api:report-session
 class AIReport(Entity):
     """AI-generated report containing an ordered, deterministic action proposal."""
     if TYPE_CHECKING:
@@ -137,9 +132,6 @@ class AIReport(Entity):
         )
         return properties
 
-    # @testable true
-    # @tests tests_unit/test_020b_ai_planner.py::test_report_availability_rejects_old_and_malformed_records
-    # @matrix ai-report : validation status unavailable
     @property
     def available(self) -> bool:
         if self.format_version != REPORT_FORMAT_VERSION:
@@ -176,9 +168,6 @@ class AIReport(Entity):
         except (ValueError, TypeError, AttributeError, KeyError):
             return False
 
-    # @testable false
-    # @covered-by lagniappe/core/entities/ai_report.py::AIReport.available
-    # @reason output classification uses only supported report data
     @property
     def output_kind(self) -> Literal["proposal", "answer"] | None:
         if not self.available or not self.proposal:
@@ -192,9 +181,6 @@ class AIReport(Entity):
             raise AttributeError(f"{type(self).__name__} requires an attached parent")
         return [parent.hash]
 
-    # @testable true
-    # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_permissions_follow_creator_ownership
-    # @matrix ai-report permissions : creator delete owner unrelated-user view
     def allowed(self, action: Action, user: FieldUser = None) -> bool:
         user = current_context_user(user._get_current_object() if isinstance(user, LocalProxy) else user)
         if not user or not user.is_authenticated:

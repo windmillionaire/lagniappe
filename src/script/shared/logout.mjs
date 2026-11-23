@@ -4,11 +4,6 @@ const LOGOUT_BUTTON_SELECTOR = "[data-action='logout'][data-route]";
 
 let initialized = false;
 
-/**
- * @testable false
- * @covered-by src/script/shared/logout.mjs::initializeLogoutForms
- * @reason private logout request helper is exercised through logout controls
- */
 const submitLogout = async (route, { submitter = null, state = null } = {}) => {
 	state = state || submitter;
 	if (state?.dataset?.submitting === "true") return;
@@ -30,14 +25,6 @@ const submitLogout = async (route, { submitter = null, state = null } = {}) => {
 	}
 };
 
-/**
- * @testable true
- * @tests tests_e2e/001_site/test_001b_login.py::test_logout_clears_session_and_returns_login
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
- * @tests tests_js/test_009_request_csrf.mjs::test_logout_button_posts_without_hidden_form
- * @matrix login : button logout redirect
- * @pair user-settings:personal-page
- */
 export const initializeLogoutForms = (root = document) => {
 	if (initialized) return;
 	initialized = true;

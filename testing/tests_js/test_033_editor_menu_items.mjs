@@ -6,7 +6,6 @@ import {
 } from "../../src/script/elements/editor/options/menuItems.mjs";
 import { createBrowser } from "../utility/js/environment.mjs";
 
-/** @matrix editor : dropdown-rerender menu-active-state */
 test("test_editor_menu_item_serializes_current_active_state", (t) => {
 	createBrowser(t);
 	const item = new toggleUnderline({});
@@ -30,7 +29,6 @@ test("test_editor_menu_item_serializes_current_active_state", (t) => {
 	assert.match(item.html, /data-active="true"/);
 });
 
-/** @matrix editor : inline-code toggle */
 test("test_editor_inline_code_menu_item_toggles_from_local_active_state", (t) => {
 	createBrowser(t);
 	const calls = [];

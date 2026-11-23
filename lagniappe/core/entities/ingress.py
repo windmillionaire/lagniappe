@@ -20,11 +20,6 @@ if TYPE_CHECKING:
     from .model_task import ModelTask
 
 
-# @testable true
-# @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_project
-# @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_category_and_form
-# @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_model_project_form
-# @matrix ingress : model parent related-entities
 class Ingress(AssetMixin, Entity):
     if TYPE_CHECKING:
         form: Form | None
@@ -49,9 +44,6 @@ class Ingress(AssetMixin, Entity):
     def required(self) -> list[str]:
         return [self.hash, "site"]
 
-    # @testable true
-    # @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_category_and_form
-    # @matrix category : parent related-entities
     def _get_properties(self):
         properties = super()._get_properties()
         properties.update(
@@ -125,9 +117,6 @@ class Ingress(AssetMixin, Entity):
             if entity_id
         ]
 
-    # @testable true
-    # @tests tests_unit/test_006b_ingress_entity.py::test_ingress_results_remove_deleted_imported_entities
-    # @matrix ingress : delete row-results
     def remove_results_for_entities(self, *entity_ids: str | None) -> int:
         removed_ids = {entity_id for entity_id in entity_ids if entity_id}
         if not removed_ids:
@@ -147,9 +136,6 @@ class Ingress(AssetMixin, Entity):
         self.properties.results.save()
         return removed
 
-    # @testable true
-    # @tests tests_unit/test_006b_ingress_entity.py::test_ingress_results_prune_missing_entities
-    # @matrix ingress : delete reload row-results
     def prune_missing_results(self) -> int:
         result_ids = set(self._result_entity_ids())
         if not result_ids:
@@ -163,9 +149,6 @@ class Ingress(AssetMixin, Entity):
         missing_ids = result_ids - existing_ids
         return self.remove_results_for_entities(*missing_ids)
 
-    # @testable true
-    # @tests tests_unit/test_006b_ingress_entity.py::test_ingress_delete_imported_entities_deletes_pages_and_tasks
-    # @matrix ingress : bulk-delete delete row-results
     def delete_imported_entities(self) -> int:
         result_ids = self._result_entity_ids()
         if not result_ids:
@@ -189,10 +172,6 @@ class Ingress(AssetMixin, Entity):
         self.remove_results_for_entities(*deleted_ids)
         return len(imported)
 
-    # @testable true
-    # @tests tests_unit/test_006b_ingress_entity.py::test_ingress_rejects_oversized_csv_before_read
-    # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_parses_the_uploaded_csv_into_rows_and_columns
-    # @matrix ingress : rows size-limit
     @classmethod
     def create(cls, upload: FileStorage | DirectUploadFile) -> Ingress:
         from ..tools.ingress import IngressService

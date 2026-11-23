@@ -4,9 +4,6 @@ import { SectionToggle } from "../elements/sectionToggle.mjs";
 import { TextareaElement } from "../elements/textarea.mjs";
 import { FormWidget } from "./base/formWidget.mjs";
 
-/**
- * @testable infrastructure
- */
 class CategoryForm extends FormWidget {
 	get nameElement() {
 		return new InputElement(
@@ -48,12 +45,6 @@ class CategoryForm extends FormWidget {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
- * @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_viewer_opens_readonly_settings
- * @matrix categories : info-form labels readonly update
- */
 export class CategoryInfo extends CategoryForm {
 	constructor(attributes) {
 		super(attributes);
@@ -99,12 +90,6 @@ export class CategoryInfo extends CategoryForm {
 	}
 }
 
-/**
- * @testable false
- * @covered-by src/script/widgets/category.mjs::CreateCategory.html
- * @covered-by lagniappe/web/routes/categories/main.py::create
- * @reason category create behavior is split between rendered controls and submit route handling
- */
 export class CreateCategory extends CategoryForm {
 	constructor(attributes) {
 		super(attributes);
@@ -122,12 +107,6 @@ export class CreateCategory extends CategoryForm {
 		await super.init();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_form
-	 * @tests tests_e2e/002_home/test_002c_home_categories.py::test_category_form_generate_toggle
-	 * @matrix categories : ai-form attach-form manual-form
-	 */
 	get html() {
 		const name = this.nameElement;
 		const description = this.descriptionElement;

@@ -16,9 +16,6 @@ from .checkpoints import _prepared_output_key
 from datetime import UTC
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
-# @pair ai-report:create-order
 def _create_form(action, _report, user, _created, context=None):
     _require_allowed(
         Resource.FORMS.allowed(Action.CREATE, user),
@@ -42,9 +39,6 @@ def _create_form(action, _report, user, _created, context=None):
     return form, [form]
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
-# @pair ai-report:create-order
 def _create_category(action, _report, user, created, context=None):
     _require_allowed(
         Resource.CATEGORY.allowed(Action.CREATE, user),
@@ -71,9 +65,6 @@ def _create_category(action, _report, user, created, context=None):
     return category, [category]
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
-# @pair ai-report:create-order
 def _create_project(action, _report, user, _created, context=None):
     _require_allowed(
         Resource.PROJECT.allowed(Action.CREATE, user),
@@ -90,9 +81,6 @@ def _create_project(action, _report, user, _created, context=None):
     return project, [project]
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
-# @pair ai-report:create-order
 def _create_model_task(action, _report, user, created, context=None):
     data = _data(action)
     project = _resolve_entity(
@@ -127,10 +115,6 @@ def _create_model_task(action, _report, user, created, context=None):
     return model_task, [model_task]
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_uses_category_form_from_stored_key_for_page_submission
-# @matrix ai-report : create-order default-category persistence submission-completion
 def _create_page(action, _report, user, created, context=None):
     data = _data(action)
     category = _resolve_entity(
@@ -197,8 +181,6 @@ def _create_page(action, _report, user, created, context=None):
     return page, [page], metadata
 
 
-# @testable true
-# @pair ai-report:moves
 def _move_task(action, _report, user, created):
     data = _data(action)
     task = _resolve_entity(
@@ -250,9 +232,6 @@ def _move_task(action, _report, user, created):
     return task, [task], metadata
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_and_records_manual_page_cleanup
-# @pair ai-report:manual-cleanup
 def _suggest_page_deletion(action, _report, user, created):
     data = _data(action)
     page = _resolve_entity(
@@ -284,15 +263,9 @@ def _suggest_page_deletion(action, _report, user, created):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason skip actions are covered through deterministic report action dispatch
 def _skip_action(_action, _report, _user, _created):
     return None, []
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason review actions are covered through deterministic report action dispatch
 def _needs_review_action(_action, _report, _user, _created):
     return None, []

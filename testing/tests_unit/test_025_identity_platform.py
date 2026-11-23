@@ -68,7 +68,6 @@ class RejectedSMTP(FakeSMTP):
         raise smtplib.SMTPAuthenticationError(535, b"Bad credentials")
 
 
-# @matrix login : audience identity-platform issuer token-verification
 def test_verify_identity_token_enforces_project_issuer_and_subject(monkeypatch):
     claims = {
         "aud": "project-1",
@@ -112,7 +111,6 @@ def test_verify_identity_token_enforces_project_issuer_and_subject(monkeypatch):
         claims[claim] = original_value
 
 
-# @matrix login : audience email-verification google-oauth token-verification
 def test_verify_google_credential_enforces_client_and_verified_email(monkeypatch):
     claims = {
         "sub": "google-user-1",
@@ -155,7 +153,6 @@ def test_verify_google_credential_enforces_client_and_verified_email(monkeypatch
         claims[claim] = original_value
 
 
-# @matrix login : google-oauth identity-platform provider-error-code token-exchange
 def test_exchange_google_credential_uses_identity_platform_idp_endpoint():
     session = FakeSession(
         [
@@ -217,7 +214,6 @@ def test_exchange_google_credential_uses_identity_platform_idp_endpoint():
     assert error.value.provider_code == "USER_DISABLED"
 
 
-# @matrix login : google-oauth identity-platform provider-state
 def test_google_provider_enabled_reads_live_provider_state():
     session = FakeSession(
         [
@@ -255,7 +251,6 @@ def test_google_provider_enabled_reads_live_provider_state():
         )
 
 
-# @matrix login : action-codes authentication-email identity-platform
 def test_generate_email_action_code_returns_provider_code_without_sending():
     session = FakeSession([FakeResponse({"oobCode": "reset-code"})])
 
@@ -282,7 +277,6 @@ def test_generate_email_action_code_returns_provider_code_without_sending():
     assert request["timeout"] == identity_platform.IDENTITY_REQUEST_TIMEOUT
 
 
-# @matrix login : account-enumeration authentication-email availability smtp
 def test_auth_email_connection_preflight_is_address_independent():
     config = {
         "provider": "smtp",
@@ -316,7 +310,6 @@ def test_auth_email_connection_preflight_is_address_independent():
         )
 
 
-# @matrix login : authentication-email smtp tls
 def test_send_auth_email_supports_generic_smtp_transports():
     FakeSMTP.instances.clear()
     tls_context = object()
@@ -371,7 +364,6 @@ def test_send_auth_email_supports_generic_smtp_transports():
     assert implicit_tls.started_tls is None
 
 
-# @matrix login : action-link authentication-email templates
 def test_auth_action_message_escapes_content_and_links():
     subject, text_body, html_body = auth_email.auth_action_message(
         "verifyEmail",
@@ -385,7 +377,6 @@ def test_auth_action_message_escapes_content_and_links():
     assert "a&amp;next=&quot;bad&quot;" in html_body
 
 
-# @matrix users : account-delete identity-platform
 def test_delete_account_by_email_looks_up_and_deletes_identity_user():
     session = FakeSession(
         [

@@ -4,9 +4,6 @@ import { BaseElement } from "./base/baseElement.mjs";
 import { formatting } from "./formatting.mjs";
 import { primitives } from "./primitives.mjs";
 
-/**
- * @testable infrastructure
- */
 export class BookmarkElement extends BaseElement {
 	get value() {
 		const inputs = this.elt.querySelectorAll("input");

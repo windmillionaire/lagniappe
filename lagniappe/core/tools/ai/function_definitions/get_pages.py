@@ -77,10 +77,6 @@ GET_CATEGORY_PAGES = types.FunctionDeclaration(
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_category_pages_compact_returns_lightweight_page_refs
-# @tests tests_unit/test_015_ai_tools.py::test_get_category_pages_reports_effective_limit_and_pagination
-# @matrix ai category-pages : compact pagination tool-context
 def execute_get_category_pages(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
     form_identifier = args.get("form_id")
@@ -162,18 +158,12 @@ def execute_get_category_pages(args: Mapping[str, object], user: User) -> Mappin
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_pages.py::execute_get_category_pages
-# @reason boolean argument coercion is exercised through the public tool handler
 def _bool_arg(value):
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes"}
     return bool(value)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_pages.py::execute_get_category_pages
-# @reason compact page projection is exercised through the public tool handler
 def _compact_page_reference(page, user):
     ai_url = getattr(page, "_ai_url", None)
     data = {
@@ -200,9 +190,6 @@ def _compact_page_reference(page, user):
     return {key: value for key, value in data.items() if value not in (None, [], {})}
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_pages.py::_compact_page_reference
-# @reason compact related projection is exercised through compact page results
 def _compact_entity_reference(entity, user):
     if not entity or not entity.allowed(Action.VIEW, user):
         return None

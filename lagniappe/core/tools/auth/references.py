@@ -22,9 +22,6 @@ if TYPE_CHECKING:
 UNAVAILABLE_REFERENCE_ERROR = "One or more selected items are unavailable."
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/references.py::SubmittedReferenceResolver
-# @reason identifier normalization is exercised through the resolver boundary
 def _entity_key(value: object) -> Key | None:
     if not value:
         return None
@@ -33,9 +30,6 @@ def _entity_key(value: object) -> Key | None:
     return database_get.datastore_key(value)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/references.py::SubmittedReferenceResolver
-# @reason existing-relation normalization is exercised through the resolver boundary
 def _existing_keys(existing: object) -> set[Key]:
     if not existing:
         return set()
@@ -43,10 +37,6 @@ def _existing_keys(existing: object) -> set[Key]:
     return {key for key in (_entity_key(value) for value in values) if key}
 
 
-# @testable true
-# @tests tests_unit/test_031_submitted_references.py::test_submitted_reference_resolver_rejects_unavailable_targets
-# @tests tests_unit/test_031_submitted_references.py::test_submitted_reference_resolver_preserves_authorized_order_and_existing_targets
-# @matrix submitted-references : action batch dedup existing generic-error kind order predicate
 class SubmittedReferenceResolver:
     """Batch-load and authorize secondary entity keys from a request body."""
 

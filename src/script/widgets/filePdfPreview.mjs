@@ -13,11 +13,6 @@ const LOAD_RETRY_DELAYS_MS = [500, 1500];
 const WIDTH_WAIT_FRAMES = 8;
 const RANGE_CHUNK_SIZE = 1024 * 1024;
 
-/**
- * @testable false
- * @covered-by src/script/widgets/filePdfPreview.mjs::PDFPreview
- * @reason range transport behavior is exercised through the PDF preview widget
- */
 class PDFRangeTransport extends pdfjs.PDFDataRangeTransport {
 	constructor({ url, length, filename }) {
 		super(length, null, true, filename);
@@ -58,16 +53,6 @@ class PDFRangeTransport extends pdfjs.PDFDataRangeTransport {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_renders_pdf_preview_widget
- * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_pdf_preview_loading_state_paints_before_document_render
- * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_toolbar_navigates_pages
- * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_mobile_pdf_preview_renders_canvas
- * @tests tests_js/test_025_pdf_preview.mjs::test_pdf_preview_loading_does_not_block_widget_reconciliation
- * @tests tests_js/test_025_pdf_preview.mjs::test_pdf_preview_revisit_does_not_await_pending_rasterization
- * @matrix file : loading-state pdf-preview pdf-toolbar revisit view-transition
- */
 export class PDFPreview {
 	constructor(attributes) {
 		Object.assign(this, attributes);

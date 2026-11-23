@@ -26,9 +26,6 @@ import {
 import ShellView from "./shell.mjs";
 import { Task } from "./task.mjs";
 
-/**
- * @testable infrastructure
- */
 export default class Core extends ShellView {
 	constructor(node) {
 		super(node);
@@ -64,23 +61,11 @@ export default class Core extends ShellView {
 		this.blurredAt = null;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity._initialTabId
-	 * @covered-by src/script/views/base/index.mjs::EntityIndex._defaultToolTarget
-	 * @reason URL query helpers are exercised through view-specific defaults
-	 */
 	queryParam(name) {
 		const value = new URLSearchParams(window.location.search).get(name);
 		return value?.trim() || null;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/entity.mjs::Entity._initialTabId
-	 * @covered-by src/script/views/base/index.mjs::EntityIndex._defaultToolTarget
-	 * @reason URL query helpers are exercised through view-specific defaults
-	 */
 	querySlug(value) {
 		return value
 			?.trim()
@@ -97,11 +82,6 @@ export default class Core extends ShellView {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_shell_intercepts_interactions_before_deferred_services
-	 * @matrix startup : deferred-services interaction-ready
-	 */
 	async init() {
 		await super.init();
 		initializeCoreServices(this);
@@ -159,10 +139,6 @@ export default class Core extends ShellView {
 	/**
 	 * Subscribe the root view to its durable entity or collection revision.
 	 *
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_core_polling_subscription_lifecycle
-	 * @covered-by src/script/views/base/services.mjs::ensurePollingCoordinator
-	 * @matrix polling : channel entity refresh
 	 */
 	_initPollingSubscription() {
 		if (!this.PollingCoordinator) return;
@@ -253,10 +229,6 @@ export default class Core extends ShellView {
 	 * and any invalidations received mid-pass are
 	 * handled by the next iteration.
 	 *
-	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.mjs::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
-	 * @matrix reconnect-refresh : committed-delete destination-invalidation mounted-collection
-	 * @pair polling:reentrancy
 	 */
 	reconcileChange(change = {}) {
 		return reconcileChange(this, change);
@@ -266,14 +238,6 @@ export default class Core extends ShellView {
 
 	async afterReconcileChange() {}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_category
-	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
-	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
-	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_file
-	 * @matrix starred : accessible-state title-menu
-	 */
 	_applyStarState({ key, starred, type } = {}) {
 		if (!key) return;
 		const active = starred ?? type === "star";
@@ -343,18 +307,6 @@ export default class Core extends ShellView {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
-	 * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
-	 * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
-	 * @tests tests_js/test_028_form_state_split.mjs::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
-	 * @tests tests_js/test_029_core_startup.mjs::test_core_sync_distinguishes_visible_blur_from_hard_suspension
-	 * @matrix offline : background-replay dirty-form-preservation
-	 * @matrix polling : blur catch-up nonblocking visibility
-	 * @pair sync:deregistration
-	 * @matrix offline : indicator server-health view-reset
-	 */
 	async sync({
 		hidden = document.hidden,
 		blurred = false,
@@ -418,9 +370,6 @@ export default class Core extends ShellView {
 	 * polling, sync, EditWatcher, or the visible server render. OfflineQueue
 	 * itself polls mounted updated forms as each replay succeeds.
 	 *
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
-	 * @pairs offline:background-replay polling:nonblocking
 	 */
 	scheduleOfflineReplay() {
 		if (this._offlineReplayTask) return this._offlineReplayTask;
@@ -441,9 +390,6 @@ export default class Core extends ShellView {
 	 * to the foreground. Managers retain state for hidden widgets, but only the
 	 * active visible widget may own recurring form, document, or ingress work.
 	 *
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_core_polling_subscription_lifecycle
-	 * @matrix polling : active-widget subscription-lifecycle visibility
 	 */
 	async reconcilePollingSubscriptions() {
 		if (this._destroyed || this.hidden || !this.online) return;
@@ -463,10 +409,6 @@ export default class Core extends ShellView {
 	 * rendering wait for manager or network work. Repeated renders coalesce and
 	 * request at most one follow-up pass if ownership changes while a pass runs.
 	 *
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_core_polling_subscription_lifecycle
-	 * @matrix polling : nonblocking subscription-lifecycle
-	 * @matrix startup : nonblocking single-flight
 	 */
 	schedulePollingReconciliation() {
 		if (this._destroyed || this.hidden || !this.online) {
@@ -509,20 +451,10 @@ export default class Core extends ShellView {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.mjs::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
-	 * @matrix reconnect-refresh : batching fallback manifest
-	 */
 	_collectRefreshTargets(components) {
 		return collectRefreshTargets(this, components);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.mjs::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
-	 * @matrix reconnect-refresh : cache-invalidation delta-apply legacy-fallback
-	 */
 	async _refreshCollectionComponents(components, options = {}) {
 		return refreshCollectionComponents(this, components, options);
 	}
@@ -611,11 +543,6 @@ export default class Core extends ShellView {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/007_categories/test_007a_category_index.py::test_page_creation_requires_name_and_rows_do_not_follow_attached_form
-	 * @matrix pages : row-navigation
-	 */
 	_click(e) {
 		const menuTrigger = e.target.closest("[data-role='menu-trigger']");
 		const menu = menuTrigger?.closest("[lp-menu]");
@@ -781,11 +708,6 @@ export default class Core extends ShellView {
 		return response;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002a_home.py::test_model_lists_load_on_toggle
-	 * @matrix home : lazy-load loading-indicator
-	 */
 	_setLoadingTrigger(trigger, component, widgetName) {
 		const target = component.elt.querySelector(`[data-widget="${widgetName}"]`);
 		if (!target || target.hasAttribute("loaded")) return null;
@@ -797,22 +719,12 @@ export default class Core extends ShellView {
 		return trigger;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/core.mjs::Core._setLoadingTrigger
-	 * @reason paired cleanup for transient trigger loading state
-	 */
 	_clearLoadingTrigger(trigger) {
 		if (!trigger) return;
 		delete trigger.dataset.loading;
 		trigger.removeAttribute("aria-busy");
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_component_open_event_follows_delegated_toggle
-	 * @matrix navigation tasks : delegated-toggle task-open-event
-	 */
 	renderComponent(trigger) {
 		if (!trigger) return;
 		if (this._componentActions.has(trigger)) {

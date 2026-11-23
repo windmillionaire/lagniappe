@@ -20,7 +20,6 @@ const emptyRequest = {};
 class EmptySiteSetting {}
 class EmptySelectBox {}
 
-/** @matrix admin : deployment-settings memory-pressure scaling-controls */
 test("test_site_deployment_caps_workers_only_for_f2_and_b2", async () => {
 	const { SiteDeployment } = await esmock.strict(
 		"../../src/script/widgets/siteSettings/deployment.mjs",
@@ -81,7 +80,6 @@ test("test_site_deployment_caps_workers_only_for_f2_and_b2", async () => {
 	}
 });
 
-/** @matrix admin : composite-widgets persistence sections site-settings */
 test("test_site_settings_coordinates_section_widgets", async (t) => {
 	class FakeToggle {
 		constructor() {
@@ -245,7 +243,6 @@ async function loadAiModels() {
 	);
 }
 
-/** @matrix admin : ai-settings model-options saved-values */
 test("test_site_settings_initializes_ai_selects_before_syncing_saved_values", async () => {
 	const { SiteAiModels } = await loadAiModels();
 	const calls = [];
@@ -284,7 +281,6 @@ test("test_site_settings_initializes_ai_selects_before_syncing_saved_values", as
 	);
 });
 
-/** @matrix admin : ai-settings model-selection submission */
 test("test_site_settings_ai_submission_uses_visible_combobox_values", async (t) => {
 	class FormDataBoundary {
 		constructor(form) {
@@ -352,7 +348,6 @@ test("test_site_settings_ai_submission_uses_visible_combobox_values", async (t) 
 	);
 });
 
-/** @matrix form-schema forms : canonical-list legacy-object-rejected visibility */
 test("test_renderer_visibility_requires_canonical_condition_lists", async () => {
 	const { FormRenderer } = await esmock.strict(
 		"../../src/script/forms/renderer.mjs",
@@ -427,7 +422,6 @@ class BuilderNode {
 	}
 }
 
-/** @matrix form-schema forms : builder immutable-schema presentation-defaults */
 test("test_builder_model_defaults_are_presentation_only", async (t) => {
 	const calls = [];
 	const primitive = (kind) => (attributes) => {
@@ -644,7 +638,6 @@ const completedMigration = {
 };
 
 /**
- * @matrix admin database-migrations : actionable-links audit-error cache-gate current failed fresh-install pending repair-filtering repairs running version-history
  * @template home/site_settings.html::site_settings
  */
 test("test_site_settings_migration_status_uses_generic_release_states", async (t) => {
@@ -881,7 +874,6 @@ test("test_site_settings_migration_status_uses_generic_release_states", async (t
 });
 
 /**
- * @matrix cache : failure-isolation actionable-links
  * @template home/site_settings.html::site_settings
  */
 test("test_site_settings_cache_refresh_displays_linked_failures", async (t) => {

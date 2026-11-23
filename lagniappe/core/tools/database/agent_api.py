@@ -44,23 +44,14 @@ _UPLOAD_BATCH_PATTERN = re.compile(UPLOAD_BATCH_ID_PATTERN)
 _PLAN_OPERATION_TOKEN_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::rotate_credential
-# @reason named key construction is exercised through transactional rotation
 def credential_key(identifier: str) -> Key:
     return create_named_key("agent_api_credential", identifier)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/agent_api.py::authenticate_credential
-# @reason raw lookup is owned by the authenticated credential boundary
 def get_credential(identifier: str) -> DatastoreEntity | None:
     return DATA.datastore.get(credential_key(identifier))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason stable claim-key construction is exercised through competing claims
 def plan_operation_claim_key(report_key: Key) -> Key:
     """Return the one serialized external-operation claim beneath a report."""
     return create_named_key(
@@ -70,9 +61,6 @@ def plan_operation_claim_key(report_key: Key) -> Key:
     )
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_upload_file_identity_is_deterministic_per_batch_record
-# @matrix agent-api mcp-upload : deterministic-file-identity retry
 def upload_file_key(report_key: Key, upload_batch_id: str, file_index: int) -> Key:
     """Return a stable File key for one server-issued upload batch record."""
     report_identity = database_get.urlsafe_key(report_key)
@@ -92,9 +80,6 @@ def upload_file_key(report_key: Key, upload_batch_id: str, file_index: int) -> K
     return create_named_key("file", f"agent-upload-{digest}")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason raw report JSON is validated through public claim outcomes
 def _json_field(row, name, expected_type, default):
     value = row.get(name)
     if value is None:
@@ -106,9 +91,6 @@ def _json_field(row, name, expected_type, default):
     return decoded if isinstance(decoded, expected_type) else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason canonical process-backed status is validated through public claim outcomes
 def _report_process(row):
     process = _json_field(row, "process", dict, {})
     if process is None:
@@ -117,9 +99,6 @@ def _report_process(row):
     return report_process if isinstance(report_process, dict) else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason canonical process-backed status is validated through public claim outcomes
 def _report_status(row):
     report_process = _report_process(row)
     if report_process is None:
@@ -127,9 +106,6 @@ def _report_status(row):
     return report_process.get("status")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason shared report-state validation is exercised through public claim outcomes
 def _report_operation_state(report, phase):
     """Return validated state used to decide one serialized Plan operation."""
     from lagniappe.core.entities.ai_report import REPORT_FORMAT_VERSION
@@ -189,9 +165,6 @@ def _report_operation_state(report, phase):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason durable phase transitions are exercised through competing operation claims
 def _completed_claim_transition(claim, state):
     """Whether a prior owner already committed its report-side transition."""
     phase = claim["phase"]
@@ -209,9 +182,6 @@ def _completed_claim_transition(claim, state):
     return False
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason claim validation is exercised through the public transaction
 def _valid_claim(row):
     if row is None:
         return None
@@ -237,9 +207,6 @@ def _valid_claim(row):
     }
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_plan_operation_claim_serializes_competing_workers
-# @matrix agent-api mcp-upload : claim concurrency lease transaction
 @retry_aborted
 def claim_plan_operation(
     report_key: Key,
@@ -314,9 +281,6 @@ def claim_plan_operation(
     return PLAN_OPERATION_CLAIMED
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_plan_operation_claim_serializes_competing_workers
-# @matrix agent-api mcp-upload : fencing lease renewal
 @retry_aborted
 def renew_plan_operation(
     report_key: Key,
@@ -343,11 +307,6 @@ def renew_plan_operation(
     return True
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_plan_operation_commit_rejects_a_replacement_owner
-# @tests tests_unit/test_032b_agent_plan_notifications.py::test_publication_notification_commits_with_plan_and_survives_replay
-# @matrix agent-api mcp-upload : atomic-checkpoint cas claim fencing transaction
-# @pairs agent-api:creator-bound agent-api:ready-state notifications:idempotency notifications:ordinary-count
 @retry_aborted
 def commit_plan_operation(
     report_key: Key,
@@ -459,9 +418,6 @@ def commit_plan_operation(
     return PLAN_OPERATION_COMMITTED
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::commit_plan_operation
-# @reason the fenced publication tests cover recipient, state, and durable replay identity
 def _prepare_publication_notification(report, user):
     """Prepare the first publication alert; its manifest marker outlives dismissal."""
     from lagniappe.core.entities.ai_report import REPORT_FORMAT_VERSION
@@ -489,9 +445,6 @@ def _prepare_publication_notification(report, user):
     }
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_idle_plan_mutation_fences_api_claims_and_stale_browser_snapshots
-# @matrix agent-api ai-report : browser-review cas claim fencing transaction
 @retry_aborted
 def commit_plan_mutation_if_idle(
     report_key: Key,
@@ -591,9 +544,6 @@ def commit_plan_mutation_if_idle(
     return PLAN_OPERATION_COMMITTED
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_plan_operation_claim_serializes_competing_workers
-# @matrix agent-api mcp-upload : claim cleanup ownership
 @retry_aborted
 def release_plan_operation(
     report_key: Key,
@@ -617,9 +567,6 @@ def release_plan_operation(
     return True
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_credential_rotation_and_revocation_are_transactional
-# @matrix agent-api : credential persistence revoke rotate
 @retry_aborted
 def rotate_credential(
     identifier: str,
@@ -652,9 +599,6 @@ def rotate_credential(
     return row
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_credential_rotation_and_revocation_are_transactional
-# @matrix agent-api : credential persistence revoke rotate
 @retry_aborted
 def revoke_credential(
     identifier: str, user_key: Key, *, revoked_at: datetime

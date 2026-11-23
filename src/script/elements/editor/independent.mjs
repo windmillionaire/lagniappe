@@ -7,21 +7,11 @@ import { Toolbar } from "./toolbar.mjs";
 const EMPTY_HTML = new Set(["", "<p></p>", "<p><br></p>"]);
 const KEEPALIVE_BODY_LIMIT = 64 * 1024;
 
-/**
- * @testable false
- * @covered-by src/script/elements/editor/independent.mjs::IndependentDocument.flush
- * @reason content normalization is exercised through the editor acknowledgement boundary
- */
 const normalizeHTML = (html) => {
 	const normalized = typeof html === "string" ? html.trim() : "";
 	return EMPTY_HTML.has(normalized) ? "" : normalized;
 };
 
-/**
- * @testable false
- * @covered-by src/script/elements/editor/independent.mjs::IndependentDocument.flush
- * @reason keepalive eligibility is private flush transport policy
- */
 const keepaliveCompatible = (body) => {
 	const serialized = JSON.stringify(body);
 	return (
@@ -29,9 +19,6 @@ const keepaliveCompatible = (body) => {
 	);
 };
 
-/**
- * @testable infrastructure
- */
 export class IndependentDocument {
 	constructor(attributes) {
 		Object.assign(this, attributes);
@@ -57,10 +44,6 @@ export class IndependentDocument {
 	 * A failed request remains visibly retryable and never publishes blank
 	 * content as loaded state.
 	 *
-	 * @testable true
-	 * @tests tests_js/test_045_browser_persistence.mjs::test_independent_editor_failed_load_stays_inert_and_retries
-	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
-	 * @matrix editor html-field : authoritative-content error-reporting initial-load retry
 	 */
 	load() {
 		if (this._destroyed) return Promise.resolve(false);
@@ -202,12 +185,6 @@ export class IndependentDocument {
 	 * exact submitted value. Edits made while a PUT is active are coalesced into
 	 * one latest follow-up value.
 	 *
-	 * @testable true
-	 * @tests tests_js/test_045_browser_persistence.mjs::test_independent_editor_failed_save_stays_dirty_and_retries
-	 * @tests tests_js/test_045_browser_persistence.mjs::test_independent_editor_serializes_inflight_edits_and_acknowledges_in_order
-	 * @tests tests_js/test_045_browser_persistence.mjs::test_independent_editor_saves_intentional_clear
-	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
-	 * @matrix editor html-field : concurrent-edit error-reporting intentional-clear keepalive retry serialized-save server-acknowledgement
 	 */
 	flush({ keepalive = false } = {}) {
 		if (this.readonly || this._destroyed || !this.editor) {
@@ -304,10 +281,6 @@ export class IndependentDocument {
 		return normalizeHTML(this.editor.getHTML());
 	}
 
-	/**
-	 * @testable true
-	 * @matrix editor : initial-load
-	 */
 	_initEditor(html) {
 		return new Promise((resolve) => {
 			this.editor = independentEditor(this.container, html);
@@ -356,11 +329,6 @@ export class IndependentDocument {
 		this.target.classList.remove("hidden");
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_045_browser_persistence.mjs::test_editor_teardown_releases_toolbar_before_editor_view
-	 * @matrix editor html-field : listener-teardown builder-save
-	 */
 	destroy() {
 		if (this._destroyed) return;
 		this._destroyed = true;

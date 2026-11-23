@@ -26,9 +26,6 @@ _REPORT_PROCESS_KEYS = (
 type _Report = AIReport
 
 
-# @testable true
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_process_state_stores_report_metadata
-# @matrix ai-report : canonical-storage process-state
 class ReportProcess(ProcessProperty[_Report]):
     """Process section containing an AI report's workflow state."""
 
@@ -99,9 +96,6 @@ class ReportProcess(ProcessProperty[_Report]):
         self.error = message
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/ai_report_process.py::ReportProcess
-# @reason thin process-backed value adapter exercised through report process state
 class ReportProcessValue[V = object](Property[V, _Report, V | None]):
     """Entity property facade for one report process attribute."""
 
@@ -133,45 +127,30 @@ class ReportProcessValue[V = object](Property[V, _Report, V | None]):
         self._clear_cached_entity_views()
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/ai_report_process.py::ReportProcess
-# @reason process-backed field adapter has no behavior beyond ReportProcessValue
 class Status(ReportProcessValue[str]):
     """Current AI report processing status."""
 
     _id = "status"
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/ai_report_process.py::ReportProcess
-# @reason active deferred-job metadata is exercised through report process state
 class DeferredJob(ReportProcessValue[dict[str, object]]):
     """Reference metadata for the report's currently active background job."""
 
     _id = "deferred_job"
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/ai_report_process.py::ReportProcess
-# @reason process-backed field adapter has no behavior beyond ReportProcessValue
 class Summary(ReportProcessValue[str]):
     """Short user-facing AI report summary."""
 
     _id = "summary"
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/ai_report_process.py::ReportProcess
-# @reason process-backed field adapter has no behavior beyond ReportProcessValue
 class Error(ReportProcessValue[str]):
     """User-facing AI report error message."""
 
     _id = "error"
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/ai_report_process.py::ReportProcess
-# @reason bool coercion is exercised through report process state
 class Pending(ReportProcessValue[bool]):
     """Whether an AI report still represents work in progress."""
 
@@ -190,11 +169,6 @@ class Pending(ReportProcessValue[bool]):
         self._clear_cached_entity_views()
 
 
-# @testable true
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_create_and_file_cleanup
-# @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
-# @pair ai-report:status
-# @pair agent-api:status
 class Note(Property[str, _Report]):
     """User-facing note derived from the report process state."""
 

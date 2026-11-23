@@ -5,13 +5,6 @@ import { EditReconciler } from "./reconciler.mjs";
  * View-scoped detector for committed edits to forms represented by
  * lp-edited-marker descendants.
  *
- * @testable true
- * @tests tests_js/test_024_edit_watcher.mjs::test_edit_watcher_compares_and_resets_each_form_independently
- * @tests tests_js/test_028_form_state_split.mjs::test_owned_deferred_completion_replaces_clean_active_form
- * @tests tests_e2e/004_projects/test_004b_info.py::test_project_revision_notice_only_resets_changed_form
- * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
- * @matrix edited-entity-notice : acknowledgement acknowledgement-no-probe active-state batching entity-ancestor owned-deferred-completion per-form subscription-lifecycle visibility
- * @pairs deferred-jobs:owned-deferred-completion edited-entity-notice:staged-reset polling:freshness
  */
 export class EditWatcher {
 	constructor(view) {
@@ -132,11 +125,6 @@ export class EditWatcher {
 		return true;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_owned_deferred_completion_replaces_clean_active_form
-	 * @matrix deferred-jobs edited-entity-notice : owned-deferred-completion
-	 */
 	_ownedDeferredCompletion(marker, widget) {
 		const key = marker.closest?.("[lp-entity]")?.dataset?.key;
 		const operation = widget?._deferredOperation;
@@ -221,12 +209,6 @@ export class EditWatcher {
 		await this._probeEntity(key, revision.fingerprint, revision.modified);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_edit_watcher_restores_active_autofill_without_form_sync
-	 * @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-	 * @matrix deferred-jobs edited-entity-notice : active-operation form-lock reload
-	 */
 	async _lockEntity(entity, descriptor) {
 		if (!entity || !descriptor?.operation) return;
 		const forms = new Set();

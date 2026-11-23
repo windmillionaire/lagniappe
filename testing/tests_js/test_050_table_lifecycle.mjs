@@ -145,10 +145,6 @@ async function open(editor) {
 	editor.postreconcile();
 }
 
-/**
- * @source src/script/widgets/tables/editor.mjs::TableEditor
- * @matrix table-controls : quick-edit async-preparation
- */
 test("test_table_editor_close_discards_late_input_and_checkbox_fields", async (t) => {
 	const gate = deferred();
 	const { editor, cell, fields } = await setup(t, { load: () => gate.promise });
@@ -168,10 +164,6 @@ test("test_table_editor_close_discards_late_input_and_checkbox_fields", async (t
 	assert.equal(cell().querySelector("input").value, "Original");
 });
 
-/**
- * @source src/script/widgets/tables/editor.mjs::TableEditor
- * @matrix table-controls : quick-edit async-preparation teardown
- */
 test("test_table_editor_rechecks_ownership_in_queued_commits", async (t) => {
 	const queued = [];
 	const queuedOpen = deferred();
@@ -202,10 +194,6 @@ test("test_table_editor_rechecks_ownership_in_queued_commits", async (t) => {
 		assert.equal(field.destroy.mock.callCount(), 1);
 });
 
-/**
- * @source src/script/widgets/tables/editor.mjs::TableEditor
- * @matrix table-controls : quick-edit async-preparation
- */
 test("test_table_editor_latest_cell_open_owns_the_only_editor", async (t) => {
 	const first = deferred();
 	const second = deferred();
@@ -229,10 +217,6 @@ test("test_table_editor_latest_cell_open_owns_the_only_editor", async (t) => {
 	assert.equal(discarded.destroy.mock.callCount(), 1);
 });
 
-/**
- * @source src/script/widgets/tables/editor.mjs::TableEditor
- * @matrix table-controls : quick-edit async-preparation teardown
- */
 test("test_table_checkbox_batches_release_superseded_and_failed_fields", async (t) => {
 	const gate = deferred();
 	const failure = new Error("Field import failed");
@@ -260,10 +244,6 @@ test("test_table_checkbox_batches_release_superseded_and_failed_fields", async (
 	for (const field of fields) assert.equal(field.destroy.mock.callCount(), 1);
 });
 
-/**
- * @source src/script/widgets/tables/editor.mjs::TableEditor
- * @matrix table-controls : quick-edit pending-save
- */
 test("test_table_save_after_close_preserves_newer_edit_and_focus", async (t) => {
 	let gate;
 	const { editor, cell, requests } = await setup(t, {
@@ -301,10 +281,6 @@ test("test_table_save_after_close_preserves_newer_edit_and_focus", async (t) => 
 	assert.equal(requests.length, 2);
 });
 
-/**
- * @source src/script/widgets/tables/editor.mjs::TableEditor
- * @matrix table-controls : quick-edit pending-save
- */
 test("test_table_pending_save_is_shared_and_blocks_same_cell_reentry", async (t) => {
 	const gate = deferred();
 	const { editor, cell, requests } = await setup(t, {
@@ -329,10 +305,6 @@ test("test_table_pending_save_is_shared_and_blocks_same_cell_reentry", async (t)
 	assert.equal(cell().querySelector("input").value, "Submitted snapshot");
 });
 
-/**
- * @source src/script/widgets/tables/editor.mjs::TableEditor
- * @matrix table-controls : quick-edit pending-save
- */
 test("test_table_save_failure_keeps_current_draft_and_allows_retry", async (t) => {
 	const failure = new Error("Network failed");
 	let attempt = 0;
@@ -360,10 +332,6 @@ test("test_table_save_failure_keeps_current_draft_and_allows_retry", async (t) =
 	assert.equal(cell().dataset.editValue, '"Retried draft"');
 });
 
-/**
- * @source src/script/widgets/tables/editor.mjs::TableEditor
- * @matrix table-controls : quick-edit pending-save
- */
 test("test_table_checkbox_save_can_finish_with_editor_closed_or_reopened", async (t) => {
 	let gate;
 	const { editor, cell } = await setup(t, { patch: () => gate.promise });
@@ -397,10 +365,6 @@ test("test_table_checkbox_save_can_finish_with_editor_closed_or_reopened", async
 	}
 });
 
-/**
- * @source src/script/widgets/tables/editor.mjs::TableEditor
- * @matrix table-controls : quick-edit pending-save teardown
- */
 test("test_table_saved_timers_cannot_clear_newer_save_or_survive_destroy", async (t) => {
 	const { editor, cell } = await setup(t, {
 		patch: async () => response("Saved"),
@@ -429,11 +393,6 @@ test("test_table_saved_timers_cannot_clear_newer_save_or_survive_destroy", async
 	assert.equal(cell().querySelector("[data-role=quick-edit-saved]"), null);
 });
 
-/**
- * @source src/script/widgets/tables/indexTable.mjs::IndexTable.refresh
- * @source src/script/widgets/tables/indexTable.mjs::IndexTable.refreshDelta
- * @matrix table-controls : quick-edit row-replacement teardown
- */
 test("test_table_refresh_releases_replaced_and_removed_edits", async (t) => {
 	const { editor, table, cell, fields } = await setup(t);
 	for (const delta of [true, false]) {
@@ -467,10 +426,6 @@ test("test_table_refresh_releases_replaced_and_removed_edits", async (t) => {
 	}
 });
 
-/**
- * @source src/script/widgets/tables/indexTable.mjs::IndexTable.refreshDelta
- * @matrix table-controls : quick-edit row-replacement teardown
- */
 test("test_table_refresh_rejects_pending_fields_and_save_results", async (t) => {
 	const loading = deferred();
 	const saving = deferred();
@@ -501,10 +456,6 @@ test("test_table_refresh_rejects_pending_fields_and_save_results", async (t) => 
 	await editor.refreshCheckboxes();
 });
 
-/**
- * @source src/script/widgets/tables/indexTable.mjs::IndexTable.refreshDelta
- * @matrix table-controls : quick-edit row-replacement teardown
- */
 test("test_table_refresh_preserves_edits_in_unchanged_rows", async (t) => {
 	const { editor, table, cell } = await setup(t);
 	await open(editor);
@@ -524,9 +475,6 @@ test("test_table_refresh_preserves_edits_in_unchanged_rows", async (t) => {
 	assert.equal(cell("name", "two").textContent, "Changed elsewhere");
 });
 
-/**
- * @matrix table-controls : quick-edit teardown
- */
 test("test_table_editor_destroy_releases_fields_listeners_and_pending_work", async (t) => {
 	const gate = deferred();
 	const { editor, table, cell, fields } = await setup(t, {
@@ -554,11 +502,6 @@ test("test_table_editor_destroy_releases_fields_listeners_and_pending_work", asy
 	assert.equal(table.target.querySelector("input"), null);
 });
 
-/**
- * @source src/script/widgets/tables/editor.mjs::TableEditor.releaseRows
- * @source src/script/widgets/tables/indexTable.mjs::IndexTable.refreshDelta
- * @matrix table-controls : quick-edit row-replacement teardown
- */
 test("test_table_refresh_releases_rows_already_removed_by_the_view", async (t) => {
 	const { editor, table, cell } = await setup(t);
 	await open(editor);
@@ -575,10 +518,6 @@ test("test_table_refresh_releases_rows_already_removed_by_the_view", async (t) =
 	assert.equal(editor.activeEdit.cell, cell("name", "two"));
 });
 
-/**
- * @source src/script/widgets/tables/editor.mjs::TableEditor
- * @matrix table-controls : quick-edit async-preparation teardown
- */
 test("test_table_editor_destroy_during_init_or_field_load_cannot_attach", async (t) => {
 	const gate = deferred();
 	const { editor, table, cell, component, fields } = await setup(t, {
@@ -605,9 +544,6 @@ test("test_table_editor_destroy_during_init_or_field_load_cannot_attach", async 
 	assert.equal(add.mock.callCount(), 0);
 });
 
-/**
- * @matrix table-controls : persistence sorting teardown
- */
 test("test_table_sorting_destroy_removes_controls_and_rejects_queued_toggles", async (t) => {
 	createBrowser(t);
 	const queued = [];

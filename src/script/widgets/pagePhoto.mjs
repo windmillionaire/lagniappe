@@ -5,11 +5,6 @@ import { createIcon } from "../shared/icons.mjs";
 import { request } from "../shared/index.mjs";
 import { withTransition } from "../shared/transitions.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
- * @matrix pages : image-generate photo-visibility photo-prompt ai-disabled
- */
 export class PagePhoto extends BaseUpload {
 	constructor(attributes) {
 		super(attributes);
@@ -111,12 +106,6 @@ export class PagePhoto extends BaseUpload {
 		if (this.uploadMenu) this.uploadMenu.create();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_add_image_to_page
-	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_replace_image_on_page
-	 * @matrix pages : image-add image-replace upload-error
-	 */
 	async uploadImage() {
 		return this._withImageMutation(async () => {
 			withTransition(() => {
@@ -139,13 +128,6 @@ export class PagePhoto extends BaseUpload {
 		});
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto.uploadImage
-	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto._generateImage
-	 * @covered-by src/script/widgets/pagePhoto.mjs::PagePhoto._removeImage
-	 * @reason serialize image changes while keeping view controls and editor availability aligned
-	 */
 	async _withImageMutation(operation) {
 		if (this.view.photoBusy || this.readonly) return;
 		this.view.setPhotoBusy(true);
@@ -163,11 +145,6 @@ export class PagePhoto extends BaseUpload {
 		this._removeImage();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_remove_image_from_page
-	 * @pair pages:image-remove
-	 */
 	async _removeImage() {
 		return this._withImageMutation(async () => {
 			const response = await request.delete(this.endpoints.remove);
@@ -179,11 +156,6 @@ export class PagePhoto extends BaseUpload {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
-	 * @pair pages:image-generate
-	 */
 	async _generateImage() {
 		return this._withImageMutation(async () => {
 			const response = await request.post(

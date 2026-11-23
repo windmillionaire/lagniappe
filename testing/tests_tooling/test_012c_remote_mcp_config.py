@@ -5,7 +5,6 @@ import pytest
 from config.remote_mcp import CLIENT_ID, REDIRECT_URI, mcp_connection_name, mcp_issuer, normalize_mcp_config
 
 
-# @matrix mcp-oauth : configuration validation
 @pytest.mark.tooling
 def test_mcp_connection_name_is_safe_for_copyable_commands():
     assert mcp_connection_name() == "lagniappe-remote"
@@ -17,7 +16,6 @@ def test_mcp_connection_name_is_safe_for_copyable_commands():
             normalize_mcp_config({"MCP_NAME": name})
 
 
-# @matrix mcp-oauth : configuration validation
 @pytest.mark.tooling
 def test_remote_mcp_configuration_is_opt_in_and_exact():
     assert normalize_mcp_config({}) == {
@@ -59,7 +57,6 @@ def test_remote_mcp_configuration_is_opt_in_and_exact():
         normalize_mcp_config({**valid, "CUSTOM_DOMAIN": "pilot.run.app"})
 
 
-# @matrix mcp-oauth : configuration validation loopback
 @pytest.mark.tooling
 def test_supported_clients_require_exact_callbacks():
     from config.remote_mcp import (

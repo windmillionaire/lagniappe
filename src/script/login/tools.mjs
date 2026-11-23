@@ -1,12 +1,6 @@
 import { analytics } from "../shared/analytics.mjs";
 import { request } from "../shared/request.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/001_site/test_001b_login.py::test_check_user_status_endpoint_does_not_enumerate_accounts
- * @tests tests_e2e/001_site/test_001b_login.py::test_check_user_status_endpoint_returns_first_time_setup
- * @matrix login : account-enumeration endpoint first-time-setup
- */
 async function getUserStatus(email) {
 	const response = await fetch(
 		`/users/check-user-status?email=${encodeURIComponent(email)}`,
@@ -14,12 +8,6 @@ async function getUserStatus(email) {
 	return await response.json();
 }
 
-/**
- * @testable true
- * @tests tests_e2e/001_site/test_001b_login.py::test_unknown_email_transitions_to_sign_in_without_leaking_existence
- * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
- * @matrix login : account-enumeration sign-in-transition
- */
 async function checkUserStatus(email, form) {
 	try {
 		const userData = await getUserStatus(email);
@@ -45,16 +33,6 @@ async function checkUserStatus(email, form) {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/001_site/test_001b_login.py::test_login_identity_client_handoff_redirects_or_requires_verification
- * @tests tests_e2e/001_site/test_001b_login.py::test_verification_delivery_failure_recovers_safely
- * @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
- * @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
- * @tests tests_js/test_009_request_csrf.mjs::test_login_handoff_refreshes_csrf_before_submit_and_retries_once
- * @tests tests_js/test_009_request_csrf.mjs::test_login_verification_email_reuses_refreshed_csrf
- * @matrix login : csrf-refresh delivery-failure email-password hosted-e2e identity-platform owner-bootstrap recovery redirect remember-preference safe-error token-verification verify-email
- */
 async function handleIdentityUser(user, form) {
 	const body = JSON.stringify({
 		authResult: user.idToken,
@@ -63,11 +41,6 @@ async function handleIdentityUser(user, form) {
 		remember: form.remember(),
 	});
 	let csrfToken = (await request.token()) || form.getToken();
-	/**
-	 * @testable false
-	 * @covered-by src/script/login/tools.mjs::handleIdentityUser
-	 * @reason retryable login request helper is private to Identity Platform handoff
-	 */
 	const send = () =>
 		fetch("/users/login-identity", {
 			method: "POST",
@@ -120,11 +93,6 @@ async function handleIdentityUser(user, form) {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/001_site/test_001b_login.py::test_login_auth_error_messages_are_user_safe
- * @pair login:auth-errors
- */
 function getAuthErrorMessage(error) {
 	switch (error.code) {
 		case "auth/wrong-password":

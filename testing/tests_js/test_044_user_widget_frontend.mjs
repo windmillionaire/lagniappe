@@ -15,7 +15,6 @@ function replaceGlobal(t, name, value) {
 	});
 }
 
-// @matrix users : create-form create-form-reset focus-preservation visibility-isolation
 test("test_create_user_focuses_on_open_and_reset_without_stealing_live_field_focus", async (t) => {
 	let activeElement = null;
 	const body = { id: "body" };
@@ -143,7 +142,6 @@ test("test_create_user_focuses_on_open_and_reset_without_stealing_live_field_foc
 	assert.equal(activeElement.id, "reset-name");
 });
 
-// @matrix user-groups : rename reset-rebinding
 test("test_group_permissions_tracks_rename_draft_after_target_rebuild", async () => {
 	const node = (name) => ({
 		dataset: { name },

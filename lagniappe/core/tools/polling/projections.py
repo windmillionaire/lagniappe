@@ -59,18 +59,11 @@ CHANNEL_REVISION_PATHS = {
 }
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_filter_revision_tracks_parent_definition_and_viewer_permissions
-# @matrix filters polling : saved-filter permissions revision
 def filter_revision(entity: Entity, user: User) -> str:
     """Scope a saved Filter's parent/definition revision to its viewer."""
     return f"{entity.fingerprint}:{user.authorization_fingerprint}"
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_filter_result_revision_includes_tasks_only_for_projects
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
-# @matrix filters polling : saved-filter permissions revision
 def filter_result_revision(entity: Entity, user: User) -> str:
     """Include every durable authority used by a preview or saved result page."""
     parent = cast("Entity", entity.parent) if entity.entity_kind == "filter" else entity
@@ -80,26 +73,16 @@ def filter_result_revision(entity: Entity, user: User) -> str:
     return revision
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_page_tasks_revision_changes_with_saved_forms_without_loading_tasks
-# @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_saved_relabels_preserve_active_task_answers_and_conditions
-# @matrix tasks forms : cache-invalidation live-metadata
 def page_tasks_revision(page: Page, user: User) -> str:
     """Include saved Task Form definitions without reading the Page's Tasks."""
     return f"{page.fingerprint}:{database_utility.site_fingerprint('/forms/index')}"
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
-# @matrix polling : channel mounted-scope permissions revision
 def channel_paths(channel: str) -> tuple[str, ...]:
     """Return the durable fingerprint paths owned by one polling channel."""
     return CHANNEL_REVISION_PATHS.get(channel, (f"/{channel}/index",))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/projections.py::channel_revisions
-# @reason single-channel hashing is exercised through the batched public projection
 def channel_revision(
     channel: str,
     user: User,
@@ -150,10 +133,6 @@ def channel_revision(
 _NOTIFICATION_STATE_UNSET = _Unspecified.NOTIFICATION_STATE
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
-# @matrix polling : batching channel mounted-scope
-# @pair messaging:polling-revision
 def channel_revisions(
     channels: Iterable[str],
     user: User,
@@ -194,10 +173,6 @@ def channel_revisions(
     }
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_operation_statuses_skip_fresh_cached_jobs_and_batch_stale_jobs
-# @matrix deferred-jobs : cache-failure-isolation owner redis-projection
-# @matrix polling : batching permissions revision
 def operation_statuses(
     descriptors: list[OperationDescriptor],
     user: User,
@@ -259,10 +234,6 @@ def operation_statuses(
     return statuses, unchanged
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_render_operation_statuses_batches_and_attaches_known_jobs
-# @matrix deferred-jobs : server-render status
-# @pair polling:batching
 def render_operation_statuses(entities: Iterable[Entity] | None, user: User, *, status_loader: StatusLoader | None = None) -> dict[str, JobStatus]:
     """Attach current status projections to server-rendered operation owners."""
     status_loader = status_loader or DeferredJobs.statuses
@@ -293,9 +264,6 @@ def render_operation_statuses(entities: Iterable[Entity] | None, user: User, *, 
     return statuses
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/projections.py::lock_result
-# @reason result envelope construction is asserted through the public lock projection
 def _result(descriptor, status, *, revision=None, payload=None):
     result = {
         "id": descriptor["id"],
@@ -310,9 +278,6 @@ def _result(descriptor, status, *, revision=None, payload=None):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/projections.py::lock_result
-# @reason revision comparison is asserted through the public lock projection
 def _revision_result(descriptor, revision, payload=None):
     changed = descriptor["revision"] != revision
     return _result(
@@ -323,9 +288,6 @@ def _revision_result(descriptor, revision, payload=None):
     )
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_form_lock_revision_is_independent_of_entity_fingerprint
-# @pairs deferred-jobs:form-lock polling:revision
 def lock_result(descriptor: KeyDescriptor, entity: Entity | None, active_locks: Mapping[str, ActiveLock], *, user: User) -> dict[str, object]:
     """Project one form lock without reading Flask's process-global actor."""
     if not entity or not entity.allowed(Action.VIEW, user=user):

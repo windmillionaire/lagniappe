@@ -3,12 +3,6 @@ import { FormController } from "../forms/controller.mjs";
 import { captureError, request } from "../shared/index.mjs";
 import { FormWidget } from "./base/formWidget.mjs";
 
-/**
- * @testable false
- * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showOriginalCompletion
- * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showArchivedSubmission
- * @reason explicitly requested original submissions use the readonly form renderer
- */
 async function renderOriginalSubmission(response, key) {
 	const host = document.createElement("div");
 	host.dataset.kind = "task";
@@ -39,15 +33,6 @@ async function renderOriginalSubmission(response, key) {
 	return { form, host };
 }
 
-/**
- * @testable true
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_submit_attached_task_form
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_empty_form_is_readonly
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_partial_submission_omits_empty_fields
- * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_empty_form_structure_without_edit_controls
- * @matrix tasks : attached-form autofill complete empty-fields partial-submission permission-gates readonly submission
- */
 export class TaskForm extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
@@ -87,12 +72,6 @@ export class TaskForm extends FormWidget {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
-	 * @matrix tasks : history-fill live-update
-	 */
 	get hasHistory() {
 		return Boolean(
 			this.target?.dataset.history ||
@@ -100,12 +79,6 @@ export class TaskForm extends FormWidget {
 		);
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showOriginalCompletion
-	 * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showArchivedSubmission
-	 * @reason archive warnings and history selection stay above the displayed submission
-	 */
 	get prepend() {
 		const archived = this.target.querySelector(
 			"[data-role='archived-submission-controls']",
@@ -150,11 +123,6 @@ export class TaskForm extends FormWidget {
 		return [this.autofillElement, notice, raw];
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showOriginalCompletion
-	 * @reason retain the current rendered fields while showing the requested original
-	 */
 	_setCompletionView(showOriginal) {
 		const controls = this.target.querySelector(
 			"[data-role='original-completion-controls']",
@@ -179,22 +147,11 @@ export class TaskForm extends FormWidget {
 			!showOriginal;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showOriginalCompletion
-	 * @reason the selected history source and visible submission change together
-	 */
 	_selectCompletionSubmission(event) {
 		event.stopPropagation();
 		this._setCompletionView(event.target.value === "original");
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
-	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_conversion_runs_after_save_and_preserves_originals
-	 * @matrix task-completion : original-view readonly
-	 */
 	async _showOriginalCompletion(event) {
 		event.preventDefault();
 		event.stopPropagation();
@@ -247,11 +204,6 @@ export class TaskForm extends FormWidget {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_deleted_migrated_form_retains_completed_submissions_and_history
-	 * @matrix task-completion : deleted-form generation raw-values
-	 */
 	async _showArchivedSubmission(event) {
 		event.preventDefault();
 		event.stopPropagation();
@@ -296,12 +248,6 @@ export class TaskForm extends FormWidget {
 		}
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showOriginalCompletion
-	 * @covered-by src/script/widgets/taskForm.mjs::TaskForm._showArchivedSubmission
-	 * @reason requested readonly forms share the Task form lifetime
-	 */
 	_clearOriginalCompletion() {
 		this._originalCompletionGeneration += 1;
 		this._originalCompletionForm?.destroy();
@@ -351,11 +297,6 @@ export class TaskForm extends FormWidget {
 		await this.loadHistoryFill();
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/taskForm.mjs::TaskForm
-	 * @reason detached task-form resets preserve history-fill initialization
-	 */
 	async prepareReset(options = {}) {
 		this._clearOriginalCompletion();
 		this._resetHistoryFillCache();
@@ -398,11 +339,6 @@ export class TaskForm extends FormWidget {
 		return submission;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/taskForm.mjs::TaskForm.loadHistoryFill
-	 * @reason history buttons request one converted value and display its validation feedback
-	 */
 	async historyValue(fieldId) {
 		const form = this.form;
 		const generation = this._historyFillGeneration;
@@ -423,13 +359,6 @@ export class TaskForm extends FormWidget {
 		return response.latest_submission?.[fieldId];
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
-	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_task_history_fill_reports_incompatible_values_and_ignores_stale_responses
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_history_fill_converts_selected_fields_and_reports_invalid_values
-	 * @matrix tasks : history-fill latest-submission incompatible-value stale-response
-	 */
 	async loadHistoryFill() {
 		if (!this.historyFillEnabled || !this.form?.renderer) return;
 

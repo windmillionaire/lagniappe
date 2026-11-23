@@ -22,18 +22,12 @@ from lagniappe.web import responses
 from . import assets
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/assets/main.py::get_image
-# @reason file asset response handling is route-local glue around tested range helpers
 def _asset_size(asset):
     if asset.size is not None:
         return asset.size
     return database_assets.file_size(asset.path, asset.visibility.value)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/assets/main.py::get_image
-# @reason large-asset decision is route-local response plumbing
 def _large_asset(asset):
     if asset.large is not None:
         return asset.large
@@ -41,9 +35,6 @@ def _large_asset(asset):
     return bool(size is not None and size > LARGE_ASSET_BYTES)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/assets/main.py::get_image
-# @reason metadata responses are route-local glue for range-capable preview clients
 def _asset_metadata_response(asset, mimetype):
     response, status = responses.file_response(
         b"",
@@ -56,9 +47,6 @@ def _asset_metadata_response(asset, mimetype):
     return response, status
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/assets/main.py::get_image
-# @reason signed URL redirects depend on provider credentials and route permission
 def _asset_redirect(asset, mimetype):
     response_type = mimetype or asset.content_type or "application/octet-stream"
     filename = f"{asset.name}.{asset.extension}" if asset.extension else asset.name
@@ -77,9 +65,6 @@ def _asset_redirect(asset, mimetype):
     return redirect(url), 302
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/assets/main.py::get_image
-# @reason file asset response handling is route-local glue around tested range helpers
 def _file_response(asset, mimetype):
     size = None
     byte_range = None
@@ -118,12 +103,6 @@ def _file_response(asset, mimetype):
     return responses.file_response(content, mimetype, accept_ranges=True)
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_image_asset_lifecycle_and_projections
-# @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image
-# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_renders_pdf_preview_widget
-# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_toolbar_navigates_pages
-# @pairs editor:image-upload file:preview page:asset-lifecycle
 @assets.route("<key>/<name>", methods=["GET", "HEAD"])
 @permission(requested=Action.VIEW)
 def get_image(

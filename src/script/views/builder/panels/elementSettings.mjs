@@ -3,9 +3,6 @@ import { STYLES } from "../../../generated/styles.mjs";
 import { withTransition } from "../../../shared/transitions.mjs";
 import { CONFIG } from "../config.mjs";
 
-/**
- * @testable infrastructure
- */
 const _section = (name, elements) => {
 	const section = document.createElement("div");
 	section.className = STYLES.builder.settings.section;
@@ -14,9 +11,6 @@ const _section = (name, elements) => {
 	return section;
 };
 
-/**
- * @testable infrastructure
- */
 const _presentation = (schema) => {
 	const defaults = CONFIG.PRESENTATION_DEFAULTS[schema.type] || {};
 	return {
@@ -26,11 +20,6 @@ const _presentation = (schema) => {
 	};
 };
 
-/**
- * @testable true
- * @tests tests_js/test_036_form_builder_frontend.mjs::test_builder_schema_lists_use_button_surfaces_and_centered_actions
- * @matrix forms : action-button-centering builder-list-actions
- */
 const _toggle = (icon, role, kind = "form", disabled = false) => {
 	const toggle = primitives.toggle({
 		icon: icon,
@@ -51,9 +40,6 @@ const _toggle = (icon, role, kind = "form", disabled = false) => {
 	return toggle;
 };
 
-/**
- * @testable infrastructure
- */
 const _condition = (condition, index) => {
 	const elt = document.createElement("li");
 	elt.className = STYLES.builder.settings.item;
@@ -82,9 +68,6 @@ const _condition = (condition, index) => {
 	return elt;
 };
 
-/**
- * @testable infrastructure
- */
 const _option = (option, index, length) => {
 	const wrapper = document.createElement("li");
 	wrapper.className = STYLES.builder.settings.item;
@@ -111,9 +94,6 @@ const _option = (option, index, length) => {
 	return wrapper;
 };
 
-/**
- * @testable infrastructure
- */
 const _column = (column, index, length) => {
 	const wrapper = document.createElement("li");
 	wrapper.className = STYLES.builder.settings.item;
@@ -145,9 +125,6 @@ const _column = (column, index, length) => {
 	return wrapper;
 };
 
-/**
- * @testable infrastructure
- */
 const title = (schema) => {
 	const title = primitives.input({
 		label: "Title",
@@ -157,9 +134,6 @@ const title = (schema) => {
 	return _section("title", [title]);
 };
 
-/**
- * @testable infrastructure
- */
 const placeholder = (schema) => {
 	const placeholder = primitives.input({
 		label: "Placeholder",
@@ -169,9 +143,6 @@ const placeholder = (schema) => {
 	return _section("placeholder", [placeholder]);
 };
 
-/**
- * @testable infrastructure
- */
 const visibility = (schema) => {
 	const title = document.createElement("div");
 	title.className = STYLES.builder.settings.title;
@@ -193,9 +164,6 @@ const visibility = (schema) => {
 	return _section("visibility", [title]);
 };
 
-/**
- * @testable infrastructure
- */
 const status = (schema) => {
 	const title = document.createElement("div");
 	title.className = STYLES.builder.settings.title;
@@ -218,9 +186,6 @@ const status = (schema) => {
 	}
 };
 
-/**
- * @testable infrastructure
- */
 const options = (schema) => {
 	const title = document.createElement("div");
 	title.className = STYLES.builder.settings.title;
@@ -244,9 +209,6 @@ const options = (schema) => {
 	}
 };
 
-/**
- * @testable infrastructure
- */
 const editor = () => {
 	const title = document.createElement("div");
 	title.className = STYLES.builder.settings.title;
@@ -259,9 +221,6 @@ const editor = () => {
 	return _section("html", [title]);
 };
 
-/**
- * @testable infrastructure
- */
 const input = (schema) => {
 	const display = _presentation(schema);
 	const fieldset = document.createElement("fieldset");
@@ -287,9 +246,6 @@ const input = (schema) => {
 	return _section("input", [fieldset]);
 };
 
-/**
- * @testable infrastructure
- */
 const location = (schema) => {
 	const display = _presentation(schema);
 	const fieldset = document.createElement("fieldset");
@@ -315,9 +271,6 @@ const location = (schema) => {
 	return _section("location", [fieldset]);
 };
 
-/**
- * @testable infrastructure
- */
 const columns = (schema) => {
 	const title = document.createElement("div");
 	title.className = STYLES.builder.settings.title;
@@ -341,9 +294,6 @@ const columns = (schema) => {
 	}
 };
 
-/**
- * @testable infrastructure
- */
 const required = (schema) => {
 	const required = primitives.checkbox({
 		label: "Required",
@@ -353,9 +303,6 @@ const required = (schema) => {
 	return _section("required", [required]);
 };
 
-/**
- * @testable infrastructure
- */
 const multiple = (schema) => {
 	const multiple = primitives.checkbox({
 		label: "Multiple",
@@ -365,9 +312,6 @@ const multiple = (schema) => {
 	return _section("multiple", [multiple]);
 };
 
-/**
- * @testable infrastructure
- */
 const checked = (schema) => {
 	const checked = primitives.checkbox({
 		label: "Default",
@@ -377,9 +321,6 @@ const checked = (schema) => {
 	return _section("checked", [checked]);
 };
 
-/**
- * @testable infrastructure
- */
 const deleteButton = () => {
 	const button = document.createElement("button");
 	button.textContent = "Replace or Delete";
@@ -406,9 +347,6 @@ const SettingsElement = {
 	deleteButton: deleteButton,
 };
 
-/**
- * @testable infrastructure
- */
 export class ElementSettings {
 	constructor(builder) {
 		this.builder = builder;
@@ -459,12 +397,6 @@ export class ElementSettings {
 		this.builder.updateSchema();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
-	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility
-	 * @matrix forms : builder-field-visibility builder-select-options
-	 */
 	_click(e) {
 		if (e.target.closest("button")?.disabled) return;
 		const element = this.builder.selectedElement;
@@ -516,11 +448,6 @@ export class ElementSettings {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
-	 * @pairs forms:builder-field-title frontend-icons:material-icon-preservation
-	 */
 	_setTitle(element, value) {
 		element.schema.title = value;
 		element.item.querySelector(
@@ -598,12 +525,6 @@ export class ElementSettings {
 		return sections;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_036b_builder_draft.mjs::test_saved_controls_refresh_without_replacing_draft_inputs
-	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_inputs_use_replacement_panel_after_first_save
-	 * @matrix forms : builder-save stable-identity
-	 */
 	refreshSavedState(
 		schema = this.builder.selectedElement?.schema,
 		sections = this.panel.children,

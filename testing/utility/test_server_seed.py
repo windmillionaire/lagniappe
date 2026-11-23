@@ -559,9 +559,6 @@ def _run_post_load_actions(
     return actions
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_seed_loading_requires_authority_before_import_or_mutation
-# @matrix test-session : lease-ownership seed-loading
 def load_packs(pack_names: Iterable[str], authority) -> SeedReport:
     """Load one or more seed packs into the testing datastore/cache."""
 

@@ -5,9 +5,6 @@ from .field_host import FieldHost
 from ..definitions import Ordering
 
 
-# @testable false
-# @covered-by lagniappe/core/mixins/column.py::ColumnMixin
-# @reason helper keeps generic column editability from touching entity descriptors
 def _entity_is_completed(entity: object) -> bool:
     return (
         getattr(entity, "entity_kind", None) == "task"
@@ -15,10 +12,6 @@ def _entity_is_completed(entity: object) -> bool:
     )
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_entity.py::Name.column_value
-# @covered-by lagniappe/core/properties/user_entity.py::Email
-# @covered-by lagniappe/core/properties/task_dates.py::Completed.column_value
 class ColumnMixin(FieldHost):
     """Adds table column display. Used by Columns to build table metadata.
 
@@ -64,9 +57,6 @@ class ColumnMixin(FieldHost):
     def selected(self, value: bool) -> None:
         self._selected = value
 
-    # @testable true
-    # @tests tests_unit/test_008_page_properties.py::test_column_editable_does_not_load_page_tasks
-    # @matrix page : table-editability task-load
     @property
     def editable(self) -> bool:
         return (
@@ -79,9 +69,6 @@ class ColumnMixin(FieldHost):
     def editable(self, value: bool) -> None:
         self._editable = value
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_column_and_filter_contract_errors_are_explicit
-    # @matrix property : column validation
     @property
     def ordering(self) -> Ordering | Literal[False]:
         ordering = getattr(self, "_ordering", False)

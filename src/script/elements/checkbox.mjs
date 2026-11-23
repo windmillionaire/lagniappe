@@ -3,9 +3,6 @@ import { setIcon } from "../shared/icons.mjs";
 import { BaseElement } from "./base/baseElement.mjs";
 import { primitives } from "./primitives.mjs";
 
-/**
- * @testable infrastructure
- */
 export class CheckboxElement extends BaseElement {
 	active() {
 		const input = this.elt?.querySelector("input");

@@ -14,8 +14,6 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.test_entities import TestEntities
 
 
-# @matrix ai-report : active-request quota search-opt-in service-tier summary-prepass
-# @pair files:normalization
 @pytest.mark.unit
 def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
     user = _test_user("summary-prepass-owner")
@@ -160,7 +158,6 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
     assert fourth.summary is None
 
 
-# @matrix ai-report : fallback large-file summary-prepass
 @pytest.mark.unit
 def test_summarize_report_input_files_falls_back_for_large_files(monkeypatch):
     user = _test_user("large-summary-owner")
@@ -216,7 +213,6 @@ def test_summarize_report_input_files_falls_back_for_large_files(monkeypatch):
     assert by_filename["large-source.zip"]["display_name"] == "large-source"
 
 
-# @matrix ai-report : issue persistence summary-prepass unreadable-pdf
 @pytest.mark.unit
 def test_unreadable_pdf_is_saved_skipped_and_reported(monkeypatch):
     user = _test_user("unreadable-pdf-owner")

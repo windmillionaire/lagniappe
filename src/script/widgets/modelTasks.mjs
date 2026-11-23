@@ -5,9 +5,6 @@ import { request } from "../shared/index.mjs";
 import { withTransition } from "../shared/transitions.mjs";
 import { FormWidget } from "./base/formWidget.mjs";
 
-/**
- * @testable infrastructure
- */
 class ModelTask extends FormWidget {
 	get formSelectElement() {
 		const target = this.target.querySelector('[data-action="select-form"]');
@@ -39,15 +36,6 @@ class ModelTask extends FormWidget {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004a_project.py::test_create_model_task
- * @tests tests_e2e/004_projects/test_004a_project.py::test_create_model_task_with_form
- * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_create_model_form_opens_from_model_tasks_section
- * @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_editor_can_open_model_task_creation
- * @matrix model-tasks : attach-form create permission-gates
- * @pair entity-layout:project-mobile
- */
 export class CreateModelTask extends ModelTask {
 	constructor(attributes) {
 		super(attributes);
@@ -71,14 +59,6 @@ export class CreateModelTask extends ModelTask {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_click_model_opens_info
- * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_edit_model_task_name
- * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_change_model_task_form
- * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task_form
- * @matrix model-tasks : form-change form-clear info-form name update
- */
 export class ModelTaskInfo extends ModelTask {
 	constructor(attributes) {
 		super(attributes);
@@ -106,14 +86,6 @@ export class ModelTaskInfo extends ModelTask {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task
- * @tests tests_e2e/004_projects/test_004k_model_task_ordering.py::test_model_task_arrows_preserve_open_edits_and_saved_order
- * @tests tests_e2e/004_projects/test_004k_model_task_ordering.py::test_model_order_rejects_invalid_membership_and_readonly_users
- * @pair model-tasks:delete
- * @matrix model-tasks : ordering persistence permission-gates parent-membership
- */
 export class ModelTaskList extends BaseList {
 	constructor(attributes) {
 		super(attributes);

@@ -16,9 +16,6 @@ from testing.utility.test_entities import TestEntities
 pytestmark = pytest.mark.unit
 
 
-# @matrix mentions : entity-contract idempotency index-exclusion
-# @matrix messaging : entity-contract index-exclusion owner-opt-in polling-revision
-# @matrix notifications : aggregate-count discriminator generation revision
 def test_messaging_entities_and_owner_toggles_are_fail_closed():
     user = User(testing=True)
     assert user.allow_messages_and_mentions is False
@@ -72,7 +69,6 @@ def test_messaging_entities_and_owner_toggles_are_fail_closed():
     assert notification.aggregate_generation == "generation-a"
 
 
-# @matrix migrations : idempotency notification-discriminator
 def test_notification_discriminator_migration_is_idempotent():
     notification = {"type": "notification"}
     first = canonicalize_notification_record(notification)
@@ -84,7 +80,6 @@ def test_notification_discriminator_migration_is_idempotent():
     assert canonicalize_notification_record({"type": "note"}).changed is False
 
 
-# @matrix task-assignment : idempotency self-exclusion transition
 def test_task_assignment_notice_uses_stable_transition_identity(monkeypatch):
     task = TestEntities.get("TASK", {"name": "Review", "hash": "task-notice"})
     actor = TestEntities.get(

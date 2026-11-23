@@ -24,7 +24,6 @@ from testing.utility.polling import expect_poll_result
 pytestmark = pytest.mark.e2e
 
 
-# @matrix file : active-reset polling status summarize summary
 def test_file_summary_completion_stages_authoritative_info_until_reset(
     get_admin, get_user,
     browser_failures,

@@ -4,9 +4,6 @@ from typing import TYPE_CHECKING
 
 from runner import presentation as ui
 from runner.presentation import output as print
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_ai_settings_applies_saved_app_config
-# @matrix setup : ai-settings datastore
 def get_ai_settings() -> Entity | None:
     from installer.utils import ensure_datastore_dependency
     from installer.image import DATASTORE_TIMEOUT, get_datastore_client

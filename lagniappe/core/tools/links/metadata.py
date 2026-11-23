@@ -18,9 +18,6 @@ METADATA_HEADERS = {
 }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/links/metadata.py::get_link_attributes
-# @reason metadata parsing is owned by the external link metadata fetch workflow
 def extract_link_metadata(content: str | bytes, *, base_url: str | None = None) -> dict[str, str | None]:
     """Extract page metadata (title, description, image) from HTML content."""
     soup = BeautifulSoup(content, "html.parser")
@@ -55,9 +52,6 @@ def extract_link_metadata(content: str | bytes, *, base_url: str | None = None) 
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/links/metadata.py::get_link_attributes
-# @reason broken-link labeling is part of external link metadata fallback
 def _broken_link_label(url: str) -> str:
     """Short display label when the URL cannot be fetched (HTTP error, timeout, etc.)."""
     try:
@@ -72,10 +66,6 @@ def _broken_link_label(url: str) -> str:
     return f"Broken link - {host}"
 
 
-# @testable true
-# @tests tests_unit/test_032_outbound_http.py::test_link_metadata_uses_typed_fetch_and_resolves_relative_images
-# @matrix link : fallback metadata relative-image
-# @pairs bookmark:metadata outbound-http:privacy
 def get_link_attributes(url: str) -> dict[str, str | None]:
     """Fetch page metadata (title, description, image) from a URL via meta tags.
 
@@ -96,9 +86,6 @@ def get_link_attributes(url: str) -> dict[str, str | None]:
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/form_links.py::Bookmark.validate_submission
-# @reason external bookmark metadata fetch is owned by bookmark submission workflows
 def get_bookmark_metadata(data: Mapping[str, str]) -> dict[str, str | None]:
     """Fetch bookmark metadata, falling back to user-provided title."""
     if not data.get("url"):

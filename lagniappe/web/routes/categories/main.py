@@ -33,11 +33,6 @@ from lagniappe.core.tools.diagnostics import timed
 from . import categories
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_page_acl_user_sees_one_page_on_category_index_home_and_search
-# @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_create_scoped_to_one_category
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
-# @matrix categories : create-control first-batch index-filter permission-gates server-render
 @categories.route("/<key>", methods=["GET"])
 @timed(profile=True)
 @permission(Resource.CATEGORY, Action.RESTRICTED)
@@ -54,9 +49,6 @@ def index(
     return responses.index("categories", category_index, pages=pages)
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_page_acl_user_sees_one_page_on_category_index_home_and_search
-# @matrix categories : index-filter permission-gates
 @categories.route("/<key>/rows", methods=["GET"])
 @permission(Resource.CATEGORY, Action.RESTRICTED)
 def rows(
@@ -70,8 +62,6 @@ def rows(
     return responses.rows(pages, category_index)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::category_info
 @categories.route("/<key>/info/replace", methods=["GET"])
 @permission(Resource.CATEGORY, Action.VIEW)
 def info(
@@ -80,10 +70,6 @@ def info(
     return responses.category_info(kwargs["entity"])
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/categories/main.py::create
-# @covered-by lagniappe/web/routes/categories/main.py::update
-# @reason form parsing helper owned by category create/update routes
 def _category_data(form: MultiDict[str, str], category: models.Category | None = None) -> CategoryData:
     form_key = form.get("form")
     current_form = category.form if category else None
@@ -106,10 +92,6 @@ def _category_data(form: MultiDict[str, str], category: models.Category | None =
     }
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
-# @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_viewer_opens_readonly_settings
-# @matrix categories : permission-gates update
 @categories.route("<key>/update", methods=["PUT"])
 @permission(Resource.CATEGORY, Action.EDIT)
 def update(
@@ -126,9 +108,6 @@ def update(
     return responses.category_info(category)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/categories/main.py::create
-# @reason AI response shaping is exercised through the category create route
 def _generate_category(generated_data: ai_category.GeneratedCategory) -> CategoryData:
     if generated_data.get("form_schema"):
         create_form_data = {
@@ -149,12 +128,6 @@ def _generate_category(generated_data: ai_category.GeneratedCategory) -> Categor
     return category_data
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_manual_mode
-# @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode
-# @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_with_form
-# @tests tests_e2e/002_home/test_002c_home_categories.py::test_retired_initial_prompt_request_cannot_create_category
-# @matrix categories : ai-create attach-form create-manual retired-preview no-create
 @categories.route("create", methods=["POST"])
 @permission(Resource.MODELS, Action.CREATE)
 def create() -> ResponseReturnValue:
@@ -191,9 +164,6 @@ def create() -> ResponseReturnValue:
     return responses.new_category(category)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002c_home_categories.py::test_delete_category
-# @pair categories:delete
 @categories.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.MODELS, Action.DELETE)
 def delete(key: str, **kwargs: Unpack[EntityContext[Entity]]) -> ResponseReturnValue:

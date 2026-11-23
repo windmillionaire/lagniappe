@@ -5,12 +5,6 @@ import { CONFIG } from "../config.mjs";
 import { fieldKind } from "../migrations.mjs";
 import { Condition } from "./base.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_table_column_condition_editor
- * @pair forms:builder-table-column
- * @matrix forms : stable-identity
- */
 export default class Columns extends Condition {
 	constructor(builder) {
 		super(builder);
@@ -130,11 +124,6 @@ export default class Columns extends Condition {
 		this.target.addEventListener("updated", this._updated);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_036b_builder_draft.mjs::test_saved_controls_refresh_without_replacing_draft_inputs
-	 * @matrix forms : builder-save stable-identity
-	 */
 	refreshSavedState() {}
 
 	_updated(e) {

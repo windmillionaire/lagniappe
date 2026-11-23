@@ -22,17 +22,14 @@ if TYPE_CHECKING:
     from google.cloud import datastore, storage, tasks_v2
 
 
-# @testable infrastructure
 class _Gcloud(Protocol):
     def __call__(self, arguments: list[str], /, *, timeout: float) -> object: ...
 
 
-# @testable infrastructure
 class _DatastoreFactory(Protocol):
     def __call__(self, *, project: str, database: str) -> datastore.Client: ...
 
 
-# @testable infrastructure
 class _ProviderOverrides(TypedDict, total=False):
     gcloud: _Gcloud
     storage_client: storage.Client
@@ -68,9 +65,6 @@ class DataLifecycleError(SetupError):
     category = "data-lifecycle"
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_identifiers_and_storage_paths_are_strict
-# @matrix data-lifecycle : identifier-validation path-containment
 def validate_backup_id(value: str) -> str:
     """Return one canonical user-facing backup ID or raise."""
     value = str(value or "").strip()
@@ -85,9 +79,6 @@ def validate_backup_id(value: str) -> str:
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_identifiers_and_storage_paths_are_strict
-# @pair data-lifecycle:identifier-validation
 def validate_project_id(value: object) -> str:
     value = str(value or "").strip()
     if not PROJECT_ID_PATTERN.fullmatch(value):
@@ -95,9 +86,6 @@ def validate_project_id(value: object) -> str:
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_identifiers_and_storage_paths_are_strict
-# @pair data-lifecycle:identifier-validation
 def validate_database_id(value: str, *, allow_default: bool = True) -> str:
     """Validate the current Firestore multiple-database identifier contract."""
     value = str(value or "").strip()
@@ -115,9 +103,6 @@ def validate_database_id(value: str, *, allow_default: bool = True) -> str:
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_identifiers_and_storage_paths_are_strict
-# @pair data-lifecycle:identifier-validation
 def validate_bucket_name(value: str) -> str:
     value = str(value or "").strip()
     if not BUCKET_PATTERN.fullmatch(value) or ".." in value:
@@ -125,16 +110,10 @@ def validate_bucket_name(value: str) -> str:
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_identifiers_and_storage_paths_are_strict
-# @pair data-lifecycle:path-containment
 def backup_root_uri(bucket: str, backup_id: str) -> str:
     return f"gs://{validate_bucket_name(bucket)}/{BACKUP_ROOT_PREFIX}/{validate_backup_id(backup_id)}"
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_identifiers_and_storage_paths_are_strict
-# @pair data-lifecycle:path-containment
 def parse_gs_uri(value: str) -> tuple[str, str]:
     """Parse an exact object URI; bucket-only and URL-shaped values are rejected."""
     value = str(value or "").strip()
@@ -159,9 +138,6 @@ def parse_gs_uri(value: str) -> tuple[str, str]:
     return bucket, path
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_manifest_validation_rejects_foreign_or_uncontained_artifacts
-# @pair data-lifecycle:path-containment
 def require_uri_below(uri: str, root_uri: str) -> str:
     bucket, path = parse_gs_uri(uri)
     root_bucket, root_path = parse_gs_uri(f"{root_uri}/root")
@@ -171,7 +147,6 @@ def require_uri_below(uri: str, root_uri: str) -> str:
     return path
 
 
-# @testable infrastructure
 @dataclass(frozen=True)
 class BackupManifest:
     """Atomic v3 completion marker shared by every lifecycle consumer."""
@@ -201,9 +176,6 @@ class BackupManifest:
     asset_count: int
     tool_version: str
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_manifest_validation_rejects_foreign_or_uncontained_artifacts
-    # @matrix data-lifecycle : manifest path-containment
     @classmethod
     def from_dict(
         cls,
@@ -312,7 +284,6 @@ class BackupManifest:
         return asdict(self)
 
 
-# @testable infrastructure
 @dataclass
 class ProviderContext:
     """Validated saved provider target and injectable provider adapters."""
@@ -329,9 +300,6 @@ class ProviderContext:
     monotonic: Callable[[], float] = time.monotonic
     now: Callable[[], datetime] = lambda: datetime.now(UTC)
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_provider_context_always_uses_default_database_and_recovery_bucket
-    # @pair data-lifecycle:provider-context
     @classmethod
     def from_settings(
         cls,
@@ -469,9 +437,6 @@ class ProviderContext:
             raise DataLifecycleError("Provider did not return a valid restore operation name.")
         return name, payload
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_database_import_uses_export_output_prefix
-    # @matrix data-lifecycle : database-import provider-contract
     def start_import(
         self, output_prefix: str, database_id: str
     ) -> tuple[str, dict[str, object]]:
@@ -536,9 +501,6 @@ class ProviderContext:
             timeout=30,
         ))
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_operation_polling_resumes_and_reports_provider_failure
-    # @matrix data-lifecycle : failure-propagation operation-polling transient-retry
     def wait_for_operation(
         self, name: str, *, database_id: str | None = None, timeout: float | None = None
     ) -> dict[str, object]:
@@ -573,9 +535,6 @@ class ProviderContext:
             attempt += 1
             self.sleep(delay)
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_database_creation_uses_current_operation_gcloud_contract
-    # @matrix data-lifecycle : database-create operation-provider-contract
     def create_database(
         self, database_id: str, location: str, *, delete_protection: bool = True
     ) -> dict[str, object]:
@@ -637,9 +596,6 @@ class ProviderContext:
         client_database_id = "" if database_id == "(default)" else database_id
         return factory(project=self.project_id, database=client_database_id)
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_lifecycle_requires_completed_asset_generation_migration
-    # @matrix data-lifecycle migrations : read-only asset-generation prerequisite
     def require_asset_generation_migration(
         self, database_id: str = "(default)"
     ) -> datastore.Entity:
@@ -672,9 +628,6 @@ class ProviderContext:
             )
         return record
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_queue_snapshot_preserves_full_task_definitions
-    # @matrix data-lifecycle : provider-pagination queue-purge-audit
     def list_queue_tasks(self, queue_name: str, location: str) -> list[dict[str, Any]]:
         """Return every task using FULL view so a pre-purge audit keeps payloads."""
         from google.cloud.tasks_v2.types import Task
@@ -862,9 +815,6 @@ class ProviderContext:
         except AlreadyExists:
             return None
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_cutover_waits_for_dispatched_task_attempts_to_settle
-    # @pair data-lifecycle:inflight-task-settlement
     def wait_for_no_inflight_tasks(
         self, queue_name: str, location: str, *, timeout: float = 3700
     ) -> None:
@@ -1002,9 +952,6 @@ class ProviderContext:
             self.sleep(POLL_DELAYS[min(attempt, len(POLL_DELAYS) - 1)])
             attempt += 1
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_maintenance_version_probe_uses_nonfailing_version_list
-    # @matrix data-lifecycle : app-engine-version provider-contract
     def version_exists(self, version_id: str) -> bool:
         payload = self.json_command(["app", "versions", "list", "--service=default"])
         if not isinstance(payload, list) or any(
@@ -1127,9 +1074,6 @@ class ProviderContext:
             self.sleep(POLL_DELAYS[min(attempt, len(POLL_DELAYS) - 1)])
             attempt += 1
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_cache_invalidation_uses_setup_redis_connection
-    # @matrix data-lifecycle : cache-invalidation framework-neutral restore
     def invalidate_cache(self) -> None:
         """Clear restored installation cache data without importing the web app."""
         import redis
@@ -1197,9 +1141,6 @@ class ProviderContext:
         return blob
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason provider response normalization is exercised through backup publication
 def operation_times(payload: dict[str, Any]) -> tuple[str, str]:
     metadata = payload.get("metadata") or {}
     common = metadata.get("common") or {}
@@ -1219,9 +1160,6 @@ def operation_times(payload: dict[str, Any]) -> tuple[str, str]:
     return str(start or now), str(end or now)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason provider response normalization is exercised through backup publication
 def export_output_uri(payload: dict[str, Any]) -> str:
     response = payload.get("response") or {}
     metadata = payload.get("metadata") or {}

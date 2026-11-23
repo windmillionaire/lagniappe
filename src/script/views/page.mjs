@@ -2,24 +2,7 @@ import { setIcon } from "../shared/icons.mjs";
 import { withTransition } from "../shared/transitions.mjs";
 import Entity from "./base/entity.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/005_pages/test_005f_page_image.py::test_add_image_to_page
- * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
- * @tests tests_js/test_038_startup_specializations.mjs::test_page_photo_initializes_only_when_selected_or_visible
- * @tests tests_e2e/005_pages/test_005f_page_image.py::test_photo_controls_toggle_and_remember_desktop_visibility
- * @tests tests_e2e/005_pages/test_005f_page_image.py::test_readonly_viewer_can_toggle_image_without_editing
- * @tests tests_e2e/005_pages/test_005f_page_image.py::test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop
- * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_flipper_reveals_sections
- * @matrix pages : image-add mobile-photo-tab photo-lazy-activation photo-prompt photo-visible-startup desktop-tabs photo-visibility readonly
- * @matrix entity-layout : flipper page-mobile
- */
 export default class Page extends Entity {
-	/**
-	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.mjs::test_page_task_collection_watches_task_form_changes
-	 * @matrix polling tasks : channel refresh
-	 */
 	async reconcilePollingSubscriptions() {
 		await super.reconcilePollingSubscriptions();
 		const component = this.components.tasks;
@@ -229,11 +212,6 @@ export default class Page extends Entity {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/005_pages/test_005c_page_mobile_ui.py::test_page_mobile_create_task_opens_from_tasks_section
-	 * @matrix entity-layout : page-mobile task-create
-	 */
 	async _focusTask(taskId) {
 		const taskTab = this.getComponent(this.elt.querySelector("#tasks"));
 		await taskTab.activate("PageTaskList");
@@ -246,11 +224,6 @@ export default class Page extends Entity {
 		this.postRender = null;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_route_rewrites_to_page_url_after_focus
-	 * @matrix tasks : canonical-url navigation reload
-	 */
 	_replaceFocusedTaskUrl() {
 		const pagePath = this.key ? `/pages/${this.key}` : window.location.pathname;
 		history.replaceState(null, "", pagePath);

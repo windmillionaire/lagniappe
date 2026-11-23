@@ -59,7 +59,6 @@ def guard_store(monkeypatch):
                            lookup=lookup, transaction_ids=transaction_ids)
 
 
-# @matrix mutations : concurrency batched-reads
 def test_guarded_write_batches_distinct_keys_and_matches_unordered_results(guard_store):
     page = guard_store.row("page", assets="saved", unrelated="kept")
     form = guard_store.row("form", generation=2)
@@ -87,7 +86,6 @@ def test_guarded_write_batches_distinct_keys_and_matches_unordered_results(guard
     assert list(mutation.property_mask.paths) == ["assets"]
 
 
-# @matrix mutations : concurrency batched-reads
 @pytest.mark.parametrize("saved,expectations,conflict", [
     (None, [None, None], False),
     ({}, [None, {}], True),
@@ -122,7 +120,6 @@ def test_guarded_write_enforces_every_expectation(guard_store, saved, expectatio
     assert guard_store.api.lookup.call_args.kwargs["request"]["keys"] == [key.to_protobuf()]
 
 
-# @matrix mutations : concurrency batched-reads
 @pytest.mark.parametrize("count,sizes", [(0, []), (1000, [1000]), (1001, [1000, 1]), (2001, [1000, 1000, 1])])
 def test_guard_reads_respect_lookup_limit_and_skip_empty_input(guard_store, count, sizes):
     keys = [guard_store.client.key("records", str(index)) for index in range(count)]
@@ -135,7 +132,6 @@ def test_guard_reads_respect_lookup_limit_and_skip_empty_input(guard_store, coun
     assert all(request["read_options"].transaction == guard_store.transaction_ids[0] for request in requests)
 
 
-# @matrix mutations : concurrency batched-reads
 @pytest.mark.parametrize("unresolved", [False, True])
 def test_guard_reads_resolve_deferred_keys_before_accepting_absence(guard_store, monkeypatch, unresolved):
     from google.cloud.datastore import client as datastore_client
@@ -164,7 +160,6 @@ def test_guard_reads_resolve_deferred_keys_before_accepting_absence(guard_store,
     assert all(request["read_options"].transaction == guard_store.transaction_ids[0] for request in attempts)
 
 
-# @matrix mutations : concurrency batched-reads
 @pytest.mark.parametrize("changed", [False, True])
 def test_guarded_write_rechecks_batched_guards_after_aborted_commit(guard_store, changed):
     saved = guard_store.row("guarded", version=1)
@@ -191,7 +186,6 @@ def test_guarded_write_rechecks_batched_guards_after_aborted_commit(guard_store,
             for call in guard_store.api.lookup.call_args_list] == guard_store.transaction_ids
 
 
-# @matrix mutations : concurrency batched-reads
 @pytest.mark.parametrize("conflict", [False, True])
 def test_atomic_job_start_enforces_duplicate_guards_before_writing(guard_store, conflict):
     source = guard_store.row("report", revision=2, status="ready")

@@ -46,8 +46,6 @@ def _add_table_row(user, table, note):
     expect(form).not_to_be_attached()
 
 
-# @matrix template-formatting : date number phone time
-# @pair pages:basic-inputs
 def test_basic_input_submission(get_admin, get_user):
     user = get_admin()
     page = Pages.test_basic_input_submission.get(user)
@@ -58,8 +56,6 @@ def test_basic_input_submission(get_admin, get_user):
     page.submit_and_verify_submission(submission)
 
 
-# @matrix pages tasks : submission-validation
-# @pair request-errors:plain-validation
 @pytest.mark.parametrize("entity_kind", ["PAGE", "TASK"])
 def test_invalid_typed_submission_returns_error_without_saving(get_admin, get_user, entity_kind):
     user = get_admin()
@@ -129,7 +125,6 @@ def test_invalid_typed_submission_returns_error_without_saving(get_admin, get_us
         assert after.db == saved
 
 
-# @matrix pages : read-mode selection-fields submission
 def test_selection_submission(get_admin, get_user):
     user = get_admin()
     page = Pages.test_selection_submission.get(user)
@@ -153,8 +148,6 @@ def test_selection_submission(get_admin, get_user):
             expect(read_value).to_contain_text(label)
 
 
-# @matrix pages : link-field submission
-# @pair form-link:read-layout
 # @style form.linkLabel
 def test_link_submission(get_admin, get_user):
     user = get_admin()
@@ -181,7 +174,6 @@ def test_link_submission(get_admin, get_user):
     assert layout["lineHeight"] == pytest.approx(layout["iconHeight"])
 
 
-# @matrix form-table : delete edit reload reorder row-actions
 def test_table_submission_row_actions(get_admin, get_user):
     user = get_admin()
     page = Pages.test_table_submission.get(user)
@@ -235,7 +227,6 @@ def test_table_submission_row_actions(get_admin, get_user):
     expect(rows.first).to_contain_text("Row two edited")
 
 
-# @matrix form-table : mobile row-actions touch-gesture
 def test_table_submission_mobile_row_action_gestures(get_admin):
     user = get_admin(has_touch=True)
     page = Pages.test_table_submission.get(user)

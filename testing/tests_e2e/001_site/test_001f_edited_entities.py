@@ -43,7 +43,6 @@ def poll(user, subscriptions):
     )
 
 
-# @matrix polling : authorization batching channel entity fingerprint identifiers permissions protocol revision unavailable validation
 @pytest.mark.e2e_group("owner")
 @pytest.mark.e2e_serial
 def test_poll_endpoint_batches_entity_changes(get_user, browser_failures):
@@ -176,9 +175,6 @@ def test_poll_endpoint_batches_entity_changes(get_user, browser_failures):
         assert oversized["status"] == 422
 
 
-# @matrix notifications : cold-seed ping redis-projection
-# @matrix polling : personal-state piggyback
-# @pair web-headers:notification-state
 @pytest.mark.e2e_group("owner")
 def test_cold_notification_state_seeds_through_one_poll(get_user):
     owner = get_user(Users.OWNER)

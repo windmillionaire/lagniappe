@@ -1,8 +1,3 @@
-/**
- * @testable true
- * @tests tests_js/test_036c_form_migrations.mjs::test_schema_changes_and_condition_repairs_are_local
- * @matrix form-migration : schema-only stable-identity conditions
- */
 export const fieldKind = (field) =>
 	field.type === "input"
 		? field.input || "text"
@@ -12,11 +7,6 @@ export const fieldKind = (field) =>
 				? "multiple"
 				: field.type;
 
-/**
- * @testable true
- * @tests tests_js/test_036c_form_migrations.mjs::test_schema_changes_and_condition_repairs_are_local
- * @matrix form-migration : schema-only stable-identity
- */
 export const needsMigration = (before, after) =>
 	before.some((field) => {
 		if (["html", "status"].includes(field.type)) return false;
@@ -35,11 +25,6 @@ export const needsMigration = (before, after) =>
 			: false;
 	});
 
-/**
- * @testable true
- * @tests tests_js/test_036c_form_migrations.mjs::test_schema_changes_and_condition_repairs_are_local
- * @matrix form-migration : conditions
- */
 export const repairConditions = (schema) => {
 	let removed = 0;
 	for (const field of schema)

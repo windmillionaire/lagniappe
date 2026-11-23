@@ -6,9 +6,6 @@ from runner.presentation import output as print
 from installer import wrap_text
 
 
-# @testable false
-# @covered-by installer/custom_domain.py::_setup_custom_domain
-# @reason console-only overview for the custom-domain workflow
 def explain_domain_setup(
     *, configure_auth: bool = True, google_signin: bool = True
 ) -> None:

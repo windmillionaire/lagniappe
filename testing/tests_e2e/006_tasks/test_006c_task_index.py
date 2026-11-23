@@ -67,7 +67,6 @@ def _assert_visible_task_order(user, tasks):
     expect(titles).to_have_text(expected)
 
 
-# @pairs permissions:own-page-only task-index:authenticated-access
 def test_task_index_allows_own_page_only_users(get_user):
     user = get_user(Users.user_no_access)
 
@@ -80,8 +79,6 @@ def test_task_index_allows_own_page_only_users(get_user):
     ).to_be_visible()
 
 
-# @matrix home task-index : assignee-visibility
-# @pair tasks:inaccessible-backing-page
 # @template table.html::rows
 # @template home/tasks.html::task
 def test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index(get_admin, get_user):
@@ -106,7 +103,6 @@ def test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index(get_admin, 
     expect(_row_for(assignee, undated_task)).to_be_visible()
 
 
-# @pair task-index:columns
 def test_tasks_table_columns(get_admin, get_user):
     user = get_admin()
     Tasks.test_mobile_index_task.get(user)
@@ -134,7 +130,6 @@ def test_tasks_table_columns(get_admin, get_user):
         if title:
             expect(header.locator("[data-role='title']")).to_have_text(title)
 
-# @matrix table-controls : name sort-asc sorting
 def test_task_index_name_sort_ascending_reorders_rows(get_admin, get_user):
     user = get_admin()
     personal = Tasks.test_task_index_personal_today.get(user)
@@ -147,7 +142,6 @@ def test_task_index_name_sort_ascending_reorders_rows(get_admin, get_user):
     _assert_visible_task_order(user, [future, page_active, personal])
 
 
-# @matrix table-controls : due-date filtering sorting
 def test_task_index_due_date_sort_filters_to_dated_rows(get_admin, get_user):
     user = get_admin()
     today = Tasks.test_task_index_personal_today.get(user)
@@ -162,7 +156,6 @@ def test_task_index_due_date_sort_filters_to_dated_rows(get_admin, get_user):
     _assert_visible_task_order(user, [today, future])
 
 
-# @matrix tasks : focus page-task row-link
 def test_task_index_title_link_opens_backing_page_task(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_task_index_project_linked.get(user)
@@ -177,7 +170,6 @@ def test_task_index_title_link_opens_backing_page_task(get_admin, get_user):
     expect(task_on_page.locator("[data-widget='TaskSettings']")).to_be_visible()
 
 
-# @matrix tasks : canonical-url navigation reload
 def test_task_route_rewrites_to_page_url_after_focus(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_task_index_page_active.get(user)
@@ -199,7 +191,6 @@ def test_task_route_rewrites_to_page_url_after_focus(get_admin, get_user):
     expect(task_on_page).to_be_visible()
 
 
-# @pair task-index:delete
 # @template table.html::row
 def test_task_index_delete_task_from_row(get_admin, get_user):
     user = get_admin()
@@ -225,7 +216,6 @@ def test_task_index_delete_task_from_row(get_admin, get_user):
     expect(row).not_to_be_visible()
 
 
-# @matrix task-index : editable-cell link-affordance quick-edit
 def test_task_index_quick_edit_updates_editable_cell(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_task_index_page_active.get(user)
@@ -267,9 +257,6 @@ def test_task_index_quick_edit_updates_editable_cell(get_admin, get_user):
         restored.save()
 
 
-# @source src/script/widgets/tables/editor.mjs::TableEditor
-# @matrix table-controls : quick-edit pending-save
-# @pair task-index:quick-edit
 def test_task_index_quick_edit_background_save_preserves_newer_edit(get_admin, get_user):
     user = get_admin()
     first = Tasks.test_task_index_page_active.get(user)
@@ -347,7 +334,6 @@ def test_task_index_quick_edit_background_save_preserves_newer_edit(get_admin, g
         Entities.delete(second.entity)
 
 
-# @matrix table-controls task-index : checkbox-cell column-visibility quick-edit
 def test_task_index_quick_edit_keeps_revealed_completed_column_editable(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_task_index_page_active.get(user)

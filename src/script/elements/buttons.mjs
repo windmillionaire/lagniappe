@@ -2,10 +2,6 @@ import { STYLES } from "../generated/styles.mjs";
 import { createIcon, setIcon } from "../shared/icons.mjs";
 import { formatting } from "./formatting.mjs";
 
-/**
- * @testable infrastructure
- * @covered-by src/script/elements/buttons.mjs::button
- */
 const buttonContents = (icon, text) => {
 	if (icon && text) {
 		return formatting.iconLabel({
@@ -23,9 +19,6 @@ const buttonContents = (icon, text) => {
 	return textElt;
 };
 
-/**
- * @testable infrastructure
- */
 const submit = (attributes) => {
 	return button({
 		type: "submit",
@@ -34,9 +27,6 @@ const submit = (attributes) => {
 	});
 };
 
-/**
- * @testable infrastructure
- */
 const button = (attributes) => {
 	const {
 		text = "",
@@ -69,11 +59,6 @@ const button = (attributes) => {
 	return buttonElt;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_018_style_pipeline.mjs::test_active_action_buttons_preserve_full_width_icon_slots
- * @matrix ui-action : fixed-layout loading-state
- */
 const active = (attributes) => {
 	const buttonElt = attributes.existingButton || button(attributes);
 	const {
@@ -87,11 +72,6 @@ const active = (attributes) => {
 			buttonElt.textContent,
 		completedIcon = attributes.completedIcon || attributes.icon,
 	} = attributes;
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/buttons.mjs::active
-	 * @reason slot updates are exercised through each public active-button state
-	 */
 	const setState = (icon, text) => {
 		let textElt = buttonElt.querySelector("[data-role='text']");
 		if (!textElt) {

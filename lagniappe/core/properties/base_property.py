@@ -22,11 +22,6 @@ def build_field[Field](field_type: type[Field], owner: Entity | Site) -> Field:
 UNSET = object()
 
 
-# @testable true
-# @tests tests_unit/test_002_entity_general_properties.py::test_property_contract_errors_are_explicit
-# @tests tests_unit/test_002_entity_general_properties.py::test_property_unset_state_is_distinct_from_explicit_values
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_property_defaults_to_config_test_user
-# @matrix property : current-user explicit-false explicit-none initialization propagation unset validation
 class Property[Value = object, Owner: Entity | Site = "Entity", Write = Value | None]:
     """Base property class. Most entity properties inherit from this.
 
@@ -54,9 +49,6 @@ class Property[Value = object, Owner: Entity | Site = "Entity", Write = Value | 
         self._entity = entity
         self._user = current_context_user(cast("FieldUser", kwargs.get("user")))
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_property_getattribute_wraps_descriptor_attribute_error
-    # @matrix property : descriptor error-wrapping
     def __getattribute__(self, name: str) -> object:
         try:
             return object.__getattribute__(self, name)

@@ -19,9 +19,6 @@ from lagniappe.web import responses
 from . import reference
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_form
-# @pair projects:create-help
 @reference.route("/section/<section>")
 @logged_in
 def section(section: str) -> ResponseReturnValue:
@@ -29,10 +26,6 @@ def section(section: str) -> ResponseReturnValue:
     return responses.reference_topic(section)
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_settings_requires_administrator
-# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @matrix admin : environment-variables site-settings
 @reference.route("/environment-variables")
 @permission(Resource.SITE)
 def environment_variables() -> ResponseReturnValue:
@@ -42,10 +35,6 @@ def environment_variables() -> ResponseReturnValue:
     return responses.reference_environment_variables(env_data)
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_additional_admin_cannot_access_owner_configuration
-# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @matrix admin owner : recovery-export
 @reference.route("/download-settings")
 @owner_only
 def download_settings() -> ResponseReturnValue:

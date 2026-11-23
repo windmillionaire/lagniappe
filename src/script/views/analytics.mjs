@@ -2,13 +2,6 @@ import { request } from "../shared/request.mjs";
 import { withTransition } from "../shared/transitions.mjs";
 import ShellView from "./base/shell.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
- * @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
- * @matrix analytics : accordion dashboard retention-clear
- * @pair analytics:page-tracking
- */
 export default class Analytics extends ShellView {
 	async init() {
 		await super.init();

@@ -38,10 +38,6 @@ def _aggregate_count(aggregate: Mapping[str, object], field: str) -> int:
     return int(cast(int | str, aggregate.get(field) or 0))
 
 
-# @testable true
-# @tests tests_unit/test_025_notification_state.py::test_warm_notification_state_is_redis_only_and_refreshes_ttl
-# @tests tests_unit/test_025_notification_state.py::test_expired_notification_state_gets_a_new_generation
-# @matrix notifications : cold-seed datastore-read-isolation expiry generation redis-projection ttl
 def peek_notification_state(user: object) -> NotificationState | None:
     """Read warm notification state and slide its expiration without seeding."""
     state_key, epoch_key = _redis_keys(user)
@@ -53,17 +49,12 @@ def peek_notification_state(user: object) -> NotificationState | None:
     return _project(values)
 
 
-# @testable infrastructure
 def _default_keys_loader(user):
     from lagniappe.core.tools.database import notifications as database_notifications
 
     return database_notifications.notification_keys(user)
 
 
-# @testable true
-# @tests tests_unit/test_025_notification_state.py::test_cold_seed_runs_one_keys_only_query_and_is_race_safe
-# @tests tests_unit/test_025_notification_state.py::test_notification_list_keys_repair_warm_projection
-# @matrix notifications : authoritative-repair cold-seed keys-only membership race-safety revision
 def seed_notification_state(
     user: object,
     notification_keys: Iterable[object] | None = None,
@@ -166,7 +157,6 @@ def seed_notification_state(
     raise RuntimeError("Notification state changed too frequently.")
 
 
-# @testable infrastructure
 def repair_notification_state(
     user: object,
     notification_keys: Iterable[object],
@@ -181,10 +171,6 @@ def repair_notification_state(
     )
 
 
-# @testable true
-# @tests tests_unit/test_025_notification_state.py::test_notification_mutations_are_idempotent_and_advance_once
-# @tests tests_unit/test_025_notification_state.py::test_absent_projection_mutation_updates_epoch_without_querying
-# @matrix notifications : cold-cache datastore-read-isolation idempotent-count mutation revision
 def update_notification_projection(
     *, upserts: Iterable[object] = (), deletes: Iterable[object] = (),
     aggregates: Mapping[str, Mapping[str, object]] | None = None,
@@ -258,9 +244,6 @@ def update_notification_projection(
     return results
 
 
-# @testable true
-# @tests tests_unit/test_025_notification_state.py::test_durable_aggregate_publish_preserves_members_and_exact_combined_count
-# @matrix notifications : aggregate-count redis-projection revision
 def publish_notification_aggregate(
     user: object, aggregate: Mapping[str, object]
 ) -> NotificationState:

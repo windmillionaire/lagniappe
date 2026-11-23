@@ -23,19 +23,6 @@ from testing.resources.form import Form
 pytestmark = pytest.mark.e2e
 
 
-# @source lagniappe/core/tools/ai/function_definitions/preview_form_schema_update.py::execute_preview_form_schema_update
-# @source lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
-# @source lagniappe/core/tools/deferred_jobs/adapters/form_change.py::FormChangeAdapter
-# @source lagniappe/core/tools/deferred_jobs/adapters/form_change.py::FormChangeAdapter.prepare_ai_target
-# @source lagniappe/core/tools/forms/changes.py::prepare_target
-# @source lagniappe/core/tools/ai/reporting/schema_updates.py::report_impact
-# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @source lagniappe/core/tools/ai/function_definitions/get_task_history.py::execute_get_task_history
-# @matrix form-migration : preview external-provider-free publication completed-task review
-# @matrix ai-report : schema-update deterministic-run continue
-# @pairs agent-api:proposal-validation
-# @matrix ai tasks : original-completion schema-version
 @pytest.mark.parametrize("origin", ["api", "web", "web-without-id"])
 def test_reviewed_schema_migration_waits_for_publication_and_preserves_completion(get_admin, monkeypatch, origin):
     user = get_admin()

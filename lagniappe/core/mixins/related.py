@@ -25,11 +25,6 @@ else:
         """The host contracts come from each concrete field at runtime."""
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_related.py::Categories
-# @covered-by lagniappe/core/properties/common_related.py::Projects
-# @covered-by lagniappe/core/properties/page_related.py::PageCategories
-# @covered-by lagniappe/core/properties/user_related.py::Groups
 class RelatedEntityListMixin[Related: Entity = "Entity"](_RelationHost):
     _value: object
     _touch_members = True
@@ -57,9 +52,6 @@ class RelatedEntityListMixin[Related: Entity = "Entity"](_RelationHost):
     _column_value: list[dict[str, object]] | None
     _attached: dict[Key, Related] | None
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_related_property_writes_refresh_entity_and_column_projections
-    # @matrix cache related-properties : cache-invalidation column-value details parent-pointer
     def _invalidate_projections(self) -> None:
         self._column_value = None
         if self.entity:
@@ -237,12 +229,6 @@ class RelatedEntityListMixin[Related: Entity = "Entity"](_RelationHost):
         return details
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_related.py::AttachedForm
-# @covered-by lagniappe/core/properties/common_related.py::RelatedForm
-# @covered-by lagniappe/core/properties/common_related.py::AttachedProject
-# @covered-by lagniappe/core/properties/project.py::ModelTaskProject
-# @covered-by lagniappe/core/properties/task_related.py::AssignedTo
 class RelatedEntityMixin[Related: Entity = "Entity"](_RelationHost):
     """Adds storage for a single related entity.
 
@@ -271,9 +257,6 @@ class RelatedEntityMixin[Related: Entity = "Entity"](_RelationHost):
     _attached: dict[Key, Related] | None
 
     # Entity Attributes
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_related_property_writes_refresh_entity_and_column_projections
-    # @matrix cache related-properties : cache-invalidation column-value details parent-pointer
     def _invalidate_projections(self) -> None:
         self._column_value = None
         if self.entity:
@@ -286,9 +269,6 @@ class RelatedEntityMixin[Related: Entity = "Entity"](_RelationHost):
             return []
         return [cast("Key | None", self.entity.db.get(self.id))]
 
-    # @testable true
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_related_attach_caches_attached_entity_map
-    # @pair relations:attach-cache
     def attach(self, key_map: Mapping[Key, Related]) -> None:
         if not isinstance(self, DBProperty) or not self.entity:
             return
@@ -342,11 +322,6 @@ class RelatedEntityMixin[Related: Entity = "Entity"](_RelationHost):
         return self.value.name if self.value else None
 
     # Property Attributes
-    # @testable true
-    # @tests tests_unit/test_026_site_admin.py::test_unloaded_optional_form_is_not_mistaken_for_a_deleted_form
-    # @tests tests_unit/test_006b_ingress_entity.py::test_related_entity_setter_rejects_values_without_key
-    # @matrix permissions relations : unloaded-relation
-    # @matrix relations : key-validation validation
     @property
     def value(self) -> Related | None:
         return self._read_related()
@@ -458,10 +433,6 @@ class RelatedEntityMixin[Related: Entity = "Entity"](_RelationHost):
         return details
 
 
-# @testable false
-# @covered-by lagniappe/core/mixins/related.py::RelatedEntityMixin
-# @covered-by lagniappe/core/mixins/related.py::RelatedEntityListMixin
-# @reason AI reference projection is exercised through related property output
 def _ai_entity_reference(entity: Entity) -> dict[str, object]:
     details = _ai_reference_value(entity.reference_details)
     if getattr(entity, "hash", None):
@@ -469,9 +440,6 @@ def _ai_entity_reference(entity: Entity) -> dict[str, object]:
     return details
 
 
-# @testable false
-# @covered-by lagniappe/core/mixins/related.py::_ai_entity_reference
-# @reason recursive sanitization is covered through related AI reference projection
 @overload
 def _ai_reference_value(value: dict[str, object]) -> dict[str, object]: ...
 

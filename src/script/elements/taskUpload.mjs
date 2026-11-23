@@ -8,11 +8,6 @@ import { UploadMenu, uploadElement } from "./upload.mjs";
 const UPLOAD_DROPZONE_TEXT =
 	"Drop file/photo here, click to upload, or tap to choose camera/files";
 
-/**
- * @testable true
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_file
- * @matrix tasks : create file-upload
- */
 export class TaskUpload extends BaseUpload {
 	constructor(button, widget) {
 		super({

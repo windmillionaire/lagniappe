@@ -34,14 +34,10 @@ class ValidationError(Exception):
     context: dict[str, object]
 
 
-# @testable infrastructure
 class MutationConflict(ValidationError):
     """A compare-and-set rejected a stale mutation before durable writes."""
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_exception_context_survives_autofill_wrapper_without_duplicate_capture
-# @pair ai:error-context
 class AIException(Exception):
     """Raised when AI generation fails or returns invalid output."""
 
@@ -66,7 +62,6 @@ class SiteImageError(Exception):
     """Raised when site image processing fails."""
 
 
-# @testable infrastructure
 class PropertyError(Exception):
     """Raised when a property fails to instantiate or is used incorrectly.
 
@@ -83,9 +78,6 @@ class UnloadedRelationError(Exception):
     """Raised or captured when code asks an entity relation to lazy-load."""
 
 
-# @testable false
-# @covered-by lagniappe/web/start/errors.py::_handle_error_with_context
-# @reason debug context is rendered and captured through the Flask error handler
 def get_debug_context(error: BaseException) -> dict[str, object]:
     """
     Extract comprehensive debug context from an exception.
@@ -117,11 +109,6 @@ def get_debug_context(error: BaseException) -> dict[str, object]:
     return context
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_error_capture_can_wait_for_sentry_delivery
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_error_capture_sanitizes_context_without_duplicate_request
-# @matrix deferred-jobs : sentry terminal-delivery
-# @matrix error-handling : privacy redaction request-context sentry terminal-delivery
 def capture(
     error: object,
     context: Mapping[str, object] | None = None,

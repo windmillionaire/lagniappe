@@ -12,13 +12,6 @@ const HOME_CHANNELS = Object.freeze({
 	ToolReportList: "tool-reports",
 });
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002a_home.py::test_home_mobile_dashboard_smoke
- * @tests tests_js/test_040_home_polling.mjs::test_home_polling_subscribes_loaded_widgets_and_refreshes_only_owner
- * @matrix home polling : foreground lazy-widget mounted-scope targeted-refresh
- * @pair home:mobile
- */
 export default class Home extends Core {
 	constructor(elt) {
 		super(elt);
@@ -99,12 +92,6 @@ export default class Home extends Core {
 		return true;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/home.mjs::Home._refreshStarred
-	 * @covered-by src/script/views/home.mjs::Home._hideEmptyLists
-	 * @reason polling reconciliation delegates collection work to focused home handlers
-	 */
 	async refreshSupplementalCollections(changes = []) {
 		if (changes.some(({ type }) => ["star", "unstar"].includes(type))) {
 			await this._refreshStarred();
@@ -112,13 +99,6 @@ export default class Home extends Core {
 		if (changes.some(({ type }) => type === "delete")) this._hideEmptyLists();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_category
-	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
-	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
-	 * @matrix starred : category page project
-	 */
 	async _refreshStarred() {
 		const starredComponent = this.getComponent(
 			document.getElementById("starred"),
@@ -144,11 +124,6 @@ export default class Home extends Core {
 		this._syncHomePollingSubscriptions();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_reload_uses_server_state_until_replay
-	 * @matrix offline : reload server-first
-	 */
 	_hideEmptyLists() {
 		for (const component of Object.values(this.components)) {
 			for (const widget of Object.values(component.widgets)) {

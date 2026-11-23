@@ -120,7 +120,6 @@ function renderedCategory(ToolReportList, dataset) {
 	return populated[0].dataset.filter;
 }
 
-// @matrix ai-report : filter-categories
 test("test_report_categories_and_saved_filter_selection", async () => {
 	const state = await loadToolReportList();
 	for (const status of [
@@ -177,7 +176,6 @@ test("test_report_categories_and_saved_filter_selection", async () => {
 	);
 });
 
-// @matrix ai-report : filter-categories filter-counts filter-empty filter-persistence filter-create
 test("test_report_filters_count_hidden_categories_and_empty_selections", async () => {
 	const state = await loadToolReportList();
 	const f = fixture(state.ToolReportList);
@@ -279,7 +277,6 @@ test("test_paginated_report_list_clarifies_page_scoped_empty_and_delete_labels",
 	);
 });
 
-// @matrix ai-report : bulk-delete delete-failure delete-snapshot loading-indicator
 test("test_bulk_delete_recovers_from_partial_and_network_failures", async (t) => {
 	replaceGlobal(t, "DOMParser", class {});
 	const { request } = await import("../../src/script/shared/request.mjs");

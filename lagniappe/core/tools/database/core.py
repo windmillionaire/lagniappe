@@ -18,30 +18,18 @@ BUCKET_CREATE_LOCATION = storage_contract.BUCKET_CREATE_LOCATION
 BUCKET_DEFAULT_STORAGE_CLASS = storage_contract.BUCKET_DEFAULT_STORAGE_CLASS
 
 
-# @testable false
-# @covered-by config/storage.py::expected_storage_cors_origins
-# @reason compatibility wrapper for the shared setup/runtime storage contract
 def expected_storage_cors_origins(config: Config = CONFIG) -> list[str]:
     return storage_contract.expected_storage_cors_origins(config)
 
 
-# @testable false
-# @covered-by config/storage.py::expected_storage_cors
-# @reason compatibility wrapper for the shared setup/runtime storage contract
 def expected_storage_cors(config: Config = CONFIG) -> list[storage_contract._CorsRule]:
     return storage_contract.expected_storage_cors(config)
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_storage_cors_comparison_is_order_insensitive
-# @matrix storage : cors idempotent
 def _normalized_cors(cors):
     return storage_contract._normalized_cors(cors)
 
 
-# @testable false
-# @covered-by config/storage.py::configure_storage_bucket
-# @reason compatibility wrapper for the shared setup/runtime storage contract
 def configure_storage_bucket(bucket: storage.Bucket, config: Config = CONFIG) -> bool:
     return storage_contract.configure_storage_bucket(bucket, config)
 
@@ -97,9 +85,6 @@ class KINDS(Enum):
     agent_api_plan_operation_claim = agent_api_plan_operation_claims
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_data_services_initialize_uses_shared_adc
-# @matrix database storage : adc
 class DataServices:
     """Lazy-initialized singleton for Datastore and Cloud Storage clients."""
 
@@ -109,9 +94,6 @@ class DataServices:
     _public_bucket: storage.Bucket | None = None
     _history_bucket: storage.Bucket | None = None
 
-    # @testable true
-    # @tests tests_unit/test_018_database_assets.py::test_data_services_initialize_uses_shared_adc
-    # @matrix database storage : adc
     def initialize(self) -> None:
         """Create project-bound Datastore and Storage clients with shared ADC."""
         if self._datastore_client and self._storage_client:
@@ -146,9 +128,6 @@ class DataServices:
         assert self._storage_client is not None
         return self._storage_client
 
-    # @testable true
-    # @tests tests_unit/test_018_database_assets.py::test_runtime_storage_only_reads_setup_provisioned_buckets
-    # @matrix iam storage : provisioning-boundary runtime
     def _create_bucket(self, name: str) -> storage.Bucket:
         bucket_name = f"{PREFIX}{name}"
 
@@ -160,9 +139,6 @@ class DataServices:
                 "Rerun setup with the installer identity before starting the app."
             ) from error
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/core.py::configure_storage_bucket
-    # @reason setup/runtime bucket iteration is thin plumbing over the tested helper
     def configure_buckets(self) -> dict[str, storage.Bucket]:
         """Verify and return all storage buckets provisioned by setup."""
         return {
@@ -174,9 +150,6 @@ class DataServices:
             )
         }
 
-    # @testable true
-    # @tests tests_unit/test_018_database_assets.py::test_runtime_storage_only_reads_setup_provisioned_buckets
-    # @matrix storage : provisioning-boundary runtime
     def bucket(self, name: str) -> storage.Bucket:
         """Return the named storage bucket (history, private, or public)."""
         if name == "history":
@@ -188,9 +161,6 @@ class DataServices:
         else:
             raise ValueError(f"Invalid bucket name: {name}")
 
-    # @testable true
-    # @tests tests_unit/test_018_database_assets.py::test_test_cleanup_deletes_objects_without_deleting_buckets
-    # @matrix iam storage : provisioning-boundary test-cleanup
     def delete_buckets(self) -> None:
         """Delete test objects while preserving setup-owned bucket resources."""
         self.initialize()

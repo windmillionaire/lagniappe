@@ -10,9 +10,6 @@ from config.recovery import (
 from lagniappe.core.tools.database import site as site_database
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/recovery.py::load_recovery_snapshot
-# @reason typed failure construction is exercised through the public snapshot loader
 class RecoverySnapshotUnavailable(RuntimeError):
     """A recovery export could not be assembled without omitting live state."""
 
@@ -21,10 +18,6 @@ class RecoverySnapshotUnavailable(RuntimeError):
         self.public_message = public_message
 
 
-# @testable true
-# @tests tests_unit/test_026_site_admin.py::test_recovery_snapshot_merges_live_settings
-# @tests tests_unit/test_026_site_admin.py::test_recovery_snapshot_failures_use_safe_public_messages
-# @matrix admin : failure-isolation live-settings recovery-export
 def load_recovery_snapshot(persisted: Mapping[str, object]) -> dict[str, object]:
     """Return a canonical snapshot or a safe typed failure."""
     try:

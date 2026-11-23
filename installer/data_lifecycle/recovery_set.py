@@ -23,27 +23,23 @@ if TYPE_CHECKING:
     from google.cloud.storage import Bucket
     from .provider import ProviderContext
 
-# @testable infrastructure
 class Asset(TypedDict):
     role: str
     path: str
     generation: str
     owners: list[dict[str, str]]
 
-# @testable infrastructure
 class CapturedAsset(Asset):
     size: int
     sha256: str
     recovery_object: str
     recovery_generation: str
 
-# @testable infrastructure
 class Inventory(TypedDict):
     snapshot_time: str
     entity_count: int
     entities: list[dict[str, str | None]]
 
-# @testable infrastructure
 class CatalogDescriptor(TypedDict):
     uri: str
     sha256: str
@@ -53,9 +49,6 @@ class CatalogDescriptor(TypedDict):
 COPY_CHUNK_BYTES = 8 * 1024 * 1024
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/recovery_set.py::inventory_database
-# @reason timestamp canonicalization is exercised by exact inventory generation
 def _timestamp(value):
     if not isinstance(value, datetime):
         return None
@@ -64,9 +57,6 @@ def _timestamp(value):
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/recovery_set.py::inventory_database
-# @reason named scratch keys are canonicalized during public inventory generation
 def _canonical_key(key, source_database_id):
     if source_database_id == "(default)":
         return key
@@ -79,9 +69,6 @@ def _canonical_key(key, source_database_id):
     )
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/recovery_set.py::inventory_database
-# @reason reference canonicalization is part of the entity inventory digest
 def _key_reference(key, source_database_id="(default)"):
     key = _canonical_key(key, source_database_id)
     return PortableReference(
@@ -91,9 +78,6 @@ def _key_reference(key, source_database_id="(default)"):
     )
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/recovery_set.py::inventory_database
-# @reason canonical entity hashing is validated through deterministic inventories
 def _entity_digest(entity, source_database_id):
     codec = ValueCodec(
         reference_resolver=lambda key: _key_reference(key, source_database_id)
@@ -109,9 +93,6 @@ def _entity_digest(entity, source_database_id):
     return hashlib.sha256(canonical_json(payload)).hexdigest()
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/recovery_set.py::inventory_database
-# @reason descriptor extraction and validation are inventory responsibilities
 def _asset_definitions(entity, source_database_id):
     canonical_owner = encode_urlsafe_key(
         _canonical_key(entity.key, source_database_id)
@@ -167,10 +148,6 @@ def _asset_definitions(entity, source_database_id):
     return definitions
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_inventory_uses_one_read_time_and_requires_asset_generations
-# @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_inventory_includes_uploaded_file_asset_generations
-# @matrix data-lifecycle disaster-recovery file : asset-generation inventory point-in-time uploaded-file
 def inventory_database(
     client: Client,
     *,
@@ -245,9 +222,6 @@ def inventory_database(
     }, captured_assets
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/recovery_set.py::capture_assets
-# @reason bounded generation-matched hashing is exercised by immutable asset capture
 def _blob_sha256(blob, size):
     digest = hashlib.sha256()
     offset = 0
@@ -266,9 +240,6 @@ def _blob_sha256(blob, size):
     return digest.hexdigest()
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_capture_recovery_assets_copies_exact_generation_create_only
-# @matrix data-lifecycle storage : asset-generation checksum immutable-copy
 def capture_assets(
     context: ProviderContext,
     backup_id: str,
@@ -344,16 +315,10 @@ def capture_assets(
     return captured
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason canonical catalog bytes are owned by immutable backup publication
 def catalog_bytes(payload: object) -> bytes:
     return canonical_json(payload)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason catalog checksum descriptors are owned by immutable backup publication
 def catalog_descriptor(uri: str, payload: object) -> CatalogDescriptor:
     encoded = catalog_bytes(payload)
     return {

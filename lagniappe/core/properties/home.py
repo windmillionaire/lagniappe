@@ -10,7 +10,6 @@ from lagniappe.core.tools.database import get as database_get
 from .base_property import UNSET
 
 
-# @testable infrastructure
 class HomeProperty[Cursor: str | int = str]:
     """Base class for home page list sections.
 
@@ -23,10 +22,6 @@ class HomeProperty[Cursor: str | int = str]:
     _label: str
     _list: list[Entity]
 
-    # @testable true
-    # @tests tests_unit/test_002i_home_properties.py::test_home_requires_explicit_user
-    # @tests tests_unit/test_002i_home_properties.py::test_home_sections_keep_their_viewer_across_lazy_and_paginated_reads
-    # @matrix home : explicit-user validation
     def __init__(self, *args: object, user: User, cursor: Cursor | None = None, **kwargs: object) -> None:
         if user is None:
             raise ValueError("Home section requires a user")
@@ -63,9 +58,6 @@ class HomeProperty[Cursor: str | int = str]:
         return getattr(self, "_list", UNSET)
 
 
-# @testable true
-# @tests tests_unit/test_002i_home_properties.py::test_home_project_list_restrictions_and_cursor
-# @matrix home : pagination projects restrictions
 class ProjectList(HomeProperty):
     _id = "projects"
     _label = "Projects"
@@ -88,9 +80,6 @@ class ProjectList(HomeProperty):
 
         return self._list
 
-# @testable true
-# @tests tests_unit/test_002i_home_properties.py::test_home_category_list_restrictions_and_cursor
-# @matrix home : categories pagination restrictions
 class CategoryList(HomeProperty):
     _id = "categories"
     _label = "Categories"
@@ -112,9 +101,6 @@ class CategoryList(HomeProperty):
 
         return self._list
 
-# @testable true
-# @tests tests_unit/test_002i_home_properties.py::test_home_page_list_restrictions_and_cursor
-# @matrix home pages : pagination restrictions
 class PageList(HomeProperty):
     _id = "pages"
     _label = "Pages"
@@ -136,13 +122,6 @@ class PageList(HomeProperty):
         return self._list
 
 
-# @testable true
-# @tests tests_unit/test_002i_home_properties.py::test_home_task_list_restrictions_visibility_and_count
-# @tests tests_e2e/002_home/test_002h_home_permissions.py::test_home_task_list_shows_view_only_page_tasks_without_controls
-# @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
-# @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_add_due_date
-# @matrix home : assignee-visibility count permissions task-list tasks view-only
-# @pairs task-assignment:home-list tasks:inaccessible-backing-page
 class TaskList(HomeProperty):
     _id = "tasks"
     _label = "Tasks"
@@ -179,11 +158,6 @@ class TaskList(HomeProperty):
         return database_get.user_task_count(self._user.page)
 
 
-# @testable true
-# @tests tests_unit/test_002i_home_properties.py::test_home_starred_list_paginates_and_marks_missing_keys
-# @tests tests_unit/test_002i_home_properties.py::test_home_starred_list_hides_but_retains_inaccessible_keys
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_route_rejects_inaccessible_and_missing_targets
-# @matrix starred : inaccessible-placeholder missing-placeholder pagination retained-inaccessible view-authorization
 class StarredList(HomeProperty[str | int]):
     _id = "starred"
     _label = "Starred"
@@ -248,9 +222,6 @@ class StarredList(HomeProperty[str | int]):
         return len(self._user.properties.starred.keys)
 
 
-# @testable true
-# @tests tests_unit/test_002i_home_properties.py::test_home_note_ingress_and_tool_lists_load_database_entities
-# @pair home:notes
 class NoteList(HomeProperty):
     _id = "notes"
     _label = "Notes"
@@ -265,9 +236,6 @@ class NoteList(HomeProperty):
         return self._list
 
 
-# @testable true
-# @tests tests_unit/test_002i_home_properties.py::test_home_note_ingress_and_tool_lists_load_database_entities
-# @pair home:ingress
 class IngressList(HomeProperty):
     _id = "ingress"
     _label = "Import Data"
@@ -282,12 +250,6 @@ class IngressList(HomeProperty):
         return self._list
 
 
-# @testable true
-# @tests tests_unit/test_002i_home_properties.py::test_home_note_ingress_and_tool_lists_load_database_entities
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
-# @matrix ai-report home : list tools
-# @pair ai-report:provider-independent-history
 class ToolsList(HomeProperty):
     _id = "tools"
     _label = "Plans & Reports"

@@ -4,13 +4,6 @@ import { request } from "../../../shared/request.mjs";
 import { Dropdown } from "../../combobox/dropdown.mjs";
 import { createMenuButton } from "../dropdowns.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_saves_do_not_create_automatic_history
- * @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
- * @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
- * @matrix editor : history-list history-positioning history-restore
- */
 class DocumentHistoryButton {
 	constructor(toolbar) {
 		this.toolbar = toolbar;

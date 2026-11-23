@@ -23,8 +23,6 @@ from lagniappe.reference import get_topic, topics, topic_html, topic_sections, t
 from . import formatters, styles
 
 
-# @testable false
-# @reason Flask/Jinja startup helpers are exercised through rendered E2E pages; unit coverage would require app-context scaffolding
 class SafeJSONProvider(DefaultJSONProvider):
     """JSON provider that gracefully handles non-serializable types
     so ``|tojson`` in templates never raises TypeError."""
@@ -38,28 +36,19 @@ class SafeJSONProvider(DefaultJSONProvider):
         return str(o)
 
 
-# @testable false
-# @reason current-user template helper is exercised through rendered E2E pages
 def starred(entity: Entity) -> bool:
     return entity.key in current_user.properties.starred.keys
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_owner_assignment_opt_in_enables_managed_user_combobox
-# @pair task-assignment:owner-opt-in
 def owner_allows_assignments() -> bool:
     owner = cache.get_owner_projection()
     return bool(owner and owner.get("allow_task_assignments"))
 
 
-# @testable false
-# @reason Flask/Jinja date tests are exercised through rendered E2E pages
 def is_datetime(value: object) -> bool:
     return isinstance(value, datetime)
 
 
-# @testable false
-# @reason Flask/Jinja date tests are exercised through rendered E2E pages
 def _date(value):
     if isinstance(value, datetime):
         return value.date()
@@ -71,15 +60,10 @@ def _date(value):
         return None
 
 
-# @testable false
-# @reason Flask/Jinja filters are exercised through rendered E2E pages
 def yesno(value: object) -> str:
     return "true" if value else "false"
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_safe_html_filter_rejects_untyped_values
-# @matrix templates security : safe-html strict-filter
 def render_safe_html(value: SafeHTML) -> Markup:
     """Expose only policy-stamped HTML at an explicit Jinja raw sink."""
     if not isinstance(value, SafeHTML):
@@ -87,8 +71,6 @@ def render_safe_html(value: SafeHTML) -> Markup:
     return Markup(str(value))
 
 
-# @testable false
-# @reason Flask/Jinja filters are exercised through rendered E2E pages
 def _icon_definition(key):
     definition = styles.ICONS
     for part in str(key or "").split("."):
@@ -100,9 +82,6 @@ def _icon_definition(key):
     return definition
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002a_home.py::test_home_material_symbols_use_semantic_span_markup
-# @matrix home icons : material-symbol-markup
 def render_icon(key: str, classes: str | None = "", kind: str | None = None) -> Markup:
     """Render one decorative Material Symbol from its semantic registry ID."""
     definition = _icon_definition(key)
@@ -134,8 +113,6 @@ def render_icon(key: str, classes: str | None = "", kind: str | None = None) -> 
     )
 
 
-# @testable false
-# @reason Flask/Jinja date tests are exercised through rendered E2E pages
 def is_after_today(value: date | datetime | None) -> bool:
     date = _date(value)
     if not date:
@@ -144,8 +121,6 @@ def is_after_today(value: date | datetime | None) -> bool:
     return date > dates.user_today().date()
 
 
-# @testable false
-# @reason Flask/Jinja date tests are exercised through rendered E2E pages
 def is_before_today(value: date | datetime | None) -> bool:
     date = _date(value)
     if not date:
@@ -154,13 +129,6 @@ def is_before_today(value: date | datetime | None) -> bool:
     return date < dates.user_today().date()
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_navbar_task_results_render_current_completion_state
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_snippets_are_plain_text_and_at_most_five_lines
-# @matrix template-formatting : safe-json tojson
-# @pair frontend-build:font-delivery
-# @pair ai-report:list-snippets
 def initialize(app: Flask) -> None:
     app.json_provider_class = SafeJSONProvider
     app.json = SafeJSONProvider(app)

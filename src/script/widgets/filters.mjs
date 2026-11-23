@@ -5,9 +5,6 @@ import { primitives } from "../elements/primitives.mjs";
 import { request } from "../shared/index.mjs";
 import { withTransition } from "../shared/transitions.mjs";
 
-/**
- * @testable infrastructure
- */
 export class Filters {
 	constructor(attributes) {
 		Object.assign(this, attributes);
@@ -34,12 +31,6 @@ export class Filters {
 		this._buttons = {};
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filters_tab_opens
-	 * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filters_form_opens
-	 * @pair filters:tab-open
-	 */
 	async init() {
 		this._initFilters();
 		this._initButtons();
@@ -167,12 +158,6 @@ export class Filters {
 		return data;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_save
-	 * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filter_save_and_run
-	 * @pair filters:save
-	 */
 	async save() {
 		this._buttons.save.activate();
 		const response = await request.post(this.endpoints.save, this.formData);
@@ -193,11 +178,6 @@ export class Filters {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filters_require_at_least_one_condition
-	 * @pair filters:empty-validation
-	 */
 	async run() {
 		if (this.definitions.length === 0) {
 			this.showError("Please add at least one filter condition");
@@ -360,11 +340,6 @@ export class Filters {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_reset
-	 * @pair filters:reset
-	 */
 	reset() {
 		this._cleanup();
 		this._cleanupFormConditions();
@@ -388,11 +363,4 @@ export class Filters {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_save
- * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filters_empty_state
- * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filter_save_and_run
- * @matrix filters : empty-state reload-persistence save saved-filters
- */
 export class SavedFilters extends BaseList {}

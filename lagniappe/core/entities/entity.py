@@ -48,7 +48,6 @@ class _ProcessSection(Protocol):
 type RegisteredProperty = _ReadableProperty | _ProcessSection
 
 
-# @testable infrastructure
 @runtime_checkable
 class _KeyedRecord(Protocol):
     @property
@@ -132,10 +131,6 @@ class EntityProperties:
                 yield cast("Capability", self[name])
 
 
-# @testable true
-# @tests tests_unit/test_002_entity_general_properties.py::test_entity_requires_subclass_entity_kind
-# @tests tests_unit/test_002_entity_general_properties.py::test_entity_preserves_key_from_empty_datastore_entity
-# @matrix entity : empty-datastore-entity initialization key-preservation validation
 class Entity:
     """Base class for all persistent entities.
 
@@ -227,9 +222,6 @@ class Entity:
     def temporary(self) -> bool | None:
         return self._temporary
 
-    # @testable true
-    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_restricted_fingerprints_share_the_entity_and_cache_formula
-    # @matrix cache permissions : fingerprint modified
     @property
     def fingerprint(self) -> str:
         modified = self.modified or datetime.now(UTC)
@@ -337,9 +329,6 @@ class Entity:
         self._details = details
         return self._details
 
-    # @testable true
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_reference_details_does_not_derive_requirements_from_unloaded_relations
-    # @pairs entities:reference-details relations:direct
     @property
     def reference_details(self) -> dict[str, object]:
         """Return a non-recursive display projection for an entity reference."""
@@ -360,12 +349,6 @@ class Entity:
             details["id"] = self.urlsafe_key
         return details
 
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_default_entity_fields_are_not_duplicated_in_submission_search_cache
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_to_cache_stores_detail_parent_pointers
-    # @tests tests_unit/test_002_entity_general_properties.py::test_restriction_fields_keep_source_boundaries
-    # @matrix cache : cache-deduplication default-fields details-key parent-key
-    # @matrix permissions cache : source-clauses stable-order
     @property
     def to_cache(self) -> dict[str, object]:
         if self.reserved or not self.hash:
@@ -394,15 +377,6 @@ class Entity:
         self._to_cache = cache
         return cache
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_context_exports_authentication_and_filter_index_neutrality
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_to_ai_merges_submission_fields_without_nested_duplicate
-    # @tests tests_unit/test_006_file_properties.py::test_file_to_ai_exports_metadata_and_uri_to_ai
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_to_ai_keeps_browser_urls_separate_from_hash_references
-    # @matrix ai entity submission : single-merge submission-fields
-    # @matrix ai file : metadata permissions
-    # @pair permissions:authenticated-user
-    # @pair ai:browser-url
     def to_ai(self, user: FieldUser = None) -> dict[str, object]:
         user = current_context_user(user)
         if not user or not getattr(user, "is_authenticated", False):
@@ -430,19 +404,10 @@ class Entity:
 
         return {k: v for k, v in values.items() if v is not None}
 
-    # @testable false
-    # @covered-by lagniappe/core/entities/entity.py::Entity.to_ai
-    # @reason canonical URL passthrough is exercised through the AI entity projection
     def _ai_url(self):
         """Return the browser URL; hash references are separate tool arguments."""
         return self.url
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_context_exports_authentication_and_filter_index_neutrality
-    # @tests tests_unit/test_013_task_properties.py::test_task_filter_index_includes_restricted_related_values
-    # @tests tests_unit/test_004e_submission_behavior.py::test_unset_submission_fields_do_not_erase_entity_filter_metadata
-    # @matrix filter-index permissions task : column-view entity-metadata permission-neutral related-values unset-values
-    # @pairs filter-index:related-values permissions:filter-index-neutral
     def to_filter_index(self, user: FieldUser = None) -> dict[str, object]:
         values: dict[str, object] = {"id": self.urlsafe_key}
 
@@ -464,12 +429,6 @@ class Entity:
     def reserved(self) -> bool:
         return cast(bool, self.db.get("reserved", False))
 
-    # @testable true
-    # @tests tests_unit/test_009f_page_view_access.py::test_page_restricted_access_group_match
-    # @tests tests_unit/test_013_task_properties.py::test_task_restrictions_require_each_source_with_any_group
-    # @matrix task permissions : source-clauses assignee-override parent-page restricted-access
-    # @matrix task permissions : source-clauses admin-only
-    # @matrix page permissions user-groups : group-match restricted-access
     def restricted_access(self, user: FieldUser) -> bool:
         if not user or not user.is_authenticated:
             return True
@@ -490,9 +449,6 @@ class Entity:
 
         return False
 
-    # @testable true
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_testing_entity_allowed_uses_real_permissions
-    # @matrix permissions testing : entity-allowed no-testing-shortcut
     def allowed(self, action: Action, user: FieldUser = None) -> bool:
         user = current_context_user(user)
 
@@ -510,9 +466,6 @@ class Entity:
 
         return self._key
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_key_access_without_key_raises_runtime_error
-    # @pair entity:key-validation
     @property
     def urlsafe_key(self) -> str:
         if not self.key:
@@ -525,9 +478,6 @@ class Entity:
         self._urlsafe_key = database_get.urlsafe_key(self.key)
         return self._urlsafe_key
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_key_access_without_key_raises_runtime_error
-    # @pair entity:key-validation
     @property
     def db(self) -> datastore.Entity | dict[str, object]:
         if self._db is not None and (self._db or self._temporary or self._testing):
@@ -543,10 +493,6 @@ class Entity:
 
         return self._db
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_add_mutation_intents_requires_typed_intents_and_dedupes
-    # @matrix entity : dedupe key-validation typed-intent validation
-    # @matrix editor mutations : document durable-first cleanup named-versions
     def add_mutation_intents(self, *intents: MutationIntent) -> None:
         if self._mutation_intents is None:
             self._mutation_intents = []

@@ -235,7 +235,6 @@ async function setupMain(t, { activeNavigationTransition = false } = {}) {
 	return context;
 }
 
-/** @pairs startup:settled-boundary view-transition:navigation */
 test("test_cross_document_transition_publishes_settled_readiness", async (t) => {
 	const context = await setupMain(t, { activeNavigationTransition: true });
 	assert.equal(window.__NAVIGATION_TRANSITION_SETTLED__, false);
@@ -251,7 +250,6 @@ test("test_cross_document_transition_publishes_settled_readiness", async (t) => 
 	assert.equal(window.__NAVIGATION_TRANSITION_SETTLED__, true);
 });
 
-/** @matrix startup : error-reporting navigation transient-network */
 test("test_navigation_fetch_abort_is_not_reported_as_application_error", async (t) => {
 	const context = await setupMain(t);
 	context.initialize();
@@ -277,7 +275,6 @@ test("test_navigation_fetch_abort_is_not_reported_as_application_error", async (
 	assert.equal(context.capturedErrors[0].message, "broken startup");
 });
 
-/** @matrix offline sync : deregistration pagehide visibility */
 test("test_suspend_current_view_deregisters_without_health_check", async (t) => {
 	const context = await setupMain(t);
 	context.setView({
@@ -291,8 +288,6 @@ test("test_suspend_current_view_deregisters_without_health_check", async (t) => 
 	assert.equal(context.fetchCalls.length, 0);
 });
 
-/** @matrix polling : blur catch-up focus visibility */
-/** @pair offline:visible-blur */
 test("test_window_blur_soft_suspends_visible_tab_until_focus_catchup", async (t) => {
 	const context = await setupMain(t);
 	context.setView({
@@ -337,7 +332,6 @@ test("test_window_blur_soft_suspends_visible_tab_until_focus_catchup", async (t)
 	assert.equal(context.syncCalls[0].blurredAt, null);
 });
 
-/** @matrix offline : cache-policy server-health */
 test("test_ping_uses_server_owned_cache_policy", async (t) => {
 	const context = await setupMain(t);
 	assert.equal(await context.pingServer(), true);
@@ -349,7 +343,6 @@ test("test_ping_uses_server_owned_cache_policy", async (t) => {
 	assert.equal(new Headers(call.options.headers).has("Cache-Control"), false);
 });
 
-/** @matrix offline : server-health bounded-timeout slow-response */
 test("test_ping_tolerates_slow_response_but_bounds_unresponsive_server", async (t) => {
 	const context = await setupMain(t);
 	t.mock.timers.enable({ apis: ["setTimeout"] });
@@ -379,7 +372,6 @@ test("test_ping_tolerates_slow_response_but_bounds_unresponsive_server", async (
 	assert.equal(await stalled, false);
 });
 
-/** @matrix offline : pending-ownership server-health settled-cleanup */
 test("test_ping_clears_only_the_settled_pending_promise", async (t) => {
 	const context = await setupMain(t);
 	const settled = context.pingServer();
@@ -403,7 +395,6 @@ test("test_ping_clears_only_the_settled_pending_promise", async (t) => {
 	assert.equal(window.__PING_PENDING__, successor);
 });
 
-/** @matrix offline : coalescing rapid-transitions server-health transitions */
 test("test_rapid_sync_requests_coalesce_and_retain_forced_transition", async (t) => {
 	const context = await setupMain(t);
 	context.setView({
@@ -423,7 +414,6 @@ test("test_rapid_sync_requests_coalesce_and_retain_forced_transition", async (t)
 	assert.equal(context.fetchCalls.length, 2);
 });
 
-/** @matrix connectivity offline : browser-state error-recovery settled-boundary transitions */
 test("test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary", async (t) => {
 	const context = await setupMain(t);
 	context.initialize();
@@ -464,7 +454,6 @@ test("test_native_connectivity_state_publishes_before_async_view_sync_and_expose
 	assert.equal(context.connectivityState.browser, "online");
 });
 
-/** @matrix connectivity service-worker : state-publication startup */
 test("test_startup_publishes_worker_state_before_loading_view_with_pending_ping", async (t) => {
 	const context = await setupMain(t);
 	let workerState = { browser: "online", server: "offline" };
@@ -501,8 +490,6 @@ test("test_startup_publishes_worker_state_before_loading_view_with_pending_ping"
 	assert.equal(workerState.server, "online");
 });
 
-/** @matrix connectivity service-worker : controller-replacement state-publication version */
-/** @pair service-worker:recent-search-cleanup */
 test("test_controller_replacement_receives_current_versioned_connectivity_state", async (t) => {
 	const context = await setupMain(t);
 	const firstController = {
@@ -541,7 +528,6 @@ test("test_controller_replacement_receives_current_versioned_connectivity_state"
 	assert.equal(cleanupCalls, 2);
 });
 
-/** @matrix browser-protocol request-errors service-worker : banner client-message upstream-unavailable validation retry */
 test("test_upstream_unavailable_worker_message_shows_retryable_banner", async (t) => {
 	const context = await setupMain(t);
 	context.initialize();
@@ -582,7 +568,6 @@ test("test_upstream_unavailable_worker_message_shows_retryable_banner", async (t
 	assert.equal(context.upstreamMessages.length, 1);
 });
 
-/** @pairs service-worker:registration startup:interaction-ready */
 test("test_service_worker_registration_starts_immediately", async (t) => {
 	const context = await setupMain(t);
 	let resolveView;
@@ -615,8 +600,6 @@ test("test_service_worker_registration_starts_immediately", async (t) => {
 	assert.equal(context.serviceWorkerRegistrations.length, 1);
 });
 
-/** @matrix startup : analytics deferred-lifecycle public-boundary */
-/** @pair service-worker:registration */
 test("test_public_page_skips_authenticated_lifecycle", async (t) => {
 	const context = await setupMain(t);
 	context.setMode("public");

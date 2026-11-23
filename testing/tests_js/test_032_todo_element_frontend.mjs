@@ -16,7 +16,6 @@ async function createTodo(t, overrides = {}) {
 	return { ...module, todo };
 }
 
-/** @matrix form-todo : checked-state history-fill normalization */
 test("test_todo_value_normalization_and_history_reset", async (t) => {
 	const { normalizeTodoValue, todo } = await createTodo(t, {
 		_editing: true,
@@ -59,7 +58,6 @@ test("test_todo_value_normalization_and_history_reset", async (t) => {
 	assert.equal(todo._renamingIndex, null);
 });
 
-/** @pair form-todo:keyboard */
 test("test_todo_keyboard_commit_contract", async (t) => {
 	const { TodoElement, todo } = await createTodo(t);
 	let commits = 0;
@@ -115,7 +113,6 @@ test("test_todo_keyboard_commit_contract", async (t) => {
 	});
 });
 
-/** @pair form-todo:title-actions */
 test("test_todo_title_actions_use_table_style_semantics", async (t) => {
 	const { todo } = await createTodo(t);
 	todo._elt = document.createElement("div");
@@ -155,7 +152,6 @@ test("test_todo_title_actions_use_table_style_semantics", async (t) => {
 	assert.equal(remove.className, STYLES.form.table.actionButton);
 });
 
-/** @pair forms:components */
 test("test_todo_builder_registration_is_task_only", () => {
 	const taskTodo = CONFIG.FORM_COMPONENTS.find(({ type }) => type === "todo");
 	const pageTodo = CONFIG.PAGE_COMPONENTS.find(({ type }) => type === "todo");

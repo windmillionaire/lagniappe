@@ -10,8 +10,6 @@ if TYPE_CHECKING:
     from ..entities.user import User as User
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/user_permissions.py::UserPermissions.create
 class UserPermissions(UserPermissionsMixin, Permissions["User"]):
     """Computed permission map for a user.
 
@@ -28,12 +26,6 @@ class UserPermissions(UserPermissionsMixin, Permissions["User"]):
         value (dict): {resource_hash: Action.name}.
     """
 
-    # @testable true
-    # @tests tests_unit/test_009c_user_permissions_form.py::test_form_permissions
-    # @tests tests_unit/test_009b_user_permissions.py::test_combine_groups
-    # @tests tests_unit/test_009a_user.py::test_public_user_permissions_inherit_public_group_defaults_without_mutating_group
-    # @matrix permissions public-users : combine-groups form-data no-group-mutation no-groups own-page public-group-defaults restricted
-    # @pair permissions:public-group-defaults
     def create(self, form_data: dict[str, str] | None = None) -> None:
         self.entity.properties.restrictions.clear()
         self.entity.invalidate_cache = True
@@ -59,9 +51,6 @@ class UserPermissions(UserPermissionsMixin, Permissions["User"]):
             permissions[self.entity.page.hash] = Action.EDIT.name
             self._write_db_value(permissions)
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/user_permissions.py::UserPermissions.create
-    # @reason public users should reuse an already-attached public group when recalculating
     def _public_group(self) -> UserGroup:
         for group in self.entity.groups:
             if self._is_public_group(group):

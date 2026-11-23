@@ -39,10 +39,6 @@ SOURCES = {"form", "page", "task"}
 VERIFICATION_ATTEMPTS = 3
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_change_detection_and_forced_retry
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_form_creation_and_content_edits_do_not_queue_reconciliation
-# @matrix permissions cache : change-detection retry new-form content-only no-queue
 def prepare_changes(entities: Iterable[Entity]) -> list[Entity]:
     """Preserve required permission work before replacing source cache rows."""
     sources = [entity for entity in entities
@@ -72,9 +68,6 @@ def prepare_changes(entities: Iterable[Entity]) -> list[Entity]:
     return changes
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_change_detection_and_forced_retry
-# @matrix permissions cache : change-detection retry
 def dispatch_changes(changes: Iterable[Entity]) -> None:
     for entity in changes:
         enqueue({
@@ -87,9 +80,6 @@ def dispatch_changes(changes: Iterable[Entity]) -> None:
         entity._reconcile_restrictions = False
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_enqueue_uses_current_source_key
-# @matrix permissions : queue dispatch
 def enqueue(payload: ReconcileTask) -> None:
     if CONFIG.local and not CONFIG.TASK_QUEUE_ENABLED:
         next_batch: ReconcileTask | None = payload
@@ -104,10 +94,6 @@ def enqueue(payload: ReconcileTask) -> None:
         raise RuntimeError("Restriction reconciliation could not be queued; retry saving.")
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_cached_restrictions_resolve_file_task_page_and_form
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_restriction_projection_preserves_own_form_versions_and_base_modified
-# @matrix permissions cache : source-clauses preserved-fields fingerprint form-version no-descendant-writes
 def _projection(current, source, *, own_form=False):
     """Replace only this source's clauses and recalculate the cached revision."""
     restrictions = normalize_restrictions(current.get("restricted_to"))
@@ -136,9 +122,6 @@ def _projection(current, source, *, own_form=False):
     }
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_restriction_batch_updates_only_projection_fields
-# @matrix permissions cache : preserved-fields restriction-removal batch-write
 def _write_projections(details, rows, projections):
     """Write calculated permissions and fingerprints as one Redis batch."""
     with cache.pipeline() as pipe:
@@ -165,9 +148,6 @@ def _write_projections(details, rows, projections):
         pipe.execute()
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_completion_publishes_existing_collection_revisions
-# @matrix permissions cache : channel-invalidation reconciliation
 def _publish_completion(owners):
     from ...entities import Entities
     from ..database import utility as database_utility
@@ -178,9 +158,6 @@ def _publish_completion(owners):
         update(*owners)
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_collects_owner_keys_without_loading_relations
-# @matrix permissions cache : owner-reuse no-extra-read
 def _collection_owner_keys(entities):
     """Collect list owners from stored references in root Page/Task rows."""
     keys = set()
@@ -197,9 +174,6 @@ def _collection_owner_keys(entities):
     return {encode_urlsafe_key(key) for key in keys}
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/restrictions.py::reconcile_batch
-# @reason existing membership revisions make offset continuation safe across moves
 def _membership_revision():
     from ..database import utility as database_utility
 
@@ -214,17 +188,6 @@ def _membership_revision():
     return ":".join(values)
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconcile_preserves_local_page_groups_and_removes_form_restrictions
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_restarts_when_membership_changes_between_or_during_batches
-# @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_form_restrictions_reconcile_existing_descendants
-# @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_restriction_reconciliation_visits_every_indexed_batch
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_verifies_repairs_and_retries
-# @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_restriction_reconciliation_repairs_concurrent_changes
-# @matrix permissions search : reconciliation local-restrictions removal batching duplicate-names source-clauses source-save
-# @matrix permissions cache : owner-reuse
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_reads_available_cache_details_without_recovery
-# @matrix permissions cache : batching concurrent-move continuation-restart concurrent-save deleted-row preserved-fields fingerprint reconciliation retry cache-miss no-extra-read
 def reconcile_batch(
     source_key: str,
     cursor: str | None = None,

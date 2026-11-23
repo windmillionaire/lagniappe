@@ -19,9 +19,6 @@ PROJECTION_VERSION = "1"
 TOPIC_ID = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*\Z")
 
 
-# @testable false
-# @covered-by lagniappe/reference/__init__.py::topics
-# @reason immutable data record populated by the validated corpus loader
 class TopicRecord(TypedDict):
     id: str
     title: str
@@ -43,16 +40,10 @@ class Topic:
     text: str
     related: tuple[str, ...]
 
-    # @testable false
-    # @covered-by lagniappe/reference/__init__.py::get_topic
-    # @reason canonical address is part of the topic lookup contract
     @property
     def url(self) -> str:
         return f"/help/{self.id}"
 
-    # @testable true
-    # @tests tests_unit/test_035_help.py::test_topics_are_canonical_and_portable
-    # @pair help:canonical-source
     def as_dict(self) -> TopicRecord:
         return {
             "id": self.id, "title": self.title, "url": self.url,
@@ -61,18 +52,11 @@ class Topic:
         }
 
 
-# @testable false
-# @covered-by lagniappe/reference/__init__.py::help_version
-# @covered-by lagniappe/reference/__init__.py::topics
-# @reason deployed source snapshot is immutable for the life of a process
 @lru_cache(maxsize=1)
 def _sources() -> tuple[tuple[str, bytes], ...]:
     return tuple((path.stem, path.read_bytes()) for path in sorted(TOPIC_DIRECTORY.glob("*.md")))
 
 
-# @testable true
-# @tests tests_unit/test_035_help.py::test_help_version_changes_with_source_without_rendering
-# @pair help:version
 @lru_cache(maxsize=1)
 def help_version() -> str:
     """Fingerprint source bytes without parsing Markdown on a warm startup."""
@@ -82,10 +66,6 @@ def help_version() -> str:
     return digest.hexdigest()
 
 
-# @testable true
-# @tests tests_unit/test_035_help.py::test_topics_are_canonical_and_portable
-# @tests tests_unit/test_035_help.py::test_invalid_topic_sources_fail_validation
-# @matrix help : canonical-source validation
 @lru_cache(maxsize=1)
 def topics() -> MappingProxyType[str, Topic]:
     """Load and validate the complete corpus once, without Flask or Redis."""
@@ -135,10 +115,6 @@ def topics() -> MappingProxyType[str, Topic]:
     return MappingProxyType(loaded)
 
 
-# @testable true
-# @tests tests_unit/test_035_help.py::test_topics_are_canonical_and_portable
-# @tests tests_unit/test_035_help.py::test_topic_lookup_rejects_aliases_and_paths
-# @pair help:canonical-source
 def get_topic(topic_id: str) -> Topic:
     """Resolve exactly one canonical ID, never a filename, alias or path."""
     if not isinstance(topic_id, str) or not TOPIC_ID.fullmatch(topic_id):
@@ -146,9 +122,6 @@ def get_topic(topic_id: str) -> Topic:
     return topics()[topic_id]
 
 
-# @testable true
-# @tests tests_unit/test_035_help.py::test_topic_rendering_preserves_safety_and_links
-# @pair help:rendering
 @lru_cache(maxsize=256)
 def topic_html(topic_id: str, *, embedded: bool = False) -> SafeHTML:
     """Render the reference body with headings appropriate to its wrapper."""
@@ -159,9 +132,6 @@ def topic_html(topic_id: str, *, embedded: bool = False) -> SafeHTML:
     return sanitize_html(str(soup))
 
 
-# @testable true
-# @tests tests_unit/test_035_help.py::test_topic_rendering_preserves_safety_and_links
-# @pair help:rendering
 @lru_cache(maxsize=256)
 def topic_sections(topic_id: str, *, embedded: bool = False) -> tuple[SafeHTML, ...]:
     """Split the safe body into introduction and details for template wrappers."""
@@ -182,9 +152,6 @@ def topic_sections(topic_id: str, *, embedded: bool = False) -> tuple[SafeHTML, 
     return tuple(sanitize_html("".join(section)) for section in sections)
 
 
-# @testable true
-# @tests tests_unit/test_035_help.py::test_context_is_separate_and_requires_authenticated_user
-# @pair help:context-permissions
 def topic_context(topic_id: str, user: object | None = None) -> dict[str, str]:
     """Return safe installation context only for an authenticated reader."""
     if not user or not getattr(user, "is_authenticated", False):

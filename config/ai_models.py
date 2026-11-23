@@ -128,25 +128,16 @@ MODEL_CATALOG = [
 ]
 
 
-# @testable false
-# @covered-by config/ai_models.py::discover_model_options
-# @reason formatting helper exercised through discovery/catalog tests
 def _preview_label(option):
     if option.get("preview") and "Preview" not in option["label"]:
         option["label"] = f"{option['label']} (Preview)"
     return option
 
 
-# @testable false
-# @covered-by config/ai_models.py::discover_model_options
-# @reason model id normalization is covered through discovery/catalog tests
 def _model_id(name):
     return str(name or "").split("/")[-1]
 
 
-# @testable false
-# @covered-by config/ai_models.py::discover_model_options
-# @reason provider label fallback is covered through discovery tests
 def _model_label(model_id):
     words = [word for word in re.split(r"[-_]+", model_id) if word]
     label = " ".join(
@@ -155,9 +146,6 @@ def _model_label(model_id):
     return label.replace("Flash Lite", "Flash-Lite")
 
 
-# @testable false
-# @covered-by config/ai_models.py::discover_model_options
-# @reason numeric version parsing is covered through discovery tests
 def _model_version(model_id):
     match = re.match(r"gemini-(\d+)(?:\.(\d+))?(?:\.(\d+))?", model_id.lower())
     if not match:
@@ -165,9 +153,6 @@ def _model_version(model_id):
     return tuple(int(part or 0) for part in match.groups())
 
 
-# @testable false
-# @covered-by config/ai_models.py::discover_model_options
-# @reason model-family filtering is covered through discovery tests
 def _model_kind(model_id):
     tokens = set(re.findall(r"[a-z0-9]+", model_id.lower()))
     if tokens & UNSUPPORTED_MODEL_FAMILIES:
@@ -178,9 +163,6 @@ def _model_kind(model_id):
     return "image" if "image" in tokens else "text"
 
 
-# @testable false
-# @covered-by config/ai_models.py::discover_model_options
-# @reason natural provider ordering is covered through discovery tests
 def _model_sort_key(option):
     model_id = option["id"].lower()
     version = _model_version(model_id) or (0, 0, 0)
@@ -189,17 +171,11 @@ def _model_sort_key(option):
     return tuple(-part for part in version) + (prerelease, family_rank, model_id)
 
 
-# @testable false
-# @covered-by config/ai_models.py::discover_model_options
-# @reason superseded alias filtering is covered through discovery tests
 def _has_stable_replacement(model_id, provider_ids):
     prerelease = re.search(r"-(?:preview|exp)(?:-|$)", model_id)
     return bool(prerelease and model_id[: prerelease.start()] in provider_ids)
 
 
-# @testable false
-# @covered-by config/ai_models.py::discover_model_options
-# @reason simple catalog copy covered through public discovery behavior
 def _catalog_options():
     options = []
     for item in MODEL_CATALOG:
@@ -213,9 +189,6 @@ def _catalog_options():
     return options
 
 
-# @testable false
-# @covered-by config/ai_models.py::discover_model_options
-# @reason provider model adapter covered through public discovery behavior
 def _option_from_model(model):
     model_id = _model_id(getattr(model, "name", None))
     if not model_id.startswith("gemini-"):
@@ -263,9 +236,6 @@ def _option_from_model(model):
     return _preview_label(option)
 
 
-# @testable false
-# @covered-by config/ai_models.py::discover_model_options
-# @reason merge behavior covered through public discovery behavior
 def _merge_options(catalog_options, provider_options):
     catalog = {option["id"]: option for option in catalog_options}
     provider_ids = {option["id"] for option in provider_options}
@@ -282,9 +252,6 @@ def _merge_options(catalog_options, provider_options):
     return sorted(merged.values(), key=_model_sort_key)
 
 
-# @testable false
-# @covered-by config/ai_models.py::discover_model_options
-# @reason custom option preservation covered through public discovery behavior
 def _add_current_model(options, model_id, kind):
     if not model_id or any(option["id"] == model_id for option in options):
         return
@@ -303,9 +270,6 @@ def _add_current_model(options, model_id, kind):
     )
 
 
-# @testable false
-# @covered-by config/ai_models.py::discover_model_options
-# @reason response shaping covered through public discovery behavior
 def _options_response(
     options: list[ModelOption], current_settings: Mapping[str, object] | None = None
 ) -> ModelOptions:
@@ -314,9 +278,6 @@ def _options_response(
     _add_current_model(options, current_settings.get("AI_UTILITY_MODEL"), "text")
     _add_current_model(options, current_settings.get("AI_IMAGE_MODEL"), "image")
 
-    # @testable false
-    # @covered-by config/ai_models.py::discover_model_options
-    # @reason per-kind limit and current selection preservation use public coverage
     def limited_options(kind: str, current_ids: tuple[object, ...]) -> list[ModelOption]:
         kind_options = [option for option in options if option["kind"] == kind]
         available_ids = {option["id"] for option in kind_options}
@@ -347,11 +308,6 @@ def _options_response(
     }
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_model_discovery_falls_back_to_catalog_and_preserves_custom
-# @tests tests_unit/test_015_ai_tools.py::test_ai_model_discovery_uses_agent_platform_catalog_and_filters_specialized_models
-# @tests tests_unit/test_015_ai_tools.py::test_ai_model_discovery_limits_options_and_preserves_current_models
-# @matrix ai : api-version custom-current fallback model-discovery option-limit ordering provider-filtering
 def discover_model_options(
     project: str | None = None,
     location: str = "global",
@@ -430,9 +386,6 @@ def discover_model_options(
     return _options_response(merged, current_settings=current_settings)
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_model_discovery_falls_back_to_catalog_and_preserves_custom
-# @matrix ai : model-discovery validation
 def known_model_ids(
     model_options: ModelOptions | None = None, kind: str | None = None
 ) -> set[str]:

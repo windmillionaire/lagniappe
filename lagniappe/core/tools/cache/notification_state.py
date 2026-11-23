@@ -33,7 +33,6 @@ MEMBER_PREFIX = "member:"
 _RECORDED_STATES: ContextVar[dict[str | None, PublicNotificationState] | None] = ContextVar("notification_projection_states", default=None)
 
 
-# @testable infrastructure
 @overload
 def decode(value: str | bytes) -> str: ...
 
@@ -46,19 +45,16 @@ def decode(value: object) -> str | None:
     return str(value) if value is not None else None
 
 
-# @testable infrastructure
 def decode_map[K: str | bytes, V: str | bytes](values: Mapping[K, V] | None) -> dict[str, str]:
     return {decode(key): decode(value) for key, value in (values or {}).items()}
 
 
-# @testable infrastructure
 def user_id(user: object) -> str | None:
     if isinstance(user, str):
         return user
     return getattr(user, "urlsafe_key", None)
 
 
-# @testable infrastructure
 def notification_id(notification: object) -> str | None:
     if isinstance(notification, str):
         return notification
@@ -79,12 +75,10 @@ def notification_id(notification: object) -> str | None:
     return str(key) if key else None
 
 
-# @testable infrastructure
 def owner_id(notification: object) -> str | None:
     return user_id(getattr(notification, "parent", None))
 
 
-# @testable infrastructure
 def redis_keys(user: object) -> tuple[str, str]:
     identifier = user_id(user)
     if not identifier:
@@ -95,7 +89,6 @@ def redis_keys(user: object) -> tuple[str, str]:
     )
 
 
-# @testable infrastructure
 def project[K: str | bytes, V: str | bytes](raw: Mapping[K, V] | None) -> NotificationState | None:
     values = decode_map(raw)
     if values.get("schema") != NOTIFICATION_SCHEMA_VERSION:
@@ -128,7 +121,6 @@ def project[K: str | bytes, V: str | bytes](raw: Mapping[K, V] | None) -> Notifi
     }
 
 
-# @testable infrastructure
 def public_notification_state(state: NotificationState | None) -> PublicNotificationState:
     """Return the browser-safe projection fields, or a reported miss."""
     if not state:
@@ -140,20 +132,17 @@ def public_notification_state(state: NotificationState | None) -> PublicNotifica
     }
 
 
-# @testable infrastructure
 def record(user: object, state: NotificationState | None) -> None:
     recorded = dict(_RECORDED_STATES.get() or {})
     recorded[user_id(user)] = public_notification_state(state)
     _RECORDED_STATES.set(recorded)
 
 
-# @testable infrastructure
 def clear_recorded_notification_states() -> None:
     """Clear request-local mutation state before serving another request."""
     _RECORDED_STATES.set({})
 
 
-# @testable infrastructure
 def take_recorded_notification_state(user: object) -> PublicNotificationState | None:
     """Pop a request-local notification mutation result for ``user``."""
     identifier = user_id(user)
@@ -163,14 +152,12 @@ def take_recorded_notification_state(user: object) -> PublicNotificationState | 
     return state
 
 
-# @testable infrastructure
 def member_ids(values: Iterable[object] | None) -> set[str]:
     return {
         identifier for value in values or () if (identifier := notification_id(value))
     }
 
 
-# @testable infrastructure
 def write_mapping(
     generation: str,
     revision: int,
@@ -193,7 +180,6 @@ def write_mapping(
     }
 
 
-# @testable infrastructure
 def group_mutations(upserts: Iterable[object], deletes: Iterable[object]) -> dict[str, dict[str, set[str]]]:
     grouped = {}
     for operation, values in (("upserts", upserts), ("deletes", deletes)):

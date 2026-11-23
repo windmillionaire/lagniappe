@@ -43,9 +43,6 @@ end
 """
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_note_delete_completes_with_root_only_owners
-# @matrix notes cache : masked-touch preserved-fields no-extra-read filter-invalidation
 def invalidate_revisions(*entities: Entity) -> None:
     """Invalidate modified-only owners without rebuilding their relation graph."""
     owners = {entity.hash: entity for entity in entities if entity.hash}
@@ -64,9 +61,6 @@ def invalidate_revisions(*entities: Entity) -> None:
         pipe.execute()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/query.py::_add_snippet
-# @reason cache-write escaping is read back through search snippet formatting
 def _escape_pipe(text):
     """Escape only pipe and backslash for safe joining/splitting."""
     if not isinstance(text, str):
@@ -75,13 +69,6 @@ def _escape_pipe(text):
     return text.replace("\\", "\\\\").replace("|", "\\|")
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_redis_details_store_parent_key_not_parent_blob
-# @tests tests_unit/test_017_cache_query.py::test_redis_details_preserve_restriction_sources
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reserved_form_is_not_a_cached_permission_source
-# @matrix cache : details parent-key redis-storage
-# @pair cache:source-clauses
-# @matrix permissions cache : reserved-form form-version no-extra-read
 def _redis_details(entity):
     """Return entity details as Redis stores them, with parent represented by hash."""
     details = dict(entity.details)
@@ -114,15 +101,11 @@ def _redis_details(entity):
     return details
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_kind_search_score_prioritizes_high_level_entities
-# @matrix cache : kind-score search-ranking
 def _kind_search_score(kind):
     """Return the RediSearch document score for an entity kind."""
     return KIND_SEARCH_SCORES.get(kind, DEFAULT_SEARCH_SCORE)
 
 
-# @testable infrastructure
 def delete_entity_from_search(kind: str, entity: Entity) -> None:
     """Delete an entity from the search index."""
     key = Search[kind].key(entity)
@@ -131,12 +114,6 @@ def delete_entity_from_search(kind: str, entity: Entity) -> None:
     cache.delete(key)
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_cache_update_writes_pointer_search_rows_and_parent_free_details
-# @tests tests_unit/test_017_cache_query.py::test_cache_update_keeps_non_searchable_entity_hash_addressable
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reserved_form_is_not_a_cached_permission_source
-# @matrix cache : details parent-key redis-storage search-visibility
-# @matrix permissions cache : reserved-form form-version no-extra-read
 def update(*entities: Entity, update: bool = True) -> None:
     """Write entity data to the hash cache and update JSON indexes."""
     cacheable = [e for e in entities if getattr(e, "to_cache", None)]
@@ -195,7 +172,6 @@ def update(*entities: Entity, update: bool = True) -> None:
     update_json_index(update_json)
 
 
-# @testable infrastructure
 def update_json_index(entities: Collection[Entity]) -> None:
     """Propagate entity changes to parent JSON filter indexes."""
     if not entities:

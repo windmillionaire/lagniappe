@@ -254,32 +254,16 @@ GET_GUIDELINES = types.FunctionDeclaration(
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_guidelines_returns_named_bundle
-# @tests tests_unit/test_015_ai_tools.py::test_get_guidelines_filters_actions_and_schema_field_types
-# @tests tests_unit/test_032d_external_guidance.py::test_submission_patch_guidance_is_shared_and_omits_autofill_workflow
-# @matrix ai : guidelines tool-dispatch
-# @matrix ai guidelines : action-selection field-type-selection payload-size
 def execute_get_guidelines(args: Mapping[str, object], _user: User) -> Mapping[str, object]:
     """Return guidelines for the built-in provider's current workflow stage."""
     return _guidelines_result(args, external=False)
 
 
-# @testable true
-# @tests tests_unit/test_032d_external_guidance.py::test_organize_guidance_is_shared_across_provider_and_external_dispatch
-# @tests tests_unit/test_032d_external_guidance.py::test_submission_patch_guidance_is_shared_and_omits_autofill_workflow
-# @matrix ai agent-api : guidelines tool-dispatch
-# @matrix ai guidelines : action-selection field-type-selection payload-size
-# @matrix ai-report submission : preservation validation
 def execute_external_get_guidelines(args: Mapping[str, object], _user: User) -> Mapping[str, object]:
     """Compose external authoring guidance from trusted API dispatch context."""
     return _guidelines_result(args, external=True)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
-# @reason shared bundle filtering is observed through both trusted entry points
 def _guidelines_result(args, *, external):
     task = args.get("task")
     ai_debug("tool.get_guidelines.request", task=task)
@@ -388,9 +372,6 @@ def _guidelines_result(args, *, external):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @reason option validation and stable deduplication are observed through filtered guidance
 def _selected_values(value, allowed, field):
     if value is None:
         return None, None
@@ -407,19 +388,12 @@ def _selected_values(value, allowed, field):
     return normalized, None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @reason field-type section routing is asserted through filtered public guidance
 def _schema_type_guidance(field_types):
     from ..guidelines.field_types import schema_type_guidance
 
     return schema_type_guidance(field_types)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
-# @reason schema-only guidance and field filtering are asserted through both tool entry points
 def _schema_definition_guidance(field_types, *, page_form=False):
     selected = SCHEMA_FIELD_TYPES if field_types is None else field_types
     sections = [
@@ -439,9 +413,6 @@ def _schema_definition_guidance(field_types, *, page_form=False):
     return "\n\n".join(sections)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @reason selected action text is asserted through filtered public guidance
 def _selected_action_guidance(actions):
     lines = [
         "### Selected Action Planning",

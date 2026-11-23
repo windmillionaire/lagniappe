@@ -17,9 +17,6 @@ class MentionOccurrence(SavedMention):
     occurrence_id: str
 
 
-# @testable true
-# @tests tests_unit/test_027c_mentions.py::test_mentions_validate_saved_occurrences_dedupe_and_sanitize
-# @pair mentions:payload-validation
 def validate_mentions_payload(value: object) -> str | None:
     if value is None:
         return None
@@ -37,9 +34,6 @@ def validate_mentions_payload(value: object) -> str | None:
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/mentions/service.py::deliver_mentions
-# @reason saved checkpoint parsing is exercised through authorized delivery
 def saved_mentions(html: str | None) -> dict[str, SavedMention]:
     soup = BeautifulSoup(html or "", "html.parser")
     saved: dict[str, SavedMention] = {}
@@ -56,9 +50,6 @@ def saved_mentions(html: str | None) -> dict[str, SavedMention]:
     return saved
 
 
-# @testable true
-# @tests tests_unit/test_027c_mentions.py::test_mentions_validate_saved_occurrences_dedupe_and_sanitize
-# @pair mentions:public-sanitization
 def sanitize_mentions(html: str) -> str:
     """Render mention nodes as inert plain @Name text for public/export HTML."""
     if not html:

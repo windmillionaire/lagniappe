@@ -11,10 +11,6 @@ type FieldDefinition = dict[str, object]
 type SchemaSource = Mapping[str, object] | Iterable[tuple[str, object]]
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/schema.py::Schema.fields
-# @covered-by lagniappe/core/properties/form_inputs.py::TextInput
-# @covered-by lagniappe/core/properties/form_table.py::Table
 class SchemaProperty[Value = object, Write = Value | None](
     dict[str, object], Property[Value, "Entity", Write]
 ):

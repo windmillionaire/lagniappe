@@ -31,7 +31,6 @@ def _valid_config():
     }
 
 
-# @matrix ai-email : aliases config domain email-address idna limits normalization public-projection secrets
 def test_ai_email_config_normalizes_domains_aliases_and_public_projection():
     normalized = normalize_ai_email_config(_valid_config())
 
@@ -52,7 +51,6 @@ def test_ai_email_config_normalizes_domains_aliases_and_public_projection():
     }
 
 
-# @matrix ai-email : aliases config limits secrets validation
 def test_ai_email_config_rejects_security_weakening_values():
     mutations = (
         lambda value: value.update(unknown=True),
@@ -76,7 +74,6 @@ class _Response:
         return self.payload
 
 
-# @matrix ai-email setup : authorization resend-api setup
 def test_resend_setup_client_uses_full_key_for_provider_administration():
     from installer.ai_email import ResendSetupClient
 
@@ -106,7 +103,6 @@ def test_resend_setup_client_uses_full_key_for_provider_administration():
     }
 
 
-# @matrix ai-email setup : domain idempotence receiving-only resend resend-domain setup
 def test_reconcile_receiving_domain_creates_or_reuses_one_exact_domain(monkeypatch):
     from installer import ai_email
 
@@ -160,7 +156,6 @@ def test_reconcile_receiving_domain_creates_or_reuses_one_exact_domain(monkeypat
     assert reused.enabled == ["domain-old"]
 
 
-# @matrix ai-email setup : disabled-first idempotence resend resend-webhook secret-retrieval setup webhook
 def test_reconcile_webhook_reuses_endpoint_and_disables_before_deploy(monkeypatch):
     from installer import ai_email
 
@@ -231,7 +226,6 @@ def test_reconcile_webhook_reuses_endpoint_and_disables_before_deploy(monkeypatc
     ]
 
 
-# @matrix ai-email resend setup : authorization browser instructions resend secrets setup
 def test_resend_setup_guides_full_receiving_key_creation(monkeypatch, capsys):
     from installer import ai_email
 
@@ -247,7 +241,6 @@ def test_resend_setup_guides_full_receiving_key_creation(monkeypatch, capsys):
     assert opened == [ai_email.RESEND_API_KEYS_URL]
 
 
-# @matrix ai-email resend setup : authentication-email authorization instructions resend reuse secrets sending-domain setup
 def test_resend_setup_explains_when_authentication_email_can_be_reused(
     monkeypatch,
     capsys,
@@ -273,7 +266,6 @@ def test_resend_setup_explains_when_authentication_email_can_be_reused(
     assert opened == []
 
 
-# @matrix ai-email setup : browser cloudflare-dns instructions manual-dns receiving-domain setup
 def test_receiving_dns_guidance_prefers_cloudflare_and_keeps_manual_fallback(
     monkeypatch,
     capsys,
@@ -322,7 +314,6 @@ def test_receiving_dns_guidance_prefers_cloudflare_and_keeps_manual_fallback(
     assert "Priority:  10" in manual_output
 
 
-# @matrix ai-email setup : custom-domain prerequisites setup supporting-services
 def test_ai_email_setup_requires_custom_domain_and_supporting_services():
     from installer.ai_email import _prerequisites
     from installer.errors import ProviderInvalidInput
@@ -360,7 +351,6 @@ def test_ai_email_setup_requires_custom_domain_and_supporting_services():
     )
 
 
-# @matrix ai-email setup : deferred-activation main-install optional prerequisites
 def test_main_install_ai_email_offer_requires_custom_domain_and_resend(
     monkeypatch,
     capsys,
@@ -415,7 +405,6 @@ def test_main_install_ai_email_offer_requires_custom_domain_and_resend(
     assert calls == [{"prepare_installation": False, "deploy": False}]
 
 
-# @matrix ai-email : deploy deployment-guidance disabled-first manual-smoke-test provider-verification setup
 def test_ai_email_setup_saves_deploys_then_enables_webhook(
     monkeypatch,
     capsys,
@@ -534,7 +523,6 @@ def test_ai_email_setup_saves_deploys_then_enables_webhook(
     assert "Send a normal email from a registered user's exact email address" in output
 
 
-# @matrix ai-email : provider-verification secrets setup
 def test_ai_email_rerun_reuses_saved_inbound_api_key_without_prompt(
     monkeypatch,
     capsys,
@@ -622,7 +610,6 @@ def test_ai_email_rerun_reuses_saved_inbound_api_key_without_prompt(
     assert "Reusing the saved Full access receiving key." in output
 
 
-# @matrix ai-email setup : deploy disable disabled-first provider-state secrets setup
 def test_ai_email_disable_turns_off_provider_before_saving_and_deploying(
     monkeypatch,
 ):
@@ -673,7 +660,6 @@ def test_ai_email_disable_turns_off_provider_before_saving_and_deploying(
     assert disabled["resend"]["webhookSecret"] == existing["resend"]["webhookSecret"]
 
 
-# @matrix ai-email : aliases config limits normalization public-projection
 @pytest.mark.parametrize("version", [1, 2, 999])
 def test_ai_email_policy_does_not_depend_on_or_rewrite_saved_settings(version):
     saved = _valid_config()

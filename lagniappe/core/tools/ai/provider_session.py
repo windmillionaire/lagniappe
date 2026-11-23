@@ -27,11 +27,6 @@ current_session: ContextVar[ProviderSession | None] = ContextVar("ai_provider_se
 MIN_PROVIDER_RETRY_SECONDS = 30
 
 
-# @testable true
-# @tests tests_unit/test_015c_provider_session.py::test_blocked_request_is_cancelled_and_closed
-# @tests tests_unit/test_015c_provider_session.py::test_transient_retry_preserves_request_and_uses_one_budget
-# @tests tests_unit/test_015c_provider_session.py::test_transient_error_does_not_retry_with_too_little_time
-# @matrix ai : cancellation deadline retry-ownership service-tier
 class ProviderSession:
     """Own the client and loop; never leave a blocked request in a worker thread."""
 

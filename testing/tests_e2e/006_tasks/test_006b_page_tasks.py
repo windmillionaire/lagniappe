@@ -149,7 +149,6 @@ def _clear_signature(form, field_id=SIGNATURE_FIELD_ID):
     expect(hidden_input).to_have_value("")
 
 
-# @matrix tasks : basic create
 def test_create_basic_page_task(get_admin, get_user):
     user = get_admin()
 
@@ -167,7 +166,6 @@ def test_create_basic_page_task(get_admin, get_user):
     expect(task.element).to_contain_text(task.definition.name)
 
 
-# @matrix tasks : create-close empty-state
 # @template pages/tasks.html::task_list
 # @template pages/tasks.html::task_empty
 def test_empty_page_task_list_shows_marker_only_after_create_closes(get_admin, get_user):
@@ -191,7 +189,6 @@ def test_empty_page_task_list_shows_marker_only_after_create_closes(get_admin, g
     expect(empty).to_be_visible()
 
 
-# @matrix tasks : attach-form create
 def test_create_page_task_with_form(get_admin, get_user):
     user = get_admin()
 
@@ -207,7 +204,6 @@ def test_create_page_task_with_form(get_admin, get_user):
     task.key = _submit_create_task_form(user, page, task, create_form)
 
 
-# @pair tasks:complete
 def test_complete_page_task(get_admin, get_user):
     user = get_admin()
 
@@ -220,7 +216,6 @@ def test_complete_page_task(get_admin, get_user):
     assert not task.completed
 
 
-# @matrix tasks : project-link select-toggle-layout
 # @style select.button
 # @template pages/tasks.html::action_buttons
 def test_create_page_task_with_project(get_admin, get_user):
@@ -266,7 +261,6 @@ def test_create_page_task_with_project(get_admin, get_user):
     expect(project_input).to_have_css("height", "40px")
 
 
-# @matrix tasks : attach-form badge create model-task-link
 # @template pages/tasks.html::task_details
 # @template pages/tasks.html::action_buttons
 def test_create_page_task_with_model_task(get_admin, get_user):
@@ -321,7 +315,6 @@ def test_create_page_task_with_model_task(get_admin, get_user):
     expect(user.page).to_have_url(re.compile(re.escape(model_path) + "$"))
 
 
-# @matrix tasks : attach-form create model-task-link retained-draft
 # @template pages/tasks.html::action_buttons
 def test_model_task_replaces_form_on_reopened_create_draft(get_admin, get_user):
     user = get_admin()
@@ -381,8 +374,6 @@ def test_model_task_replaces_form_on_reopened_create_draft(get_admin, get_user):
     expect(task.task_form.locator("input[name='current-result']")).to_be_visible()
 
 
-# @matrix tasks : assignee badge create
-# @pair notifications:assignee-target
 # @template notifications.html::item
 def test_create_page_task_with_assigned_to(get_admin, get_user):
     user = get_admin()
@@ -416,7 +407,6 @@ def test_create_page_task_with_assigned_to(get_admin, get_user):
     )
 
 
-# @matrix tasks : badge create due-date
 def test_create_page_task_with_due_date(get_admin, get_user):
     user = get_admin()
 
@@ -435,7 +425,6 @@ def test_create_page_task_with_due_date(get_admin, get_user):
     expect(task.element.locator("[data-role='change-due-date']")).to_be_visible()
 
 
-# @matrix tasks : settings-form unsaved-marker update
 # @template controls.html::task_save
 # @template pages/tasks.html::task_title
 # @template pages/tasks.html::task_nav
@@ -483,7 +472,6 @@ def test_update_page_task_settings_from_row(get_admin, get_user):
     assert description.text_content() == updated_description
 
 
-# @matrix tasks : attach-form merged-submission widget-identity
 # @template pages/tasks.html::task
 # @template pages/tasks.html::settings_form
 # @template pages/tasks.html::task_form
@@ -571,7 +559,6 @@ def test_adding_form_from_task_settings_preserves_widget_identity(get_admin, get
     )
 
 
-# @matrix tasks : completed move title-menu
 # @template pages/tasks.html::task_title
 # @template pages/tasks.html::move_form
 # @template pages/tasks.html::move_page_select
@@ -614,7 +601,6 @@ def test_completed_task_can_move_to_another_page(get_admin, get_user):
     expect(user.locate(f"[data-key='{task.key}']")).not_to_be_attached()
 
 
-# @pair tasks:delete
 # @template pages/tasks.html::task
 def test_delete_page_task_from_page_row(get_admin, get_user):
     user = get_admin()
@@ -633,7 +619,6 @@ def test_delete_page_task_from_page_row(get_admin, get_user):
     expect(task.element).not_to_be_visible()
 
 
-# @matrix tasks : attached-form autofill submission
 # @template pages/tasks.html::task_form
 def test_submit_attached_task_form(get_admin, get_user):
     user = get_admin()
@@ -675,8 +660,6 @@ def test_submit_attached_task_form(get_admin, get_user):
         assert submission.verify_submission_value(task_form)
 
 
-# @matrix tasks : attached-form complete readonly refresh update-state
-# @pair reconnect-refresh:page-tasks
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
 # @template pages/tasks.html::settings_form
@@ -728,7 +711,6 @@ def test_task_update_preserves_open_widget_and_completed_readonly_state(get_admi
     expect(readonly_field.locator("input")).to_have_count(0)
 
 
-# @matrix tasks : attached-form complete empty-fields readonly
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
 # @template pages/tasks.html::settings_form
@@ -768,7 +750,6 @@ def test_completed_task_with_empty_form_is_readonly(get_admin, get_user, tmp_pat
     expect(task.task_form.locator("[data-role='empty-completed-submission']")).to_have_count(0)
 
 
-# @matrix tasks : attached-form complete empty-fields partial-submission readonly
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
 def test_completed_task_with_partial_submission_omits_empty_fields(get_admin, get_user):
@@ -802,7 +783,6 @@ def test_completed_task_with_partial_submission_omits_empty_fields(get_admin, ge
     expect(active_form.locator("[name='input-textab12']")).to_have_value("")
 
 
-# @matrix tasks : create list-state while-open
 # @template pages/tasks.html::task_tab
 # @template pages/tasks.html::task_list
 # @template pages/tasks.html::task
@@ -838,7 +818,6 @@ def test_create_page_task_while_another_task_is_open_keeps_rows_clear(get_admin,
     ).not_to_be_visible()
 
 
-# @matrix signature : asset-lifecycle clear editable file-input form-value readonly reload
 def test_signature_submission_draw_save_reload_and_clear(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_signature_submission.get(user)
@@ -905,7 +884,6 @@ def test_signature_submission_draw_save_reload_and_clear(get_admin, get_user):
     expect(reset_field.locator("[data-role='read']")).to_have_count(0)
 
 
-# @matrix tasks : async-upload attachment create file-upload remove
 # @template pages/tasks.html::action_buttons
 def test_create_page_task_with_file(get_admin, get_user):
     user = get_admin()

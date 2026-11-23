@@ -11,10 +11,6 @@ import {
 const thirdPartyLicenseBanner =
 	"/*! Third-party licenses: /third-party-licenses.txt */";
 
-/**
- * @testable false
- * @covered-by build/rollup.shared.mjs::createRollupConfig
- */
 const browserPlugins = () => [
 	json(),
 	resolve({
@@ -24,19 +20,11 @@ const browserPlugins = () => [
 	}),
 ];
 
-/**
- * @testable false
- * @covered-by build/rollup.shared.mjs::createRollupConfig
- */
 const onwarn = (warning, warn) => {
 	if (warning.code === "EVAL" && warning.id.includes("node_modules")) return;
 	warn(warning);
 };
 
-/**
- * @testable false
- * @covered-by build/rollup.shared.mjs::createRollupConfig
- */
 const onMainWarning = (warning, warn) => {
 	if (
 		warning.code === "CIRCULAR_DEPENDENCY" &&
@@ -50,9 +38,6 @@ const onMainWarning = (warning, warn) => {
  * Build the shared entry/output contract with fresh plugins for each bundle.
  * Mode-specific transforms stay ordered in the calling configuration.
  *
- * @testable true
- * @tests tests_js/test_032_build_configuration.mjs::test_rollup_modes_preserve_bundle_and_publication_contracts
- * @matrix frontend-build : artifact-inventory chunking view-registry warnings build-modes
  */
 export const createRollupConfig = ({
 	buildId,

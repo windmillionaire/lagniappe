@@ -8,19 +8,11 @@ from datetime import datetime
 from ..tools.auth.restrictions import normalize_restrictions
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_restricted_fingerprints_share_the_entity_and_cache_formula
-# @matrix permissions cache : fingerprint modified stable-order
 def base_fingerprint(modified: datetime) -> str:
     """Hash the durable modification timestamp without changing its meaning."""
     return hashlib.md5(modified.isoformat().encode("utf-8")).hexdigest()
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_restricted_fingerprints_share_the_entity_and_cache_formula
-# @tests tests_unit/test_002_entity_general_properties.py::test_restriction_fingerprint_preserves_source_boundaries
-# @matrix permissions cache : fingerprint form-version stable-order
-# @matrix permissions cache : source-clauses
 def restricted_fingerprint(
     base: str,
     restricted_to: Mapping[str, Iterable[str]] | None,

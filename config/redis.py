@@ -7,27 +7,16 @@ from pathlib import Path
 from typing import NotRequired, TypedDict, Unpack, cast
 
 
-# @testable false
-# @covered-by config/redis.py::validate_redis_ca_cert
-# @covered-by config/redis.py::redis_tls_enabled
-# @reason configuration-specific ValueError type exercised through its raisers
 class RedisTLSConfigurationError(ValueError):
     """Raised when Redis TLS settings cannot produce a verified connection."""
 
 
-# @testable false
-# @covered-by config/redis.py::redis_client_kwargs
-# @covered-by config/redis.py::redis_tls_enabled
-# @reason mapping/object compatibility helper owned by public Redis config builders
 def _setting(settings, name, default=None):
     if isinstance(settings, Mapping):
         return settings.get(name, default)
     return getattr(settings, name, default)
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_redis_client_kwargs_support_verified_tls
-# @matrix config : redis-tls settings
 def redis_tls_enabled(settings: object) -> bool:
     """Return the normalized Redis TLS flag from a mapping or config object."""
     value = _setting(settings, "REDIS_TLS", False)
@@ -46,10 +35,6 @@ def redis_tls_enabled(settings: object) -> bool:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_redis_client_kwargs_support_verified_tls
-# @tests tests_tooling/test_003_config.py::test_redis_tls_requires_a_valid_ca_bundle
-# @matrix config : certificate-validation failure redis-tls
 def validate_redis_ca_cert(path: object, *, app_dir: str | Path | None = None) -> Path:
     """Resolve and validate a PEM CA bundle, returning its absolute path."""
     if not path:
@@ -83,10 +68,6 @@ def validate_redis_ca_cert(path: object, *, app_dir: str | Path | None = None) -
     return cert_path
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_redis_client_kwargs_support_verified_tls
-# @tests tests_tooling/test_003_config.py::test_redis_tls_requires_a_valid_ca_bundle
-# @matrix config : redis-connection redis-tls
 def redis_client_kwargs(
     settings: object, *, app_dir: str | Path | None = None, **connection_options: object
 ) -> dict[str, object]:

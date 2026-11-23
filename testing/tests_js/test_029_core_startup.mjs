@@ -121,8 +121,6 @@ function createSubmit(form, submitter) {
 	};
 }
 
-/** @matrix startup : deferred-services destroy-safety interaction-ready performance-marks single-flight */
-/** @pair forms:submit-interception */
 test("test_shell_intercepts_interactions_before_deferred_services", async (t) => {
 	const { marks } = installShellEnvironment(t, "public");
 	const ShellView = await loadShellView();
@@ -262,8 +260,6 @@ test("test_shell_intercepts_interactions_before_deferred_services", async (t) =>
 	assert.equal(retrySubmits, 1);
 });
 
-/** @matrix startup : first-interaction single-flight */
-/** @pair search:navbar-results */
 test("test_lazy_search_replays_the_latest_live_input_after_loading", async (t) => {
 	const coreSource = readFileSync("src/script/views/base/core.mjs", "utf8");
 	assert.equal(
@@ -361,7 +357,6 @@ async function loadCore(connectivity = { online: true }) {
 	return Core;
 }
 
-/** @matrix navigation tasks : delegated-toggle task-open-event */
 test("test_component_open_event_follows_delegated_toggle", async (t) => {
 	const { createBrowser } = await import("../utility/js/environment.mjs");
 	createBrowser(t);
@@ -405,8 +400,6 @@ test("test_component_open_event_follows_delegated_toggle", async (t) => {
 	assert.deepEqual(opened, [trigger], "Closing must not emit an open event");
 });
 
-/** @matrix polling : active-widget channel entity nonblocking refresh subscription-lifecycle visibility */
-/** @matrix startup : nonblocking single-flight */
 test("test_core_polling_subscription_lifecycle", async () => {
 	const Core = await loadCore();
 	const subscriptions = [];
@@ -579,8 +572,6 @@ test("test_core_polling_subscription_lifecycle", async () => {
 	assert.equal(maximumActivePasses, 1);
 });
 
-/** @matrix polling : blur visibility */
-/** @pair sync:deregistration */
 test("test_core_sync_distinguishes_visible_blur_from_hard_suspension", async () => {
 	const Core = await loadCore({ online: true });
 	const events = [];
@@ -652,7 +643,6 @@ async function loadViewComponent() {
 }
 
 /** @covers src/script/views/base/component.mjs::ViewComponent.activate */
-/** @matrix navigation tabs : static-component visibility */
 test("test_static_component_without_default_widget_activates", async () => {
 	const ViewComponent = await loadViewComponent();
 	const component = Object.create(ViewComponent.prototype);
@@ -671,7 +661,6 @@ test("test_static_component_without_default_widget_activates", async () => {
 	assert.equal(component.active, null);
 });
 
-/** @matrix deferred-jobs : rendered-visibility */
 test("test_task_form_operation_subscription_follows_component_visibility", async () => {
 	const ViewComponent = await loadViewComponent();
 	const events = [];
@@ -714,8 +703,6 @@ test("test_task_form_operation_subscription_follows_component_visibility", async
 	assert.deepEqual(events.slice(-2), ["suspend", "disable"]);
 });
 
-/** @matrix polling : component-render nonblocking subscription-lifecycle */
-/** @matrix startup : component-render deferred-services nonblocking */
 test("test_component_render_does_not_wait_for_polling_reconciliation", async (t) => {
 	replaceGlobal(t, "document", { getElementById: () => null });
 	const ViewComponent = await loadViewComponent();
@@ -749,7 +736,6 @@ test("test_component_render_does_not_wait_for_polling_reconciliation", async (t)
 	assert.equal(scheduled, 1);
 });
 
-/** @pair forms:queue-independent-initial-render */
 test("test_offline_queue_does_not_block_initial_form_render", async () => {
 	const { FormWidget } = await esmock.strict(
 		"../../src/script/widgets/base/formWidget.mjs",
@@ -850,7 +836,6 @@ async function loadCollaborativeDocument({
 	return CollaborativeDocument;
 }
 
-/** @matrix sync : editor-readiness state-only */
 test("test_collaborative_document_renders_before_initial_state", async (t) => {
 	let resolveSync;
 	const dom = createBrowser(t, { html: "<section></section>" });
@@ -902,8 +887,6 @@ test("test_collaborative_document_renders_before_initial_state", async (t) => {
 	assert.equal(documentWidget.container.hasAttribute("loaded"), true);
 });
 
-/** @matrix editor : loading-feedback empty-content failure lifecycle */
-/** @matrix sync : lifecycle */
 test("test_document_loading_status_tracks_content_and_teardown", async (t) => {
 	const dom = createBrowser(t);
 	t.mock.timers.enable({ apis: ["setTimeout"] });
@@ -1023,8 +1006,6 @@ test("test_document_loading_status_tracks_content_and_teardown", async (t) => {
 	}
 });
 
-/** @matrix editor : empty-content initialization save-guard */
-/** @matrix sync : checkpoint concurrent-edit dirty-state empty-content initialization intentional-clear response-contract save-guard */
 test("test_collaborative_document_does_not_save_untouched_empty_state", async () => {
 	let editorHandler;
 	let ydocUpdateHandler;

@@ -97,7 +97,6 @@ def _open_request(
     )
 
 
-# @matrix csrf web-startup : blueprint-registration exemption-policy
 @pytest.mark.parametrize(
     ("analytics", "ai_observability", "analytics_enabled"),
     (
@@ -174,7 +173,6 @@ def test_blueprint_registration_and_csrf_exemption_policy(
     assert bindings["analytics"] not in csrf_recorder.exemptions
 
 
-# @matrix csrf web-startup : exemption-policy validation
 def test_blueprint_policy_rejects_invalid_bindings_and_exemptions():
     runtime_config = SimpleNamespace(ANALYTICS=False, AI_OBSERVABILITY=False)
 
@@ -240,8 +238,6 @@ def test_blueprint_policy_rejects_invalid_bindings_and_exemptions():
         )
 
 
-# @matrix csrf : exemption-policy route-gate
-# @pairs agent-api:error-envelope agent-api:routing error-handling:csrf login:google-signin
 def test_csrf_exempt_surfaces_reach_replacement_authentication_gates(
     monkeypatch,
 ):
@@ -281,8 +277,6 @@ def test_csrf_exempt_surfaces_reach_replacement_authentication_gates(
     assert google_response.headers.get("X-Lagniappe-CSRF") is None
 
 
-# @matrix login session : cookie-hardening lifetime
-# @pair web-headers:security
 def test_flask_security_configuration_and_session_cookie_attributes():
     flask_app = Flask("security-wiring")
     runtime_config = SimpleNamespace(
@@ -318,7 +312,6 @@ def test_flask_security_configuration_and_session_cookie_attributes():
     assert "SameSite=Lax" in session_cookie
 
 
-# @matrix auth login : lazy-user-loading login-manager redirect-view
 def test_login_manager_wiring_and_anonymous_redirect():
     class LoginManagerRecorder:
         def __init__(self):
@@ -350,7 +343,6 @@ def test_login_manager_wiring_and_anonymous_redirect():
     assert parse_qs(location.query) == {"next": ["/users/index"]}
 
 
-# @pair web-headers:security
 def test_common_security_headers():
     with app.test_request_context("/security-wiring"):
         response = app.process_response(app.make_response("ok"))
@@ -365,7 +357,6 @@ def test_common_security_headers():
     assert response.headers["Cache-Control"] == "private, no-cache"
 
 
-# @matrix agent-api : bearer-only build-marker error-envelope no-store request-correlation session-independent
 @pytest.mark.parametrize("path", ("/api", "/api/v1"))
 def test_external_api_authentication_and_header_contract(monkeypatch, path):
     actor = SimpleNamespace(is_public=False, urlsafe_key="security-wiring-actor")
@@ -419,7 +410,6 @@ def test_external_api_authentication_and_header_contract(monkeypatch, path):
     assert authorized.headers.get("WWW-Authenticate") is None
 
 
-# @matrix agent-api : body-limit error-envelope streaming
 def test_external_api_bounds_json_without_a_declared_content_length(monkeypatch):
     actor = SimpleNamespace(is_public=False, urlsafe_key="bounded-body-actor")
     monkeypatch.setattr(

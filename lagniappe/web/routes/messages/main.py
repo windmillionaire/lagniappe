@@ -20,12 +20,10 @@ from lagniappe.web.auth import authenticated_user, abort_public_user_action, log
 from . import message_internal, messages
 
 
-# @testable infrastructure
 def _managed_only():
     abort_public_user_action()
 
 
-# @testable infrastructure
 @messages.route("")
 @messages.route("/")
 @logged_in
@@ -38,7 +36,6 @@ def index() -> ResponseReturnValue:
     )
 
 
-# @testable infrastructure
 @message_internal.route("/conversations")
 @logged_in
 def conversations() -> ResponseReturnValue:
@@ -49,7 +46,6 @@ def conversations() -> ResponseReturnValue:
     )
 
 
-# @testable infrastructure
 @message_internal.route("/conversations/<key>")
 @logged_in
 def history(key: str) -> ResponseReturnValue:
@@ -66,7 +62,6 @@ def history(key: str) -> ResponseReturnValue:
     return responses.json_response(payload)
 
 
-# @testable infrastructure
 @message_internal.route("/conversations/<key>/delete")
 @logged_in
 def clear_modal(key: str) -> ResponseReturnValue:
@@ -82,7 +77,6 @@ def clear_modal(key: str) -> ResponseReturnValue:
     return responses.message_clear_modal(key, peer_name=peer_name)
 
 
-# @testable infrastructure
 @message_internal.route("", methods=["POST"])
 @logged_in
 def send() -> ResponseReturnValue:
@@ -104,7 +98,6 @@ def send() -> ResponseReturnValue:
     return responses.json_response(payload, status=201 if payload["created"] else 200)
 
 
-# @testable infrastructure
 @message_internal.route("/conversations/<key>/read", methods=["POST"])
 @logged_in
 def read(key: str) -> ResponseReturnValue:
@@ -125,7 +118,6 @@ def read(key: str) -> ResponseReturnValue:
     return responses.json_response({"conversation": conversation})
 
 
-# @testable infrastructure
 @message_internal.route("/<key>", methods=["DELETE"])
 @logged_in
 def hide_message(key: str) -> ResponseReturnValue:
@@ -139,7 +131,6 @@ def hide_message(key: str) -> ResponseReturnValue:
     return responses.json_response({"deleted": True})
 
 
-# @testable infrastructure
 @message_internal.route("/conversations/<key>", methods=["DELETE"])
 @logged_in
 def clear(key: str) -> ResponseReturnValue:

@@ -5,27 +5,12 @@ import BROWSER_PROTOCOL from "../../../config/browser_protocol.json" with {
 export const BROWSER_PROTOCOL_ID = BROWSER_PROTOCOL.id;
 export const BROWSER_PROTOCOL_VERSION = BROWSER_PROTOCOL.version;
 
-/**
- * @testable true
- * @tests tests_js/test_021_browser_protocol.mjs::test_browser_protocol_contains_versioned_worker_messages
- * @matrix browser-protocol : message-types
- */
 export const WORKER_MESSAGES = Object.freeze({ ...BROWSER_PROTOCOL.messages });
 
-/**
- * @testable false
- * @covered-by src/script/shared/protocol.mjs::validateConnectivityState
- * @reason record-shape guard is exercised through connectivity validation
- */
 function isRecord(value) {
 	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-/**
- * @testable true
- * @tests tests_js/test_021_browser_protocol.mjs::test_connectivity_messages_are_versioned_and_validated
- * @matrix browser-protocol : connectivity validation
- */
 export function validateConnectivityState(state) {
 	if (!isRecord(state)) return false;
 	return (
@@ -36,11 +21,6 @@ export function validateConnectivityState(state) {
 	);
 }
 
-/**
- * @testable true
- * @tests tests_js/test_021_browser_protocol.mjs::test_connectivity_messages_are_versioned_and_validated
- * @matrix browser-protocol : connectivity envelope producer version
- */
 export function connectivityMessage(state) {
 	if (!validateConnectivityState(state)) {
 		throw new TypeError("Invalid connectivity state");
@@ -62,11 +42,6 @@ const UPSTREAM_RETRY_OUTCOMES = new Set([
 	"service_worker",
 ]);
 
-/**
- * @testable true
- * @tests tests_js/test_021_browser_protocol.mjs::test_upstream_unavailable_messages_are_versioned_and_privacy_bounded
- * @matrix browser-protocol request-errors : upstream-unavailable validation
- */
 export function validateUpstreamUnavailableState(state) {
 	if (!isRecord(state)) return false;
 	return (
@@ -86,11 +61,6 @@ export function validateUpstreamUnavailableState(state) {
 	);
 }
 
-/**
- * @testable true
- * @tests tests_js/test_021_browser_protocol.mjs::test_upstream_unavailable_messages_are_versioned_and_privacy_bounded
- * @matrix browser-protocol request-errors : envelope privacy producer upstream-unavailable version
- */
 export function upstreamUnavailableMessage(state) {
 	if (!validateUpstreamUnavailableState(state)) {
 		throw new TypeError("Invalid upstream-unavailable state");

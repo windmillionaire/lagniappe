@@ -14,10 +14,6 @@ from config.recovery import CONFIG_KIND, CONFIG_SCHEMA_VERSION
 from config.locations import normalize_app_engine_location, normalize_resource_region
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_build_app_settings_refreshes_agent_access_defaults
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_config_builders_preserve_inputs_and_generate_independent_documents
-# @matrix setup : agent-access ai-defaults config-files config-version source-link
 def build_app_settings(
     app_settings: Mapping[str, object],
     gcloud_config: Mapping[str, object],
@@ -138,9 +134,6 @@ def build_app_settings(
     return app
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_config_builders_preserve_inputs_and_generate_independent_documents
-# @matrix deploy : app-yaml pdf-preview static-assets
 def build_deploy_yaml(
     app_settings: Mapping[str, object], deployment: dict[str, object]
 ) -> tuple[dict[str, object], dict[str, object]]:
@@ -170,9 +163,6 @@ def build_deploy_yaml(
     return app, deploy
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_config_builders_preserve_inputs_and_generate_independent_documents
-# @matrix setup : config-files transactional-state
 def build_dev_yaml(
     dev_settings: Mapping[str, object], test_settings: Mapping[str, object]
 ) -> tuple[dict[str, object], dict[str, object]]:
@@ -206,9 +196,6 @@ def build_dev_yaml(
     return dev, test
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_config_builders_preserve_inputs_and_generate_independent_documents
-# @matrix setup : config-files transactional-state
 def build_index_yaml(existing: dict[str, object]) -> dict[str, object]:
     from config import constants
 
@@ -219,9 +206,6 @@ def build_index_yaml(existing: dict[str, object]) -> dict[str, object]:
     return indexes
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_config_builders_preserve_inputs_and_generate_independent_documents
-# @matrix setup : config-files transactional-state
 def build_manifest(
     app_settings: Mapping[str, object], existing: dict[str, object]
 ) -> dict[str, object]:

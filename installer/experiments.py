@@ -5,9 +5,6 @@ from runner.presentation import output as print
 from installer.errors import SetupError
 
 
-# @testable true
-# @tests tests_tooling/test_001l_setup_experiments.py::test_experiments_preset_preserves_existing_choices_and_rejects_conversion
-# @matrix experiments : configuration
 def configure(*, requested: bool = False, first_install: bool = False) -> bool:
     from config import SETTINGS
     from config.experiments import normalize_experiments_config
@@ -50,9 +47,6 @@ def configure(*, requested: bool = False, first_install: bool = False) -> bool:
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001l_setup_experiments.py::test_experiments_toolchain_builds_production_without_provisioning_test_resources
-# @matrix experiments : toolchain
 def prepare_toolchain() -> None:
     """Reuse local dependency setup without test buckets or a development build."""
     import sys
@@ -92,9 +86,6 @@ def prepare_toolchain() -> None:
             raise SetupError(f"{label} failed; rerun setup to resume.")
 
 
-# @testable true
-# @tests tests_tooling/test_001l_setup_experiments.py::test_experiments_bootstrap_verification_requires_saved_accounts
-# @matrix experiments : bootstrap
 def verify_bootstrap(*, require_admin: bool = False) -> None:
     """Start the normal app, then verify its persisted bootstrap outcome."""
     import requests

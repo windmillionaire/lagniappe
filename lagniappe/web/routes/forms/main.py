@@ -31,10 +31,6 @@ from lagniappe.web.pagination import pagination_options
 from lagniappe.web import responses, direct_uploads
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::update
-# @covered-by lagniappe/web/routes/forms/main.py::create_schema
-# @reason request parsing delegates domain validation to the shared draft service
 def _draft_json(data, name, default=None):
     value = data.get(name, default)
     try:
@@ -43,10 +39,6 @@ def _draft_json(data, name, default=None):
         raise exceptions.ValidationError(f"Invalid builder {name}. Reload the builder and retry.") from error
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::update
-# @covered-by lagniappe/web/routes/forms/main.py::copy_form
-# @reason complete draft and lazy upload parsing are owned by publication routes
 def _builder_request(data, form):
     draft = {
         "name": data.get("name", form.name),
@@ -77,10 +69,6 @@ def _builder_request(data, form):
     return draft, images
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::update
-# @covered-by lagniappe/web/routes/forms/main.py::create_schema
-# @reason conflict presentation preserves local work at the existing request boundary
 def _draft_conflict(error, form):
     return responses.json_response({
         "code": "stale_form_draft", "error": str(error),
@@ -88,9 +76,6 @@ def _draft_conflict(error, form):
     }, status=409)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::create_schema
-# @reason generation may retain only saved owned images and current local draft tokens
 def _draft_image_sources(form, html_fields):
     result = {}
     for field_id, content in html_fields.items():
@@ -107,10 +92,6 @@ def _draft_image_sources(form, html_fields):
     return result
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
-# @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_form_index_*
-# @matrix forms : create-control index index-view permission-gates tools
 @forms.route("/index", methods=["GET"])
 @permission(Resource.FORMS, Action.VIEW)
 def form_index() -> ResponseReturnValue:
@@ -119,9 +100,6 @@ def form_index() -> ResponseReturnValue:
     return responses.index("forms", form_index)
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_form_index_lists_forms_*
-# @pair forms:index-view
 @forms.route("/rows", methods=["GET"])
 @permission(Resource.FORMS, Action.VIEW)
 def rows() -> ResponseReturnValue:
@@ -131,9 +109,6 @@ def rows() -> ResponseReturnValue:
     return responses.rows(forms, form_index)
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_form_builder_*
-# @matrix forms : builder-edit permission-gates restriction-control
 @forms.route("/<key>", methods=["GET"])
 @permission(Resource.FORM, Action.VIEW, no_store=True)
 def view(key: str, **kwargs: Unpack[EntityContext[models.Form]]) -> ResponseReturnValue:
@@ -150,9 +125,6 @@ def view(key: str, **kwargs: Unpack[EntityContext[models.Form]]) -> ResponseRetu
                            conversion_catalog=form_conversions.conversion_catalog())
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_failed_preflight_recovers_after_reload
-# @matrix form-migration : status recovery
 @forms.route("/<key>/change", methods=["GET", "POST"])
 @permission(Resource.FORM, Action.EDIT, no_store=True)
 def form_change(
@@ -168,13 +140,6 @@ def form_change(
         return responses.error(str(error))
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
-# @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_builder_publication_rejects_incompatible_payload_and_reuses_receipt
-# @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_stale_save_preserves_local_draft_after_another_editor_saves
-# @matrix forms : builder-add-fields builder-add-inputs builder-reload builder-save
-# @matrix forms : migration-required save-receipt stale-acknowledgement persistent-error concurrent-edit
 @forms.route("<key>/update", methods=["PUT"])
 @permission(Resource.FORM, Action.EDIT)
 def update(
@@ -196,19 +161,12 @@ def update(
     return responses.json_response(result)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::update
-# @reason signed upload creation has the same permission as final draft publication
 @forms.route("<key>/update/direct-upload", methods=["POST"])
 @permission(Resource.FORM, Action.EDIT)
 def update_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
-# @matrix forms : create page-form task-form
 @forms.route("/create", methods=["POST"])
 @permission(Resource.FORM, Action.CREATE)
 def create() -> ResponseReturnValue:
@@ -218,9 +176,6 @@ def create() -> ResponseReturnValue:
     return responses.rows(new_form, index.FormIndex())
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
-# @matrix forms : builder-copy form-type navigation schema
 @forms.route("<key>/copy", methods=["POST"])
 @permission(Resource.FORM, Action.CREATE)
 def copy_form(
@@ -244,19 +199,12 @@ def copy_form(
     return responses.json_response(payload)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::copy_form
-# @reason signed upload creation has the same permission as final draft copy
 @forms.route("<key>/copy/direct-upload", methods=["POST"])
 @permission(Resource.FORM, Action.CREATE)
 def copy_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
-# @matrix forms : page-form task-form
 @forms.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.FORM, Action.DELETE)
 def delete(
@@ -268,10 +216,6 @@ def delete(
     return responses.ok()
 
 
-# @testable true
-# @tests tests_unit/test_003e_tables.py::test_table_row_submission_text_email_checkbox
-# @tests tests_unit/test_003e_tables.py::test_table_form_mixed_column_types
-# @matrix form-table : mixed-columns row-submission
 @forms.route("<key>/validate-row/<table_id>", methods=["GET"])
 @permission(requested=Action.EDIT)
 def validate_row(
@@ -299,12 +243,6 @@ def validate_row(
     return responses.json_response({"row": row_submission})
 
 
-# @testable true
-# @tests tests_unit/test_003e_tables.py::test_table_form_single_row
-# @tests tests_unit/test_003e_tables.py::test_table_row_submission_text_email_checkbox
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_expands_table_submission_cell
-# @matrix form-table table-controls : form-table-column table-cell-expand
-# @matrix form-table : form-submission row-submission
 @forms.route("<key>/expand-table-cell/<table_id>", methods=["GET"])
 @permission(requested=Action.VIEW)
 def expand_table_cell(
@@ -329,10 +267,8 @@ def expand_table_cell(
     return responses.expanded_table_cell(field)
 
 
-# @testable true
 # @scaffolding testing/resources/form.py::Builder.restrict_to_owner
 # @scaffolding testing/resources/form.py::Builder.restrict_to_group
-# @matrix forms : access-restrictions group-restricted owner-restricted
 @forms.route("<key>/restrictions", methods=["PUT"])
 @permission(Resource.FORM, Action.EDIT)
 def restrictions(
@@ -354,10 +290,6 @@ def restrictions(
     return responses.ok()
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_generate_form_schema_live_saved_state
-# @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_schema_generation_requires_edit_access_to_submitted_form
-# @matrix ai forms : generate-schema live-ai reload saved-state submitted-reference
 @forms.route("/create-schema", methods=["POST"])
 @permission(Resource.FORMS, Action.EDIT)
 def create_schema() -> ResponseReturnValue:
@@ -418,9 +350,6 @@ def create_schema() -> ResponseReturnValue:
     return responses.json_response({**result, "request_id": request_id, "draft_revision": revision})
 
 
-# @testable true
-# @tests tests_unit/test_004_form_properties.py::test_form_schema
-# @pair form-schema:property
 @forms.route("<key>/schema", methods=["GET"])
 @permission(Resource.FORM, Action.VIEW)
 def schema(

@@ -45,9 +45,6 @@ ENUMS = frozenset({"Pages", "Tasks", "Projects", "Categories", "Forms", "Files",
                    "ModelTasks", "Users", "Groups"})
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_collection_preserves_group_and_serial_markers
-# @matrix testing : parallel-e2e
 def pytest_collection_finish(session: CollectionSession) -> None:
     destination = os.environ.get("LAGNIAPPE_E2E_COLLECTION")
     if not destination:
@@ -79,9 +76,6 @@ def pytest_collection_finish(session: CollectionSession) -> None:
     Path(destination).write_text(json.dumps(records), encoding="utf-8")
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_inventory_follows_helpers_constants_and_fixtures
-# @matrix testing : parallel-e2e
 def discover_resources(
     root: Path,
     path: str,
@@ -143,10 +137,6 @@ def discover_resources(
     return frozenset(resources)
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_inventory_balances_cases_without_transitive_resource_groups
-# @tests tests_tooling/test_015_e2e_parallel.py::test_marked_groups_stay_on_one_worker_without_becoming_exclusive
-# @matrix testing : parallel-e2e
 def story_batches(
     root: Path,
     records: Sequence[CollectedTest],
@@ -204,9 +194,6 @@ def story_batches(
     return batches, inventory
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_duration_estimates_use_only_valid_passed_e2e_results
-# @matrix testing : parallel-e2e
 def duration_estimates(root: Path) -> dict[str, float]:
     """Historical timings guide placement only; they never supply run outcomes."""
     hints = os.environ.get("LAGNIAPPE_E2E_DURATIONS")

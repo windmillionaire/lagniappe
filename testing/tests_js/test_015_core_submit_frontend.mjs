@@ -27,10 +27,6 @@ async function setupSubmissionManager(t) {
 	return { capturedErrors, SubmissionManager, request };
 }
 
-/**
- * @source src/script/views/base/submission.mjs::SubmissionManager
- * @pair submit:active-widget
- */
 test("test_duplicate_autofill_start_keeps_draft_dirty", async (t) => {
 	const { SubmissionManager, request } = await setupSubmissionManager(t);
 	const messages = [];
@@ -69,10 +65,6 @@ test("test_duplicate_autofill_start_keeps_draft_dirty", async (t) => {
 	assert.deepEqual(tracked, ["existing"]);
 });
 
-/**
- * @matrix edited-entity-notice : structured-conflict
- * @matrix submit : update-feedback
- */
 test("test_conflict_review_failure_settles_update_button", async (t) => {
 	const { capturedErrors, SubmissionManager, request } =
 		await setupSubmissionManager(t);
@@ -116,10 +108,6 @@ test("test_conflict_review_failure_settles_update_button", async (t) => {
 	assert.equal(capturedErrors.length, 1);
 });
 
-/**
- * @source src/script/views/base/submission.mjs::SubmissionManager
- * @matrix edited-entity-notice : structured-conflict
- */
 test("test_stale_online_update_opens_prepared_review", async (t) => {
 	const { SubmissionManager, request } = await setupSubmissionManager(t);
 	const form = document.body.appendChild(document.createElement("form"));
@@ -166,10 +154,6 @@ test("test_stale_online_update_opens_prepared_review", async (t) => {
 	assert.equal(submitter.disabled, false);
 });
 
-/**
- * @source src/script/views/base/submission.mjs::SubmissionManager
- * @matrix edited-entity-notice : structured-conflict
- */
 test("test_stale_autofill_start_opens_review_with_prestart_context", async (t) => {
 	const { SubmissionManager, request } = await setupSubmissionManager(t);
 	const { FormController } = await import(
@@ -237,10 +221,6 @@ test("test_stale_autofill_start_opens_review_with_prestart_context", async (t) =
 	assert.equal(submitter.disabled, false);
 });
 
-/**
- * @source src/script/views/base/submission.mjs::SubmissionManager
- * @pair submit:active-widget
- */
 test("test_retry_feedback_settles_only_after_start_response", async (t) => {
 	const { SubmissionManager, request } = await setupSubmissionManager(t);
 	const form = document.body.appendChild(document.createElement("form"));
@@ -291,10 +271,6 @@ test("test_retry_feedback_settles_only_after_start_response", async (t) => {
 	assert.deepEqual(errors, ["Retry rejected"]);
 });
 
-/**
- * @source src/script/views/base/submission.mjs::SubmissionManager
- * @pair submit:active-widget
- */
 test("test_autofill_ack_preserves_edits_made_during_request", async (t) => {
 	const { SubmissionManager, request } = await setupSubmissionManager(t);
 	const form = document.body.appendChild(document.createElement("form"));
@@ -339,10 +315,6 @@ test("test_autofill_ack_preserves_edits_made_during_request", async (t) => {
 	assert.deepEqual(JSON.parse(initialTarget.dataset.submission), baseline);
 });
 
-/**
- * @source src/script/views/base/submission.mjs::SubmissionManager
- * @pair submit:active-widget
- */
 test("test_ordinary_save_updates_comparison_baseline_without_losing_later_draft", async (t) => {
 	const { SubmissionManager, request } = await setupSubmissionManager(t);
 	let value = "Submitted clear";
@@ -379,10 +351,6 @@ test("test_ordinary_save_updates_comparison_baseline_without_losing_later_draft"
 	assert.deepEqual(staged.submission, { title: "" });
 });
 
-/**
- * @source src/script/views/base/submission.mjs::SubmissionManager
- * @pair submit:active-widget
- */
 test("test_autofill_ack_does_not_decorate_new_active_widget", async (t) => {
 	const { SubmissionManager, request } = await setupSubmissionManager(t);
 	const form = document.body.appendChild(document.createElement("form"));
@@ -449,7 +417,6 @@ function createSubmitEvent({ detail = {}, form, submitter }) {
 	};
 }
 
-/** @matrix submit : direct-upload-navigation stale-widget */
 test("test_submit_abandons_stale_widget_after_async_prepare", async (t) => {
 	const { capturedErrors, SubmissionManager } = await setupSubmissionManager(t);
 	const events = [];
@@ -516,7 +483,6 @@ test("test_submit_abandons_stale_widget_after_async_prepare", async (t) => {
 	assert.equal(capturedErrors.length, 0);
 });
 
-/** @matrix submit : direct-upload-error stale-widget */
 test("test_submit_does_not_show_upload_error_after_stale_prepare", async (t) => {
 	const { capturedErrors, SubmissionManager } = await setupSubmissionManager(t);
 	const events = [];
@@ -570,7 +536,6 @@ test("test_submit_does_not_show_upload_error_after_stale_prepare", async (t) => 
 	assert.equal(capturedErrors.length, 0);
 });
 
-/** @pair submit:missing-form-data */
 test("test_submit_stops_before_appending_when_form_data_is_missing", async (t) => {
 	const { capturedErrors, SubmissionManager } = await setupSubmissionManager(t);
 	const componentElement = createComponentElement(null);
@@ -613,7 +578,6 @@ test("test_submit_stops_before_appending_when_form_data_is_missing", async (t) =
 	assert.equal(submitter.disabled, false);
 });
 
-/** @matrix submit : active-widget route-override */
 test("test_submit_uses_explicit_action_route_over_active_widget_route", async (t) => {
 	const { SubmissionManager } = await setupSubmissionManager(t);
 	const componentElement = createComponentElement(null);
@@ -661,7 +625,6 @@ test("test_submit_uses_explicit_action_route_over_active_widget_route", async (t
 	assert.equal(update.mock.calls[0].arguments[2], "/tasks/task/update");
 });
 
-/** @matrix deferred-jobs submit : background deferred-create destination-row */
 test("test_deferred_background_create_does_not_decorate_source_form", async (t) => {
 	const { SubmissionManager } = await setupSubmissionManager(t);
 	const tracked = [];

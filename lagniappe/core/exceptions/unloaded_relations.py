@@ -29,9 +29,6 @@ def _unloaded_relations_tracing_enabled():
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/unloaded_relations.py::capture_unloaded_relation
-# @reason relation diagnostics need defensive attribute access
 def _safe_attr(item, attr, default=None):
     try:
         return getattr(item, attr, default)
@@ -39,9 +36,6 @@ def _safe_attr(item, attr, default=None):
         return f"<{type(error).__name__}: {error}>"
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/unloaded_relations.py::capture_unloaded_relation
-# @reason relation diagnostics should not depend on loaded entity instances
 def _debug_key(key):
     kind = _safe_attr(key, "kind")
     key_name = _safe_attr(key, "name")
@@ -51,9 +45,6 @@ def _debug_key(key):
     return str(key)
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/unloaded_relations.py::capture_unloaded_relation
-# @reason request context formatting is diagnostic plumbing
 def _request_context():
     if not has_request_context():
         return None
@@ -66,9 +57,6 @@ def _request_context():
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/unloaded_relations.py::capture_unloaded_relation
-# @reason caller formatting is diagnostic plumbing
 def _caller_location():
     skip_prefixes = (
         "lagniappe/core/mixins/related.py:",
@@ -87,9 +75,6 @@ def _caller_location():
     return "-"
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/unloaded_relations.py::capture_unloaded_relation
-# @reason context formatting is diagnostic plumbing
 def _entity_context(entity):
     if not entity:
         return None
@@ -109,9 +94,6 @@ def _entity_context(entity):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/unloaded_relations.py::capture_unloaded_relation
-# @reason context formatting is diagnostic plumbing
 def _property_context(prop):
     return {
         "class": f"{type(prop).__module__}.{type(prop).__name__}",
@@ -122,11 +104,6 @@ def _property_context(prop):
     }
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_related_list_value_reports_unloaded_relation_without_loading
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_related_single_value_reports_unloaded_relation_without_loading
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_related_value_strict_mode_raises_after_reporting
-# @matrix relations : diagnostics strict-mode unloaded-fallback
 def capture_unloaded_relation(
     prop: _RelationProperty, *, relation_type: str, keys: Iterable[object]
 ) -> None:

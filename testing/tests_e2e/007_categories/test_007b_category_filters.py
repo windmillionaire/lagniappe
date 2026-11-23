@@ -80,7 +80,6 @@ def _attached_form_filter_context(user):
     return filters, matching_page, excluded_page
 
 
-# @pair filters:related-forms
 def test_category_filter_select_includes_form_from_created_page(get_admin):
     user = get_admin()
     category = Categories.test_category_filter_related_form_registration.get(user)
@@ -106,7 +105,6 @@ def test_category_filter_select_includes_form_from_created_page(get_admin):
     expect(filters.form_conditions).to_be_visible()
 
 
-# @pair filters:tab-open
 def test_category_filters_form_opens(get_admin):
     user = get_admin()
     category = Categories.test_create_page.get(user)
@@ -119,7 +117,6 @@ def test_category_filters_form_opens(get_admin):
     expect(filters.locator("button[data-role='save']")).to_be_visible()
 
 
-# @pair filters:empty-validation
 def test_category_filters_require_at_least_one_condition(get_admin):
     user = get_admin()
     category = Categories.test_create_page.get(user)
@@ -130,7 +127,6 @@ def test_category_filters_require_at_least_one_condition(get_admin):
     expect(filters.error).to_contain_text("Please add at least one filter condition")
 
 
-# @matrix filters : empty-state saved-filters
 def test_category_saved_filters_empty_state(get_admin):
     user = get_admin()
     category = Categories.test_empty_category.get(user)
@@ -149,7 +145,6 @@ def test_category_saved_filters_empty_state(get_admin):
     )
 
 
-# @pair pages:tool-switch
 def test_category_saved_filters_hide_create_page_tool(get_admin):
     user = get_admin()
     category = Categories.test_empty_category.get(user)
@@ -173,7 +168,6 @@ def test_category_saved_filters_hide_create_page_tool(get_admin):
     expect(create_page).to_be_hidden()
 
 
-# @matrix filters : query-tool saved-filters
 def test_category_url_tool_opens_saved_filters(get_admin):
     user = get_admin()
     category = Categories.test_empty_category.get(user)
@@ -192,7 +186,6 @@ def test_category_url_tool_opens_saved_filters(get_admin):
     )
 
 
-# @matrix filters : run-results string-condition
 def test_category_filter_by_page_name(get_admin):
     user = get_admin()
     category, matching_page, excluded_page, _, _ = _category_filter_context(user)
@@ -205,7 +198,6 @@ def test_category_filter_by_page_name(get_admin):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @matrix filters : run-results string-condition view-access
 def test_category_filter_results_respect_page_permissions(get_admin, get_user):
     owner = get_admin()
     category = Categories.test_category_filter_pages.get(owner)
@@ -225,7 +217,6 @@ def test_category_filter_results_respect_page_permissions(get_admin, get_user):
     _expect_result_includes_excludes(results, visible, hidden)
 
 
-# @matrix filters : description run-results string-condition
 def test_category_filter_by_page_description(get_admin):
     user = get_admin()
     category, matching_page, excluded_page, _, _ = _category_filter_context(user)
@@ -238,7 +229,6 @@ def test_category_filter_by_page_description(get_admin):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @matrix filters : category entity-condition run-results
 def test_category_filter_by_additional_category(get_admin):
     user = get_admin()
     category, matching_page, excluded_page, _, extra_category = (
@@ -253,7 +243,6 @@ def test_category_filter_by_additional_category(get_admin):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @matrix filters : boolean-condition public run-results
 def test_category_filter_by_public_page(get_admin):
     user = get_admin()
     category, _, excluded_page, public_document_page, _ = (
@@ -268,7 +257,6 @@ def test_category_filter_by_public_page(get_admin):
     _expect_result_includes_excludes(results, public_document_page, excluded_page)
 
 
-# @matrix filters : boolean-condition document run-results
 def test_category_filter_by_document_asset(get_admin):
     user = get_admin()
     category, _, excluded_page, public_document_page, _ = (
@@ -283,7 +271,6 @@ def test_category_filter_by_document_asset(get_admin):
     _expect_result_includes_excludes(results, public_document_page, excluded_page)
 
 
-# @matrix filters : attached-form run-results string-condition
 def test_category_filter_by_attached_form_text_condition(get_admin):
     user = get_admin()
     filters, matching_page, excluded_page = _attached_form_filter_context(user)
@@ -298,7 +285,6 @@ def test_category_filter_by_attached_form_text_condition(get_admin):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @matrix filters : attached-form number-condition run-results
 def test_category_filter_by_attached_form_number_condition(get_admin):
     user = get_admin()
     filters, matching_page, excluded_page = _attached_form_filter_context(user)
@@ -313,7 +299,6 @@ def test_category_filter_by_attached_form_number_condition(get_admin):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @matrix filters : attached-form boolean-condition run-results
 def test_category_filter_by_attached_form_checkbox_condition(get_admin):
     user = get_admin()
     filters, matching_page, excluded_page = _attached_form_filter_context(user)
@@ -326,7 +311,6 @@ def test_category_filter_by_attached_form_checkbox_condition(get_admin):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @matrix filters : attached-form run-results select-condition
 def test_category_filter_by_attached_form_select_condition(get_admin):
     user = get_admin()
     filters, matching_page, excluded_page = _attached_form_filter_context(user)
@@ -341,8 +325,6 @@ def test_category_filter_by_attached_form_select_condition(get_admin):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @matrix filters : reload-persistence save saved-filters
-# @pairs polling:category-index reconnect-refresh:category-index
 # @template categories/index.html::view
 def test_category_saved_filter_save_and_run(get_admin, browser_failures):
     user = get_admin()

@@ -32,7 +32,6 @@ from lagniappe.core.mutations import plan_mutation
 from testing.utility.test_entities import TestEntities, TestUser as UtilityTestUser
 
 
-# @pair model-task:reference-links
 def test_model_task_reference_retains_project_without_loading_relations():
     project = Project(testing=True)
     project._key = datastore.Key("models", "link-project", project="test")
@@ -52,7 +51,6 @@ def test_model_task_reference_retains_project_without_loading_relations():
     assert project.reference_details["id"] == project.urlsafe_key
 
 
-# @matrix project : ai-value cache column description filter-value html-stripping
 @pytest.mark.unit
 def test_project_description(get_test_entities):
     """Description strips markup while preserving text, case, and whitespace."""
@@ -73,7 +71,6 @@ def test_project_description(get_test_entities):
             assert project.to_ai()["description"] == expected
 
 
-# @matrix project : ai-value cache document filter-value
 @pytest.mark.unit
 def test_project_document(get_test_entities):
     """Test Document property with CacheMixin, FilterMixin, AIMixin.
@@ -100,7 +97,6 @@ def test_project_document(get_test_entities):
             assert project.to_filter_index()["has_document"] is False
 
 
-# @matrix project : document-state markup-fallback
 @pytest.mark.unit
 def test_project_document_state_uses_markup_when_no_ydoc():
     """Project document state falls back to saved HTML when no YDoc snapshot exists."""
@@ -142,7 +138,6 @@ def test_document_computed_value_and_kind_reject_writes():
     assert document.kind == "project"
 
 
-# @matrix project : filter-value public
 @pytest.mark.unit
 def test_project_is_public(get_test_entities):
     """Test IsPublic property with FilterMixin.
@@ -168,7 +163,6 @@ def test_project_is_public(get_test_entities):
         assert project.to_filter_index()["is_public"] is is_public
 
 
-# @matrix filters project task : conditions entity-fields filter-value
 @pytest.mark.unit
 def test_project_filters(get_test_entities, get_schema):
     """Test ProjectFilters produces filter conditions and tasks have correct filter values.
@@ -271,7 +265,6 @@ def test_project_filters(get_test_entities, get_schema):
                     if key in projected_fields} == task.test_spec["expected_filter"]
 
 
-# @matrix filters permissions project : conditions entity-fields view-access
 @pytest.mark.unit
 def test_project_filter_conditions_include_only_viewable_entity_fields(monkeypatch):
     viewer = UtilityTestUser(
@@ -327,7 +320,6 @@ def test_project_filter_conditions_include_only_viewable_entity_fields(monkeypat
     assert hidden_form.hash not in entity_hashes
 
 
-# @matrix model-task permissions project : attached-form restricted-access
 @pytest.mark.unit
 def test_model_task_access_is_independent_of_attached_form_restrictions():
     viewer = UtilityTestUser(
@@ -361,7 +353,6 @@ def test_model_task_access_is_independent_of_attached_form_restrictions():
     )
 
 
-# @matrix project : db-load model-tasks ordering relation-attach
 @pytest.mark.unit
 def test_model_tasks_load_attach_and_order_from_database():
     """ModelTasks lazy-loads project children, attaches parent, and orders appends."""
@@ -405,7 +396,6 @@ def test_model_tasks_load_attach_and_order_from_database():
     assert model_two.order == 2
 
 
-# @matrix project : description identity update
 @pytest.mark.unit
 def test_project_update_sets_identity_and_description():
     """Project.update owns identity and description normalization."""
@@ -422,7 +412,6 @@ def test_project_update_sets_identity_and_description():
     assert project.description == "Safe  description"
 
 
-# @matrix model-task project : create ordering relation-save update
 @pytest.mark.unit
 def test_model_task_entity_create_update_order_and_save_relations():
     """ModelTask.create/update/order/save remain focused on model-task relations."""
@@ -482,7 +471,6 @@ def test_model_task_entity_create_update_order_and_save_relations():
     assert writes[form.key].property_mask == ("modified",)
 
 
-# @matrix project : attach details model-task-parent
 @pytest.mark.unit
 def test_model_task_project_parent_details_and_attach():
     """ModelTaskProject resolves stored project keys for details/attach."""

@@ -23,7 +23,6 @@ from testing.utility.test_entities import TestEntities
 pytestmark = pytest.mark.unit
 
 
-# @matrix notes : empty-presence revision-bound
 def test_empty_notes_hint_is_bound_to_the_page_revision(monkeypatch):
     page = TestEntities.get("PAGE", {"name": "Empty notes", "hash": "empty-notes"})
     saved = []
@@ -88,7 +87,6 @@ def _note(parent, author, *, visibility="private", scope="home", body="Note"):
     return note
 
 
-# @matrix notes : author body create defaults parent photo scope visibility
 def test_note_create_persists_body_photo_visibility_and_scope(monkeypatch):
     author = _user("Author", "note-create-author")
     photo = SimpleNamespace(filename="note.jpg")
@@ -136,7 +134,6 @@ def test_note_create_persists_body_photo_visibility_and_scope(monkeypatch):
         Entities.NOTE.create({"parent": author})
 
 
-# @matrix notes : persistence scope validation visibility
 def test_note_visibility_and_scope_validate_values():
     author = _user("Author", "note-values-author")
     note = _note(author, author)
@@ -155,7 +152,6 @@ def test_note_visibility_and_scope_validate_values():
         note.scope = "category"
 
 
-# @matrix notes permissions : creator home owner page private shared
 def test_note_permissions_follow_visibility_scope_and_authorship():
     author = _user("Author", "note-permission-author")
     viewer = _user("Viewer", "note-permission-viewer")
@@ -241,7 +237,6 @@ class _ActivityFilter:
         return self
 
 
-# @matrix activity : ancestor query multi-type type-order
 @pytest.mark.parametrize(
     ("types", "expected_filter"),
     [
@@ -268,7 +263,6 @@ def test_activity_query_filters_requested_types(monkeypatch, types, expected_fil
     assert activity_filter.calls == [expected_filter]
 
 
-# @matrix notifications : bounded-page cursor ordinary-discriminator
 def test_notification_page_is_bounded_and_excludes_aggregate_rows(monkeypatch):
     class PageResult(list):
         next_cursor = "next-cursor"
@@ -301,7 +295,6 @@ def test_notification_page_is_bounded_and_excludes_aggregate_rows(monkeypatch):
     ]
 
 
-# @matrix notifications : cold-seed keys-only
 def test_notification_keys_query_returns_only_ancestor_keys(monkeypatch):
     query = _ActivityQuery(
         [
@@ -327,7 +320,6 @@ def test_notification_keys_query_returns_only_ancestor_keys(monkeypatch):
     ]
 
 
-# @matrix notes permissions : home ordering owner private shared
 def test_home_notes_return_only_visible_notes(monkeypatch):
     now = datetime.now(UTC)
     public = _RawActivity(
@@ -386,7 +378,6 @@ def test_home_notes_return_only_visible_notes(monkeypatch):
     ]
 
 
-# @matrix mutations notes : save owner-invalidation
 def test_note_save_touches_parent_and_author():
     author = _user("Author", "note-save-author")
     page = TestEntities.get("PAGE", {"name": "Save Notes", "hash": "save-notes"})
@@ -411,7 +402,6 @@ def test_note_save_touches_parent_and_author():
         assert (MutationEffectType.CACHE_REFRESH, owner.key) not in effects
 
 
-# @matrix mutations notes : delete owner-invalidation page-cascade user-cascade
 def test_note_delete_repairs_owners_and_parent_cascades(monkeypatch):
     author = _user("Author", "note-delete-author")
     page = TestEntities.get("PAGE", {"name": "Delete Notes", "hash": "delete-notes"})

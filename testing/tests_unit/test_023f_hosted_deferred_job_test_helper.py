@@ -30,7 +30,6 @@ class _Page:
         return _Handle()
 
 
-# @matrix deferred-jobs hosted-e2e : polling revision timing
 def test_hosted_transition_poll_starts_after_existing_revision():
     page = _Page()
 
@@ -52,7 +51,6 @@ def test_hosted_transition_poll_starts_after_existing_revision():
     ) * 1_000
 
 
-# @matrix deferred-jobs hosted-e2e : retry revision scheduling timing
 def test_hosted_retry_waits_for_new_revision_and_scheduled_delay(monkeypatch):
     now = datetime.now(UTC)
     retry_job = SimpleNamespace(

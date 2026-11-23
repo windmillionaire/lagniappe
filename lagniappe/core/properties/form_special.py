@@ -17,13 +17,6 @@ if TYPE_CHECKING:
     from .form_submission import FormSubmission
 
 
-# @testable true
-# @tests tests_unit/test_003c_submission_complex.py::test_signature_field_asset_lifecycle_saves_and_clears_image
-# @tests tests_unit/test_003c_submission_complex.py::test_signature_field_projections_reflect_asset_presence
-# @tests tests_unit/test_013_task_properties.py::test_task_signature_form_submission_saves_asset_id
-# @tests tests_unit/test_013_task_properties.py::test_task_signature_form_submission_saves_multiple_assets_by_field_id
-# @matrix signature submission task : ai-value asset-lifecycle column db-value filter-value multiple-fields schema-id sort
-# @pair signature:form-value
 class Signature(AssetProperty["Entity", ImageAsset, object], FilterMixin, AIMixin, ColumnMixin, SchemaProperty[ImageAsset, object]):
     """Signature image field. Stored as an image asset.
 
@@ -93,11 +86,6 @@ class Signature(AssetProperty["Entity", ImageAsset, object], FilterMixin, AIMixi
         return bool(self.value)
 
 
-# @testable true
-# @tests tests_unit/test_004_form_properties.py::test_form_html_fields
-# @tests tests_unit/test_004e_submission_behavior.py::test_html_field_is_ignored_by_form_submission
-# @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
-# @matrix html-field : asset-isolation asset-lifecycle html-fields render-fetch submit-boundary
 class HTML(AssetProperty["Entity", HTMLAsset, str | None], SchemaProperty[HTMLAsset, str | None]):
     """Rich HTML content field. Stored as an HTML text asset.
 
@@ -162,10 +150,6 @@ class HTML(AssetProperty["Entity", HTMLAsset, str | None], SchemaProperty[HTMLAs
         return asset.url if asset else None
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/form_special.py::Status.status_conditions
-# @covered-by lagniappe/core/properties/form_special.py::Status.ai_value
-# @covered-by lagniappe/core/properties/form_special.py::Status.column_value
 class Status(AIMixin, ColumnMixin, SchemaProperty):
     """Computed status field derived from other form field values.
 
@@ -182,9 +166,6 @@ class Status(AIMixin, ColumnMixin, SchemaProperty):
     _icon = "status"
 
     # Property Attributes
-    # @testable true
-    # @tests tests_unit/test_003c_submission_complex.py::test_submission_status
-    # @pair status:computed
     @property
     def status_conditions(self) -> list[FieldDefinition]:
         """Return the status conditions from the schema."""
@@ -228,10 +209,6 @@ class Status(AIMixin, ColumnMixin, SchemaProperty):
     # Column Attributes
     _ordering = Ordering.EXISTS
 
-    # @testable true
-    # @tests tests_unit/test_003c_submission_complex.py::test_submission_status
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_has_status_renders_status_column
-    # @matrix status : column computed-column
     @property
     def column_value(self) -> list[str]:
         return self.value
@@ -241,9 +218,6 @@ class Status(AIMixin, ColumnMixin, SchemaProperty):
         return bool(self.value)
 
     # AI Attributes
-    # @testable true
-    # @tests tests_unit/test_003c_submission_complex.py::test_submission_status
-    # @matrix status : ai-value computed
     @property
     def ai_value(self) -> list[str]:
         return [cast(str, status_element["text"]) for status_element in self.active_statuses]

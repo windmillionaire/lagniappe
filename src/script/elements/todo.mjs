@@ -4,11 +4,6 @@ import { areEqual } from "../shared/utilities.mjs";
 import { BaseElement } from "./base/baseElement.mjs";
 import { primitives } from "./primitives.mjs";
 
-/**
- * @testable true
- * @tests tests_js/test_032_todo_element_frontend.mjs::test_todo_value_normalization_and_history_reset
- * @matrix form-todo : checked-state normalization
- */
 export const normalizeTodoValue = (value, { resetChecked = false } = {}) => {
 	if (!value || !Array.isArray(value.items)) return null;
 
@@ -23,13 +18,6 @@ export const normalizeTodoValue = (value, { resetChecked = false } = {}) => {
 	return items.length > 0 ? { items } : null;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_032_todo_element_frontend.mjs::test_todo_value_normalization_and_history_reset
- * @tests tests_js/test_032_todo_element_frontend.mjs::test_todo_keyboard_commit_contract
- * @tests tests_e2e/006_tasks/test_006h_task_todo_lists.py::test_task_todo_list_editing_and_history_restore
- * @matrix form-todo : add check default-persistence delete edit history-fill keyboard rename reset
- */
 export class TodoElement extends BaseElement {
 	constructor(renderer, schema, submission) {
 		super(renderer, schema, normalizeTodoValue(submission));
@@ -106,11 +94,6 @@ export class TodoElement extends BaseElement {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_032_todo_element_frontend.mjs::test_todo_title_actions_use_table_style_semantics
-	 * @pair form-todo:title-actions
-	 */
 	_button({ role, icon, label, kind = null, header = false }) {
 		const button = document.createElement("button");
 		button.type = "button";

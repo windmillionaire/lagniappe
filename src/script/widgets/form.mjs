@@ -2,12 +2,6 @@ import { InputElement } from "../elements/input.mjs";
 import { RadioElement } from "../elements/radio.mjs";
 import { FormWidget } from "./base/formWidget.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
- * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
- * @matrix forms : create page-form task-form
- */
 export class CreateForm extends FormWidget {
 	init() {
 		this.messages = {

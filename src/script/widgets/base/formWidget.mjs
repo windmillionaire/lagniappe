@@ -8,19 +8,6 @@ import {
 } from "../../forms/reviewBar.mjs";
 import { withTransition } from "../../shared/transitions.mjs";
 
-/**
- * @testable true
- * @tests tests_js/test_024_edit_watcher.mjs::test_form_revision_snapshot_is_canonical_and_memory_only
- * @matrix edited-entity-notice forms : canonicalization formdata repeated-values revision-only-state
- * @tests tests_js/test_048_form_controls.mjs::test_form_shell_waits_for_html_and_visibility_does_not_rebuild
- * @tests tests_js/test_048_form_controls.mjs::test_form_replacements_serialize_and_adopt_only_latest_controls
- * @tests tests_js/test_048_form_controls.mjs::test_form_discard_and_failure_leave_live_controls_intact
- * @tests tests_js/test_048_form_controls.mjs::test_explicit_revision_reset_can_replace_dirty_form
- * @matrix forms user-groups : initialization conditional-response single-reconciliation rebuild-serialization
- * @matrix forms : teardown reset unsaved-preservation
- * @matrix user-groups : background-update unsaved-preservation reset
- * @tests tests_js/test_048_form_controls.mjs::test_queued_commit_waits_for_newer_replacement
- */
 export class FormWidget {
 	constructor(attributes) {
 		Object.assign(this, attributes);
@@ -211,11 +198,6 @@ export class FormWidget {
 		};
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_local_revision_uses_latest_schema_and_merges_submission_values
-	 * @matrix edited-entity-notice form-schema forms : latest-schema local-values no-schema-version-choice remote-added-values
-	 */
 	buildLocalRevision(response, state = this.captureFormState()) {
 		const latestSchema = response.schema ?? [];
 		const localSchema = state.renderer_schema ?? this.schema ?? [];
@@ -270,10 +252,6 @@ export class FormWidget {
 		commit();
 	}
 
-	/**
-	 * @testable true
-	 * @pair forms:autofill-review
-	 */
 	async prepareLocalRevision(
 		response,
 		{
@@ -319,11 +297,6 @@ export class FormWidget {
 		return commit();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_form_submit_is_blocked_by_schema_migration_but_not_autofill
-	 * @matrix deferred-jobs forms submission : deliberate-submit form-lock no-live-sync
-	 */
 	async prepareSubmit(options) {
 		if (this.deferredLocked) return false;
 		return (await this.form?._subForm?.prepareSubmit?.(options)) ?? true;
@@ -340,11 +313,6 @@ export class FormWidget {
 		this.unsavedState = false;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_offline_queue_does_not_block_initial_form_render
-	 * @pair forms:queue-independent-initial-render
-	 */
 	async init() {
 		if (
 			this.target?.hasAttribute("lp-load") &&
@@ -370,7 +338,6 @@ export class FormWidget {
 		}
 	}
 
-	/** @testable infrastructure */
 	async stageOfflineConflict(conflict = this._offlineConflict) {
 		if (!conflict) return;
 		const watcher =
@@ -469,11 +436,6 @@ export class FormWidget {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_active_deferred_form_waits_for_root_operation_scan
-	 * @matrix deferred-jobs : form-lock reload
-	 */
 	async _initForm({ replace = true } = {}) {
 		if (replace && this.initialTarget) {
 			const visible = this.target?.dataset.visible;
@@ -515,11 +477,6 @@ export class FormWidget {
 		this.target.setAttribute("initialized", "");
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_direct_form_controls_clear_inputs_and_textareas
-	 * @matrix forms : clear direct-fields
-	 */
 	_click(e) {
 		if (this.readonly) return;
 
@@ -556,12 +513,6 @@ export class FormWidget {
 		return this.target?.querySelector('button[type="submit"]:not([data-role])');
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_migration_notice_survives_form_replacement_and_discard
-	 * @tests tests_e2e/003_forms/test_003g_form_changes.py::test_saved_conversion_runs_after_save_and_preserves_originals
-	 * @matrix form-migration : informational-notice
-	 */
 	async prepareReset(options = {}) {
 		if (this._preparingReset) return this._preparingReset;
 		if (this._preparedReset) return;
@@ -718,13 +669,6 @@ export class FormWidget {
 		this._success = true;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_form_response_metadata_stays_with_renderer_widget
-	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_adding_form_from_task_settings_preserves_widget_identity
-	 * @matrix forms : schema-ownership sibling-widgets
-	 * @matrix tasks : attach-form merged-submission widget-identity
-	 */
 	updated(response) {
 		const updatedTarget = response.html?.querySelector(
 			`[data-widget='${this.name}']`,

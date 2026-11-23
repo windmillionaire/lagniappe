@@ -22,7 +22,6 @@ def _app():
     }
 
 
-# @matrix experiments : configuration
 def test_experiments_settings_are_opt_in_and_project_bound():
     assert normalize_experiments_config({})["EXPERIMENTS_ENABLED"] is False
     app = {
@@ -51,7 +50,6 @@ def test_experiments_settings_are_opt_in_and_project_bound():
             normalize_experiments_config({**app, **overrides})
 
 
-# @matrix experiments : configuration
 def test_experiments_preset_preserves_existing_choices_and_rejects_conversion(
     monkeypatch, capsys
 ):
@@ -84,7 +82,6 @@ def test_experiments_preset_preserves_existing_choices_and_rejects_conversion(
     assert "private-test-code" not in capsys.readouterr().out
 
 
-# @matrix experiments : toolchain
 def test_experiments_toolchain_builds_production_without_provisioning_test_resources(
     monkeypatch,
 ):
@@ -114,7 +111,6 @@ def test_experiments_toolchain_builds_production_without_provisioning_test_resou
         experiments.prepare_toolchain()
 
 
-# @matrix experiments : bootstrap
 def test_experiments_bootstrap_verification_requires_saved_accounts(monkeypatch):
     import config
     import requests
@@ -153,7 +149,6 @@ def test_experiments_bootstrap_verification_requires_saved_accounts(monkeypatch)
         experiments.verify_bootstrap()
 
 
-# @matrix experiments : source-identity
 def test_source_identity_includes_dirty_code_and_excludes_credentials(tmp_path):
     source = tmp_path / "lagniappe/core/example.py"
     source.parent.mkdir(parents=True)
@@ -171,9 +166,6 @@ def test_source_identity_includes_dirty_code_and_excludes_credentials(tmp_path):
     assert source_identity(tmp_path) != second
 
 
-# @source installer/__main__.py::_parser
-# @source installer/__main__.py::_dispatch
-# @matrix setup : cli-routing
 def test_experiments_cli_is_an_install_option(monkeypatch):
     from installer import __main__ as cli
     from installer import install
@@ -185,8 +177,6 @@ def test_experiments_cli_is_an_install_option(monkeypatch):
     assert calls == [{"experiments": True}]
 
 
-# @source installer/deploy.py::deploy_to_app_engine
-# @matrix setup : deploy
 def test_experiments_deploy_rebuilds_assets_and_verifies_bootstrap(monkeypatch):
     import config
     from installer import deploy, mcp, monitoring, upgrade_notice

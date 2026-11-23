@@ -9,7 +9,6 @@ import {
 	WORKER_MESSAGES,
 } from "../../src/script/shared/protocol.mjs";
 
-/** @matrix browser-protocol : message-types */
 test("test_browser_protocol_contains_versioned_worker_messages", () => {
 	const details = `Unexpected worker protocol: ${JSON.stringify(WORKER_MESSAGES)}`;
 	assert.equal(Object.keys(WORKER_MESSAGES).length, 2, details);
@@ -21,7 +20,6 @@ test("test_browser_protocol_contains_versioned_worker_messages", () => {
 	);
 });
 
-/** @matrix browser-protocol : connectivity envelope producer validation version */
 test("test_connectivity_messages_are_versioned_and_validated", () => {
 	const state = {
 		browser: "online",
@@ -59,9 +57,6 @@ test("test_connectivity_messages_are_versioned_and_validated", () => {
 	);
 });
 
-/**
- * @matrix browser-protocol request-errors : envelope privacy producer upstream-unavailable validation version
- */
 test("test_upstream_unavailable_messages_are_versioned_and_privacy_bounded", () => {
 	const state = {
 		status: 503,
@@ -109,9 +104,6 @@ test("test_upstream_unavailable_messages_are_versioned_and_privacy_bounded", () 
 	);
 });
 
-/**
- * @matrix connectivity : browser-state controller polling-recovery server-health startup visibility
- */
 test("test_connectivity_state_table_covers_lifecycle_transitions", () => {
 	const state = new ConnectivityState();
 	const cases = [

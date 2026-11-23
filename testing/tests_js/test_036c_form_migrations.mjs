@@ -11,7 +11,6 @@ import {
 } from "../../src/script/views/builder/migrations.mjs";
 import { createBrowser } from "../utility/js/environment.mjs";
 
-/** @matrix form-migration : modify-panel draft-undo */
 test("test_delete_element_commits_panel_and_model_changes_in_one_transition", async (t) => {
 	createBrowser(t);
 	const commits = [];
@@ -92,7 +91,6 @@ test("test_delete_element_commits_panel_and_model_changes_in_one_transition", as
 	]);
 });
 
-/** @matrix form-migration : progress recovery */
 test("test_builder_resumes_migration_polling_and_clears_completed_status", async (t) => {
 	createBrowser(t);
 	const { Header } = await import(
@@ -396,7 +394,6 @@ test("test_builder_resumes_migration_polling_and_clears_completed_status", async
 	}
 });
 
-/** @matrix form-migration : saved-job progress reload recovery */
 test("test_migration_status_uses_notification_and_keeps_save_disabled", async (t) => {
 	createBrowser(t);
 	const { Header } = await import(
@@ -494,7 +491,6 @@ test("test_migration_status_uses_notification_and_keeps_save_disabled", async (t
 	status.destroy();
 });
 
-/** @matrix form-migration : schema-only stable-identity conditions */
 test("test_schema_changes_and_condition_repairs_are_local", () => {
 	const before = [{ id: "a", type: "input", input: "text", title: "Old" }];
 	assert.equal(needsMigration(before, [{ ...before[0], title: "New" }]), false);
@@ -525,7 +521,6 @@ test("test_schema_changes_and_condition_repairs_are_local", () => {
 	]);
 });
 
-/** @matrix form-migration : stale-input representation-aware */
 test("test_incompatible_local_values_require_review", () => {
 	const text = { id: "quantity", type: "input", input: "text" };
 	assert.equal(compatibleField(text, { ...text, title: "New label" }), true);
@@ -545,7 +540,6 @@ test("test_incompatible_local_values_require_review", () => {
 	);
 });
 
-/** @matrix form-migration : stale-input queued-conflict explicit-review */
 test("test_projected_matching_values_do_not_discard_incompatible_drafts", async (t) => {
 	createBrowser(t);
 	const { FormWidget } = await import(

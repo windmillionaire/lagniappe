@@ -37,9 +37,6 @@ CONVERSATION_PAGE_SIZE = 25
 HISTORY_PAGE_SIZE = 50
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/messaging/views.py::conversations
-# @reason peer availability batching is exercised through list and history projections
 def _peer_status(rows, user):
     peers = {
         conversation_values.peer_key(row, user)
@@ -68,9 +65,6 @@ def _peer_status(rows, user):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/messaging/views.py::conversations
-# @reason browser projection is exercised through conversation listing
 def serialize_conversation(
     conversation: DatastoreRow,
     user: User,
@@ -108,17 +102,10 @@ def serialize_conversation(
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/messaging/views.py::conversation_history
-# @reason browser projection is exercised through chronological history
 def serialize_message(message: DatastoreRow, viewer: User) -> dict[str, object]:
     return message_values.projection(message, viewer)
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @matrix messaging : compose-eligibility conversation-page
 def conversations(user: User, cursor: str | None = None, limit: int = CONVERSATION_PAGE_SIZE) -> dict[str, object]:
     if not collaboration.managed_user(user):
         raise PermissionError("Messaging is available to managed users only.")
@@ -145,19 +132,12 @@ def conversations(user: User, cursor: str | None = None, limit: int = CONVERSATI
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/messaging/views.py::conversation_history
-# @reason authorized lookup is exercised through history
 def get_conversation(user: User, conversation_identifier: str | Key) -> DatastoreRow:
     conversation = database_messaging.get_conversation(conversation_identifier)
     message_database.require_participant(conversation, user)
     return cast("DatastoreRow", conversation)
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @matrix messaging : chronological-display history-page participant-privacy
 def conversation_history(
     user: User,
     conversation_identifier: str | Key,

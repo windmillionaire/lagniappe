@@ -18,9 +18,6 @@ DIGEST_ITEM_LIMIT = 100
 DELIVERY_LEASE_SECONDS = 5 * 60
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason clock normalization is exercised through capture and delivery
 def utc(now: datetime | None = None) -> datetime:
     value = now or datetime.now(UTC)
     if value.tzinfo is None:
@@ -28,9 +25,6 @@ def utc(now: datetime | None = None) -> datetime:
     return value.astimezone(UTC)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/policy.py::eligible_user
-# @reason preference normalization is owned by recipient eligibility
 def mode(user: User) -> NotificationEmailMode:
     try:
         return NotificationEmailMode[user.notification_email_mode]
@@ -38,9 +32,6 @@ def mode(user: User) -> NotificationEmailMode:
         return NotificationEmailMode.NONE
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason opt-out generations are enforced through delivery
 def preference_epoch(user: User) -> int:
     value = user.db.get("notification_email_opt_out_epoch")
     if not value:
@@ -50,9 +41,6 @@ def preference_epoch(user: User) -> int:
     return int(value)
 
 
-# @testable true
-# @tests tests_unit/test_029a_notification_email_policy.py::test_notification_email_preference_defaults_and_eligibility
-# @matrix notification-email : eligibility never-logged-in public-user
 def eligible_user(user: object) -> bool:
     """Return whether a user may receive notification email."""
     return bool(
@@ -65,9 +53,6 @@ def eligible_user(user: object) -> bool:
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason local digest timing is exercised through public event capture
 def next_digest(user: User, now: datetime) -> datetime:
     zone = user_timezone(user)
     local_now = now.astimezone(zone)

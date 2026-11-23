@@ -88,9 +88,6 @@ const JSON_ATTRIBUTES = [
 	"options",
 ];
 
-/**
- * @testable infrastructure
- */
 const _attributes = (component, show) => {
 	const settings = {
 		component: component,
@@ -127,11 +124,6 @@ const _attributes = (component, show) => {
 	return settings;
 };
 
-/**
- * @testable false
- * @covered-by src/script/widgets/loader.mjs::loadWidget
- * @reason widget readonly is part of the widget construction contract
- */
 const _defineReadonly = (widget, component) => {
 	Object.defineProperty(widget, "readonly", {
 		configurable: true,
@@ -142,9 +134,6 @@ const _defineReadonly = (widget, component) => {
 	});
 };
 
-/**
- * @testable infrastructure
- */
 class DefaultWidget {
 	constructor(attributes) {
 		Object.assign(this, attributes);
@@ -152,9 +141,6 @@ class DefaultWidget {
 	}
 }
 
-/**
- * @testable infrastructure
- */
 export async function loadWidget(component, show, extraAttributes = {}) {
 	let widget;
 	const attributes = { ..._attributes(component, show), ...extraAttributes };

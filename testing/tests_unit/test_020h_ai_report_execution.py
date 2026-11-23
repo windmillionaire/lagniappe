@@ -103,7 +103,6 @@ def _completion_case(monkeypatch, *, completed=False, recurring=False):
     return user, task, report
 
 
-# @matrix ai-report task-completion : complete preservation recovery
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "completed,recurring",
@@ -155,7 +154,6 @@ def test_complete_task_action_preserves_details_and_retries(
     assert task.completed_on == completion
 
 
-# @matrix ai-report task-completion : complete permissions required-fields
 @pytest.mark.unit
 @pytest.mark.parametrize("denied", [True, False])
 def test_complete_task_action_requires_permission_and_required_fields(
@@ -189,7 +187,6 @@ def test_complete_task_action_requires_permission_and_required_fields(
     )
 
 
-# @matrix ai-report : action-registry contract
 @pytest.mark.unit
 @pytest.mark.parametrize("uses_context", [False, True])
 @pytest.mark.parametrize("with_metadata", [False, True])
@@ -226,7 +223,6 @@ def test_report_action_registry_matches_proposal_contracts(uses_context, with_me
     assert len(calls) == 2
 
 
-# @matrix ai-report : cancellation deterministic-run
 @pytest.mark.unit
 def test_run_report_checks_deferred_execution_guard(monkeypatch):
     report = _attach_report_process(
@@ -266,7 +262,6 @@ def test_run_report_checks_deferred_execution_guard(monkeypatch):
 
 
 
-# @matrix ai-report : cancellation deterministic-run
 @pytest.mark.unit
 def test_run_report_propagates_deferred_control_stop(monkeypatch):
     from lagniappe.core.tools.deferred_jobs.errors import DeferredJobDeadlineError
@@ -320,7 +315,6 @@ def test_run_report_propagates_deferred_control_stop(monkeypatch):
 
 
 
-# @matrix ai-report : completed-prefix create deterministic-run idempotency recovery
 @pytest.mark.unit
 def test_run_report_retry_resumes_after_completed_create_without_duplicate(monkeypatch):
     from lagniappe.core.tools.ai.reporting.execution import batch
@@ -394,7 +388,6 @@ def test_run_report_retry_resumes_after_completed_create_without_duplicate(monke
 
 
 
-# @matrix ai-report : completed-prefix deterministic-run permissions recovery
 @pytest.mark.unit
 def test_run_report_retry_continues_independent_work_after_completed_entity_changes(
     monkeypatch,
@@ -459,7 +452,6 @@ def test_run_report_retry_continues_independent_work_after_completed_entity_chan
 
 
 
-# @matrix ai-report : deterministic-run idempotency post-commit-checkpoint recovery
 @pytest.mark.unit
 def test_run_report_reconciles_applying_create_when_output_already_exists(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -523,7 +515,6 @@ def test_run_report_reconciles_applying_create_when_output_already_exists(monkey
 
 
 
-# @matrix ai-report : completed-task deterministic-run recovery reuse
 @pytest.mark.unit
 def test_completed_task_retry_preserves_reused_completion(monkeypatch):
     from lagniappe.core.tools.ai.reporting.execution import batch
@@ -614,7 +605,6 @@ def test_completed_task_retry_preserves_reused_completion(monkeypatch):
     ]
 
 
-# @matrix ai-report : completed-task-history grouping result
 @pytest.mark.unit
 def test_grouped_result_actions_groups_page_files_tasks_and_summaries():
     user = _test_user("page-result-owner")
@@ -747,7 +737,6 @@ def test_grouped_result_actions_groups_page_files_tasks_and_summaries():
 
 
 
-# @matrix ai-report : completed-task-history grouping result
 @pytest.mark.unit
 def test_grouped_result_actions_groups_completed_task_history_under_created_task():
     user = _test_user("history-result-owner")

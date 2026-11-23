@@ -14,7 +14,6 @@ from testing.utility.network import manual_mutation_headers
 pytestmark = pytest.mark.e2e
 
 
-# @matrix forms : index-view permission-gates
 # @template forms/index.html::view
 def test_form_index_forbidden_without_forms_view(get_user, browser_failures):
     user = get_user(Users.user_one_category)
@@ -25,7 +24,6 @@ def test_form_index_forbidden_without_forms_view(get_user, browser_failures):
         expect(user.page).to_have_title("Error 403")
 
 
-# @matrix forms : create-control index-view
 # @template forms/index.html::view
 def test_form_index_lists_forms_but_hides_create_without_forms_create(get_admin, get_user):
     owner = get_admin()
@@ -39,7 +37,6 @@ def test_form_index_lists_forms_but_hides_create_without_forms_create(get_admin,
     expect(viewer.locate(FormIndex.CREATE_FORM_BUTTON)).not_to_be_attached()
 
 
-# @matrix forms : create-control index-view
 # @template forms/index.html::view
 def test_form_index_shows_create_for_user_with_forms_create(get_user):
     user = get_user(Users.admin)
@@ -51,7 +48,6 @@ def test_form_index_shows_create_for_user_with_forms_create(get_user):
     expect(user.locate(FormIndex.CREATE_FORM_BUTTON)).to_be_visible()
 
 
-# @matrix forms : builder-edit permission-gates
 # @template forms/builder.html::main
 def test_form_builder_hides_edit_affordances_without_forms_edit(get_admin, get_user):
     owner = get_admin()
@@ -74,7 +70,6 @@ def test_form_builder_hides_edit_affordances_without_forms_edit(get_admin, get_u
     expect(viewer.locate("[data-role='generate']")).not_to_be_attached()
 
 
-# @matrix forms : builder-edit permission-gates
 # @template forms/builder.html::main
 def test_form_builder_shows_edit_affordances_with_forms_edit(get_admin, get_user):
     owner = get_admin()
@@ -90,7 +85,6 @@ def test_form_builder_shows_edit_affordances_with_forms_edit(get_admin, get_user
     expect(user.locate("[data-role='generate']")).to_be_attached()
 
 
-# @matrix forms : permission-gates restriction-control
 # @template forms/restrictions.html::restrict_access
 @pytest.mark.e2e_group("owner")
 def test_form_builder_restrictions_visible_only_for_site_owner(get_user):
@@ -111,7 +105,6 @@ def test_form_builder_restrictions_visible_only_for_site_owner(get_user):
     expect(save).to_be_enabled()
 
 
-# @matrix ai forms : submitted-reference
 @pytest.mark.e2e_group("owner")
 def test_schema_generation_requires_edit_access_to_submitted_form(get_user):
     owner = get_user(Users.OWNER)

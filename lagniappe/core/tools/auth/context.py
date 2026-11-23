@@ -20,12 +20,6 @@ def current_context_user(user: LocalProxy[User | None]) -> LocalProxy[User | Non
 def current_context_user(user: Literal[False]) -> Literal[False]: ...
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_current_user_prefers_explicit_user
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_current_user_uses_config_test_user_without_request
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_current_user_prefers_flask_user_over_config
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_current_user_prefers_agent_api_user_over_flask_user
-# @matrix agent-api testing users : bearer-user config-mutable current-user flask-request resolver
 def current_context_user(
     user: User | LocalProxy[User | None] | Literal[False] | None = None,
 ) -> User | LocalProxy[User | None] | Literal[False] | None:

@@ -90,7 +90,6 @@ def _go_to_search_page(user, query):
     expect(results_view).to_have_attribute("initialized", "")
 
 
-# @pair search:anonymous-access
 def test_search_page_requires_login(get_user):
     anonymous = get_user(Users.ANONYMOUS)
     base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
@@ -101,7 +100,6 @@ def test_search_page_requires_login(get_user):
     )
 
 
-# @matrix search : navbar-submit page-navigation results
 # @template nav.html::navbar
 def test_search_from_navbar(get_admin, get_user):
     user = get_admin()
@@ -123,7 +121,6 @@ def test_search_from_navbar(get_admin, get_user):
     )
 
 
-# @pair search:query-display
 # @template search/search.html::main
 def test_search_page_shows_query(get_admin, get_user):
     user = get_admin()
@@ -135,7 +132,6 @@ def test_search_page_shows_query(get_admin, get_user):
     )
 
 
-# @pair search:results
 def test_search_returns_results(get_admin, get_user):
     user = get_admin()
     project = Projects.test_create_project_manual_mode.get(user)
@@ -144,7 +140,6 @@ def test_search_returns_results(get_admin, get_user):
     expect(user.locate(SEARCH_RESULTS)).to_contain_text(project.definition.name)
 
 
-# @pair search:no-results
 # @template search/results.html::search_results
 def test_search_no_results(get_admin, get_user):
     user = get_admin()
@@ -153,7 +148,6 @@ def test_search_no_results(get_admin, get_user):
     expect(user.locate(SEARCH_RESULTS)).to_contain_text("No matches")
 
 
-# @pair search:result-title
 # @template search/results.html::search_results
 def test_search_result_titles(get_admin, get_user):
     user = get_admin()
@@ -167,7 +161,6 @@ def test_search_result_titles(get_admin, get_user):
     expect(title).to_have_attribute("data-kind", "project")
 
 
-# @pair search:primary-name-ranking
 # @template search/results.html::search_results
 def test_primary_name_matches_rank_above_file_name_and_description_matches(get_admin, get_user):
     user = get_admin()
@@ -193,7 +186,6 @@ def test_primary_name_matches_rank_above_file_name_and_description_matches(get_a
     expect(titles.nth(3)).to_have_attribute("data-kind", "file")
 
 
-# @matrix search : details-hydration parent-refresh
 # @template search/results.html::search_results
 def test_search_result_parent_details_refresh_after_category_rename(get_admin, get_user):
     user = get_admin()
@@ -214,7 +206,6 @@ def test_search_result_parent_details_refresh_after_category_rename(get_admin, g
     expect(user.locate(SEARCH_RESULTS)).not_to_contain_text(original_parent_name)
 
 
-# @pair search:snippets
 # @template search/results.html::search_results
 def test_search_result_snippets(get_admin, get_user):
     user = get_admin()
@@ -234,7 +225,6 @@ def test_search_result_snippets(get_admin, get_user):
     expect(result.locator("b").filter(has_text=snippet_term)).to_be_visible()
 
 
-# @pair search:facets
 # @template search/search.html::facet_button
 def test_facets_displayed(get_admin, get_user):
     user = get_admin()
@@ -245,7 +235,6 @@ def test_facets_displayed(get_admin, get_user):
     expect(user.locate(SEARCH_FACET)).not_to_have_count(0)
 
 
-# @matrix search : facet-filter results url-state
 # @template search/search.html::facet_button
 def test_click_facet_filters_results(get_admin, get_user):
     user = get_admin()
@@ -263,7 +252,6 @@ def test_click_facet_filters_results(get_admin, get_user):
     expect(user.locate(SEARCH_RESULTS)).to_be_visible()
 
 
-# @pair search:facet-state
 # @template search/search.html::facet_button
 def test_facet_selection_visual_state(get_admin, get_user):
     user = get_admin()
@@ -283,7 +271,6 @@ def test_facet_selection_visual_state(get_admin, get_user):
     expect(category_facet).to_have_attribute("data-selected", "false")
 
 
-# @pair search:clear-facet
 # @template search/search.html::main
 def test_clear_facet_filter(get_admin, get_user):
     user = get_admin()
@@ -314,7 +301,6 @@ def test_clear_facet_filter(get_admin, get_user):
     )
 
 
-# @matrix search : facet-filter result-links task-model
 # @template search/search.html::facet_button
 # @template search/results.html::search_results
 def test_task_facet_includes_task_and_model_results_with_links(get_admin, get_user):
@@ -367,8 +353,6 @@ def test_task_facet_includes_task_and_model_results_with_links(get_admin, get_us
     expect(completed_row.locator("span[data-icon='selected']")).to_have_count(1)
     expect(completed_row.locator("span[data-icon='unselected']")).to_have_count(0)
 
-# @matrix search : navbar-results result-links task-model
-# @matrix template-formatting : safe-json tojson
 # @template nav.html::search_results
 # @template common.html::format_name
 def test_navbar_task_results_render_current_completion_state(get_admin, get_user):
@@ -409,7 +393,6 @@ def test_navbar_task_results_render_current_completion_state(get_admin, get_user
     expect(completed_option.locator("span[data-icon='selected']")).to_have_count(1)
 
 
-# @pair search:result-navigation
 # @template search/results.html::search_results
 def test_click_result_navigates(get_admin, get_user):
     user = get_admin()
@@ -427,7 +410,6 @@ def test_click_result_navigates(get_admin, get_user):
     expect(user.locate("[data-nav='view'] [data-role='title']")).to_contain_text(name)
 
 
-# @pair search:result-links
 # @template search/results.html::search_results
 def test_result_links_correct(get_admin, get_user):
     user = get_admin()
@@ -443,7 +425,6 @@ def test_result_links_correct(get_admin, get_user):
     )
 
 
-# @pair search:pagination
 # @template search/results.html::footer
 def test_pagination_controls_visible(get_admin, get_user):
     user = get_admin()
@@ -463,7 +444,6 @@ def test_pagination_controls_visible(get_admin, get_user):
     expect(user.locate(f"{PAGINATION_BUTTON}[data-page='1']")).to_be_visible()
 
 
-# @pair search:pagination-next
 # @template search/results.html::footer
 def test_next_page(get_admin, get_user):
     user = get_admin()
@@ -484,7 +464,6 @@ def test_next_page(get_admin, get_user):
     )
 
 
-# @pair search:pagination-previous
 # @template search/results.html::footer
 def test_previous_page(get_admin, get_user):
     user = get_admin()
@@ -508,7 +487,6 @@ def test_previous_page(get_admin, get_user):
     )
 
 
-# @pair search:exact-match
 def test_search_exact_match(get_admin, get_user):
     user = get_admin()
     name = _unique("exact")
@@ -519,7 +497,6 @@ def test_search_exact_match(get_admin, get_user):
     expect(_result_titles(user).filter(has_text=name)).to_be_visible()
 
 
-# @pair search:partial-match
 def test_search_partial_match(get_admin, get_user):
     user = get_admin()
     token = f"partial{uuid4().hex[:10]}"
@@ -531,7 +508,6 @@ def test_search_partial_match(get_admin, get_user):
     expect(_result_titles(user).filter(has_text=name)).to_be_visible()
 
 
-# @pair search:special-characters
 def test_search_special_characters(get_admin, get_user):
     user = get_admin()
     token = uuid4().hex[:8]

@@ -22,9 +22,6 @@ type _Author = models.User
 type _InputFile = models.File
 
 
-# @testable true
-# @tests tests_unit/test_002j_notes.py::test_note_visibility_and_scope_validate_values
-# @matrix notes : persistence validation visibility
 class Visibility(DBProperty[str]):
     """Who may see a note within its owning surface."""
 
@@ -42,9 +39,6 @@ class Visibility(DBProperty[str]):
         self._write_db_value(value)
 
 
-# @testable true
-# @tests tests_unit/test_002j_notes.py::test_note_visibility_and_scope_validate_values
-# @matrix notes : persistence scope validation
 class Scope(DBProperty[str]):
     """Surface that owns and displays a note."""
 
@@ -97,9 +91,6 @@ class Instructions(DBProperty[str]):
     _id = "instructions"
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
-# @matrix activity notes : body html-stripping
 class Body(DBProperty[str]):
     """Plain-text body for notes and notifications."""
 
@@ -116,9 +107,6 @@ class Body(DBProperty[str]):
         self._write_db_value(body)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
-# @matrix activity notes : asset-lifecycle photo
 class Photo(AssetProperty):
     """Optional image asset attached to a note."""
 

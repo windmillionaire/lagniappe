@@ -35,10 +35,6 @@ if len(sys.argv) > 1 and sys.argv[1] in {"browser-review", "test", "test-server"
     os.environ["FLASK_ENV"] = "testing"
 
 
-# @testable false
-# @covered-by run.py::configure_test_environment
-# @covered-by run.py::run_tests
-# @reason pure environment flag shared by the two test-runner launch boundaries
 def hosted_e2e_enabled() -> bool:
     return os.environ.get("LAGNIAPPE_HOSTED_E2E", "").strip().casefold() in {
         "1",
@@ -48,9 +44,6 @@ def hosted_e2e_enabled() -> bool:
     }
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_configure_test_environment_only_sets_import_environment
-# @matrix testing : environment
 def configure_test_environment(*, includes_e2e: bool) -> None:
     """Set test env vars before pytest imports the app package."""
     os.environ["FLASK_ENV"] = "testing"
@@ -125,9 +118,6 @@ def _run_pytest_subprocess(command: list[str]) -> int:
 MCP_E2E_TEST = "testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py"
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_unit_partitions_adapter_once_and_merges_results
-# @matrix mcp-package testing : result-aggregation exit-status
 def _combine_pytest_exit_statuses(*statuses: int) -> int:
     """Combine partitions while treating an empty companion selection as neutral."""
     for status in statuses:
@@ -136,9 +126,6 @@ def _combine_pytest_exit_statuses(*statuses: int) -> int:
     return 0 if 0 in statuses else 5
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_merge_mcp_test_evidence_validates_and_forwards_outcomes
-# @matrix mcp-package testing traceability : result-aggregation test-evidence
 def _merge_mcp_test_evidence(
     result_path: Path,
     full_command: list[str],
@@ -186,18 +173,6 @@ def _merge_mcp_test_evidence(
     )
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_e2e_aligns_adc_before_pytest
-# @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_focused_adapter_uses_only_locked_package_bridge
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_unit_partitions_adapter_once_and_merges_results
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_adapter_preflight_stops_before_root_test_work
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_hosted_adapter_selection_checks_prebuilt_environment
-# @matrix hosted-e2e testing : cli-routing
-# @matrix hosted-e2e mcp-package testing : environment-check isolation
-# @matrix mcp-package testing : cli-routing environment-isolation no-duplicate-collection
-# @matrix mcp-package testing : fail-closed local-preflight repair-guidance
-# @pairs hosted-e2e:frontend-build testing:adc
 def run_tests(test_args: list[str]) -> int:
     """Run pytest through the repo wrapper.
 
@@ -474,10 +449,6 @@ def run_test_server_command(command_args: list[str]) -> int:
         return 1
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_auth_runs_interactive_human_adc_alignment
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_auth_reports_alignment_failure
-# @matrix auth : adc explicit-command interactive runtime-identity
 def run_auth_command(command_args: list[str]) -> int:
     """Interactively align human ADC for local runtime impersonation."""
     parser = argparse.ArgumentParser(
@@ -588,11 +559,6 @@ def _update_reporting_privacy_version(version: str) -> tuple[Path, ...]:
     return tuple(path for path, _content in updates)
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_version_show_uses_package_only_before_generated_settings_exist
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_version_note_appends_concise_release_entry
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_version_set_updates_package_settings_and_release_file
-# @pair version:cli-routing
 def run_version_command(command_args: list[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="run.py version",
@@ -649,10 +615,6 @@ def run_version_command(command_args: list[str]) -> int:
     return 1
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_upgrade_dependencies_runs_dependency_upgrade
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_upgrade_dependencies_rejects_software_upgrade_branch
-# @matrix dependencies : cli-routing upgrade
 def run_dependency_upgrade_command(command_args: list[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="run.py upgrade-dependencies",
@@ -744,9 +706,6 @@ def _read_release_json(
     return value
 
 
-# @testable false
-# @covered-by run.py::release_readiness_issues
-# @reason optional Git-object reads are exercised through migration-aware release checks
 def _read_optional_git_text(
     repo_root: Path,
     object_spec: str,
@@ -757,9 +716,6 @@ def _read_optional_git_text(
         return None
 
 
-# @testable false
-# @covered-by run.py::release_readiness_issues
-# @reason literal catalog extraction is exercised through release-check acceptance tests
 def _migration_catalog_metadata(content: str) -> dict[str, dict]:
     """Extract immutable migration metadata without importing application code."""
     tree = ast.parse(content)
@@ -818,10 +774,6 @@ def _migration_catalog_metadata(content: str) -> dict[str, dict]:
     return catalog
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_major_version_for_new_migration
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_matching_migration_release_metadata
-# @matrix release migrations : major-version release-note version-metadata
 def _migration_release_issues(
     repo_root: Path,
     merge_base: str,
@@ -905,17 +857,6 @@ def _migration_release_issues(
     return issues
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_accepts_complete_release
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_development_build
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_incomplete_release
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_aligned_node_declarations
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_major_version_for_new_migration
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_requires_matching_migration_release_metadata
-# @matrix release : build-mode delivery-tree
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_reuses_valid_production_build
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_stale_or_modified_build
-# @matrix migrations release : major-version release-note version-metadata
 def release_readiness_issues(
     repo_root: Path,
     base_ref: str,

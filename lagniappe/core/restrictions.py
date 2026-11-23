@@ -4,7 +4,6 @@ from enum import Enum
 from typing import Literal, TypeIs
 
 
-# @testable infrastructure
 class Restriction(Enum):
     """Sentinel values for permission restriction filters.
 

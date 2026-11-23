@@ -17,26 +17,11 @@ const ARTIFACT_INVENTORY_PATH =
 	process.env.LAGNIAPPE_FRONTEND_ARTIFACT_INVENTORY;
 const recordedArtifacts = new Set();
 
-/**
- * @testable false
- * @covered-by build/publication.mjs::publishFrontendBuild
- * @reason private repository path adapter exercised through publication
- */
 const repositoryPath = (root, pathValue) => resolve(root, pathValue);
 
-/**
- * @testable false
- * @covered-by build/publication.mjs::recordBuildArtifacts
- * @reason private path normalizer exercised through emitted inventories
- */
 const repositoryRelativePath = (root, pathValue) =>
 	relative(root, resolve(root, pathValue)).split("\\").join("/");
 
-/**
- * @testable false
- * @covered-by build/publication.mjs::publishFrontendBuild
- * @reason private path guard exercised through publication failure tests
- */
 const safeRelativePath = (pathValue) => {
 	if (
 		typeof pathValue !== "string" ||
@@ -57,11 +42,6 @@ const safeRelativePath = (pathValue) => {
 	return normalized;
 };
 
-/**
- * @testable false
- * @covered-by build/publication.mjs::publishFrontendBuild
- * @reason private durability helper exercised through completion-marker tests
- */
 const atomicWrite = (pathValue, content) => {
 	mkdirSync(dirname(pathValue), { recursive: true });
 	const temporary = `${pathValue}.tmp-${process.pid}`;
@@ -73,11 +53,6 @@ const atomicWrite = (pathValue, content) => {
 	}
 };
 
-/**
- * @testable false
- * @covered-by build/publication.mjs::frontendSourceIdentity
- * @reason private contract loader exercised through source identity tests
- */
 const publicationContract = (root = process.cwd()) => {
 	const value = JSON.parse(
 		readFileSync(repositoryPath(root, CONTRACT_PATH), "utf8"),
@@ -88,30 +63,15 @@ const publicationContract = (root = process.cwd()) => {
 	return value;
 };
 
-/**
- * @testable false
- * @covered-by build/publication.mjs::publishFrontendBuild
- * @reason shared contract projection used by build cleanup and publication validation
- */
 const exclusiveArtifactRoots = (root = process.cwd()) =>
 	publicationContract(root).exclusive_artifact_roots.map((pathValue) =>
 		repositoryPath(root, safeRelativePath(pathValue)),
 	);
 
-/**
- * @testable false
- * @covered-by build/publication.mjs::frontendSourceIdentity
- * @reason private recursive enumerator exercised through source identity tests
- */
 const filesUnder = (root, relativeRoot) => {
 	const directory = repositoryPath(root, relativeRoot);
 	if (!existsSync(directory) || !statSync(directory).isDirectory()) return [];
 	const files = [];
-	/**
-	 * @testable false
-	 * @covered-by build/publication.mjs::filesUnder
-	 * @reason private recursive step owned by the directory enumerator
-	 */
 	const visit = (current) => {
 		for (const entry of readdirSync(current, { withFileTypes: true })) {
 			const pathValue = join(current, entry.name);
@@ -127,9 +87,6 @@ const filesUnder = (root, relativeRoot) => {
 /**
  * Hash the complete portable source surface used by frontend publication.
  *
- * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.mjs::test_frontend_publication_records_recursive_artifacts_and_source_identity
- * @pair frontend-build:source-integrity
  */
 const frontendSourceIdentity = (root = process.cwd()) => {
 	const contract = publicationContract(root);
@@ -158,11 +115,6 @@ const frontendSourceIdentity = (root = process.cwd()) => {
 	return digest.digest("hex");
 };
 
-/**
- * @testable false
- * @covered-by build/publication.mjs::recordBuildArtifacts
- * @reason private Rollup output adapter exercised through inventory tests
- */
 const outputArtifactPath = (outputOptions, fileName) => {
 	if (outputOptions.dir) return join(outputOptions.dir, fileName);
 	if (outputOptions.file) return join(dirname(outputOptions.file), fileName);
@@ -172,9 +124,6 @@ const outputArtifactPath = (outputOptions, fileName) => {
 /**
  * Collect every emitted Rollup output across the sequential bundle cohort.
  *
- * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.mjs::test_frontend_publication_records_recursive_artifacts_and_source_identity
- * @matrix frontend-build : artifact-inventory nested-chunks
  */
 const recordBuildArtifacts = ({
 	final = false,
@@ -216,11 +165,6 @@ const recordBuildArtifacts = ({
 	},
 });
 
-/**
- * @testable false
- * @covered-by build/publication.mjs::publishFrontendBuild
- * @reason private digest serializer exercised through completion-marker tests
- */
 const artifactRecord = (root, pathValue) => {
 	const content = readFileSync(repositoryPath(root, pathValue));
 	return {
@@ -233,10 +177,6 @@ const artifactRecord = (root, pathValue) => {
 /**
  * Commit build metadata only after Rollup and every external build hook pass.
  *
- * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.mjs::test_frontend_publication_records_recursive_artifacts_and_source_identity
- * @tests tests_js/test_022_build_chunk_versioning.mjs::test_frontend_publication_rejects_missing_outputs_and_source_drift
- * @matrix frontend-build : artifact-integrity completion-marker safe-failure source-integrity
  */
 const publishFrontendBuild = ({
 	root = process.cwd(),

@@ -2,9 +2,6 @@
 from collections.abc import Mapping, MutableMapping
 
 
-# @testable false
-# @covered-by config/deployment.py::normalize_deployment_settings
-# @reason shared validation error exercised through deployment normalization
 class DeploymentSettingsError(ValueError):
     """Raised when deployment settings cannot be applied safely."""
 
@@ -13,9 +10,6 @@ MEMORY_SAFE_WORKER_CLASSES = frozenset({"F2", "B2"})
 MEMORY_SAFE_WORKER_LIMIT = 3
 
 
-# @testable false
-# @covered-by config/deployment.py::normalize_deployment_settings
-# @reason shared validation detail for deployment integer settings
 def _deployment_int(settings, defaults, key, label, min_value=1):
     value = settings.get(key, defaults[key])
     try:
@@ -33,9 +27,6 @@ def _deployment_int(settings, defaults, key, label, min_value=1):
     return str(parsed)
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_deployment_settings_normalize_validation
-# @matrix config user-settings : app-yaml deployment-settings memory-pressure validation
 def normalize_deployment_settings(
     deployment_settings: Mapping[str, object] | None,
     *,
@@ -111,10 +102,6 @@ def normalize_deployment_settings(
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_deployment_settings_apply_automatic_scaling_preserves_unowned_app_config
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_deployment_settings_apply_basic_scaling_preserves_unowned_app_config
-# @matrix config : app-yaml deployment-settings
 def apply_deployment_settings(
     app_config: MutableMapping[str, object] | None = None,
     app_settings: MutableMapping[str, object] | None = None,

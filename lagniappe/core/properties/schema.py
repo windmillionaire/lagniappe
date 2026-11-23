@@ -35,10 +35,6 @@ if TYPE_CHECKING:
     from ..mixins.field_host import FieldUser
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/schema.py::SchemaFields.create_field
-# @covered-by lagniappe/core/properties/schema.py::SchemaFields.validate_type
-# @reason small enum-member normalization helper owned by schema field validation
 def _member_name(value: object) -> str | None:
     if not isinstance(value, str):
         return None
@@ -48,9 +44,6 @@ def _member_name(value: object) -> str | None:
     return value.upper()
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/schema.py::Schema.validate_ai
-# @reason small id guard owned by AI schema validation
 def _valid_schema_id(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
@@ -78,10 +71,6 @@ class SchemaFields(Enum):
     BOOKMARK = Bookmark
     STATUS = Status
 
-    # @testable true
-    # @tests tests_unit/test_004b_schema_core.py::test_schema_create_field_unknown_returns_none
-    # @tests tests_unit/test_004b_schema_core.py::test_schema_create_field_known_text_input
-    # @matrix form-schema : field-factory unknown-type
     @classmethod
     def create_field(cls, definition: object, entity: Entity) -> SchemaField | None:
         """Create a field instance from a schema definition."""
@@ -93,9 +82,6 @@ class SchemaFields(Enum):
             return None
         return cls[name].value(definition, entity=entity)
 
-    # @testable true
-    # @matrix ai-report submission : validation failure-isolation
-    # @matrix submission : ai preservation
     @classmethod
     def prepare_ai_field(
         cls,
@@ -115,9 +101,6 @@ class SchemaFields(Enum):
             raise ValidationError("; ".join(map(str, candidate.errors)))
         return candidate
 
-    # @testable true
-    # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_filters_invalid_top_level
-    # @pair form-schema:validation
     @classmethod
     def validate_type(cls, definition: object) -> bool:
         if not isinstance(definition, dict):
@@ -144,13 +127,6 @@ PAGE_DEFAULT_SCHEMA = [
     },
 ]
 
-# @testable true
-# @tests tests_unit/test_004b_schema_core.py::test_schema_canonicalizer_unifies_creation_paths_without_changing_membership
-# @tests tests_unit/test_004b_schema_core.py::test_schema_canonicalizer_rejects_ambiguous_durable_shapes
-# @tests tests_unit/test_004b_schema_core.py::test_schema_canonicalizer_preserves_snapshot_membership
-# @tests tests_unit/test_003g_todo_lists.py::test_todo_schema_is_task_only
-# @matrix form-schema : canonicalization form-type history-snapshot membership validation versioning
-# @pair form-todo:task-only
 def canonicalize_schema(
     value: object,
     *,
@@ -188,14 +164,6 @@ class SchemaFormat(DBProperty[int, "Entity"]):
     _id = "schema_format"
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/schema.py::Schema.value
-# @covered-by lagniappe/core/properties/schema.py::Schema.previous
-# @covered-by lagniappe/core/properties/schema.py::Schema.fields
-# @covered-by lagniappe/core/properties/schema.py::Schema.table_fields
-# @covered-by lagniappe/core/properties/schema.py::Schema.html_fields
-# @covered-by lagniappe/core/properties/schema.py::Schema.required_fields
-# @covered-by lagniappe/core/properties/schema.py::Schema.validate_ai
 class Schema(AIMixin, DBProperty[list[FieldDefinition], "Entity"]):
     """Form schema stored as a JSON list of field definitions.
 
@@ -227,11 +195,6 @@ class Schema(AIMixin, DBProperty[list[FieldDefinition], "Entity"]):
         self._table_fields: dict[str, ColumnField] | None = None
         self._previous: list[FieldDefinition] | Literal[False] = False
 
-    # @testable true
-    # @tests tests_unit/test_004b_schema_core.py::test_schema_previous_and_fields_cache
-    # @tests tests_unit/test_004_form_properties.py::test_form_schema
-    # @tests tests_unit/test_004_form_properties.py::test_form_schema_change_refreshes_table_fields_and_filter_conditions
-    # @matrix form-schema : cache property
     @property
     def value(self) -> list[FieldDefinition]:
         value = super().value or []
@@ -266,18 +229,10 @@ class Schema(AIMixin, DBProperty[list[FieldDefinition], "Entity"]):
         if self.entity.properties.get("filters"):
             cast("Form", self.entity).properties.filters.reset()
 
-    # @testable true
-    # @tests tests_unit/test_004b_schema_core.py::test_schema_previous_and_fields_cache
-    # @pair form-schema:previous
     @property
     def previous(self) -> list[FieldDefinition] | Literal[False]:
         return self._previous
 
-    # @testable true
-    # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_filters_invalid_top_level
-    # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_html_calls_set_html_field
-    # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_table_filters_bad_columns
-    # @matrix form-schema form-table : ai-value columns validation
     def validate_ai(self, value: object) -> None:
         from ..tools.ai.form_content import prepare_static_form_element
 
@@ -319,10 +274,6 @@ class Schema(AIMixin, DBProperty[list[FieldDefinition], "Entity"]):
             if field_id in valid_ids:
                 cast("Form", self.entity).set_html_field(field_id, rendered_content)
 
-    # @testable true
-    # @tests tests_unit/test_004b_schema_core.py::test_schema_previous_and_fields_cache
-    # @tests tests_unit/test_004_form_properties.py::test_form_schema
-    # @matrix form-schema : cache fields property
     @property
     def fields(self) -> dict[str, SchemaField]:
         if self._fields is not None:
@@ -338,9 +289,6 @@ class Schema(AIMixin, DBProperty[list[FieldDefinition], "Entity"]):
         self._fields = value
         self._table_fields = None
 
-    # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_table_fields
-    # @matrix form-schema form-table : table-fields
     @property
     def table_fields(self) -> dict[str, ColumnField]:
         if self._table_fields is not None:
@@ -354,16 +302,10 @@ class Schema(AIMixin, DBProperty[list[FieldDefinition], "Entity"]):
         self._table_fields = table_fields
         return self._table_fields
 
-    # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_html_fields
-    # @matrix form-schema html-field : html-fields
     @property
     def html_fields(self) -> list[HTML]:
         return [f for f in self.fields.values() if isinstance(f, HTML)]
 
-    # @testable true
-    # @tests tests_unit/test_004b_schema_core.py::test_schema_required_fields
-    # @pair form-schema:required-fields
     @property
     def required_fields(self) -> list[SchemaField]:
         return [

@@ -117,7 +117,6 @@ def _analytics_request(user, path, method="GET"):
     )
 
 
-# @pair home:directory-list
 @pytest.mark.e2e
 def test_directory_links_present(get_admin):
     """Test that all directory links are present."""
@@ -136,7 +135,6 @@ def test_directory_links_present(get_admin):
     expect(list_root).not_to_be_visible()
 
 
-# @pair manual:page-load
 # @template manual/content/overview.html::open_source
 @pytest.mark.e2e
 def test_navigate_to_manual_from_home_button(get_admin):
@@ -152,7 +150,6 @@ def test_navigate_to_manual_from_home_button(get_admin):
     expect(source_link).to_contain_text("Source for this installation")
 
 
-# @matrix admin : page-load site-settings
 @pytest.mark.e2e_group("owner")
 @pytest.mark.e2e
 def test_admin_directory_link_opens_admin_settings(get_user):
@@ -173,7 +170,6 @@ def test_admin_directory_link_opens_admin_settings(get_user):
     expect(settings).to_be_visible()
 
 
-# @matrix analytics : accordion dashboard owner-filter page-load period-controls retention-clear
 # Deleting all analytics records and asserting an empty view needs a quiet site.
 @pytest.mark.e2e_serial
 @pytest.mark.e2e
@@ -284,7 +280,6 @@ def test_analytics_dashboard_owner_filter_and_retention_clear(
     assert DATA.datastore.get(recent_key) is None
 
 
-# @pair analytics:internal-request-exclusion
 @pytest.mark.e2e
 def test_analytics_excludes_internal_requests(get_admin):
     owner = get_admin()
@@ -320,9 +315,6 @@ def test_analytics_excludes_internal_requests(get_admin):
         DATA.datastore.delete_multi([row.key for row in saved])
 
 
-# @matrix ai-observability : ai-only independent-clear independent-flags job-correlation
-# @pairs analytics:page-tracking deferred-jobs:diagnostics
-# @pair frontend-build:font-delivery
 # @template analytics/index.html::ai_observability
 # @template analytics/index.html::ai_runs
 # Clearing all diagnostics deletes other workers' terminal jobs before their
@@ -488,7 +480,6 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
     assert DATA.datastore.get(job.key) is None
 
 
-# @matrix manual : metadata popstate section-navigation
 @pytest.mark.e2e
 def test_manual_ajax_section_navigation_and_popstate(get_admin):
     user = get_admin()
@@ -528,7 +519,6 @@ def test_manual_ajax_section_navigation_and_popstate(get_admin):
     expect(content.get_by_role("heading", name="Tasks Live on Pages", exact=True)).to_be_visible()
 
 
-# @pair manual:section-navigation
 @pytest.mark.e2e
 def test_manual_security_section_loads(get_admin):
     user = get_admin()
@@ -559,7 +549,6 @@ def test_manual_security_section_loads(get_admin):
 # @style manual.codeShell
 # @style manual.codeToolbar
 # @style manual.copyButton
-# @pair manual:command-copy
 @pytest.mark.e2e
 def test_manual_installation_commands_are_copyable_and_scroll_on_mobile(
     get_user,
@@ -637,7 +626,6 @@ def test_manual_installation_commands_are_copyable_and_scroll_on_mobile(
         assert bounds["shellRight"] <= bounds["contentRight"] + 0.5
 
 
-# @matrix manual : anonymous-access no-auth-bootstrap
 @pytest.mark.e2e
 def test_public_manual_loads_without_login_or_auth_bootstrap(get_user):
     anonymous = get_user(Users.ANONYMOUS)
@@ -671,7 +659,6 @@ def test_public_manual_loads_without_login_or_auth_bootstrap(get_user):
     assert auth_bootstrap_paths == []
 
 
-# @matrix manual : address-redaction ai-email ajax-section anonymous-access direct-section no-auth-bootstrap
 @pytest.mark.e2e
 def test_ai_manual_keeps_account_addresses_authenticated(get_admin, get_user):
     anonymous = get_user(Users.ANONYMOUS)

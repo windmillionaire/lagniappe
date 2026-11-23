@@ -2,12 +2,6 @@ import { FacetsBox } from "../../elements/combobox/facets.mjs";
 
 /**
  * Local administrator/group choices shared by Page, User Settings and Builder.
- * @testable true
- * @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_page_restrictions_save_drafts_and_show_each_source
- * @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_admin_only_replaces_groups_until_explicitly_selected_again
- * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_submit_preserves_attached_form_and_categories
- * @matrix pages forms : access-restrictions explicit-submit group-restricted owner-restricted
- * @pair user-settings:restrictions
  */
 export default class AccessRestrictions {
 	constructor(root, { readonly = false, onChange = () => {} } = {}) {

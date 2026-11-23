@@ -36,16 +36,10 @@ from . import testing
 PUBLIC_ENDPOINTS = frozenset({"testing.health", "testing.create_session"})
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/testing/main.py::require_hosted_e2e_session
-# @reason concealment response helper owned by the hosted request gate
 def _hidden():
     return abort(404)
 
 
-# @testable false
-# @covered-by config/hosted_e2e.py::is_reserved_hosted_e2e_hostname
-# @reason response marker is verified by the hosted lifecycle preflight
 def _soft_route_hidden():
     response = make_response("", 404)
     response.headers["X-Lagniappe-Hosted-E2E-Guard"] = "active"
@@ -54,9 +48,6 @@ def _soft_route_hidden():
     return response
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/testing/main.py::create_session
-# @reason header parsing is exercised through the deployed Google OIDC exchange
 def _bearer_token() -> str | None:
     authorization = request.headers.get("Authorization", "")
     if not authorization.startswith("Bearer "):
@@ -65,8 +56,6 @@ def _bearer_token() -> str | None:
     return token or None
 
 
-# @testable infrastructure
-# @matrix hosted-e2e : authentication internal-callback
 def _valid_internal_process_request() -> bool:
     """Allow the app's own OIDC-authenticated task callbacks through the gate."""
     if request.method != "POST" or not request.path.startswith("/process/"):
@@ -95,8 +84,6 @@ def _valid_internal_process_request() -> bool:
     return True
 
 
-# @testable infrastructure
-# @matrix hosted-e2e : authentication deployment-binding lease request-gate
 @testing.before_app_request
 def require_hosted_e2e_session() -> ResponseReturnValue | None:
     """Hide every dynamic/static Flask request without an active run cookie."""
@@ -129,10 +116,6 @@ def require_hosted_e2e_session() -> ResponseReturnValue | None:
     return None
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001a_environment.py::test_testing_health_identifies_the_exact_session
-# @matrix hosted-e2e : readiness server-identity
-# @matrix test-session : health-nonce readiness server-identity
 @testing.route("/health", methods=["GET"])
 def health() -> ResponseReturnValue:
     """Expose only non-secret identity needed to validate a fresh version."""
@@ -167,9 +150,6 @@ def health() -> ResponseReturnValue:
     return response
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001d_offline.py::test_upstream_unavailable_preserves_current_form_state
-# @matrix e2e request-errors : server-failure upstream-unavailable
 @testing.route("/upstream-unavailable", methods=["GET"])
 def upstream_unavailable() -> ResponseReturnValue:
     """Return provider-shaped unmarked HTML for the browser failure story."""
@@ -184,8 +164,6 @@ def upstream_unavailable() -> ResponseReturnValue:
     return response
 
 
-# @testable infrastructure
-# @matrix hosted-e2e : authentication bootstrap cookie replay
 @testing.route("/session", methods=["POST"])
 def create_session() -> ResponseReturnValue:
     """Exchange one Google ID token for a run- and version-bound cookie."""

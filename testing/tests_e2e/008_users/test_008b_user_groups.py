@@ -56,7 +56,6 @@ def _create_group(user, user_index, group):
     return title
 
 
-# @matrix user-groups : column-link isolation query-route reload same-page-navigation
 # @template common.html::format_name
 # @template users/tools.html::group_permissions
 @pytest.mark.e2e_group("owner")
@@ -98,7 +97,6 @@ def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
     expect(owner.page).to_have_url(re.compile(r"/users/index$"))
 
 
-# @matrix user-groups : general-permissions group-create nav permission-update
 # @template users/tools.html::create_user_group
 # @template users/tools.html::group_permissions
 @pytest.mark.e2e_group("owner")
@@ -116,7 +114,6 @@ def test_set_general_permissions(get_user):
     _set_and_verify_permissions(user, group, permissions)
 
 
-# @matrix user-groups : entity-permissions group-create nav permission-update
 # @template users/tools.html::create_user_group
 # @template users/tools.html::group_permissions
 @pytest.mark.e2e_group("owner")
@@ -134,7 +131,6 @@ def test_set_entity_specific_permissions(get_user):
     _set_and_verify_permissions(user, group, permissions)
 
 
-# @matrix user-groups : permission-update rename
 # @template users/tools.html::group_permissions
 # @template users/tools.html::group_selector
 @pytest.mark.e2e_group("owner")
@@ -168,10 +164,6 @@ def test_rename_group(get_user):
     expect(name_input).to_have_value(renamed)
 
 
-# @matrix user-groups : background-update unsaved-preservation reset permission-update
-# @source src/script/widgets/base/formWidget.mjs::FormWidget
-# @source src/script/widgets/userPermissions.mjs::GroupPermissions
-# @source lagniappe/web/responses.py::group_permissions
 # @template users/tools.html::group_permissions
 # @template users/permissions.html::sections
 @pytest.mark.e2e_group("owner")
@@ -213,7 +205,6 @@ def test_permissions_html_preserves_dirty_form_until_explicit_reset(get_user):
     local.verify(General.MODELS, Levels.NONE)
 
 
-# @matrix permissions public-groups : active permission-update public
 # @template users/tools.html::public_permissions
 @pytest.mark.e2e_group("owner")
 def test_set_public_permissions(get_user):
@@ -270,7 +261,6 @@ def test_set_public_permissions(get_user):
         permissions_form.submit()
 
 
-# @matrix user-groups : group-delete nav-refresh polling
 # @template users/tools.html::group_nav
 @pytest.mark.e2e_group("owner")
 def test_delete_group_refreshes_group_navigation(get_user):

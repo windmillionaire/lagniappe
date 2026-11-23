@@ -22,9 +22,6 @@ PENDING_SECONDS = 10 * 60
 REFRESH_SECONDS = 30 * 24 * 60 * 60
 
 
-# @testable true
-# @tests tests_tooling/test_012c_remote_mcp_config.py::test_mcp_connection_name_is_safe_for_copyable_commands
-# @matrix mcp-oauth : configuration validation
 def mcp_connection_name(value: object = "lagniappe-remote") -> str:
     """Validate the connection alias embedded in user-facing shell commands."""
     if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", value):
@@ -35,8 +32,6 @@ def mcp_connection_name(value: object = "lagniappe-remote") -> str:
     return value
 
 
-# @testable false
-# @covered-by config/remote_mcp.py::normalize_mcp_config
 def https_url(value: object, *, origin: bool = False) -> str:
     """Require an exact, canonical HTTPS URL rather than normalizing identity."""
     if not isinstance(value, str) or not value or len(value) > 2048:
@@ -63,9 +58,6 @@ def https_url(value: object, *, origin: bool = False) -> str:
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_012c_remote_mcp_config.py::test_remote_mcp_configuration_is_opt_in_and_exact
-# @matrix mcp-oauth : configuration validation
 def normalize_mcp_config(settings: Mapping[str, object]) -> dict[str, str | None]:
     """Validate the installed endpoint and identity, including while AI is off."""
     name = mcp_connection_name(settings.get("MCP_NAME", "lagniappe-remote"))
@@ -85,9 +77,6 @@ def normalize_mcp_config(settings: Mapping[str, object]) -> dict[str, str | None
     return {"MCP_NAME": name, "MCP_RESOURCE": resource, "MCP_SERVICE_ACCOUNT": service_account}
 
 
-# @testable true
-# @tests tests_tooling/test_012c_remote_mcp_config.py::test_remote_mcp_configuration_is_opt_in_and_exact
-# @matrix mcp-oauth : configuration validation
 def mcp_issuer(settings: Mapping[str, object]) -> str:
     """Use the application's canonical origin for OAuth and workload identity."""
     domain = settings.get("CUSTOM_DOMAIN")
@@ -95,18 +84,12 @@ def mcp_issuer(settings: Mapping[str, object]) -> str:
     return https_url(issuer.rstrip("/") if isinstance(issuer, str) else issuer, origin=True)
 
 
-# @testable true
-# @tests tests_tooling/test_012c_remote_mcp_config.py::test_supported_clients_require_exact_callbacks
-# @matrix mcp-oauth : configuration validation loopback
 def client_allowed(client_id: object) -> bool:
     return isinstance(client_id, str) and (
         client_id in CIMD_CLIENTS or client_id == CODEX_CLIENT_ID
     )
 
 
-# @testable true
-# @tests tests_tooling/test_012c_remote_mcp_config.py::test_supported_clients_require_exact_callbacks
-# @matrix mcp-oauth : configuration validation loopback
 def redirect_allowed(client_id: object, redirect_uri: object) -> bool:
     if not client_allowed(client_id):
         return False

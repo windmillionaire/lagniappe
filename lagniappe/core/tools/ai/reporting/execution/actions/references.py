@@ -21,9 +21,6 @@ from .common import (
 )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
-# @reason file reference resolution is exercised through public file move tests
 def _resolve_file_entity(data, created, source=None):
     reference = (
         data.get("file")
@@ -46,9 +43,6 @@ def _resolve_file_entity(data, created, source=None):
     return _resolve_entity(reference, created, expected=Entities.FILE)
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_by_exact_source_attachment_name
-# @matrix ai-report files : readable-file-fallback
 def _resolve_file_from_source(data, source, reference=None):
     labels = _move_file_label_candidates(data, reference)
     if not labels or source is None:
@@ -69,9 +63,6 @@ def _resolve_file_from_source(data, source, reference=None):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
-# @reason fallback file matching is exercised through public file move tests
 def _move_file_label_candidates(data, reference=None):
     candidates = []
     for value in [
@@ -96,9 +87,6 @@ def _move_file_label_candidates(data, reference=None):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
-# @reason fallback file matching is exercised through public file move tests
 def _endpoint_file_entities(endpoint):
     try:
         files = list(endpoint.files or [])
@@ -107,9 +95,6 @@ def _endpoint_file_entities(endpoint):
     return [file for file in files if isinstance(file, Entities.FILE)]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
-# @reason fallback file matching is exercised through public file move tests
 def _file_matches_labels(file, labels):
     for value in [file.name, file.filename, getattr(file, "display_name", None)]:
         if value and str(value).strip().casefold() in labels:
@@ -117,9 +102,6 @@ def _file_matches_labels(file, labels):
     return False
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
-# @reason endpoint resolution is covered through public file move tests
 def _resolve_file_endpoint(data, created, endpoint):
     if endpoint == "source":
         page_roots = ("from_page", "source_page", "page_from")
@@ -139,9 +121,6 @@ def _resolve_file_endpoint(data, created, endpoint):
     return _resolve_entity(task_ref, created, expected=Entities.TASK)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
-# @reason attachment mutation is covered through move tests
 def _file_attached_to_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
         return not file.db.get("task") and endpoint.key == file.db.get("page")
@@ -150,9 +129,6 @@ def _file_attached_to_endpoint(file, endpoint):
     return False
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
-# @reason attachment mutation is covered through move tests
 def _remove_file_from_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
         if file.properties.task.key or file.properties.page.key != endpoint.key:
@@ -169,9 +145,6 @@ def _remove_file_from_endpoint(file, endpoint):
     return False
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
-# @reason attachment mutation is covered through move tests
 def _add_file_to_endpoint(file, endpoint):
     if isinstance(endpoint, Entities.PAGE):
         return file.move_to(endpoint)
@@ -190,9 +163,6 @@ def _add_file_to_endpoint(file, endpoint):
     return False
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wrong_kind
-# @matrix ai-report task-completion tasks : page-reference repair task-history
 def _resolve_action_page(data, created, user):
     reference = (
         data.get("page")
@@ -250,9 +220,6 @@ def _resolve_action_page(data, created, user):
     raise exceptions.ValidationError("Missing required entity reference.")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/references.py::_resolve_action_page
-# @reason non-page page inference is covered through task creation and attachment tests
 def _page_from_non_page_reference(entity, page_name=None):
     if isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)):
         page = getattr(entity, "page", None)
@@ -265,9 +232,6 @@ def _page_from_non_page_reference(entity, page_name=None):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/references.py::_resolve_action_page
-# @reason unique prior page inference is covered through report-run attachment tests
 def _page_from_created_context(created, page_name=None):
     candidates = {}
     for entity in created.values():
@@ -285,9 +249,6 @@ def _page_from_created_context(created, page_name=None):
     return next(iter(candidates.values())) if len(candidates) == 1 else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/references.py::_resolve_action_page
-# @reason exact page-name fallback is covered through task creation and attachment tests
 def _resolve_page_by_exact_name(page_name, user):
     if not page_name:
         return None
@@ -320,9 +281,6 @@ def _resolve_page_by_exact_name(page_name, user):
     return page if isinstance(page, Entities.PAGE) else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/references.py::_resolve_action_page
-# @reason page-name matching is covered through task creation and attachment tests
 def _page_name_matches(page, page_name=None):
     if not page:
         return False
@@ -331,9 +289,6 @@ def _page_name_matches(page, page_name=None):
     return _normalized_lookup_name(page.name) == _normalized_lookup_name(page_name)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason reference resolution is exercised through ordered runner tests
 @overload
 def _resolve_entity[T: Entity](reference, created, expected: type[T], optional: Literal[False] = False) -> T: ...
 @overload
@@ -367,9 +322,6 @@ def _resolve_entity(reference, created, expected: type[Entity] | None = None, op
     return entity
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason reference normalization is covered through runner reference tests
 def _reference_key(reference):
     if isinstance(reference, dict):
         reference = (
@@ -382,9 +334,6 @@ def _reference_key(reference):
     return reference
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_resolves_report_file_by_exact_url_and_file_prefix
-# @matrix ai-report files : deterministic-run exact-id report-file-reference
 def _resolve_report_file(reference, report, created=None):
     if isinstance(reference, dict):
         reference = (
@@ -410,9 +359,6 @@ def _resolve_report_file(reference, report, created=None):
     raise exceptions.ValidationError("Referenced report file was not found.")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/references.py::_resolve_report_file
-# @reason helper behavior is covered through public report runner file matching tests
 def _report_file_reference_candidates(reference):
     if reference is None:
         return []
@@ -431,17 +377,12 @@ def _report_file_reference_candidates(reference):
     return _unique_values(candidates)
 
 
-# @testable false
-# @reason result entity loading is exercised through public execution tests
 def _load_result_entity(details):
     if not isinstance(details, dict) or not details.get("id"):
         return None
     return _fetch_report_entity(details["id"])
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason polymorphic report references are exercised through run tests
 def _fetch_report_entity(identifier, *, derived_page=False):
     entity = Entities.fetch_one(identifier, request=Fetch.root())
     if entity is None:

@@ -136,9 +136,6 @@ def _format_command(command: list[str] | str) -> str:
     return shlex.join(str(part) for part in command)
 
 
-# @testable false
-# @covered-by runner/upgrade.py::run_command
-# @reason cancel only the subprocess group created for this dependency command
 def _stop_command(process):
     if os.name == "posix":
         with suppress(ProcessLookupError):
@@ -158,11 +155,6 @@ def _stop_command(process):
     process.wait(timeout=5)
 
 
-# @testable true
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_dependency_command_streams_prompts_and_preserves_output
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_dependency_command_capture_closes_stdin_and_retains_output
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_dependency_command_timeout_preserves_output_and_stops_children
-# @matrix dependencies : subprocess-output timeout cancellation isolation
 def run_command(
     command: list[str],
     check: bool = True,
@@ -184,9 +176,6 @@ def run_command(
             report.record_command(command, None, error=str(e))
         raise
 
-    # @testable false
-    # @covered-by runner/upgrade.py::run_command
-    # @reason drain both pipes without waiting for newline-terminated prompts
     def drain(pipe, name, destination):
         decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         with pipe:
@@ -248,9 +237,6 @@ def run_command(
     return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
-# @testable false
-# @covered-by runner/upgrade.py::upgrade_npm_packages
-# @reason select the upgraded Node runtime while preserving command I/O options
 def run_nvm_command(
     args: list[str],
     *,
@@ -395,9 +381,6 @@ def _node_version_from_output(output: str) -> str:
     return matches[-1] if matches else output.strip()
 
 
-# @testable false
-# @covered-by runner/upgrade.py::update_node_version_pin
-# @reason declaration staging and exception recovery belong to the public alignment operation
 def _publish_node_declarations(replacements, report):
     """Stage the full set, restoring prior files if publication is interrupted."""
     directories = []
@@ -468,15 +451,6 @@ def _publish_node_declarations(replacements, report):
                     )
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_dependency_upgrade_updates_node_version_pin
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_node_alignment_failure_preserves_all_declarations
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_node_alignment_publishes_all_declarations_and_skips_unchanged_files
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_node_alignment_restores_declarations_on_publication_failure
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_node_alignment_interrupt_restores_declarations
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_node_alignment_retains_backups_when_restoration_fails
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_node_alignment_cleanup_failure_does_not_hide_success
-# @matrix dependencies : node-version pinning upgrade cancellation
 def update_node_version_pin(
     version: str,
     report: UpgradeReport,
@@ -529,9 +503,6 @@ def update_node_version_pin(
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_node_image_lookup_verifies_registry_digest
-# @matrix dependencies : node-version pinning upgrade
 def resolve_node_image(version: str) -> str:
     """Resolve an exact official Node tag without installing Docker or layers."""
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
@@ -561,9 +532,6 @@ def resolve_node_image(version: str) -> str:
     return f"node:{tag}@{digest}"
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_dependency_upgrade_updates_node_version_pin
-# @matrix dependencies : node-version pinning upgrade
 def upgrade_node(report: UpgradeReport | None = None) -> bool:
     """Upgrade Node.js to the latest version using nvm when available."""
     report = report or UpgradeReport()
@@ -641,11 +609,6 @@ def upgrade_node(report: UpgradeReport | None = None) -> bool:
     return False
 
 
-# @testable true
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_npm_upgrade_uses_one_bounded_lookup_and_preserves_package_metadata
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_npm_lookup_failure_does_not_modify_or_install_dependencies
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_npm_interruption_records_completed_file_changes
-# @matrix dependencies : upgrade failure-propagation package-lock cancellation upgrade-report
 def upgrade_npm_packages(report: UpgradeReport | None = None) -> bool:
     """Look up latest versions once, update direct ranges, then install and audit."""
     report = report or UpgradeReport()
@@ -814,9 +777,6 @@ def record_pip_version_changes(
         )
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_dependency_upgrade_resolves_and_rewrites_all_requirement_files
-# @pair dependencies:upgrade-requirements
 def upgrade_pip_packages(report: UpgradeReport | None = None) -> bool:
     """Resolve direct setup, runtime, development, and font-tool requirements."""
     report = report or UpgradeReport()
@@ -937,9 +897,6 @@ def _update_requirements_file(
         report.add_note(f"No {requirements_path} changes were detected.")
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_dependency_upgrade_resolves_and_rewrites_all_requirement_files
-# @pair dependencies:upgrade-requirements
 def update_requirements_files(report: UpgradeReport | None = None) -> bool:
     """Update direct requirement pins only after Python resolution validates."""
     report = report or UpgradeReport()
@@ -1121,9 +1078,6 @@ def _render_warnings(report: UpgradeReport) -> list[str]:
     return lines
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_dependency_upgrade_report_includes_setup_pins
-# @pair dependencies:upgrade-report
 def render_upgrade_report(report: UpgradeReport) -> str:
     """Render the captured upgrade run as Markdown."""
     status = "completed with errors" if report.errors else "completed"
@@ -1261,9 +1215,6 @@ def _print_console_group(title: str, changes: list[VersionChange]) -> None:
         print(f"  {change.name}: {change.before} -> {change.after}")
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_dependency_upgrade_report_includes_setup_pins
-# @pair dependencies:upgrade-report
 def print_upgrade_summary(
     report: UpgradeReport,
     success: bool,
@@ -1307,10 +1258,6 @@ def print_upgrade_summary(
     print(f"\nReport: {report_path}")
 
 
-# @testable true
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_dependency_upgrade_stops_on_failure_and_saves_report
-# @tests tests_tooling/test_014_dependency_upgrade.py::test_dependency_upgrade_saves_report_on_interrupt
-# @matrix dependencies : cancellation failure-propagation upgrade-report
 def upgrade_all(*, only: str | None = None) -> int:
     """Run selected upgrade steps with visible progress and a durable report."""
     report = UpgradeReport()

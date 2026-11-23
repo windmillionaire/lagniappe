@@ -2,11 +2,6 @@ import { request } from "../shared/request.mjs";
 import { withTransition } from "../shared/transitions.mjs";
 import EntityIndex from "./base/index.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_from_index
- * @matrix users : create-form create-submit created-row
- */
 export default class Users extends EntityIndex {
 	constructor(node) {
 		super(node);
@@ -15,12 +10,6 @@ export default class Users extends EntityIndex {
 		this._loadingPublicMode = false;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_hidden_when_public_users_disabled
-	 * @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
-	 * @matrix users : disabled index-mode-toggle table-row
-	 */
 	async init() {
 		await super.init();
 		this.elt.addEventListener("click", this._publicModeClick);
@@ -30,11 +19,6 @@ export default class Users extends EntityIndex {
 		this._setCreateUserAvailability();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008b_user_groups.py::test_group_column_link_opens_group_tools_and_tracks_url
-	 * @matrix user-groups : column-link isolation query-route same-page-navigation
-	 */
 	_click(e) {
 		const groupLink = e.target.closest("a[data-kind='group'][href]");
 		if (groupLink && this.elt.contains(groupLink)) {
@@ -54,11 +38,6 @@ export default class Users extends EntityIndex {
 		super._click(e);
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/user.mjs::Users._click
-	 * @reason initial query resolution and link interception share the same DOM lookup
-	 */
 	_groupSelector(groupKey) {
 		if (!groupKey) return null;
 		return Array.from(
@@ -68,11 +47,6 @@ export default class Users extends EntityIndex {
 		).find((button) => button.dataset.key === groupKey);
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/user.mjs::Users._click
-	 * @reason component activation emits the event exercised by the group-link E2E flow
-	 */
 	_groupPanelChange(event) {
 		const component = event.detail?.subcomponent;
 		if (component?.name !== "user-groups") return;
@@ -80,11 +54,6 @@ export default class Users extends EntityIndex {
 		this._replaceGroupUrl(component.active?.target?.dataset.key);
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/user.mjs::Users._click
-	 * @reason URL synchronization is observed through navigation and reload behavior
-	 */
 	_replaceGroupUrl(groupKey = null) {
 		const route = new URL(window.location.href);
 		if (groupKey) {
@@ -97,11 +66,6 @@ export default class Users extends EntityIndex {
 		window.history.replaceState(window.history.state, "", route);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008b_user_groups.py::test_group_column_link_opens_group_tools_and_tracks_url
-	 * @matrix user-groups : query-route reload
-	 */
 	_defaultToolTarget(tools) {
 		const selector = this._groupSelector(this.queryParam("group"));
 		if (selector) {
@@ -114,22 +78,11 @@ export default class Users extends EntityIndex {
 		return super._defaultToolTarget(tools);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
-	 * @matrix users : index-mode-toggle refresh table-row
-	 */
 	async refreshCollections(navigation = false, options = {}) {
 		this._syncUserModeRoute();
 		await super.refreshCollections(navigation, options);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008b_user_groups.py::test_delete_group_refreshes_group_navigation
-	 * @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
-	 * @matrix user-groups : group-delete nav-refresh polling unrelated-delete
-	 */
 	async refreshSupplementalCollections(changes = []) {
 		const groupsElt = this.elt?.querySelector("[id='user-groups']");
 		const groups = groupsElt ? this.getComponent(groupsElt) : null;
@@ -166,11 +119,6 @@ export default class Users extends EntityIndex {
 		);
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/user.mjs::Users.init
-	 * @reason delegated click handler is exercised through public-users index E2E
-	 */
 	async _publicModeClick(e) {
 		const button = e.target.closest("[data-role='public-users-toggle']");
 		if (!button || !this.elt.contains(button)) return;
@@ -184,12 +132,6 @@ export default class Users extends EntityIndex {
 		await this._loadUserMode(nextMode, button);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
-	 * @tests tests_js/test_022_refresh_frontend.mjs::test_user_mode_switch_loads_all_pages_and_preserves_current_mode_on_failure
-	 * @matrix users : index-mode-toggle pagination
-	 */
 	async _loadUserMode(mode, button) {
 		const table = this.getComponent(this.elt.querySelector("#table"));
 		const route = this._userModeRoute(mode, button);
@@ -234,11 +176,6 @@ export default class Users extends EntityIndex {
 		}
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/user.mjs::Users.init
-	 * @reason DOM replacement details are verified through the public-users toggle flow
-	 */
 	_replaceUserRows(table, body, route = null) {
 		const refreshRoute = route || body.dataset.route;
 		if (refreshRoute) body.dataset.route = refreshRoute;
@@ -268,11 +205,6 @@ export default class Users extends EntityIndex {
 		}
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/user.mjs::Users.refreshCollections
-	 * @reason helper maps the active public-users mode to the widget refresh route
-	 */
 	_userModeRoute(mode = this.elt.dataset.userMode, button = null) {
 		const toggle =
 			button || this.elt.querySelector("[data-role='public-users-toggle']");
@@ -283,11 +215,6 @@ export default class Users extends EntityIndex {
 			: toggle.dataset.routeRegular;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/user.mjs::Users.refreshCollections
-	 * @reason keeps inherited component refresh requests aligned with the current list mode
-	 */
 	_syncUserModeRoute() {
 		const table = this.getComponent(this.elt.querySelector("#table"));
 		const indexTable = table?.widgets.IndexTable;
@@ -298,11 +225,6 @@ export default class Users extends EntityIndex {
 		if (indexTable.target) indexTable.target.dataset.route = route;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/user.mjs::Users.init
-	 * @reason control state mirrors the browser-only mode transition
-	 */
 	_syncPublicModeControls() {
 		const publicMode = this.elt.dataset.userMode === "public";
 		const label = publicMode ? "Show regular users" : "Show public users";
@@ -319,11 +241,6 @@ export default class Users extends EntityIndex {
 			});
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/user.mjs::Users.init
-	 * @reason create-tool visibility is coupled to the browser mode toggle
-	 */
 	_setCreateUserAvailability() {
 		const publicMode = this.elt.dataset.userMode === "public";
 		this.elt
@@ -341,11 +258,6 @@ export default class Users extends EntityIndex {
 		this._refreshMobileToolsDropdown();
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/user.mjs::Users.init
-	 * @reason dropdown item filtering depends on runtime viewport state
-	 */
 	_refreshMobileToolsDropdown() {
 		if (!this.mobile || !this.dropdown) return;
 		this.dropdown.destroy();
@@ -353,11 +265,6 @@ export default class Users extends EntityIndex {
 		this._createDropdown();
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/user.mjs::Users.init
-	 * @reason loading state is a small visual guard around the mode request
-	 */
 	_setPublicModeLoading(loading) {
 		this._loadingPublicMode = loading;
 		this.elt

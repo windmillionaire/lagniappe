@@ -6,11 +6,6 @@ import { connectivityMessage } from "./shared/protocol.mjs";
 import { installUpstreamUnavailableBanner } from "./shared/upstreamUnavailable.mjs";
 import { loadView } from "./viewRegistry.mjs";
 
-/**
- * @testable true
- * @tests tests_js/test_017_main_lifecycle.mjs::test_navigation_fetch_abort_is_not_reported_as_application_error
- * @matrix startup : error-reporting navigation transient-network
- */
 async function onError(event) {
 	const {
 		captureError,
@@ -37,23 +32,12 @@ window.__CONNECTIVITY__ = connectivity.snapshot();
 // background connectivity cycle to settle. Rendering never awaits this.
 window.__CONNECTIVITY_READY__ = Promise.resolve();
 
-/**
- * @testable true
- * @tests tests_js/test_017_main_lifecycle.mjs::test_cross_document_transition_publishes_settled_readiness
- * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
- * @pairs startup:settled-boundary view-transition:navigation
- */
 function publishNavigationTransitionReadiness() {
 	// A parser-time observer can publish the exact `pagereveal` boundary before
 	// this deferred module evaluates. Preserve it when available.
 	if (window.__NAVIGATION_TRANSITION_READY__) return;
 	window.__NAVIGATION_TRANSITION_SETTLED__ = false;
 	window.__NAVIGATION_TRANSITION_READY__ = new Promise((resolve) => {
-		/**
-		 * @testable false
-		 * @covered-by src/script/main.mjs::publishNavigationTransitionReadiness
-		 * @reason recursive browser-state sampling is owned by the published readiness boundary
-		 */
 		const publishWhenInactive = () => {
 			const transition = document.activeViewTransition;
 			if (transition) {
@@ -83,11 +67,6 @@ function publishNavigationTransitionReadiness() {
 publishNavigationTransitionReadiness();
 
 let __activeView = null;
-/**
- * @testable true
- * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
- * @pair offline:view-reset
- */
 const getView = async () => {
 	const viewElt = document.querySelector("[lp-view]");
 	if (!viewElt) return null;
@@ -123,17 +102,6 @@ let _ping = null;
 // Include browser scheduling and connection setup, not just handler latency.
 const SERVER_HEALTH_TIMEOUT_MS = 5_000;
 
-/**
- * @testable true
- * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
- * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
- * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
- * @tests tests_js/test_017_main_lifecycle.mjs::test_ping_uses_server_owned_cache_policy
- * @tests tests_js/test_017_main_lifecycle.mjs::test_ping_clears_only_the_settled_pending_promise
- * @tests tests_js/test_017_main_lifecycle.mjs::test_ping_tolerates_slow_response_but_bounds_unresponsive_server
- * @matrix offline : bounded-timeout cache-policy pending-ownership server-health settled-cleanup slow-response
- * @pair offline:indicator
- */
 export async function pingServer() {
 	if (_ping) return _ping;
 
@@ -172,23 +140,12 @@ const KEEP_AWAKE_MS = 10 * 60 * 1000;
 const POLL_MS = 2 * 1000;
 const OFFLINE_POLL_MS = 5 * 1000;
 
-/**
- * @testable false
- * @covered-by src/script/main.mjs::syncViewOnce
- * @covered-by src/script/main.mjs::pollServer
- * @reason timer cancellation is owned by the foreground/background sync lifecycle
- */
 function stopPolling() {
 	if (!_pollTimeout) return;
 	clearTimeout(_pollTimeout);
 	_pollTimeout = null;
 }
 
-/**
- * @testable false
- * @covered-by src/script/main.mjs::syncViewOnce
- * @reason timer scheduling supports the server-health sync contract
- */
 function pollServer(online) {
 	stopPolling();
 	// Healthy testing-mode views do not need the production keep-awake timer,
@@ -214,21 +171,11 @@ let _syncPending = null;
  * user is working elsewhere. Rendered deferred operations receive the bounded
  * visible-blur exception downstream.
  *
- * @testable false
- * @covered-by src/script/main.mjs::syncViewOnce
- * @covered-by src/script/main.mjs::initialize
- * @reason shared inactivity predicate is exercised through lifecycle entry points
  */
 function documentInactive() {
 	return document.hidden || document.hasFocus?.() === false;
 }
 
-/**
- * @testable false
- * @covered-by src/script/main.mjs::syncViewOnce
- * @covered-by src/script/main.mjs::suspendCurrentView
- * @reason connectivity publication is owned by the visible/hidden sync lifecycle
- */
 function updateConnectivity(patch) {
 	const state = connectivity.transition(patch);
 	window.__CONNECTIVITY__ = state;
@@ -236,11 +183,6 @@ function updateConnectivity(patch) {
 	return state;
 }
 
-/**
- * @testable false
- * @covered-by src/script/main.mjs::syncView
- * @reason pending sync option merging is private queue plumbing for the public sync runner
- */
 function queueSync({
 	hidden,
 	blurred,
@@ -266,19 +208,6 @@ function queueSync({
 	if (pendingBrowser !== undefined) _syncPending.browser = pendingBrowser;
 }
 
-/**
- * @testable true
- * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
- * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
- * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
- * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
- * @tests tests_js/test_017_main_lifecycle.mjs::test_rapid_sync_requests_coalesce_and_retain_forced_transition
- * @tests tests_js/test_017_main_lifecycle.mjs::test_window_blur_soft_suspends_visible_tab_until_focus_catchup
- * @tests tests_js/test_017_main_lifecycle.mjs::test_startup_publishes_worker_state_before_loading_view_with_pending_ping
- * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_delete_file_removes_attached_task_badge
- * @matrix connectivity service-worker : state-publication startup
- * @matrix offline : browser-state coalescing indicator rapid-transitions reconnect server-health transitions view-reset visible-blur
- */
 async function syncViewOnce({
 	hidden = documentInactive(),
 	blurred = hidden && !document.hidden && document.hasFocus?.() === false,
@@ -317,14 +246,6 @@ async function syncViewOnce({
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
- * @tests tests_js/test_017_main_lifecycle.mjs::test_rapid_sync_requests_coalesce_and_retain_forced_transition
- * @tests tests_js/test_017_main_lifecycle.mjs::test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary
- * @matrix offline : browser-state server-health settled-boundary transitions
- * @pairs connectivity:error-recovery offline:error-recovery
- */
 export async function syncView(options = {}) {
 	queueSync(options);
 	if (_sync) return _sync;
@@ -354,20 +275,12 @@ export async function syncView(options = {}) {
  * synchronization, or replay. Consumers can read connectivity synchronously;
  * only callers that need the background cycle's completion await the result.
  *
- * @testable true
- * @tests tests_js/test_017_main_lifecycle.mjs::test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary
- * @matrix connectivity offline : browser-state settled-boundary transitions
  */
 function browserConnectivityChanged(browser) {
 	updateConnectivity({ browser });
 	return syncView({ browser });
 }
 
-/**
- * @testable true
- * @tests tests_js/test_017_main_lifecycle.mjs::test_suspend_current_view_deregisters_without_health_check
- * @matrix offline sync : deregistration pagehide visibility
- */
 export function suspendCurrentView({
 	blurred = false,
 	blurredAt = blurred ? Date.now() : null,
@@ -382,11 +295,6 @@ export function suspendCurrentView({
 	return syncView({ hidden: true, blurred, blurredAt });
 }
 
-/**
- * @testable true
- * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
- * @pair offline:view-reset
- */
 function setTestMode() {
 	const mode = document
 		?.querySelector("meta[name='mode']")
@@ -396,46 +304,20 @@ function setTestMode() {
 	}
 }
 
-/**
- * @testable false
- * @covered-by src/script/main.mjs::initialize
- * @reason mode metadata lookup only gates authenticated session startup work
- */
 function pageMode() {
 	return document?.querySelector("meta[name='mode']")?.getAttribute("content");
 }
 
-/**
- * @testable false
- * @covered-by src/script/main.mjs::initialize
- * @reason analytics startup is composition owned by the page-mode lifecycle
- */
 async function startAnalytics() {
 	const { analytics } = await import("./shared/analytics.mjs");
 	analytics.view();
 }
 
-/**
- * @testable false
- * @covered-by src/script/main.mjs::initialize
- * @reason global error-listener installation is composition owned by startup
- */
 function startErrorHandling() {
 	window.addEventListener("unhandledrejection", onError);
 	window.addEventListener("error", onError);
 }
 
-/**
- * @testable true
- * @tests tests_js/test_017_main_lifecycle.mjs::test_service_worker_registration_starts_immediately
- * @tests tests_js/test_017_main_lifecycle.mjs::test_controller_replacement_receives_current_versioned_connectivity_state
- * @tests tests_js/test_017_main_lifecycle.mjs::test_upstream_unavailable_worker_message_shows_retryable_banner
- * @tests tests_js/test_017_main_lifecycle.mjs::test_public_page_skips_authenticated_lifecycle
- * @matrix connectivity service-worker : controller-replacement state-publication version
- * @matrix request-errors service-worker : upstream-unavailable validation
- * @pairs service-worker:registration startup:interaction-ready
- * @pair service-worker:recent-search-cleanup
- */
 function startServiceWorker() {
 	if (!("serviceWorker" in navigator)) return;
 	navigator.serviceWorker.register("/sw.js").catch(async (error) => {
@@ -455,13 +337,6 @@ function startServiceWorker() {
 	});
 }
 
-/**
- * @testable true
- * @tests tests_js/test_017_main_lifecycle.mjs::test_public_page_skips_authenticated_lifecycle
- * @tests tests_js/test_017_main_lifecycle.mjs::test_window_blur_soft_suspends_visible_tab_until_focus_catchup
- * @matrix polling : blur catch-up focus visibility
- * @matrix startup : analytics deferred-lifecycle public-boundary
- */
 async function startAuthenticatedLifecycle() {
 	startErrorHandling();
 
@@ -494,9 +369,6 @@ async function startAuthenticatedLifecycle() {
 	updateUserData();
 }
 
-/**
- * @testable infrastructure
- */
 export function initialize() {
 	if (window.__INITIALIZED__) return;
 	window.__INITIALIZED__ = true;

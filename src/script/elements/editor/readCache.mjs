@@ -9,11 +9,6 @@ import {
  * the response cache also shares logout/permission/build invalidation and
  * quota eviction. A retained handle cannot recreate a deleted cache.
  *
- * @testable true
- * @tests tests_js/test_046_document_read_cache.mjs::test_document_reads_retain_snapshots_and_deltas_without_pending_work
- * @tests tests_js/test_046_document_read_cache.mjs::test_document_read_cache_is_scoped_best_effort_and_invalidatable
- * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_read_document_survives_offline_reload_without_saving
- * @matrix offline sync : cached-read delta empty-content invalidation persistence reload save-guard storage-failure user-scope
  */
 export class DocumentReadCache {
 	constructor(scope, syncId) {

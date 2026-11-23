@@ -15,13 +15,6 @@ from .base_schema import SchemaProperty
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_text_input
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_text_input_empty_column_value_is_blank
-# @tests tests_unit/test_004d_submitter.py::test_import_submission_space_joins_input_list_values
-# @tests tests_unit/test_004d_submitter.py::test_import_submission_preserves_table_row_lists_during_input_list_normalization
-# @tests tests_unit/test_004b_schema_core.py::test_schema_create_field_known_text_input
-# @matrix text-input : ai-value column empty-field empty-value field-factory filter-value import list-normalization save search-value
 class TextInput(SearchMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty[str]):
     """Plain text input field.
 
@@ -76,9 +69,6 @@ class TextInput(SearchMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty[s
         return super().search_value
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_date_input
-# @matrix date-input : ai-value column filter-value form-submission import timezone
 class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty[datetime]):
     """Date input field. Stored as UTC datetime.
 
@@ -98,10 +88,6 @@ class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty[dat
     _editable = True
 
     # Form Attributes
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
-    # @tests tests_unit/test_004e_submission_behavior.py::test_typed_browser_submission_accepts_valid_and_blank
-    # @matrix date-input : empty-value form-submission validation
     def validate_submission(self, value: object) -> None:
         """Parse form-submitted date string (YYYY-MM-DD format)."""
         try:
@@ -140,9 +126,6 @@ class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty[dat
     _field_options = FilterOptions.DATE.value
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_time_input
-# @matrix time-input : ai-value column filter-value import
 class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[datetime]):
     """Time input field. Stored as a datetime with only the time component.
 
@@ -164,10 +147,6 @@ class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[datetime]):
     _editable = True
 
     # Form Attributes
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
-    # @tests tests_unit/test_004e_submission_behavior.py::test_typed_browser_submission_accepts_valid_and_blank
-    # @matrix time-input : empty-value form-submission validation
     def validate_submission(self, value: object) -> None:
         """Parse form-submitted time string (HH:MM format)."""
         try:
@@ -230,9 +209,6 @@ class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[datetime]):
         self.value = datetime.strptime(cast(str, value), "%H:%M") if value else None
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_number_input
-# @matrix number-input : ai-value filter-value import
 class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[float]):
     """Numeric input field. Stored as a float.
 
@@ -257,11 +233,6 @@ class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[float]):
         return self.filter_value
 
     # Form Attributes
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_submission_number_form_accepts_zero
-    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
-    # @tests tests_unit/test_004e_submission_behavior.py::test_typed_browser_submission_accepts_valid_and_blank
-    # @matrix number-input : empty-value form-submission validation zero
     def validate_submission(self, value: object) -> None:
         """Parse form-submitted number string to float."""
         try:
@@ -311,9 +282,6 @@ class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[float]):
         return None
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_email_input
-# @matrix email-input : ai-value filter-value import
 class EmailInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[str]):
     """Email input field. Validates format on browser submission, AI, and import.
 
@@ -332,10 +300,6 @@ class EmailInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[str]):
     _ordering = Ordering.EXISTS
     _editable = True
 
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
-    # @tests tests_unit/test_004e_submission_behavior.py::test_typed_browser_submission_accepts_valid_and_blank
-    # @matrix email-input : empty-value form-submission validation
     def validate_submission(self, value: object) -> None:
         """Reject nonempty malformed addresses without replacing an existing value."""
         if value in (None, "", []):
@@ -367,9 +331,6 @@ class EmailInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[str]):
     _field_options = FilterOptions.STRING.value
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_tel_input
-# @matrix tel-input : ai-value filter-value formatting import
 class TelInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[str]):
     """Telephone input field. Normalizes to E.164 format.
 

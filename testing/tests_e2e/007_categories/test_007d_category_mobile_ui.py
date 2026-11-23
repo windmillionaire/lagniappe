@@ -10,7 +10,6 @@ from testing.resources.category import Category
 pytestmark = pytest.mark.e2e
 
 
-# @matrix table-controls : columns mobile-controls
 def test_category_mobile_controls_open_with_page_columns(get_admin, get_user):
     user = get_admin()
     Pages.test_create_page.get(user)
@@ -48,7 +47,6 @@ def test_category_viewer_mobile_controls_do_not_require_edit_permission(get_admi
     expect(controls.row("modified")).to_be_visible()
 
 
-# @matrix table-controls : column-visibility mobile-controls
 def test_category_mobile_visibility_toggle_hides_column(get_admin, get_user):
     user = get_admin()
     Pages.test_create_page.get(user)
@@ -66,7 +64,6 @@ def test_category_mobile_visibility_toggle_hides_column(get_admin, get_user):
     expect(user.locate("#table td[data-column='modified']:visible")).to_have_count(0)
 
 
-# @matrix table-controls : mobile-controls sorting
 def test_category_mobile_filter_button_opens_sorting_panel(get_admin, get_user):
     user = get_admin()
     Pages.test_create_page.get(user)
@@ -84,7 +81,6 @@ def test_category_mobile_filter_button_opens_sorting_panel(get_admin, get_user):
     ).to_be_visible()
 
 
-# @matrix table-controls : form-columns mobile-controls sorting
 def test_category_mobile_controls_handle_form_columns(get_admin, get_user):
     user = get_admin()
     Pages.test_category_filter_match_page.get(user)
@@ -120,7 +116,6 @@ def test_category_mobile_controls_handle_form_columns(get_admin, get_user):
     ).to_be_visible()
 
 
-# @matrix pages : category-index create mobile-tools
 def test_category_mobile_tools_dropdown_opens_new_page_form(get_admin, get_user):
     user = get_admin()
     user.go(Categories.test_empty_category)

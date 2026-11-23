@@ -8,7 +8,6 @@ Does **not** cover ``Form.update``, ``Form.save``, or ``SchemaVersion`` — see
 import pytest
 
 
-# @matrix form-index : columns table
 @pytest.mark.unit
 def test_form_index_table(get_test_entities):
     """Test FormIndex.table produces correct column structure for UI.

@@ -46,7 +46,6 @@ def _member_user(key, group, public=False):
     return user
 
 
-# @matrix permissions user-groups : form-data restricted views
 @pytest.mark.unit
 def test_group_permissions(get_permissions_test_data):
     """``GroupPermissions.create(form_data)``, ``views`` index, RESTRICTED pruning.
@@ -77,7 +76,6 @@ def test_group_permissions(get_permissions_test_data):
             assert group.db["views"] == expected["views"]
 
 
-# @matrix permissions public-groups : active permissions public
 @pytest.mark.unit
 def test_public_permissions(get_permissions_test_data):
     """Test PublicPermissions.create() sets public key based on active state.
@@ -101,7 +99,6 @@ def test_public_permissions(get_permissions_test_data):
             assert group.db["views"] == ["models"]
 
 
-# @matrix permissions public-groups user-groups : default-denial form-data permission-form
 @pytest.mark.unit
 def test_general_forms_none_round_trips_for_default_view_permission():
     user = CONFIG.TEST_CURRENT_USER
@@ -132,7 +129,6 @@ def test_general_forms_none_round_trips_for_default_view_permission():
     )
 
 
-# @matrix permissions public-groups : default-forms-view explicit-none storage
 @pytest.mark.unit
 def test_public_permissions_default_forms_view_is_stored():
     user = CONFIG.TEST_CURRENT_USER
@@ -162,7 +158,6 @@ def test_public_permissions_default_forms_view_is_stored():
     assert explicit_none.permissions[General.FORMS.value] == Levels.NONE.name
 
 
-# @matrix user-groups : create permissions reserved-name save
 @pytest.mark.unit
 def test_user_group_create_rejects_public_and_initializes_permissions():
     with pytest.raises(ValueError, match="reserved group name"):
@@ -192,7 +187,6 @@ def test_user_group_create_rejects_public_and_initializes_permissions():
     save.assert_called_once_with(group)
 
 
-# @matrix permissions public-groups user-groups : cache-invalidation member-refresh permission-update
 @pytest.mark.unit
 def test_save_permissions_refreshes_member_users_with_current_group():
     form_data = {General.MODELS.value: Levels.VIEW.name}
@@ -298,7 +292,6 @@ def test_save_permissions_refreshes_member_users_with_current_group():
     assert public_user.invalidate_cache is True
 
 
-# @matrix permissions user-groups : admin unauthenticated
 @pytest.mark.unit
 def test_group_permissions_require_admin_and_handle_anonymous():
     anonymous = SimpleNamespace(is_authenticated=False, is_owner=False)
@@ -329,7 +322,6 @@ def test_group_permissions_require_admin_and_handle_anonymous():
     assert public.permissions == {"forms": "VIEW", "public": "TRUE"}
 
 
-# @matrix public-groups : create enabled get permissions
 @pytest.mark.unit
 def test_public_group_get_create_and_enabled_state():
     with pytest.raises(TypeError):

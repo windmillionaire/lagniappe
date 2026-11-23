@@ -18,8 +18,6 @@ def fresh_activity_memo(monkeypatch):
     monkeypatch.setattr(email_presence, "_activity_memo", OrderedDict())
 
 
-# @source lagniappe/core/properties/user_entity.py::NotificationEmailPreference.value
-# @matrix notification-email : eligibility never-logged-in preference public-user
 def test_notification_email_preference_defaults_and_eligibility():
     now = datetime(2026, 8, 15, 12, tzinfo=UTC)
     user = user_row("managed", now)
@@ -57,7 +55,6 @@ def test_notification_email_preference_defaults_and_eligibility():
         user.notification_email_mode = "weekly"
 
 
-# @matrix notification-email : coarse-request-activity presence
 def test_site_activity_is_coarse_and_expires(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=UTC)
     cache = MemoryRedis()
@@ -82,7 +79,6 @@ def test_site_activity_is_coarse_and_expires(monkeypatch):
     )
 
 
-# @matrix notification-email : coarse-request-activity presence redis-loss
 def test_site_activity_memo_bounds_reads_and_redis_loss_delay(monkeypatch):
     from unittest.mock import Mock
     now = datetime(2026, 8, 15, 12, tzinfo=UTC)
@@ -104,7 +100,6 @@ def test_site_activity_memo_bounds_reads_and_redis_loss_delay(monkeypatch):
     assert cache.get.call_count == 3
 
 
-# @matrix notification-email : coarse-request-activity failure bounded
 def test_activity_memo_retries_failures_and_bounds_memory(monkeypatch):
     from unittest.mock import Mock
     now = datetime(2026, 8, 15, 12, tzinfo=UTC)
@@ -131,7 +126,6 @@ def test_activity_memo_retries_failures_and_bounds_memory(monkeypatch):
     assert email_presence._activity_key(failed) not in email_presence._activity_memo
 
 
-# @matrix notification-email : coarse-request-activity concurrency clock
 def test_activity_memo_is_safe_for_concurrent_workers_and_clock_changes(monkeypatch):
     from concurrent.futures import ThreadPoolExecutor
     from unittest.mock import Mock

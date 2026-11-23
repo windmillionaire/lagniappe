@@ -72,21 +72,12 @@ def offline() -> tuple[str, int]:
     return render_template("home/offline.html"), 200
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_note_text_photo_and_delete_modal
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_rejects_non_csv_upload
-# @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_invalid_typed_submission_returns_error_without_saving
-# @pair request-errors:plain-validation
 def error(error: object, exception: BaseException | None = None) -> Response:
     if exception:
         exceptions.capture(exception)
     return Response(str(error), status=422, mimetype="text/plain")
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/filters/main.py::_contract_error_response
-# @reason filter request tests assert the route-owned 400 response
 def bad_request(error: object) -> Response:
     return Response(str(error), status=400, mimetype="text/plain")
 
@@ -109,9 +100,6 @@ def cell(
     return template(field, entity, template_column, parent), 200
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_visibility_panel_includes_category_form_columns
-# @matrix category-index : missing-field mixed-form render
 # @template cell.html::cell
 def table(entities: Sequence[Entity], parent: object) -> tuple[str, int]:
     template = get_template_attribute("table.html", "table")
@@ -156,15 +144,11 @@ def json_response(data: object, status: int = 200) -> tuple[Response, int]:
     return jsonify(data), status
 
 
-# @testable infrastructure
 def publish_notification_state(state: NotificationState | None) -> None:
     """Attach compact notification state to the current response lifecycle."""
     g.NOTIFICATION_STATE = cache.public_notification_state(state)
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
-# @matrix web-headers : acknowledgement entity-revision local-save
 def entity_response[T](response: T, *entities: Entity | None) -> T:
     """Annotate a successful response with committed entity revisions."""
     revisions = getattr(g, "ENTITY_RESPONSE_REVISIONS", {})
@@ -180,10 +164,6 @@ def entity_response[T](response: T, *entities: Entity | None) -> T:
     return response
 
 
-# @testable false
-# @manual true
-# @reason pending/completed notification replacement is exercised through notification workflows
-# @matrix notifications : item-html pending target
 def notification_item(notification: models.Notification) -> str:
     template = get_template_attribute("notifications.html", "item")
     return template(notification).strip()
@@ -192,12 +172,6 @@ def notification_item(notification: models.Notification) -> str:
 # --- Index Responses ---
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
-# @tests tests_e2e/006_tasks/test_006c_task_index.py::test_tasks_table_columns
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
-# @pairs categories:first-batch indexes:rendering reconnect-refresh:root-fingerprint task-index:columns
 def index(name: str, index: Index | Entity, **context: object) -> tuple[str, int]:
     fingerprint = (
         database_utility.site_fingerprint(f"/{name}/index")
@@ -236,9 +210,6 @@ def rows[T: Entity](entities: T | list[T], parent: object) -> tuple[str, int]:
 # --- Document Responses ---
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
-# @matrix public-pages : metadata preview public-rendering
 def public_document(entity: models.Page) -> Response:
     from lagniappe.core.tools.email.notifications.links import absolute_url
     from lagniappe.core.tools.site import public_pages
@@ -247,9 +218,6 @@ def public_document(entity: models.Page) -> Response:
         url_for("pages.public", public_id=entity.public_id)
     )
 
-    # @testable false
-    # @covered-by lagniappe/web/responses.py::public_document
-    # @reason route-specific absolute image adapter is part of public rendering
     def image_url(candidate):
         name = candidate.name
         if candidate.extension:
@@ -304,8 +272,6 @@ def document_image(url: str | None) -> tuple[Response, int]:
 # --- Task Responses ---
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::entity_response
 def page_task(task: models.Task, **extra: object) -> tuple[Response, int]:
     from lagniappe.web.deferred_autofill import form_state
     submission = task.properties.submission.form_value
@@ -330,16 +296,11 @@ def page_task(task: models.Task, **extra: object) -> tuple[Response, int]:
     )
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::entity_response
 def task_settings(task: models.Task) -> tuple[str, int]:
     template = get_template_attribute("pages/tasks.html", "settings_form")
     return entity_response((template(task, task.page), 200), task)
 
 
-# @testable true
-# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
-# @matrix task-combine : checkbox-form compatible
 def task_combine_form(
     task: models.Task, compatible: Sequence[models.Task]
 ) -> tuple[str, int]:
@@ -347,9 +308,6 @@ def task_combine_form(
     return template(task, compatible), 200
 
 
-# @testable true
-# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
-# @matrix task-combine : delta ordering remove upsert
 def task_combine_delta(
     main: models.Task, removed: Iterable[models.Task], page: models.Page
 ) -> tuple[Response, int]:
@@ -375,12 +333,6 @@ def task_combine_delta(
 # --- Form Responses ---
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
-# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_deleted_migrated_form_retains_completed_submissions_and_history
-# @matrix html-field : html-fields
-# @matrix security : html-sanitization inner-html
-# @matrix task-completion : deleted-form generation raw-values
 def form_submission(
     entity: models.Page | models.Task | models.TaskHistory,
     *,
@@ -444,10 +396,6 @@ def new_form_restriction(group: models.UserGroup) -> tuple[str, int]:
 # --- Page Responses ---
 
 
-# @testable false
-# @covered-by lagniappe/web/responses.py::page
-# @covered-by lagniappe/web/responses.py::page_document_settings
-# @reason response context adapter delegates extraction and normalization to tested services
 def _public_page_settings_context(page):
     from lagniappe.core.tools.site import public_pages
 
@@ -471,7 +419,6 @@ def _public_page_settings_context(page):
     }
 
 
-# @testable infrastructure
 def page(page: models.Page, focus_task: models.Task | None = None) -> tuple[str, int]:
     public_context = (
         _public_page_settings_context(page)
@@ -504,8 +451,6 @@ def new_file_upload(
     return "".join(template(uploaded, page) for uploaded in files), 200
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::entity_response
 def page_info(page: models.Page, **extra: object) -> tuple[Response, int]:
     from lagniappe.web.deferred_autofill import form_state
     template = get_template_attribute("pages/info.html", "info_form")
@@ -528,8 +473,6 @@ def page_info(page: models.Page, **extra: object) -> tuple[Response, int]:
     )
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::entity_response
 def user_settings(page: models.Page) -> tuple[Response, int]:
     template = get_template_attribute("pages/info.html", "user_settings")
     schema = page.submission_schema if page.form else None
@@ -559,15 +502,11 @@ def user_settings(page: models.Page) -> tuple[Response, int]:
     )
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::entity_response
 def page_permissions(page: models.Page) -> tuple[str, int]:
     template = get_template_attribute("pages/info.html", "permissions_form")
     return entity_response((template(page), 200), page)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::entity_response
 def page_document_settings(entity: models.Project | models.Page) -> tuple[str, int]:
     return entity_response(
         (
@@ -589,8 +528,6 @@ def page_image(page: models.Page) -> tuple[str, int]:
 # --- Category Responses ---
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::entity_response
 def category_info(category: models.Category) -> tuple[str, int]:
     template = get_template_attribute("categories/tools.html", "category_info")
     return entity_response((template(category), 200), category)
@@ -603,15 +540,11 @@ def project_view(project: models.Project) -> tuple[str, int]:
     return render_template("projects/project.html", project=project), 200
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::entity_response
 def project_info(project: models.Project) -> tuple[str, int]:
     template = get_template_attribute("projects/info.html", "info_form")
     return entity_response((template(project), 200), project)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::entity_response
 def new_model_task(model_task: models.ModelTask) -> tuple[str, int]:
     template = get_template_attribute("projects/model_tasks.html", "model_task")
     return entity_response(
@@ -624,15 +557,10 @@ def new_model_task(model_task: models.ModelTask) -> tuple[str, int]:
 # --- File Responses ---
 
 
-# @testable true
-# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_text_tab_renders_uploaded_text_content
-# @matrix file : text-tab
 def file_page(file: models.File) -> tuple[str, int]:
     return render_template("files/file.html", file=file), 200
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::entity_response
 def file_info(file: models.File) -> tuple[str, int]:
     return entity_response(
         (get_template_attribute("files/info.html", "info_form")(file), 200),
@@ -640,9 +568,6 @@ def file_info(file: models.File) -> tuple[str, int]:
     )
 
 
-# @testable true
-# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_download_uses_original_filename_and_mimetype
-# @matrix file : download filename mimetype
 def file_download(file_entity: models.File) -> ResponseReturnValue:
     g.NO_CACHE = True
     asset = file_entity.properties.file.value
@@ -675,7 +600,6 @@ def file_download(file_entity: models.File) -> ResponseReturnValue:
     return response, 200
 
 
-# @testable infrastructure
 def ingress_progress(file: models.Ingress) -> tuple[Response, int]:
     from lagniappe.core.tools.ingress import IngressService
 
@@ -720,9 +644,6 @@ def new_page(page: models.Page) -> tuple[str, int]:
     return template(page), 200
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/notes.py::create_note
-# @reason shared rendering response is exercised through the public note creation routes
 def new_note(note: models.Note, surface: str = "home") -> tuple[str, int]:
     template = get_template_attribute("notes.html", "note_item")
     return template(note, surface), 200
@@ -738,10 +659,6 @@ def new_tool_report(report: models.AIReport) -> tuple[Response, int]:
     return template(report), 200
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
-# @covered-by lagniappe/web/routes/tools/main.py::run_report
-# @reason deferred report acknowledgement is route plumbing verified through create and execution workflows
 def deferred_tool_report(
     report: models.AIReport,
     notification: models.Notification | None,
@@ -764,9 +681,6 @@ def deferred_tool_report(
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::report
-# @reason report route coverage owns status hydration and full-page rendering
 def tool_report(report: models.AIReport) -> tuple[str, int]:
     if not report.available:
         return render_template("tools/report.html", report=report), 200
@@ -779,10 +693,6 @@ def tool_report(report: models.AIReport) -> tuple[str, int]:
                            migration_pending=migration_pending(report)), 200
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002h_home_permissions.py::test_category_home_rows_only_offer_star_controls
-# @tests tests_e2e/002_home/test_002h_home_permissions.py::test_empty_home_model_lists_settle_to_disabled_zero_state
-# @pairs permissions:active-tasks-directory permissions:home-actions permissions:own-page-only
 # @template home/categories.html::category
 # @template home/directory.html::list
 # @template home/home.html::create
@@ -798,10 +708,6 @@ def home_page(home: models.Home) -> tuple[str, int]:
     )
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_admin_directory_link_opens_admin_settings
-# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_settings_requires_administrator
-# @matrix admin : page-load site-settings
 def admin_page() -> tuple[str, int]:
     from lagniappe.core.tools.site.data_protection import data_protection_status
 
@@ -819,35 +725,23 @@ def admin_page() -> tuple[str, int]:
     ), 200
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/site.py::privacy_policy
-# @reason static public document rendered through the route
 def privacy_policy() -> tuple[str, int]:
     return render_template("home/privacy_policy.html"), 200
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/site.py::reporting_privacy
-# @reason static public document rendered through the route
 def reporting_privacy() -> tuple[str, int]:
     return render_template("home/reporting_privacy.html"), 200
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/main.py::get
 def activity(section: HomeProperty) -> tuple[str, int]:
     return get_template_attribute("home/notes.html", "list")(section), 200
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/notes.py::get_notes
-# @reason response wrapper delegates Page note rendering to the tested collection route
 def page_notes(notes: Iterable[models.Note], page: models.Page) -> tuple[str, int]:
     template = get_template_attribute("pages/notes.html", "note_list")
     return template(page, notes), 200
 
 
-# @testable infrastructure
 def notifications(
     notifications: Iterable[models.Notification],
     *,
@@ -859,7 +753,6 @@ def notifications(
     return template(notifications, aggregate, cursor, can_message), 200
 
 
-# @testable infrastructure
 def message_page(
     *, initial_conversation: str | None = None, can_message: bool = False
 ) -> tuple[str, int]:
@@ -870,8 +763,6 @@ def message_page(
     ), 200
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/routes/messages/main.py::clear_modal
 def message_clear_modal(key: str, *, peer_name: str) -> tuple[str, int]:
     return render_template(
         "delete/conversation.html",
@@ -880,8 +771,6 @@ def message_clear_modal(key: str, *, peer_name: str) -> tuple[str, int]:
     ), 200
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/main.py::get
 def home_section(section: HomeProperty) -> tuple[str, int] | None:
     if section.id == "ingress":
         return get_template_attribute("home/ingress.html", "import_list")(section), 200
@@ -904,9 +793,6 @@ def home_section(section: HomeProperty) -> tuple[str, int] | None:
         return get_template_attribute("home/projects.html", "list")(section), 200
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tasks/main.py::update
-# @reason route response adapter is exercised through its owning task mutation
 def home_task_list() -> tuple[str, int]:
 
     home = Entities.HOME(user=auth.authenticated_user())
@@ -919,18 +805,12 @@ def home_task_list() -> tuple[str, int]:
     return count_html + task_list_html, 200
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tasks/main.py::update
-# @reason route response adapter is exercised through its owning task mutation
 def home_task(task: models.Task) -> tuple[Response, int]:
     template = get_template_attribute("home/tasks.html", "task")
     count = database_get.user_task_count(current_user.page)
     return jsonify({"html": template(task), "count": count}), 200
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tasks/main.py::update
-# @reason route response adapter is exercised through its owning task mutation
 def home_task_removed() -> tuple[Response, int]:
     count = database_get.user_task_count(current_user.page)
     return jsonify({"removed": True, "count": count}), 200
@@ -939,10 +819,6 @@ def home_task_removed() -> tuple[Response, int]:
 # --- Filter Responses ---
 
 
-# @testable false
-# @covered-by lagniappe/web/responses.py::filtered_task_index
-# @covered-by lagniappe/web/responses.py::filtered_page_index
-# @reason filtered index response tests exercise the rendered polling contract
 def _filtered_index_poll_context(entity):
     if not entity.temporary:
         context = {"fingerprint": filter_result_revision(entity, auth.authenticated_user())}
@@ -976,11 +852,6 @@ def saved_filters(
         return template(entity, filters), 200
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_saved_in_progress_filter_removes_completed_task_after_back_navigation
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_saved_in_progress_filter_refreshes_after_reconnect
-# @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_completed_button
-# @pairs filters:saved-filter polling:task-index reconnect-refresh:task-index
 def filtered_task_index(
     tasks: Iterable[models.Task], filter: models.Filter
 ) -> tuple[str, int]:
@@ -995,9 +866,6 @@ def filtered_task_index(
     )
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filter_save_and_run
-# @pairs polling:category-index reconnect-refresh:category-index
 def filtered_page_index(
     pages: Iterable[models.Page], filter: models.Filter
 ) -> tuple[str, int]:
@@ -1012,10 +880,6 @@ def filtered_page_index(
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/filters/main.py::condition
-# @covered-by lagniappe/web/routes/filters/main.py::options
-# @reason condition and option routes own rendered filter response behavior
 def filter_condition(
     data: dict[str, object],
     condition: models.Condition,
@@ -1039,9 +903,6 @@ def filter_condition(
 # --- User Responses ---
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
-# @matrix user-groups : group-create nav
 def create_group(group: models.UserGroup) -> tuple[str, int]:
     form_partial = get_template_attribute("users/tools.html", "group_permissions")
     selector_partial = get_template_attribute(
@@ -1053,8 +914,6 @@ def create_group(group: models.UserGroup) -> tuple[str, int]:
     return form_partial(group, sections) + selector_partial(group), 200
 
 
-# @testable true
-# @matrix user-groups : permission-update
 def group_permissions(group: models.UserGroup, public: bool = False) -> tuple[str, int]:
     if public:
         template = get_template_attribute("users/tools.html", "public_permissions")
@@ -1092,11 +951,6 @@ def created_index_result(result: Mapping[str, object]) -> tuple[Response, int]:
     ), 200
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_click_result_navigates
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_result_links_correct
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_navbar_task_results_render_current_completion_state
-# @matrix search : navbar-results result-links result-navigation task-model
 def search_results(
     query: str, results: Sequence[Mapping[str, object]], total: int
 ) -> tuple[dict[str, str], int]:
@@ -1104,12 +958,6 @@ def search_results(
     return {"results": template(query, results, total)}, 200
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_page_shows_query
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_no_results
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_result_titles
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_task_facet_includes_task_and_model_results_with_links
-# @matrix search : no-results query-display result-links result-title
 def search_page(
     q: str, results: Sequence[Mapping[str, object]], pagination: Mapping[str, object]
 ) -> tuple[str, int]:
@@ -1132,9 +980,6 @@ def location_results(
 # --- Delete Responses ---
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_form_delete_modal_lists_page_and_task_users
-# @matrix forms : delete-modal instance-query preview-limit
 def delete_entity(
     entity: Entity | None = None, key: str | None = None
 ) -> tuple[str, int]:
@@ -1169,10 +1014,6 @@ def delete_entity(
 # --- Manual & Reference Responses ---
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
-# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_discovery_follows_live_setting
-# @matrix manual : canonical-url metadata search-discovery section-navigation
 def manual_index(section: str, index: Iterable[Mapping[str, str]]) -> Response:
     from lagniappe.core.tools.site import public_pages
 
@@ -1221,9 +1062,6 @@ def manual_index(section: str, index: Iterable[Mapping[str, str]]) -> Response:
     return response
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
-# @matrix manual : ajax-section noindex site-policy address-redaction anonymous-access
 def manual_content(section: str) -> Response:
     response = make_response(
         smartypants(render_template(f"manual/content/{section}.html"))
@@ -1232,9 +1070,6 @@ def manual_content(section: str) -> Response:
     return response
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009e_help.py::test_help_article_navigation_and_canonical_ids
-# @pair help:navigation
 def reference_topic(section: str) -> tuple[str, int]:
     from lagniappe.reference import get_topic
 
@@ -1245,9 +1080,6 @@ def reference_topic(section: str) -> tuple[str, int]:
     return render_template("reference/topic.html", topic=topic), 200
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @matrix admin : configuration-display recovery-export secrets web-headers
 def reference_environment_variables(
     variables: Mapping[str, object], download: bool = False
 ) -> ResponseReturnValue:
@@ -1279,9 +1111,6 @@ def reference_environment_variables(
         ), 200
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @matrix admin : configuration-display secrets
 def site_configuration(variables: Mapping[str, object]) -> tuple[str, int]:
     from config.recovery import redact_settings_for_display
 

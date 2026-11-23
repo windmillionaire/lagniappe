@@ -18,10 +18,6 @@ from ..notifications import service as notification_service
 from . import views
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @matrix messaging : compose-eligibility idempotency new-after-clear reply-permission
 def send_message(
     actor: User,
     recipient_identifier: str,
@@ -73,10 +69,6 @@ def send_message(
     }
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @pair messaging:read-race
 def mark_read(user: User, conversation_identifier: str | Key, expected_revision: int | None = None) -> views.ConversationProjection:
     key = database_get.datastore_key(conversation_identifier)
     if not key:
@@ -103,10 +95,6 @@ def mark_read(user: User, conversation_identifier: str | Key, expected_revision:
     return views.serialize_conversation(conversation, user, **peer_status)
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @pair messaging:per-copy-delete
 def hide_message(user: User, message_identifier: str | Key) -> bool:
     key = database_get.datastore_key(message_identifier)
     if not key:
@@ -118,10 +106,6 @@ def hide_message(user: User, message_identifier: str | Key) -> bool:
     return bool(conversation)
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @pair messaging:clear-horizon
 def clear_conversation(user: User, conversation_identifier: str | Key) -> views.ConversationProjection:
     key = database_get.datastore_key(conversation_identifier)
     if not key:

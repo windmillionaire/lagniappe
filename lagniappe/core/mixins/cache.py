@@ -1,8 +1,5 @@
 from .field_host import FieldHost
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_summary
-# @pair file:cache
 class CacheMixin(FieldHost):
     """Adds entity cache output. Collected by Entity.to_cache.
 

@@ -33,7 +33,6 @@ def _project(allowed=True):
     return project
 
 
-# @matrix editor link-preview : internal metadata permissions
 def test_internal_preview_returns_allowed_entity_metadata(monkeypatch):
     entity = _entity()
     monkeypatch.setattr(
@@ -58,7 +57,6 @@ def test_internal_preview_returns_allowed_entity_metadata(monkeypatch):
     }
 
 
-# @pair link-preview:nested-relations
 @pytest.mark.parametrize("kind", ["task", "file"])
 def test_task_preview_loads_page_form_before_permission_check(monkeypatch, kind):
     def stored(entity_type, name):
@@ -94,7 +92,6 @@ def test_task_preview_loads_page_form_before_permission_check(monkeypatch, kind)
     assert denied["title"] == "Access Restricted"
 
 
-# @matrix editor link-preview : internal metadata permissions
 def test_internal_status_preview_uses_project_permission(monkeypatch):
     project = _project()
     monkeypatch.setattr(
@@ -134,7 +131,6 @@ def test_internal_status_preview_uses_project_permission(monkeypatch):
     assert "Preview Target" not in str(denied)
 
 
-# @matrix editor link-preview : internal permissions
 def test_internal_preview_hides_missing_or_forbidden_entities(monkeypatch):
     monkeypatch.setattr(link_preview.Entities, "fetch_one", lambda key, request: None)
 
@@ -160,7 +156,6 @@ def test_internal_preview_hides_missing_or_forbidden_entities(monkeypatch):
     assert denied["description"] == "You do not have access to preview this link."
 
 
-# @matrix editor link-preview : external metadata
 def test_external_preview_maps_metadata_and_falls_back(monkeypatch):
     def fetch(url, policy, *, headers):
         assert url == "https://example.com/articles/one"
@@ -201,7 +196,6 @@ def test_external_preview_maps_metadata_and_falls_back(monkeypatch):
         assert fallback["description"] is None
 
 
-# @matrix editor link-preview : external url-safety
 def test_external_preview_rejects_unsafe_urls(monkeypatch):
     for url in [
         "javascript:alert(1)",

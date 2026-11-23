@@ -21,7 +21,6 @@ CSV_DIR = Path(__file__).parent.parent / "files"
 # --- ProcessCSV Tests ---
 
 
-# @pair ingress-csv:delimiter
 def test_standard_csv():
     """Test processing a standard comma-delimited CSV."""
     csv_path = CSV_DIR / "sample_data.csv"
@@ -41,7 +40,6 @@ def test_standard_csv():
     ]
 
 
-# @pair ingress-csv:delimiter
 def test_semicolon_delimiter():
     """Test processing a semicolon-delimited CSV."""
     csv_path = CSV_DIR / "csv_semicolon.csv"
@@ -60,7 +58,6 @@ def test_semicolon_delimiter():
     assert "score" in column_labels
 
 
-# @pair ingress-csv:empty-rows
 def test_empty_rows_skipped():
     """Test that empty rows are skipped during processing."""
     csv_path = CSV_DIR / "csv_with_empties.csv"
@@ -83,7 +80,6 @@ def test_empty_rows_skipped():
     ]
 
 
-# @pair ingress-csv:validation
 def test_header_only_raises():
     """Test that a CSV with only headers raises an error."""
     csv_path = CSV_DIR / "csv_header_only.csv"
@@ -93,14 +89,12 @@ def test_header_only_raises():
         process_csv(text)
 
 
-# @pair ingress-csv:validation
 def test_no_header_raises():
     """Test that an empty CSV raises an error."""
     with pytest.raises(exceptions.ValidationError, match="No header row"):
         process_csv("")
 
 
-# @pair ingress-csv:column-ids
 def test_rows_keyed_by_column_id():
     """Test that row data is keyed by column IDs."""
     csv_path = CSV_DIR / "sample_data.csv"
@@ -125,7 +119,6 @@ def test_rows_keyed_by_column_id():
 # --- Column Type Inference Tests ---
 
 
-# @matrix ingress-csv : email type-inference
 def test_email_detection():
     """Test that email columns are detected."""
     csv_path = CSV_DIR / "csv_mixed_types.csv"
@@ -138,7 +131,6 @@ def test_email_detection():
     assert email_col["icon"] == "email"
 
 
-# @matrix ingress-csv : phone type-inference
 def test_phone_detection():
     """Test that phone number columns are detected."""
     csv_path = CSV_DIR / "csv_mixed_types.csv"
@@ -151,7 +143,6 @@ def test_phone_detection():
     assert phone_col["icon"] == "tel"
 
 
-# @matrix ingress-csv : date type-inference
 def test_date_detection():
     """Test that date columns are detected."""
     csv_path = CSV_DIR / "csv_mixed_types.csv"
@@ -164,7 +155,6 @@ def test_date_detection():
     assert date_col["icon"] == "date"
 
 
-# @matrix ingress-csv : type-inference url
 def test_url_detection():
     """Test that URL columns are detected."""
     csv_path = CSV_DIR / "csv_mixed_types.csv"
@@ -177,7 +167,6 @@ def test_url_detection():
     assert url_col["icon"] == "link"
 
 
-# @matrix ingress-csv : type-inference url
 def test_url_detection_rejects_long_unsupported_path_within_deadline():
     """Reject unsupported URL syntax without pathological regex backtracking."""
     unsupported_url = f"https://example.com/{'a' * 100}?"
@@ -199,7 +188,6 @@ def test_url_detection_rejects_long_unsupported_path_within_deadline():
     assert url_col["type"] == "string"
 
 
-# @matrix ingress-csv : boolean type-inference
 def test_boolean_detection():
     """Test that boolean columns are detected."""
     csv_path = CSV_DIR / "csv_mixed_types.csv"
@@ -212,7 +200,6 @@ def test_boolean_detection():
     assert bool_col["icon"] == "checkbox"
 
 
-# @matrix ingress-csv : categorical type-inference
 def test_categorical_detection():
     """Test that categorical columns are detected."""
     csv_path = CSV_DIR / "csv_mixed_types.csv"
@@ -226,7 +213,6 @@ def test_categorical_detection():
     assert cat_col["icon"] == "radio"
 
 
-# @matrix ingress-csv : multi-categorical type-inference
 def test_multi_categorical_detection():
     """Test that multi-value categorical columns are detected."""
     csv_path = CSV_DIR / "csv_multi_categorical.csv"
@@ -245,7 +231,6 @@ def test_multi_categorical_detection():
     assert departments_col["icon"] == "select"
 
 
-# @matrix ingress-csv : number type-inference
 def test_number_detection():
     """Test that numeric columns are detected."""
     csv_path = CSV_DIR / "sample_data.csv"
@@ -258,7 +243,6 @@ def test_number_detection():
     assert salary_col["icon"] == "number"
 
 
-# @matrix ingress-csv : fallback type-inference
 def test_string_fallback():
     """Test that unrecognized columns default to string type."""
     csv_path = CSV_DIR / "sample_data.csv"

@@ -1,11 +1,6 @@
 import { STYLES } from "../generated/styles.mjs";
 import { Modal } from "../shared/modal.mjs";
 
-/**
- * @testable true
- * @tests tests_js/test_028_form_state_split.mjs::test_migration_notice_survives_form_replacement_and_discard
- * @matrix form-migration : informational-notice readonly-modal
- */
 export function installMigrationNotice(widget) {
 	widget._migrationNotice?.destroy();
 	if (widget.revisionPreview || widget.target?.dataset.completed === "true")
@@ -33,11 +28,6 @@ export function installMigrationNotice(widget) {
 			banner?.remove();
 		},
 	};
-	/**
-	 * @testable false
-	 * @covered-by src/script/forms/migrationNotice.mjs::installMigrationNotice
-	 * @reason read-only comparison is owned by the installed notice
-	 */
 	const click = async () => {
 		const root = document.createElement("div");
 		root.id = "modal";

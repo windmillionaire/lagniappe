@@ -6,17 +6,6 @@ import Core from "./base/core.mjs";
 const REPORT_FORM_SELECTOR =
 	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='revise-report-form']";
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_runs_ready_report
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_preserves_completed_work
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_action_dependencies
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_dependent_submission_updates
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_report_detail_shows_answer_without_duplicate_proposal
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_report_detail_shows_revision_and_manual_execution
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_submits_revision
- * @matrix ai-report : answer-html ask create deferred-refresh delete-modal detail execute failure links no-actions pending reload result-json revision skip-action
- */
 export default class Report extends Core {
 	async init() {
 		await super.init();
@@ -37,11 +26,6 @@ export default class Report extends Core {
 		return this;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_038_startup_specializations.mjs::test_report_loads_base_form_only_for_present_forms_and_in_parallel
-	 * @matrix ai-report : concurrent-form-init lazy-form-runtime
-	 */
 	ensureReportForms() {
 		if (this._reportFormsReady) return Promise.resolve(this);
 		if (this._reportFormsPromise) return this._reportFormsPromise;

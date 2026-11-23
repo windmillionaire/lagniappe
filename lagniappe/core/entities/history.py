@@ -57,12 +57,6 @@ class TaskHistoryOverrides(TypedDict, total=False):
     created: datetime | None
 
 
-# @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_snapshots_completed_task_state
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_legacy_task_history_snapshot_text_defaults_to_none
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_fingerprint_ignores_later_form_versions
-# @matrix task-completion : asset-copy description history immutable-fingerprint legacy linked-pages name schema-version snapshot submission
 class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     """Immutable task snapshot with a stable entity fingerprint.
 
@@ -109,9 +103,6 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     def readonly(self) -> bool:
         return True
 
-    # @testable true
-    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_history_permissions_follow_live_task
-    # @matrix permissions tasks : task-history live-task
     def allowed(self, action: Action, user: FieldUser = None) -> bool:
         return cast("Task", permission_relation(self, "task", required=True)).allowed(action, user=user)
 
@@ -169,10 +160,6 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
         }
         return EntityProperties(self, properties)
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_snapshots_completed_task_state
-    # @matrix task-completion : asset-copy history
-    # @pair signature:asset-copy
     def copy_assets(self, task: Task | TaskHistory) -> None:
         try:
             for name in list(getattr(task, "assets", {}).keys()):
@@ -185,14 +172,6 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
             cleanup_rejected_attempt(self)
             raise
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_snapshots_completed_task_state
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_clones_another_task_and_existing_history
-    # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
-    # @matrix task-combine : asset-copy attachments existing-history metadata schema-version source-snapshot
-    # @matrix task-completion : asset-copy snapshot
-    # @matrix task-completion : history schema-version
-    # @pair signature:asset-copy
     @classmethod
     def create(
         cls, task: Task, overrides: TaskHistoryOverrides | None = None, *,
@@ -257,9 +236,6 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
         return new_history
 
 
-# @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_archived_generation_preserves_schema_html_and_images
-# @matrix form-schema html-field : history generation immutable-assets
 class FormHistory(Entity, AssetMixin):
     if TYPE_CHECKING:
         schema: list[dict[str, object]]
@@ -269,9 +245,6 @@ class FormHistory(Entity, AssetMixin):
 
     entity_kind = "form_history"
 
-    # @testable true
-    # @tests tests_unit/test_004f_form_drafts.py::test_definition_snapshot_requires_submitter_scoped_authorization
-    # @matrix form-schema html-field : history permission-boundary
     def allowed(self, action: Action, user: FieldUser = None) -> bool:
         # An internal definition is not a standalone resource. Readers must
         # authorize the live Task/TaskHistory that selected this exact version.
@@ -316,9 +289,6 @@ class FormHistory(Entity, AssetMixin):
     def html_fields(self) -> list[HTML]:
         return self.properties.schema.html_fields
 
-    # @testable true
-    # @tests tests_unit/test_004f_form_drafts.py::test_archived_generation_preserves_schema_html_and_images
-    # @matrix html-field : history immutable-assets
     def get_html_field(self, field_id: str) -> str | None:
         if not self.content_available:
             return None
@@ -363,9 +333,6 @@ class FormHistory(Entity, AssetMixin):
         }
         return EntityProperties(self, properties)
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_form_history_create_copies_explicit_saved_definition_without_asset_copy
-    # @matrix form-schema html-field : history content-version
     @classmethod
     def create(cls, source: Form, previous_generation: int) -> Self:
         """Build the old definition from the saved source supplied by Form Save."""
@@ -383,14 +350,6 @@ class FormHistory(Entity, AssetMixin):
         return history
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_saves_do_not_create_automatic_history
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_document_history_create_copies_document_asset
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_document_history_named_versions_order_and_delete_in_bounded_batches
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_document_history_named_version_rejects_invalid_name_or_content
-# @matrix document-history : asset-copy asset-path batch-delete current-content legacy named ordering validation
-# @matrix editor : history-list validation
 class DocumentHistory(AssetMixin, Entity):
     if TYPE_CHECKING:
         @property

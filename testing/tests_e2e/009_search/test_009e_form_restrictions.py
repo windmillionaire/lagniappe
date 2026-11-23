@@ -14,7 +14,6 @@ from testing.elements import HeaderSearch, Select
 pytestmark = pytest.mark.e2e
 
 
-# @matrix permissions search files : task-move ancestor-tags
 def test_task_move_updates_all_owned_file_search_permissions():
     from lagniappe.core.tools.cache.core import cache
     from lagniappe.core.tools.cache.keys import Search
@@ -47,8 +46,6 @@ def test_task_move_updates_all_owned_file_search_permissions():
             assert cache.hget(Search.file.key(file), "restricted_to_page") == restriction
 
 
-# @matrix permissions search : reconciliation removal local-restrictions source-clauses source-save
-# @matrix forms : access-restrictions explicit-submit group-restricted owner-restricted
 # @template forms/restrictions.html::restrict_access
 # @template nav.html::search_results
 @pytest.mark.e2e_group("owner")
@@ -174,7 +171,6 @@ def test_form_restrictions_reconcile_existing_descendants(get_user, browser_fail
         assert Entities.fetch_one(task_file.key, request=Fetch.root()).modified == baseline[task_file.key]
 
 
-# @matrix permissions search : reconciliation queue retry continuation authentication
 def test_restriction_worker_retries_and_continues(monkeypatch):
     from google.oauth2 import id_token
 
@@ -222,7 +218,6 @@ def test_restriction_worker_retries_and_continues(monkeypatch):
     assert response.status_code == 503 and response.json == {"success": False, "retry": True}
 
 
-# @matrix permissions search : reconciliation batching duplicate-names
 def test_restriction_reconciliation_visits_every_indexed_batch(monkeypatch):
     from lagniappe.core.tools.cache import restrictions as worker
     from lagniappe.core.tools.cache.keys import Search
@@ -249,7 +244,6 @@ def test_restriction_reconciliation_visits_every_indexed_batch(monkeypatch):
         assert worker.cache.redis.hget(Search[entity.kind].key(entity), "restricted_to_page_form") is None
 
 
-# @matrix permissions cache : concurrent-save deleted-row preserved-fields fingerprint reconciliation
 @pytest.mark.parametrize("change", ["move", "task-form", "delete"])
 def test_restriction_reconciliation_repairs_concurrent_changes(monkeypatch, change):
     import json

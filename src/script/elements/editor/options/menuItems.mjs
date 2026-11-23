@@ -1,17 +1,6 @@
 import { STYLES } from "../../../generated/styles.mjs";
 import { setIcon } from "../../../shared/icons.mjs";
 
-/**
- * @testable true
- * @tests tests_js/test_033_editor_menu_items.mjs::test_editor_menu_item_serializes_current_active_state
- * @tests tests_js/test_033_editor_menu_items.mjs::test_editor_inline_code_menu_item_toggles_from_local_active_state
- * @tests tests_e2e/004_projects/test_004d_document.py::test_inline_code_style_formats_selected_text_and_persists
- * @tests tests_e2e/004_projects/test_004d_document.py::test_task_list_persists
- * @tests tests_e2e/004_projects/test_004j_editor_menus.py::test_list_menu_formats_selection
- * @matrix editor : dropdown-rerender menu-active-state
- * @matrix editor : formatting inline-code selection toggle
- * @matrix editor : task-list list-menu
- */
 class ToolbarMenuItem {
 	constructor(toolbar) {
 		this.toolbar = toolbar;
@@ -122,12 +111,6 @@ class ToolbarMenuItem {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004j_editor_menus.py::test_table_menu_creates_edits_and_saves
- * @tests tests_e2e/004_projects/test_004j_editor_menus.py::test_table_menu_edits_pasted_table
- * @matrix editor : table-menu
- */
 class TableMenuItem extends ToolbarMenuItem {
 	isAvailable() {
 		const editor = this.toolbar.editor;
@@ -143,9 +126,6 @@ class TableMenuItem extends ToolbarMenuItem {
 	}
 }
 
-/**
- * @testable infrastructure
- */
 class ClearFormatMenuItem extends ToolbarMenuItem {
 	_onClick(option) {
 		this.button = option;
@@ -153,9 +133,6 @@ class ClearFormatMenuItem extends ToolbarMenuItem {
 	}
 }
 
-/**
- * @testable infrastructure
- */
 class FormMenuItem extends ToolbarMenuItem {
 	_onClick(option) {
 		this.button = option;

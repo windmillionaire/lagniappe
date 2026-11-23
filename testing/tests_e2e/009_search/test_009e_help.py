@@ -39,7 +39,6 @@ def _get(user, path):
 # @template help/macros.html::body
 # @template reference/macros.html::modal
 # @style help.content
-# @pair help:navigation
 def test_help_article_navigation_and_canonical_ids(get_admin, get_user, browser_failures):
     user = get_admin()
     user.go(SitePage(url='/help/create_form'))
@@ -59,7 +58,6 @@ def test_help_article_navigation_and_canonical_ids(get_admin, get_user, browser_
             assert _get(user, path)['status'] == 404
 
 
-# @pair help:context-permissions
 def test_help_requires_login_but_general_admin_guidance_is_readable(get_user, browser_failures):
     base = SETTINGS.test_config['BASE_URL'].rstrip('/')
     anonymous = get_user(Users.ANONYMOUS)
@@ -74,12 +72,8 @@ def test_help_requires_login_but_general_admin_guidance_is_readable(get_user, br
         assert _get(user, '/reference/download-settings')['status'] == 403
 
 
-# @source lagniappe/core/tools/cache/query.py::search
-# @source lagniappe/web/routes/home/search.py::search_bar
-# @source lagniappe/web/routes/home/search.py::_search_page_results
 # @template search/search.html::facet_button
 # @style dropdown.icon
-# @matrix search : results navbar-results
 def test_help_search_facet_snippet_and_mobile_navigation(get_user):
     user = get_user(Users.user_no_access)
     user.go(SitePage(url='/l/search-page'), query_params={'q': 'reopening', 'kind': 'help'})
@@ -113,12 +107,6 @@ def test_help_search_facet_snippet_and_mobile_navigation(get_user):
     expect(user.page).to_have_url(base + '/')
 
 
-# @source lagniappe/core/tools/cache/help.py::ensure_help
-# @source lagniappe/core/tools/cache/query.py::search
-# @source lagniappe/core/tools/cache/query.py::candidate_search
-# @source lagniappe/core/tools/cache/query.py::exact_name_search
-# @matrix search : permissions pagination
-# @matrix help : publication version
 def test_redis_help_versions_permissions_pagination_and_record_exclusion():
     version = ensure_help()
     topic = get_topic('task_history')

@@ -19,7 +19,6 @@ from lagniappe.web.routes.api import main as api
 pytestmark = pytest.mark.e2e
 
 
-# @matrix experiments : http-execution
 def test_experiments_execute_requires_remote_admin_and_exact_proposal(monkeypatch):
     actor = SimpleNamespace(
         email=CONFIG.AGENT_ACCESS_EMAIL,
@@ -297,7 +296,6 @@ def test_app_wide_auto_execute_api_key_compact_get_and_one_step_submit(monkeypat
     }
 
 
-# @matrix experiments : request-measurements
 @pytest.mark.parametrize(
     "enabled,mode", [(False, "off"), (True, "off"), (True, "summary"), (True, "trace")]
 )
@@ -352,8 +350,6 @@ def test_experiments_request_headers_and_private_log_summary(
     assert records[1]["request_id"] != summary["request_id"]
 
 
-# @source lagniappe/web/experiments.py::task_list_context_keys
-# @matrix experiments : task-list-comparison request-measurements
 def test_experiments_comparison_metadata_survives_304(monkeypatch):
     flask_app = Flask("experiments-comparison-test")
     config = SimpleNamespace(

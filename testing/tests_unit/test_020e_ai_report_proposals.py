@@ -13,9 +13,6 @@ from lagniappe.core.tools.ai.reporting.proposals import (
 )
 
 
-# @source lagniappe/core/tools/ai/reporting/proposals/repair.py::_complete_form_schema_fields
-# @matrix ai-report : deterministic-repair form-type schema-field-id schema-update
-# @matrix form-schema : deterministic-repair form-type schema-update
 @pytest.mark.unit
 @pytest.mark.parametrize("consumer,form_type", [("create_page", "page"), ("create_task", "task")])
 def test_schema_repairs_keep_existing_fields_and_complete_unambiguous_structure(consumer, form_type):
@@ -47,8 +44,6 @@ def test_schema_repairs_keep_existing_fields_and_complete_unambiguous_structure(
     assert _complete_form_schema_fields(repaired) is repaired
 
 
-# @source lagniappe/core/tools/ai/reporting/proposals/repair.py::_complete_form_schema_fields
-# @matrix ai-report form-schema : deterministic-repair form-type
 @pytest.mark.unit
 def test_schema_repair_leaves_conflicting_form_usage_for_validation():
     from lagniappe.core.tools.ai.reporting.proposals.repair import _complete_form_schema_fields
@@ -62,7 +57,6 @@ def test_schema_repair_leaves_conflicting_form_usage_for_validation():
     assert "form_type" not in proposal["actions"][0]["data"]
 
 
-# @pairs ai-report:proposal ai-report:validation editor:document markdown:html-sanitization
 @pytest.mark.unit
 @pytest.mark.parametrize("action_type", ["create_page", "append_page_document", "replace_page_document"])
 def test_validate_proposal_renders_page_document_markdown(action_type):
@@ -96,7 +90,6 @@ def test_validate_proposal_renders_page_document_markdown(action_type):
     assert "<script" not in data["document"]
 
 
-# @matrix ai-report : proposal validation
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "form_type,field",
@@ -147,7 +140,6 @@ def test_validate_proposal_rejects_invalid_static_form_content(form_type, field)
         proposal_validation.validate_proposal(proposal)
 
 
-# @pairs ai-report:reference-kind permissions:personal-page
 @pytest.mark.unit
 def test_validate_proposal_accepts_virtual_user_kind_as_personal_page(monkeypatch):
     personal_hash = "abc123def456"
@@ -196,7 +188,6 @@ def test_validate_proposal_accepts_virtual_user_kind_as_personal_page(monkeypatc
         )
 
 
-# @matrix ai-report : task-page validation
 @pytest.mark.unit
 def test_validate_proposal_requires_create_task_page_reference():
     proposal = {
@@ -225,7 +216,6 @@ def test_validate_proposal_requires_create_task_page_reference():
         proposal_validation.validate_proposal(proposal)
 
 
-# @matrix ai-report form-schema : proposal schema-update validation
 @pytest.mark.unit
 def test_validate_proposal_rejects_unsafe_schema_update_operations():
     proposal = {
@@ -250,7 +240,6 @@ def test_validate_proposal_rejects_unsafe_schema_update_operations():
         proposal_validation.validate_proposal(proposal)
 
 
-# @matrix ai-report : explicit-task-identity proposal validation
 @pytest.mark.unit
 def test_validate_proposal_requires_completed_root_task_targets():
     with pytest.raises(
@@ -321,7 +310,6 @@ def test_validate_proposal_requires_completed_root_task_targets():
         proposal_validation.validate_proposal(proposal)
 
 
-# @matrix ai-report : completed-task future-date proposal validation
 @pytest.mark.unit
 def test_validate_proposal_rejects_future_completed_dates(monkeypatch):
     monkeypatch.setattr(
@@ -354,7 +342,6 @@ def test_validate_proposal_rejects_future_completed_dates(monkeypatch):
     assert proposal_validation.validate_proposal(proposal)["issues"] == []
 
 
-# @matrix ai-report : action-reference-namespace proposal submission validation
 @pytest.mark.unit
 def test_validate_proposal_treats_action_like_submission_fields_as_content():
     proposal = {
@@ -394,7 +381,6 @@ def test_validate_proposal_treats_action_like_submission_fields_as_content():
     )
 
 
-# @matrix ai-report : file-placement proposal validation
 @pytest.mark.unit
 def test_validate_proposal_requires_every_report_file_attachment(monkeypatch):
     monkeypatch.setattr(
@@ -446,7 +432,6 @@ def test_validate_proposal_requires_every_report_file_attachment(monkeypatch):
     assert validated["actions"][1]["data"]["file"] == "second-file-id"
 
 
-# @matrix ai-report : file-summary proposal validation
 @pytest.mark.unit
 def test_validate_proposal_requires_external_file_summaries(monkeypatch):
     monkeypatch.setattr(
@@ -565,7 +550,6 @@ def test_validate_proposal_requires_external_file_summaries(monkeypatch):
         )
 
 
-# @matrix ai-report : dependencies proposal skip
 @pytest.mark.unit
 def test_skip_proposal_actions_marks_dependencies():
     proposal = {
@@ -598,7 +582,6 @@ def test_skip_proposal_actions_marks_dependencies():
     ]
 
 
-# @matrix ai-report : dependencies exact-indexes grouped-display proposal restore skip
 @pytest.mark.unit
 def test_toggle_proposal_action_skip_restores_dependencies():
     proposal = {

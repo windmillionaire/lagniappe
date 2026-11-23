@@ -119,7 +119,6 @@ def _fetch(user, path, method="GET", data=None):
     )
 
 
-# @matrix mentions : document-view empty-results floating-menu keyboard link-popover mouse node-attributes profile-link recipient-search unlink
 @pytest.mark.e2e_group("owner")
 def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
     owner = get_user(Users.OWNER)
@@ -253,8 +252,6 @@ def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
     expect(editor.text_entry).to_contain_text(f"@{recipient.name}")
 
 
-# @matrix messaging : active-polling clear-confirmation clear-horizon compose-modal conversation-page history-page new-after-clear per-copy-delete permission polling-revision read-race unread-count
-# @matrix notifications : aggregate-count exact-count
 @pytest.mark.e2e_group("owner")
 def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     get_user,
@@ -401,7 +398,6 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     assert denied["status"] == 404
 
 
-# @matrix messaging : inline-reply preserve-selection responsive-peer-selector selection-race unread-peer
 def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_admin, get_user):
     owner = get_admin()
     user = get_user(_managed_definition("Mobile"), creator=owner, has_touch=True)
@@ -484,8 +480,6 @@ def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_admin, ge
     expect(delete_modal).not_to_be_attached()
 
 
-# @matrix messaging : compose-eligibility inline-reply reply-permission
-# @pair notifications:menu-open
 def test_inbound_message_allows_reply_without_compose_permission(get_admin, get_user):
     owner = get_admin()
     recipient = get_user(_restricted_definition("Reply Only"), creator=owner)

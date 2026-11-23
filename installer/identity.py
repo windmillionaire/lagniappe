@@ -41,9 +41,6 @@ IDENTITY_INITIALIZATION_ATTEMPTS = 8
 IDENTITY_INITIALIZATION_DELAYS = (2, 4, 8, 15, 20, 30, 30)
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
-# @matrix setup : identity-platform provider-state
 def get_identity_platform_config(
     session: Session, project_id: str, headers: Mapping[str, str]
 ) -> dict[str, object] | None:
@@ -61,9 +58,6 @@ def get_identity_platform_config(
     return data if response.status_code == 200 else None
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
-# @matrix setup : authorized-domain identity-platform
 def identity_platform_target(app_url: str) -> tuple[str, str]:
     """Return the application domain and local email action-handler URL."""
     app_url = str(app_url or "").strip().rstrip("/")
@@ -75,19 +69,11 @@ def identity_platform_target(app_url: str) -> tuple[str, str]:
     return parsed.hostname, f"{app_url}/users/login"
 
 
-# @testable false
-# @covered-by installer/identity.py::identity_platform_config_matches
-# @covered-by installer/recovery.py::_probe_identity_platform
-# @reason nested provider-state adapter is exercised through matching and recovery
 def _email_password_enabled(config):
     email = ((config or {}).get("signIn") or {}).get("email") or {}
     return email.get("enabled") is True and email.get("passwordRequired") is True
 
 
-# @testable false
-# @covered-by installer/identity.py::identity_platform_config_matches
-# @covered-by installer/identity.py::reconcile_identity_platform
-# @reason core provider-state predicate is exercised through public reconciliation
 def _core_matches(config, app_url):
     domain, _ = identity_platform_target(app_url)
     domains = {
@@ -100,9 +86,6 @@ def _core_matches(config, app_url):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
-# @matrix setup : authorized-domain identity-platform provider-state
 def identity_platform_config_matches(
     config: Mapping[str, object] | None, app_url: str
 ) -> bool:
@@ -110,9 +93,6 @@ def identity_platform_config_matches(
     return _core_matches(config, app_url)
 
 
-# @testable false
-# @covered-by installer/identity.py::reconcile_identity_platform
-# @reason bounded convergence polling is owned by provider reconciliation
 def _wait_for_config(session, project_id, headers, predicate):
     deadline = time.monotonic() + PROVIDER_OPERATION_TIMEOUT_SECONDS
     attempt = 0
@@ -130,9 +110,6 @@ def _wait_for_config(session, project_id, headers, predicate):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_verification_preserves_standalone_subtype
-# @matrix setup : auth-separation identity-platform provider-state
 def _ensure_standalone_subtype(config, project_id):
     subtype = str((config or {}).get("subtype") or "").strip()
     if subtype != IDENTITY_PLATFORM_SUBTYPE:
@@ -143,12 +120,6 @@ def _ensure_standalone_subtype(config, project_id):
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_initialization_retries_api_activation
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_initialization_accepts_existing_provider
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_initialization_accepts_already_enabled_http_400
-# @matrix setup : authorized-domain diagnostics idempotency identity-platform provider-convergence provider-state retry
 def reconcile_identity_platform(
     session: Session, project_id: str, headers: Mapping[str, str], app_url: str
 ) -> dict[str, object]:
@@ -257,9 +228,6 @@ def reconcile_identity_platform(
     return config
 
 
-# @testable false
-# @covered-by installer/identity.py::setup_identity_platform
-# @reason public config projection is exercised through persisted setup output
 def _public_client_config(config, project_id):
     api_key = str((((config or {}).get("client") or {}).get("apiKey")) or "").strip()
     if not api_key:
@@ -270,11 +238,6 @@ def _public_client_config(config, project_id):
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_finishes_spinner_before_reporting_error
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
-# @matrix setup : authorized-domain diagnostics error-reporting identity-platform provider-state settings-save spinner
 def setup_identity_platform(app_url: str | None = None) -> bool:
     """Set up standalone Identity Platform email/password authentication."""
     from config import SETTINGS
@@ -322,9 +285,6 @@ def setup_identity_platform(app_url: str | None = None) -> bool:
     return True
 
 
-# @testable false
-# @covered-by installer/identity.py::setup_google_provider
-# @reason provider lookup is exercised through Google-provider reconciliation
 def get_google_provider_config(
     session: Session, project_id: str, headers: Mapping[str, str]
 ) -> dict[str, object] | None:
@@ -343,9 +303,6 @@ def get_google_provider_config(
     return data if response.status_code == 200 else None
 
 
-# @testable false
-# @covered-by installer/identity.py::setup_google_provider
-# @reason provider-state predicate is exercised through reconciliation
 def google_provider_matches(
     config: Mapping[str, object] | None, client_id: str
 ) -> bool:
@@ -356,9 +313,6 @@ def google_provider_matches(
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_google_provider_reconciliation
-# @matrix setup : google-oauth identity-platform provider-state secrets
 def setup_google_provider(client_id: str, client_secret: str | None = None) -> bool:
     """Configure the Google provider without persisting its OAuth secret."""
     from config import SETTINGS

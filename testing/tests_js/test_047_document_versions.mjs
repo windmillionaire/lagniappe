@@ -15,7 +15,6 @@ async function versions(request = {}) {
 	});
 }
 
-// @matrix editor sync : replacement offline-replay preview
 test("test_replacement_detection_keeps_the_live_document_untouched", async (t) => {
 	createBrowser(t);
 	const { incomingReplacements } = await versions();
@@ -49,7 +48,6 @@ test("test_replacement_detection_keeps_the_live_document_untouched", async (t) =
 	remote.destroy();
 });
 
-// @matrix editor sync : replacement recovery offline-replay
 test("test_recovery_failure_preserves_draft_before_merge", async (t) => {
 	createBrowser(t);
 	const requests = [];

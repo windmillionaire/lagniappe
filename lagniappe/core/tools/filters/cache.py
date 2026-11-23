@@ -31,9 +31,6 @@ def _entity_ids(value: object) -> TypeGuard[list[str]]:
     return isinstance(value, list) and all(isinstance(key, str) for key in value)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/cache.py::FilterCache._query_keys
-# @reason escaped-regex selection is exercised by literal filter queries
 def _needs_literal_match(definition):
     # RedisJSON versions can silently miss regex operands containing escaped
     # characters. Evaluate those literal comparisons over cached candidates.
@@ -47,9 +44,6 @@ def _needs_literal_match(definition):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/cache.py::FilterCache._query_keys
-# @reason candidate comparisons are owned by the compiled cache query boundary
 def _matches_literal(row, definition):
     value = row.get(definition.field)
     if not isinstance(value, str):
@@ -58,17 +52,11 @@ def _matches_literal(row, definition):
     return actual == expected if definition.comparator == Comparator.EQUALS else expected in actual
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
-# @reason filter-index value escaping is part of cache materialization
 def escape_for_filter[T](to_filter: T) -> T:
     """Preserve semantic cache values; query literals provide the escaping."""
     return to_filter
 
 
-# @testable true
-# @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_uses_shared_cache_key_without_user_restrictions
-# @matrix cache filters permissions : restrictions shared-key
 class FilterCache:
     """Manages a cached filter index for an entity."""
 
@@ -79,14 +67,6 @@ class FilterCache:
 
         self._to_cache = {}
 
-    # @testable true
-    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_query_filters_loaded_entities_by_view_permission
-    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_rejects_uncompiled_query_definitions
-    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_matches_escaped_string_literals_after_redis_predicates
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_string_punctuation_matches_literal_values
-    # @matrix cache filters : allowed query query-boundary related-load validation
-    # @matrix permissions : allowed query related-load
-    # @matrix filters : escaping punctuation regex-literal run-results string-condition
     def _query_keys(self, filter: CompiledFilter) -> list[str]:
         if not isinstance(filter, CompiledFilter):
             raise TypeError("FilterCache queries require a CompiledFilter")
@@ -108,22 +88,10 @@ class FilterCache:
             and all(_matches_literal(row, definition) for definition in literals)
         ]
 
-    # @testable true
-    # @tests tests_unit/test_021_refresh.py::test_filter_cache_query_roots_uses_root_fetch_without_permission_expansion
-    # @matrix filters reconnect-refresh : membership root-depth
     def query_roots(self, filter: CompiledFilter) -> list[Entity]:
         """Return matching roots for modified-time comparison without expansion."""
         return Entities.fetch(*self._query_keys(filter), request=Fetch.root())
 
-    # @testable true
-    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_query_filters_loaded_entities_by_view_permission
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_category
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_multiple_conditions
-    # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_results_respect_page_permissions
-    # @matrix filters : compound entity-condition run-results string-condition view-access
-    # @pair filters:query
     def query(self, filter: CompiledFilter) -> list[Entity]:
         """Query the cache with a filter and return matching entities."""
         return [
@@ -135,10 +103,6 @@ class FilterCache:
             if entity.allowed(Action.VIEW, user=self.user)
         ]
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
-    # @covered-by lagniappe/web/routes/process/main.py::update_cache
-    # @reason refresh scheduling is owned by route/process workflows
     def update(self, queue: bool = True) -> None:
         """Refresh the cache immediately or via a background task."""
         now = CONFIG.local or not queue
@@ -155,15 +119,9 @@ class FilterCache:
             }
             create_task(task_endpoint, payload)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
-    # @reason index-map shaping is part of cache materialization
     def _entity_map(self, entities):
         return {e.hash: cast("JsonType", escape_for_filter(e.to_filter_index())) for e in entities}
 
-    # @testable true
-    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_loads_category_pages_without_restrictions
-    # @matrix filters : cache category-pagination restrictions source-query
     def _load(self, cursor=None):
         if self.entity.kind == "project":
             self._load_project_tasks()
@@ -188,9 +146,6 @@ class FilterCache:
                 return
             cursor = index.next_cursor
 
-    # @testable true
-    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filters
-    # @matrix cache filters project task : all-tasks completed restrictions source-query
     def _load_project_tasks(self):
         """Load every task for a project filter cache.
 
@@ -212,11 +167,6 @@ class FilterCache:
 
         self._to_cache.update(self._entity_map(tasks))
 
-    # @testable true
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_category
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_model_task
-    # @matrix filters : entity-condition model-task run-results string-condition
     def cache(self) -> None:
         """Build or incrementally refresh the filter cache."""
         # filter_cache.delete(self.cache_key)

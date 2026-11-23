@@ -28,7 +28,6 @@ def _publish(path, payload):
     temporary.replace(path)
 
 
-# @matrix testing : parallel-e2e
 # @template pages/info.html::info_form
 @pytest.mark.parametrize("case", ["independent-a", "independent-b", "shared-a", "shared-b", "exclusive"])
 def test_worker_page_and_task(get_user, case, results):

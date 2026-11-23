@@ -46,7 +46,6 @@ from testing.utility.live_ai import submit_live_ai
 pytestmark = pytest.mark.e2e
 
 
-# @matrix projects : ai-form create-help manual-form
 # @template home/projects.html::create
 def test_create_project_form(get_admin, get_user):
     """
@@ -96,7 +95,6 @@ def test_create_project_form(get_admin, get_user):
     expect(form).not_to_be_visible()
 
 
-# @matrix projects : create-manual navigate search
 # @template home/projects.html::create
 def test_create_project_manual_mode(get_admin, get_user):
     """
@@ -119,7 +117,6 @@ def test_create_project_manual_mode(get_admin, get_user):
     expect(user.page).to_have_title(re.compile(project.definition.name))
 
 
-# @matrix projects : ai-create ai-form ai-generated
 # @template home/projects.html::create
 # @template home/projects.html::project
 @pytest.mark.ai
@@ -166,7 +163,6 @@ def test_create_project_ai_mode(get_admin, get_user, results, browser_failures, 
     results.record("project", project.entity.db)
 
 
-# @pair projects:delete
 # @template projects/project.html::view_header
 # @template menus.html::title
 # @template menus.html::delete

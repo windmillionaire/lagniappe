@@ -27,9 +27,6 @@ class GeneratedCategory(TypedDict):
 GENERIC_MESSAGE = "Generation failed. Please try again. "
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
-# @matrix ai : category validation
 def validate_category(category_data: object) -> GeneratedCategory:
     """Validate category output and normalize an omitted default form."""
     if not isinstance(category_data, dict) or not isinstance(category_data.get("category_name"), str) or not category_data["category_name"]:
@@ -54,14 +51,8 @@ def validate_category(category_data: object) -> GeneratedCategory:
     return cast(GeneratedCategory, category_data)
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_generate_category_default_form_is_conservative
-# @matrix categories : ai-create ai-generated default-form
 def generate_category(prompt: Prompt) -> GeneratedCategory:
     """Generate category data with an optional, conservatively chosen form."""
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/category.py::generate_category
-    # @reason Inline validator behavior is exercised through category generation.
     def validate_generated(category_data):
         if isinstance(category_data, dict) and isinstance(
             category_data.get("form_schema"), list
@@ -81,9 +72,6 @@ def generate_category(prompt: Prompt) -> GeneratedCategory:
         raise exceptions.AIException(f"{GENERIC_MESSAGE} {str(e)}") from e
 
 
-# @testable true
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
-# @matrix ai : output-format prompt-builders thinking
 def category_creation_prompt(user_description: str) -> Prompt:
     """Build the AI prompt for creating a category from a user description."""
     intro = """

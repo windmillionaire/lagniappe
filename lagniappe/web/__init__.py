@@ -49,10 +49,6 @@ if CONFIG.capture_errors:
     SENTRY_LOADED = True
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_flask_security_configuration_and_session_cookie_attributes
-# @matrix login session : cookie-hardening lifetime
-# @pair web-headers:security
 def configure_flask_security(flask_app: Flask, runtime_config: Config = CONFIG) -> None:
     """Apply the stable Flask session, cookie, and runtime-mode contract."""
     flask_app.config.update(
@@ -121,9 +117,6 @@ CSP = "; ".join(
 )
 
 
-# @testable false
-# @covered-by lagniappe/web/__init__.py::add_lagniappe_headers
-# @reason local predicate for the response-header hook
 def _client_cache_invalidation_requested():
     invalidate = bool(session.get(CONFIG.LOGIN_INVALIDATE_CACHE_KEY))
     if invalidate and not session.get("_user_id"):
@@ -131,7 +124,6 @@ def _client_cache_invalidation_requested():
     return invalidate
 
 
-# @testable infrastructure
 @app.before_request
 def clear_request_notification_state() -> None:
     """Start every request without a stale post-commit projection result."""
@@ -139,9 +131,6 @@ def clear_request_notification_state() -> None:
     cache.clear_request_owner_projection()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/presence.py::record_site_activity
-# @reason Flask response-hook wiring delegates to the tested coarse activity service
 @app.after_request
 def record_authenticated_site_activity(response: Response) -> Response:
     """Keep a coarse Redis activity hint without adding browser requests."""
@@ -153,18 +142,6 @@ def record_authenticated_site_activity(response: Response) -> Response:
     return response
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_common_security_headers
-# @tests tests_e2e/001_site/test_001b_login.py::test_google_signin_uses_response_specific_style_nonces
-# @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
-# @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_native_consent_reaches_loopback_and_shows_submit_progress
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
-# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_invalidation_is_not_replayed_by_browser_http_cache
-# @matrix web-headers : conditional-request entity-revision etag missing-fingerprint security
-# @matrix cache : invalidation no-store
-# @pair login:logout
-# @matrix mcp-oauth : loopback browser-callback
 @app.after_request
 def add_lagniappe_headers(response: Response) -> Response:
     """Add security headers, ETag fingerprinting, and cache invalidation flag."""

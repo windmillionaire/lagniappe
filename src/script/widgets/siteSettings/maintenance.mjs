@@ -5,11 +5,6 @@ import { clearRecentSearchResults } from "../../shared/storage.mjs";
 import { withTransition } from "../../shared/transitions.mjs";
 import { SiteSetting } from "./base.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
- * @pair admin:configuration-modal
- */
 export class SiteMaintenance extends SiteSetting {
 	constructor(attributes) {
 		super(attributes);
@@ -113,11 +108,6 @@ export class SiteMaintenance extends SiteSetting {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_019_form_sync_frontend.mjs::test_site_settings_cache_refresh_displays_linked_failures
-	 * @matrix cache : failure-isolation actionable-links
-	 */
 	_renderCacheStatus(status) {
 		const panel = this.target.querySelector("[data-role='cache-status']");
 		if (!panel) return;
@@ -177,11 +167,6 @@ export class SiteMaintenance extends SiteSetting {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_019_form_sync_frontend.mjs::test_site_settings_migration_status_uses_generic_release_states
-	 * @matrix admin database-migrations : actionable-links audit-error cache-gate current failed fresh-install pending repair-filtering repairs running version-history
-	 */
 	_renderMigrationStatus(status) {
 		const panel = this.target.querySelector("[data-role='migration-status']");
 		if (!panel) return;

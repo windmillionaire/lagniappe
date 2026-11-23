@@ -28,9 +28,6 @@ class NotificationCounts(TypedDict):
 AGGREGATE_ID = "message-aggregate"
 
 
-# @testable true
-# @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @pair notifications:aggregate-repair
 def initial_values(parent: Entity | Key, *, ordinary_count: int = 0, unread_message_count: int = 0, now: datetime | None = None) -> dict[str, object]:
     now = now or datetime.now(UTC)
     return {
@@ -48,9 +45,6 @@ def initial_values(parent: Entity | Key, *, ordinary_count: int = 0, unread_mess
     }
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @pair notifications:aggregate-count
 def counts(row: DatastoreEntity | None) -> NotificationCounts:
     values = row or {}
     ordinary = max(0, int(values.get("ordinary_count") or 0))
@@ -65,10 +59,6 @@ def counts(row: DatastoreEntity | None) -> NotificationCounts:
     }
 
 
-# @testable true
-# @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @matrix notifications : aggregate-count ordinary-count revision
 def apply_deltas(row: DatastoreEntity, *, ordinary_delta: int = 0, message_delta: int = 0, now: datetime | None = None) -> DatastoreEntity:
     row["ordinary_count"] = max(
         0, int(row.get("ordinary_count") or 0) + int(ordinary_delta)
@@ -84,15 +74,9 @@ def apply_deltas(row: DatastoreEntity, *, ordinary_delta: int = 0, message_delta
     return row
 
 
-# @testable true
-# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-# @pair notifications:aggregate-count
 class OrdinaryCount(DBProperty[int]):
     _id = "ordinary_count"
 
-    # @testable true
-    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-    # @pair notifications:aggregate-count
     @property
     def value(self) -> int:
         return int(super().value or 0)
@@ -102,15 +86,9 @@ class OrdinaryCount(DBProperty[int]):
         self._write_db_value(value)
 
 
-# @testable true
-# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-# @pair notifications:aggregate-count
 class UnreadMessageCount(DBProperty[int]):
     _id = "unread_message_count"
 
-    # @testable true
-    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-    # @pair notifications:aggregate-count
     @property
     def value(self) -> int:
         return int(super().value or 0)
@@ -120,15 +98,9 @@ class UnreadMessageCount(DBProperty[int]):
         self._write_db_value(value)
 
 
-# @testable true
-# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-# @pair notifications:revision
 class AggregateRevision(DBProperty[int]):
     _id = "aggregate_revision"
 
-    # @testable true
-    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-    # @pair notifications:revision
     @property
     def value(self) -> int:
         return int(super().value or 0)
@@ -138,15 +110,9 @@ class AggregateRevision(DBProperty[int]):
         self._write_db_value(value)
 
 
-# @testable true
-# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-# @pair notifications:revision
 class MessageRevision(DBProperty[int]):
     _id = "message_revision"
 
-    # @testable true
-    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-    # @pair notifications:revision
     @property
     def value(self) -> int:
         return int(super().value or 0)
@@ -156,15 +122,9 @@ class MessageRevision(DBProperty[int]):
         self._write_db_value(value)
 
 
-# @testable true
-# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-# @pair notifications:generation
 class AggregateGeneration(DBProperty[str]):
     _id = "aggregate_generation"
 
-    # @testable true
-    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-    # @pair notifications:generation
     @property
     def value(self) -> str | None:
         return super().value

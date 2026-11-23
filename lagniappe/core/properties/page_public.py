@@ -22,9 +22,6 @@ PUBLIC_TITLE_LIMIT = 120
 PUBLIC_DESCRIPTION_LIMIT = 300
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_public_settings_normalize_and_invalidate_discovery
-# @matrix page public-directory sitemap : category metadata settings-validation
 def normalize_public_settings(value: object = None) -> PageSettings:
     """Return the versioned canonical per-page public settings."""
     if value is None:
@@ -38,9 +35,6 @@ def normalize_public_settings(value: object = None) -> PageSettings:
     if not isinstance(allow_indexing, bool):
         raise ValidationError("Page indexing must be enabled or disabled.")
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/page_public.py::normalize_public_settings
-    # @reason bounded text normalization is exercised through the public normalizer
     def optional_text(name: str, limit: int, label: str) -> str | None:
         raw = incoming.get(name)
         if raw is None:
@@ -78,9 +72,6 @@ def normalize_public_settings(value: object = None) -> PageSettings:
     }
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_public_visibility_invalidates_discovery_only_when_changed
-# @matrix page public-directory sitemap : visibility
 class PageIsPublic(IsPublic):
     """Page visibility with public-discovery invalidation registration."""
 
@@ -100,9 +91,6 @@ class PageIsPublic(IsPublic):
             )
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_public_settings_normalize_and_invalidate_discovery
-# @matrix page public-directory sitemap : category metadata settings-validation
 class PublicSettings(DBProperty[PageSettings]):
     """Versioned discovery and social metadata for one public page."""
 

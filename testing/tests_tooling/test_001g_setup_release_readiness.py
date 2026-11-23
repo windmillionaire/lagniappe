@@ -94,7 +94,6 @@ def _write_generation(root, app_updates=None):
         (root / relative).chmod(0o600)
 
 
-# @matrix setup : operator-summary secret-redaction
 def test_redacted_install_summary_is_allowlisted():
     settings = {
         "APP_NAME": "Demo",
@@ -193,7 +192,6 @@ def test_redacted_install_summary_is_allowlisted():
     assert manual_lines[-2:] == ["After manual deployment:", "  ./setup.sh jobs"]
 
 
-# @matrix doctor setup : operator-summary provider-resources secret-redaction
 def test_expected_resource_summary_is_allowlisted():
     settings = {
         "APP_NAME": "Demo",
@@ -244,7 +242,6 @@ def test_expected_resource_summary_is_allowlisted():
         assert secret not in text
 
 
-# @matrix setup : adc doctor keyless-config project-identity
 def test_doctor_reports_keyless_identity_drift():
     runtime_email = "runtime@demo-project.iam.gserviceaccount.com"
     assert doctor._keyless_identity_issues(
@@ -272,7 +269,6 @@ def test_doctor_reports_keyless_identity_drift():
     assert "RUNTIME_SERVICE_ACCOUNT_EMAIL is not configured" in issues
 
 
-# @matrix setup : doctor drift independent-provider-check provider-identity read-only
 def test_doctor_reports_drift_without_writing(tmp_path, capsys):
     _write_generation(tmp_path)
     active_values = {
@@ -362,7 +358,6 @@ def test_doctor_reports_drift_without_writing(tmp_path, capsys):
     }
 
 
-# @matrix setup : adc doctor parsing provider-identity read-only
 def test_doctor_decodes_saved_settings_and_guides_adc_alignment(
     tmp_path, capsys, monkeypatch
 ):
@@ -445,7 +440,6 @@ def test_doctor_decodes_saved_settings_and_guides_adc_alignment(
     assert after == before
 
 
-# @matrix setup : adc doctor provider-identity read-only
 def test_doctor_reads_adc_identity_without_changing_it():
     events = []
     credentials = types.SimpleNamespace(
@@ -504,7 +498,6 @@ def test_doctor_reads_adc_identity_without_changing_it():
     ]
 
 
-# @matrix setup : doctor operator-permissions project-identity provider-apis provider-discovery
 def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
     calls = []
 
@@ -592,7 +585,6 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
     ]
 
 
-# @matrix setup : explicit-mutation repair validation
 def test_repair_runs_reconciliation_then_validation(monkeypatch):
     events = []
     install_result = {"value": 0}

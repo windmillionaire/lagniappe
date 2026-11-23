@@ -45,7 +45,6 @@ def save_installation(root, bundle):
         (root / path).write_text(value)
 
 
-# @matrix config setup : secrets project-identity redis-tls
 def test_bundle_round_trip(bundle, tmp_path):
     save_installation(tmp_path, bundle)
     assert settings._local_bundle(tmp_path, PROJECT, {}) == bundle
@@ -95,7 +94,6 @@ class Store:
         return n, self.versions[n]
 
 
-# @matrix config setup : secrets transactional-state
 def test_publish_rejects_stale_writers(bundle, tmp_path, monkeypatch):
     save_installation(tmp_path, bundle)
     store = Store()
@@ -158,7 +156,6 @@ def generation(tmp_path, monkeypatch):
     return Files
 
 
-# @matrix config deploy : config-files transactional-state recovery
 def test_restore_preserves_previous_installation(
     bundle, tmp_path, generation, monkeypatch
 ):
@@ -204,7 +201,6 @@ def test_restore_preserves_previous_installation(
         )
 
 
-# @matrix config setup : cli-routing project-identity
 def test_cloud_settings_cli(bundle, tmp_path, monkeypatch, capsys):
     store = Store()
     monkeypatch.setattr(settings, "SecretManager", lambda *args: store)
@@ -245,7 +241,6 @@ class Bucket:
         return self.raw.encode()
 
 
-# @matrix hosted-e2e : lifecycle recovery transactional-state
 def test_checkpoint_resumes_and_excludes_competing_writers():
     bucket = Bucket()
     a = checkpoints.Checkpoint(bucket, PROJECT)
@@ -291,7 +286,6 @@ def test_checkpoint_resumes_and_excludes_competing_writers():
         assert b.doc["operation"]["action"] == "teardown"
 
 
-# @matrix hosted-e2e setup : project-identity transactional-state
 def test_checkpoint_seed_is_create_only(tmp_path, bundle, monkeypatch):
     save_installation(tmp_path, bundle)
     settings._record(tmp_path, PROJECT, "1", SOURCE)
@@ -312,7 +306,6 @@ def test_checkpoint_seed_is_create_only(tmp_path, bundle, monkeypatch):
     assert bucket.generation == 1
 
 
-# @matrix hosted-e2e : isolation project-identity
 def test_checkpoint_is_opt_in(monkeypatch, tmp_path):
     args = SimpleNamespace(action="status", recover_generation=None)
     monkeypatch.delenv("LAGNIAPPE_CLOUD_CHECKPOINT_PROJECT", raising=False)
@@ -329,7 +322,6 @@ def test_checkpoint_is_opt_in(monkeypatch, tmp_path):
         assert checkpoints.ACTIVE.get() is None
 
 
-# @matrix auth setup : adc project-identity
 def test_cloud_connection_requires_target_identity(tmp_path, monkeypatch):
     path = tmp_path / "native.json"
     monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(path))
@@ -348,7 +340,6 @@ def test_cloud_connection_requires_target_identity(tmp_path, monkeypatch):
         cloud_task.connection_file("wrong@" + PROJECT + ".iam.gserviceaccount.com")
 
 
-# @matrix auth setup : adc project-identity
 def test_cloud_connection_accepts_only_the_configured_relay(tmp_path, monkeypatch):
     native = tmp_path / "connection.json"
     manifest = tmp_path / "manifest.json"
@@ -394,7 +385,6 @@ def test_cloud_connection_accepts_only_the_configured_relay(tmp_path, monkeypatc
         cloud_task.connection_file(ACCOUNT)
 
 
-# @matrix setup : cli-routing project-identity
 @pytest.mark.parametrize("active_account", [ACCOUNT, "other@example.com"])
 def test_check_connection_uses_task_identity_before_restore(
     tmp_path, monkeypatch, capsys, active_account
@@ -441,7 +431,6 @@ def test_check_connection_uses_task_identity_before_restore(
     assert not list(tmp_path.iterdir())
 
 
-# @matrix setup : cli-routing project-identity
 def test_task_reuses_pinned_version(monkeypatch):
     calls = []
     monkeypatch.setattr(cloud_task, "connection_file", lambda account: "/native")
@@ -459,7 +448,6 @@ def test_task_reuses_pinned_version(monkeypatch):
     assert calls[1][1]["env"]["LAGNIAPPE_CLOUD_CHECKPOINT_PROJECT"] == PROJECT
 
 
-# @matrix auth setup : adc project-identity
 def test_startup_checks_identity_and_optional_redis(monkeypatch):
     app = {
         "EXPERIMENTS_ENABLED": True,
@@ -490,7 +478,6 @@ def test_startup_checks_identity_and_optional_redis(monkeypatch):
     redis.return_value.close.assert_called_once_with()
 
 
-# @matrix setup : cli-routing project-identity
 @pytest.mark.parametrize("options", [[], ["--check-redis"]])
 def test_default_startup_reads_hosted_status(monkeypatch, options):
     monkeypatch.setattr(cloud_task, "connection_file", lambda account: "/native")
@@ -511,7 +498,6 @@ def test_default_startup_reads_hosted_status(monkeypatch, options):
     assert status[-2:] == ["hosted-e2e", "status"]
 
 
-# @matrix release : protected-branch source-integrity
 def test_release_rejects_unverified_heads():
     repo = "owner/lagniappe"
     identity = {"repo": {"full_name": repo}}
@@ -556,7 +542,6 @@ def test_release_rejects_unverified_heads():
         obj[key] = old
 
 
-# @matrix release : git-upgrade source-integrity
 def test_publication_retries_with_annotated_tag(tmp_path, monkeypatch):
     remote = tmp_path / "remote.git"
     local = tmp_path / "work"
@@ -602,7 +587,6 @@ def test_publication_retries_with_annotated_tag(tmp_path, monkeypatch):
         release.publish_tag("owner/repo", sha, "1.0.2", Path("notes"))
 
 
-# @matrix hosted-e2e setup : iam project-identity
 def test_operator_grants_stay_in_experiments(bundle):
     from runner.cloud_operator_iam import CUSTOM, bindings
 
@@ -661,7 +645,6 @@ def test_operator_grants_stay_in_experiments(bundle):
         bindings(PROJECT, app, dict(setup, job="unrelated-job"), "build@example.com", hosted_job_exists=True)
 
 
-# @matrix hosted-e2e setup : iam project-identity
 def test_operator_checks_both_build_accounts_before_granting_access(monkeypatch, capsys):
     from runner.cloud_operator_iam import _build_accounts
 
@@ -695,7 +678,6 @@ def test_operator_checks_both_build_accounts_before_granting_access(monkeypatch,
         _build_accounts(base, PROJECT, apply=True)
 
 
-# @matrix deploy setup : project-identity
 def test_deploy_requires_pinned_experiments_target(bundle, tmp_path, monkeypatch):
     save_installation(tmp_path, bundle)
     app = dict(

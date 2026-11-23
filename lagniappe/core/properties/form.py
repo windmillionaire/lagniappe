@@ -22,9 +22,6 @@ if TYPE_CHECKING:
     from .base_schema import FieldDefinition
 
 
-# @testable true
-# @tests tests_unit/test_004_form_properties.py::test_form_type
-# @matrix form-type : cache column details property
 class FormType(AIMixin, ColumnMixin, DetailsMixin, CacheMixin, DBProperty[str, "Form"]):
     """Form type classification (e.g. "page", "task").
 
@@ -62,15 +59,9 @@ class FormType(AIMixin, ColumnMixin, DetailsMixin, CacheMixin, DBProperty[str, "
         return "type"
 
 
-# @testable true
-# @tests tests_unit/test_012b_form_conditions.py::test_form_status_filters
-# @matrix filters status : form-filters status-excluded
 class FormFilters(Filters):
     _filter_fields = []
 
-    # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_filters
-    # @matrix filters form : schema-fields
     @property
     def fields(self) -> dict[str, FilterMixin]:
         if self.entity.db.get("pending_form_change"):
@@ -89,9 +80,6 @@ class FormFilters(Filters):
             "icon": field.icon,
         }
 
-    # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_filters
-    # @matrix filters form : conditions exclude-table-fields schema-fields
     @property
     def conditions(self) -> list[dict[str, object]]:
         if cached := getattr(self, "_conditions", None):
@@ -101,11 +89,6 @@ class FormFilters(Filters):
         return self._conditions
 
 
-# @testable true
-# @tests tests_unit/test_004_form_properties.py::test_submission_conversion_requires_changes_to_existing_values
-# @tests tests_unit/test_004_form_properties.py::test_submission_conversion_preserves_presentation_and_additions
-# @tests tests_unit/test_004_form_properties.py::test_submission_conversion_ignores_fields_without_answers_and_unused_link_setting
-# @matrix form : generation value-conversion
 def requires_submission_conversion(
     previous_schema: Iterable[FieldDefinition] | None,
     proposed_schema: Iterable[FieldDefinition] | None,
@@ -150,10 +133,6 @@ def requires_submission_conversion(
     return False
 
 
-# @testable true
-# @tests tests_unit/test_004_form_properties.py::test_form_generation_defaults_to_zero_without_reinterpreting_legacy_versions
-# @tests tests_unit/test_004_form_properties.py::test_form_generation_stores_nonnegative_integers
-# @matrix form : generation defaults validation
 class FormGeneration(DBProperty[int, "Form"]):
     """Submission representation generation, advanced explicitly at publication.
 
@@ -174,12 +153,6 @@ class FormGeneration(DBProperty[int, "Form"]):
         self._write_db_value(value)
 
 
-# @testable true
-# @tests tests_unit/test_004_form_properties.py::test_schema_version_update_changes_when_schema_changes
-# @tests tests_unit/test_004_form_properties.py::test_schema_version_tracks_metadata_and_static_content
-# @tests tests_unit/test_004_form_properties.py::test_schema_version_ignores_name_storage_paths_and_unrelated_assets
-# @tests tests_unit/test_004_form_properties.py::test_schema_version_requires_static_content_fingerprints
-# @matrix form : schema-version update content-fingerprint
 class SchemaVersion(DBProperty[str, "Form"]):
     """Content fingerprint used to invalidate cached Form presentations."""
 

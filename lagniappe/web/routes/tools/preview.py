@@ -23,9 +23,6 @@ from . import tools
 REPORT_HASH_PATTERN = re.compile(r"^[A-Za-z0-9_-]{12}$")
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_plan_preview_redirect_is_session_and_creator_bound
-# @matrix agent-api ai-report : browser-review creator-bound short-link
 @tools.route("/api-plan/<plan_hash>", methods=["GET"])
 @logged_in
 def api_plan_preview(plan_hash: str) -> ResponseReturnValue:

@@ -18,7 +18,6 @@ def _fetch_json(url):
     return response.json()
 
 
-# @pair setup:api-drift
 @pytest.mark.setup_drift
 def test_app_engine_discovery_has_domain_mapping_create():
     data = _fetch_json(
@@ -30,7 +29,6 @@ def test_app_engine_discovery_has_domain_mapping_create():
     assert "domainMappings" in text
 
 
-# @pair setup:api-drift
 @pytest.mark.setup_drift
 def test_vertex_discovery_has_cache_config_disable_cache():
     data = _fetch_json(

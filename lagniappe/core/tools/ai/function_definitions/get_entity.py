@@ -45,14 +45,6 @@ GET_ENTITY = types.FunctionDeclaration(
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_entity_returns_full_form_schema_for_ai_autofill
-# @tests tests_unit/test_015_ai_tools.py::test_get_entity_returns_model_task_form_schema_for_ai_autofill
-# @tests tests_unit/test_015_ai_tools.py::test_get_entity_loads_model_task_form_schema_from_stored_key
-# @matrix ai : attached-form autofill model-task stored-key tool-context
-# @matrix form-schema : attached-form autofill model-task schema stored-key
-# @matrix ai : edit-view exact-answers shared-schema
-# @matrix entity-patch : preservation validation preparation permissions
 def execute_get_entity(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
     if not isinstance(identifier, str) or not identifier:
@@ -72,9 +64,6 @@ def execute_get_entity(args: Mapping[str, object], user: User) -> Mapping[str, o
     return entity_data
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
-# @reason entity lookup shape is exercised through the public get_entity tool
 def _load_entity(identifier):
     entity = Entities.fetch_one(identifier, request=Fetch.root())
     if isinstance(entity, (Entities.TASK, Entities.FILE)):
@@ -89,9 +78,6 @@ def _load_entity(identifier):
     return entity
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
-# @reason stored-key form fallback is exercised through model-task schema tests
 def _ensure_attached_form(entity):
     form_property = getattr(getattr(entity, "properties", None), "form", None)
     if not form_property:
@@ -108,9 +94,6 @@ def _ensure_attached_form(entity):
         entity.form = form
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
-# @reason edit projection shares authorization with the public entity and task readers
 def edit_entity(entity: Entity, user: User, schemas: dict[str, list[dict[str, object]]] | None = None) -> dict[str, object]:
     from copy import deepcopy
     from ..references import hash_reference

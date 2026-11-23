@@ -1,19 +1,5 @@
 import Entity from "./base/entity.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_text_tab_renders_uploaded_text_content
- * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_text_file_renders_original_content_in_text_tab
- * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_image_shows_desktop_preview
- * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_renders_pdf_preview_widget
- * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_toolbar_navigates_pages
- * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_mobile_preview_uses_preview_tab
- * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_mobile_pdf_preview_renders_canvas
- * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_page_shows_linked_page_and_task_badges
- * @tests tests_js/test_039_file_processing_reconciliation.mjs::test_file_view_shows_extract_reload_only_for_matching_unmounted_text
- * @matrix file : authoritative-remount extract reload text-tab
- * @matrix file : linked-entities page-upload pdf-preview pdf-toolbar tabs
- */
 export default class File extends Entity {
 	constructor(node) {
 		super(node);

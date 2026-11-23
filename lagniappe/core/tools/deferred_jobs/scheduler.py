@@ -31,15 +31,10 @@ class DeferredJobSchedulerError(RuntimeError):
     """The recovery Scheduler job could not converge to durable intent."""
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/deferred_jobs/scheduler.py::synchronize_deferred_job_reconciler
 def _utc():
     return datetime.now(UTC)
 
 
-# @testable true
-# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_provider_pause_and_resume_use_exact_job_resource
-# @matrix cloud-scheduler deferred-jobs : exact-resource provider-api
 def scheduler_job_url(config: Config = CONFIG) -> str:
     """Return the exact Cloud Scheduler REST resource owned by this app."""
     project = str(getattr(config, "GOOGLE_CLOUD_PROJECT", None) or "").strip()
@@ -62,8 +57,6 @@ def scheduler_job_url(config: Config = CONFIG) -> str:
     return f"{SCHEDULER_API_ROOT}/{resource}"
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/deferred_jobs/scheduler.py::set_scheduler_state
 def _response_state(response):
     response.raise_for_status()
     try:
@@ -79,8 +72,6 @@ def _response_state(response):
     return state
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/deferred_jobs/scheduler.py::set_scheduler_state
 def _request_state(session, method, url):
     try:
         response = session.request(
@@ -97,9 +88,6 @@ def _request_state(session, method, url):
         ) from error
 
 
-# @testable true
-# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_provider_pause_and_resume_use_exact_job_resource
-# @matrix cloud-scheduler deferred-jobs : idempotency pause provider-api resume
 def set_scheduler_state(desired_state: str, *, session: AuthorizedSession, config: Config = CONFIG) -> str:
     """Read and, when necessary, move the Scheduler job to one exact state."""
     if desired_state not in SCHEDULER_STATES:
@@ -122,8 +110,6 @@ def set_scheduler_state(desired_state: str, *, session: AuthorizedSession, confi
         raise
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/deferred_jobs/scheduler.py::synchronize_deferred_job_reconciler
 def _control_converged(control):
     return bool(
         control.get("applied_state") == control.get("desired_state")
@@ -132,12 +118,6 @@ def _control_converged(control):
     )
 
 
-# @testable true
-# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
-# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_releases_lease_after_provider_failure
-# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_uses_committed_control_hint_when_current
-# @matrix cloud-scheduler deferred-jobs : convergence datastore-read-isolation
-# @pair deferred-jobs:provider-failure
 def synchronize_deferred_job_reconciler(
     *,
     force: bool = False,

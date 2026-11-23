@@ -27,9 +27,6 @@ ADC_SCOPES = (
 ADC_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_adc_identity_is_secret_free_and_project_bound
-# @matrix development setup testing : adc identity project-identity
 def read_adc_identity(
     *,
     auth_default: Callable[..., tuple[Credentials, str | None]] | None = None,
@@ -85,9 +82,6 @@ def read_adc_identity(
         }
 
 
-# @testable false
-# @covered-by runner/adc.py::ensure_adc_target
-# @reason ADC mismatch normalization is exercised through target verification
 def _identity_mismatches(identity, *, principals, project):
     if identity.get("state") != "success":
         return ["ADC identity is unavailable"]
@@ -107,11 +101,6 @@ def _identity_mismatches(identity, *, principals, project):
     return mismatches
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_source_login_refreshes_stale_token
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_source_login_stops_before_authentication_by_default
-# @matrix auth : gcloud-token interactive refresh
-# @matrix setup : gcloud-token safe-failure
 def ensure_gcloud_source_login(account: str, *, allow_login: bool = False) -> None:
     """Verify that the saved gcloud account can mint a fresh access token."""
     token_check = run_command(
@@ -156,9 +145,6 @@ def ensure_gcloud_source_login(account: str, *, allow_login: bool = False) -> No
         )
 
 
-# @testable false
-# @covered-by runner/adc.py::ensure_adc_target
-# @reason ordered gcloud selection is exercised through explicit local ADC alignment
 def _select_gcloud_auth_target(account, project):
     print(wrap_text(f"Selecting gcloud account '{account}'..."))
     run_command(
@@ -174,12 +160,6 @@ def _select_gcloud_auth_target(account, project):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_adc_alignment_reauthenticates_and_sets_quota_project
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_adc_auth_selects_account_then_project_before_login
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_local_adc_mismatch_directs_to_auth_command
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_adc_alignment_updates_only_stale_quota_project
-# @matrix auth development setup testing : adc automatic-activation identity project-identity quota-project
 def ensure_adc_target(
     account: str,
     project: str,

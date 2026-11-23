@@ -5,9 +5,6 @@ import { STYLES } from "../../../generated/styles.mjs";
 import { setIcon } from "../../../shared/icons.mjs";
 import { withTransition } from "../../../shared/transitions.mjs";
 
-/**
- * @testable infrastructure
- */
 export class Condition {
 	constructor(builder) {
 		this.builder = builder;
@@ -154,11 +151,6 @@ export class Condition {
 	}
 }
 
-/**
- * @testable infrastructure
- * @covered-by src/script/views/builder/conditions/status.mjs::Status
- * @covered-by src/script/views/builder/conditions/visibility.mjs::Visibility
- */
 export class ConditionTarget extends Condition {
 	addTargetSelect() {
 		const selectElt = primitives.select({

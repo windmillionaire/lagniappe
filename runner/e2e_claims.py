@@ -12,10 +12,6 @@ from pathlib import Path
 import pytest
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_case_claims_overlap_independent_work_and_release_after_failure
-# @tests tests_tooling/test_015_e2e_parallel.py::test_case_claims_stop_waiting_on_timeout_or_lost_authority
-# @matrix testing : parallel-e2e
 @contextmanager
 def reserve_resources(
     directory: Path,
@@ -52,9 +48,6 @@ def reserve_resources(
         time.sleep(0.05)
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_case_claim_hook_covers_fixture_teardown_and_continues_after_failure
-# @matrix testing : parallel-e2e
 @pytest.hookimpl(hookwrapper=True, tryfirst=True)
 def pytest_runtest_protocol(
     item: pytest.Item, nextitem: pytest.Item | None

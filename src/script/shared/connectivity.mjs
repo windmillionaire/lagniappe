@@ -15,9 +15,6 @@ const DEFAULT_STATE = Object.freeze({
  * browser link state is a scheduling hint and unknown server state is treated
  * optimistically during startup.
  *
- * @testable true
- * @tests tests_js/test_021_browser_protocol.mjs::test_connectivity_state_table_covers_lifecycle_transitions
- * @matrix connectivity : browser-state controller polling-recovery server-health startup visibility
  */
 export class ConnectivityState {
 	constructor(initial = {}) {

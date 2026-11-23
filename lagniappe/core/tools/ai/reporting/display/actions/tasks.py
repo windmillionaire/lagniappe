@@ -16,7 +16,6 @@ from ..contracts import (
 )
 
 
-# @testable infrastructure
 def model_task_details(
     details: ProposalDetailCollector,
     data: ActionData,
@@ -26,9 +25,6 @@ def model_task_details(
     details.reference("Form", data, "form")
 
 
-# @testable true
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_completed_task_events
-# @matrix ai-report : completed-task proposal
 def task_details(
     details: ProposalDetailCollector,
     data: ActionData,
@@ -49,7 +45,6 @@ def task_details(
         details.add_reference("File", file_ref)
 
 
-# @testable infrastructure
 def move_task_details(
     details: ProposalDetailCollector,
     data: ActionData,

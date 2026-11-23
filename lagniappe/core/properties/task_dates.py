@@ -15,9 +15,6 @@ type TaskRecord = Task | TaskHistory
 
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_completed
-# @matrix task : completed details
 class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty[bool, TaskRecord, bool]):
     """Task completion status. Stored and exposed as a boolean.
 
@@ -55,9 +52,6 @@ class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty[bool
     _ordering = Ordering.BOOLEAN
     _editable = True
 
-    # @testable true
-    # @tests tests_unit/test_013_task_properties.py::test_task_completed
-    # @pair task:column
     @property
     def column_value(self) -> bool:
         return self.filter_value
@@ -72,9 +66,6 @@ class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty[bool
     _default = "IS_FALSE"
     _field_type = FieldType.BOOLEAN
 
-    # @testable true
-    # @tests tests_unit/test_013_task_properties.py::test_task_completed
-    # @matrix task : details filter-value
     @property
     def filter_value(self) -> bool:
         return self.value
@@ -99,9 +90,6 @@ class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty[bool
         return self.filter_value
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_completed_on_stores_timestamp
-# @pair task:completed-on
 class CompletedOn(DateMixin, AIMixin, ColumnMixin, DBProperty[datetime, TaskRecord]):
     """Task completion date. Stored as a UTC datetime, exposed as date.
 
@@ -138,9 +126,6 @@ class CompletedOn(DateMixin, AIMixin, ColumnMixin, DBProperty[datetime, TaskReco
         return dates.utc_datetime_to_user_datetime(self.value) if self.value else None
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_due_date
-# @matrix task : ai-value column filter-value
 class DueDate(DateMixin, AIMixin, ColumnMixin, FilterMixin, DBProperty[datetime, TaskRecord]):
     """Task due date. Stored as UTC, displayed in user timezone.
 
@@ -171,9 +156,6 @@ class DueDate(DateMixin, AIMixin, ColumnMixin, FilterMixin, DBProperty[datetime,
     _field_options = FilterOptions.DATE.value
     _field_type = FieldType.TIMESTAMP
 
-    # @testable true
-    # @tests tests_unit/test_013_task_properties.py::test_task_due_date
-    # @matrix task : date due-date
     @property
     def value(self) -> datetime | None:
         return super().value

@@ -67,7 +67,6 @@ def _executed_only(panel):
         expect(button).to_have_attribute("aria-pressed", str(desired).lower())
 
 
-# @matrix ai-report : filter-categories filter-counts filter-empty filter-persistence
 # @template home/tools.html::report_list
 # @template home/tools.html::report_item
 @pytest.mark.parametrize("mobile", [False, True])
@@ -122,7 +121,6 @@ def test_report_filters_persist_and_follow_live_status(
     expect(panel.get_by_role("link", name=answer.name)).to_be_hidden()
 
 
-# @matrix ai-report : bulk-delete confirmation delete-snapshot delete-failure loading-indicator
 # @template home/tools.html::report_list
 # @template layouts/delete.html::delete_action
 def test_delete_executed_reports_confirms_snapshot_and_preserves_workspace(
@@ -233,7 +231,6 @@ def test_delete_executed_reports_confirms_snapshot_and_preserves_workspace(
     expect(panel.get_by_role("link", name=answer.name)).to_be_visible()
 
 
-# @matrix ai-report : bulk-delete ownership validation
 def test_bulk_report_delete_rechecks_ownership_and_validates_input(
     get_user, browser_failures
 ):

@@ -39,23 +39,16 @@ _FIELD_TITLES = {
 }
 
 
-# @testable infrastructure
 class SchemaValidationError(ValueError):
     """A schema cannot be projected into the current durable format."""
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/schema.py::canonicalize_schema
-# @reason small invalid-field policy helper owned by durable schema normalization
 def _invalid(message, discard_invalid):
     if discard_invalid:
         return None
     raise SchemaValidationError(message)
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/schema.py::canonicalize_schema
-# @reason option validation is exercised through the public schema canonicalizer
 def _canonical_options(value, field_id, discard_invalid):
     if value is None:
         return []
@@ -94,9 +87,6 @@ def _canonical_options(value, field_id, discard_invalid):
     return options
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/schema.py::canonicalize_schema
-# @reason nested condition validation is exercised through the public schema canonicalizer
 def _canonical_condition_list(value, field_id, attribute, discard_invalid):
     if value is None:
         return None
@@ -113,9 +103,6 @@ def _canonical_condition_list(value, field_id, attribute, discard_invalid):
     return deepcopy(value)
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/schema.py::canonicalize_schema
-# @reason recursive field normalization is exercised through the public schema canonicalizer
 def _canonical_field(definition, *, table_column=False, discard_invalid=False):
     if not isinstance(definition, dict):
         return _invalid("Schema fields must be objects", discard_invalid)
@@ -227,9 +214,6 @@ def _canonical_field(definition, *, table_column=False, discard_invalid=False):
     return field
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/schema.py::canonicalize_schema
-# @reason runtime-neutral implementation is exercised through the public schema canonicalizer
 def normalize_form_schema(
     value: object,
     *,

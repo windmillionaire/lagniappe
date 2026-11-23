@@ -7,12 +7,6 @@ from .field_host import FieldHost
 if TYPE_CHECKING:
     from ..entities.condition import Condition
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_entity.py::Name
-# @covered-by lagniappe/core/properties/common_entity.py::Description.filter_value
-# @covered-by lagniappe/core/properties/common_entity.py::Hash.filter_key
-# @covered-by lagniappe/core/properties/form_inputs.py::TextInput
-# @covered-by lagniappe/core/properties/task_dates.py::DueDate
 class FilterMixin(FieldHost):
     """Adds filter indexing. Collected by Entity.to_filter_index().
 
@@ -70,9 +64,6 @@ class FilterMixin(FieldHost):
     def default(self) -> str | None:
         return getattr(self, "_default", None)
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_column_and_filter_contract_errors_are_explicit
-    # @matrix property : filter validation
     @property
     def field_type(self) -> FieldType:
         if not hasattr(self, "_field_type"):

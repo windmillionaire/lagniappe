@@ -194,8 +194,6 @@ def _warm_offline_create_widgets(home, *, note=True, task=True):
         )
 
 
-# @matrix activity : cached-response load notes-exclusion notes-only
-# @matrix notes : cached-response load notes-only
 # @template home/notes.html::list
 # @template home/notes.html::note_item
 def test_home_notes_exclude_notifications(get_admin, get_user):
@@ -213,8 +211,6 @@ def test_home_notes_exclude_notifications(get_admin, get_user):
     expect(_activity_item(home, notification_body)).not_to_be_attached()
 
 
-# @matrix activity : asset-lifecycle body create html-stripping parent photo scope visibility
-# @matrix notes : asset-lifecycle body create html-stripping parent photo private-default scope visibility
 # @template home/notes.html::add_note_form
 # @template notes.html::note_item
 def test_create_note_body_and_photo_from_home(get_admin, get_user):
@@ -251,7 +247,6 @@ def test_create_note_body_and_photo_from_home(get_admin, get_user):
     expect(photo_item).to_contain_text("Everyone")
 
 
-# @matrix activity notes permissions : owner-only-shared
 # @template home/home.html::create
 # @template notes.html::composer
 def test_home_note_shared_visibility_is_owner_only(get_user):
@@ -311,7 +306,6 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
     ).to_have_count(0)
 
 
-# @matrix activity notes notifications : delete ownership
 # @template notes.html::note_item
 def test_delete_activity_item_from_home(get_admin, get_user):
     user = get_admin()
@@ -345,7 +339,6 @@ def test_delete_activity_item_from_home(get_admin, get_user):
     expect(activity_list).to_contain_text(other_body)
 
 
-# @matrix activity notes permissions : home owner private shared
 # @template notes.html::note_item
 @pytest.mark.e2e_group("owner")
 def test_home_note_visibility_across_users(get_user):
@@ -372,8 +365,6 @@ def test_home_note_visibility_across_users(get_user):
     expect(_activity_item(owner_home, private_body)).to_be_visible()
 
 
-# @matrix notifications : dropdown-refresh long-text-wrap pending target target-link
-# @matrix notifications : body create
 # @template notifications.html::item
 def test_notification_menu_renders_target_and_preserves_pending_state(get_admin, get_user):
     user = get_admin()
@@ -445,7 +436,6 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_admin,
     ) <= 2
 
 
-# @matrix notifications : accessible-state clear-all delete dropdown-refresh menu-open ownership reconnect
 # @template nav.html::navbar
 @pytest.mark.parametrize("reconnect_before_open", [False, True])
 def test_notification_menu_deletes_and_clears(
@@ -528,7 +518,6 @@ def test_notification_menu_deletes_and_clears(
     assert Entities.fetch_one(second.urlsafe_key, request=Fetch.root()) is None
 
 
-# @matrix offline : queue-create reload
 # @template home/notes.html::note_item
 # @template home/tasks.html::task
 def test_offline_home_create_mutations_persist_after_reload(get_admin, get_user, browser_failures):
@@ -613,7 +602,6 @@ def test_offline_home_create_mutations_persist_after_reload(get_admin, get_user,
     expect(_task_item(home, task_name)).to_be_visible()
 
 
-# @matrix offline : optimistic-mutation reload replay server-first
 # @template home/notes.html::list
 # @template home/tasks.html::list
 def test_offline_home_reload_uses_server_state_until_replay(get_admin, get_user, browser_failures):
@@ -680,7 +668,6 @@ def test_offline_home_reload_uses_server_state_until_replay(get_admin, get_user,
     expect(_task_item(home, task_name)).not_to_be_attached()
 
 
-# @matrix offline : queue-clear replay
 # @template home/notes.html::note_item
 def test_offline_home_mutations_replay_when_online(get_admin, get_user, browser_failures):
     user = get_admin()
@@ -713,7 +700,6 @@ def test_offline_home_mutations_replay_when_online(get_admin, get_user, browser_
     assert Entities.fetch_one(replayed_key, request=Fetch.direct()).body == note_body
 
 
-# @matrix tasks : complete offline-queue
 # @template home/tasks.html::task
 def test_offline_task_complete_replays_after_reload(get_admin, get_user, browser_failures):
     user = get_admin()

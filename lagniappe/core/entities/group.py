@@ -13,11 +13,6 @@ if TYPE_CHECKING:
     from .user import User
 
 
-# @testable true
-# @tests tests_unit/test_009e_user_groups.py::test_group_permissions
-# @tests tests_unit/test_009e_user_groups.py::test_user_group_create_rejects_public_and_initializes_permissions
-# @matrix user-groups : create permissions reserved-name save
-# @pair user-groups:views
 class UserGroup(Entity):
     if TYPE_CHECKING:
         permissions: dict[str, str]
@@ -60,9 +55,6 @@ class UserGroup(Entity):
 
         return new_group
 
-    # @testable true
-    # @tests tests_unit/test_009e_user_groups.py::test_save_permissions_refreshes_member_users_with_current_group
-    # @matrix permissions public-groups user-groups : cache-invalidation member-refresh permission-update
     def save_permissions(self, form_data: Mapping[str, str] | None = None) -> list[User]:
         self.properties.permissions.create(form_data)
 
@@ -76,10 +68,6 @@ class UserGroup(Entity):
         Entities.save(*users, self)
         return users
 
-# @testable true
-# @tests tests_unit/test_009e_user_groups.py::test_public_permissions
-# @tests tests_unit/test_009e_user_groups.py::test_public_group_get_create_and_enabled_state
-# @matrix public-groups : create enabled get permissions
 class PublicGroup(UserGroup):
     entity_kind = "public_group"
 

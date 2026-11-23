@@ -159,9 +159,6 @@ def _validate_process_identity(value, name):
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_corrupt_session_state_fails_closed
-# @matrix test-session : corrupt-state fail-closed schema
 def validate_session_state(value: object) -> SessionState:
     """Return a strict local state record or fail closed."""
     if not isinstance(value, dict):
@@ -293,10 +290,6 @@ def _boot_identity() -> str:
     return hashlib.sha256(started.encode("utf-8")).hexdigest()
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_process_identity_rejects_reused_pid
-# @tests tests_tooling/test_005_test_session.py::test_capture_process_identity_uses_portable_ps_fingerprint
-# @matrix test-session : command-fingerprint pid-reuse portability process-start
 def capture_process_identity(pid: int) -> ProcessIdentity | None:
     """Capture portable identity fields that distinguish PID reuse."""
     pid_value = _ps_value(int(pid), "pid")
@@ -480,10 +473,6 @@ def _heartbeat_owned_state(authority):
             return
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_two_subprocess_starts_produce_one_owner
-# @tests tests_tooling/test_005_test_session.py::test_busy_session_stops_before_mutation
-# @matrix test-session : concurrency durable-state mutation-order ownership preflight subprocess
 def acquire_test_session(
     mode: str,
     command: str | Sequence[str],

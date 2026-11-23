@@ -1,11 +1,6 @@
 import { mergeAttributes } from "@tiptap/core";
 import Image from "@tiptap/extension-image";
 
-/**
- * @testable true
- * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_image_layout_survives_builder_save_and_reload
- * @matrix editor html-field : image-layout
- */
 const getImageStyles = (attrs) => {
 	const styles = [`width: ${attrs.width || "100%"}`, "display: block"];
 

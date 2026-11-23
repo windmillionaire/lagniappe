@@ -1,9 +1,6 @@
 import { captureError, ENDPOINTS, request } from "../shared/index.mjs";
 import { BaseElement } from "./base/baseElement.mjs";
 
-/**
- * @testable infrastructure
- */
 export class HtmlElement extends BaseElement {
 	constructor(renderer, schema, submission) {
 		super(renderer, schema, submission);
@@ -12,11 +9,6 @@ export class HtmlElement extends BaseElement {
 		this._destroyed = false;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_037_html_element_frontend.mjs::test_html_element_reports_request_failure_without_masking_original
-	 * @pair form-html:error-reporting
-	 */
 	async _getHtml() {
 		return await request
 			.get(ENDPOINTS.html(this.renderer.form.key, this.schema.id).getContent)
@@ -29,10 +21,6 @@ export class HtmlElement extends BaseElement {
 			});
 	}
 
-	/**
-	 * @testable true
-	 * @matrix forms : draft-history
-	 */
 	create() {
 		if (this._elt) return this._elt;
 

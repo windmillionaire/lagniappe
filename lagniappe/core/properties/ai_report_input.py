@@ -3,23 +3,18 @@
 from .base_db import DBProperty
 
 
-# @testable infrastructure
 class FormatVersion(DBProperty[int]):
     """Server-owned report format; missing versions are unavailable."""
 
     _id = "format_version"
 
 
-# @testable infrastructure
 class FileUsage(DBProperty[list[dict[str, object]]]):
     """Reviewed usage of each uploaded file, separate from executable actions."""
 
     _id = "file_usage"
     json = True
 
-# @testable true
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_create_and_file_cleanup
-# @pair ai-report:upload-manifest
 class UploadManifest(DBProperty[list[dict[str, object]]]):
     """Signed direct-upload records awaiting background finalization."""
 
@@ -27,9 +22,6 @@ class UploadManifest(DBProperty[list[dict[str, object]]]):
     json = True
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
-# @pair agent-api:report-session
 class AgentManifest(DBProperty[dict[str, object]]):
     """Versioned, non-transcript metadata for an external plan workspace."""
 
@@ -37,11 +29,6 @@ class AgentManifest(DBProperty[dict[str, object]]):
     json = True
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_email_report_shape_preserves_safe_inbound_display_fields
-# @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
-# @matrix ai-email ai-report : legacy-default origin
-# @pair agent-api:origin
 class Origin(DBProperty[str]):
     """How the initial report was submitted; legacy reports are web-origin."""
 
@@ -59,9 +46,6 @@ class Origin(DBProperty[str]):
         self._write_db_value(normalized)
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_email_report_shape_preserves_safe_inbound_display_fields
-# @matrix ai-email ai-report : inbound-manifest privacy
 class InboundManifest(DBProperty[dict[str, object]]):
     """Safe normalized email fields displayed with an email-origin report."""
 

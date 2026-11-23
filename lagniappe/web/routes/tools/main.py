@@ -39,10 +39,6 @@ from lagniappe.web.auth import authenticated_user, ai_access, logged_in, require
 from . import tools
 
 
-# @testable true
-# @matrix ai-report : cancellation revision reload
-# @pair ai:autofill
-# @matrix ai tasks : cancellation
 @tools.route("/operations/<job_key>/cancel", methods=["POST"])
 @logged_in
 def cancel_generation(job_key: str) -> ResponseReturnValue:
@@ -80,8 +76,6 @@ def cancel_generation(job_key: str) -> ResponseReturnValue:
     return redirect(url_for("tools.report", key=report.urlsafe_key))
 
 
-# @testable true
-# @pair ai:autofill
 @tools.route("/autofill/<key>/revise", methods=["POST"])
 @ai_access(AI.CREATE)
 def refine_autofill(key: str) -> ResponseReturnValue:
@@ -117,10 +111,6 @@ def refine_autofill(key: str) -> ResponseReturnValue:
         return responses.error(str(error))
 
 
-# @testable true
-# @matrix ai-report : cancellation revision reload
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_corrective_plan_controls_require_create_access
-# @pair ai-access:provider-boundary
 @tools.route("/reports/<key>/retry-generation", methods=["POST"])
 @ai_access(AI.ASK)
 def retry_generation(key: str) -> ResponseReturnValue:
@@ -152,9 +142,6 @@ def retry_generation(key: str) -> ResponseReturnValue:
         raise
     return redirect(url_for("tools.report", key=report.urlsafe_key))
 
-# @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder
-# @pair ai-report:upload
 def _uploaded_report_files():
     files = []
     for upload in request.files.getlist("tool-files"):
@@ -179,9 +166,6 @@ def _uploaded_report_files():
     return files
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
-# @reason signed upload manifest parsing is exercised through the organize route
 def _report_upload_manifest():
     direct_uploads.direct_upload_files(
         "tool-files",
@@ -194,18 +178,12 @@ def _report_upload_manifest():
     return report_uploads.prepare_report_upload_manifest(records)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
-# @reason route permission mirrors the final organize upload endpoint
 @tools.route("/ai/direct-upload", methods=["POST"])
 @ai_access(AI.ASK)
 def create_ai_report_direct() -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
-# @matrix ai-report : create title-truncation
 def _report_name(instructions):
     text = " ".join((instructions or "").split())
     if not text:
@@ -214,9 +192,6 @@ def _report_name(instructions):
     return f"{text[:80]}{suffix}"
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::create_ai_report
-# @reason shared report persistence and dispatch are exercised through tool routes
 def _start_tool_report(
     instructions,
     *,
@@ -279,14 +254,6 @@ def _start_tool_report(
     return responses.deferred_tool_report(report, notification, job=job)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_text_only_organize_plans_updates
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder
-# @matrix ai-report : remote-update async create http-boundary text-only upload validation persistence
-# @matrix ai-report : list
 @tools.route("/ai", methods=["POST"])
 @ai_access(AI.ASK)
 def create_ai_report() -> ResponseReturnValue:
@@ -320,11 +287,6 @@ def create_ai_report() -> ResponseReturnValue:
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::report
-# @covered-by lagniappe/web/routes/tools/main.py::run_report
-# @covered-by lagniappe/web/routes/tools/main.py::delete_report
-# @reason report lookup and owner guard are exercised through report routes
 def _get_report(key, *, require_available=True):
     if getattr(current_user, "is_public", False):
         abort(403)
@@ -341,10 +303,6 @@ def _get_report(key, *, require_available=True):
     return report
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tools/main.py::skip_report_action
-# @covered-by lagniappe/web/routes/tools/main.py::delete_report
-# @reason browser conflict responses are exercised by both guarded routes
 def _external_plan_mutation_error(outcome):
     if outcome == agent_api_store.PLAN_OPERATION_MISSING:
         return responses.not_found("Report not found")
@@ -358,21 +316,6 @@ def _external_plan_mutation_error(outcome):
     return response
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_runs_ready_report
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_action_dependencies
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_report_detail_shows_answer_without_duplicate_proposal
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_report_detail_shows_revision_and_manual_execution
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_shows_review_only_proposal_without_execute
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_submits_revision
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_dependent_submission_updates
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_requires_saved_response_and_allows_corrections
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
-# @matrix ai-report : detail live-submit needs-review no-execute organize revision schema-update skip-action
-# @matrix ai-report : structured-filter workspace-tools
-# @pair ai-access:provider-boundary
 @tools.route("/reports/<key>", methods=["GET"])
 @logged_in
 def report(key: str) -> ResponseReturnValue:
@@ -382,16 +325,6 @@ def report(key: str) -> ResponseReturnValue:
     return responses.tool_report(report)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_runs_ready_report
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_preserves_completed_work
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_run_start_error_does_not_save_stale_report
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_stale_schema_plan_keeps_review_and_explains_recovery
-# @matrix ai-report : detail deterministic-run entitlement-independent idempotent recovery repeat-run retry
-# @matrix ai-report : browser-review stale-proposal
-# @matrix agent-api ai-report : browser-review error-isolation report-execution
-# @matrix ai-report : failed-prefix failure reload
 @tools.route("/reports/<key>/run", methods=["POST"])
 @logged_in
 def run_report(key: str) -> ResponseReturnValue:
@@ -433,15 +366,6 @@ def run_report(key: str) -> ResponseReturnValue:
     return responses.deferred_tool_report(report, notification, job=job)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_submits_revision
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_requires_saved_response_and_allows_corrections
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_revision_is_provider_blocked
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_corrective_plan_controls_require_create_access
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_browser_correction_requires_create_access
-# @matrix ai-report : async completed-state feedback live-submit organize ready-state revision route-guard
-# @pair agent-api:provider-free-revision
-# @pair ai-access:provider-boundary
 @tools.route("/reports/<key>/revise", methods=["POST"])
 @ai_access(AI.ASK)
 def revise_report(key: str) -> ResponseReturnValue:
@@ -511,12 +435,6 @@ def revise_report(key: str) -> ResponseReturnValue:
     return responses.deferred_tool_report(report, notification, job=job)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_action_dependencies
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_browser_mutations_reject_fenced_state_without_side_effects
-# @matrix ai-report : dependencies entitlement-independent skip-action
-# @matrix agent-api ai-report : browser-review cas skip-action
 @tools.route("/reports/<key>/actions/<int:action_index>/skip", methods=["POST"])
 @logged_in
 def skip_report_action(key: str, action_index: int) -> ResponseReturnValue:
@@ -559,13 +477,6 @@ def skip_report_action(key: str, action_index: int) -> ResponseReturnValue:
     return responses.json_response(result)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_browser_mutations_reject_fenced_state_without_side_effects
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_api_report_delete_rejects_active_execution_without_side_effects
-# @matrix ai-report : delete delete-modal entitlement-independent file-cleanup
-# @matrix agent-api ai-report : browser-review cas delete report-execution
 @tools.route("/reports/<key>", methods=["DELETE"])
 @logged_in
 def delete_report(key: str) -> ResponseReturnValue:
@@ -579,10 +490,6 @@ def delete_report(key: str) -> ResponseReturnValue:
     return responses.ok()
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_delete_executed_reports_confirms_snapshot_and_preserves_workspace
-# @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_bulk_report_delete_rechecks_ownership_and_validates_input
-# @matrix ai-report : bulk-delete ownership validation
 @tools.route("/reports/executed", methods=["DELETE"])
 @logged_in
 def delete_executed_reports() -> ResponseReturnValue:

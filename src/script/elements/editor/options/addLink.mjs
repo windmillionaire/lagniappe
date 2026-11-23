@@ -12,9 +12,6 @@ import { normalizeLinkAttributes } from "../extensions/linkAttributes.mjs";
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:/i;
 const BARE_DOMAIN_PATTERN = /^[^\s/]+\.[^\s]+(?:\/.*)?$/;
 
-/**
- * @testable infrastructure
- */
 class LinkSearchBox extends RemoteQueryCombobox {
 	constructor(element, addLink) {
 		super(element);
@@ -75,13 +72,6 @@ class LinkSearchBox extends RemoteQueryCombobox {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_external_link_persists_searches_and_unlinks
- * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_link_form_dismissal_preserves_selection_interactions
- * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
- * @matrix editor : external-link form-dismissal internal-link link reload search selection shortcut unlink
- */
 class AddLink {
 	constructor(toolbar) {
 		this.toolbar = toolbar;

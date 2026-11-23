@@ -19,9 +19,6 @@ from ..database import assets as storage_database
 from ..database import site as site_database
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/images.py::create_site_image
-# @reason background removal is part of the site image admin workflow gap
 def flood_fill_background(image: Image.Image, tolerance: int = 30) -> Image.Image:
     """
     Background removal using flood fill from corners.
@@ -58,10 +55,6 @@ def flood_fill_background(image: Image.Image, tolerance: int = 30) -> Image.Imag
     return result
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @tests tests_unit/test_018_database_assets.py::test_site_image_rejects_oversized_input_before_decode
-# @matrix admin : generated-images metadata site-image-upload
 def create_site_image(image: FileStorage | DirectUploadFile, remove_bg: bool = True, bg_tolerance: int = 30) -> dict[str, str]:
     """
     Save site image with optional background removal.
@@ -166,9 +159,6 @@ def create_site_image(image: FileStorage | DirectUploadFile, remove_bg: bool = T
     return image_paths
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/images.py::generate_site_images
-# @reason source image validation is part of generated site image output
 def validate_source_image(image: Image.Image) -> tuple[bool, str]:
     """
     Validate if the source image is suitable for favicon/icon generation.
@@ -203,9 +193,6 @@ def validate_source_image(image: Image.Image) -> tuple[bool, str]:
     return True, "Image is suitable for favicon generation."
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/images.py::generate_site_images
-# @reason maskable icon shaping is part of generated site image output
 def create_maskable_icon(image: Image.Image, size: int, padding_percent: int = 20) -> Image.Image:
     """
     Create a maskable icon by adding padding and ensuring the icon fits within the safe area.
@@ -243,9 +230,6 @@ def create_maskable_icon(image: Image.Image, size: int, padding_percent: int = 2
     return maskable
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/images.py::generate_site_images
-# @reason image resizing is part of generated site image output
 def resize_image_smooth(image: Image.Image, size: tuple[int, int]) -> Image.Image:
     """
     Resize image with high quality resampling and sharpening while preserving transparency.
@@ -280,9 +264,6 @@ def resize_image_smooth(image: Image.Image, size: tuple[int, int]) -> Image.Imag
     return resized
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/images.py::generate_site_images
-# @reason ICO assembly is part of generated site image output
 def create_ico_file(image: Image.Image) -> bytes:
     """
     Create a multi-size ICO file containing 16x16, 32x32, and 48x48 versions.
@@ -310,9 +291,6 @@ def create_ico_file(image: Image.Image) -> bytes:
     return ico_buffer.getvalue()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/images.py::generate_site_images
-# @reason splash image composition is part of generated site image output
 def create_splash_screen(
     source_image: Image.Image, app_name: str, size: tuple[int, int] = (1242, 2688), theme_color: str = "#4f46e5"
 ) -> Image.Image:
@@ -408,9 +386,6 @@ def create_splash_screen(
     return splash
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @pair admin:generated-images
 def generate_site_images(source_image: Image.Image) -> dict[str, bytes]:
     """
     Generate all necessary favicon, icon, and splash screen files from a source image.

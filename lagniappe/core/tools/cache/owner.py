@@ -34,24 +34,15 @@ OWNER_SCHEMA_VERSION = "1"
 _REQUEST_OWNER: ContextVar[OwnerProjection | None] = ContextVar("owner_projection", default=None)
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
-# @pair owner-projection:normalization
 def normalize_owner_name(value: object) -> str:
     value = unicodedata.normalize("NFKC", str(value or ""))
     return " ".join(value.casefold().split())
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
-# @pair owner-projection:request-memo
 def clear_request_owner_projection() -> None:
     _REQUEST_OWNER.set(None)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/owner.py::get_owner_projection
-# @reason Redis byte normalization is internal to projection reads
 def _decode_map[K, V](values: Mapping[K, V] | None) -> dict[str, str]:
     return {
         (key.decode() if isinstance(key, bytes) else str(key)): (
@@ -61,9 +52,6 @@ def _decode_map[K, V](values: Mapping[K, V] | None) -> dict[str, str]:
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/owner.py::get_owner_projection
-# @reason schema validation is internal to projection reads and repair
 def _project[K, V](raw: Mapping[K, V] | None) -> OwnerProjection | None:
     values = _decode_map(raw)
     if values.get("schema") != OWNER_SCHEMA_VERSION:
@@ -85,9 +73,6 @@ def _project[K, V](raw: Mapping[K, V] | None) -> OwnerProjection | None:
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/owner.py::update_owner_projection
-# @reason mapping construction is asserted through the published projection
 def _mapping(user: User, page_key: str, revision: int) -> dict[FieldT, str]:
     return {
         "schema": OWNER_SCHEMA_VERSION,
@@ -104,9 +89,6 @@ def _mapping(user: User, page_key: str, revision: int) -> dict[FieldT, str]:
     }
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
-# @matrix owner-projection : fail-closed revision
 def update_owner_projection(*users: Entity) -> OwnerProjection | None:
     """Publish an owner row only after its durable mutation has committed."""
     owner = next((cast("User", user) for user in users if getattr(user, "is_owner", False)), None)
@@ -120,9 +102,6 @@ def update_owner_projection(*users: Entity) -> OwnerProjection | None:
     return projected
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
-# @matrix owner-projection : repair request-memo
 def get_owner_projection(*, repair: bool = True) -> OwnerProjection | None:
     """Read the request memo/Redis projection and repair from User on a miss."""
     memo = _REQUEST_OWNER.get()
@@ -150,9 +129,6 @@ def get_owner_projection(*, repair: bool = True) -> OwnerProjection | None:
     return update_owner_projection(owner)
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
-# @pair owner-projection:selector-shape
 def owner_search_result(projection: OwnerProjection | None) -> dict[str, object] | None:
     """Return the selector shape used by user facets."""
     if not projection:

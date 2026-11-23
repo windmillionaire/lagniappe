@@ -11,9 +11,6 @@ if TYPE_CHECKING:
     from .schema import SchemaField
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/base_submission.py::SubmissionProperty.search_value
-# @reason private normalization helper for the submission search-value collector
 def _search_items(value: object) -> list[object]:
     if value is None:
         return []
@@ -22,15 +19,10 @@ def _search_items(value: object) -> list[object]:
     return [item for item in value if item is not None and item != ""]
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/base_submission.py::SubmissionProperty.db_value
-# @covered-by lagniappe/core/properties/form_table.py::Table.db_value
-# @reason private blank-value helper used by submission projection collectors
 def _is_blank_value(value: object) -> bool:
     return value is None or value == [] or value == {}
 
 
-# @testable infrastructure
 class SubmissionProperty:
     """Base mixin for form submission data.
 
@@ -76,9 +68,6 @@ class SubmissionProperty:
         elif isinstance(value, str):
             self._submission = json.loads(value)
 
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_submission_db_value_omits_unset_number_field
-    # @matrix submission : db-value empty-field
     @property
     def db_value(self) -> dict[str, object]:
         submission = {
@@ -108,11 +97,6 @@ class SubmissionProperty:
                 values[field.filter_key] = value
         return values
 
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_submission_search_value_merges_table_column_labels
-    # @tests tests_unit/test_004e_submission_behavior.py::test_submission_search_value_accepts_scalar_boolean_values
-    # @tests tests_unit/test_004e_submission_behavior.py::test_submission_search_value_omits_blank_search_fields
-    # @matrix form-table submission : search-value
     @property
     def search_value(self) -> dict[str, list[object]]:
         keys, values = [], []

@@ -16,9 +16,6 @@ from .schema import compact_json
 _REQUEST_ID_TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]*")
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_mcp_v2_results_use_direct_structured_values_and_complete_aliases
 def _error_result(
     error: AdapterError,
     *,
@@ -35,9 +32,6 @@ def _error_result(
     return response
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/presentation.py::_success_result
-# @covered-by mcp/src/lagniappe_mcp/presentation.py::_error_result
 def _ensure_frame_limit(
     response: CallToolResult,
     *,
@@ -57,10 +51,6 @@ def _ensure_frame_limit(
         )
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_mcp_v2_results_use_direct_structured_values_and_complete_aliases
-# @tests tests_unit/test_033_mcp_adapter.py::test_server_presents_matching_schemas_and_values_for_each_protocol
 def _success_result(
     result: AdapterResult,
     *,

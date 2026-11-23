@@ -26,10 +26,6 @@ class ImportSettings(Protocol):
     def fuzzy_match(self, field_id: str) -> bool: ...
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/row_submission.py::TableColumnFields.create_field
-# @covered-by lagniappe/core/properties/row_submission.py::TableColumnFields.validate_type
-# @reason small enum-member normalization helper owned by table column validation
 def _member_name(value: object) -> str | None:
     if not isinstance(value, str):
         return None
@@ -54,10 +50,6 @@ class TableColumnFields(Enum):
     CHECKBOX = Checkbox
     LINK = Link
 
-    # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_table_fields
-    # @tests tests_unit/test_004e_submission_behavior.py::test_submission_search_value_merges_table_column_labels
-    # @matrix form-table : search-value table-fields timezone
     @classmethod
     def create_field(cls, definition: object, table: Table) -> ColumnField | None:
         """Create a field instance from a column definition dict."""
@@ -74,9 +66,6 @@ class TableColumnFields(Enum):
         field.field_type = FieldType.LIST
         return field
 
-    # @testable true
-    # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_table_filters_bad_columns
-    # @matrix form-schema form-table : columns validation
     @classmethod
     def validate_type(cls, definition: object) -> bool:
         if not isinstance(definition, dict):
@@ -88,11 +77,6 @@ class TableColumnFields(Enum):
         return _member_name(schema_type) in cls.__members__
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/row_submission.py::RowSubmission.validate_import
-# @covered-by lagniappe/core/properties/row_submission.py::RowSubmission.validate_ai
-# @covered-by lagniappe/core/properties/row_submission.py::RowSubmission.validate_submission
-# @reason row behavior is owned by import, AI, and form-submission constructors
 class RowSubmission(SubmissionProperty):
     """A single row within a Table field's submission.
 
@@ -131,11 +115,6 @@ class RowSubmission(SubmissionProperty):
 
         return self._fields
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_import_single_row
-    # @tests tests_unit/test_003e_tables.py::test_table_import_multiple_rows
-    # @tests tests_unit/test_003e_tables.py::test_table_import_mixed_column_types
-    # @pair form-table:import
     @classmethod
     def validate_import(
         cls,
@@ -152,9 +131,6 @@ class RowSubmission(SubmissionProperty):
             field.validate_import(value)
         return row
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_ai_multiple_rows
-    # @matrix form-table : ai-value multiple-rows
     @classmethod
     def validate_ai(cls, table: Table, values: dict[str, object]) -> Self:
         row = cls(table)
@@ -163,11 +139,6 @@ class RowSubmission(SubmissionProperty):
             field.validate_ai(values.get(field_id))
         return row
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_row_submission_text_email_checkbox
-    # @tests tests_unit/test_003e_tables.py::test_table_row_submission_external_link_column
-    # @tests tests_unit/test_003e_tables.py::test_table_row_submission_internal_link_column
-    # @matrix form-table link : row-submission
     @classmethod
     def validate_submission(cls, table: Table, values: dict[str, object]) -> Self:
         row = cls(table)

@@ -3,9 +3,6 @@ import { STYLES } from "../../../generated/styles.mjs";
 import { setIcon } from "../../../shared/icons.mjs";
 import { CONFIG } from "../config.mjs";
 
-/**
- * @testable infrastructure
- */
 export class ComponentsPanel {
 	constructor(builder) {
 		this.builder = builder;
@@ -16,13 +13,6 @@ export class ComponentsPanel {
 		this.init();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
-	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
-	 * @tests tests_js/test_032_todo_element_frontend.mjs::test_todo_builder_registration_is_task_only
-	 * @matrix forms : components page-form task-form
-	 */
 	init() {
 		const componentConfig =
 			this.builder.elt.dataset.formType === "page"
@@ -84,13 +74,6 @@ export class ComponentsPanel {
 		return true;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
-	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
-	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_signature_field_builder_unique_component
-	 * @matrix forms : builder-add-fields builder-add-inputs unique-component
-	 */
 	_click(event) {
 		const button = event.target.closest("[data-role]");
 		if (button?.dataset.role === "add") {

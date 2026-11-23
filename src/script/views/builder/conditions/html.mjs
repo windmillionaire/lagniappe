@@ -2,12 +2,6 @@ import { ENDPOINTS } from "../../../shared/endpoints.mjs";
 import { DraftDocument } from "../draftDocument.mjs";
 import { Condition } from "./base.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
- * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
- * @pair html-field:builder-html-field
- */
 export default class HtmlEditor extends Condition {
 	constructor(builder) {
 		super(builder);

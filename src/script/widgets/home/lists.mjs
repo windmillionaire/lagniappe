@@ -4,11 +4,6 @@ import { withTransition } from "../../shared/transitions.mjs";
 
 const REPORT_FILTERS = ["active", "executed", "answers"];
 
-/**
- * @testable true
- * @tests tests_js/test_047_home_report_filters.mjs::test_report_categories_and_saved_filter_selection
- * @matrix ai-report : filter-categories
- */
 function reportCategory(report) {
 	if (report.outputKind === "answer") return "answers";
 	return report.outputKind === "proposal" && report.status === "complete"
@@ -16,23 +11,12 @@ function reportCategory(report) {
 		: "active";
 }
 
-/**
- * @testable false
- * @covered-by src/script/widgets/home/lists.mjs::HomeProjectList
- * @reason selector helper for home list loading affordances
- */
 function _listToggle(component, widgetName) {
 	return component.elt.querySelector(
 		`[lp-show='${component.name}:${widgetName}'][data-toggle]`,
 	);
 }
 
-/**
- * @testable false
- * @covered-by src/script/widgets/home/lists.mjs::LoadedHomeList._syncUnavailableToggle
- * @covered-by src/script/widgets/home/lists.mjs::ToolReportList
- * @reason shared zero-count presentation is exercised through home list E2E flows
- */
 function _syncEmptyCount(toggle, widgetName, empty) {
 	const indicator = toggle?.querySelector(`[data-indicator='${widgetName}']`);
 	if (!indicator) return;
@@ -51,9 +35,6 @@ function _syncEmptyCount(toggle, widgetName, empty) {
 /**
  * Shared loading lifecycle for simple home collection lists.
  *
- * @testable false
- * @covered-by src/script/widgets/home/lists.mjs::HomePageList
- * @reason internal adapter exercised through the semantic list subclasses
  */
 class LoadedHomeList extends BaseList {
 	static unlockToggleWhenPopulated = false;
@@ -64,11 +45,6 @@ class LoadedHomeList extends BaseList {
 		this._listToggle = _listToggle(this.component, this.name);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002h_home_permissions.py::test_empty_home_model_lists_settle_to_disabled_zero_state
-	 * @matrix home : lazy-empty-list unavailable-toggle
-	 */
 	_syncUnavailableToggle() {
 		if (!this.constructor.disableToggleWhenUnavailable || !this._listToggle) {
 			return;
@@ -94,67 +70,27 @@ class LoadedHomeList extends BaseList {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
- * @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
- * @matrix projects : ai-create create-manual
- */
 export class HomeProjectList extends LoadedHomeList {
 	static disableToggleWhenUnavailable = true;
 }
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_manual_mode
- * @tests tests_e2e/002_home/test_002c_home_categories.py::test_navigate_to_category
- * @matrix categories : create-manual navigate
- */
 export class HomeCategoryList extends LoadedHomeList {
 	static disableToggleWhenUnavailable = true;
 }
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002k_home_pages.py::test_home_page_list_loads_recent_pages
- * @matrix home pages : list load
- */
 export class HomePageList extends LoadedHomeList {
 	static unlockToggleWhenPopulated = true;
 	static disableToggleWhenUnavailable = true;
 }
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002a_home.py::test_directory_list
- * @tests tests_e2e/002_home/test_002f_home_directory.py::test_directory_links_present
- * @pair home:directory-list
- */
 export class DirectoryList extends LoadedHomeList {
 	static unlockToggleWhenPopulated = true;
 }
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_file_input
- * @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_drag_drop
- * @matrix ingress : delete upload-counts
- */
 export class IngressList extends LoadedHomeList {
 	static unlockToggleWhenPopulated = true;
 }
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_lazy_report_list_reconciles_active_job_status
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
- * @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
- * @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_report_filters_persist_and_follow_live_status
- * @matrix ai-report : deferred-refresh delete-modal empty-count lazy-load list operation-poll stage-labels status-reconciliation toggle
- * @matrix ai-report : filter-create filter-persistence
- */
 export class ToolReportList extends BaseList {
 	constructor(attributes) {
 		super(attributes);
@@ -193,12 +129,6 @@ export class ToolReportList extends BaseList {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_tool_starts_pending_report
-	 * @tests tests_js/test_047_home_report_filters.mjs::test_report_filters_count_hidden_categories_and_empty_selections
-	 * @matrix ai-report : filter-create filter-persistence
-	 */
 	created(response) {
 		super.created(response);
 		const items =
@@ -223,12 +153,6 @@ export class ToolReportList extends BaseList {
 		if (clear && this.target.contains(clear)) void this._openDelete(clear);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_report_filters_persist_and_follow_live_status
-	 * @tests tests_js/test_047_home_report_filters.mjs::test_report_filters_count_hidden_categories_and_empty_selections
-	 * @matrix ai-report : filter-categories filter-counts filter-empty
-	 */
 	_renderFilters() {
 		const counts = { active: 0, executed: 0, answers: 0 };
 		let visible = 0;
@@ -316,11 +240,6 @@ export class ToolReportList extends BaseList {
 		this.target.setAttribute("loaded", "");
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_delete_executed_reports_confirms_snapshot_and_preserves_workspace
-	 * @matrix ai-report : bulk-delete confirmation delete-snapshot
-	 */
 	async _openDelete(trigger) {
 		if (this._openingDelete || this._deleting || this._deleteModal?.modal)
 			return;
@@ -370,12 +289,6 @@ export class ToolReportList extends BaseList {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_delete_executed_reports_confirms_snapshot_and_preserves_workspace
-	 * @tests tests_js/test_047_home_report_filters.mjs::test_bulk_delete_recovers_from_partial_and_network_failures
-	 * @matrix ai-report : bulk-delete delete-failure delete-snapshot loading-indicator
-	 */
 	async _deleteExecuted(keys, route, modal) {
 		if (this._deleting) return;
 		this._deleting = true;
@@ -436,13 +349,6 @@ export class ToolReportList extends BaseList {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_category
- * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
- * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
- * @matrix starred : category page project
- */
 export class StarredList extends BaseList {
 	constructor(attributes) {
 		super(attributes);

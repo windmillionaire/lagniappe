@@ -21,9 +21,6 @@ from lagniappe.web.auth import authenticated_user, permission
 from . import pages
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_notes_visibility_and_title_menu
-# @matrix notes pages permissions : load owner private shared viewer
 @pages.route("<key>/notes", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def get_notes(
@@ -48,9 +45,6 @@ def get_notes(
     return responses.page_notes(notes, page)
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_note_text_photo_and_delete_modal
-# @matrix notes pages : body create photo scope validation visibility
 @pages.route("<key>/notes", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def create_note(

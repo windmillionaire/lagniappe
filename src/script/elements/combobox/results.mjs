@@ -12,11 +12,6 @@ const SEARCH_ENTITIES = Object.freeze({
 	quot: '"',
 });
 
-/**
- * @testable false
- * @covered-by src/script/elements/combobox/results.mjs::Results.create
- * @reason entity decoding is exercised through safe highlighted result rendering
- */
 const decodeSearchEntities = (text) =>
 	String(text).replace(SEARCH_ENTITY_PATTERN, (entity, name) => {
 		if (!name.startsWith("#"))
@@ -43,9 +38,6 @@ const decodeSearchEntities = (text) =>
  * segment is decoded and appended as a text node, so unexpected markup never
  * becomes executable DOM.
  *
- * @testable false
- * @covered-by src/script/elements/combobox/results.mjs::Results.create
- * @reason allowlisted highlight rendering is exercised through recent search results
  */
 const appendHighlightedSearchText = (element, markup) => {
 	let target = element;
@@ -61,9 +53,6 @@ const appendHighlightedSearchText = (element, markup) => {
 	}
 };
 
-/**
- * @testable infrastructure
- */
 const option = (details) => {
 	const option = document.createElement("div");
 	option.className = STYLES.dropdown.option.flow;
@@ -86,9 +75,6 @@ const option = (details) => {
 	return option.outerHTML;
 };
 
-/**
- * @testable infrastructure
- */
 const icon = (details) => {
 	const iconType = details.icon || details.kind || details.type;
 	if (iconType) {
@@ -101,9 +87,6 @@ const icon = (details) => {
 	}
 };
 
-/**
- * @testable infrastructure
- */
 const name = (details) => {
 	const p1 = document.createElement("p");
 
@@ -112,9 +95,6 @@ const name = (details) => {
 	return p1;
 };
 
-/**
- * @testable infrastructure
- */
 const search = (result) => {
 	const option = document.createElement("div");
 	option.className = STYLES.dropdown.search.link;
@@ -151,9 +131,6 @@ const search = (result) => {
 	return option.outerHTML;
 };
 
-/**
- * @testable infrastructure
- */
 const facet = (details) => {
 	const option = document.createElement("div");
 	option.className = `${STYLES.dropdown.search.result}`;
@@ -168,9 +145,6 @@ const facet = (details) => {
 	return option.outerHTML;
 };
 
-/**
- * @testable infrastructure
- */
 export class Results {
 	constructor(index) {
 		this.index = index;
@@ -213,13 +187,6 @@ export class Results {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_023_entity_name_formatting.mjs::test_recent_combobox_results_reuse_shared_parent_name_formatting
-	 * @tests tests_js/test_023_entity_name_formatting.mjs::test_recent_search_snippets_allow_only_highlight_markup
-	 * @matrix combobox : parent-separator recent-results
-	 * @pairs entity-name:recent-results search:snippet-safety
-	 */
 	create(items = []) {
 		let options = items;
 		if (!items.length) {

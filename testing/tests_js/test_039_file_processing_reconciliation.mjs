@@ -15,7 +15,6 @@ function replaceGlobal(t, name, value) {
 	});
 }
 
-/** @matrix file : authoritative-remount extract reload text-tab */
 test("test_file_info_extract_completion_requests_one_reload_notice", async (t) => {
 	const events = [];
 	let hasTextTab = false;
@@ -95,7 +94,6 @@ test("test_file_info_extract_completion_requests_one_reload_notice", async (t) =
 	assert.equal(events.filter((event) => event === "metadata").length, 4);
 });
 
-/** @matrix file : authoritative-remount extract reload text-tab */
 test("test_file_view_shows_extract_reload_only_for_matching_unmounted_text", async (t) => {
 	let reloads = 0;
 	replaceGlobal(t, "window", {

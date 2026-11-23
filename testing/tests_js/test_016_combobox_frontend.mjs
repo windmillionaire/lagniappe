@@ -122,7 +122,6 @@ async function setupFloating(t) {
 	};
 }
 
-/** @matrix location : initialization on-demand */
 test("test_location_combobox_starts_location_sync_on_init", async (t) => {
 	installBrowserBoundaries(t, {
 		html: '<label><input name="place" placeholder="Search for a place"></label>',
@@ -148,7 +147,6 @@ test("test_location_combobox_starts_location_sync_on_init", async (t) => {
 	box.destroy();
 });
 
-/** @matrix location : request-ordering session-update */
 test("test_location_combobox_waits_for_session_sync_before_search", async (t) => {
 	installBrowserBoundaries(t, { html: "<label><input></label>" });
 	const calls = [];
@@ -193,7 +191,6 @@ test("test_location_combobox_waits_for_session_sync_before_search", async (t) =>
 });
 
 /**
- * @matrix combobox dropdown : positioning
  * @style dropdown.panel
  * @style dropdown.menu
  */
@@ -252,7 +249,6 @@ test("test_combobox_positioning_uses_live_element_by_default_and_explicit_refere
 });
 
 /**
- * @pair combobox:teardown
  * @style dropdown.panel
  */
 test("test_combobox_positioning_stops_after_destroy", async (t) => {
@@ -282,7 +278,6 @@ test("test_combobox_positioning_stops_after_destroy", async (t) => {
 });
 
 /**
- * @matrix combobox : positioning-readiness readiness
  * @style dropdown.panel
  */
 test("test_combobox_exposes_initial_positioning_readiness", async (t) => {
@@ -315,7 +310,6 @@ test("test_combobox_exposes_initial_positioning_readiness", async (t) => {
 });
 
 /**
- * @matrix combobox : positioning-readiness transition-race
  * @style dropdown.panel
  */
 test("test_combobox_initial_position_ignores_superseded_transition_geometry", async (t) => {
@@ -348,7 +342,6 @@ test("test_combobox_initial_position_ignores_superseded_transition_geometry", as
 });
 
 /**
- * @matrix combobox : aria keyboard
  * @style dropdown.panel
  */
 test("test_combobox_aria_and_keyboard_state_follow_the_open_panel", async (t) => {
@@ -402,7 +395,6 @@ test("test_combobox_aria_and_keyboard_state_follow_the_open_panel", async (t) =>
 });
 
 /**
- * @matrix combobox : dismissal pointer
  * @style dropdown.panel
  */
 test("test_combobox_pointer_and_dismissal_events_preserve_trigger_focus", async (t) => {
@@ -460,7 +452,6 @@ test("test_combobox_pointer_and_dismissal_events_preserve_trigger_focus", async 
 });
 
 /**
- * @pair combobox:empty-results
  * @style dropdown.panel
  */
 test("test_combobox_hides_empty_recent_panel_but_keeps_server_empty_result_row", async (t) => {
@@ -489,7 +480,6 @@ test("test_combobox_hides_empty_recent_panel_but_keeps_server_empty_result_row",
 });
 
 /**
- * @pair combobox:dataset-configuration
  * @style dropdown.panel
  */
 test("test_combobox_copies_only_supported_dataset_configuration", async (t) => {
@@ -561,7 +551,6 @@ test("test_combobox_copies_only_supported_dataset_configuration", async (t) => {
 	assert.equal(new env.Combobox(single.parent).multiple, false);
 });
 
-/** @pair combobox:clear-notification */
 test("test_submitter_clear_can_suppress_change_notification", async (t) => {
 	const env = await setupFloating(t);
 	const { parent } = makeComboboxElements();
@@ -583,7 +572,6 @@ test("test_submitter_clear_can_suppress_change_notification", async (t) => {
 });
 
 /**
- * @matrix dropdown : callback-index dynamic-options mixed-options rerender
  * @style dropdown.panel
  */
 test("test_dynamic_dropdown_rerenders_each_open_and_keeps_mixed_option_indexes", async (t) => {
@@ -630,7 +618,6 @@ test("test_dynamic_dropdown_rerenders_each_open_and_keeps_mixed_option_indexes",
 });
 
 /**
- * @matrix entity-menu : readiness state-linking title-menu title-positioning
  * @style dropdown.menu
  */
 test("test_entity_title_menu_anchors_to_the_title_bottom_left", async (t) => {

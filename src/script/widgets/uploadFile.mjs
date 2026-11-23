@@ -5,12 +5,6 @@ import { UploadMenu, uploadElement } from "../elements/upload.mjs";
 const FILE_DROPZONE_TEXT =
 	"Drop file here, click to upload, or tap to choose camera/files";
 
-/**
- * @testable true
- * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_file_to_page
- * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_multiple_files_to_page_without_existing_file_select
- * @matrix pages : file-upload multi-file
- */
 export class FileUpload extends BaseUpload {
 	constructor(attributes) {
 		super(attributes);

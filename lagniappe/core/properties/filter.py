@@ -33,9 +33,6 @@ class ConditionEntities(RelatedEntityListMixin, DBProperty["list[Entity]", "Filt
     _id = "related"
 
 
-# @testable true
-# @tests tests_unit/test_011_filters.py::test_filter_parent_sets_parent_hash
-# @matrix filter : parent parent-hash
 class FilterParent(RelatedEntityMixin["Category | Project"], DBProperty["Category | Project", "Filter"]):
     """The category or project that a saved filter applies to.
 
@@ -72,10 +69,6 @@ class Creator(RelatedEntityMixin["User"], DBProperty["User", "Filter"]):
     _label = "Creator"
 
 
-# @testable true
-# @tests tests_unit/test_011_filters.py::test_filter_table_derives_parent_fields_and_related_forms
-# @matrix filter : category project related-forms table
-# @matrix form-migration : pending-projection removed-field typed-filter
 class FilterTable(Columns["Filter"]):
     _id = "table"
 

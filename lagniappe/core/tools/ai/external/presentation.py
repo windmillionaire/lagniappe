@@ -17,9 +17,6 @@ from ..references import HASH_REFERENCE_REGEX, hash_reference
 from .validation import _walk_strings
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_entity_links_use_the_site_origin_without_rewriting_evidence
-# @pair agent-api:origin-validation
 def absolute_entity_links(value: object, *, origin: str) -> object:
     """Qualify structured record links for clients outside the website."""
     if isinstance(value, dict):
@@ -45,9 +42,6 @@ def absolute_entity_links(value: object, *, origin: str) -> object:
     return value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/presentation.py::public_plan_proposal
-# @reason recursive projection is asserted through the public round-trip contract
 def _replace_internal_references(value, replacements):
     if isinstance(value, dict):
         return {
@@ -70,9 +64,6 @@ def _replace_internal_references(value, replacements):
     return value
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_public_execution_receipt_rechecks_entity_visibility
-# @pair agent-api:execution-receipt
 def public_execution_receipt(report: AIReport, user: User) -> dict[str, object] | None:
     """Expose bounded outcomes, never the recovery ledger or stale entity data."""
     result = getattr(report, "result", None)
@@ -148,10 +139,6 @@ def public_execution_receipt(report: AIReport, user: User) -> dict[str, object] 
     }
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_public_plan_proposal_round_trips_hash_references_and_markdown
-# @tests tests_unit/test_032_agent_api.py::test_public_plan_omits_preview_references_before_loading_entities
-# @matrix agent-api ai-report : markdown public-reference round-trip stored-execution
 def public_plan_proposal(report: AIReport, user: User | None = None) -> dict[str, object] | None:
     """Project stored execution state back into the public submission contract."""
     proposal = getattr(report, "proposal", None)

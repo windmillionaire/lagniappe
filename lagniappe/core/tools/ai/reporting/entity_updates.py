@@ -46,11 +46,6 @@ RELATION_FIELDS = {
 }
 
 
-# @testable true
-# @tests tests_unit/test_032g_entity_patches.py::test_update_review_and_execution_share_exact_references
-# @tests tests_unit/test_032g_entity_patches.py::test_update_execution_overwrites_selected_values_but_rejects_unreviewed_proposal
-# @tests tests_unit/test_032g_entity_patches.py::test_update_missing_dependencies_never_fall_back_to_entity_lookup
-# @matrix entity-patch : integration review dependencies stale-state
 def prepare_update_action(
     action: ReportAction,
     user: models.User,
@@ -80,10 +75,6 @@ def prepare_update_action(
     return prepare_patch(target, resolved, user)
 
 
-# @testable true
-# @tests tests_unit/test_032g_entity_patches.py::test_update_review_and_execution_share_exact_references
-# @tests tests_unit/test_032g_entity_patches.py::test_update_execution_overwrites_selected_values_but_rejects_unreviewed_proposal
-# @matrix entity-patch : integration review dependencies stale-state
 def review_update_action(
     action: ReportAction,
     user: models.User,
@@ -103,11 +94,6 @@ def review_update_action(
     return prepared
 
 
-# @testable true
-# @tests tests_unit/test_032g_entity_patches.py::test_update_review_and_execution_share_exact_references
-# @tests tests_unit/test_032g_entity_patches.py::test_update_execution_overwrites_selected_values_but_rejects_unreviewed_proposal
-# @tests tests_unit/test_032g_entity_patches.py::test_update_missing_dependencies_never_fall_back_to_entity_lookup
-# @matrix entity-patch : integration review dependencies stale-state
 def execute_update_action(
     action: ReportAction,
     report: models.AIReport,
@@ -130,9 +116,6 @@ def execute_update_action(
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/entity_updates.py::prepare_update_action
-# @reason strict dependency resolution is exercised through preparation and execution
 def _resolve(reference, kind, outputs):
     if not isinstance(reference, str) or not reference:
         raise ValidationError("Use an exact entity reference or an earlier action reference.")
@@ -152,9 +135,6 @@ def _resolve(reference, kind, outputs):
     return entity
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/entity_updates.py::execute_update_action
-# @reason deterministic source fingerprints bind review to stored source state
 def _sources(prepared, outputs=None):
     forms = {}
     for form in prepared.forms:
@@ -165,9 +145,6 @@ def _sources(prepared, outputs=None):
     return forms
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/entity_updates.py::execute_update_action
-# @reason earlier outputs have stable action identities across preview and execution
 def _comparison(value, outputs=None):
     aliases = {entity.urlsafe_key: "$" + name for name, entity in (outputs or {}).items() if isinstance(name, str) and not name.startswith(("$", "action:")) and name != entity.urlsafe_key}
     if isinstance(value, dict):
@@ -181,17 +158,10 @@ def _comparison(value, outputs=None):
     return value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/entity_updates.py::execute_update_action
-# @reason fingerprint encoding is shared by proposal and source checks
 def _fingerprint(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
 
 
-# @testable true
-# @tests tests_unit/test_032g_entity_patches.py::test_proposal_prepares_new_forms_and_model_order
-# @tests tests_unit/test_032g_entity_patches.py::test_proposal_orders_models_on_a_new_project
-# @matrix entity-patch : integration review dependencies stale-state
 def prepare_entity_updates(
     proposal: ReportProposal, user: models.User | None
 ) -> ReportProposal:
@@ -263,9 +233,6 @@ def prepare_entity_updates(
     return proposal
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/entity_updates.py::review_update_action
-# @reason display projects the complete server-prepared before/after snapshot
 def update_details(
     details: ProposalDetailCollector,
     data: ActionData,

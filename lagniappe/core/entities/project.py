@@ -21,9 +21,6 @@ class ProjectData(TypedDict, total=False):
     description: str | None
 
 
-# @testable true
-# @tests tests_unit/test_005_project_properties.py::test_project_update_sets_identity_and_description
-# @pair project:update
 class Project(Entity, AssetMixin):
     if TYPE_CHECKING:
         description: str | None
@@ -95,9 +92,6 @@ class Project(Entity, AssetMixin):
     def index(self, *args: object, undated: bool = False, **kwargs: Unpack[CollectionOptions]) -> TaskIndex:
         return TaskIndex(*args, entity=self, undated=undated, **kwargs)
 
-    # @testable true
-    # @tests tests_unit/test_032h_report_batches.py::test_dependent_creations_share_one_commit
-    # @matrix ai-report : batching identity dependencies
     @classmethod
     def create(cls, data: ProjectData, *, key: Key | None = None) -> Self:
         new_project = cls(key)
@@ -107,9 +101,6 @@ class Project(Entity, AssetMixin):
 
         return new_project
 
-    # @testable true
-    # @tests tests_unit/test_005_project_properties.py::test_project_update_sets_identity_and_description
-    # @matrix project : description identity update
     def update(self, data: ProjectData) -> None:
         self.name = data["name"]
         self.description = data.get("description")

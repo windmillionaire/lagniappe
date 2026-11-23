@@ -10,8 +10,6 @@ from . import JsonValue
 from .limits import MAX_ERROR_BYTES
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/errors.py::AdapterError
 def _bounded_text(value: object, limit: int = MAX_ERROR_BYTES) -> str:
     text = " ".join(str(value).split())
     encoded = text.encode("utf-8", errors="replace")
@@ -22,8 +20,6 @@ def _bounded_text(value: object, limit: int = MAX_ERROR_BYTES) -> str:
     return encoded[:room].decode("utf-8", errors="ignore") + marker
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/errors.py::AdapterError
 def _safe_details(value: object, *, depth: int = 0) -> JsonValue:
     """Keep only bounded JSON values; never stringify arbitrary exceptions."""
     if depth > 8:
@@ -56,10 +52,6 @@ def _safe_details(value: object, *, depth: int = 0) -> JsonValue:
     return None
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_api_errors_redact_credentials_and_duplicate_json_is_rejected
-# @tests tests_unit/test_033_mcp_adapter.py::test_mcp_v2_results_use_direct_structured_values_and_complete_aliases
 @dataclass(slots=True)
 class AdapterError(Exception):
     """An expected failure with a stable, non-secret model-facing form."""
@@ -71,15 +63,11 @@ class AdapterError(Exception):
     request_id: str | None = None
     details: object = None
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/errors.py::AdapterError
     def __post_init__(self) -> None:
         self.message = _bounded_text(self.message, 2048)
         self.details = _safe_details(self.details)
         Exception.__init__(self, self.message)
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/errors.py::AdapterError
     def render(self) -> str:
         payload: dict[str, object] = {
             "code": self.code,

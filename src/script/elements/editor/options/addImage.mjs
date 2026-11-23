@@ -8,12 +8,6 @@ import { UploadMenu, uploadElement } from "../../upload.mjs";
 const IMAGE_DROPZONE_TEXT =
 	"Drop image here, click to upload, or tap to choose camera/files<br>All images will be sized down to 1280x720";
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image_generate_toggle
- * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image
- * @matrix editor : image-generate-toggle image-selection image-upload
- */
 class Image extends BaseUpload {
 	constructor(toolbar) {
 		super();

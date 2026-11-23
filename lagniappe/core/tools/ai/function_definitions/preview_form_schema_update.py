@@ -64,9 +64,6 @@ PREVIEW_FORM_SCHEMA_UPDATE = types.FunctionDeclaration(
 )
 
 
-# @testable true
-# @tests tests_unit/test_004l_form_schema_updates.py::test_preview_paginates_and_rejects_stale_cursor
-# @matrix form-migration ai : preview pagination read-only complete-scope
 def execute_preview_form_schema_update(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     try:
         identifier = args.get("id")

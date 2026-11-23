@@ -1,10 +1,5 @@
 import { FONT_MENU } from "../config.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_font_family
- * @matrix editor : font-family reload
- */
 class FontFamilyPicker {
 	constructor(toolbar) {
 		this.toolbar = toolbar;

@@ -28,7 +28,6 @@ async function loadTaskSettings({ FormWidget, SectionToggle = {} }) {
 	});
 }
 
-/** @matrix tasks : attach-form model-task-link retained-draft manual-form-choice */
 test("test_model_task_selection_replaces_form_and_preserves_later_manual_choice", async () => {
 	class FormWidget {
 		constructor(attributes) {
@@ -86,7 +85,6 @@ test("test_model_task_selection_replaces_form_and_preserves_later_manual_choice"
 	choose("project", { id: "first-model", kind: "model", form: first });
 });
 
-/** @matrix tasks : active-widget complete uncomplete update-state */
 test("test_closed_task_errors_persist_while_waiting_and_retrying", async (t) => {
 	createBrowser(t);
 	t.mock.timers.enable({ apis: ["setTimeout"], now: 0 });
@@ -150,7 +148,6 @@ test("test_closed_task_errors_persist_while_waiting_and_retrying", async (t) => 
 	}
 });
 
-/** @matrix tasks : history-fill latest-submission incompatible-value stale-response */
 test("test_task_history_fill_reports_incompatible_values_and_ignores_stale_responses", async () => {
 	class FormWidget {
 		constructor(attributes) {
@@ -234,7 +231,6 @@ test("test_task_history_fill_reports_incompatible_values_and_ignores_stale_respo
 	assert.equal(controls.length, 2);
 });
 
-/** @matrix tasks : history-fill stale-response */
 test("test_history_fill_waits_without_overwriting_new_input", async (t) => {
 	const fakeDocument = {
 		createElement: () => ({
@@ -298,7 +294,6 @@ test("test_history_fill_waits_without_overwriting_new_input", async (t) => {
 	assert.deepEqual(filled, ["7"]);
 });
 
-/** @matrix tasks : active-widget complete history-refresh uncomplete */
 test("test_task_completion_replaces_closed_row_in_one_transition", async () => {
 	const transitions = [];
 	let committing = false;
@@ -498,7 +493,6 @@ test("test_task_completion_replaces_closed_row_in_one_transition", async () => {
 	await updateTask({ completed: true, nextCompleted: false, cancel: true });
 });
 
-/** @matrix tasks : action-control-lifecycle teardown */
 test("test_task_settings_awaits_action_controls_and_cleans_up", async () => {
 	const events = [];
 	let resolveUpload;
@@ -613,7 +607,6 @@ test("test_task_settings_awaits_action_controls_and_cleans_up", async () => {
 	assert.equal(updatedListener, null);
 });
 
-/** @matrix forms : schema-ownership sibling-widgets */
 test("test_form_response_metadata_stays_with_renderer_widget", async () => {
 	class FormController {}
 	const { FormWidget } = await esmock.strict(

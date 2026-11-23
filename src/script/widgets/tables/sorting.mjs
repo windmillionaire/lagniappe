@@ -2,9 +2,6 @@ import { primitives } from "../../elements/primitives.mjs";
 import { sessionStore } from "../../shared/storage.mjs";
 import { withTransition } from "../../shared/transitions.mjs";
 
-/**
- * @testable infrastructure
- */
 export class TableSorting {
 	constructor(attributes) {
 		Object.assign(this, attributes);
@@ -110,9 +107,6 @@ export class TableSorting {
 	/**
 	 * Rebuild row-value caches after server row replacement while preserving active sorts.
 	 *
-	 * @testable infrastructure
-	 * @covered-by src/script/widgets/tables/indexTable.mjs::IndexTable.refreshDelta
-	 * @covered-by src/script/widgets/tables/indexTable.mjs::IndexTable.refresh
 	 */
 	refreshRows() {
 		if (this._destroyed || !this.initialized) return;
@@ -155,11 +149,6 @@ export class TableSorting {
 		return null;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_persists_after_back_navigation
-	 * @matrix table-controls : persistence sorting
-	 */
 	_saveState() {
 		const sorts = {};
 
@@ -207,12 +196,6 @@ export class TableSorting {
 		if (toggle) toggle.dataset.active = "true";
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_filter_button_opens_sorting_panel
-	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_filter_button_opens_sorting_panel
-	 * @matrix table-controls : mobile-controls sorting
-	 */
 	_setSortingToggles() {
 		const container = this.view.mobile
 			? document.getElementById("mobile-controls")
@@ -284,17 +267,6 @@ export class TableSorting {
 		return initialOrder;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_ascending_reorders_rows
-	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_name_column_sort_descending_reorders_rows
-	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_clearing_sort_restores_default_order
-	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_boolean_column_filter_clear_restores_rows
-	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_exists_column_filter_treats_phone_values_as_present
-	 * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_name_sort_ascending_reorders_rows
-	 * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_due_date_sort_filters_to_dated_rows
-	 * @matrix table-controls : boolean-column due-date exists-column filtering name phone sort-asc sort-clear sort-desc sorting
-	 */
 	sort() {
 		if (this._destroyed) return;
 		let reorderRows = false;
@@ -454,11 +426,6 @@ export class TableSorting {
 		return this.sorts.get(column);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_050_table_lifecycle.mjs::test_table_sorting_destroy_removes_controls_and_rejects_queued_toggles
-	 * @matrix table-controls : persistence sorting teardown
-	 */
 	destroy() {
 		if (this._destroyed) return;
 		this._destroyed = true;
@@ -477,11 +444,6 @@ export class TableSorting {
 	}
 }
 
-/**
- * @testable false
- * @covered-by src/script/widgets/tables/sorting.mjs::TableSorting.sort
- * @reason private sort strategy exercised through the TableSorting orchestrator
- */
 class RadioSort {
 	constructor(orchestrator, column, ordering) {
 		this.orchestrator = orchestrator;
@@ -513,11 +475,6 @@ class RadioSort {
 		return this.active ? { value: this.sortValue } : null;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_image_column_sort_panel_offers_presence_options
-	 * @matrix table-controls : exists-column sorting
-	 */
 	get options() {
 		const setOptions = (options) => {
 			if (this.sortValue === null) this.sortValue = this.defaultValue;
@@ -692,11 +649,6 @@ class RadioSort {
 
 const OPTIONS = Symbol("options");
 
-/**
- * @testable false
- * @covered-by src/script/widgets/tables/sorting.mjs::TableSorting.sort
- * @reason private sort strategy exercised through the TableSorting orchestrator
- */
 class CheckboxSort {
 	constructor(orchestrator, column, ordering) {
 		this.orchestrator = orchestrator;

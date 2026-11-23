@@ -1,9 +1,6 @@
 import { FormController } from "../../../forms/controller.mjs";
 import { captureError, ENDPOINTS, request } from "../../../shared/index.mjs";
 
-/**
- * @testable infrastructure
- */
 export class FormSettings {
 	constructor(builder) {
 		this._destroyed = false;
@@ -47,9 +44,7 @@ export class FormSettings {
 	}
 
 	/**
-	 * @testable true
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_group
-	 * @matrix forms : access-restrictions group-restricted
 	 */
 	async init() {
 		if (this._destroyed) return;
@@ -93,13 +88,8 @@ export class FormSettings {
 	}
 
 	/**
-	 * @testable true
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_group
-	 * @matrix forms : access-restrictions group-restricted owner-restricted
-	 * @tests tests_js/test_036_form_builder_frontend.mjs::test_restriction_save_submits_snapshot_and_releases_failed_submitter
-	 * @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_form_restrictions_reconcile_existing_descendants
-	 * @matrix forms : access-restrictions explicit-submit retryable-action single-flight
 	 */
 	_saveRestrictions(event) {
 		event.preventDefault();
@@ -143,13 +133,6 @@ export class FormSettings {
 		return this._restrictionPromise;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_036_form_builder_frontend.mjs::test_builder_generation_failure_stays_visible_and_releases_submitter
-	 * @matrix forms ui-action : persistent-error retryable-action schema-generation single-flight
-	 * @matrix forms : draft-history
-	 * @pair forms:stale-response
-	 */
 	_generateSchema(event) {
 		event.preventDefault();
 		event.stopPropagation();

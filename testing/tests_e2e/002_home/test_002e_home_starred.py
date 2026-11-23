@@ -95,7 +95,6 @@ def _patch_star(user, key):
     )
 
 
-# @matrix starred : category title-menu
 # @scaffolding testing/elements/containers.py::List.find_item
 # @template menus.html::star
 @pytest.mark.e2e
@@ -148,7 +147,6 @@ def test_star_category(get_admin, get_user):
     expect(starred_category).to_be_visible()
 
 
-# @matrix starred : project title-menu
 # @scaffolding testing/elements/containers.py::List.find_item
 # @template menus.html::star
 @pytest.mark.e2e
@@ -204,8 +202,6 @@ def test_star_project(get_admin, get_user):
     assert star_button.is_starred is True
 
 
-# @matrix starred : accessible-state page title-menu
-# @pair view-transition:navigation
 # @template menus.html::star
 @pytest.mark.e2e
 def test_star_page(get_admin, get_user):
@@ -247,7 +243,6 @@ def test_star_page(get_admin, get_user):
     _title_star_action(user, "Page actions", "Star")
 
 
-# @matrix starred : file title-menu
 # @template menus.html::star
 @pytest.mark.e2e
 def test_star_file(get_admin, get_user):
@@ -271,7 +266,6 @@ def test_star_file(get_admin, get_user):
     _title_star_action(user, "File actions", "Star")
 
 
-# @matrix starred : add-authorization inaccessible-placeholder missing-placeholder missing-target no-mutation retained-inaccessible unavailable-removal
 # @template home/starred.html::list
 @pytest.mark.e2e_group("owner")
 @pytest.mark.e2e

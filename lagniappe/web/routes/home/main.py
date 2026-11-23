@@ -29,9 +29,6 @@ from lagniappe.web import responses
 from . import home, internal
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002a_home.py::test_home_mobile_dashboard_smoke
-# @matrix home : layout load mobile
 @home.route("/")
 @home_permission(anonymous_endpoint="home.public_directory")
 def home_page() -> ResponseReturnValue:
@@ -39,13 +36,6 @@ def home_page() -> ResponseReturnValue:
     return responses.home_page(home)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002a_home.py::test_tasks_prefetch
-# @tests tests_e2e/002_home/test_002a_home.py::test_model_lists_load_on_toggle
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
-# @matrix home : category-list lazy-load prefetch project-list task-count task-list
-# @pair ai-report:provider-independent-history
 @internal.route("/get/<kind>")
 @home_permission()
 def get(kind: str) -> ResponseReturnValue:
@@ -67,10 +57,6 @@ def get(kind: str) -> ResponseReturnValue:
     return response
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_notes_exclude_notifications
-# @matrix activity : cached-response load notes-exclusion notes-only
-# @matrix notes : cached-response load notes-only
 @internal.route("/activity")
 @home_permission()
 def activity() -> ResponseReturnValue:
@@ -78,13 +64,6 @@ def activity() -> ResponseReturnValue:
     return responses.activity(home.section("notes"))
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_renders_target_and_preserves_pending_state
-# @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
-# @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_assigned_to
-# @matrix notifications offline : dropdown-refresh target-link
-# @matrix notifications : pending target
-# @pair notifications:assignee-target
 @internal.route("/notifications")
 @logged_in
 def notifications() -> ResponseReturnValue:
@@ -126,9 +105,6 @@ def notifications() -> ResponseReturnValue:
     )
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_deletes_and_clears
-# @matrix notifications : clear-all ownership
 @internal.route("/notifications", methods=["DELETE"])
 @logged_in
 def clear_notifications() -> ResponseReturnValue:
@@ -140,12 +116,6 @@ def clear_notifications() -> ResponseReturnValue:
     return responses.ok()
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_note_shared_visibility_is_owner_only
-# @matrix activity : body create owner-only-shared parent photo scope visibility
-# @matrix notes : body create owner-only-shared parent photo private-default scope visibility
-# @pair permissions:owner-only-shared
 @internal.route("/activity/notes", methods=["POST"])
 @logged_in
 def create_note() -> ResponseReturnValue:
@@ -177,9 +147,6 @@ def create_note() -> ResponseReturnValue:
     return responses.new_note(new_note, surface="home")
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_delete_activity_item_from_home
-# @matrix activity notes notifications : delete ownership
 @internal.route("/activity/<key>", methods=["DELETE"])
 @logged_in
 def delete_activity(key: str) -> ResponseReturnValue:
@@ -209,13 +176,6 @@ def delete_activity(key: str) -> ResponseReturnValue:
     return responses.ok()
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_category
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_file
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_route_rejects_inaccessible_and_missing_targets
-# @matrix starred : add-authorization category file missing-target no-mutation page project unavailable-removal
 @internal.route("/toggle-star/<key>", methods=["PATCH"])
 @logged_in
 def toggle_star(key: str) -> ResponseReturnValue:

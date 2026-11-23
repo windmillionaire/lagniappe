@@ -3,9 +3,6 @@ import { captureError } from "../shared/errors.mjs";
 import { withTransition } from "../shared/transitions.mjs";
 import { generateElementId } from "../shared/utilities.mjs";
 
-/**
- * @testable infrastructure
- */
 export class FormRenderer {
 	constructor(form) {
 		this.id = generateElementId("renderer");
@@ -92,12 +89,6 @@ export class FormRenderer {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
-	 * @matrix tasks : element-matrix history-fill latest-submission
-	 */
 	addHistoryFillButtons(submission) {
 		if (!this.historyFillEnabled || !submission) return;
 
@@ -127,11 +118,6 @@ export class FormRenderer {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_019_form_sync_frontend.mjs::test_renderer_visibility_requires_canonical_condition_lists
-	 * @matrix form-schema forms : canonical-list legacy-object-rejected visibility
-	 */
 	async _initVisibilityTriggers() {
 		this.visibilityTriggers = new Map();
 		this.visibilityConditions.clear();

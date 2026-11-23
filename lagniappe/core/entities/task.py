@@ -66,10 +66,6 @@ class TaskData(TypedDict, total=False):
     submission: object
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_entity_lifecycle_readonly_and_save_relations
-# @matrix task : entity-lifecycle readonly save
-# @matrix task-completion mutations : hydration no-extra-read
 class Task(AssetMixin, SubmitterMixin, Entity):
     if TYPE_CHECKING:
         @property
@@ -164,9 +160,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             return value.replace(tzinfo=UTC)
         return value
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_add_uncomplete_task_to_queue_future_due_queues_in_production
-    # @matrix task-scheduling : durable-uncomplete post-commit
     def _defer_scheduled_uncomplete(self, schedule_at: datetime) -> None:
         self.db["scheduled_uncomplete_token"] = uuid4().hex
         self.db["scheduled_uncomplete_at"] = schedule_at
@@ -177,9 +170,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             )
         )
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_manual_uncomplete_clears_pending_scheduled_delivery
-    # @matrix task-completion task-scheduling : idempotency stale-delivery
     def _clear_scheduled_uncomplete(self) -> None:
         self.db.pop("scheduled_uncomplete_token", None)
         self.db.pop("scheduled_uncomplete_at", None)
@@ -234,15 +224,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     def is_assigned_to(self, user: User) -> bool:
         return self.properties.assigned_to.key == user.page.key
 
-    # @testable true
-    # @tests tests_unit/test_013_task_properties.py::test_task_allowed_assigned_user_page_override
-    # @tests tests_unit/test_013_task_properties.py::test_task_allowed_models_view_requires_models_marker
-    # @tests tests_unit/test_013_task_properties.py::test_task_allowed_restricted_form_blocks_page_permission
-    # @tests tests_unit/test_013_task_properties.py::test_task_allowed_requires_loaded_page_even_with_stored_permission
-    # @tests tests_unit/test_013_task_properties.py::test_task_restrictions_require_each_source_with_any_group
-    # @matrix task permissions : source-clauses assignee-override parent-page restricted-access
-    # @matrix permissions task users : allowed assignee-override lazy-parent-check models-scope parent-page restricted-access shallow-page stored-requires user-page
-    # @pair task:stored-requires
     def allowed(self, action: Action, user: FieldUser = None) -> bool:
         user = current_context_user(user)
         if self.restricted_access(user):
@@ -259,9 +240,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             and Action.EDIT.implies(action)
         )
 
-    # @testable true
-    # @tests tests_unit/test_013_task_properties.py::test_task_update_rejects_assignee_without_restricted_task_access
-    # @matrix permissions task : assignment restricted-access
     def validate_assignment(self, assigned_to: Page | User | None, actor: FieldUser = None) -> None:
         if not assigned_to:
             return
@@ -292,9 +270,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
                 "Assigned user does not have access to this task's restricted form."
             )
 
-    # @testable true
-    # @tests tests_unit/test_004i_form_definitions.py::test_original_answers_are_available_only_after_completed_values_change
-    # @matrix task-completion : generation original-view no-extra-read
     @property
     def has_converted_completion(self) -> bool:
         """Offer original answers only when a later generation changed this completion."""
@@ -308,9 +283,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             self.properties.submission.value, sort_keys=True,
         )
 
-    # @testable true
-    # @tests tests_unit/test_004i_form_definitions.py::test_history_orders_same_day_completions_by_archive_time
-    # @matrix tasks task-completion : history ordering schema-version
     @property
     def history(self) -> list[TaskHistory]:
         return sorted(
@@ -322,10 +294,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             reverse=True,
         )
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_history_loading_resolves_moved_task_and_independently_moved_files
-    # @matrix files tasks : task-history parent-key restrictions
-    # @pair tasks:single-batch
     def load_history(self, *records: Row | None) -> list[TaskHistory]:
         """Load snapshots with their live Task and current attachment owners."""
         rows = [record for record in records if record is not None]
@@ -348,9 +316,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             *self.derived_page_keys, request=Fetch.direct()
         ))
 
-    # @testable true
-    # @tests tests_unit/test_013_task_properties.py::test_task_postpone_preserves_original_due_date_once
-    # @matrix task task-scheduling : due-date postpone
     def postpone(self, due_date: str) -> None:
         """Push the due date forward, preserving the original as postponed_from."""
         new_date = scheduling.calculate_postponed_due_date(due_date)
@@ -362,8 +327,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     def postponed_from(self) -> datetime | None:
         return cast("datetime | None", self.db.get("postponed_from"))
 
-    # @testable true
-    # @matrix submission task-completion : required-fields validation
     def _check_required(self) -> list[SchemaField]:
         """Return visible required fields that have no value."""
         submission = self.properties.submission
@@ -375,14 +338,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
 
         return [s for s in incomplete if submission.is_visible(s.id)]
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_without_schedule
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_raises_when_required_submission_missing
-    # @tests tests_unit/test_020h_ai_report_execution.py::test_complete_task_action_preserves_details_and_retries
-    # @matrix task-completion : assignee complete completed-by no-schedule
-    # @matrix task-completion : schema-version
-    # @matrix submission task-completion : required-fields validation
     def complete(self, *, user: FieldUser = None, history_key: Key | None = None) -> None:
         if self.completed:
             return
@@ -409,11 +364,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         else:
             self.due_date = None
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
-    # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_repeats_when_completed
-    # @matrix task-scheduling : complete next-due-date recurring schedule-queue
-    # @pairs task-completion:next-due-date task-completion:schedule-queue
     def _complete_active_schedule(self, *, history_key: Key | None = None) -> None:
         self.properties.schedule.set_next_due_date()
         if history_key is None:
@@ -421,14 +371,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         else:
             scheduling.add_uncomplete_task_to_queue(self, history_key=history_key)
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_create_history_entry_accepts_completion_overrides
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_clones_another_task_and_existing_history
-    # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_records_older_completed_event_without_mutating_live_task
-    # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
-    # @matrix task-completion : attachments description explicit-overrides history live-task name submission uncomplete
-    # @matrix task-combine : attachments source-snapshot
     def create_history_entry(
         self,
         completed_on: datetime | None = None,
@@ -470,9 +412,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         self.db["history"] = True
         return history
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete
-    # @matrix signature task-completion : asset-cleanup uncomplete
     def clear_submission_assets(self) -> None:
         for name in list(self.assets.keys()):
             asset = self.get_asset(name)
@@ -484,14 +423,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         self._assets = {}
         self.db.pop("assets", None)
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_clears_submission_and_legacy_defaults_preserving_assignment
-    # @tests tests_unit/test_003g_todo_lists.py::test_uncomplete_archives_then_clears_todo_items
-    # @matrix task-completion : assignment history field-reset uncomplete
-    # @matrix task-completion : schema-version
-    # @pairs form-todo:field-reset signature:history
-    # @matrix task-completion mutations : immutable-submission concurrency
     def uncomplete(self, history_key: Key | None = None, *, submission_source: str = "original") -> None:
         """Archive the selected answers and reset; automatic reopening keeps originals."""
 
@@ -553,11 +484,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     def has_history(self) -> bool:
         return cast(bool, self.db.get("history", False))
 
-    # @testable true
-    # @tests tests_unit/test_013_task_properties.py::test_task_entity_lifecycle_readonly_and_save_relations
-    # @tests tests_unit/test_032h_report_batches.py::test_create_batch_reserves_one_key_per_output_and_reuses_receipts
-    # @pair task:create
-    # @matrix ai-report : id-allocation identity
     @classmethod
     def create(cls, data: TaskData, *, key: Key | None = None) -> Self:
         new_task = cls(key)
@@ -579,11 +505,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             self.project = None
             self.model = None
 
-    # @testable true
-    # @tests tests_unit/test_013_task_properties.py::test_task_update_tracks_project_model_and_uploaded_file
-    # @tests tests_unit/test_013_task_properties.py::test_task_update_saves_file_relations_from_upload_assets
-    # @tests tests_unit/test_031_submitted_references.py::test_task_update_preserves_unchanged_assignee_eligibility
-    # @matrix task : assignee-preservation file-assets tracking update uploaded-files
     def update(self, data: TaskData) -> None:
         if self.completed:
             raise ValidationError("Reopen the task before editing its completion.")
@@ -630,11 +551,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
 
         self.updated = True
 
-    # @testable true
-    # @tests tests_unit/test_027a_messaging_properties.py::test_task_assignment_notice_uses_stable_transition_identity
-    # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_assigned_to
-    # @matrix task-assignment : idempotency self-exclusion transition
-    # @pair notifications:assignee-target
     def _add_assignment_notice(self, actor: FieldUser, assigned_page: Page | None) -> None:
         """Plan one stable notification for a non-self assignee transition."""
         recipient = getattr(assigned_page, "user", None) if assigned_page else None
@@ -665,9 +581,6 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             MutationIntent.standard(notification, reason="task-assignment-notice")
         )
 
-    # @testable true
-    # @tests tests_unit/test_013_task_properties.py::test_task_entity_lifecycle_readonly_and_save_relations
-    # @pair task:list-owner-fingerprint
     @property
     def task_list_owners(self) -> list[Page | Project]:
         owners = [self.page, self.project, self.assigned_to, *self.linked_pages]

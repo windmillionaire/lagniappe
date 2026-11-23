@@ -26,10 +26,6 @@ from lagniappe.web import direct_uploads
 from . import assets
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_image_asset_lifecycle_and_projections
-# @tests tests_e2e/005_pages/test_005f_page_image.py::test_add_image_to_page
-# @pairs page:asset-lifecycle pages:image-add
 @assets.route("<key>/add-page-image", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def add_page_image(
@@ -56,9 +52,6 @@ def add_page_image(
     return responses.page_image(page)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/assets/page.py::add_page_image
-# @reason route permission mirrors the final page image upload endpoint
 @assets.route("<key>/add-page-image/direct-upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def add_page_image_direct(key: str, **kwargs: object) -> ResponseReturnValue:
@@ -67,10 +60,6 @@ def add_page_image_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_image_asset_lifecycle_and_projections
-# @tests tests_e2e/005_pages/test_005f_page_image.py::test_remove_image_from_page
-# @pairs page:asset-lifecycle pages:image-remove
 @assets.route("<key>/remove-page-image", methods=["DELETE"])
 @permission(Resource.PAGE, Action.EDIT)
 def remove_page_image(
@@ -86,10 +75,6 @@ def remove_page_image(
     return responses.page_image(page)
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_image_asset_lifecycle_and_projections
-# @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
-# @pairs page:asset-lifecycle pages:image-generate
 @assets.route("<key>/generate-page-image", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def generate_page_image(

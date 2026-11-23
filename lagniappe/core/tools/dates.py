@@ -16,10 +16,6 @@ from .auth.context import current_context_user
 type DateUser = FieldUser | Literal[False]
 
 
-# @testable false
-# @covered-by lagniappe/core/mixins/date.py::DateMixin
-# @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.set_next_due_date
-# @reason timezone resolution is owned by date/scheduling consumers
 def user_timezone(user: DateUser = None) -> ZoneInfo:
     """Get the request or user's timezone, falling back to UTC."""
     if user is None:
@@ -33,10 +29,6 @@ def user_timezone(user: DateUser = None) -> ZoneInfo:
         return ZoneInfo("UTC")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ingress.py::IngressMutationPlanner._set_history
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_parse_completed_task_completed_on
-# @reason imported date parsing is exercised through ingress and report completion workflows
 def parse_imported_date_as_utc(
     date_string: str | None, *, user: DateUser = None
 ) -> datetime | None:
@@ -52,9 +44,6 @@ def parse_imported_date_as_utc(
         return None
 
 
-# @testable false
-# @covered-by lagniappe/core/mixins/date.py::DateMixin
-# @reason user-facing date formatting is owned by DateMixin projections
 def utc_datetime_to_user_date_string(
     utc_dt: datetime | None, *, user: DateUser = None
 ) -> str:
@@ -62,9 +51,6 @@ def utc_datetime_to_user_date_string(
     return utc_dt.astimezone(user_timezone(user)).strftime("%Y-%m-%d") if utc_dt else ""
 
 
-# @testable true
-# @tests tests_unit/test_013d_date_utilities.py::test_format_date_as_input_string
-# @matrix template-formatting : blank-value date input-value string-passthrough
 def format_date_as_input_string(value: date | str | None) -> str:
     """Format a date-like value for an HTML date input."""
     if not value:
@@ -72,17 +58,11 @@ def format_date_as_input_string(value: date | str | None) -> str:
     return value if isinstance(value, str) else value.strftime("%Y-%m-%d")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/scheduling.py::add_uncomplete_task_to_queue
-# @reason UTC queue date formatting is part of task uncomplete scheduling
 def utc_datetime_to_utc_date_string(utc_dt: datetime | None) -> str:
     """Format a UTC datetime as YYYY-MM-DD HH:MM:SS."""
     return utc_dt.strftime("%Y-%m-%d %H:%M:%S") if utc_dt else ""
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/process/main.py::uncomplete_task
-# @reason UTC queue date parsing is part of task uncomplete processing
 def utc_date_string_to_utc_datetime(value: str) -> datetime:
     """Parse a YYYY-MM-DD or YYYY-MM-DD HH:MM:SS UTC value."""
     try:
@@ -92,9 +72,6 @@ def utc_date_string_to_utc_datetime(value: str) -> datetime:
     return parsed.replace(tzinfo=UTC)
 
 
-# @testable false
-# @covered-by lagniappe/core/mixins/date.py::DateMixin
-# @reason user-timezone datetime projection is owned by DateMixin
 def utc_datetime_to_user_datetime(
     utc_dt: datetime | None, *, user: DateUser = None
 ) -> datetime | None:
@@ -102,10 +79,6 @@ def utc_datetime_to_user_datetime(
     return utc_dt.astimezone(user_timezone(user)) if utc_dt else None
 
 
-# @testable false
-# @covered-by lagniappe/core/mixins/date.py::DateMixin
-# @covered-by lagniappe/core/properties/task_scheduling.py::Periodic.update
-# @reason user date parsing is owned by DateMixin and periodic schedule update
 def user_date_string_to_utc_datetime(
     date_string: str | None, *, user: DateUser = None
 ) -> datetime | None:
@@ -128,10 +101,6 @@ def user_date_string_to_utc_datetime(
         raise ValueError(f"Invalid date format: {date_string}") from None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/dates.py::user_today
-# @covered-by lagniappe/core/tools/dates.py::parse_imported_date_as_utc
-# @reason day-boundary normalization is owned by date parsing and today helpers
 def beginning_of_day(value: datetime) -> datetime:
     """Return midnight at the supplied datetime's timezone."""
     if not value.tzinfo:
@@ -139,11 +108,6 @@ def beginning_of_day(value: datetime) -> datetime:
     return datetime.combine(value.date(), datetime.min.time(), tzinfo=value.tzinfo)
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.set_next_due_date
-# @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.skipped
-# @covered-by lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.prepare
-# @reason current user-day boundary is owned by task scheduling behaviors
 def user_today(user: DateUser = None) -> datetime:
     """Return the beginning of today in the user's timezone."""
     return beginning_of_day(datetime.now(user_timezone(user)))

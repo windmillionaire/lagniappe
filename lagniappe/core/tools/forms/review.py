@@ -30,8 +30,6 @@ class Proposal(TypedDict):
     values: dict[str, object]
 
 
-# @testable true
-# @pair ai:autofill
 def merge_proposal(
     baseline: Mapping[str, object],
     current: dict[str, object],
@@ -56,8 +54,6 @@ def merge_proposal(
     return merged, conflicts, applied
 
 
-# @testable true
-# @pair ai:autofill
 def launch_snapshot(
     target: Page | Task,
     actor: User,
@@ -94,8 +90,6 @@ def launch_snapshot(
     return json.loads(json.dumps(snapshot, default=str))
 
 
-# @testable true
-# @pair ai:autofill
 def snapshot_matches_form(snapshot: Mapping[str, object], target: Page | Task) -> bool:
     """Answer drift can be reviewed; a different form definition needs a fresh run."""
     return bool(snapshot) and (
@@ -105,8 +99,6 @@ def snapshot_matches_form(snapshot: Mapping[str, object], target: Page | Task) -
     )
 
 
-# @testable true
-# @pair ai:autofill
 def prepare_proposal(
     schema: Sequence[FieldDefinition],
     submission: Mapping[str, object],
@@ -124,8 +116,6 @@ def prepare_proposal(
     return {"answers": answers, "values": values}
 
 
-# @testable true
-# @pair ai:autofill
 def stage_submission_guard(
     target: Page | Task, submitted: Mapping[str, object]
 ) -> bool:
@@ -142,17 +132,14 @@ def stage_submission_guard(
     return True
 
 
-# @testable infrastructure
 def review_slot(actor: User | None = None) -> str | None:
     return actor.urlsafe_key if actor is not None else "shared"
 
 
-# @testable infrastructure
 def review_references(target: Page | Task) -> dict[str | None, str | None]:
     return cast(dict[str | None, str | None], json_value(target.db, REVIEWS))
 
 
-# @testable infrastructure
 def remember_review(
     target: Page | Task, job: DeferredJob, *, private: bool = False
 ) -> None:
@@ -162,8 +149,6 @@ def remember_review(
     check_size(target.db)
 
 
-# @testable true
-# @pair ai:autofill
 def review_projection(target: Page | Task, actor: User) -> list[dict[str, object]]:
     """Project only saved shared proposals and this editor's private refinement."""
     if not target.allowed(Action.EDIT, user=actor):
@@ -198,8 +183,6 @@ def review_projection(target: Page | Task, actor: User) -> list[dict[str, object
     return result
 
 
-# @testable true
-# @pair ai:autofill
 def acknowledge_reviews(
     target: Page | Task, actor: User, operations: Collection[str]
 ) -> None:

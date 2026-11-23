@@ -1,9 +1,5 @@
 import { captureError } from "../shared/errors.mjs";
 
-/**
- * @testable true
- * @pair forms:autofill-completion-review
- */
 export function currentReviewOperation(widget, incoming) {
 	const current = widget.reviewState?.operation;
 	if (current?.key === incoming?.key)
@@ -21,10 +17,6 @@ export function currentReviewOperation(widget, incoming) {
 
 /**
  * One notification surface for operation progress, schema changes, and remote edits.
- * @testable true
- * @pair forms:submission-choice
- * @pair forms:autofill-completion-review
- * @pair form-migration:informational-notice
  */
 export function renderReviewBar(widget, operation = null) {
 	const target = widget?.target;
@@ -122,21 +114,11 @@ export function renderReviewBar(widget, operation = null) {
 			: "false";
 }
 
-/**
- * @testable true
- * @tests tests_js/test_049_autofill_review.mjs::test_review_bar_cancel_uses_operation_identity
- * @pair ai:autofill
- */
 export function installReviewBar(widget) {
 	widget._reviewBar?.destroy();
 	if (widget.revisionPreview || !widget.target?.dataset.formState) return;
 	widget.reviewState = JSON.parse(widget.target.dataset.formState);
 	renderReviewBar(widget);
-	/**
-	 * @testable false
-	 * @covered-by src/script/forms/reviewBar.mjs::installReviewBar
-	 * @reason button actions belong to the installed notification bar
-	 */
 	const click = async (event) => {
 		const button = event.target.closest(
 			"[data-role='autofill-cancel'], [data-role='autofill-retry']",

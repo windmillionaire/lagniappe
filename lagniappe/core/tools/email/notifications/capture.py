@@ -23,9 +23,6 @@ DOCUMENT_MENTION_EVENT = "document_mention"
 TASK_ASSIGNMENT_EVENT = "task_assignment"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason shared serialization is exercised through typed capture APIs
 def _event_values(*, source_type, source_key, body, title, target_path, now):
     return {
         "source_type": source_type,
@@ -37,9 +34,6 @@ def _event_values(*, source_type, source_key, body, title, target_path, now):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification
-# @reason target-specific copy is exercised through notification capture
 def _notification_copy(target, body):
     title = "Notification"
     body = str(body or "").strip()
@@ -71,9 +65,6 @@ def _notification_copy(target, body):
     return title, body
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason shared persistence and dispatch are exercised through typed capture APIs
 def _record_event(user, values, *, now=None):
     now = policy.utc(now)
     if not policy.eligible_user(user):
@@ -118,11 +109,6 @@ def _record_event(user, values, *, now=None):
     return row
 
 
-# @testable true
-# @tests tests_unit/test_029b_notification_email_events.py::test_immediate_notification_is_delayed_escaped_and_delivered
-# @tests tests_unit/test_029b_notification_email_events.py::test_task_assignment_email_uses_task_copy_without_headers
-# @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_groups_messages_and_uses_named_completion_links
-# @matrix notification-email : notification pending-filter target-link target-title task-assignment
 def record_notification(notification: Notification | None, *, now: datetime | None = None) -> DatastoreRow | None:
     """Capture one final ordinary notification for email delivery."""
     if (
@@ -179,11 +165,6 @@ def record_notification(notification: Notification | None, *, now: datetime | No
     return _record_event(getattr(notification, "parent", None), values, now=now)
 
 
-# @testable true
-# @tests tests_unit/test_029b_notification_email_events.py::test_immediate_notification_is_delayed_escaped_and_delivered
-# @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_uses_next_local_eight_and_batches
-# @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_groups_messages_and_uses_named_completion_links
-# @matrix notification-email : digest full-roundup future-only-switch idempotency immediate timezone
 def record_notification_event(user: User, source_key: Key, *, body: str, target: Entity | None = None, now: datetime | None = None) -> DatastoreRow | None:
     """Capture a known final notification at a direct transaction boundary."""
     now = policy.utc(now)
@@ -198,9 +179,6 @@ def record_notification_event(user: User, source_key: Key, *, body: str, target:
     return _record_event(user, values, now=now)
 
 
-# @testable true
-# @tests tests_unit/test_029b_notification_email_events.py::test_document_mention_email_uses_concise_copy_and_document_tab
-# @pair notification-email:document-mention
 def record_document_mention(user: User, source_key: Key, *, document: Entity, now: datetime | None = None) -> DatastoreRow | None:
     """Capture a document mention with its dedicated email presentation."""
     now = policy.utc(now)
@@ -219,11 +197,6 @@ def record_document_mention(user: User, source_key: Key, *, document: Entity, no
     return _record_event(user, values, now=now)
 
 
-# @testable true
-# @tests tests_unit/test_029c_notification_email_messages.py::test_immediate_messages_wait_for_conversation_quiet
-# @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_groups_messages_and_uses_named_completion_links
-# @matrix notification-email : latest-only message quiet-window
-# @pair notification-email:message-grouping
 def record_message(message: DatastoreRow, conversation: DatastoreRow, recipient: User, *, now: datetime | None = None) -> DatastoreRow | None:
     """Capture a newly-created inbound direct message."""
     now = policy.utc(now or message.get("created"))

@@ -24,9 +24,6 @@ class ProviderErrorDetails(TypedDict):
     raw: str
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_config_combines_search_tools_json_and_thinking_settings
-# @pair ai:retry-config
 def retry_http_options(
     api_version: str | None = None,
     attempts: int | None = None,
@@ -52,10 +49,6 @@ def retry_http_options(
     return types.HttpOptions.model_validate(options)
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
-# @tests tests_unit/test_015_ai_tools.py::test_generate_ai_image_returns_clean_provider_message
-# @matrix ai : config image-generate provider-errors user-message
 def provider_error_message(error: BaseException) -> str:
     """Extract the concise provider message from a GenAI exception."""
     details = provider_error_details(error)
@@ -65,9 +58,6 @@ def provider_error_message(error: BaseException) -> str:
     return str(error).strip() or "The image provider did not return details."
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_text_generation
-# @matrix ai : provider-errors quota
 def provider_error_details(error: BaseException) -> ProviderErrorDetails:
     """Extract structured details from a GenAI provider exception."""
     message = getattr(error, "message", None)
@@ -90,9 +80,6 @@ def provider_error_details(error: BaseException) -> ProviderErrorDetails:
     }
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_text_generation
-# @matrix ai : provider-errors quota
 def is_provider_quota_error(error: BaseException) -> bool:
     """Return whether a provider exception represents retryable quota pressure."""
     details = provider_error_details(error)
@@ -106,9 +93,6 @@ def is_provider_quota_error(error: BaseException) -> bool:
     )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_provider_transient_error_classification
-# @matrix ai deferred-jobs : provider-errors retry-classification
 def is_provider_transient_error(error: BaseException) -> bool:
     """Return whether a provider error is safe for a deferred retry."""
     if isinstance(error, (httpx.TimeoutException, httpx.ConnectError)):

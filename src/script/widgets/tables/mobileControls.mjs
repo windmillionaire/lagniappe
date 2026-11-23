@@ -1,7 +1,3 @@
-/**
- * @testable infrastructure
- * @tests tests_e2e/008_users/test_008a_user_index.py::test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load
- */
 export class MobileTableControls {
 	constructor(attributes) {
 		Object.assign(this, attributes);
@@ -23,13 +19,6 @@ export class MobileTableControls {
 		if (sorting?.initialized) sorting.refreshRows();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_controls_open_with_task_columns
-	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_controls_open_with_page_columns
-	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_controls_handle_form_columns
-	 * @matrix table-controls : columns form-columns mobile-controls
-	 */
 	_syncVisibilityButtons(visibleColumns) {
 		this.target
 			.querySelectorAll("button[data-toggle='visibility']")
@@ -55,12 +44,6 @@ export class MobileTableControls {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_visibility_toggle_hides_column
-	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_visibility_toggle_hides_column
-	 * @matrix table-controls : column-visibility mobile-controls
-	 */
 	_dispatchVisibilityToggle(button, active) {
 		const event = new CustomEvent("toggle-column-visibility", {
 			detail: {
@@ -72,13 +55,6 @@ export class MobileTableControls {
 		this.target.dispatchEvent(event);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_filter_button_opens_sorting_panel
-	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_filter_button_opens_sorting_panel
-	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_controls_handle_form_columns
-	 * @matrix table-controls : form-columns mobile-controls sorting
-	 */
 	_dispatchFilterToggle(button) {
 		const event = new CustomEvent("toggle-column-filter", {
 			detail: {

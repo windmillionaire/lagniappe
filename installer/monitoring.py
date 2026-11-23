@@ -20,7 +20,6 @@ from runner.context import setup_command
 if TYPE_CHECKING:
     from requests import Session
 
-# @testable infrastructure
 class MemoryPolicy(TypedDict):
     displayName: str
     documentation: dict[str, str]
@@ -32,7 +31,6 @@ class MemoryPolicy(TypedDict):
     notificationChannels: list[str]
     alertStrategy: dict[str, object]
 
-# @testable infrastructure
 class MemoryThreshold(TypedDict):
     instance_class: str
     envelope_mib: int
@@ -65,10 +63,6 @@ class MonitoringReconciliationError(RuntimeError):
     """Raised when the focused monitoring resource cannot be reconciled."""
 
 
-# @testable false
-# @covered-by installer/monitoring.py::reconcile_memory_alert
-# @covered-by installer/monitoring.py::inspect_memory_alert
-# @reason stable-label recognition is exercised through reconciliation and inspection
 def _managed(resource):
     labels = resource.get("userLabels") or {}
     return (
@@ -77,9 +71,6 @@ def _managed(resource):
     )
 
 
-# @testable false
-# @covered-by installer/monitoring.py::memory_threshold
-# @reason instance-class lookup is exercised through the public threshold contract
 def _instance_class(settings):
     instance_class = str(settings.get("DEPLOY_INSTANCE_CLASS") or "").upper()
     if instance_class not in INSTANCE_CLASS_MEMORY_MIB:
@@ -89,9 +80,6 @@ def _instance_class(settings):
     return instance_class
 
 
-# @testable true
-# @tests tests_tooling/test_001i_setup_monitoring.py::test_memory_threshold_is_derived_from_each_supported_instance_class
-# @matrix monitoring setup : instance-class threshold
 def memory_threshold(settings: Mapping[str, object]) -> MemoryThreshold:
     """Return the configured memory envelope and its 80% warning threshold."""
     instance_class = _instance_class(settings)
@@ -104,9 +92,6 @@ def memory_threshold(settings: Mapping[str, object]) -> MemoryThreshold:
     }
 
 
-# @testable false
-# @covered-by installer/monitoring.py::memory_policy_payload
-# @reason MQL construction is asserted through the complete policy payload
 def _memory_query(settings):
     threshold = memory_threshold(settings)["threshold_bytes"]
     return "\n".join(
@@ -131,9 +116,6 @@ def _memory_query(settings):
     )
 
 
-# @testable false
-# @covered-by installer/monitoring.py::memory_policy_payload
-# @reason chart-link encoding is asserted through policy documentation
 def _chart_url(project):
     query = (
         "fetch gae_app | metric "
@@ -146,9 +128,6 @@ def _chart_url(project):
     )
 
 
-# @testable false
-# @covered-by installer/monitoring.py::memory_policy_payload
-# @reason responder guidance is asserted through the complete policy payload
 def _documentation(settings, project):
     threshold = memory_threshold(settings)
     workers = str(settings.get("DEPLOY_WORKER_COUNT") or "3")
@@ -171,9 +150,6 @@ def _documentation(settings, project):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001i_setup_monitoring.py::test_memory_policy_payload_uses_per_instance_query_and_actionable_documentation
-# @matrix monitoring setup : alert-policy documentation memory-pressure payload
 def memory_policy_payload(
     settings: Mapping[str, object], project: str, notification_channels: Sequence[str]
 ) -> MemoryPolicy:
@@ -206,10 +182,6 @@ def memory_policy_payload(
     }
 
 
-# @testable false
-# @covered-by installer/monitoring.py::reconcile_memory_alert
-# @covered-by installer/monitoring.py::inspect_memory_alert
-# @reason paginated provider reads are exercised through reconciliation and inspection
 def _list_resources(session, url, headers, key):
     from installer.google_provider import _api_request
 
@@ -227,24 +199,14 @@ def _list_resources(session, url, headers, key):
             return resources
 
 
-# @testable false
-# @covered-by installer/monitoring.py::reconcile_memory_alert
-# @reason channel-label lookup is exercised through owner reconciliation
 def _email(channel):
     return str((channel.get("labels") or {}).get("email_address") or "").strip()
 
 
-# @testable false
-# @covered-by installer/monitoring.py::reconcile_memory_alert
-# @reason enabled-channel filtering is exercised through owner reconciliation
 def _enabled(channel):
     return channel.get("enabled") is not False
 
 
-# @testable false
-# @covered-by installer/monitoring.py::reconcile_memory_alert
-# @covered-by installer/monitoring.py::inspect_memory_alert
-# @reason owner-channel selection is exercised through reconciliation and drift inspection
 def _choose_owner_channel(channels, owner_email):
     expected = owner_email.casefold()
     matching = [
@@ -258,9 +220,6 @@ def _choose_owner_channel(channels, owner_email):
     return matching[0] if matching else None
 
 
-# @testable false
-# @covered-by installer/monitoring.py::reconcile_memory_alert
-# @reason managed channel creation is exercised through owner reconciliation
 def _create_owner_channel(session, project, headers, owner_email):
     from installer.google_provider import _api_request
 
@@ -287,10 +246,6 @@ def _create_owner_channel(session, project, headers, owner_email):
     return channel
 
 
-# @testable false
-# @covered-by installer/monitoring.py::reconcile_memory_alert
-# @covered-by installer/monitoring.py::inspect_memory_alert
-# @reason provider-owned field normalization is exercised through idempotence and drift checks
 def _owned_policy_fields(policy):
     owned = {
         key: policy.get(key)
@@ -315,17 +270,10 @@ def _owned_policy_fields(policy):
     return owned
 
 
-# @testable false
-# @covered-by installer/monitoring.py::reconcile_memory_alert
-# @covered-by installer/monitoring.py::inspect_memory_alert
-# @reason normalized equality is exercised through idempotence and drift checks
 def _policy_matches(policy, expected):
     return _owned_policy_fields(policy) == _owned_policy_fields(expected)
 
 
-# @testable false
-# @covered-by installer/monitoring.py::reconcile_memory_alert
-# @reason channel ownership and operator preservation are asserted by reconciliation tests
 def _desired_channels(existing_policy, channels, selected_channel):
     managed_names = {
         channel.get("name")
@@ -337,10 +285,6 @@ def _desired_channels(existing_policy, channels, selected_channel):
     return sorted(set([*operator_channels, selected_channel["name"]]))
 
 
-# @testable false
-# @covered-by installer/monitoring.py::reconcile_memory_alert
-# @covered-by installer/monitoring.py::inspect_memory_alert
-# @reason authenticated REST setup is exercised through the public provider operations
 def _provider_context(project, *, session=None):
     if session is None:
         import requests
@@ -356,10 +300,6 @@ def _provider_context(project, *, session=None):
     return session, _google_request_headers(token, project, json_content=True)
 
 
-# @testable false
-# @covered-by installer/monitoring.py::reconcile_memory_alert
-# @covered-by installer/monitoring.py::inspect_memory_alert
-# @reason managed resource discovery is exercised through reconciliation and drift inspection
 def _resources(session, project, headers):
     base = f"{MONITORING_ROOT}/projects/{project}"
     channels = _list_resources(
@@ -377,10 +317,6 @@ def _resources(session, project, headers):
     return channels, [policy for policy in policies if _managed(policy)]
 
 
-# @testable true
-# @tests tests_tooling/test_001i_setup_monitoring.py::test_reconcile_reuses_owner_channel_preserves_operator_channels_and_is_idempotent
-# @tests tests_tooling/test_001i_setup_monitoring.py::test_reconcile_creates_owner_channel_and_detaches_obsolete_managed_channels
-# @matrix monitoring setup : alert-policy creation idempotence notification-channel operator-preservation owner-reconciliation
 def reconcile_memory_alert(
     *,
     settings: Mapping[str, object] | None = None,
@@ -471,9 +407,6 @@ def reconcile_memory_alert(
     return reconciled
 
 
-# @testable true
-# @tests tests_tooling/test_001i_setup_monitoring.py::test_automatic_reconciliation_failure_is_nonfatal_and_prints_retry_command
-# @matrix monitoring setup : failure-isolation post-deploy retry-command
 def reconcile_memory_alert_after_deploy() -> bool:
     """Run automatic reconciliation without invalidating a completed deploy."""
     from config import SETTINGS
@@ -508,9 +441,6 @@ def reconcile_memory_alert_after_deploy() -> bool:
         return False
 
 
-# @testable true
-# @tests tests_tooling/test_001i_setup_monitoring.py::test_inspection_reports_missing_and_drifted_managed_policy
-# @matrix doctor monitoring setup : drift read-only
 def inspect_memory_alert(
     settings: Mapping[str, object], project: str, *, session: Session | None = None
 ) -> dict[str, object]:

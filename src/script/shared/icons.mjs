@@ -1,10 +1,5 @@
 import { ICONS } from "../generated/icons.mjs";
 
-/**
- * @testable true
- * @tests tests_js/test_018_style_pipeline.mjs::test_frontend_icon_helpers_render_structured_material_symbols
- * @matrix frontend-icons : lookup nested-ids registry
- */
 export const iconDefinition = (name) => {
 	let definition = ICONS;
 	for (const part of String(name || "").split(".")) {
@@ -14,11 +9,6 @@ export const iconDefinition = (name) => {
 	return definition?.glyph ? definition : null;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_018_style_pipeline.mjs::test_frontend_icon_helpers_render_structured_material_symbols
- * @matrix frontend-icons : accessibility animation fill semantic-markup weight
- */
 export const setIcon = (element, name, classes = "") => {
 	const definition = iconDefinition(name);
 	if (!definition) {
@@ -47,11 +37,6 @@ export const setIcon = (element, name, classes = "") => {
 	return element;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_018_style_pipeline.mjs::test_frontend_icon_helpers_render_structured_material_symbols
- * @matrix frontend-icons : element-creation semantic-markup
- */
 export const createIcon = (name, classes = "") => {
 	return setIcon(document.createElement("span"), name, classes);
 };

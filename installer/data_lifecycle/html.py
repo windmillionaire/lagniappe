@@ -19,7 +19,6 @@ from .portable import portable_name, unportable_name
 from .provider import DataLifecycleError
 
 
-# @testable infrastructure
 class _Identity(TypedDict):
     type: str
     id: str
@@ -27,13 +26,11 @@ class _Identity(TypedDict):
     reserved_role: NotRequired[str]
 
 
-# @testable infrastructure
 class _Record(TypedDict):
     identity: _Identity
     properties: dict[str, object]
 
 
-# @testable infrastructure
 
 class BuildResult(TypedDict):
     pages: int
@@ -72,9 +69,6 @@ STYLE = """
 """.strip()
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_html_sanitizer_removes_active_and_remote_content
-# @matrix portable-archive : html-sanitization no-network
 def sanitize_stored_html(
     value: str,
     *,
@@ -121,9 +115,6 @@ def sanitize_stored_html(
     return str(soup)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/html.py::sanitize_stored_html
-# @reason URL classification and rewriting are sanitizer implementation details
 def _rewrite_reference_url(value, page_path, identities):
     if REMOTE_PATTERN.search(value) or value.casefold().startswith(("javascript:", "data:")):
         return None
@@ -144,9 +135,6 @@ def _rewrite_reference_url(value, page_path, identities):
     return posixpath.relpath(target, posixpath.dirname(page_path))
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_html_archive_renders_owner_sections_and_local_navigation
-# @matrix portable-archive : navigation offline-html owner-content
 class OfflineHTMLBuilder:
     """Render presentation pages using only already-portable records and assets."""
 

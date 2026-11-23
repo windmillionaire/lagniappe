@@ -70,9 +70,6 @@ PLAN_START_RATE_LIMIT = (100, 60 * 60)
 PLAN_TOOL_RATE_WINDOW = 31 * 24 * 60 * 60
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_uses_only_a_configured_request_origin
-# @matrix agent-api : discovery origin-validation proposal-contract
 def _api_origin():
     """Use the configured site origin, or the authenticated remote OAuth issuer."""
     if getattr(g, "remote_mcp_authenticated", False):
@@ -82,15 +79,11 @@ def _api_origin():
     return absolute_url("/").rstrip("/")
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::_api_origin
-# @reason URL joining is exercised across discovery, OpenAPI, plan, and contract links
 def _api_absolute_url(path):
     """Build an API-advertised URL from the selected configured origin."""
     return f"{_api_origin()}/{str(path or '/').lstrip('/')}"
 
 
-# @testable infrastructure
 class APIProblem(Exception):
     """Expected client-facing API failure."""
 
@@ -111,9 +104,6 @@ class APIProblem(Exception):
         self.retry_after = retry_after
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::authenticate_request
-# @reason request correlation is part of the public authentication envelope
 def _request_id():
     supplied = str(request.headers.get("X-Request-ID") or "").strip()
     if REQUEST_ID_PATTERN.fullmatch(supplied):
@@ -121,9 +111,6 @@ def _request_id():
     return uuid.uuid4().hex
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::authenticate_request
-# @reason stable errors are asserted through the public bearer boundary
 def _error(code, message, status, *, details=None, retry_after=None):
     payload = {
         "error": {
@@ -142,9 +129,6 @@ def _error(code, message, status, *, details=None, retry_after=None):
     return response
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::authenticate_request
-# @reason shared Redis limiter behavior is owned by the authenticated API boundary
 def _rate_limit(scope, identifier, limit, window_seconds):
     try:
         state = check_limit(scope, identifier, limit, window_seconds)
@@ -175,14 +159,6 @@ def _rate_limit(scope, identifier, limit, window_seconds):
     return state
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_external_api_authentication_and_header_contract
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_external_api_bounds_json_without_a_declared_content_length
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_token_api_envelope_and_browser_revocation
-# @matrix agent-api : site-policy bearer-only body-limit entitlement-independent error-envelope public-user request-correlation request-recheck session-independent streaming
-# @pairs agent-api:rate-limit
 @api.before_request
 def authenticate_request() -> ResponseReturnValue | None:
     """Authenticate only a bearer token; browser sessions are never a fallback."""
@@ -261,9 +237,6 @@ def authenticate_request() -> ResponseReturnValue | None:
 api_family.before_request(authenticate_request)
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_external_api_authentication_and_header_contract
-# @matrix agent-api : build-marker error-envelope no-store request-correlation
 @api.after_request
 def annotate_response(response: Response) -> Response:
     response.headers["X-Request-ID"] = getattr(
@@ -279,10 +252,6 @@ def annotate_response(response: Response) -> Response:
 api_family.after_request(annotate_response)
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_csrf_exempt_surfaces_reach_replacement_authentication_gates
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : error-envelope routing
 def handle_api_http_error(error: HTTPException) -> Response:
     """Render routing-level API failures with the normal JSON envelope."""
     g.NO_CACHE = True
@@ -304,9 +273,6 @@ def handle_api_http_error(error: HTTPException) -> Response:
     return annotate_response(response)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::authenticate_request
-# @reason expected problem rendering uses the same tested error envelope
 @api.errorhandler(APIProblem)
 def handle_api_problem(problem: APIProblem) -> ResponseReturnValue:
     return _error(
@@ -318,7 +284,6 @@ def handle_api_problem(problem: APIProblem) -> ResponseReturnValue:
     )
 
 
-# @testable infrastructure
 @api.errorhandler(Exception)
 def handle_unexpected_error(error: Exception) -> Response:
     if isinstance(error, HTTPException):
@@ -343,16 +308,9 @@ def handle_unexpected_error(error: Exception) -> Response:
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::create_plan
-# @covered-by lagniappe/web/routes/api/main.py::_api_origin
-# @reason domain-exception translation is exercised through public API routes
 def _route(handler):
     """Qualify record links and translate expected domain failures."""
 
-    # @testable false
-    # @covered-by lagniappe/web/routes/api/main.py::_route
-    # @reason generated decorator closure delegates to the route translator
     @wraps(handler)
     def wrapped(*args, **kwargs):
         try:
@@ -374,9 +332,6 @@ def _route(handler):
     return wrapped
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::create_plan
-# @reason request normalization is exercised through plan creation
 def _json_body():
     try:
         data = request.get_json(silent=True)
@@ -393,16 +348,10 @@ def _json_body():
     return data
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::execute_tool
-# @reason response normalization is exercised through tool dispatch
 def _json_safe(value):
     return json.loads(json.dumps(value, ensure_ascii=False, default=str))
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::_plan_payload
-# @reason file projection is part of the plan response contract
 def _file_payload(file):
     return {
         "ref": hash_reference(file),
@@ -417,9 +366,6 @@ def _file_payload(file):
 
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::get_plan
-# @reason plan projection is asserted through the public plan resource
 def _plan_payload(report, *, include_proposal=True):
     payload = {
         "id": report.urlsafe_key,
@@ -478,9 +424,6 @@ def _plan_payload(report, *, include_proposal=True):
     return _json_safe(payload)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/plans.py::submit_plan_request
-# @reason compact publication fields are asserted through the public submit resource
 def _submission_receipt(report):
     """Return a compact receipt without echoing the normalized proposal."""
     plan = _plan_payload(report, include_proposal=False)
@@ -501,18 +444,11 @@ def _submission_receipt(report):
     }
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_resources_hide_other_users_plans
-# @matrix agent-api : creator-bound entitlement-independent generic-not-found plan-isolation stale-plan
 def _load_plan(plan_id):
     return external_api.load_plan(plan_id, g.agent_api_user)
 
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::execute_tool
-# @reason availability is exercised through the public plan-scoped tool resource
 def _require_tools_available(report):
     if report.status == "draft":
         return
@@ -529,9 +465,6 @@ def _require_tools_available(report):
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::api_index
-# @reason shared URL assembly is exercised by both authenticated discovery resources
 def _discovery_payload():
     return {
         "name": "Lagniappe External Agent API",
@@ -551,9 +484,6 @@ def _discovery_payload():
     }
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : discovery bearer-only
 @api_family.get("/", strict_slashes=False)
 @_route
 def api_family_index() -> ResponseReturnValue:
@@ -566,9 +496,6 @@ def api_family_index() -> ResponseReturnValue:
     }
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : discovery bearer-only
 @api.get("/", strict_slashes=False)
 @_route
 def api_index() -> ResponseReturnValue:
@@ -576,9 +503,6 @@ def api_index() -> ResponseReturnValue:
     return _discovery_payload()
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : bootstrap bearer-only discovery
 @api.get("/client-skill.md")
 @_route
 def client_skill() -> ResponseReturnValue:
@@ -593,9 +517,6 @@ def client_skill() -> ResponseReturnValue:
     return response
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : contract
 @api.get("/openapi.json")
 @_route
 def openapi_document() -> ResponseReturnValue:
@@ -605,10 +526,6 @@ def openapi_document() -> ResponseReturnValue:
     )
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_types_are_available_without_provider_access
-# @matrix agent-api : bearer-only entitlement-independent plan-capability
 @api.get("/me")
 @_route
 def me() -> ResponseReturnValue:
@@ -633,9 +550,6 @@ def me() -> ResponseReturnValue:
     }
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : tool-catalog
 @api.get("/tools")
 @_route
 def tools() -> ResponseReturnValue:
@@ -678,20 +592,12 @@ def tools() -> ResponseReturnValue:
     }
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_plan_free_reads_and_answer_context_do_not_create_reports
-# @pair agent-api:answer-context
 @api.get("/answer-context")
 @_route
 def answer_context() -> ResponseReturnValue:
     return external_api.answer_context(g.agent_api_user)
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_types_are_available_without_provider_access
-# @matrix agent-api : entitlement-independent plan-session tool-selection
-# @pairs agent-api:rate-limit
 @api.post("/plans")
 @_route
 def create_plan() -> ResponseReturnValue:
@@ -827,9 +733,6 @@ def execute_plan(plan_id: str) -> ResponseReturnValue:
     }, 202
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @matrix agent-api : proposal-contract
 @api.get("/plans/<plan_id>/contract")
 @_route
 def get_plan_contract(plan_id: str) -> ResponseReturnValue:
@@ -867,13 +770,6 @@ def get_plan_contract(plan_id: str) -> ResponseReturnValue:
 
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_upload_batch_identity_rejects_a_same_metadata_last_writer
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_claimed_upload_routes_reload_before_storage_side_effects
-# @matrix agent-api mcp-upload : last-writer upload-batch-identity uploads
-# @pairs agent-api:authoritative-reload agent-api:concurrency agent-api:stale-snapshot
-# @pairs mcp-upload:authoritative-reload mcp-upload:concurrency mcp-upload:stale-snapshot
 @api.post("/plans/<plan_id>/uploads")
 @_route
 def create_uploads(plan_id: str) -> ResponseReturnValue:
@@ -885,12 +781,6 @@ def create_uploads(plan_id: str) -> ResponseReturnValue:
     ), 201
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_upload_batch_identity_rejects_a_same_metadata_last_writer
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_claimed_upload_routes_reload_before_storage_side_effects
-# @matrix agent-api mcp-upload : last-writer upload-batch-identity uploads
-# @matrix agent-api mcp-upload : authoritative-reload concurrency checkpoint resume stale-snapshot
 @api.post("/plans/<plan_id>/uploads/finalize")
 @_route
 def finalize_uploads(plan_id: str) -> ResponseReturnValue:
@@ -903,9 +793,6 @@ def finalize_uploads(plan_id: str) -> ResponseReturnValue:
     return _plan_payload(finalized)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::execute_tool
-# @reason signed original-file projection belongs to permission-bounded tool dispatch
 def _original_file_download(tool_name, arguments, result):
     if tool_name != "get_file" or not isinstance(arguments, dict):
         return result
@@ -956,13 +843,6 @@ def _original_file_download(tool_name, arguments, result):
     return result
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_types_are_available_without_provider_access
-# @matrix agent-api : tool-dispatch
-# @pair agent-api:answer-context
-# @pairs agent-api:ask-refinement agent-api:create-revision agent-api:organize-revision agent-api:envelope-validation
-# @pairs agent-api:rate-limit
 @api.post("/tools/<tool_name>", defaults={"plan_id": None})
 @api.post("/plans/<plan_id>/tools/<tool_name>")
 @_route
@@ -1053,12 +933,6 @@ def execute_tool(plan_id: str, tool_name: str) -> ResponseReturnValue:
         )
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_submission_is_serialized_with_upload_operations
-# @matrix agent-api : submission
-# @pairs agent-api:concurrency agent-api:plan-operation
-# @pairs mcp-upload:concurrency mcp-upload:plan-operation
 @api.post("/plans/<plan_id>/submit")
 @_route
 def submit_plan(plan_id: str) -> ResponseReturnValue:

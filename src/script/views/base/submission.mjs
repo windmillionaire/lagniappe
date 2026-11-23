@@ -5,14 +5,6 @@ import { withTransition } from "../../shared/transitions.mjs";
 /**
  * Coordinates the view-scoped form submission lifecycle.
  *
- * @testable true
- * @tests tests_js/test_015_core_submit_frontend.mjs::test_submit_abandons_stale_widget_after_async_prepare
- * @tests tests_js/test_015_core_submit_frontend.mjs::test_submit_does_not_show_upload_error_after_stale_prepare
- * @tests tests_js/test_015_core_submit_frontend.mjs::test_submit_stops_before_appending_when_form_data_is_missing
- * @tests tests_js/test_015_core_submit_frontend.mjs::test_submit_uses_explicit_action_route_over_active_widget_route
- * @tests tests_js/test_015_core_submit_frontend.mjs::test_conflict_review_failure_settles_update_button
- * @matrix submit : active-widget direct-upload-error direct-upload-navigation missing-form-data route-override stale-widget update-feedback
- * @matrix edited-entity-notice : structured-conflict
  */
 export class SubmissionManager {
 	constructor(view) {
@@ -322,13 +314,6 @@ export class SubmissionManager {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
-	 * @tests tests_js/test_015_core_submit_frontend.mjs::test_deferred_background_create_does_not_decorate_source_form
-	 * @matrix deferred-jobs submit : background deferred-create destination-row
-	 * @pair deferred-jobs:hosted-e2e
-	 */
 	async _deferredCreated(response, component) {
 		const [operations, notifications] = await Promise.all([
 			this.view.ensureDeferredOperations?.(),
@@ -362,14 +347,6 @@ export class SubmissionManager {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-	 * @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
-	 * @matrix deferred-jobs : form-schema refresh
-	 * @matrix notifications tasks : autofill deferred
-	 * @matrix pages : autofill deferred form-schema refresh
-	 */
 	async _deferredUpdated(response, component) {
 		if (response.scope === "form-autofill" && !response.already_running) {
 			const subform = component.active?.form?._subForm;

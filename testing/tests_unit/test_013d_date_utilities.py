@@ -9,7 +9,6 @@ from lagniappe.core.tools import dates as generic_dates
 from lagniappe.core.tools.tasks import scheduling as dates
 
 
-# @matrix task-scheduling : recurring periodic interval-semantics
 @pytest.mark.unit
 def test_calculate_next_recurring_due_date_preserves_interval_semantics():
     """Fixed intervals keep relativedelta clamping and datetime precision."""
@@ -25,7 +24,6 @@ def test_calculate_next_recurring_due_date_preserves_interval_semantics():
     ) == datetime(2025, 2, 28, 9, 30, 45, 123456, tzinfo=tz)
 
 
-# @matrix task-scheduling : scheduled exact-boundary timezone
 @pytest.mark.unit
 def test_calculate_next_scheduled_due_date():
     """Calendar rules are strict and preserve mode-specific wall-clock behavior."""
@@ -60,7 +58,6 @@ def test_calculate_next_scheduled_due_date():
         ) == datetime(2028, 2, 29, tzinfo=tz)
 
 
-# @matrix task-scheduling : scheduled calendar-validation
 @pytest.mark.unit
 def test_calculate_next_scheduled_due_date_rejects_invalid_rules():
     """Malformed and impossible stored calendar rules do not create recurrences."""
@@ -112,7 +109,6 @@ def test_calculate_next_scheduled_due_date_rejects_invalid_rules():
         assert dates.calculate_next_scheduled_due_date(due_date, rule) is None
 
 
-# @pair dates:ordinal-weekday
 @pytest.mark.unit
 def test_find_ordinal_weekday_in_month():
     """Test finding nth weekday or last weekday in a month."""
@@ -136,7 +132,6 @@ def test_find_ordinal_weekday_in_month():
     assert dates.find_ordinal_weekday_in_month(month_start, 5, 1) is None
 
 
-# @pair dates:monthly-occurrence
 @pytest.mark.unit
 def test_calculate_next_monthly_occurrence():
     """Test monthly occurrence calculation with various modes."""
@@ -194,7 +189,6 @@ def test_calculate_next_monthly_occurrence():
     )
 
 
-# @pair dates:yearly-occurrence
 @pytest.mark.unit
 def test_calculate_next_yearly_occurrence():
     """Test yearly occurrence calculation."""
@@ -241,7 +235,6 @@ def test_calculate_next_yearly_occurrence():
         assert dates.calculate_next_yearly_occurrence(due_date, sched) is None
 
 
-# @pair dates:postponement
 @pytest.mark.unit
 def test_calculate_postponed_due_date():
     """Test postponement calculation relative to mocked today."""
@@ -301,7 +294,6 @@ def test_calculate_postponed_due_date():
             ) == mock_now + timedelta(days=5 + offset)
 
 
-# @matrix template-formatting : blank-value date input-value string-passthrough
 @pytest.mark.unit
 def test_format_date_as_input_string():
     assert generic_dates.format_date_as_input_string(None) == ""

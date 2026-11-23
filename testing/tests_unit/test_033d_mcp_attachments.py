@@ -38,7 +38,6 @@ class Chunks(httpx.AsyncByteStream):
             yield b"x" * min(65536, self.size - offset)
 
 
-# @matrix mcp-upload : remote ssrf dns-pinning
 def test_attachment_urls_reject_unsafe_addresses_and_pin_dns(monkeypatch):
     async def scenario():
         await _public_dns(monkeypatch)
@@ -71,7 +70,6 @@ def test_attachment_urls_reject_unsafe_addresses_and_pin_dns(monkeypatch):
     asyncio.run(scenario())
 
 
-# @matrix mcp-upload : remote filename mime
 def test_attachment_names_and_mime_hints_do_not_select_paths():
     assert files.attachment_name({"file_name": "../../etc/passwd"}, 0, "") == "passwd"
     assert (
@@ -92,7 +90,6 @@ def test_attachment_names_and_mime_hints_do_not_select_paths():
     )
 
 
-# @matrix mcp-upload : remote streaming bounds redirects privacy
 def test_attachment_download_counts_actual_bytes_and_cleans_partial_files(
     monkeypatch, tmp_path
 ):
@@ -161,7 +158,6 @@ def test_attachment_download_counts_actual_bytes_and_cleans_partial_files(
     asyncio.run(scenario())
 
 
-# @matrix mcp-upload : remote ssrf redirects privacy
 def test_redirect_destinations_are_revalidated_before_connecting(monkeypatch, tmp_path):
     async def scenario():
         resolutions, requests = [], []
@@ -201,7 +197,6 @@ def test_redirect_destinations_are_revalidated_before_connecting(monkeypatch, tm
     asyncio.run(scenario())
 
 
-# @matrix mcp-upload : remote cancellation cleanup bounds
 def test_partial_downloads_clean_the_entire_spool_when_transfer_fails(monkeypatch):
     async def scenario():
         await _public_dns(monkeypatch)
@@ -252,7 +247,6 @@ def test_partial_downloads_clean_the_entire_spool_when_transfer_fails(monkeypatc
     asyncio.run(scenario())
 
 
-# @matrix mcp-upload : remote streaming bounds redirects privacy
 def test_attachment_redirects_and_expiry_never_forward_credentials(
     monkeypatch, tmp_path
 ):
@@ -292,7 +286,6 @@ def test_attachment_redirects_and_expiry_never_forward_credentials(
     asyncio.run(scenario())
 
 
-# @matrix mcp-upload : remote cancellation cleanup bounds duplicate
 def test_spooling_has_one_total_limit_and_cleans_on_cancellation(monkeypatch):
     async def scenario():
         locations, caps = [], []

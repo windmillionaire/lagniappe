@@ -71,9 +71,6 @@ GET_FORM_INSTANCES = types.FunctionDeclaration(
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_form_instances_filters_permissions_status_and_truncates
-# @matrix ai form-schema : form-instances permissions status submission truncation
 def execute_get_form_instances(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     """Return viewable page/task instances attached to a form."""
     identifier = args.get("id")
@@ -124,9 +121,6 @@ def execute_get_form_instances(args: Mapping[str, object], user: User) -> Mappin
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_form_instances.py::execute_get_form_instances
-# @reason argument normalization is covered through the public tool handler
 def _instance_kinds(value):
     if value is None:
         return set(ALLOWED_KINDS), []
@@ -149,9 +143,6 @@ def _instance_kinds(value):
     return kinds or set(ALLOWED_KINDS), invalid
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_form_instances.py::execute_get_form_instances
-# @reason argument normalization is covered through the public tool handler
 def _task_status(value):
     if value is None:
         return None, None
@@ -163,9 +154,6 @@ def _task_status(value):
     return TASK_STATUS_ALIASES[normalized], None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_form_instances.py::execute_get_form_instances
-# @reason result limiting is covered through the public tool handler
 def _limit(value):
     try:
         limit = int(value)
@@ -174,9 +162,6 @@ def _limit(value):
     return max(1, min(limit, MAX_LIMIT))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_form_instances.py::execute_get_form_instances
-# @reason permission and status filters are covered through the public tool handler
 def _include_instance(entity, user, kinds, task_completed):
     if isinstance(entity, Entities.PAGE):
         return "page" in kinds and entity.allowed(Action.VIEW, user=user)
@@ -187,9 +172,6 @@ def _include_instance(entity, user, kinds, task_completed):
     return False
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_form_instances.py::execute_get_form_instances
-# @reason result projection is covered through the public tool handler
 def _entity_result(entity):
     return {
         "hash": hash_reference(entity),
@@ -198,9 +180,6 @@ def _entity_result(entity):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_form_instances.py::execute_get_form_instances
-# @reason result projection is covered through the public tool handler
 def _instance_result(entity, user):
     result = {
         **_entity_result(entity),

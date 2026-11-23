@@ -54,9 +54,6 @@ class SchemaAction(TypedDict):
     data: dict[str, object]
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_start_stages_intent_without_enumerating_submissions
-# @matrix form-migration : save no-submission-read durable-intent
 def start_change(
     form: Form,
     draft: Mapping[str, object],
@@ -186,9 +183,6 @@ def start_change(
     return change_response(current, actor)
 
 
-# @testable true
-# @tests tests_unit/test_004l_form_schema_updates.py::test_conversion_failure_status_names_columns_and_checks_target_visibility
-# @matrix form-migration : status recovery permissions
 def change_response(form: Form, actor: User | None = None) -> FormPublication:
     from . import drafts
 
@@ -230,9 +224,6 @@ def change_response(form: Form, actor: User | None = None) -> FormPublication:
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/changes.py::change_response
-# @reason status messages and permission-checked failure links are exercised through the browser response
 def _conversion_failure_status(
     change: PendingFormChange, job: DeferredJob | None, form: Form, actor: User | None
 ) -> tuple[str | None, dict[str, object] | None]:
@@ -285,9 +276,6 @@ def _conversion_failure_status(
     return message, failed_entity
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/changes.py::apply_target
-# @reason each batch reloads its durable Form owner and validates the executing actor
 def owned_change(context: DeferredJobContext) -> tuple[Form, PendingFormChange]:
     context.ensure_active()
     from ..deferred_jobs.context import required_input
@@ -308,10 +296,6 @@ def owned_change(context: DeferredJobContext) -> tuple[Form, PendingFormChange]:
     return form, change
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_prepare_target_preserves_completion_and_original_answers
-# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_deleted_migrated_form_retains_completed_submissions_and_history
-# @matrix form-migration : completed-task legacy-generation notice masked-write
 def prepare_target(
     entity: Page | Task,
     change: PendingFormChange,
@@ -354,12 +338,6 @@ def prepare_target(
     return type(entity)(cast("DatastoreEntity", row))
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_apply_is_guarded_idempotent_and_retries_effects
-# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_form_editor_migrates_restricted_submissions
-# @matrix form-migration : duplicate-delivery guarded-write effects-retry
-# @matrix form-migration : partial-read generation removed-link
-# @matrix form-migration : form-authority restricted-submissions
 def apply_target(
     context: DeferredJobContext,
     raw: DatastoreEntity,
@@ -446,12 +424,6 @@ def apply_target(
         )
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_mutation_guard_blocks_locked_and_stale_answer_writes
-# @tests tests_unit/test_004k_form_changes.py::test_new_attachments_adopt_current_generation_without_accepting_stale_answers
-# @tests tests_unit/test_004k_form_changes.py::test_pending_change_fences_conflicting_writes
-# @matrix form-migration : writer-fence stale-generation completion-race creation reassignment
-# @matrix form-migration : pending-delete masked-write attachment
 def mutation_guards(
     writes: Sequence[MutationEffect], deletes: Collection[MutationEffect]
 ) -> list[tuple[Key, Mapping[str, object] | None]]:
@@ -545,10 +517,6 @@ def mutation_guards(
     return guards
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_recovery_retains_partial_changes_and_cancels_only_before_apply
-# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_failed_preflight_recovers_after_reload
-# @matrix form-migration : retry cancellation ownership
 def recover_change(form: Form, actor: User, action: str) -> FormPublication:
     from ..deferred_jobs.service import DeferredJobs
     from ...properties.deferred_job_lifecycle import ACTIVE_STATUSES
@@ -616,9 +584,6 @@ def recover_change(form: Form, actor: User, action: str) -> FormPublication:
     return change_response(resumed, actor)
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_notice_shows_only_changed_fields_and_cells
-# @matrix form-migration : informational-notice changed-cells
 def notice_projection(entity: Page | Task | TaskHistory) -> list[dict[str, object]]:
     """A read-only display of changed values; no restore choices or writes."""
     from .. import dates
@@ -629,7 +594,6 @@ def notice_projection(entity: Page | Task | TaskHistory) -> list[dict[str, objec
     result = []
     zone = str(dates.user_timezone())
 
-    # @testable infrastructure
     def display(value, field):
         if value is None:
             return "Not provided"
@@ -638,7 +602,6 @@ def notice_projection(entity: Page | Task | TaskHistory) -> list[dict[str, objec
         except (ValueError, TypeError, KeyError):
             return json.dumps(value, ensure_ascii=False)
 
-    # @testable infrastructure
     def changed(label, before, after, source, target, reason):
         if json.dumps(before, sort_keys=True) != json.dumps(after, sort_keys=True):
             if target is None:

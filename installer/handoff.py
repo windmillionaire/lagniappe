@@ -22,13 +22,11 @@ if TYPE_CHECKING:
     from google.cloud.resourcemanager_v3 import ProjectsClient
     from google.cloud.storage import Bucket
 
-# @testable infrastructure
 class HandoffContext(TypedDict):
     projects: ProjectsClient
     service_accounts: IAMClient
     buckets: Mapping[str, Bucket]
 
-# @testable infrastructure
 class _Deploy(Protocol):
     def __call__(self, *, print_final_summary: bool) -> None: ...
 
@@ -36,9 +34,6 @@ class _Deploy(Protocol):
 OWNER_ROLE = "roles/owner"
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_handoff_operator_preparation_accepts_installer_or_owner
-# @matrix handoff : active-account adc gcloud installer operator owner preconditions
 def prepare_handoff_operator() -> str:
     """Activate the saved project as either permitted handoff operator."""
     from config import SETTINGS
@@ -82,9 +77,6 @@ def prepare_handoff_operator() -> str:
     return active_email
 
 
-# @testable false
-# @covered-by installer/handoff.py::handoff
-# @reason provider client composition is exercised through the injected transaction contract
 def _cloud_context(project_id: str, bucket_names: Sequence[str]) -> HandoffContext:
     install_if_missing(
         "google.cloud.resourcemanager_v3",
@@ -113,9 +105,6 @@ def _cloud_context(project_id: str, bucket_names: Sequence[str]) -> HandoffConte
     }
 
 
-# @testable false
-# @covered-by installer/handoff.py::handoff
-# @reason provider policy fetch shape is owned by the handoff transaction
 def _project_policy(client, project_id):
     return client.get_iam_policy(
         request={
@@ -125,9 +114,6 @@ def _project_policy(client, project_id):
     )
 
 
-# @testable false
-# @covered-by installer/handoff.py::handoff
-# @reason provider policy fetch shape is owned by the handoff transaction
 def _service_account_policy(client, project_id, runtime_email):
     resource = f"projects/{project_id}/serviceAccounts/{runtime_email}"
     policy = client.get_iam_policy(
@@ -139,9 +125,6 @@ def _service_account_policy(client, project_id, runtime_email):
     return resource, policy
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent
-# @matrix handoff : bucket idempotence owner-add service-account verification
 def _grant_owner_resource_access(context, project_id, runtime_email, owner_email):
     from google.iam.v1 import policy_pb2
 
@@ -195,9 +178,6 @@ def _grant_owner_resource_access(context, project_id, runtime_email, owner_email
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent
-# @matrix handoff : bucket installer-removal service-account unrelated-members verification
 def _remove_installer_resource_access(
     context, project_id, runtime_email, installer_email
 ):
@@ -226,9 +206,6 @@ def _remove_installer_resource_access(
         raise RuntimeError("Installer still has direct IAM on the runtime service account.")
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent
-# @matrix handoff : all-bindings final-mutation owner-lockout project-role verification
 def _remove_installer_project_access(
     context, project_id, installer_email, owner_email
 ):
@@ -252,10 +229,6 @@ def _remove_installer_project_access(
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_rejects_owner_lockout_and_default_no_confirmation
-# @matrix handoff : cleanup confirmation default-no deploy idempotence no-mutation ordering owner-lockout preconditions preview resumable settings
 def handoff(
     *,
     context: HandoffContext | None = None,

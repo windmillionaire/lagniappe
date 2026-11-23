@@ -2,11 +2,6 @@ import { FormController } from "../../../forms/controller.mjs";
 import { buttons } from "../../buttons.mjs";
 import { primitives } from "../../primitives.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_youtube
- * @pair editor:youtube-embed
- */
 class AddYouTube {
 	constructor(toolbar) {
 		this.toolbar = toolbar;

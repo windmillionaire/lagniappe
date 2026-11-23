@@ -10,7 +10,6 @@ from testing.resources.site import FormIndex
 pytestmark = pytest.mark.e2e
 
 
-# @matrix table-controls : mobile-controls mobile-tools mutual-exclusion
 # @template forms/index.html::view_header
 # @template table.html::mobile_toggles
 def test_form_index_mobile_tools_and_column_controls_are_exclusive(get_admin, get_user):

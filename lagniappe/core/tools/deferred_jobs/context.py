@@ -25,7 +25,6 @@ from .common import _json_copy
 from .errors import DeferredJobClaimLostError
 
 
-# @testable infrastructure
 @dataclass
 class DeferredJobContext:
     job: DeferredJob
@@ -38,7 +37,6 @@ class DeferredJobContext:
     execution_control: DeferredExecutionControl | None = None
     checkpoint_callback: Callable[..., None] | None = None
 
-    # @testable infrastructure
     @overload
     def input(self, name: Literal["file"], default: None = None) -> File | None: ...
     @overload
@@ -52,7 +50,6 @@ class DeferredJobContext:
     def input(self, name: str, default: Entity | None = None) -> Entity | None:
         return self.inputs.get(name, default)
 
-    # @testable infrastructure
     def ensure_active(self) -> None:
         """Stop domain writes after cancellation or lease replacement."""
         if self.execution_control is not None:
@@ -61,15 +58,11 @@ class DeferredJobContext:
         if self.active_check is not None and not self.active_check():
             raise DeferredJobClaimLostError("Deferred job was cancelled or superseded.")
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
     def set_phase(self, phase: str | DeferredJobPhase, **details: object) -> None:
         """Persist a bounded user-visible phase for this claimed job."""
         if self.execution_control is not None:
             self.execution_control.set_phase(phase, **details)
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
     def checkpoint_stage(self, stage: str | DeferredJobPhase, payload: Mapping[str, object] | None = None, **progress: object) -> dict[str, object]:
         """Persist a resumable adapter-owned preparation checkpoint."""
         self.ensure_active()

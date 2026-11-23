@@ -33,9 +33,6 @@ def verify_python_version() -> None:
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
-# @matrix setup : portability prerequisites python-version virtualenv
 def verify_setup_runtime() -> None:
     """Require supported Python from this checkout's project virtualenv."""
     from installer.errors import SetupError
@@ -47,9 +44,6 @@ def verify_setup_runtime() -> None:
         raise SetupError("Setup must run from this checkout's project virtualenv.")
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_config_status_save_and_gcloud_login_helpers
-# @pair setup:config-files
 def config_file_status() -> dict[str, bool]:
     from config import File
 
@@ -59,10 +53,6 @@ def config_file_status() -> dict[str, bool]:
     return {file.name: file.exists() for file in required}
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_formatter_tracks_active_spinners
-# @tests tests_tooling/test_001k_setup_console.py::test_formatter_preserves_plain_and_colored_output
-# @matrix setup : package-install spinner
 class Formatter:
     """Bootstrap Rich once; formatting itself never changes dependencies."""
 

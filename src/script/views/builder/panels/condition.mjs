@@ -1,8 +1,5 @@
 import { withTransition } from "../../../shared/transitions.mjs";
 
-/**
- * @testable infrastructure
- */
 export class ConditionPanel {
 	constructor(builder) {
 		this.builder = builder;

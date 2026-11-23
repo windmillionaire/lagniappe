@@ -102,8 +102,6 @@ def _open_history_visibility(history):
     return controller
 
 
-# @matrix tasks task-completion : history generation readonly
-# @matrix task-completion : original-view archive uncomplete
 # @template tasks/history.html::completion_history
 # @template pages/tasks.html::task_form
 def test_completion_views_follow_generation_and_archive_original_answers(get_admin, get_user):
@@ -416,7 +414,6 @@ def _open_combine_form(user, task):
     return combine_form
 
 
-# @matrix tasks : attachments completion-cycle description history name
 # @template cell.html::cell
 # @template tasks/history.html::completion_history
 # @template pages/tasks.html::task_history
@@ -488,7 +485,6 @@ def test_task_history_appears_after_completion_cycle(get_admin, get_user):
     expect(attachment_link).to_have_attribute("href", re.compile(r"/files/.+"))
 
 
-# @matrix tasks : active-widget complete history-refresh uncomplete
 # @template pages/tasks.html::task
 def test_uncomplete_from_loaded_task_history_closes_task(get_admin, get_user):
     user = get_admin()
@@ -530,7 +526,6 @@ def test_uncomplete_from_loaded_task_history_closes_task(get_admin, get_user):
     expect(refreshed_history.locator("tbody tr[lp-entity]")).to_have_count(2)
 
 
-# @matrix tasks : active-widget history-refresh uncomplete
 # @template pages/tasks.html::task_form
 # @template pages/tasks.html::task_history
 def test_reopening_discards_inactive_history_until_next_click(get_admin, get_user):
@@ -588,7 +583,6 @@ def test_reopening_discards_inactive_history_until_next_click(get_admin, get_use
         user.page.remove_listener("request", track_history)
 
 
-# @matrix tasks : active-widget complete uncomplete update-state
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
 def test_completion_waits_for_acceptance_and_moves_closed_task(get_admin, get_user, browser_failures):
@@ -657,8 +651,6 @@ def test_completion_waits_for_acceptance_and_moves_closed_task(get_admin, get_us
                 expect(task.task_form).to_contain_text("Keep this answer")
 
 
-# @matrix table-controls : column-visibility persistence
-# @matrix tasks : history reload
 # @template pages/tasks.html::task_tab
 def test_task_history_visibility_persists_after_reload(get_admin, get_user):
     user = get_admin()
@@ -694,9 +686,6 @@ def test_task_history_visibility_persists_after_reload(get_admin, get_user):
         ).to_be_checked()
 
 
-# @matrix tasks : history-fill latest-submission live-update
-# @matrix task-completion : field-reset uncomplete
-# @source lagniappe/core/entities/task.py::Task.uncomplete
 # @template pages/tasks.html::task_form
 def test_task_form_field_fills_from_latest_history(get_admin, get_user):
     """History restores this submission only; the next cycle starts empty."""
@@ -784,7 +773,6 @@ def test_task_form_field_fills_from_latest_history(get_admin, get_user):
     expect(history.locator("tbody tr[lp-entity]")).to_have_count(2)
 
 
-# @matrix tasks : history-fill latest-submission incompatible-value
 # @template pages/tasks.html::task_form
 def test_history_fill_converts_selected_fields_and_reports_invalid_values(get_admin, get_user, browser_failures):
     user = get_admin()
@@ -853,7 +841,6 @@ def test_history_fill_converts_selected_fields_and_reports_invalid_values(get_ad
     expect(history.locator("td[data-column='invalid']")).to_have_text("not a number")
 
 
-# @matrix tasks : element-matrix history-fill latest-submission live-update
 # @template pages/tasks.html::task_form
 def test_task_history_fill_controls_cover_submission_elements(get_admin, get_user):
     user = get_admin()
@@ -1036,7 +1023,6 @@ def test_task_history_fill_controls_cover_submission_elements(get_admin, get_use
         Entities.delete(form)
 
 
-# @pair embedded-table:table-cell-expand
 # @template cell.html::table_cell
 # @template controls.html::expand
 # @template tasks/history.html::completion_history
@@ -1069,8 +1055,6 @@ def test_task_history_expands_table_submission_cell(get_admin, get_user):
     expect(embedded).to_contain_text("History row")
 
 
-# @matrix task-combine : checkbox-form compatible lazy-form lazy-reload linked-page no-model same-model same-page view-page
-# @pair web-headers:no-store
 # @template pages/tasks.html::combine_form
 def test_combine_task_form_filters_compatible_tasks(get_admin, get_user):
     user = get_admin()
@@ -1146,11 +1130,9 @@ def test_combine_task_form_filters_compatible_tasks(get_admin, get_user):
         combine_form.get_by_role("checkbox", name=no_model_peer.entity.name)
     ).to_have_count(0)
 
-# @matrix task-combine : attachments checkbox-submit completed-on current-snapshot delete delta existing-history isolated-form migrate-history no-reload ordering remove upsert winner
 # @template pages/tasks.html::combine_form
 # @template pages/tasks.html::task
 # @template tasks/history.html::completion_history
-# @matrix tasks : delta concurrent-create
 def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_admin, get_user):
     user = get_admin()
     fixture = Tasks.test_history_form_task.get(user)

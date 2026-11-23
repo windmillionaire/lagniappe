@@ -5,11 +5,6 @@ import { createMenuButton } from "./dropdowns.mjs";
 
 const DEFAULT_USER_COLOR = "rgba(22, 163, 74, 0.6)";
 
-/**
- * @testable false
- * @covered-by src/script/elements/editor/users.mjs::UserManager
- * @reason user dropdown row rendering is private user-manager plumbing
- */
 const _userItem = (item) => {
 	const itemElt = document.createElement("div");
 	itemElt.role = "option";
@@ -28,9 +23,6 @@ const _userItem = (item) => {
 	return { html: itemElt.outerHTML };
 };
 
-/**
- * @testable infrastructure
- */
 export class UserManager {
 	constructor(toolbar) {
 		this.toolbar = toolbar;

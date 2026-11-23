@@ -35,16 +35,10 @@ from .definitions import (
 from .validation import submission_validation_errors, validate_external_proposal
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/plans.py::create_plan
-# @reason timestamp helper is exercised through draft creation and submission
 def _utcnow():
     return datetime.now(UTC)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/plans.py::create_plan
-# @reason title normalization is part of the public draft-creation contract
 def _plan_name(instructions, requested=None):
     requested = " ".join(str(requested or "").split())
     if requested:
@@ -53,10 +47,6 @@ def _plan_name(instructions, requested=None):
     return f"AI: {text[:80]}{'...' if len(text) > 80 else ''}" if text else "AI plan"
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
-# @matrix agent-api ai-report : draft report-session
-# @pair agent-api:entitlement-independent
 def create_plan(
     user: User,
     *,
@@ -110,13 +100,6 @@ def create_plan(
     return report
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_proposal_submission_is_idempotent_and_provider_free
-# @tests tests_unit/test_032_agent_api.py::test_external_ask_submission_completes_without_files_or_execution
-# @tests tests_unit/test_032_agent_api.py::test_external_create_submission_renders_markdown_without_files
-# @matrix agent-api ai-report : idempotency proposal-publication ready-state remote-update
-# @pairs agent-api:ask agent-api:create ai-report:answer-only agent-api:answer-only
-# @pairs agent-api:ask-revision agent-api:create-revision agent-api:organize-revision
 def submit_plan(
     report: AIReport,
     user: User,
@@ -227,18 +210,11 @@ def submit_plan(
     return report
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_resources_hide_other_users_plans
-# @matrix agent-api : creator-bound entitlement-independent generic-not-found plan-isolation stale-plan
 def load_plan(plan_id: Identifier, user: User) -> AIReport:
     report = Entities.fetch_one(plan_id, request=Fetch.direct())
     return require_plan_access(report, user)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/plans.py::load_plan
-# @reason loaded and supplied reports have the same creator/origin/availability boundary
 def require_plan_access(report: Entity | None, user: User) -> AIReport:
     actor = user
     owner_key = getattr(report.properties.user, "key", None) if report else None
@@ -253,9 +229,6 @@ def require_plan_access(report: Entity | None, user: User) -> AIReport:
     return report
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::execute_tool
-# @reason draft-state gating is exercised through plan-scoped operations
 def require_draft(report: AIReport) -> None:
     if report.status != "draft":
         raise ExternalPlanError(
@@ -264,9 +237,6 @@ def require_draft(report: AIReport) -> None:
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/plans.py::submit_plan_request
-# @reason both the transport precheck and claimed submission use this state gate
 def require_submission_available(report: AIReport) -> str:
     reusable_status = "complete" if report.output_kind == "answer" else "ready"
     if report.status not in {"draft", reusable_status}:
@@ -276,12 +246,6 @@ def require_submission_available(report: AIReport) -> str:
     return reusable_status
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_submission_is_serialized_with_upload_operations
-# @matrix agent-api : submission
-# @pairs agent-api:concurrency agent-api:plan-operation
-# @pairs mcp-upload:concurrency mcp-upload:plan-operation
 def submit_plan_request(report: AIReport, user: User, data: dict[str, object], *, request_id: str | None) -> AIReport:
     require_plan_access(report, user)
     plan_id = report.urlsafe_key

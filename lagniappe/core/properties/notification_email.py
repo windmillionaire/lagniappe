@@ -14,9 +14,6 @@ if TYPE_CHECKING:
 DELIVERY_SCHEMA_VERSION = 1
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason exact delivery construction is exercised through capture and delivery
 def initial_values(user: models.User, *, record_type: str, mode: NotificationEmailMode, due_at: datetime, preference_epoch: int, now: datetime) -> dict[str, object]:
     return {
         "type": "notification_email_delivery",
@@ -32,9 +29,6 @@ def initial_values(user: models.User, *, record_type: str, mode: NotificationEma
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason compact terminal schema is exercised through delivery completion
 def terminal_values(row: Mapping[str, object], state: str, now: datetime) -> dict[str, object]:
     values = {
         "type": "notification_email_delivery",

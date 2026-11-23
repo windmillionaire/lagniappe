@@ -20,7 +20,6 @@ from testing.utility.user_cache import acknowledge_user_cache_invalidation
 pytestmark = pytest.mark.e2e
 
 
-# @matrix search permissions : source-clauses pagination restricted-access
 def test_redis_search_matches_each_restriction_source_before_pagination():
     from lagniappe.core.tools.auth.restrictions import restriction_fields
     from lagniappe.core.tools.cache import query
@@ -101,7 +100,6 @@ def test_redis_search_matches_each_restriction_source_before_pagination():
             pipe.execute()
 
 
-# @matrix cache : invalidation no-store etag conditional-response
 # Both routes include a site-wide revision in their ETag; unrelated writes must
 # not change it while this story verifies the acknowledgement preserves it.
 @pytest.mark.e2e_serial
@@ -193,8 +191,6 @@ def test_invalidation_is_not_replayed_by_browser_http_cache(
             assert_same_etag(clean["etag"], pending["etag"])
 
 
-# @matrix cache user : invalidation acknowledgement concurrency property-mask
-# @pair cache:invalidation-acknowledgement
 def test_cache_acknowledgement_preserves_newer_permissions(get_admin, setup_test_server):
     owner = get_admin()
     user = User(user=owner, definition=UserDefinition(
@@ -255,8 +251,6 @@ def test_cache_acknowledgement_preserves_newer_permissions(get_admin, setup_test
         user.entity.save()
 
 
-# @matrix search : permissions
-# @pair cache:invalidation-acknowledgement
 def test_search_matches_explicit_denial_and_administrator_content_access(get_admin, get_user):
     owner = get_admin()
     suffix = uuid4().hex

@@ -87,9 +87,6 @@ EMPTY_TEXT_RETRY_ATTEMPTS = 2
 DEFERRED_AI_RETRY_ATTEMPTS = 2
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/provider_policy.py::is_provider_quota_error
-# @reason wrapper message is exercised through provider quota tests
 def _raise_provider_error(error: Exception) -> Never:
     if is_provider_quota_error(error):
         details = provider_error_details(error)
@@ -108,24 +105,14 @@ def _raise_provider_error(error: Exception) -> Never:
     raise error
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_image
-# @reason private model-routing branch for image provider selection
 def _is_imagen_model(model: str) -> bool:
     return str(model or "").startswith("imagen-")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/core.py::GenAI._generate_imagen_image
-# @reason private prompt adapter for Imagen's text-only request shape
 def _image_prompt_text(prompt: Prompt) -> str:
     return "\n\n".join(part for part in (prompt.intro, prompt.build()) if part)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/core.py::GenAI._extract_text
-# @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_image
-# @reason provider enum normalization is asserted through text and image extraction
 def _finish_reason_name(reason: object) -> str | None:
     """Normalize SDK enum and string finish reasons to their provider value."""
     if reason is None:
@@ -134,9 +121,6 @@ def _finish_reason_name(reason: object) -> str | None:
     return str(value).rsplit(".", 1)[-1].upper()
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
-# @matrix ai : citations cleanup
 def clean_json_references(obj: ModelValue) -> ModelValue:
     """Recursively remove numeric reference citations from JSON strings."""
     if isinstance(obj, dict):
@@ -148,9 +132,6 @@ def clean_json_references(obj: ModelValue) -> ModelValue:
     return obj
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
-# @matrix ai : cleanup json-extraction
 def extract_first_json_value(response_text: str) -> str | None:
     """Return the first balanced JSON object or array from model output."""
     start = next(
@@ -187,7 +168,6 @@ def extract_first_json_value(response_text: str) -> str | None:
     return None
 
 
-# @testable infrastructure
 class GenAI:
     """Singleton wrapper around the Google GenAI client for Vertex AI."""
 
@@ -200,7 +180,6 @@ class GenAI:
         assert self._client is not None
         return self._client
 
-    # @testable infrastructure
     @classmethod
     def initialize(cls) -> None:
         """Initialize the GenAI client if not already connected."""
@@ -215,9 +194,6 @@ class GenAI:
             credentials=CONFIG.google_credentials,
         )
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
-    # @matrix ai : citations cleanup
     @staticmethod
     def cleanup(response_text: str, output_format: str | None) -> ModelValue:
         """Strip code fences and numeric reference citations from model output.
@@ -250,11 +226,6 @@ class GenAI:
             result = REFERENCE_REGEX.sub(r"", response_text)
         return result
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_config_combines_search_tools_json_and_thinking_settings
-    # @tests tests_unit/test_015_ai_tools.py::test_deferred_ai_config_uses_short_sdk_retry_profile
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_model_tier_routes_generation_to_primary_or_utility_model
-    # @matrix ai : config output-format retry-config retry-ownership search service-tier thinking tools
     @staticmethod
     def create_config(prompt: Prompt, **overrides: object) -> types.GenerateContentConfig:
         """Build a GenerateContentConfig from a Prompt's settings."""
@@ -315,10 +286,6 @@ class GenAI:
         config.update(overrides)
         return types.GenerateContentConfig.model_validate(config)
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_model_tier_routes_generation_to_primary_or_utility_model
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_json_generation_pins_runtime_model_through_structured_final_pass
-    # @matrix ai : model-routing request-pinning runtime-settings
     @staticmethod
     def _model_for_prompt(prompt: Prompt, settings: RuntimeAISettings | None = None) -> str:
         """Choose the configured text model for a prompt's requested tier."""
@@ -327,9 +294,6 @@ class GenAI:
             return settings["AI_UTILITY_MODEL"]
         return settings["AI_MODEL"]
 
-    # @testable true
-    # @tests tests_unit/test_015b_ai_prompt_builders.py::test_prompt_tracks_context_output_examples_and_attachments
-    # @matrix ai : attachments prompt
     def _build_contents(self, prompt: Prompt) -> list[types.ContentUnionDict]:
         contents: list[types.ContentUnionDict] = [prompt.build()]
         for data in prompt.bytes:
@@ -342,10 +306,6 @@ class GenAI:
             )
         return contents
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_accepts_empty_json_object_without_retry
-    # @matrix ai : empty-json response-extraction safety
     @staticmethod
     def _extract_text(response: types.GenerateContentResponse, output_format: str | None):
         if response.candidates:
@@ -377,15 +337,6 @@ class GenAI:
 
         return None
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_model_tier_routes_generation_to_primary_or_utility_model
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_retries_empty_text_response_once
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_accepts_empty_json_object_without_retry
-    # @tests tests_unit/test_015_ai_tools.py::test_autofill_accepts_summary_backed_json_without_tool_or_final_call
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_search_json_generation_keeps_provider_response_unconstrained
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_tool_loop
-    # @matrix ai : output-format provider-errors quota search tool-loop
-    # @matrix ai : empty-response-retry model-routing site-policy provider-boundary
     @overload
     def generate_content[T](self, prompt: Prompt, *, validator: Callable[[object], T], validation_retries: int = 0) -> T: ...
     @overload
@@ -458,19 +409,12 @@ class GenAI:
                 observer.reset(token)
                 observer.persist()
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_content
     def _request_content(self, **kwargs: Unpack[ContentRequest]) -> types.GenerateContentResponse:
         session = current_session.get()
         if session is not None:
             return session.request(**kwargs)
         return self.client.models.generate_content(**kwargs)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_content
-    # @covered-by lagniappe/core/tools/ai/category.py::generate_category
-    # @covered-by lagniappe/core/tools/ai/project.py::generate_project
-    # @reason single-attempt provider flow is exercised through the public retry wrapper and downstream generators
     def _generate_content_once(self, prompt: Prompt, model: str, validator=None, validation_retries: int = 0):
         """Generate text content from a Prompt, including optional tool-call loops."""
         contents = self._build_contents(prompt)
@@ -553,8 +497,6 @@ class GenAI:
             validation_retries=validation_retries,
         )
 
-    # @testable false
-    # @reason debug-only console logging, not a behavior contract
     @staticmethod
     def _log_response(response, label=""):
         usage = getattr(response, "usage_metadata", None)
@@ -590,9 +532,6 @@ class GenAI:
                     preview = part.text[:200].replace("\n", " ")
                     debug_log(f"[ai:{label}] Model text: {preview}...")
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_loop_limit_exception_includes_trace
-    # @matrix ai : error-context tool-dispatch trace validation repair
     def _tool_loop(
         self,
         response: types.GenerateContentResponse,
@@ -814,10 +753,6 @@ class GenAI:
             return text
         raise exceptions.AIException(EMPTY_TEXT_RESPONSE_MESSAGE)
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_json_generation_pins_runtime_model_through_structured_final_pass
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_json_generation_preserves_no_call_response_in_structured_final
-    # @matrix ai : config response-preservation structured-output tool-loop
     def _generate_structured_final(
         self,
         contents,
@@ -892,10 +827,6 @@ class GenAI:
             return text
         raise exceptions.AIException(EMPTY_TEXT_RESPONSE_MESSAGE)
 
-    # @testable true
-    # @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
-    # @matrix ai pages : image-generate site-policy provider-boundary
     def generate_image(self, prompt: Prompt, aspect_ratio: str | None = None) -> GeneratedImage:
         """Generate an image from a Prompt and return a BytesIO buffer."""
         if not CONFIG.AI_ENABLED:
@@ -942,9 +873,6 @@ class GenAI:
 
         raise exceptions.AIException("No image data in response")
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
-    # @matrix ai : config image-generate imagen
     def _generate_imagen_image(self, prompt: Prompt, model: str, aspect_ratio: str | None = None) -> GeneratedImage:
         """Generate an image through Imagen's generate_images endpoint."""
         config = types.GenerateImagesConfig(number_of_images=1)

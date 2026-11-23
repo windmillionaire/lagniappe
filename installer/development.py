@@ -29,16 +29,10 @@ _REQUIRED_INSTALLATION_FILES = (
 )
 
 
-# @testable false
-# @covered-by installer/development.py::setup_development
-# @reason platform branch is exercised through the development setup entrypoint
 def _native_windows() -> bool:
     return os.name == "nt"
 
 
-# @testable false
-# @covered-by installer/development.py::setup_development
-# @reason virtualenv enforcement is exercised through the development setup entrypoint
 def _in_virtualenv() -> bool:
     return bool(
         getattr(sys, "real_prefix", None)
@@ -46,17 +40,11 @@ def _in_virtualenv() -> bool:
     )
 
 
-# @testable false
-# @covered-by installer/development.py::setup_development
-# @reason installation prerequisite reporting is exercised through the development setup entrypoint
 def _missing_installation_files() -> list[str]:
     status = config_file_status()
     return [name for name in _REQUIRED_INSTALLATION_FILES if not status.get(name)]
 
 
-# @testable false
-# @covered-by installer/development.py::setup_development
-# @reason Node discovery is exercised through the development setup entrypoint
 def _installed_node_version() -> str | None:
     if NODE_CLI is None:
         return None
@@ -72,9 +60,6 @@ def _installed_node_version() -> str | None:
     return result.stdout.strip()
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_development_setup_validates_node_range
-# @matrix setup : development node-version
 def node_version_supported(version: str | None) -> bool:
     """Return whether a Node version satisfies the project's engine floor."""
     match = _NODE_VERSION_PATTERN.match(str(version).strip())
@@ -86,9 +71,6 @@ def node_version_supported(version: str | None) -> bool:
     return parsed >= minimum
 
 
-# @testable false
-# @covered-by installer/development.py::setup_development
-# @reason subprocess sequencing and failures are exercised through the development setup entrypoint
 def _run_command(label, command, timeout=None):
     print("\n" + ui.heading(label))
     if timeout is None:
@@ -111,11 +93,6 @@ def _run_command(label, command, timeout=None):
     return False
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_development_setup_requires_existing_installation
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_development_setup_is_additive_and_idempotent
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_development_setup_directs_native_windows_to_wsl
-# @matrix setup : development frontend-build idempotence package-install portability prerequisites windows
 def setup_development() -> int:
     """Install local development dependencies after ordinary installer."""
     print(ui.heading("Lagniappe development setup"))

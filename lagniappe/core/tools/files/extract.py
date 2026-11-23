@@ -17,13 +17,6 @@ from ... import exceptions
 from .constants import DOCUMENT_AI_MIMETYPES
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_extract_update_completes_immediately_for_text_files
-# @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-# @matrix file : deferred-dispatch extract process-complete text-asset
-# @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatch_uses_explicit_actor
-# @tests tests_unit/test_006_file_properties.py::test_file_dispatch_rejects_missing_actor_before_changing_status
-# @matrix file deferred-jobs : explicit-actor validation
 def get_file_text(file: File, *, actor: User | None = None, dispatch: bool = True) -> Extract:
     """Initiate text extraction for a file, dispatching to OCR or a background task.
 
@@ -52,12 +45,6 @@ def get_file_text(file: File, *, actor: User | None = None, dispatch: bool = Tru
     return extract
 
 
-# @testable true
-# @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_start_file_extraction_uses_explicit_actor_and_identity
-# @matrix deferred-jobs file : extraction follow-up idempotency
-# @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatch_uses_explicit_actor
-# @tests tests_unit/test_006_file_properties.py::test_file_dispatch_rejects_missing_actor_before_changing_status
-# @matrix file deferred-jobs : explicit-actor validation
 def start_file_extraction(
     file: File,
     *,
@@ -85,9 +72,6 @@ def start_file_extraction(
 
 
 # Document AI docs: https://cloud.google.com/document-ai/docs/ocr
-# @testable false
-# @covered-by lagniappe/core/tools/files/extract.py::get_file_text
-# @reason Document AI OCR is external-service behavior owned by process/E2E workflows
 def ocr_file(file: File, raise_errors: bool = False) -> Extract:
     """Run Document AI OCR on a GCS file and return the extracted text.
 

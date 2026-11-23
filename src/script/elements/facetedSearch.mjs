@@ -4,9 +4,6 @@ import { FacetsBox } from "./combobox/index.mjs";
 import { formatting } from "./formatting.mjs";
 import { primitives } from "./primitives.mjs";
 
-/**
- * @testable infrastructure
- */
 export class FacetedSearchElement extends BaseElement {
 	active(value) {
 		return (

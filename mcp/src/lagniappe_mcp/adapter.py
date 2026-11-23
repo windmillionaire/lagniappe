@@ -76,8 +76,6 @@ _URL_CANDIDATE_PATTERN = re.compile(r"(?i)https://[^\s\"'<>]+")
 _MAX_PRIVATE_QUERY_CHARS = 16 * 1024
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/adapter.py::_reject_private_model_data
 def _query_has_private_storage_parameter(query: str) -> bool:
     """Recognize a bounded query that carries a nonempty storage capability."""
     if not query or len(query) > _MAX_PRIVATE_QUERY_CHARS:
@@ -96,8 +94,6 @@ def _query_has_private_storage_parameter(query: str) -> bool:
     )
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/adapter.py::_reject_private_model_data
 def _has_private_transport_shape(value: str) -> bool:
     """Recognize an actual signed/session value, not ordinary prose about one."""
     stripped = value.strip()
@@ -125,10 +121,6 @@ def _has_private_transport_shape(value: str) -> bool:
     return False
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_model_visibility_screen_rejects_catalog_reflection_and_preserves_safe_result_paths
-# @tests tests_unit/test_033_mcp_adapter.py::test_model_visibility_screen_rejects_successful_output_reflection
 def _reject_private_model_data(value: object, *, bearer: str) -> None:
     """Reject credentials and storage capabilities at the MCP boundary.
 
@@ -169,9 +161,6 @@ def _reject_private_model_data(value: object, *, bearer: str) -> None:
             )
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_original_download_capability_is_scoped_to_requested_file_result
 def validate_file_result(value: object, *, arguments: Mapping[str, object], bearer: str) -> None:
     """Permit one explicitly requested, validated original download capability."""
     screened = deepcopy(value)
@@ -224,12 +213,6 @@ class AdapterResult(Generic[ResultValue]):
     media: tuple[MediaContent, ...] = ()
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-# @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_summary_and_preserves_candidate_and_api_errors
-# @tests tests_unit/test_033_mcp_adapter.py::test_requested_unsupported_original_is_a_bounded_tool_error
-# @tests tests_unit/test_033_mcp_adapter.py::test_requested_missing_original_is_a_bounded_tool_error
 class LagniappeAdapter:
     """Own startup catalog state and dispatch only fixed, typed operations."""
 
@@ -242,9 +225,6 @@ class LagniappeAdapter:
         self.actor: JsonObject | None = None
         self.tools: dict[str, ToolDefinition] = {}
 
-    # @testable true
-    # @pair mcp-adapter:product-contract
-    # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
     async def initialize(self) -> None:
         discovery, actor, catalog = await self.rest.startup()
         validate_value(ACTOR_SCHEMA, actor, phase="actor")
@@ -262,15 +242,9 @@ class LagniappeAdapter:
         self.actor = deepcopy(actor)
         self.tools = registry
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
     async def aclose(self) -> None:
         await self.rest.aclose()
 
-    # @testable true
-    # @pair mcp-adapter:product-contract
-    # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-    # @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_summary_and_preserves_candidate_and_api_errors
     async def execute(self, name: str, arguments: object) -> AdapterResult:
         """Validate, dispatch, project, and validate one known MCP tool call."""
         definition = self.tools.get(name)
@@ -336,8 +310,6 @@ class LagniappeAdapter:
         self._enforce_result_limits(result)
         return result
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _get_actor(self) -> AdapterResult[JsonObject]:
         value, _request_id = await self.rest.request_json(
             "GET", "me", max_bytes=128 * 1024
@@ -347,8 +319,6 @@ class LagniappeAdapter:
         self.actor = deepcopy(actor)
         return AdapterResult(actor)
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _start_plan(self, kind: str, arguments: dict[str, object]) -> AdapterResult:
         method, route, _ = PLAN_ROUTES[kind]
         body = {"instructions": arguments.get("instructions", "")}
@@ -364,8 +334,6 @@ class LagniappeAdapter:
             plan, plan_id=cast(str, plan["id"]), actions=cast(list[str] | None, arguments.get("actions"))
         )
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _with_lifecycle_context(
         self,
         value: Mapping[str, object],
@@ -432,8 +400,6 @@ class LagniappeAdapter:
                 }
             )
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _get_plan(
         self, plan_id: str, *, include_proposal: bool = False
     ) -> AdapterResult:
@@ -448,8 +414,6 @@ class LagniappeAdapter:
         )
         return AdapterResult(self._safe_plan(value, expected_plan_id=plan_id))
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _load_contract(
         self, plan_id: str, *, view: str, actions: list[str] | None = None
     ) -> dict[str, object]:
@@ -512,8 +476,6 @@ class LagniappeAdapter:
         result["proposal_schema"] = proposal_schema
         return result
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _get_contract_projection(
         self, plan_id: str, *, actions: list[str] | None = None, view: str = "summary"
     ) -> AdapterResult[dict[str, object]]:
@@ -532,8 +494,6 @@ class LagniappeAdapter:
         )
         return AdapterResult(contract)
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _submit_plan(self, arguments: dict[str, object]) -> AdapterResult:
         plan_id = cast(str, arguments["plan_id"])
         # The API validates the candidate against live permissions and state.
@@ -557,8 +517,6 @@ class LagniappeAdapter:
         )
         return AdapterResult(self._safe_receipt(value, expected_plan_id=plan_id))
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _upload_files(self, arguments: dict[str, object]) -> AdapterResult:
         from .files import upload_local_files
 
@@ -585,8 +543,6 @@ class LagniappeAdapter:
         validate_value(UPLOAD_RESULT_SCHEMA, value, phase="upstream_output")
         return await self._with_lifecycle_context(value, plan_id=plan_id)
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _read_tool(
         self,
         definition: ToolDefinition,
@@ -615,14 +571,6 @@ class LagniappeAdapter:
             return AdapterResult(result)
         return await self._project_file_result(result, rest_arguments)
 
-    # @testable true
-    # @pair mcp-adapter:product-contract
-    # @tests tests_unit/test_033_mcp_adapter.py::test_requested_unsupported_original_is_a_bounded_tool_error
-    # @tests tests_unit/test_033_mcp_adapter.py::test_requested_missing_original_is_a_bounded_tool_error
-    # @tests tests_unit/test_033_mcp_adapter.py::test_original_download_mime_must_match_upstream_file_metadata
-    # @tests tests_unit/test_033_mcp_adapter.py::test_original_download_fallback_preserves_source_without_fetching_binary
-    # @tests tests_unit/test_033_mcp_adapter.py::test_oversized_original_media_falls_back_only_for_size_limit
-    # @tests tests_unit/test_033_mcp_adapter.py::test_original_media_delivery_matches_the_emitted_content_index
     async def _project_file_result(
         self,
         raw_value: object,
@@ -724,8 +672,6 @@ class LagniappeAdapter:
         validate_file_result(value, arguments=arguments, bearer=self.config.api_key)
         return AdapterResult(value, media)
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     def _safe_plan(
         self,
         value: object,
@@ -769,8 +715,6 @@ class LagniappeAdapter:
         validate_value(SAFE_PLAN_SCHEMA, result, phase="upstream_output")
         return result
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     def _safe_receipt(self, value: object, *, expected_plan_id: str) -> dict[str, object]:
         if not isinstance(value, dict):
             raise TransportError(
@@ -803,8 +747,6 @@ class LagniappeAdapter:
         validate_value(SAFE_RECEIPT_SCHEMA, result, phase="upstream_output")
         return result
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     @staticmethod
     def _enforce_result_limits(result: AdapterResult) -> None:
         structured_size = json_size(result.value)

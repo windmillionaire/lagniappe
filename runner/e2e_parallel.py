@@ -36,10 +36,6 @@ class Batch:
         return (self.nodeid, *self.additional_nodeids)
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_worker_messages_allow_publication_during_completion
-# @tests tests_tooling/test_015_e2e_parallel.py::test_worker_messages_reject_missing_completed_messages
-# @matrix testing : parallel-e2e
 def await_worker_file(path: Path) -> dict[str, object]:
     """Wait for an atomic harness message, never for browser/app state."""
     deadline = time.monotonic() + 90
@@ -53,11 +49,6 @@ def await_worker_file(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_scheduler_overlaps_independent_work_and_serializes_conflicts
-# @tests tests_tooling/test_015_e2e_parallel.py::test_scheduler_stops_children_before_returning_on_lost_authority
-# @tests tests_tooling/test_015_e2e_parallel.py::test_scheduler_reaps_a_crashed_workers_remaining_children
-# @matrix testing : parallel-e2e
 def schedule(
     batches: Sequence[Batch],
     launch: Callable[[Batch], subprocess.Popen],
@@ -134,11 +125,6 @@ def schedule(
                 process.wait(timeout=5)
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_merge_preserves_failures_and_rejects_missing_corrupt_or_duplicate_evidence
-# @tests tests_tooling/test_015_e2e_parallel.py::test_merge_preserves_each_parameter_and_reports_missing_batch_cases
-# @tests tests_tooling/test_015_e2e_parallel.py::test_merge_checks_each_case_identity_and_outcome
-# @matrix testing : parallel-e2e
 def merge_results(
     batches: Sequence[Batch],
     directory: Path,

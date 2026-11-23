@@ -15,9 +15,6 @@ from installer.errors import SetupCancelled
 from installer.state import record_step
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_is_announced_before_dependency_or_provider_mutation
-# @matrix setup : failure-isolation recovery
 def _recovery_file_present(app_dir=None):
     """Detect the canonical recovery-file shape without importing config."""
     app_dir = Path(app_dir) if app_dir else REPOSITORY_ROOT
@@ -27,11 +24,6 @@ def _recovery_file_present(app_dir=None):
     ).exists()
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_characterization_starts_empty_and_reaches_all_boundaries
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_only_prints_manual_deployment_steps_when_declined
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_activates_ai_email_after_deploy_and_jobs
-# @matrix setup : explicit-project main-install manual-deploy prerequisites virtualenv
 def install(*, experiments: bool = False) -> int:
     print(ui.heading(wrap_text("Welcome to Lagniappe setup")))
     if _recovery_file_present():

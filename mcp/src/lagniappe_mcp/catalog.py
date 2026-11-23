@@ -486,8 +486,6 @@ ENRICHED_UPLOAD_RESULT_SCHEMA = {
 }
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
 def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, object]:
     return {
         "type": "object",
@@ -517,8 +515,6 @@ def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, object]:
     }
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
 def _plan_id_input(properties: dict[str, object]) -> dict[str, object]:
     return {
         "type": "object",
@@ -531,9 +527,6 @@ def _plan_id_input(properties: dict[str, object]) -> dict[str, object]:
     }
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_get_file_schema_projects_every_transport_extension
 def get_file_output_schema(rest_schema: dict[str, object]) -> dict[str, object]:
     """Expose a scoped original download alongside bounded inline media."""
     result = validate_schema_document(rest_schema)
@@ -635,9 +628,6 @@ def get_file_output_schema(rest_schema: dict[str, object]) -> dict[str, object]:
     return validate_schema_document(result)
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_server_presents_matching_schemas_and_values_for_each_protocol
 @dataclass(frozen=True, slots=True)
 class ToolDefinition:
     name: str
@@ -649,8 +639,6 @@ class ToolDefinition:
     rest_output_schema: dict[str, object] | None = None
     result_paths: dict[str, object] | None = None
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/catalog.py::ToolDefinition
     def requires_result_wrapper(self, protocol_version: str) -> bool:
         # Select by the declared schema, including nullable/union roots, so
         # every successful value matches the same advertised result shape.
@@ -659,8 +647,6 @@ class ToolDefinition:
             and self.output_schema.get("type") != "object"
         )
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/catalog.py::ToolDefinition
     def as_mcp_tool(self, protocol_version: str = LATEST_MODERN_VERSION) -> Tool:
         wrapped = self.requires_result_wrapper(protocol_version)
         result_paths = (
@@ -686,8 +672,6 @@ class ToolDefinition:
         )
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/catalog.py::ToolDefinition
 def _wrap_result_paths(value: object) -> object:
     """Keep catalog JSONPath hints relative to the advertised MCP value."""
     if isinstance(value, dict):
@@ -724,9 +708,6 @@ SUBMIT_ANNOTATIONS = ToolAnnotations(
 )
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
 def lifecycle_tools() -> tuple[ToolDefinition, ...]:
     common_start = (
         "Each call creates a new report. Reuse the returned id as plan_id for "
@@ -864,9 +845,6 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
     )
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
 def catalog_tools(catalog: Mapping[str, object]) -> tuple[ToolDefinition, ...]:
     """Validate and convert every REST read into one fixed-route MCP tool."""
     if json_size(catalog) > MAX_CATALOG_BYTES:
@@ -1019,9 +997,6 @@ def catalog_tools(catalog: Mapping[str, object]) -> tuple[ToolDefinition, ...]:
     return tuple(sorted(result, key=lambda item: item.name))
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
 def build_tool_registry(catalog: Mapping[str, object], *, execute_plan: bool = False) -> dict[str, ToolDefinition]:
     tools = (*lifecycle_tools(), *catalog_tools(catalog), *((execution_tool(),) if execute_plan else ()))
     if execute_plan:
@@ -1067,9 +1042,6 @@ def build_tool_registry(catalog: Mapping[str, object], *, execute_plan: bool = F
     return {tool.name: tool for tool in tools}
 
 
-# @testable true
-# @tests tests_unit/test_033_mcp_adapter.py::test_experiments_execution_is_advertised_only_when_authorized
-# @matrix mcp-adapter : product-contract
 def execution_tool() -> ToolDefinition:
     return ToolDefinition(
         "execute_plan",

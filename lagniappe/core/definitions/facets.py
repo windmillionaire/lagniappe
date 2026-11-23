@@ -75,9 +75,6 @@ class Help:
     title = "Help"
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::search_page
-# @covered-by src/script/views/results.mjs::Results.init
 class SearchFacets(Enum):
     """
     Enum of available search facets.

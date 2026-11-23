@@ -110,8 +110,6 @@ def make_demo_app(tmp_path: Path) -> Path:
     return app_dir
 
 
-# @matrix frontend-build : freshness no-op
-# @pair test-server:freshness
 def test_test_frontend_bundle_skips_current_build(
     import_config_testing,
     monkeypatch,
@@ -144,8 +142,6 @@ def test_test_frontend_bundle_skips_current_build(
     assert testing.ensure_test_frontend_bundle(FakeAuthority()) is False
 
 
-# @matrix frontend-build : freshness output-validation rebuild
-# @pair test-server:freshness
 def test_test_frontend_bundle_rebuilds_stale_build(
     import_config_testing,
     monkeypatch,
@@ -189,8 +185,6 @@ def test_test_frontend_bundle_rebuilds_stale_build(
     }
 
 
-# @matrix frontend-build : freshness no-op production-preservation
-# @pair test-server:freshness
 def test_test_frontend_bundle_preserves_current_production_build(
     import_config_testing,
     monkeypatch,
@@ -226,8 +220,6 @@ def test_test_frontend_bundle_preserves_current_production_build(
     assert "Current production frontend bundle detected" in capsys.readouterr().out
 
 
-# @matrix frontend-build : freshness production-preservation rebuild
-# @pair test-server:freshness
 def test_test_frontend_bundle_replaces_stale_production_build(
     import_config_testing,
     monkeypatch,
@@ -340,7 +332,6 @@ def test_run_py_test_server_adc_mismatch_points_to_auth(monkeypatch, capsys):
     assert "run.py auth" in output
 
 
-# @matrix test-session : health-nonce readiness slow-start
 def test_wait_for_session_server_allows_slow_local_startup(
     import_config_testing, monkeypatch, tmp_path
 ):
@@ -390,7 +381,6 @@ def test_wait_for_session_server_allows_slow_local_startup(
     assert sleeps == [0.5] * 10
 
 
-# @matrix test-session : deadline diagnostics readiness stalled-response
 def test_wait_for_session_server_bounds_stalled_requests_by_one_deadline(
     import_config_testing, monkeypatch, tmp_path, capsys
 ):
@@ -426,7 +416,6 @@ def test_wait_for_session_server_bounds_stalled_requests_by_one_deadline(
     assert "ReadTimeout" in output
 
 
-# @matrix test-session : diagnostics http-state readiness
 def test_wait_for_session_server_reports_last_http_state(
     import_config_testing, monkeypatch, tmp_path, capsys
 ):

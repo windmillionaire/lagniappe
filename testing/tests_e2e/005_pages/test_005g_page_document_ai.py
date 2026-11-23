@@ -77,7 +77,6 @@ def _assert_ordered(text, first, second):
     assert text.index(first) < text.index(second)
 
 
-# @matrix ai editor : generate-text insert-mode
 def test_generate_text_inserts_ai_markup_with_insert_modes(get_admin, get_user):
     user = get_admin()
     page = user.go(Pages.test_document_generation_page)
@@ -157,7 +156,6 @@ def test_generate_text_inserts_ai_markup_with_insert_modes(get_admin, get_user):
     expect(page.editor.text_entry).to_contain_text("Generated cursor marker")
 
 
-# @matrix ai editor : generate-text replace-selection selected-text
 def test_generate_text_replaces_selection_and_posts_selected_text(get_admin, get_user):
     user = get_admin()
     page = user.go(Pages.test_document_generation_selection_page)
@@ -200,7 +198,6 @@ def test_generate_text_replaces_selection_and_posts_selected_text(get_admin, get
         expect(selection_highlight).to_have_count(0)
 
 
-# @matrix ai editor : error generate-text
 def test_generate_text_provider_error_surfaces_in_form(
     get_admin, get_user,
     browser_failures,
@@ -243,7 +240,6 @@ def test_generate_text_provider_error_surfaces_in_form(
             re.compile(error)
         )
 
-# @matrix ai : document-context generate-text live-provider page-context
 @pytest.mark.ai
 @pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
 def test_generate_text_live_page_context_with_tasks_and_files(get_admin, get_user, request, browser_failures, live_ai_quota):

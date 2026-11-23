@@ -7,19 +7,12 @@ import argparse
 import sys
 
 
-# @testable false
-# @covered-by installer/__main__.py::_parser
-# @reason keep argparse help plain across Python versions and nested commands
 class _SetupArgumentParser(argparse.ArgumentParser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.color = False
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_routes_every_mode_and_returns_status
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_rejects_multiple_or_dashed_commands
-# @matrix setup : argument-validation cli-routing
 def _parser() -> argparse.ArgumentParser:
     parser = _SetupArgumentParser(description="Lagniappe setup")
     parser.add_argument("--experiments", action="store_true", help="Create a dedicated experiments installation with an Administrator agent")
@@ -124,23 +117,14 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-# @testable false
-# @covered-by installer/__main__.py::main
-# @reason small argument-to-operation mapping owned by the tested CLI boundary
 def _mode(args):
     return args.command or "install"
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_lifecycle_cli_routes_nested_commands_and_read_only_boundaries
-# @matrix data-lifecycle : cli-routing read-only
 def _local_only(args):
     return args.command == "archive" and args.archive_target == "validate"
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_lifecycle_cli_routes_nested_commands_and_read_only_boundaries
-# @matrix data-lifecycle : cli-routing read-only
 def _read_only(args):
     return (
         _local_only(args)
@@ -149,10 +133,6 @@ def _read_only(args):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_routes_every_mode_and_returns_status
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_treats_none_cancellation_as_failure
-# @matrix setup : cli-status failure-propagation
 def _status(result: object) -> int:
     """Normalize every setup entry point to an honest process status."""
     if result is True:
@@ -168,10 +148,6 @@ def _status(result: object) -> int:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_stale_gcloud_token_stops_with_setup_auth_instruction
-# @matrix setup : dependency-bootstrap focused-mode gcloud-token prerequisites safe-failure
 def _prepare_setup_dependencies(args):
     """Bootstrap focused modes before importing their dependency-backed handlers."""
     if _mode(args) == "install":
@@ -225,10 +201,6 @@ def _prepare_setup_dependencies(args):
         raise SetupError(str(error)) from error
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_routes_every_mode_and_returns_status
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_provider_failures_are_nonzero
-# @matrix setup : cli-routing failure-propagation lazy-imports
 def _dispatch(args):
     command = args.command
     if command == "auth":
@@ -361,10 +333,6 @@ def _dispatch(args):
     return install(experiments=True) if getattr(args, "experiments", False) else install()
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_rejects_multiple_or_dashed_commands
-# @matrix setup : cli-routing operation-journal prerequisites
 def main(argv: list[str] | None = None) -> int:
     from installer import verify_python_version
 
@@ -401,10 +369,6 @@ def main(argv: list[str] | None = None) -> int:
         return _status(_dispatch(args))
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_provider_failures_are_nonzero
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_treats_none_cancellation_as_failure
-# @matrix setup : cli-status failure-propagation unexpected-errors
 def cli(argv: list[str] | None = None) -> int:
     from installer.errors import SetupCancelled, SetupError, SetupInterrupted
 

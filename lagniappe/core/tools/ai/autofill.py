@@ -89,17 +89,11 @@ class AutofillPromptOptions(TypedDict, total=False):
     review_context: dict[str, object] | None
 
 
-# @testable true
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
-# @matrix ai : structured-output submission
 def submission_response_schema() -> dict[str, object]:
     """Return the provider schema for one dynamic form submission object."""
     return {"type": "object"}
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/autofill.py::autofill_prompt_data
-# @reason target normalization is private shared-context plumbing
 def _autofill_page(entity: Page | Task) -> Page | None:
     if getattr(entity, "entity_kind", None) == "task":
         return cast("Task", entity).page
@@ -108,10 +102,6 @@ def _autofill_page(entity: Page | Task) -> Page | None:
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/autofill.py::autofill_attached_files
-# @covered-by lagniappe/core/tools/ai/autofill.py::autofill_summary_dependencies
-# @reason shared permission filtering is asserted through attachment and dependency projections
 def _readable_autofill_files(entity, user):
     if getattr(entity, "entity_kind", None) not in {"page", "task"}:
         return []
@@ -127,9 +117,6 @@ def _readable_autofill_files(entity, user):
     return files
 
 
-# @testable true
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_autofill_prompt_data_keeps_attachment_context_entity_specific
-# @matrix ai files : attached-files entity-specific
 def autofill_attached_files(entity: Page | Task, user: User) -> list[dict[str, str]]:
     """List directly attached evidence without eagerly injecting its summaries."""
     return [
@@ -142,9 +129,6 @@ def autofill_attached_files(entity: Page | Task, user: User) -> list[dict[str, s
     ]
 
 
-# @testable true
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_autofill_summary_dependencies_track_enabled_processing
-# @matrix ai files : autofill complete failed pending summary-dependency
 def autofill_summary_dependencies(entity: Page | Task, user: User) -> dict[str, list[File]]:
     """Classify enabled attached-file summaries before autofill generation."""
     states = {"complete": [], "pending": [], "failed": []}
@@ -161,11 +145,6 @@ def autofill_summary_dependencies(entity: Page | Task, user: User) -> dict[str, 
     return states
 
 
-# @testable true
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_autofill_prompt_data_keeps_attachment_context_entity_specific
-# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-# @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
-# @matrix ai files pages tasks : attached-files autofill entity-specific partial-submission shared-context
 def autofill_prompt_data(
     entity: Page | Task,
     user: User,
@@ -234,9 +213,6 @@ def autofill_prompt_data(
     }
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
-# @matrix ai : citations validation
 def validate_submission(submission: object, *, entity: Page | Task | None = None, user: User | None = None, schema: Sequence[dict[str, object]] | None = None) -> dict[str, object]:
     """Validate exact target fields without mutation and clean text citations."""
     if not isinstance(submission, dict):
@@ -276,9 +252,6 @@ def validate_submission(submission: object, *, entity: Page | Task | None = None
     return submission
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_exception_context_survives_autofill_wrapper_without_duplicate_capture
-# @matrix ai : error-context terminal-capture validation repair
 def generate_autofilled_submission(prompt: Prompt, *, entity: Page | Task, user: User, schema: Sequence[dict[str, object]] | None = None) -> dict[str, object]:
     """Generate and validate an autofilled form submission from a Prompt."""
     try:
@@ -294,11 +267,6 @@ def generate_autofilled_submission(prompt: Prompt, *, entity: Page | Task, user:
         ) from e
 
 
-# @testable true
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_autofill_original_file_uses_uri_without_redundant_get_file_tool
-# @tests tests_unit/test_015_ai_tools.py::test_autofill_accepts_summary_backed_json_without_tool_or_final_call
-# @matrix ai : file-context output-format prompt-builders search tools
 def form_autofill_prompt(**kwargs: Unpack[AutofillPromptOptions]) -> Prompt:
     """Build the AI prompt for form autofilling based on existing data"""
 

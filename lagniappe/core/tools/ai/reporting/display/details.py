@@ -43,10 +43,6 @@ DETAIL_KINDS = {
 }
 
 
-# @testable true
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_decision_details
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_empty_submission_reason
-# @matrix ai-report : classification details feedback proposal submission-empty-reason
 class ProposalDetailCollector:
     """Resolve and collect display details without knowing action types."""
 

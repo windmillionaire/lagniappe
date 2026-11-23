@@ -20,7 +20,6 @@ def _todo_field():
     )
 
 
-# @matrix form-todo : ai-value column db-value form-value search-value submission
 @pytest.mark.unit
 def test_todo_list_submission_projections():
     field = _todo_field()
@@ -62,7 +61,6 @@ def test_todo_list_submission_projections():
     assert field.ai_value == expected
 
 
-# @matrix form-todo : ai-value import normalization validation
 @pytest.mark.unit
 def test_todo_list_validation_and_import():
     field = _todo_field()
@@ -104,7 +102,6 @@ def test_todo_list_validation_and_import():
     assert field.value == preserved
 
 
-# @pairs form-schema:form-type form-todo:task-only
 @pytest.mark.unit
 def test_todo_schema_is_task_only():
     schema = [{"id": "todo-work", "title": "Work", "type": "todo"}]
@@ -141,8 +138,6 @@ def _todo_task(hash_suffix):
     return task
 
 
-# @matrix task-completion : history field-reset
-# @pair form-todo:field-reset
 @pytest.mark.unit
 def test_uncomplete_archives_then_clears_todo_items():
     task = _todo_task("uncomplete")

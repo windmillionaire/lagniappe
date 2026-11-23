@@ -69,9 +69,6 @@ def _admin_login_url() -> str:
     return f"{SETTINGS.test_config['BASE_URL']}/users/login?test_user={email}"
 
 
-# @testable true
-# @tests tests_tooling/test_004_reports.py::test_browser_review_capture_cleans_failed_folder
-# @matrix browser-review : attachment failure-cleanup
 def capture_review(args: argparse.Namespace) -> int:
     """Capture screenshots and browser diagnostics into a review folder."""
     os.environ["FLASK_ENV"] = "testing"

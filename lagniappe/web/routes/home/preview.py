@@ -14,9 +14,6 @@ from lagniappe.web.auth import authenticated_user, logged_in
 from . import internal
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/links/preview.py::preview_for_url
-# @reason route wrapper delegates preview resolution and safety checks to core helper
 @internal.route("/preview")
 @logged_in
 def preview() -> ResponseReturnValue:

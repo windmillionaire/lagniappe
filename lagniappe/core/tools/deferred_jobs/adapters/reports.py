@@ -38,18 +38,12 @@ from ..errors import (
 )
 
 
-# @testable true
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_phases_reuse_current_report_without_loading_input_files
-# @matrix ai-report : input-files no-extra-read fresh-read
 class ReportAdapter(DeferredJobAdapter):
     """Shared report generation and revision behavior."""
 
     queued_message = "Creating report..."
     retry_message = "The model is busy right now. We'll try again later."
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_replacement_supersedes_old_job_and_ignores_old_failure
-    # @pairs ai-report:active-operation deferred-jobs:superseded
     def started(self, context: DeferredJobContext) -> None:
         report = required_input(context, "report")
         current = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
@@ -68,9 +62,6 @@ class ReportAdapter(DeferredJobAdapter):
         }
         Entities.save(report, context.actor)
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_corrective_report_generation_requires_create_access
-    # @pair ai-access:provider-boundary
     def authorize(self, context: DeferredJobContext) -> None:
         super().authorize(context)
         report = context.input("report")
@@ -98,7 +89,6 @@ class ReportAdapter(DeferredJobAdapter):
                 "This report operation was replaced by a newer request."
             )
 
-    # @testable infrastructure
     def inspect(self, context: DeferredJobContext) -> DeferredJobInspection:
         report = Entities.fetch_one(
             required_input(context, "report").urlsafe_key,
@@ -116,12 +106,6 @@ class ReportAdapter(DeferredJobAdapter):
             return DeferredJobInspection.NOT_APPLIED
         return DeferredJobInspection.DRIFTED
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_ai_report_resumes_prepared_proposal
-    # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
-    # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-    # @matrix ai-report : proposal-publication status
-    # @matrix ai-report : async persistence
     def apply(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         context.ensure_active()
         self.validate_apply(context)
@@ -154,8 +138,6 @@ class ReportAdapter(DeferredJobAdapter):
             "action_count": len(proposal.get("actions") or []),
         }
 
-    # @testable true
-    # @matrix ai-report : cancellation revision reload
     def cleanup(self, context: DeferredJobContext, *, terminal: bool) -> None:
         if not terminal:
             return
@@ -227,9 +209,6 @@ class ReportAdapter(DeferredJobAdapter):
             report.db["auto_execute_pause_reason"] = str(error)
             Entities.save_root(report, property_mask=("auto_execute_pause_reason",))
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_replacement_supersedes_old_job_and_ignores_old_failure
-    # @pair ai-report:failure-isolation
     def failure(self, context: DeferredJobContext, error: BaseException | str) -> None:
         report = context.input("report")
         if not isinstance(report, Entities.REPORT):
@@ -252,7 +231,6 @@ class ReportAdapter(DeferredJobAdapter):
             report.properties.process.fail(str(error), result=result)
         external_operations.save_plan_if_idle(report, snapshot)
 
-    # @testable infrastructure
     def terminal_message(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> str:
         label = "AI"
         if context.job.status in {"cancelled", "superseded"}:
@@ -263,10 +241,6 @@ class ReportAdapter(DeferredJobAdapter):
         return f"{label} report failed. {str(error or '').strip()}".strip()
 
 
-# @testable true
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_ai_report_resumes_prepared_proposal
-# @matrix ai-report : plan-resume proposal-publication status
-# @matrix deferred-jobs : quota retry service-tier cancellation
 class AIReportAdapter(ReportAdapter):
     job_type = DeferredJobType.REPORT_AI
     required_ai_access = AI.ASK
@@ -336,22 +310,6 @@ class AIReportAdapter(ReportAdapter):
         return None
 
 
-# @testable true
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_adapter_runs_the_reviewed_proposal
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_schedules_report_dependency_checks_with_backoff
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_failure_preserves_a_retryable_ledger
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_execution_start_rejects_stale_browser_snapshot
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_duplicate_cleanup_cannot_overwrite_new_api_proposal
-# @tests tests_unit/test_034_experiments.py::test_execution_rejects_stale_proposals_and_reuses_exact_operations
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_phases_reuse_current_report_without_loading_input_files
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
-# @matrix ai-report : deterministic-run entitlement-independent recovery
-# @matrix deferred-jobs : cancellation provider-boundary report-execution tier-declaration
-# @matrix agent-api ai-report deferred-jobs : browser-review cas report-execution terminal-delivery
-# @matrix ai-report : input-files no-extra-read fresh-read
-# @matrix deferred-jobs : dependency-wait backoff
-# @matrix experiments : execution-policy
 class ReportExecutionAdapter(DeferredJobAdapter):
     """Durably execute a reviewed report through its per-action ledger."""
 
@@ -515,9 +473,6 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             "action_count": len(result.get("actions") or []),
         }
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/deferred_jobs/adapters/reports.py::ReportExecutionAdapter
-    # @reason ledger mutation boundaries recheck the shared execution policy
     def _ensure_execution_active(self, context):
         context.ensure_active()
         if context.parameters.get("experiments_execution"):
@@ -625,8 +580,5 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         return f"Report execution failed. {str(error or '').strip()}".strip()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/deferred_jobs/adapters/reports.py::ReportExecutionAdapter
-# @reason execution authorization and drift checks own this canonical proposal hash
 def _report_proposal_fingerprint(report):
     return proposal_fingerprint(getattr(report, "proposal", None))

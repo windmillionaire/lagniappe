@@ -3,14 +3,6 @@ import { request } from "../shared/request.mjs";
 import { withTransition } from "../shared/transitions.mjs";
 import ShellView from "./base/shell.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
- * @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
- * @tests tests_js/test_038_startup_specializations.mjs::test_manual_dropdown_loads_only_in_mobile_mode
- * @matrix manual : popstate responsive-navigation section-navigation
- * @pair startup:mobile-only-dropdown
- */
 export default class Manual extends ShellView {
 	async init() {
 		await super.init();
@@ -61,11 +53,6 @@ export default class Manual extends ShellView {
 		return this;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/manual.mjs::Manual.fetchSection
-	 * @reason head metadata changes are part of the tested manual navigation commit
-	 */
 	_updateMetadata(key) {
 		const metadata = this.sections.get(key)?.metadata;
 		if (!metadata) return null;
@@ -120,12 +107,6 @@ export default class Manual extends ShellView {
 		return { elt: this.elt };
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
-	 * @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
-	 * @matrix manual : canonical-url metadata popstate section-navigation
-	 */
 	async fetchSection(key, pushState) {
 		if (this.loading) return;
 		this.loading = true;

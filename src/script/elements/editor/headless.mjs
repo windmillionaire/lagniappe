@@ -6,20 +6,12 @@ const HEADLESS_WIDGETS = {
 	},
 };
 
-/**
- * @testable false
- * @covered-by src/script/elements/editor/headless.mjs::loadHeadlessWidget
- * @reason helper owned by the headless sync widget loader
- */
 function _headlessKind(sync_id) {
 	if (sync_id.endsWith(":document")) return "document";
 	return null;
 }
 
 /**
- * @testable true
- * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
- * @matrix sync : concurrency document headless-widget offline-replay
  *
  * Construct a sync-capable widget with no view or DOM chrome.
  * Caller runs init(), assigns remote/offlineRecord, then sync().

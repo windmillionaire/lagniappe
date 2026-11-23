@@ -102,8 +102,6 @@ MANIFEST_SCHEMA = {
 }
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/terminal_files.py::prepare_uploads
 def tool_definitions(local: ToolDefinition) -> tuple[ToolDefinition, ToolDefinition]:
     return (
         replace(
@@ -157,9 +155,6 @@ def tool_definitions(local: ToolDefinition) -> tuple[ToolDefinition, ToolDefinit
     )
 
 
-# @testable true
-# @tests tests_unit/test_033e_mcp_terminal_files.py::test_manifest_allows_only_validated_storage_writes_and_never_oauth_secrets
-# @matrix mcp-upload : terminal validation token-separation
 def validate_manifest(value: object, *, bearer: str) -> tuple[str, list[tuple[str, int]]]:
     validate_value(MANIFEST_SCHEMA, value, phase="upload_manifest")
     manifest = cast(_Manifest, value)
@@ -185,9 +180,6 @@ def validate_manifest(value: object, *, bearer: str) -> tuple[str, list[tuple[st
     return sessions
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_remote_attachment_uses_shared_upload_and_preserves_pending_failure
-# @matrix mcp-upload : terminal upload-batch-identity safe-result
 async def prepare_uploads(adapter: LagniappeAdapter, arguments: PrepareUploadArguments) -> AdapterResult:
     plan_id, files = arguments["plan_id"], arguments["files"]
     contract = await adapter._load_contract(plan_id, view="summary")
@@ -227,10 +219,6 @@ async def prepare_uploads(adapter: LagniappeAdapter, arguments: PrepareUploadArg
     )
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_remote_attachment_uses_shared_upload_and_preserves_pending_failure
-# @tests tests_unit/test_033e_mcp_terminal_files.py::test_terminal_finalize_never_accepts_incomplete_or_replaced_batch
-# @matrix mcp-upload : terminal finalize-once upload-batch-identity safe-result
 async def finalize_uploads(adapter: LagniappeAdapter, arguments: FinalizeUploadArguments) -> AdapterResult:
     plan_id, batch = arguments["plan_id"], arguments["upload_batch_id"]
     route = f"plans/{quote_path_segment(plan_id)}"

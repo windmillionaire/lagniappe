@@ -401,7 +401,6 @@ def _open_sign_in_form(user, login_page, email):
     return sign_in_form
 
 
-# @matrix login : form-state page-load
 # @template users/login.html::button
 # @template users/login.html::heading
 # @template users/login.html::subheading
@@ -499,7 +498,6 @@ def test_login_page_loads(get_user):
         expect(confirmation).to_have_class(re.compile(r".*\bborder-kind-default\b.*"))
 
 
-# @matrix login : session test-user
 def test_user_login_success(get_admin):
     """
     Verify test user authentication and home page access.
@@ -528,8 +526,6 @@ def test_user_login_success(get_admin):
     expect(user.page).to_have_title("Home")
 
 
-# @matrix auth : invalidation page-key session-keys session-user switch user-key
-# @pair cache:invalidation-acknowledgement
 def test_switching_session_user_requests_client_cache_invalidation(get_admin, get_user):
     owner = get_admin()
     source = get_user(Users.session_switch_source, creator=owner)
@@ -562,7 +558,6 @@ def test_switching_session_user_requests_client_cache_invalidation(get_admin, ge
     assert payload[CONFIG.LOGIN_USER_PAGE_KEY] == target.entity.page.urlsafe_key
 
 
-# @matrix auth : batch-load clear fallback flask-login-skip page-key session-keys session-preload stale-session user-key
 def test_stale_preloaded_session_keys_fall_back_to_flask_login_user(get_admin, get_user):
     owner = get_admin()
     stale = get_user(Users.create_user_from_index, creator=owner)
@@ -595,7 +590,6 @@ def test_stale_preloaded_session_keys_fall_back_to_flask_login_user(get_admin, g
             assert key not in session
 
 
-# @pair login:redirect-target
 @pytest.mark.e2e_group("owner")
 def test_login_returns_to_requested_url_after_redirect(get_user):
     user = get_user(Users.ANONYMOUS)
@@ -609,7 +603,6 @@ def test_login_returns_to_requested_url_after_redirect(get_user):
     expect(user.page).to_have_url(_site_url("/tasks/index"))
 
 
-# @pair login:redirect-target
 def test_login_google_buttons_carry_safe_next_state(get_user):
     user = get_user(Users.ANONYMOUS)
     target = "/pages/public-target?from=public#notes"
@@ -624,7 +617,6 @@ def test_login_google_buttons_carry_safe_next_state(get_user):
     )
 
 
-# @matrix login : authentication-email redirect-target
 def test_auth_action_url_preserves_safe_login_destination(monkeypatch):
     target = "/tasks/index?from=email#details"
     delivered = {}
@@ -675,8 +667,6 @@ def test_auth_action_url_preserves_safe_login_destination(monkeypatch):
     }
 
 
-# @matrix csrf : double-submit match mismatch missing-body missing-cookie
-# @pair login:google-signin
 def test_google_signin_enforces_double_submit_csrf_before_provider_auth(get_user):
     user = get_user(Users.ANONYMOUS)
     url = _site_url("/users/google-signin")
@@ -706,7 +696,6 @@ def test_google_signin_enforces_double_submit_csrf_before_provider_auth(get_user
     assert "remember_token" not in cookie_names
 
 
-# @pair login:redirect-target
 @pytest.mark.e2e_group("owner")
 def test_login_accepts_google_state_redirect_target(get_user):
     user = get_user(Users.ANONYMOUS)
@@ -720,7 +709,6 @@ def test_login_accepts_google_state_redirect_target(get_user):
     expect(user.page).to_have_url(_site_url(target))
 
 
-# @matrix login : agent-access session user-page
 # @template users/agent_login.html::agent_login_form
 # @style login.heading
 def test_agent_access_login_form_creates_session(get_user, browser_failures):
@@ -765,7 +753,6 @@ def test_agent_access_login_form_creates_session(get_user, browser_failures):
     expect(user.locate("[data-widget='UserSettings']")).to_be_attached()
 
 
-# @matrix login : auth-errors owner-bootstrap password-validation verify-email
 # @template users/login.html::google_signin
 # @style login.heading
 # @style login.subheading
@@ -862,7 +849,6 @@ def test_uninitialized_owner_starts_google_first_setup(get_user, browser_failure
         assert not identity_calls["unexpected"]
 
 
-# @matrix login : auth-method email-signin google-oauth
 @pytest.mark.e2e_group("owner")
 def test_login_defaults_to_auth_method_form(get_user):
     """
@@ -888,7 +874,6 @@ def test_login_defaults_to_auth_method_form(get_user):
     expect(email_form.locator(".g_id_signin")).to_have_count(0)
 
 
-# @matrix login : auth-method authorization-error google-oauth
 @pytest.mark.e2e_group("owner")
 def test_unregistered_google_error_returns_to_method_chooser(get_user):
     """A verified but unprovisioned Google account gets a useful login error."""
@@ -908,7 +893,6 @@ def test_unregistered_google_error_returns_to_method_chooser(get_user):
     expect(auth_method.locator(PASSWORD)).to_have_count(0)
 
 
-# @matrix login : auth-method disabled-account google-oauth safe-error
 @pytest.mark.e2e_group("owner")
 def test_disabled_google_error_returns_to_method_chooser(get_user):
     """A disabled Identity Platform account gets a useful, provider-safe error."""
@@ -930,8 +914,6 @@ def test_disabled_google_error_returns_to_method_chooser(get_user):
     expect(auth_method.locator(PASSWORD)).to_have_count(0)
 
 
-# @matrix login : auth-method owner-bootstrap google-oauth
-# @pair web-headers:security
 # @template users/login.html::google_signin
 @pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("owner_setup", [False, True], ids=["ordinary", "owner"])
@@ -967,7 +949,6 @@ def test_google_signin_uses_response_specific_style_nonces(monkeypatch, owner_se
         assert not any(value.startswith("'nonce-") for value in policy["script-src"])
 
 
-# @matrix login : auth-method disabled-provider google-oauth
 # @template users/login.html::google_signin
 @pytest.mark.e2e_group("owner")
 def test_login_hides_google_when_provider_is_disabled(monkeypatch):
@@ -1005,7 +986,6 @@ def test_login_hides_google_when_provider_is_disabled(monkeypatch):
     assert 'data-role="back-to-owner-google"' not in owner_html
 
 
-# @matrix login : auth-method disabled-provider google-oauth operator-intent
 @pytest.mark.e2e_group("owner")
 def test_google_signin_setting_disables_ui_and_callback(monkeypatch):
     """The persisted opt-out hides Google and rejects direct callback posts."""
@@ -1045,9 +1025,6 @@ def test_google_signin_setting_disables_ui_and_callback(monkeypatch):
     }
 
 
-# @matrix admin : exact-email google-only
-# @matrix login : bootstrap owner-first-login provisioning
-# @pair owner:provisioning
 def test_delegated_bootstrap_admin_requires_exact_google_email_and_closes_after_owner_login(
     monkeypatch,
 ):
@@ -1152,7 +1129,6 @@ def test_delegated_bootstrap_admin_requires_exact_google_email_and_closes_after_
         ("OPERATION_NOT_ALLOWED", None),
     ],
 )
-# @matrix login : disabled-account disabled-provider google-oauth redirect-target safe-error
 def test_google_provider_rejections_return_safely(
     monkeypatch,
     provider_code,
@@ -1205,7 +1181,6 @@ def test_google_provider_rejections_return_safely(
     assert provider_code not in response.headers["Location"]
 
 
-# @matrix login : account-enumeration sign-in-transition
 @pytest.mark.e2e_group("owner")
 def test_unknown_email_transitions_to_sign_in_without_leaking_existence(
     get_user,
@@ -1245,7 +1220,6 @@ def test_unknown_email_transitions_to_sign_in_without_leaking_existence(
         )
 
 
-# @matrix login : account-enumeration endpoint
 @pytest.mark.e2e_group("owner")
 def test_check_user_status_endpoint_does_not_enumerate_accounts(get_user):
     """Unknown accounts should receive the generic sign-in next step."""
@@ -1270,7 +1244,6 @@ def test_check_user_status_endpoint_does_not_enumerate_accounts(get_user):
     expect(user.locate(login_page.SIGN_IN_FORM)).to_be_visible()
 
 
-# @matrix login : endpoint first-time-setup
 @pytest.mark.e2e_group("owner")
 def test_check_user_status_endpoint_returns_first_time_setup(get_user):
     """Provisioned users without a prior login should get first-time setup."""
@@ -1307,7 +1280,6 @@ def test_check_user_status_endpoint_returns_first_time_setup(get_user):
     expect(user.locate(login_page.FIRST_TIME_SETUP_FORM)).to_be_visible()
 
 
-# @matrix login : action-code-validation expired-link query-mode reset-password
 def test_reset_password_mode(get_user, browser_failures):
     """
     Verify reset password form displays with correct query parameters.
@@ -1381,7 +1353,6 @@ def test_reset_password_mode(get_user, browser_failures):
     assert not identity_calls["unexpected"]
 
 
-# @matrix login : query-mode verify-email
 def test_verify_email_mode(get_user):
     """
     Verify email verification form displays with correct query parameters.
@@ -1412,7 +1383,6 @@ def test_verify_email_mode(get_user):
     assert not identity_calls["unexpected"]
 
 
-# @pair login:email-validation
 @pytest.mark.e2e_group("owner")
 def test_email_input_validation(get_user):
     """
@@ -1446,7 +1416,6 @@ def test_email_input_validation(get_user):
     expect(email_form).to_be_visible()
 
 
-# @pair login:responsive-layout
 @pytest.mark.e2e_group("owner")
 def test_login_responsive_design(get_user):
     """
@@ -1485,7 +1454,6 @@ def test_login_responsive_design(get_user):
     expect(login_form).to_be_visible()
 
 
-# @pair error-handling:csrf
 def test_csrf_failure_is_identified_for_targeted_retry(get_admin, browser_failures):
     """Only Flask-WTF CSRF failures should trigger the frontend retry path."""
     user = get_admin()
@@ -1521,8 +1489,6 @@ def test_csrf_failure_is_identified_for_targeted_retry(get_admin, browser_failur
     assert response["body"]
 
 
-# @matrix login : clear logout redirect session session-keys
-# @pair cache:invalidation-acknowledgement
 # @style login.heading
 def test_logout_clears_session_and_returns_login(get_admin, get_user):
     """
@@ -1573,8 +1539,6 @@ def test_logout_clears_session_and_returns_login(get_admin, get_user):
     expect(user.page).to_have_url(re.compile(r"/tasks/index$"))
 
 
-# @matrix login : ajax invalidation logout redirect
-# @pair cache:invalidation-acknowledgement
 def test_logout_flags_user_cache_invalidation(get_admin, get_user):
     """The logout control should expose invalidation and navigate to login."""
     owner = get_admin()
@@ -1619,7 +1583,6 @@ def test_logout_flags_user_cache_invalidation(get_admin, get_user):
     expect(user.page).to_have_title("Home")
 
 
-# @matrix login : cookie-hardening remember-cookie
 def test_login_sets_hardened_auth_cookies(get_admin, get_user):
     """Test login should issue hardened session and remember-me cookies."""
     owner = get_admin()
@@ -1657,7 +1620,6 @@ def test_login_sets_hardened_auth_cookies(get_admin, get_user):
     expect(user.page).to_have_title("Home")
 
 
-# @matrix login : email-check sign-in-transition
 @pytest.mark.e2e_group("owner")
 def test_known_registered_email_shows_sign_in(get_user):
     """
@@ -1674,7 +1636,6 @@ def test_known_registered_email_shows_sign_in(get_user):
     expect(user.locate(login_page.SIGN_IN_FORM)).to_be_visible()
 
 
-# @matrix login : forgot-password sign-in-transition
 # @template users/login.html::success
 # @style login.success
 @pytest.mark.e2e_group("owner")
@@ -1712,7 +1673,6 @@ def test_forgot_password_form_opens_from_sign_in(get_user):
     assert reset_email_calls == [{"email": SETTINGS.test_config["ADMIN_EMAIL"]}]
 
 
-# @matrix login : delivery-failure forgot-password recovery safe-error
 @pytest.mark.e2e_group("owner")
 def test_password_reset_delivery_failure_recovers_safely(
     get_user,
@@ -1763,7 +1723,6 @@ def test_password_reset_delivery_failure_recovers_safely(
     ]
 
 
-# @matrix login : identity-platform rate-limit
 def test_login_identity_returns_rate_limit_response(get_user, browser_failures):
     """The live Identity Platform login route should propagate limiter 429 responses."""
     user = get_user(Users.ANONYMOUS)
@@ -1817,7 +1776,6 @@ def test_login_identity_returns_rate_limit_response(get_user, browser_failures):
         _clear_auth_rate_limit_scope("login-identity")
 
 
-# @pair login:remember-preference
 @pytest.mark.e2e_group("owner")
 def test_login_remember_preference_syncs_across_forms(get_user):
     """Changing remember-me in one login form updates later remember forms."""
@@ -1877,7 +1835,6 @@ def test_login_remember_preference_syncs_across_forms(get_user):
     assert "lagniappe_remember=1" in user.page.evaluate("document.cookie")
 
 
-# @matrix login : account-create first-time-setup form-state
 @pytest.mark.e2e_group("owner")
 def test_first_time_setup_form_creates_password_and_can_return_to_email_check(
     get_user,
@@ -1945,7 +1902,6 @@ def test_first_time_setup_form_creates_password_and_can_return_to_email_check(
     assert not identity_calls["unexpected"]
 
 
-# @matrix login : identity-platform redirect remember-preference verify-email
 @pytest.mark.e2e_group("owner")
 def test_login_identity_client_handoff_redirects_or_requires_verification(
     get_user,
@@ -2048,7 +2004,6 @@ def test_login_identity_client_handoff_redirects_or_requires_verification(
     assert not identity_calls["unexpected"]
 
 
-# @matrix login : delivery-failure identity-platform recovery safe-error verify-email
 @pytest.mark.e2e_group("owner")
 def test_verification_delivery_failure_recovers_safely(
     get_user,
@@ -2127,7 +2082,6 @@ def test_verification_delivery_failure_recovers_safely(
     assert not identity_calls["unexpected"]
 
 
-# @matrix login : auth-errors existing-account first-time-setup recovery sign-in-transition
 @pytest.mark.e2e_group("owner")
 def test_login_auth_error_messages_are_user_safe(get_user, browser_failures):
     """Identity Platform error codes should render safe messages, not provider internals."""

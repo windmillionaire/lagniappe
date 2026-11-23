@@ -31,13 +31,6 @@ from lagniappe.core.tools.database import utility as database_utility
 from .base import DeferredJobAdapter
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_email_ingest_adapter_starts_existing_report_job_idempotently
-# @tests tests_unit/test_028_ai_email.py::test_email_ingest_failure_surfaces_bounded_diagnostic
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_email_ingest_notification_is_created_only_for_failure
-# @matrix ai-email deferred-jobs : acceptance diagnostics failure idempotency privacy report-handoff terminal-delivery
-# @matrix feedback : diagnostics failure privacy terminal-delivery
-# @pair deferred-jobs:failure-only-notification
 class EmailIngestAdapter(DeferredJobAdapter):
     """Finalize received attachments, then start the normal report adapter."""
 

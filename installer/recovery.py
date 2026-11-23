@@ -16,17 +16,10 @@ AVAILABLE = "AVAILABLE"
 UNAVAILABLE = "UNAVAILABLE"
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason recovery-specific provider state error exercised through verification
 class RecoveryResourceError(RuntimeError):
     """Raised when recovered provider resources cannot be safely verified."""
 
 
-# @testable false
-# @covered-by installer/recovery.py::_probe_gcloud_json
-# @covered-by installer/recovery.py::_probe_ocr
-# @reason provider error classification exercised through public recovery verification
 def _provider_error_state(error):
     status_code = getattr(error, "status_code", None)
     code = getattr(error, "code", None)
@@ -52,9 +45,6 @@ def _provider_error_state(error):
     return UNAVAILABLE
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_provider_states_distinguish_absent_from_unavailable
-# @matrix setup : failure-isolation provider-discovery recovery
 def _probe_gcloud_json(command):
     """Return a three-state observation for an explicitly targeted gcloud lookup."""
     result = run_gcloud_command(command, check=False)
@@ -78,9 +68,6 @@ def _probe_gcloud_json(command):
     return {"state": AVAILABLE, "details": details, "error": None}
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_service_account(project_id, email):
     return _probe_gcloud_json(
         [
@@ -94,9 +81,6 @@ def _probe_service_account(project_id, email):
     )
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_enabled_api(project_id, service_name):
     result = run_gcloud_command(
         [
@@ -134,9 +118,6 @@ def _probe_enabled_api(project_id, service_name):
     }
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_service_account_policy(project_id, email):
     return _probe_gcloud_json(
         [
@@ -150,18 +131,12 @@ def _probe_service_account_policy(project_id, email):
     )
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_app_engine(project_id):
     return _probe_gcloud_json(
         ["app", "describe", f"--project={project_id}", "--format=json"]
     )
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_runtime_version(project_id):
     return _probe_gcloud_json(
         [
@@ -177,9 +152,6 @@ def _probe_runtime_version(project_id):
     )
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_task_queue(project_id, region, queue_name):
     return _probe_gcloud_json(
         [
@@ -194,9 +166,6 @@ def _probe_task_queue(project_id, region, queue_name):
     )
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_bucket(project_id, bucket_name):
     return _probe_gcloud_json(
         [
@@ -210,9 +179,6 @@ def _probe_bucket(project_id, bucket_name):
     )
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason provider client construction is checked through the public provider recovery report
 def _probe_ocr(project_id, location, processor_name):
     try:
         from google.api_core.client_options import ClientOptions
@@ -240,9 +206,6 @@ def _probe_ocr(project_id, location, processor_name):
         }
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_recovery_gets_live_config
-# @matrix setup : identity-platform recovery
 def _probe_identity_platform(project_id):
     try:
         import requests
@@ -280,9 +243,6 @@ def _probe_identity_platform(project_id):
         }
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason Redis setup adapter is checked through the public provider recovery report
 def _probe_redis(settings):
     from installer.redis import test_redis_connection
 
@@ -295,9 +255,6 @@ def _probe_redis(settings):
     }
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason state enforcement is exercised through the public provider recovery report
 def _require_observable(name, observation):
     if observation["state"] == UNAVAILABLE:
         raise RecoveryResourceError(
@@ -307,11 +264,6 @@ def _require_observable(name, observation):
     return observation
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_provider_discovery_targets_only_recovered_project
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_reports_missing_signing_setup_as_repairable_drift
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_provider_mismatch_or_unavailable_stops_before_mutation
-# @matrix setup : failure-isolation keyless-config project-identity project-number provider-discovery recovery repair
 def verify_recovery_resources(
     settings: Mapping[str, object],
     project_id: str,

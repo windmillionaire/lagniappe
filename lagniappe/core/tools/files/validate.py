@@ -30,10 +30,6 @@ class ParsedCSV(CSVMetadata):
     rows: list[dict[str, str]]
 
 
-# @testable true
-# @tests tests_unit/test_006a_ingress_csv.py::test_categorical_detection
-# @tests tests_unit/test_006a_ingress_csv.py::test_string_fallback
-# @matrix ingress-csv : categorical fallback type-inference
 def infer_column_types(rows: Sequence[Mapping[str, str]], columns: Sequence[CSVColumn]) -> None:
     """Infer column types (string, number, date, etc.) by sampling row values.
 
@@ -59,47 +55,25 @@ def infer_column_types(rows: Sequence[Mapping[str, str]], columns: Sequence[CSVC
     boolean_values = {"yes", "no", "true", "false", "1", "0", "y", "n"}
     multiple_value_pattern = re.compile(r"[;|]\s*\w")
 
-    # @testable true
-    # @tests tests_unit/test_006a_ingress_csv.py::test_phone_detection
-    # @matrix ingress-csv : phone type-inference
     def is_phone_number(s: str) -> bool:
         digits = "".join(c for c in s if c.isdigit())
         return 10 <= len(digits) <= 15
 
-    # @testable true
-    # @tests tests_unit/test_006a_ingress_csv.py::test_url_detection
-    # @tests tests_unit/test_006a_ingress_csv.py::test_url_detection_rejects_long_unsupported_path_within_deadline
-    # @matrix ingress-csv : type-inference url
     def is_url(s: str) -> bool:
         return bool(url_pattern.match(s.lower().strip()))
 
-    # @testable true
-    # @tests tests_unit/test_006a_ingress_csv.py::test_email_detection
-    # @matrix ingress-csv : email type-inference
     def is_email(s: str) -> bool:
         return bool(email_pattern.match(s.lower().strip()))
 
-    # @testable true
-    # @tests tests_unit/test_006a_ingress_csv.py::test_multi_categorical_detection
-    # @matrix ingress-csv : multi-categorical type-inference
     def has_multiple_values(s: str) -> bool:
         return bool(multiple_value_pattern.search(s))
 
-    # @testable true
-    # @tests tests_unit/test_006a_ingress_csv.py::test_number_detection
-    # @matrix ingress-csv : number type-inference
     def is_numeric(s: str) -> bool:
         return str(s).replace(".", "").replace("-", "").isdigit()
 
-    # @testable true
-    # @tests tests_unit/test_006a_ingress_csv.py::test_date_detection
-    # @matrix ingress-csv : date type-inference
     def is_date(s: str) -> bool:
         return any(pattern.match(str(s)) for pattern in date_patterns)
 
-    # @testable true
-    # @tests tests_unit/test_006a_ingress_csv.py::test_boolean_detection
-    # @matrix ingress-csv : boolean type-inference
     def is_boolean(s: str) -> bool:
         return str(s).lower() in boolean_values
 
@@ -178,9 +152,6 @@ def infer_column_types(rows: Sequence[Mapping[str, str]], columns: Sequence[CSVC
             continue
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/validate.py::create_schema
-# @reason categorical option extraction is part of schema generation
 def extract_options(rows: Sequence[Mapping[str, str]], column: CSVColumn) -> tuple[list[str], str | None]:
     """Extract unique option values for a categorical or multi-categorical column.
 
@@ -210,14 +181,6 @@ def extract_options(rows: Sequence[Mapping[str, str]], column: CSVColumn) -> tup
         return sorted(set(values.strip() for values in values)), None
 
 
-# @testable true
-# @tests tests_unit/test_006a_ingress_csv.py::test_standard_csv
-# @tests tests_unit/test_006a_ingress_csv.py::test_semicolon_delimiter
-# @tests tests_unit/test_006a_ingress_csv.py::test_empty_rows_skipped
-# @tests tests_unit/test_006a_ingress_csv.py::test_header_only_raises
-# @tests tests_unit/test_006a_ingress_csv.py::test_no_header_raises
-# @tests tests_unit/test_006a_ingress_csv.py::test_rows_keyed_by_column_id
-# @matrix ingress-csv : column-ids delimiter empty-rows validation
 def process_csv(text: str) -> ParsedCSV:
     """Parse CSV text into structured rows, columns, and inferred types.
 
@@ -277,9 +240,6 @@ def process_csv(text: str) -> ParsedCSV:
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/validate.py::create_schema
-# @reason select/radio option shaping is part of schema generation
 def create_options(values: Sequence[str], column_schema: dict[str, object]) -> list[dict[str, str]]:
     """Build option objects for a select column, switching to radio for small sets."""
     if len(values) < 6:
@@ -289,10 +249,6 @@ def create_options(values: Sequence[str], column_schema: dict[str, object]) -> l
     return [{"value": f"o{short_uuid()}", "label": v} for v in values]
 
 
-# @testable true
-# @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_builds_or_selects_the_submission_form
-# @tests tests_unit/test_006b_ingress_entity.py::test_generated_import_schema_preserves_reserved_page_fields
-# @matrix form ingress : choose-form default-form schema-generation
 def create_schema(columns: Mapping[str, CSVColumn], rows: Sequence[Mapping[str, str]], *, form_type: str) -> tuple[list[dict[str, object]], str | None]:
     """Generate a form schema from inferred column types and row data.
 
@@ -318,9 +274,6 @@ def create_schema(columns: Mapping[str, CSVColumn], rows: Sequence[Mapping[str, 
         "multi_categorical": {"type": "select", "multiple": True},
     }
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/validate.py::create_schema
-    # @reason per-column schema assembly is part of create_schema
     def build_schema(column, separators):
         label = column["label"].strip()
         column_schema: dict[str, object] = {"title": label}

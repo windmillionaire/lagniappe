@@ -7,9 +7,6 @@ from pathlib import Path
 DIRECT_HTTP_MODULES = frozenset({"requests", "httpx", "urllib.request"})
 
 
-# @testable true
-# @tests tests_tooling/test_010_runtime_outbound_http.py::test_direct_http_inventory_recognizes_supported_import_forms
-# @matrix outbound-http tooling : import-syntax source-inventory
 def direct_http_imports(path: Path) -> frozenset[str]:
     """Return direct HTTP libraries imported by one Python source file."""
     imports = set()
@@ -36,9 +33,6 @@ def direct_http_imports(path: Path) -> frozenset[str]:
     return frozenset(imports)
 
 
-# @testable true
-# @tests tests_tooling/test_010_runtime_outbound_http.py::test_runtime_direct_http_imports_match_shared_boundary_and_audited_providers
-# @matrix outbound-http tooling : direct-call-guard provider-ownership source-inventory
 def runtime_direct_http_imports(
     runtime_root: Path,
     *,

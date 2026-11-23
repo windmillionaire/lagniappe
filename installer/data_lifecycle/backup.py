@@ -43,9 +43,6 @@ CONSISTENCY_NOTICE = (
 RUNTIME_CATALOG_OBJECT = "data-lifecycle/recovery-catalog.json"
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason terminal animation is a presentation wrapper around tested lifecycle phases
 @contextmanager
 def _progress(formatter, message):
     with formatter.progress(text=message) as spinner:
@@ -57,9 +54,6 @@ def _progress(formatter, message):
         spinner.ok()
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason final console rendering presents an already validated manifest
 def _print_backup_summary(formatter, manifest):
     snapshot = datetime.fromisoformat(
         manifest.snapshot_time.replace("Z", "+00:00")
@@ -73,9 +67,6 @@ def _print_backup_summary(formatter, manifest):
     print("  This manual backup is self-contained and remains available until deleted.")
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason random ID generation is validated through the public backup operation
 def new_backup_id(
     now: datetime | None = None, token_hex: Callable[[int], str] | None = None
 ) -> str:
@@ -85,16 +76,10 @@ def new_backup_id(
     return validate_backup_id(value)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::load_backup
-# @reason exact object naming is exercised through validated manifest loading
 def manifest_object_name(backup_id: str) -> str:
     return f"{BACKUP_ROOT_PREFIX}/{validate_backup_id(backup_id)}/manifest.json"
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_manifest_validation_rejects_foreign_or_uncontained_artifacts
-# @matrix data-lifecycle : manifest path-containment
 def load_backup(context: ProviderContext, backup_id: str) -> tuple[BackupManifest, Any]:
     backup_id = validate_backup_id(backup_id)
     payload, blob = context.load_json_object(manifest_object_name(backup_id))
@@ -144,9 +129,6 @@ def load_backup(context: ProviderContext, backup_id: str) -> tuple[BackupManifes
     return manifest, blob
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason point-in-time normalization is enforced by the public backup workflow
 def _snapshot_time(value=None):
     value = value or datetime.now(UTC) - timedelta(minutes=1)
     if not isinstance(value, datetime) or value.tzinfo is None:
@@ -154,9 +136,6 @@ def _snapshot_time(value=None):
     return value.astimezone(UTC).replace(second=0, microsecond=0)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason runtime bucket binding is exercised by exact asset capture
 def _runtime_buckets(context):
     from config import SETTINGS
     from config.storage import storage_bucket_names
@@ -167,9 +146,6 @@ def _runtime_buckets(context):
     }
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason sanitized catalog publication follows validated backup publication
 def _refresh_runtime_catalog(context):
     """Publish only non-sensitive manual-backup metadata for the admin UI."""
     from config import SETTINGS
@@ -206,9 +182,6 @@ def _refresh_runtime_catalog(context):
     )
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason best-effort UI projection cannot invalidate a completed recovery set
 def _try_refresh_runtime_catalog(context):
     try:
         _refresh_runtime_catalog(context)
@@ -216,9 +189,6 @@ def _try_refresh_runtime_catalog(context):
         print(ui.warning(f"manual backup is valid, but the admin catalog was not refreshed: {error}"))
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason immutable catalog publication is exercised by backup resumption
 def _publish_catalog(context, object_name, payload):
     descriptor = catalog_descriptor(
         f"gs://{context.recovery_bucket}/{object_name}", payload
@@ -233,10 +203,6 @@ def _publish_catalog(context, object_name, payload):
     return descriptor
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_backup_resumes_provider_operation_and_publishes_manifest_last
-# @tests tests_tooling/test_008_data_lifecycle.py::test_backup_selects_completed_whole_minute_without_runtime_action
-# @matrix data-lifecycle : backup framework-neutral manifest-last point-in-time resume
 def create_backup(
     context: ProviderContext | None = None,
     *,
@@ -484,9 +450,6 @@ def create_backup(
     return manifest
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_backup_listing_ignores_invalid_incomplete_and_foreign_objects
-# @matrix data-lifecycle : backup-list manifest
 def list_backups(
     context: ProviderContext | None = None,
     *,
@@ -526,9 +489,6 @@ def list_backups(
     return manifests
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_backup_delete_requires_typed_confirmation_and_manifest_first
-# @matrix data-lifecycle : backup-delete confirmation path-containment
 def delete_backup(
     backup_id: str,
     context: ProviderContext | None = None,
@@ -579,9 +539,6 @@ def delete_backup(
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_automatic_backup_preparation_uses_scratch_then_v3
-# @matrix data-lifecycle : named-scratch-database automatic-backup-preparation
 def prepare_automatic_backup(
     native_backup_id: str, context: ProviderContext | None = None
 ) -> BackupManifest:

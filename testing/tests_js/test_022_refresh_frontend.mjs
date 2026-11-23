@@ -7,7 +7,6 @@ class EntityBoundary {
 	async reconcilePollingSubscriptions() {}
 }
 
-/** @matrix users : index-mode-toggle pagination */
 test("test_user_mode_switch_loads_all_pages_and_preserves_current_mode_on_failure", async (t) => {
 	createBrowser(t, {
 		html: `<main data-user-mode="regular">
@@ -100,7 +99,6 @@ async function loadPage() {
 	).default;
 }
 
-/** @matrix polling tasks : channel refresh */
 test("test_page_task_collection_watches_task_form_changes", async () => {
 	const Page = await loadPage();
 	const page = new Page();
@@ -145,7 +143,6 @@ test("test_page_task_collection_watches_task_form_changes", async () => {
 	assert.equal(unsubscriptions, 1);
 });
 
-/** @matrix polling startup : subscription-lifecycle deferred-services */
 test("test_page_task_subscription_survives_list_loading_before_polling_service", async (t) => {
 	createBrowser(t);
 	const Page = await loadPage();
@@ -201,8 +198,6 @@ test("test_page_task_subscription_survives_list_loading_before_polling_service",
 	}
 });
 
-/** @matrix reconnect-refresh : manifest */
-/** @source src/script/widgets/tables/indexTable.mjs::IndexTable.refreshDescriptor */
 test("test_collection_manifests_include_hash_and_fingerprint", async () => {
 	class Base {}
 	const [{ IndexTable }, { PageTaskList }] = await Promise.all([
@@ -244,7 +239,6 @@ test("test_collection_manifests_include_hash_and_fingerprint", async () => {
 	}
 });
 
-/** @matrix form-index : created-row delete-target destination-refresh sorting */
 test("test_index_table_row_updates_rebuild_active_sort", async (t) => {
 	createBrowser(t);
 	class BaseTable {}
@@ -333,9 +327,6 @@ async function deltaTable(t, html) {
 	return { table, target, released, flashed };
 }
 
-/**
- * @matrix table-controls : delta-order unchanged-rows focus hidden-rows sentinel-rows
- */
 test("test_index_delta_preserves_unchanged_rows_and_focus", async (t) => {
 	const { table, target, released } = await deltaTable(
 		t,
@@ -383,9 +374,6 @@ test("test_index_delta_preserves_unchanged_rows_and_focus", async (t) => {
 	);
 });
 
-/**
- * @matrix table-controls : delta-order insertion removal empty-row sorting quick-edit-teardown
- */
 test("test_index_delta_reorders_adds_removes_and_restores_sort", async (t) => {
 	const { table, target, released, flashed } = await deltaTable(
 		t,
@@ -457,10 +445,6 @@ test("test_index_delta_reorders_adds_removes_and_restores_sort", async (t) => {
 	);
 });
 
-/**
- * @matrix reconnect-refresh : batching cache-invalidation committed-delete delta-apply destination-invalidation fallback legacy-fallback manifest mounted-collection
- * @pair polling:reentrancy
- */
 test("test_core_refresh_batches_supported_widgets_and_falls_back_per_target", async (t) => {
 	createBrowser(t);
 	const events = [];

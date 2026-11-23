@@ -33,9 +33,6 @@ class RowCommit(TypedDict):
     execution: NotRequired[dict[str, object]]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/ingress.py::commit_ingress_row
-# @reason shared key normalization is exercised through public ingress cursor helpers
 def _ingress_key(identifier):
     if isinstance(identifier, Key):
         return identifier
@@ -46,9 +43,6 @@ def _ingress_key(identifier):
     return datastore_key(identifier)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/ingress.py::commit_ingress_row
-# @reason stored execution decoding is exercised through public ingress cursor helpers
 def _ingress_execution(entity):
     raw = entity.get("execution", "{}")
     try:
@@ -58,10 +52,6 @@ def _ingress_execution(entity):
     return execution if isinstance(execution, dict) else {}
 
 
-# @testable true
-# @tests tests_unit/test_006d_ingress_service.py::test_ingress_status_update_is_cursor_checked
-# @tests tests_unit/test_006d_ingress_service.py::test_ingress_stop_is_durable_and_preserves_current_row_boundary
-# @matrix ingress : compare-and-set cursor failure status stop
 def update_ingress_status(
     identifier: Identifier,
     status: str,
@@ -113,10 +103,6 @@ def update_ingress_status(
         }
 
 
-# @testable true
-# @tests tests_unit/test_006d_ingress_service.py::test_ingress_row_commit_requires_expected_cursor_and_applies_masks
-# @tests tests_unit/test_006d_ingress_service.py::test_ingress_row_commit_rejects_duplicate_cursor
-# @matrix ingress : compare-and-set cursor duplicate-delivery durable-commit property-mask
 def commit_ingress_row(
     identifier: Identifier,
     expected_cursor: int,

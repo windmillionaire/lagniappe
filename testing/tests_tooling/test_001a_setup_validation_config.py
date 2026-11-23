@@ -159,7 +159,6 @@ def _stub_existing_install_preflight(
     monkeypatch.setattr("builtins.input", lambda prompt: "y")
 
 
-# @pair setup:validation
 def test_setup_validators_cover_expected_inputs():
     from installer import admin
     from installer.domain.validation import (
@@ -175,7 +174,6 @@ def test_setup_validators_cover_expected_inputs():
     assert not admin.validate_oauth_client_id("not-google")
 
 
-# @pair setup:interactive-input
 def test_validate_input_retries_allows_empty_and_exits(monkeypatch):
     from installer.utils import validate_input
 
@@ -221,7 +219,6 @@ def test_validate_input_retries_allows_empty_and_exits(monkeypatch):
         never_returns()
 
 
-# @pair setup:project-id
 def test_validate_project_id_and_project_state_are_non_mutating(
     monkeypatch,
     isolated_setup_config,
@@ -286,7 +283,6 @@ def test_validate_project_id_and_project_state_are_non_mutating(
     }
 
 
-# @matrix setup : gcloud-config gcloud-token interactive-input
 def test_gcloud_account_selection_requires_an_explicit_authenticated_identity(
     monkeypatch,
     isolated_setup_config,
@@ -364,7 +360,6 @@ def test_gcloud_account_selection_requires_an_explicit_authenticated_identity(
         setup_target._get_gcloud_account("")
 
 
-# @matrix setup : interactive-input project-id
 def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     monkeypatch,
     isolated_setup_config,
@@ -535,7 +530,6 @@ def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     )
 
 
-# @matrix setup : delegated-install existing-project gcloud-config interactive-input project-iam project-picker provider-discovery
 def test_delegated_project_picker_lists_only_direct_owner_projects(
     monkeypatch,
     isolated_setup_config,
@@ -679,7 +673,6 @@ def test_delegated_project_picker_lists_only_direct_owner_projects(
         setup_target._list_owned_projects("installer@example.com")
 
 
-# @matrix setup : delegated-install interactive-input ordinary-install project-picker
 def test_initial_target_choice_uses_delegated_picker_or_ordinary_name_flow(
     monkeypatch,
     isolated_setup_config,
@@ -734,7 +727,6 @@ def test_initial_target_choice_uses_delegated_picker_or_ordinary_name_flow(
     assert "Enter Y to select an existing project" in output
 
 
-# @matrix setup : adc gcloud-config
 def test_adc_identity_reports_principal_project_and_quota(
     monkeypatch,
     isolated_setup_config,
@@ -768,7 +760,6 @@ def test_adc_identity_reports_principal_project_and_quota(
     assert "https://www.googleapis.com/auth/cloud-platform" in requested_scopes
 
 
-# @matrix setup : adc gcloud-config identity
 def test_adc_principal_mismatch_requires_explicit_reauthentication(
     monkeypatch,
     isolated_setup_config,
@@ -813,7 +804,6 @@ def test_adc_principal_mismatch_requires_explicit_reauthentication(
     assert login_calls == [("owner@example.com", "target-project-1")]
 
 
-# @matrix setup : billing gcloud-config interactive-input
 def test_billing_selection_defers_to_project_console_when_cli_returns_no_open_account(
     monkeypatch,
     capsys,
@@ -840,7 +830,6 @@ def test_billing_selection_defers_to_project_console_when_cli_returns_no_open_ac
     assert capsys.readouterr().out == ""
 
 
-# @matrix setup : billing browser interactive-input
 def test_project_billing_authorization_uses_existing_account_and_project_console(
     monkeypatch,
     capsys,
@@ -897,7 +886,6 @@ def test_project_billing_authorization_uses_existing_account_and_project_console
     assert "create a billing account" not in output
 
 
-# @matrix setup : billing preflight provider-apis
 def test_target_preflight_selects_billing_and_reports_required_apis(
     monkeypatch,
     isolated_setup_config,
@@ -960,7 +948,6 @@ def test_target_preflight_selects_billing_and_reports_required_apis(
     assert preflight["missing_apis"] == ["missing.googleapis.com"]
 
 
-# @matrix setup : billing preflight project-create provider-apis
 def test_target_preflight_defers_billing_discovery_until_new_project_exists(
     monkeypatch,
     isolated_setup_config,
@@ -993,7 +980,6 @@ def test_target_preflight_defers_billing_discovery_until_new_project_exists(
     assert preflight["missing_apis"] == ["one.googleapis.com"]
 
 
-# @matrix setup : billing preflight project-create
 def test_apply_target_preflight_creates_and_bills_confirmed_project(
     monkeypatch,
     isolated_setup_config,
@@ -1062,7 +1048,6 @@ def test_apply_target_preflight_creates_and_bills_confirmed_project(
     ]
 
 
-# @matrix setup : billing browser preflight project-create
 def test_apply_target_preflight_authorizes_billing_after_project_creation_when_cli_list_is_empty(
     monkeypatch,
     isolated_setup_config,
@@ -1131,7 +1116,6 @@ def test_apply_target_preflight_authorizes_billing_after_project_creation_when_c
     assert ["authorize-billing", "target-project-1"] in events
 
 
-# @matrix setup : billing preflight project-create provider-apis
 def test_apply_target_preflight_rediscovers_and_links_existing_billing_account(
     monkeypatch,
     isolated_setup_config,
@@ -1218,7 +1202,6 @@ def test_apply_target_preflight_rediscovers_and_links_existing_billing_account(
     ] in events
 
 
-# @matrix setup : error-guidance google-cloud-terms identity provider-apis
 def test_google_cloud_terms_failure_has_account_specific_repair(
     monkeypatch,
     isolated_setup_config,
@@ -1266,7 +1249,6 @@ def test_google_cloud_terms_failure_has_account_specific_repair(
     )
 
 
-# @matrix setup : app-name validation
 def test_app_name_validation_rejects_control_characters_and_long_names(
     isolated_setup_config,
 ):
@@ -1280,7 +1262,6 @@ def test_app_name_validation_rejects_control_characters_and_long_names(
     assert setup_target._gcloud_configuration_name("A") == "a-setup"
 
 
-# @matrix setup : gcloud-config identity
 def test_cli_identity_snapshot_fails_closed_on_unset_or_error(
     monkeypatch,
     isolated_setup_config,
@@ -1336,7 +1317,6 @@ def test_cli_identity_snapshot_fails_closed_on_unset_or_error(
     }
 
 
-# @pair setup:config-files
 def test_set_application_defaults_deep_copies_templates(monkeypatch, tmp_path):
     _use_isolated_app_dir(monkeypatch, tmp_path)
 
@@ -1418,7 +1398,6 @@ def test_set_application_defaults_deep_copies_templates(monkeypatch, tmp_path):
     assert original_index == constants.INDEX_YAML
 
 
-# @pair setup:config-files
 def test_set_application_defaults_generates_fresh_settings(monkeypatch, tmp_path):
     _use_isolated_app_dir(monkeypatch, tmp_path)
 
@@ -1502,7 +1481,6 @@ def test_set_application_defaults_generates_fresh_settings(monkeypatch, tmp_path
     }
 
 
-# @matrix setup : config-files gcloud-config interactive-input
 def test_set_application_defaults_persists_prompted_name_before_cloud_change(
     monkeypatch,
     tmp_path,
@@ -1681,7 +1659,6 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
     assert "setup_draft" not in config.File.DEV_YAML.load()
 
 
-# @matrix setup : adc existing-project interactive-input preconfirmation provider-apis
 def test_existing_project_prepares_bootstrap_apis_before_adc(
     monkeypatch,
     tmp_path,
@@ -1785,8 +1762,6 @@ def test_existing_project_prepares_bootstrap_apis_before_adc(
     ]
 
 
-# @matrix admin : bootstrap-email google-oauth google-signin interactive-input prompt-clarity
-# @matrix setup : billing delegated-install existing-project owner preconfirmation project-iam
 def test_delegated_setup_automatically_enables_google_and_installer_bootstrap(
     monkeypatch, tmp_path, capsys
 ):
@@ -1891,7 +1866,6 @@ def test_delegated_setup_automatically_enables_google_and_installer_bootstrap(
     assert signin_choices == ["asked"]
 
 
-# @matrix setup : adc gcloud-token operator-permissions preflight
 def test_existing_project_checks_cli_installer_permissions_before_adc_authentication(
     monkeypatch,
     capsys,
@@ -1948,7 +1922,6 @@ def test_existing_project_checks_cli_installer_permissions_before_adc_authentica
     assert "missing required permission" in str(error.value)
 
 
-# @matrix setup : adc gcloud-token identity
 def test_gcloud_project_client_uses_selected_cli_account_without_adc(monkeypatch):
     from google.cloud import resourcemanager_v3
     from google.oauth2 import credentials as oauth_credentials
@@ -2005,7 +1978,6 @@ def test_gcloud_project_client_uses_selected_cli_account_without_adc(monkeypatch
         setup_target._gcloud_project_client("installer@example.test")
 
 
-# @matrix setup : config-files config-version
 def test_update_config_sets_application_version_from_package(monkeypatch, generation_reload_isolation):
     import config
     from config import constants
@@ -2036,7 +2008,6 @@ def test_update_config_sets_application_version_from_package(monkeypatch, genera
     assert email == {"version": 1, "aliases": {"ai": "ai", "ask": "ask"}}
 
 
-# @matrix setup : agent-access ai-defaults config-files source-link
 def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_path):
     _use_isolated_app_dir(monkeypatch, tmp_path)
 
@@ -2149,7 +2120,6 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
     assert token_calls == []
 
 
-# @matrix setup : config-files gcloud-config
 def test_setup_config_status_save_and_gcloud_login_helpers(monkeypatch, tmp_path):
     app_dir = tmp_path
     _use_isolated_app_dir(monkeypatch, app_dir)
@@ -2235,7 +2205,6 @@ def test_setup_config_status_save_and_gcloud_login_helpers(monkeypatch, tmp_path
     }
 
 
-# @matrix setup : activation deploy-surface gcloud-config transactional-state
 def test_verify_installation_is_read_only_and_activation_is_explicit(monkeypatch):
     from installer import verify
 
@@ -2278,7 +2247,6 @@ def test_verify_installation_is_read_only_and_activation_is_explicit(monkeypatch
     assert calls == ["generation", "deploy-surface"]
 
 
-# @matrix setup : config-files validation
 def test_verify_application_config_reports_missing_areas(monkeypatch, capsys):
     import installer as setup_pkg
     from installer import create_config
@@ -2309,10 +2277,6 @@ def test_verify_application_config_reports_missing_areas(monkeypatch, capsys):
     assert "SECRET_KEY" not in output
 
 
-# @matrix setup : ai-policy config-files git-upgrade interactive-input settings-save
-# @matrix mcp-install : configuration opt-in legacy-settings
-# @source installer/optional.py::configure_ai_features
-# @source installer/mcp.py::requested
 @pytest.mark.parametrize(
     "upgrade,policy,answers,expected_policy,expect_mcp",
     [
@@ -2376,7 +2340,6 @@ def test_upgrade_collects_missing_ai_choices(
         assert saved == []
 
 
-# @matrix setup : config-files google-oauth optional validation
 def test_verify_application_config_requires_google_client_only_when_enabled(
     monkeypatch,
     capsys,
@@ -2407,7 +2370,6 @@ def test_verify_application_config_requires_google_client_only_when_enabled(
     assert create_config.verify_application_config()
 
 
-# @matrix setup : config-files keyless-config project-identity validation
 def test_verify_application_config_rejects_keyless_identity_mismatch(
     monkeypatch,
     capsys,
@@ -2446,7 +2408,6 @@ def test_verify_application_config_rejects_keyless_identity_mismatch(
     assert "Google Cloud keyless identity" in capsys.readouterr().out
 
 
-# @matrix setup : config-files redis-tls validation
 def test_verify_application_config_reports_invalid_redis_tls(monkeypatch, capsys):
     import installer as setup_pkg
     from installer import create_config
@@ -2482,8 +2443,6 @@ def test_verify_application_config_reports_invalid_redis_tls(monkeypatch, capsys
     assert "Missing configuration areas: Redis transport security" in output
 
 
-# @matrix setup : config-files config-version transactional-state
-# @matrix deploy : app-yaml pdf-preview static-assets
 @pytest.mark.parametrize("scaling", ["automatic", "basic"])
 def test_config_builders_preserve_inputs_and_generate_independent_documents(scaling, monkeypatch):
     from config import constants
@@ -2551,7 +2510,6 @@ def test_config_builders_preserve_inputs_and_generate_independent_documents(scal
     assert (app, gcloud, deployment, dev, test, indexes, manifest) == inputs
 
 
-# @matrix setup : config-files config-version git-upgrade
 def test_update_config_refreshes_preloaded_builders_and_current_settings(
     monkeypatch, tmp_path, generation_reload_isolation
 ):
@@ -2604,7 +2562,6 @@ def _configure_adc_quota_test(monkeypatch, spinner):
 
 
 
-# @matrix setup : adc permissions transactional-state
 def test_adc_authentication_is_kept_only_after_project_permission_confirmation(
     monkeypatch,
     tmp_path,
@@ -2679,7 +2636,6 @@ def test_adc_authentication_is_kept_only_after_project_permission_confirmation(
     assert adc_path.read_text(encoding="utf-8") == new_credentials
 
 
-# @matrix setup : adc transactional-state
 @pytest.mark.parametrize("failure", [SetupCancelled, KeyboardInterrupt])
 @pytest.mark.parametrize("prior", [False, True])
 def test_adc_transaction_rolls_back_uncommitted_interruption(tmp_path, failure, prior):
@@ -2704,7 +2660,6 @@ def test_adc_transaction_rolls_back_uncommitted_interruption(tmp_path, failure, 
         assert not path.exists()
 
 
-# @matrix setup : adc transactional-state
 def test_adc_transaction_rejects_existing_credentials_and_keeps_committed_identity(tmp_path):
     path = tmp_path / "adc.json"
     path.write_text("rejected existing ADC")
@@ -2724,7 +2679,6 @@ def test_adc_transaction_rejects_existing_credentials_and_keeps_committed_identi
     assert path.read_text() == "confirmed ADC"
 
 
-# @matrix setup : adc new-project transactional-state
 def test_new_project_forces_transactional_adc_refresh(monkeypatch, tmp_path):
     spinner = SpinnerRecorder()
     _configure_adc_quota_test(monkeypatch, spinner)
@@ -2803,7 +2757,6 @@ def test_new_project_forces_transactional_adc_refresh(monkeypatch, tmp_path):
     assert delays == [2, 4]
 
 
-# @matrix setup : adc gcloud-config
 def test_set_application_defaults_refreshes_adc_login_after_quota_failure(monkeypatch, adc_transaction):
     spinner = SpinnerRecorder()
     _configure_adc_quota_test(monkeypatch, spinner)
@@ -2885,7 +2838,6 @@ def test_set_application_defaults_refreshes_adc_login_after_quota_failure(monkey
     )
 
 
-# @matrix setup : adc gcloud-config
 def test_set_application_defaults_exits_when_adc_login_refresh_fails(monkeypatch, adc_transaction):
     spinner = SpinnerRecorder()
     _configure_adc_quota_test(monkeypatch, spinner)
@@ -2933,7 +2885,6 @@ def test_set_application_defaults_exits_when_adc_login_refresh_fails(monkeypatch
     )
 
 
-# @matrix setup : env-export gcloud-config
 def test_gcloud_switcher_exports_project_for_child_processes(monkeypatch):
     import os
     import config

@@ -21,9 +21,6 @@ from .ordering import page_task_roots
 _MIN_DATETIME = datetime.min.replace(tzinfo=UTC)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/combine.py::combine_tasks
-# @reason immutable result only carries the persisted combine outcome
 @dataclass(frozen=True)
 class TaskCombineResult:
     main: Task
@@ -31,10 +28,6 @@ class TaskCombineResult:
     histories: tuple
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/combine.py::compatible_tasks
-# @covered-by lagniappe/core/tools/tasks/combine.py::combine_tasks
-# @reason exact page/model identity is exercised through both public combine boundaries
 def _compatible(source, candidate, page):
     if not isinstance(source, Entities.TASK) or not isinstance(
         candidate, Entities.TASK
@@ -52,9 +45,6 @@ def _compatible(source, candidate, page):
     return source.properties.model.key == candidate.properties.model.key
 
 
-# @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_combine_selects_completed_then_modified_main
-# @matrix task-combine : completed-on deterministic-tie modified winner
 def select_main_task(tasks: Iterable[Task]) -> Task:
     """Choose the task whose current state remains after a combination."""
     tasks = tuple(task for task in tasks if isinstance(task, Entities.TASK))
@@ -82,9 +72,6 @@ def select_main_task(tasks: Iterable[Task]) -> Task:
     )
 
 
-# @testable true
-# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
-# @matrix task-combine : compatible linked-page no-model same-model same-page view-page
 def compatible_tasks(task: Task, page: Page, user: User) -> tuple[Task, ...]:
     """Return delete-permitted peers owned by the page displaying ``task``."""
     if not isinstance(task, Entities.TASK) or not isinstance(page, Entities.PAGE):
@@ -108,9 +95,6 @@ def compatible_tasks(task: Task, page: Page, user: User) -> tuple[Task, ...]:
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/combine.py::combine_tasks
-# @reason stable destination identities make the public two-phase combine retry-safe
 def _history_key(main, source):
     source_key = source.urlsafe_key.encode("utf-8")
     digest = hashlib.sha256(source_key).hexdigest()
@@ -118,9 +102,6 @@ def _history_key(main, source):
     return database_utility.create_named_key("task_history", identifier, parent=main)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/combine.py::combine_tasks
-# @reason source history expansion is part of the public migration operation
 def _source_histories(tasks):
     keys = [
         history_key
@@ -139,9 +120,6 @@ def _source_histories(tasks):
     )
 
 
-# @testable true
-# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
-# @matrix task-combine : attachments completed-on current-snapshot delete existing-history migrate-history winner
 def combine_tasks(task: Task, selected_keys: Iterable[str] | None, page: Page, user: User) -> TaskCombineResult:
     """Combine ``task`` with selected compatible peers and return the outcome."""
     selected_keys = tuple(selected_keys or ())

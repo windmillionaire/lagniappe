@@ -15,7 +15,6 @@ from testing.utility.ai_report_fakes import (
     _test_user,
 )
 
-# @matrix ai-report direct-upload : normalization upload-manifest validation
 @pytest.mark.unit
 def test_prepare_report_upload_manifest_normalizes_browser_records():
     manifest = report_uploads.prepare_report_upload_manifest(
@@ -94,7 +93,6 @@ def test_prepare_report_upload_manifest_normalizes_browser_records():
 
 
 
-# @matrix ai-report direct-upload : active-request background-finalization progress resume upload-manifest
 @pytest.mark.unit
 def test_finalize_report_upload_manifest_resumes_and_checkpoints(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -181,7 +179,6 @@ def test_finalize_report_upload_manifest_resumes_and_checkpoints(monkeypatch):
 
 
 
-# @matrix ai-report direct-upload : background-finalization checkpoint-failure upload-manifest
 @pytest.mark.unit
 def test_finalize_report_upload_manifest_retains_source_until_checkpoint(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -271,8 +268,6 @@ def test_finalize_report_upload_manifest_retains_source_until_checkpoint(monkeyp
     assert report.upload_manifest is None
 
 
-# @matrix ai-report direct-upload : checkpoint-failure generation-cleanup lease-renewal
-# @source lagniappe/core/tools/ai/reporting/uploads.py::finalize_report_upload_manifest
 @pytest.mark.unit
 def test_finalize_report_upload_manifest_cleans_copied_file_after_definite_lease_loss():
     user = SimpleNamespace()
@@ -317,8 +312,6 @@ def test_finalize_report_upload_manifest_cleans_copied_file_after_definite_lease
     )
 
 
-# @matrix ai-report direct-upload : factory-failure generation-cleanup
-# @source lagniappe/core/tools/ai/reporting/uploads.py::finalize_report_upload_manifest
 @pytest.mark.unit
 def test_finalize_report_upload_manifest_owns_cleanup_when_file_factory_fails():
     report = SimpleNamespace(
@@ -361,8 +354,6 @@ def test_finalize_report_upload_manifest_owns_cleanup_when_file_factory_fails():
     )
 
 
-# @matrix ai-report direct-upload : cleanup partial-progress retry
-# @source lagniappe/core/tools/ai/reporting/uploads.py::finalize_report_upload_manifest
 @pytest.mark.unit
 def test_finalize_report_upload_manifest_retains_checkpoint_when_source_cleanup_fails():
     report = SimpleNamespace(
@@ -396,7 +387,6 @@ def test_finalize_report_upload_manifest_retains_checkpoint_when_source_cleanup_
 
 
 
-# @matrix ai-report direct-upload : large-file
 @pytest.mark.unit
 def test_finalize_report_upload_manifest_accepts_actual_oversized_object():
     report = SimpleNamespace(
@@ -432,7 +422,6 @@ def test_finalize_report_upload_manifest_accepts_actual_oversized_object():
     assert len(cleaned) == 1
 
 
-# @matrix ai-report direct-upload : pre-execution upload-manifest
 @pytest.mark.unit
 def test_finalize_report_upload_manifest_marks_default_files_as_report_only(monkeypatch):
     user = _test_user("default-upload-owner")
@@ -471,7 +460,6 @@ def test_finalize_report_upload_manifest_marks_default_files_as_report_only(monk
 
 
 
-# @matrix ai-report direct-upload : cleanup partial-progress upload-manifest
 @pytest.mark.unit
 def test_cleanup_report_upload_manifest_deletes_all_temporary_sources(monkeypatch):
     _patch_fake_keys(monkeypatch)

@@ -6,9 +6,6 @@ from .base import MigrationDataError, _file_record_reference, _result, scan_kind
 from ..core import KINDS
 
 
-# @testable true
-# @tests tests_unit/test_018b_database_migrations.py::test_file_page_migration_backfills_task_ancestry_and_preserves_staging
-# @matrix files migrations : history parent-key conflict idempotence
 def migrate_file_pages(context: MigrationContext) -> MigrationResult:
     result = _result("FIL-002", "File Page ancestry")
     owners = {
@@ -22,9 +19,6 @@ def migrate_file_pages(context: MigrationContext) -> MigrationResult:
         if row.get("type") == "task_history"
     }
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/migration_steps/v2_0_file_pages.py::migrate_file_pages
-    # @reason raw-record transform is exercised through the migration runner
     def transform(row):
         task_key, page_key = row.get("task"), row.get("page")
         if task_key in histories:
@@ -76,9 +70,6 @@ def migrate_file_pages(context: MigrationContext) -> MigrationResult:
     return result
 
 
-# @testable true
-# @tests tests_unit/test_018b_database_migrations.py::test_canonical_restrictions_migration_preserves_local_settings_and_inheritance
-# @matrix permissions migrations : local-restrictions admin-only idempotence
 def migrate_canonical_restrictions(context: MigrationContext) -> MigrationResult:
     result = _result("RST-002", "Canonical restriction groups")
     groups = {
@@ -87,9 +78,6 @@ def migrate_canonical_restrictions(context: MigrationContext) -> MigrationResult
         if row.get("type") in {"group", "public_group"}
     }
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/migration_steps/v2_0_file_pages.py::migrate_canonical_restrictions
-    # @reason raw-record transform is exercised through the migration runner
     def transform(row):
         stored = row.get("restricted_to") or []
         if not isinstance(stored, list) or any(not isinstance(value, str) or not value for value in stored):

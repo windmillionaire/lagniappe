@@ -50,17 +50,12 @@ def _target_key(target: Entity | str) -> str:
 AUTOFILL_FORM_LOCK_SCOPE = Scope.AUTOFILL_FORM
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lock_resolution_is_target_scoped
-# @matrix deferred-jobs : deterministic-key form-lock
 def deferred_job_lock_key(target: Entity | str, scope: str = AUTOFILL_FORM_LOCK_SCOPE) -> Key | None:
     """Return the deterministic lock key for one target mutation surface."""
     identifier = Scope.identifier(target, scope)
     return database_utility.create_named_key("job_lock", identifier) if identifier else None
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/deferred_jobs/locks.py::deferred_job_lock_descriptor
 def active_deferred_job_lock(target: Entity | str | None, scope: str = AUTOFILL_FORM_LOCK_SCOPE) -> ActiveLock | None:
     """Return ``(lock, job)`` while the target's referenced job is active."""
     if target is None:
@@ -69,9 +64,6 @@ def active_deferred_job_lock(target: Entity | str | None, scope: str = AUTOFILL_
     return deferred_job_lock_descriptors([target], scope=scope).get(target_key)
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lock_resolution_is_target_scoped
-# @matrix deferred-jobs : form-lock stale-cleanup
 def deferred_job_lock_descriptors(targets: Iterable[Entity | str | None] | None, scope: str = AUTOFILL_FORM_LOCK_SCOPE) -> dict[str, ActiveLock]:
     """Batch-resolve active locks keyed by target urlsafe key."""
     targets = [target for target in targets or () if target]
@@ -127,9 +119,6 @@ def deferred_job_lock_descriptors(targets: Iterable[Entity | str | None] | None,
     return active
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lock_descriptor_is_browser_safe
-# @matrix deferred-jobs : browser-projection form-lock
 def deferred_job_lock_descriptor(target: Entity | str, scope: str = AUTOFILL_FORM_LOCK_SCOPE) -> dict[str, object] | None:
     """Return the browser-safe active-operation descriptor for ``target``."""
     active = active_deferred_job_lock(target, scope)

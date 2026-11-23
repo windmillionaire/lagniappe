@@ -3,11 +3,6 @@
  * Epoch checks remain authoritative even when AbortController is unavailable
  * or a transport cannot be cancelled.
  *
- * @testable true
- * @tests tests_js/test_046_async_query_lifecycle.mjs::test_query_lifecycle_publishes_only_the_current_request
- * @tests tests_js/test_046_async_query_lifecycle.mjs::test_query_lifecycle_invalidates_repeated_keys_and_destroyed_owners
- * @tests tests_js/test_046_async_query_lifecycle.mjs::test_query_lifecycle_propagates_current_loader_errors
- * @matrix async-query : cancellation error-propagation ordering repeated-key teardown
  */
 export class QueryLifecycle {
 	constructor() {

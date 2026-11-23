@@ -79,7 +79,6 @@ def _write_completed_build(root, *, mode="production", version="1.2.3"):
     return metadata
 
 
-# @matrix frontend-build : artifact-integrity build-metadata source-integrity
 def test_frontend_build_validator_checks_recursive_artifacts_and_source_identity(
     tmp_path,
 ):
@@ -118,7 +117,6 @@ def test_frontend_build_validator_checks_recursive_artifacts_and_source_identity
     assert any("not in the artifact inventory" in issue for issue in issues)
 
 
-# @matrix frontend-build : artifact-integrity build-identity path-safety
 def test_frontend_build_validator_rejects_unsafe_and_incoherent_metadata(tmp_path):
     metadata = _write_completed_build(tmp_path, mode="development")
     metadata["artifacts"][0]["path"] = "../outside.js"
@@ -142,7 +140,6 @@ def test_frontend_build_validator_rejects_unsafe_and_incoherent_metadata(tmp_pat
     assert any("different build IDs" in issue for issue in issues)
 
 
-# @matrix deploy frontend-build : safe-failure validation
 def test_verify_frontend_build_reports_actionable_failure(tmp_path):
     with pytest.raises(RuntimeError, match="Rerun the appropriate npm build command"):
         verify_frontend_build(

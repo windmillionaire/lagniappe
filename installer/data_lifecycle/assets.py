@@ -23,14 +23,12 @@ if TYPE_CHECKING:
     from .archive import _RecoveryAssetBucket
 
 
-# @testable infrastructure
 class _RangeDownload(Protocol):
     def __call__(
         self, *, start: int, end: int, if_generation_match: int, checksum: None
     ) -> bytes: ...
 
 
-# @testable infrastructure
 class ArchiveAsset(TypedDict):
     logical_id: str
     entity: dict[str, object]
@@ -50,9 +48,6 @@ DOWNLOAD_CHUNK_BYTES = 8 * 1024 * 1024
 GENERATION_RETRY_LIMIT = 3
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_asset_collection_is_generation_bound_resumable_and_deduplicated
-# @matrix portable-archive : assets generation-binding resume
 class AssetCollector:
     """Download only staged references and publish verified content-addressed bytes."""
 

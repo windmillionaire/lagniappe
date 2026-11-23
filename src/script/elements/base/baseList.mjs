@@ -1,6 +1,3 @@
-/**
- * @testable infrastructure
- */
 export class BaseList {
 	constructor(attributes) {
 		Object.assign(this, attributes);

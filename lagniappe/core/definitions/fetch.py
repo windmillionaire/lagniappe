@@ -5,8 +5,6 @@ from enum import Enum, IntEnum
 from typing import Self
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/definitions/fetch.py::Fetch
 class FetchDepth(IntEnum):
     """Total relationship depth available after a fetch completes."""
 
@@ -15,8 +13,6 @@ class FetchDepth(IntEnum):
     NESTED = 2
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/definitions/fetch.py::Fetch
 class FetchReason(Enum):
     """Registered invariants that justify nested relationship loading."""
 
@@ -33,9 +29,6 @@ class FetchReason(Enum):
     CACHE_REBUILD_MATERIALIZATION = "cache-rebuild-materialization"
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_fetch_requires_registered_reason_for_nested_depth
-# @pairs entities:explicit-fetch-depth permissions:registered-reason
 @dataclass(frozen=True)
 class Fetch:
     """A caller-owned declaration of the entity graph it needs.

@@ -27,9 +27,6 @@ USER_AGENT = "Mozilla/5.0 AppleWebKit/537.36 Chrome/126 Safari/537.36"
 FONT_URL_RE = re.compile(r"src:\s*url\((https://fonts\.gstatic\.com/[^)]+)\)")
 
 
-# @testable true
-# @tests tests_tooling/test_icons.py::test_material_symbol_subset_request_uses_unique_sorted_registry_glyphs
-# @pair icons:subset-request
 def subset_request(icons_path: Path = ICONS_PATH) -> tuple[str, list[str]]:
     registry = yaml.safe_load(Path(icons_path).read_text(encoding="utf-8")) or {}
     definitions = flatten_icon_definitions(
@@ -46,18 +43,12 @@ def subset_request(icons_path: Path = ICONS_PATH) -> tuple[str, list[str]]:
     return f"{GOOGLE_FONTS_CSS_URL}?{query}", icon_names
 
 
-# @testable false
-# @covered-by runner/icons.py::update_icons
-# @reason network transport is isolated behind tested response parsing
 def _download(url):
     request = Request(url, headers={"User-Agent": USER_AGENT})
     with urlopen(request, timeout=60) as response:
         return response.read()
 
 
-# @testable true
-# @tests tests_tooling/test_icons.py::test_update_icons_writes_official_subset_metadata_and_rebuilds
-# @pair icons:subset-update
 def _font_url(css):
     match = FONT_URL_RE.search(css)
     if not match:
@@ -67,9 +58,6 @@ def _font_url(css):
     return match.group(1)
 
 
-# @testable true
-# @tests tests_tooling/test_icons.py::test_update_icons_writes_official_subset_metadata_and_rebuilds
-# @pair icons:subset-update
 def _write_subset(font, css_url, font_url, icon_names, font_path, metadata_path):
     if not font.startswith(b"wOF2"):
         raise ValueError("Google Fonts response is not a WOFF2 font")
@@ -142,9 +130,6 @@ def _write_subset(font, css_url, font_url, icon_names, font_path, metadata_path)
                 shutil.rmtree(directory)
 
 
-# @testable true
-# @tests tests_tooling/test_icons.py::test_update_icons_writes_official_subset_metadata_and_rebuilds
-# @pair icons:subset-update
 def update_icons(
     *,
     rebuild: bool = True,

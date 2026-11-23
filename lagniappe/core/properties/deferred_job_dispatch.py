@@ -18,16 +18,10 @@ class DispatchState(DBProperty[str]):
     _id = "dispatch_state"
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_task_identity_is_deterministic_and_bounded
-# @matrix deferred-jobs : feedback-identity task-identity
 class TaskIdentity(DBProperty[str]):
     _id = "task_identity"
 
     @staticmethod
-    # @testable true
-    # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_task_identity_is_deterministic_and_bounded
-    # @pair deferred-jobs:task-identity
     def create(job: models.DeferredJob, attempt: int, *, suffix: str | None = None) -> str:
         digest = hashlib.sha256(job.idempotency_key.encode("utf-8")).hexdigest()[:32]
         task_id = f"job-{digest}-a{int(attempt)}"
@@ -42,9 +36,6 @@ class TaskIdentity(DBProperty[str]):
         return task_id
 
     @staticmethod
-    # @testable true
-    # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_task_identity_is_deterministic_and_bounded
-    # @pair deferred-jobs:feedback-identity
     def feedback(job: models.DeferredJob) -> str:
         digest = hashlib.sha256(job.idempotency_key.encode("utf-8")).hexdigest()[:32]
         return f"job-{digest}-feedback"

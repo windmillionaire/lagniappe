@@ -46,7 +46,6 @@ class DeferredJobDriftError(exceptions.ValidationError):
 
 
 
-# @testable infrastructure
 class DeferredJobLockedError(exceptions.ValidationError):
     """A target-scoped operation already owns the requested mutation surface."""
 

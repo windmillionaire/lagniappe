@@ -65,11 +65,6 @@ GET_PAGE_DETAILS = types.FunctionDeclaration(
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_page_details_includes_file_summaries_by_default
-# @matrix ai files pages tasks : exclusions page-details projection summary
-# @matrix ai tasks : compact pagination permissions
-# @tests tests_unit/test_015f_ai_task_lists.py::test_compact_page_details_*
 def execute_get_page_details(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
     if not isinstance(identifier, str) or not identifier:

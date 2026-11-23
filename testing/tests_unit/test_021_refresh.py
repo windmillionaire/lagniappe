@@ -72,7 +72,6 @@ def _task(name, hash_value, modified, due_date=None):
     return task
 
 
-# @matrix reconnect-refresh : entity-view root-fingerprint site-index
 @pytest.mark.unit
 def test_load_refresh_view_uses_entity_or_site_index_fingerprint():
     category = SimpleNamespace(fingerprint="category-fingerprint")
@@ -96,7 +95,6 @@ def test_load_refresh_view_uses_entity_or_site_index_fingerprint():
     site_fingerprint.assert_called_once_with("/tasks/index")
 
 
-# @matrix filters polling : saved-filter permissions revision
 @pytest.mark.unit
 def test_saved_filter_refresh_reauthorizes_unchanged_rows_after_viewer_change(monkeypatch):
     from lagniappe.core.tools.polling.projections import filter_result_revision
@@ -133,7 +131,6 @@ def test_saved_filter_refresh_reauthorizes_unchanged_rows_after_viewer_change(mo
     assert delta.remove == delta.upsert == ()
 
 
-# @matrix reconnect-refresh task-index : ordering root-depth
 @pytest.mark.unit
 def test_task_index_refresh_roots_uses_both_ordered_query_streams():
     now = datetime.now(UTC)
@@ -173,7 +170,6 @@ def test_task_index_refresh_roots_uses_both_ordered_query_streams():
     fetch.assert_called_once_with("dated", "undated", request=Fetch.root())
 
 
-# @pairs permissions:own-page-only reconnect-refresh:authenticated-access
 @pytest.mark.unit
 def test_load_refresh_collection_allows_task_index_without_models_permission():
     viewer = _viewer()
@@ -196,7 +192,6 @@ def test_load_refresh_collection_allows_task_index_without_models_permission():
     assert collection == RefreshCollection("task-index", parent, (root,))
 
 
-# @matrix category-index reconnect-refresh : membership root-depth
 @pytest.mark.unit
 def test_page_index_refresh_roots_reuses_restricted_collection_query():
     category = TestEntities.get(
@@ -226,7 +221,6 @@ def test_page_index_refresh_roots_reuses_restricted_collection_query():
     fetch.assert_called_once_with("page-key", request=Fetch.root())
 
 
-# @matrix reconnect-refresh user-index : mode root-depth page-canonical
 @pytest.mark.unit
 def test_user_index_refresh_roots_preserves_regular_and_public_modes():
     regular = TestEntities.get(
@@ -288,7 +282,6 @@ def test_user_index_refresh_roots_preserves_regular_and_public_modes():
     assert fetch.call_args_list[3].args == (public.page.key,)
 
 
-# @matrix permissions reconnect-refresh : authorization direct-depth modified ordering removal
 @pytest.mark.unit
 def test_resolve_refresh_delta_expands_only_changed_roots_and_authorizes_before_upsert():
     now = datetime(2026, 1, 1, tzinfo=UTC)
@@ -313,7 +306,6 @@ def test_resolve_refresh_delta_expands_only_changed_roots_and_authorizes_before_
     assert delta.order == (unchanged.urlsafe_key, changed.urlsafe_key)
 
 
-# @matrix reconnect-refresh : component-identity root-depth target-validation
 @pytest.mark.unit
 def test_load_refresh_collection_resolves_component_from_view_entity():
     page = TestEntities.get(
@@ -340,7 +332,6 @@ def test_load_refresh_collection_resolves_component_from_view_entity():
     assert collection == RefreshCollection("page-tasks", page, roots)
 
 
-# @matrix filters reconnect-refresh : membership root-depth
 @pytest.mark.unit
 def test_filter_cache_query_roots_uses_root_fetch_without_permission_expansion():
     parent = SimpleNamespace(hash="refresh-filter-parent")
@@ -363,8 +354,6 @@ def test_filter_cache_query_roots_uses_root_fetch_without_permission_expansion()
     assert roots == ["first-root", "second-root"]
 
 
-# @matrix reconnect-refresh : cache-refresh component-identity root-depth
-# @pair filters:cache-refresh
 @pytest.mark.unit
 def test_load_refresh_collection_refreshes_saved_filter_cache_before_root_query():
     project = TestEntities.get(
@@ -420,8 +409,6 @@ def test_load_refresh_collection_refreshes_saved_filter_cache_before_root_query(
     )
 
 
-# @matrix permissions reconnect-refresh : authorization modified removal
-# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
 @pytest.mark.unit
 @pytest.mark.parametrize("cache_state", ["missing", "wrong-key", "wrong-kind", "stale-base", "restriction-change"])
 def test_refresh_cache_holes_and_changed_restrictions_require_authorization(monkeypatch, cache_state):
@@ -447,8 +434,6 @@ def test_refresh_cache_holes_and_changed_restrictions_require_authorization(monk
     assert delta.upsert == delta.order == ()
 
 
-# @matrix permissions reconnect-refresh : authorization modified
-# @matrix permissions cache : identity user-page no-extra-read
 @pytest.mark.unit
 @pytest.mark.parametrize("kind", ["task", "page", "user-page"])
 def test_warm_refresh_preserves_rows_without_expanding_relations(monkeypatch, kind):
@@ -472,8 +457,6 @@ def test_warm_refresh_preserves_rows_without_expanding_relations(monkeypatch, ki
     assert delta.upsert == delta.remove == ()
 
 
-# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
-# @matrix notes cache : masked-touch authorized-refresh
 @pytest.mark.unit
 def test_invalidated_owner_revision_requires_authorized_refresh(monkeypatch):
     entity = TestEntities.get("PAGE", {"name": "Touched owner", "hash": "touched-owner"})
@@ -490,8 +473,6 @@ def test_invalidated_owner_revision_requires_authorized_refresh(monkeypatch):
     assert delta.remove == (entity.urlsafe_key,)
 
 
-# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
-# @matrix reconnect-refresh permissions : cached-fingerprint authorization no-extra-read
 @pytest.mark.unit
 @pytest.mark.parametrize("source_state", ["current", "missing", "legacy-pointer", "before-cache-write"])
 def test_form_version_refresh_batches_sources_without_expanding_unchanged_rows(monkeypatch, source_state):
@@ -563,8 +544,6 @@ def test_form_version_refresh_batches_sources_without_expanding_unchanged_rows(m
     assert fetches == writes == []
 
 
-# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
-# @matrix reconnect-refresh : cached-fingerprint no-extra-read
 @pytest.mark.unit
 @pytest.mark.parametrize("reserved", [False, True], ids=["no-form", "reserved-form"])
 def test_warm_refresh_needs_no_form_source_for_no_form_or_reserved_form(monkeypatch, reserved):
@@ -591,8 +570,6 @@ def test_warm_refresh_needs_no_form_source_for_no_form_or_reserved_form(monkeypa
     assert delta.order == (task.urlsafe_key,)
 
 
-# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
-# @matrix reconnect-refresh : cached-fingerprint no-extra-read
 @pytest.mark.unit
 def test_legacy_empty_form_version_requires_one_authorized_refresh(monkeypatch):
     task = _task("Legacy", "legacy-no-form", datetime(2026, 1, 1, tzinfo=UTC))
@@ -616,8 +593,6 @@ def test_legacy_empty_form_version_requires_one_authorized_refresh(monkeypatch):
     assert cached["form_hash"] is None
 
 
-# @matrix reconnect-refresh : entity-view root-fingerprint
-# @source lagniappe/core/tools/polling/refresh.py::load_refresh_view
 @pytest.mark.unit
 def test_page_refresh_tracks_tasks_separately_from_page_fingerprint(monkeypatch):
     page = TestEntities.get("PAGE", {"name": "Page", "hash": "page-refresh"})
@@ -629,17 +604,12 @@ def test_page_refresh_tracks_tasks_separately_from_page_fingerprint(monkeypatch)
     assert loaded.reauthorize is False
 
 
-# @matrix reconnect-refresh : target-validation
-# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
 @pytest.mark.unit
 def test_legacy_refresh_manifest_falls_back_instead_of_trusting_timestamps():
     with pytest.raises(RefreshFallback):
         resolve_refresh_delta(RefreshCollection("task-index", None, ()), [{"key": "old", "modified": "date"}], _viewer())
 
 
-# @matrix reconnect-refresh : root-fingerprint membership no-extra-read
-# @source lagniappe/core/tools/polling/refresh.py::load_refresh_collection
-# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
 @pytest.mark.unit
 @pytest.mark.parametrize("change", [None, "parent", "authorization", "collection"])
 def test_refresh_reuses_membership_only_while_all_parent_revisions_match(monkeypatch, change):
@@ -675,8 +645,6 @@ def test_refresh_reuses_membership_only_while_all_parent_revisions_match(monkeyp
     assert delta.upsert == delta.remove == ()
 
 
-# @matrix reconnect-refresh permissions : cached-fingerprint authorization no-extra-read
-# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
 @pytest.mark.unit
 def test_unchanged_parent_refresh_loads_only_rows_with_changed_cached_fingerprints(monkeypatch):
     now = datetime(2026, 1, 1, tzinfo=UTC)
@@ -699,8 +667,6 @@ def test_unchanged_parent_refresh_loads_only_rows_with_changed_cached_fingerprin
     assert delta.order == (unchanged.urlsafe_key, changed.urlsafe_key)
 
 
-# @matrix reconnect-refresh user-index : page-canonical authorization
-# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
 @pytest.mark.unit
 @pytest.mark.parametrize("allowed", [True, False])
 @pytest.mark.parametrize("unchanged_parent", [True, False])
@@ -720,8 +686,6 @@ def test_user_index_refresh_authorizes_page_projection_through_its_user(monkeypa
     assert delta.remove == (() if allowed else (page.urlsafe_key,))
 
 
-# @matrix user-index : page-canonical user-fields no-extra-read
-# @source lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
 @pytest.mark.unit
 def test_user_index_revision_refreshes_user_fields_with_unchanged_page_fingerprint(monkeypatch):
     modified = datetime(2026, 1, 1, tzinfo=UTC)

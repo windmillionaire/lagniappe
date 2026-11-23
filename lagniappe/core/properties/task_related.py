@@ -31,9 +31,6 @@ type _File = models.File
 type _Model = models.ModelTask
 
 
-# @testable true
-# @tests tests_unit/test_010_task_index.py::test_task_index_status_column_derives_messages_from_mixed_forms
-# @matrix status task-index : computed-column mixed-forms
 class TaskStatus(ColumnMixin, Property[list[str], _Task]):
     """Task-level status column derived from the task's attached form."""
 
@@ -70,10 +67,6 @@ class TaskStatus(ColumnMixin, Property[list[str], _Task]):
         return field.sort_value if field else None
 
 
-# @testable true
-# @tests tests_unit/test_005_project_properties.py::test_project_filters
-# @tests tests_unit/test_013_task_properties.py::test_task_categories_follow_parent_page_categories
-# @matrix task : categories conditions entity-fields filter-value parent-derived
 class TaskCategories(
     RelatedEntityListMixin[_Category], FilterMixin, ColumnMixin, AIMixin, Property[list[_Category], _Task]
 ):
@@ -120,10 +113,6 @@ class TaskCategories(
         return details
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_related_lists_replace_linked_pages_and_report_unloaded_files
-# @tests tests_unit/test_013_task_properties.py::test_task_update_saves_file_relations_from_upload_assets
-# @matrix task : file-assets file-details preload related-files unloaded-fallback
 class TaskFiles(RelatedEntityListMixin[_File], ColumnMixin, AIMixin, DBProperty[list[_File], _TaskOrHistory]):
     """Files related to a task.
 
@@ -255,9 +244,6 @@ class TaskFiles(RelatedEntityListMixin[_File], ColumnMixin, AIMixin, DBProperty[
     def sort_value(self) -> int | None:
         return len(self.value) if self.value else None
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_has_signature_filter_value
-# @matrix filters signature task : filter-value schema-field
 class HasSignature(FilterMixin, Property[bool, _Task]):
     """Whether a task's schema includes a signature and the task has one saved.
 
@@ -300,11 +286,6 @@ class HasSignature(FilterMixin, Property[bool, _Task]):
         return self.value
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_has_status_filter_value
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_has_status_renders_status_column
-# @matrix filters status : boolean-condition filter-value run-results schema-field
-# @matrix task : filter-value schema-field
 class HasStatus(FilterMixin, Property[bool, _Task]):
     """Whether a task's schema includes status and any status is active.
 
@@ -347,11 +328,6 @@ class HasStatus(FilterMixin, Property[bool, _Task]):
         return self.value
 
 
-# @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_without_schedule
-# @tests tests_unit/test_013_task_properties.py::test_task_assignment_records_assigned_by_user_page
-# @matrix task : assigned-by assignee assignment
-# @pair task-completion:assignee
 class AssignedTo(RelatedEntityMixin[_Page], ColumnMixin, FilterMixin, AIMixin, DBProperty[_Page, _Task]):
     """User that a task is assigned to.
 
@@ -401,9 +377,6 @@ class AssignedTo(RelatedEntityMixin[_Page], ColumnMixin, FilterMixin, AIMixin, D
     multiple = True
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_assignment_records_assigned_by_user_page
-# @pair task:assigned-by
 class AssignedBy(RelatedEntityMixin[_Page], ColumnMixin, FilterMixin, AIMixin, DBProperty[_Page, _Task]):
     """User who assigned the task. Only accepts authenticated users.
 
@@ -444,9 +417,6 @@ class AssignedBy(RelatedEntityMixin[_Page], ColumnMixin, FilterMixin, AIMixin, D
     multiple = True
 
 
-# @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_without_schedule
-# @pair task-completion:completed-by
 class CompletedBy(RelatedEntityMixin[_Page], FilterMixin, AIMixin, ColumnMixin, DBProperty[_Page, _TaskOrHistory]):
     """User who completed the task. Only accepts authenticated users.
 
@@ -486,9 +456,6 @@ class CompletedBy(RelatedEntityMixin[_Page], FilterMixin, AIMixin, ColumnMixin, 
     multiple = True
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_related_lists_replace_linked_pages_and_report_unloaded_files
-# @matrix task : linked-pages replacement
 class LinkedPages(RelatedEntityListMixin[_Page], ColumnMixin, AIMixin, DBProperty[list[_Page], _TaskOrHistory]):
     """Pages linked to a task (beyond the parent page).
 
@@ -537,9 +504,6 @@ class LinkedPages(RelatedEntityListMixin[_Page], ColumnMixin, AIMixin, DBPropert
                 )
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_model_and_page_details_attach_from_key_map
-# @pair task:model
 class TaskModel(RelatedEntityMixin[_Model], FilterMixin, AIMixin, DBProperty[_Model, _Task]):
     """The model task (workflow stage) that a task belongs to within its project.
 
@@ -554,9 +518,6 @@ class TaskModel(RelatedEntityMixin[_Model], FilterMixin, AIMixin, DBProperty[_Mo
     _id = "model"
     _label = "Model Task"
 
-    # @testable true
-    # @tests tests_unit/test_013_task_properties.py::test_task_model_tracking_inherits_model_form
-    # @matrix task : inheritance model-form
     @property
     def value(self) -> models.ModelTask | None:
         return self._read_related()
@@ -571,9 +532,6 @@ class TaskModel(RelatedEntityMixin[_Model], FilterMixin, AIMixin, DBProperty[_Mo
         if form:
             self.entity.form = form
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/task_related.py::TaskModel.value
-    # @reason loaded model-form inheritance is asserted through the model setter
     def _model_form(self, model: models.ModelTask) -> models.Form | None:
         form_property = getattr(getattr(model, "properties", None), "form", None)
         if not form_property:
@@ -591,9 +549,6 @@ class TaskModel(RelatedEntityMixin[_Model], FilterMixin, AIMixin, DBProperty[_Mo
         return "model"
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_model_and_page_details_attach_from_key_map
-# @matrix task : attach details page
 class TaskPage(RelatedEntityMixin[_Page], DetailsMixin, FilterMixin, AIMixin, DBProperty[_Page, _Task]):
     """Page for a task. Tasks inherit permissions from their page.
 

@@ -22,7 +22,6 @@ from lagniappe.core.exceptions import ValidationError
 from .database import assets, utility
 
 
-# @testable infrastructure
 class BackupEntry(TypedDict):
     key: str
     name: str
@@ -39,9 +38,6 @@ def _tokens():
     return URLSafeTimedSerializer(CONFIG.SECRET_KEY, salt="document-backup")
 
 
-# @testable true
-# @tests tests_unit/test_010c_document_versions.py::test_storage_backups_are_scoped_paginated_and_generation_bound
-# @matrix document-history : backups permissions pagination
 def list_backups(entity: Entity, cursor: str | None = None) -> BackupListing:
     if cursor:
         try:
@@ -72,9 +68,6 @@ def list_backups(entity: Entity, cursor: str | None = None) -> BackupListing:
     }) if iterator.next_page_token else None}
 
 
-# @testable true
-# @tests tests_unit/test_010c_document_versions.py::test_storage_backups_are_scoped_paginated_and_generation_bound
-# @matrix document-history : backups permissions generation-pinned
 def read_backup(entity: Entity, token: str) -> str | None:
     try:
         record = _tokens().loads(token, max_age=3600)
@@ -89,9 +82,6 @@ def read_backup(entity: Entity, token: str) -> str | None:
     return assets.get_text(record["path"], "private", generation=generation)
 
 
-# @testable true
-# @tests tests_unit/test_010c_document_versions.py::test_recovery_pin_retry_is_scoped_and_keeps_empty_versions
-# @matrix document-history : recovery idempotency empty-content
 def recovery_pin(
     entity: Page | Project, user: User, *, html: str, name: str, operation_id: str
 ) -> Entity:

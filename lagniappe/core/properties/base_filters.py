@@ -11,10 +11,6 @@ from ..tools.auth.context import current_context_user
 from .base_property import Property, build_field
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/category.py::CategoryFilters
-# @covered-by lagniappe/core/properties/project.py::ProjectFilters
-# @covered-by lagniappe/core/properties/form.py::FormFilters.conditions
 class Filters[Owner: Entity = "Entity"](Property["Filters", Owner, "Filters | None"]):
     """Filter configuration for an entity's list view.
 
@@ -106,10 +102,6 @@ class Filters[Owner: Entity = "Entity"](Property["Filters", Owner, "Filters | No
     def preload(self) -> list[dict[str, object]]:
         return self.conditions
 
-    # @testable true
-    # @tests tests_unit/test_005_project_properties.py::test_project_filter_conditions_include_only_viewable_entity_fields
-    # @tests tests_unit/test_007_category_properties.py::test_category_filter_conditions_include_only_viewable_forms
-    # @matrix category filters permissions project : conditions entity-fields view-access
     @property
     def visible_entity_fields(self) -> dict[str, FilterMixin]:
         user = current_context_user()

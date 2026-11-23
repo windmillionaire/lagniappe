@@ -1,9 +1,6 @@
 import { BaseTable } from "../../elements/base/baseTable.mjs";
 import { captureError } from "../../shared/errors.mjs";
 
-/**
- * @testable infrastructure
- */
 export class IndexTable extends BaseTable {
 	constructor(attributes) {
 		super(attributes);
@@ -52,12 +49,6 @@ export class IndexTable extends BaseTable {
 		return this.target.hasAttribute("lp-prefetch");
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
-	 * @tests tests_js/test_022_refresh_frontend.mjs::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
-	 * @pairs indexes:fingerprint-gate reconnect-refresh:manifest
-	 */
 	refreshDescriptor() {
 		if (
 			this.component.name !== "table" ||
@@ -89,12 +80,6 @@ export class IndexTable extends BaseTable {
 		return template.content.querySelector("tr[lp-entity]");
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.mjs::test_index_delta_preserves_unchanged_rows_and_focus
-	 * @tests tests_js/test_022_refresh_frontend.mjs::test_index_delta_reorders_adds_removes_and_restores_sort
-	 * @matrix table-controls : quick-edit row-replacement teardown delta-order unchanged-rows focus hidden-rows sentinel-rows insertion removal empty-row sorting quick-edit-teardown
-	 */
 	refreshDelta(delta) {
 		const editor = this.component?.widgets?.TableEditor;
 		const existing = new Map(
@@ -153,12 +138,6 @@ export class IndexTable extends BaseTable {
 		void editor?.refreshCheckboxes().catch(captureError);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.mjs::test_index_table_row_updates_rebuild_active_sort
-	 * @matrix form-index : delete-target destination-refresh sorting
-	 * @matrix table-controls : quick-edit row-replacement teardown
-	 */
 	refresh(response) {
 		if (!response?.html) return;
 		const editor = this.component?.widgets?.TableEditor;
@@ -203,11 +182,6 @@ export class IndexTable extends BaseTable {
 		void editor?.refreshCheckboxes().catch(captureError);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.mjs::test_index_table_row_updates_rebuild_active_sort
-	 * @matrix form-index : created-row sorting
-	 */
 	async prereconcile() {
 		const loaded = this.target.hasAttribute("loaded");
 		if (!this.loaded || loaded) return;

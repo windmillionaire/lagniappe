@@ -4,12 +4,6 @@ import { primitives } from "../primitives.mjs";
 
 const NON_HISTORY_FILLABLE_TYPES = new Set(["html", "signature", "status"]);
 
-/**
- * @testable infrastructure
- * @tests tests_js/test_028_form_state_split.mjs::test_direct_form_controls_clear_inputs_and_textareas
- * @covered-by src/script/forms/renderer.mjs::FormRenderer.render
- * @covered-by src/script/widgets/base/formWidget.mjs::FormWidget._click
- */
 export class BaseElement {
 	constructor(renderer, schema, submission) {
 		this.renderer = renderer;
@@ -48,11 +42,6 @@ export class BaseElement {
 		return this.renderer.showEmptyFields;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
-	 * @matrix tasks : element-matrix history-fill
-	 */
 	get historyFillable() {
 		return !NON_HISTORY_FILLABLE_TYPES.has(this.schema?.type);
 	}
@@ -149,12 +138,6 @@ export class BaseElement {
 		return true;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_history_fill_waits_without_overwriting_new_input
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
-	 * @matrix tasks : history-fill stale-response element-matrix
-	 */
 	historyFillButton(value) {
 		if (!this.canHistoryFill || !this.historyValueAvailable(value)) return null;
 
@@ -215,11 +198,6 @@ export class BaseElement {
 		return true;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_direct_form_controls_clear_inputs_and_textareas
-	 * @pair forms:direct-fields
-	 */
 	create() {
 		let elt;
 		if (this.readonly && this.schema.type !== "table") {

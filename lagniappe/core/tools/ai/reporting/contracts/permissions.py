@@ -12,9 +12,6 @@ if TYPE_CHECKING:
 from .actions import ACTION_ORDER
 
 
-# @testable true
-# @matrix ai-report : action-capabilities permissions
-# @pair permissions:own-page
 def allowed_report_actions(user: models.User) -> tuple[str, ...]:
     """Return report action types this user may ask the runner to execute."""
     capabilities = user.properties.restrictions.ai_action_capabilities
@@ -45,9 +42,6 @@ def allowed_report_actions(user: models.User) -> tuple[str, ...]:
     return tuple(action for action in ACTION_ORDER if action in allowed)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/planner.py::report_prompt
-# @reason prompt text is verified through public prompt builders
 def report_action_permission_context(
     user: models.User, allowed_actions: Iterable[str] | None = None
 ) -> dict[str, list[str]]:

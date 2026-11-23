@@ -21,11 +21,6 @@ if TYPE_CHECKING:
     from ..entities.user import User as User
 
 
-# @testable true
-# @tests tests_unit/test_009a_user.py::test_user_groups_membership_changes_recalculate_permissions
-# @tests tests_unit/test_009a_user.py::test_user_groups_reject_invalid_relation_inputs
-# @tests tests_unit/test_009a_user.py::test_public_user_groups_force_public_group_only
-# @matrix user-groups : membership-change permission-recalc public-group-only public-user relation-storage sync validation
 class Groups(RelatedEntityListMixin["UserGroup"], FilterMixin, ColumnMixin, DBProperty[list["UserGroup"], "User"]):
     """Groups a user belongs to.
 
@@ -106,13 +101,6 @@ class Groups(RelatedEntityListMixin["UserGroup"], FilterMixin, ColumnMixin, DBPr
         )
 
 
-# @testable true
-# @tests tests_unit/test_009a_user.py::test_user_page_auto_create_lazy_load_and_owner_link
-# @tests tests_unit/test_009a_user.py::test_user_page_missing_key_raises_runtime_error
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_reassign_and_remove_user_from_page
-# @matrix user : auto-create lazy-load owner-link personal-page public-user validation
-# @matrix public-users : auto-create lazy-load owner-link public-user
-# @pair user-settings:page-remove
 class UserPage(RelatedEntityMixin["Page"], DBProperty["Page", "User"]):
     """The page entity associated with a user.
 
@@ -179,13 +167,6 @@ class UserPage(RelatedEntityMixin["Page"], DBProperty["Page", "User"]):
         page.categories = categories
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_category
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_file
-# @tests tests_unit/test_009a_user.py::test_user_starred_key_removal_preserves_order
-# @matrix starred : category file key-removal page project
 class Starred(RelatedEntityListMixin["Entity"], DBProperty[list["Entity"], "User"]):
     """Entities the user has starred (bookmarked).
 

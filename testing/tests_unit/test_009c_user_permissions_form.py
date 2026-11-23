@@ -18,7 +18,6 @@ from testing.utility.permissions import (
 )
 
 
-# @matrix permissions : form-data no-groups restricted
 @pytest.mark.unit
 def test_form_permissions(get_permissions_test_data):
     """No-group users receive explicit grants, restrictions, and own-page EDIT."""

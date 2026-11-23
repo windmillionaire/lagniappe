@@ -61,24 +61,16 @@ _task_id = TaskIdentity.create
 _feedback_task_id = TaskIdentity.feedback
 
 
-# @testable infrastructure
 class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRunner):
     def __init__(self, adapter_registry: DeferredJobAdapterRegistry | None = None) -> None:
         self.adapter_registry = adapter_registry or DeferredJobAdapterRegistry()
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/deferred_jobs/adapters/registry.py::DeferredJobAdapterRegistry.register
     def register[T: DeferredJobAdapter](self, adapter: T) -> T:
         return self.adapter_registry.register(adapter)
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/deferred_jobs/adapters/registry.py::DeferredJobAdapterRegistry.adapter
     def adapter(self, job_type: object) -> DeferredJobAdapter:
         return self.adapter_registry.adapter(job_type)
 
-    # @testable true
-    # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_registry_requires_resume_but_tolerates_pause_failure
-    # @matrix cloud-scheduler deferred-jobs : pause-failure recovery-guarantee resume-failure
     def _sync_reconciler(self, *, required=False, force=False, control=None):
         """Converge recovery scheduling, optionally requiring success to start."""
         try:
@@ -102,8 +94,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
                 ) from error
             return None
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/deferred_jobs/service.py::DeferredJobService.start
     def _fail_unclaimed_start(
         self,
         job,
@@ -170,13 +160,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
             Entities.save(notification)
         self._sync_reconciler(control=transition.get("scheduler_control"))
 
-    # @testable true
-    # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_create_is_transactionally_idempotent
-    # @tests tests_unit/test_023b_deferred_job_service.py::test_start_rejects_operation_id_reuse_for_different_request
-    # @tests tests_unit/test_023b_deferred_job_service.py::test_start_retains_generic_intent_after_dispatch_failure
-    # @tests tests_unit/test_023b_deferred_job_service.py::test_start_dispatch_marker_does_not_overwrite_a_fast_worker
-    # @matrix deferred-jobs : compare-and-set dispatch-worker-race mismatch no-apply operation-fingerprint start transactional-start transient-dispatch
-    # @pair notifications:pending-state
     def start(self, spec: DeferredJobSpec) -> tuple[DeferredJob, Notification | None]:
         from lagniappe.core.tools.measurements import link_job
 
@@ -444,9 +427,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
 
         return job, notification
 
-    # @testable true
-    # @tests tests_unit/test_023b_deferred_job_service.py::test_cancel_deletes_tasks_and_persists_a_tombstone
-    # @matrix deferred-jobs : cancellation deterministic-task-id
     def cancel(
         self,
         job: DeferredJob | str | dict[str, object] | None,
@@ -531,9 +511,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
             )
         return True
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/deferred_jobs/service.py::DeferredJobService.cancel
-    # @reason one-line status-specialized delegation retains cancel as the behavior owner
     def supersede(self, job: DeferredJob | str | dict[str, object] | None) -> bool:
         """Replace active work while retaining a terminal operation record."""
         return self.cancel(
@@ -542,9 +519,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
             message="Operation replaced by a newer request.",
         )
 
-    # @testable true
-    # @tests tests_unit/test_023b_deferred_job_service.py::test_long_running_feedback_updates_pending_notification
-    # @matrix deferred-jobs notifications : feedback long-running terminal-safety
     def feedback(self, job_key: Identifier) -> bool:
         """Publish a progress message when a job remains queued or running."""
         job = cast("DeferredJob | None", Entities.fetch_one(job_key, request=Fetch.direct()))
@@ -566,10 +540,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
         Entities.save(notification)
         return True
 
-    # @testable true
-    # @tests tests_unit/test_023b_deferred_job_service.py::test_statuses_returns_only_jobs_visible_to_the_actor
-    # @tests tests_unit/test_023b_deferred_job_service.py::test_statuses_rejects_more_than_fifty_jobs
-    # @matrix deferred-jobs : batching owner progress status timing
     def statuses(self, job_keys: Iterable[str] | None, actor: User, *, now: datetime | None = None) -> list[JobStatus]:
         """Project a bounded owner-safe status list for browser reconciliation."""
         actor_key = getattr(actor, "urlsafe_key", None)
@@ -596,7 +566,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
             statuses.append(projection)
         return statuses
 
-    # @testable infrastructure
     def recent(self, *, limit: int = 100, now: datetime | None = None) -> list[AdminJobStatus]:
         """Return privacy-bounded operation rows for the owner dashboard."""
         records = database_deferred_jobs.recent_records(limit)
@@ -604,9 +573,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
         jobs = Entities.fetch(*jobs, request=Fetch.direct())
         return [_admin_projection(cast("DeferredJob", job), now=_utc(now)) for job in jobs]
 
-    # @testable true
-    # @tests tests_unit/test_023b_deferred_job_service.py::test_delete_terminal_jobs_preserves_active_and_incomplete_delivery
-    # @matrix deferred-jobs : retention terminal-delivery
     def delete_terminal(self, *, before: datetime | None = None, batch_size: int = 500) -> int:
         """Delete retained terminal jobs without interrupting unfinished work."""
         before = _utc(before) if before is not None else None

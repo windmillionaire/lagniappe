@@ -65,7 +65,6 @@ def _install_cache(monkeypatch, batches, *, missing=()):
     return cache
 
 
-# @matrix search : term-relaxation permissions bounded-query cached-details
 def test_candidate_search_groups_relaxed_terms_inside_access_scope(monkeypatch):
     cache = _install_cache(
         monkeypatch,
@@ -102,7 +101,6 @@ def test_candidate_search_groups_relaxed_terms_inside_access_scope(monkeypatch):
     assert "_candidate_score" not in results[0]
 
 
-# @matrix search : candidate-ranking term-relaxation bounded-query
 def test_candidate_search_ranks_exact_strict_and_name_coverage(monkeypatch):
     strict = _document("strict", "Community allotment", score=1)
     shared_name = _document("many", "Rain garden", score=0.1)
@@ -125,7 +123,6 @@ def test_candidate_search_ranks_exact_strict_and_name_coverage(monkeypatch):
     assert [result["id"] for result in results] == ["exact", "two"]
 
 
-# @matrix search : candidate-ranking term-relaxation permissions bounded-query
 @pytest.mark.parametrize(
     "text,required,documents,expected_queries",
     [
@@ -154,7 +151,6 @@ def test_candidate_search_skips_unnecessary_or_queries(
     assert all(request._num <= 100 for request in cache.queries)
 
 
-# @matrix search : term-relaxation cached-details permissions
 def test_candidate_search_keeps_default_search_and_stale_repair(monkeypatch):
     stale = _document("stale", "Rain garden")
     live = _document("live", "Rain collection")
@@ -181,13 +177,6 @@ def _actor():
     ))
 
 
-# @source lagniappe/core/tools/ai/functions.py::execute_registered_tool
-# @source lagniappe/core/tools/ai/functions.py::execute_function_calls
-# @source lagniappe/core/tools/ai/function_definitions/search.py::execute_search
-# @source lagniappe/core/tools/cache/query.py::candidate_search
-# @matrix ai search : candidate-routing
-# @matrix search : candidate-ranking term-relaxation permissions
-# @matrix ai agent-api : tool-dispatch
 @pytest.mark.parametrize("external", [False, True], ids=["on-site", "mcp"])
 def test_registered_search_returns_ranked_partial_matches_in_both_ai_paths(
     monkeypatch, external
@@ -221,8 +210,6 @@ def test_registered_search_returns_ranked_partial_matches_in_both_ai_paths(
     assert all(request._num <= 100 for request in cache.queries)
 
 
-# @matrix ai search : candidate-routing cached-details
-# @pair ai:search-url
 def test_external_candidates_use_cached_context_without_entity_loading(monkeypatch):
     calls = []
 
@@ -269,7 +256,6 @@ def test_external_candidates_use_cached_context_without_entity_loading(monkeypat
     assert "details" not in results[0]
 
 
-# @matrix ai search : candidate-routing parent-scope
 def test_candidate_scope_preserves_full_text_and_exact_modes(monkeypatch):
     calls = []
     parent = SimpleNamespace(hash="parent", allowed=lambda action, user=None: True)

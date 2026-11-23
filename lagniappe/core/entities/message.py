@@ -20,9 +20,6 @@ from ..properties import message_conversation
 from lagniappe.core.tools.database import utility as database_utility
 
 
-# @testable true
-# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-# @matrix messaging : entity-contract polling-revision
 class MessageConversation(Entity):
     """Durable participant state and cursors for a direct-message thread."""
     if TYPE_CHECKING:
@@ -42,9 +39,6 @@ class MessageConversation(Entity):
 
     entity_kind = "message_conversation"
 
-    # @testable true
-    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-    # @pair messaging:index-exclusion
     @property
     def exclude_from_index(self) -> frozenset[str]:
         return frozenset(
@@ -56,9 +50,6 @@ class MessageConversation(Entity):
             }
         )
 
-    # @testable false
-    # @covered-by lagniappe/core/entities/message.py::MessageConversation
-    # @reason property registry composition is exercised through the entity contract
     def _get_properties(self) -> EntityProperties:
         properties = super()._get_properties()
         properties.update(
@@ -86,9 +77,6 @@ class MessageConversation(Entity):
         return conversation
 
 
-# @testable true
-# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-# @pair messaging:entity-contract
 class Message(Entity):
     """One immutable plain-text message in a conversation ancestor group."""
     if TYPE_CHECKING:
@@ -107,9 +95,6 @@ class Message(Entity):
 
     entity_kind = "message"
 
-    # @testable true
-    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-    # @pair messaging:index-exclusion
     @property
     def exclude_from_index(self) -> frozenset[str]:
         return frozenset(
@@ -122,9 +107,6 @@ class Message(Entity):
             }
         )
 
-    # @testable false
-    # @covered-by lagniappe/core/entities/message.py::Message
-    # @reason property registry composition is exercised through the entity contract
     def _get_properties(self) -> EntityProperties:
         properties = super()._get_properties()
         properties.update(

@@ -12,12 +12,6 @@ import { QueryLifecycle } from "../../../shared/queryLifecycle.mjs";
 import { request } from "../../../shared/request.mjs";
 import { debounce, generateElementId } from "../../../shared/utilities.mjs";
 
-/**
- * @testable true
- * @tests tests_js/test_042_messaging_frontend.mjs::test_mention_node_collection_insertion_and_keyboard_contract
- * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
- * @matrix mentions : node-attributes profile-link
- */
 export const LagniappeMention = Node.create({
 	name: "lagniappeMention",
 	group: "inline",
@@ -79,11 +73,6 @@ export const LagniappeMention = Node.create({
 	},
 });
 
-/**
- * @testable true
- * @tests tests_js/test_042_messaging_frontend.mjs::test_mention_node_collection_insertion_and_keyboard_contract
- * @pair mentions:query-detection
- */
 const currentQuery = (editor) => {
 	const { selection } = editor.state;
 	if (!selection.empty) return null;
@@ -98,20 +87,9 @@ const currentQuery = (editor) => {
 	};
 };
 
-/**
- * @testable false
- * @covered-by src/script/elements/editor/extensions/mention.mjs::MentionSuggestions
- * @reason suggestion publication validates the combined query and editor range key
- */
 const queryKey = (active) =>
 	active ? `${active.from}:${active.to}:${active.query}` : null;
 
-/**
- * @testable true
- * @tests tests_js/test_042_messaging_frontend.mjs::test_mention_node_collection_insertion_and_keyboard_contract
- * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
- * @matrix mentions : empty-results floating-menu keyboard mouse node-attributes pending-occurrence profile-link
- */
 export class MentionSuggestions {
 	constructor(editor, { documentKey, onInsert = null }) {
 		this._destroyed = false;
@@ -152,14 +130,12 @@ export class MentionSuggestions {
 		return this;
 	}
 
-	/** @testable infrastructure */
 	_refresh() {
 		if (this._destroyed) return;
 		this.hide();
 		this._debouncedSearch();
 	}
 
-	/** @testable infrastructure */
 	async search() {
 		if (this._destroyed) return false;
 		const active = currentQuery(this.editor);
@@ -196,7 +172,6 @@ export class MentionSuggestions {
 		);
 	}
 
-	/** @testable infrastructure */
 	render() {
 		if (this._destroyed || !this.popup?.isConnected) return;
 		this.popup.replaceChildren(
@@ -228,7 +203,6 @@ export class MentionSuggestions {
 		this._startPositioning();
 	}
 
-	/** @testable infrastructure */
 	_startPositioning() {
 		if (this._destroyed || !this.active || !this.popup?.isConnected) return;
 		this._cleanupPositioning();
@@ -272,17 +246,11 @@ export class MentionSuggestions {
 		});
 	}
 
-	/** @testable infrastructure */
 	_cleanupPositioning() {
 		this.positionCleanup?.();
 		this.positionCleanup = null;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/editor/extensions/mention.mjs::MentionSuggestions
-	 * @reason keyboard behavior is exercised through the suggestion controller contract
-	 */
 	_keydown(event) {
 		if (this.popup.classList.contains("hidden")) return;
 		if (event.key === "Escape") {
@@ -304,22 +272,12 @@ export class MentionSuggestions {
 		}
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/editor/extensions/mention.mjs::MentionSuggestions
-	 * @reason mouse selection is exercised through the suggestion controller contract
-	 */
 	_click(event) {
 		const button = event.target.closest("[role='option'][data-index]");
 		if (!button) return;
 		this.insert(this.options[Number(button.dataset.index)]);
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/editor/extensions/mention.mjs::MentionSuggestions
-	 * @reason node insertion and pending payloads are exercised through the controller contract
-	 */
 	insert(option) {
 		if (!option || !this.active) return;
 		const details = JSON.parse(option.dataset.details || "{}");
@@ -352,7 +310,6 @@ export class MentionSuggestions {
 		this.hide();
 	}
 
-	/** @testable infrastructure */
 	hide() {
 		this.queries.invalidate();
 		this._cleanupPositioning();
@@ -384,18 +341,8 @@ export class MentionSuggestions {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_js/test_042_messaging_frontend.mjs::test_mention_node_collection_insertion_and_keyboard_contract
- * @pair mentions:pending-occurrence
- */
 export const collectMentions = (document) => {
 	const mentions = [];
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/editor/extensions/mention.mjs::collectMentions
-	 * @reason recursive traversal is exercised through the public collector
-	 */
 	const visit = (node) => {
 		if (node?.type === "lagniappeMention" && node.attrs) {
 			mentions.push({

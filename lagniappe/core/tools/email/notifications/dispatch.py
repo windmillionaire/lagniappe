@@ -15,9 +15,6 @@ from .links import identity, origin
 from .policy import utc
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason one-off task dispatch is exercised through public capture APIs
 def schedule(row: DatastoreRow, *, task_suffix: str | None = None, now: datetime | None = None) -> str | None:
     now = utc(now)
     encoded = email_database.encoded_key(row.key)

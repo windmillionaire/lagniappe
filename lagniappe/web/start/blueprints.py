@@ -15,7 +15,6 @@ from dataclasses import dataclass
 from flask import Blueprint
 
 
-# @testable infrastructure
 @dataclass(frozen=True)
 class BlueprintRegistration:
     """One logical blueprint binding and its application URL prefix."""
@@ -25,7 +24,6 @@ class BlueprintRegistration:
     enable_if_any: tuple[str, ...] = ()
 
 
-# @testable infrastructure
 @dataclass(frozen=True)
 class CSRFExemption:
     """One CSRF exception and the replacement authentication boundary."""
@@ -104,9 +102,6 @@ CSRF_EXEMPTIONS = (
 )
 
 
-# @testable false
-# @covered-by lagniappe/web/start/blueprints.py::initialize
-# @reason production-only lazy import plumbing is exercised through application boot
 def _resolve_bindings(runtime_config):
     from lagniappe.web.routes import assets, categories, files, filters, forms
     from lagniappe.web.routes import home, internal, manual, message_internal
@@ -158,9 +153,6 @@ def _resolve_bindings(runtime_config):
     return bindings
 
 
-# @testable false
-# @covered-by lagniappe/web/start/blueprints.py::apply_blueprint_policy
-# @reason small predicate keeps conditional registration data-driven
 def _registration_enabled(registration, runtime_config):
     return not registration.enable_if_any or any(
         getattr(runtime_config, setting, False)
@@ -168,9 +160,6 @@ def _registration_enabled(registration, runtime_config):
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/start/blueprints.py::apply_blueprint_policy
-# @reason validation helper is exercised through the policy application boundary
 def _validate_policy(registrations, exemptions):
     registration_targets = set()
     for registration in registrations:
@@ -215,12 +204,6 @@ def _validate_policy(registrations, exemptions):
         exemption_targets.add(identity)
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_blueprint_registration_and_csrf_exemption_policy
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_blueprint_policy_rejects_invalid_bindings_and_exemptions
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_csrf_exempt_surfaces_reach_replacement_authentication_gates
-# @matrix csrf web-startup : blueprint-registration exemption-policy validation
-# @pair csrf:route-gate
 def apply_blueprint_policy(
     app: Flask,
     csrf: CSRFProtect,
@@ -277,9 +260,6 @@ def apply_blueprint_policy(
         csrf.exempt(target)
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_blueprint_registration_and_csrf_exemption_policy
-# @matrix web-startup : blueprint-registration
 def initialize(
     app: Flask,
     csrf: CSRFProtect,

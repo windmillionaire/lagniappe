@@ -28,10 +28,6 @@ if TYPE_CHECKING:
     type FilterSource = Category | Form | Project
 
 
-# @testable true
-# @tests tests_unit/test_011_filters.py::test_filter_conditions_multiple_types
-# @tests tests_unit/test_011_filters.py::test_condition_create_skips_missing_entity_reference
-# @matrix filter : conditions missing-entity mixed-types
 class Condition:
     """A single filter condition: entity + field + comparator + value.
 
@@ -199,11 +195,6 @@ class Condition:
 
         return self._details
 
-    # @testable true
-    # @tests tests_unit/test_012_category_conditions.py::*
-    # @tests tests_unit/test_012a_project_conditions.py::*
-    # @tests tests_unit/test_012b_form_conditions.py::*
-    # @matrix filters : boolean categorical condition-definition entity-valued model-task multiple number select string timestamp
     def set_value(self, form_values: object, default_comparator: str | None = None) -> None:
         """Set condition value from form input and create the FilterDefinition."""
         form_values = form_values if isinstance(form_values, list) else [form_values]
@@ -248,9 +239,6 @@ class Condition:
         if isinstance(field, CategoricalElement):
             field.multiple = True
 
-    # @testable true
-    # @tests tests_unit/test_011_filters.py::test_condition_requires_field_for_type_and_definition
-    # @matrix filters : condition-definition validation
     @property
     def field_type(self) -> FieldType:
         if not self.field:
@@ -265,9 +253,6 @@ class Condition:
     def comparator(self, name: str) -> None:
         self._comparator = Comparator[name]
 
-    # @testable true
-    # @tests tests_unit/test_011_filters.py::test_condition_requires_field_for_type_and_definition
-    # @matrix filters : condition-definition validation
     def _create_definition(self) -> None:
         if not self.field:
             raise ValueError("Field not set")

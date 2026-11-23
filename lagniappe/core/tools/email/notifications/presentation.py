@@ -26,9 +26,6 @@ class NotificationCopy(TypedDict):
     standalone_headings: bool
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason generic copy selection is exercised through delivery
 def _generic(item: Mapping[str, object], _app_name: str) -> NotificationCopy:
     return {
         "subject": None,
@@ -39,9 +36,6 @@ def _generic(item: Mapping[str, object], _app_name: str) -> NotificationCopy:
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason mention-specific copy is exercised through delivery
 def _document_mention(item: Mapping[str, object], app_name: str) -> NotificationCopy:
     document_name = str(item.get("document_name") or "document")
     return {
@@ -53,9 +47,6 @@ def _document_mention(item: Mapping[str, object], app_name: str) -> Notification
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason assignment-specific copy is exercised through delivery
 def _task_assignment(item: Mapping[str, object], app_name: str) -> NotificationCopy:
     sender_name = str(item.get("sender_name") or "A user")
     task_name = str(item.get("task_name") or "task")
@@ -77,18 +68,12 @@ EVENT_PRESENTATIONS = {
 }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason type dispatch is exercised through delivery
 def presentation(item: Mapping[str, object], app_name: str) -> NotificationCopy:
     event_type = item.get("event_type")
     renderer = EVENT_PRESENTATIONS.get(event_type, _generic) if isinstance(event_type, str) else _generic
     return renderer(item, app_name)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason sender grouping is exercised through digest delivery
 def group_digest_messages(items: Sequence[Mapping[str, object]]) -> list[Mapping[str, object]]:
     grouped = []
     by_sender = {}
@@ -117,9 +102,6 @@ def group_digest_messages(items: Sequence[Mapping[str, object]]) -> list[Mapping
     return grouped
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason multipart rendering is exercised through delivery
 def render_email(subject: str, items: Sequence[Mapping[str, object]], *, digest: bool = False, overflow: int = 0) -> tuple[str, str]:
     app_name = str(getattr(CONFIG, "APP_NAME", "Lagniappe") or "Lagniappe")
     if digest:
@@ -183,9 +165,6 @@ def render_email(subject: str, items: Sequence[Mapping[str, object]], *, digest:
     return "\n".join(text_lines).strip(), html
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason SMTP composition is exercised through delivery
 def send(user: User, row: DatastoreRow, items: Sequence[Mapping[str, object]], *, digest: bool = False, overflow: int = 0) -> bool:
     app_name = str(getattr(CONFIG, "APP_NAME", "Lagniappe") or "Lagniappe")
     row_presentation = presentation(row, app_name)

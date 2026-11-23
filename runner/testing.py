@@ -51,9 +51,6 @@ if _DEFAULT_PLAYWRIGHT_BROWSERS.is_dir():
     os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(_DEFAULT_PLAYWRIGHT_BROWSERS)
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
-# @matrix hosted-e2e testing : frontend-build provider-auth
 def hosted_e2e_enabled() -> bool:
     """Return whether this process is the managed hosted-E2E runner."""
     return os.environ.get("LAGNIAPPE_HOSTED_E2E", "").strip().casefold() in {
@@ -101,9 +98,6 @@ _TEST_FRONTEND_INPUT_FILES = (
 )
 
 
-# @testable false
-# @covered-by runner/testing.py::ensure_test_frontend_bundle
-# @reason private deterministic source/config fingerprint for the test-server build preflight
 def _test_frontend_input_fingerprint():
     digest = hashlib.sha256(f"test-frontend-v{_TEST_FRONTEND_BUNDLE_SCHEMA}".encode())
 
@@ -130,9 +124,6 @@ def _test_frontend_input_fingerprint():
     return digest.hexdigest()
 
 
-# @testable false
-# @covered-by runner/testing.py::ensure_test_frontend_bundle
-# @reason private tolerant state reader treats missing or malformed local metadata as stale
 def _read_test_frontend_bundle_state():
     try:
         state = json.loads(
@@ -143,9 +134,6 @@ def _read_test_frontend_bundle_state():
     return state if isinstance(state, dict) else None
 
 
-# @testable false
-# @covered-by runner/testing.py::ensure_test_frontend_bundle
-# @reason shared validator adapter for the managed test-server preflight
 def _inspect_test_frontend_bundle(*, expected_mode=None):
     return inspect_frontend_build(
         FilesystemFrontendBuildReader(APP_DIR),
@@ -154,13 +142,6 @@ def _inspect_test_frontend_bundle(*, expected_mode=None):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_skips_current_build
-# @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_rebuilds_stale_build
-# @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_preserves_current_production_build
-# @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_replaces_stale_production_build
-# @matrix frontend-build : freshness no-op output-validation production-preservation rebuild
-# @pair test-server:freshness
 def ensure_test_frontend_bundle(authority: TestAuthority) -> bool:
     """Build development assets when test-server inputs or outputs changed."""
     authority.assert_active()
@@ -242,8 +223,6 @@ def prepare_test_artifacts(authority: TestAuthority) -> None:
     authority.assert_active()
 
 
-# @testable infrastructure
-# @reason live test-index deployment is an operator-only provider boundary
 def update_test_indexes() -> None:
     index_data = File.INDEX_YAML.load()
     indexes = index_data["indexes"]
@@ -271,12 +250,6 @@ def update_test_indexes() -> None:
         File.INDEX_YAML.save(index_data)
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_wait_for_session_server_requires_exact_nonce_and_pid
-# @tests tests_tooling/test_005_test_server_command.py::test_wait_for_session_server_allows_slow_local_startup
-# @tests tests_tooling/test_005_test_server_command.py::test_wait_for_session_server_bounds_stalled_requests_by_one_deadline
-# @tests tests_tooling/test_005_test_server_command.py::test_wait_for_session_server_reports_last_http_state
-# @matrix test-session : deadline diagnostics health-nonce http-state process-identity readiness slow-start stalled-response
 def wait_for_session_server(
     base_url: str,
     nonce: str,
@@ -353,9 +326,6 @@ def _server_port_in_use(base_url):
         ) from error
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_occupied_port_is_refused_without_signaling
-# @matrix test-session : cross-platform fail-closed port-ownership
 def require_server_port_available(base_url: str) -> None:
     """Refuse an occupied port; a listener is never ownership evidence."""
     if _server_port_in_use(base_url):
@@ -366,9 +336,6 @@ def require_server_port_available(base_url: str) -> None:
         )
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_live_legacy_pid_is_refused_without_signaling
-# @matrix test-session : legacy-migration pid-reuse signal-safety
 def require_legacy_test_server_clear() -> bool:
     """Retire only a dead legacy PID file; never trust it for signaling."""
     from runner.test_session import RECOVERY_COMMAND, capture_process_identity
@@ -461,7 +428,6 @@ def _launch_test_server(
     )
 
 
-# @testable infrastructure
 def run_test_server(authority: TestSessionAuthority) -> subprocess.Popen[bytes]:
     """Launch and verify the local E2E Flask child for an active owner."""
     authority.assert_active(phases={"starting"})
@@ -530,9 +496,6 @@ def terminate_test_server_process(
         process.wait()
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_cleanup_scope_requires_the_reserved_test_prefix
-# @matrix hosted-e2e testing : cleanup fail-closed prefix
 def _require_test_cleanup_scope(config):
     if not config.testing or config.PREFIX != DEFAULT_TEST_PREFIX:
         raise RuntimeError(
@@ -540,7 +503,6 @@ def _require_test_cleanup_scope(config):
         )
 
 
-# @testable infrastructure
 def cleanup_test_data(authority: TestAuthority) -> None:
     """Clear the reserved test namespace only for the active lease owner."""
     authority.assert_active()
@@ -558,9 +520,6 @@ def cleanup_test_data(authority: TestAuthority) -> None:
     authority.assert_active()
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_initialize_test_services_replays_server_persistence_startup
-# @matrix hosted-e2e testing : cache database initialization migrations
 def _initialize_test_services(database, cache, migrations):
     """Replay the persistence portion of application startup after cleanup."""
     cache.initialize()
@@ -569,8 +528,6 @@ def _initialize_test_services(database, cache, migrations):
     return fresh_install
 
 
-# @testable infrastructure
-# @matrix hosted-e2e testing : cleanup initialization
 def initialize_test_data(authority: TestAuthority) -> bool:
     """Seed clean test persistence without starting another Flask process."""
     authority.assert_active()
@@ -588,9 +545,6 @@ def initialize_test_data(authority: TestAuthority) -> bool:
     return result
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_reused_recorded_pid_is_never_signaled
-# @matrix test-session : pid-reuse signal-safety
 def _terminate_verified_process_group(identity, timeout=15):
     """Signal only a still-matching, session-leading recorded process."""
     from runner.test_session import inspect_process_identity
@@ -671,9 +625,6 @@ def _wait_for_managed_keeper(authority, process, timeout=25):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_managed_start_conflict_stops_before_mutation
-# @matrix test-session : managed-start mutation-order ownership
 def start_managed_test_server(load_packs: Sequence[str] = ()) -> ManagedServerStart:
     """Start a detached keeper and explicitly hand it session ownership."""
     _configure_test_gcloud()
@@ -803,10 +754,6 @@ def _verified_managed_state(*, require_live=True):
     return state
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_managed_teardown_cannot_touch_local_e2e_owner
-# @tests tests_tooling/test_005_test_session.py::test_managed_teardown_refuses_live_browser_attachment
-# @matrix test-session : browser-attachment mode-isolation teardown
 def teardown_managed_test_server() -> int | None:
     """Stop and clean only a fully verified managed-server session."""
     _configure_test_gcloud()
@@ -921,9 +868,6 @@ def test_server_status() -> dict[str, object]:
     }
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_recovery_rejects_wrong_health_nonce_without_signaling
-# @matrix test-session : health-nonce recovery signal-safety
 def _terminate_recoverable_server(state, timeout=15):
     """Stop an orphan only when process identity and health both prove ownership."""
     from runner.test_session import inspect_process_identity
@@ -973,10 +917,6 @@ def _terminate_recoverable_server(state, timeout=15):
     raise RuntimeError(f"Could not stop orphaned server process {server['pid']}.")
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_recovery_refuses_while_owner_is_live
-# @tests tests_tooling/test_005_test_session.py::test_recovery_is_idempotent_without_state
-# @matrix test-session : idempotence live-owner recovery
 def recover_managed_test_server() -> dict[str, object]:
     """Recover only after proving the recorded owner has exited."""
     from runner.test_session import (
@@ -1085,9 +1025,6 @@ def recover_managed_test_server() -> dict[str, object]:
         lease.__exit__(None, None, None)
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_browser_attachment_is_exclusive_and_detaches
-# @matrix test-session : browser-attachment exclusivity
 def attach_browser_review(command: str) -> str:
     """Attach one browser capture to a verified managed-server session."""
     from runner.test_session import (
@@ -1131,9 +1068,6 @@ def attach_browser_review(command: str) -> str:
     return attachment_id
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_browser_attachment_is_exclusive_and_detaches
-# @matrix test-session : browser-attachment detach
 def detach_browser_review(attachment_id: str) -> bool:
     """Remove only the caller's matching browser-review attachment."""
     from runner.test_session import (

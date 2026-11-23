@@ -2,11 +2,6 @@ import { Decoration, Extension } from "@tiptap/core";
 
 const FLASH_FADE_DURATION_MS = 1000;
 
-/**
- * @testable false
- * @covered-by src/script/elements/editor/extensions/remote.mjs::FlashRemoteChanges
- * @reason text-position mapping is private remote-flash extension plumbing
- */
 const buildTextPosMap = (doc) => {
 	const map = [];
 	let currentTextPos = 0;
@@ -25,11 +20,6 @@ const buildTextPosMap = (doc) => {
 	return map;
 };
 
-/**
- * @testable false
- * @covered-by src/script/elements/editor/extensions/remote.mjs::FlashRemoteChanges
- * @reason transaction mapping is exercised through the remote-flash lifecycle
- */
 const mapFlashes = (flashes, transaction) => {
 	if (!transaction.docChanged || flashes.length === 0) return flashes;
 
@@ -40,11 +30,6 @@ const mapFlashes = (flashes, transaction) => {
 	});
 };
 
-/**
- * @testable false
- * @covered-by src/script/elements/editor/extensions/remote.mjs::FlashRemoteChanges
- * @reason remote step diffing is exercised through the public extension lifecycle
- */
 const remoteTransactionFlashes = (transaction, userColor, author) => {
 	const flashes = [];
 	let docBeforeStep = transaction.before;
@@ -160,12 +145,6 @@ const remoteTransactionFlashes = (transaction, userColor, author) => {
 	return flashes;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_041_editor_decorations.mjs::test_remote_change_flash_decorations_map_and_expire
- * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
- * @pairs editor:remote-highlight sync:document
- */
 export const FlashRemoteChanges = Extension.create({
 	name: "flashRemoteChanges",
 
@@ -191,19 +170,14 @@ export const FlashRemoteChanges = Extension.create({
 	},
 
 	onTransaction({ editor, transaction, appendedTransactions }) {
-		// @pair sync:document
 		const storage = this.storage;
-		// @pair sync:document
 		const transactions = [transaction, ...appendedTransactions];
-		// @pair sync:document
 		let addedFlashes = false;
 
-		// @pair sync:document
 		for (const tr of transactions) {
 			storage.flashes = mapFlashes(storage.flashes, tr);
 			if (!tr.getMeta("y-sync$") || !storage.color) continue;
 
-			// @pair sync:document
 			const newFlashes = remoteTransactionFlashes(
 				tr,
 				storage.color,
@@ -213,11 +187,9 @@ export const FlashRemoteChanges = Extension.create({
 
 			storage.flashes.push(...newFlashes);
 			addedFlashes = true;
-			// @pair sync:document
 			for (const decorationId of new Set(newFlashes.map(({ id }) => id))) {
 				const timeout = setTimeout(() => {
 					storage.timeouts.delete(decorationId);
-					// @pair sync:document
 					const remaining = storage.flashes.filter(
 						({ id }) => id !== decorationId,
 					);
@@ -238,7 +210,6 @@ export const FlashRemoteChanges = Extension.create({
 	},
 
 	onDestroy() {
-		// @pair sync:document
 		for (const timeout of this.storage.timeouts.values()) {
 			clearTimeout(timeout);
 		}

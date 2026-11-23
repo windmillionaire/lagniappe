@@ -30,14 +30,6 @@ from lagniappe.web import responses
 from . import projects
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
-# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_is_forbidden_without_model_permission
-# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_reads_project_without_editing_controls
-# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_can_read_document_content
-# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_url_rejects_model_task_key
-# @pair projects:wrong-entity-type
-# @matrix projects : document-tab load navigate permission-gates readonly
 @projects.route("/<key>", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
 def view(
@@ -51,10 +43,6 @@ def view(
     return responses.project_view(project)
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004b_info.py::test_project_info_replacement_is_side_effect_free_for_timestamp_only_revision
-# @tests tests_e2e/004_projects/test_004b_info.py::test_project_revision_notice_only_resets_changed_form
-# @matrix edited-entity-notice projects : dirty-state info-form no-reload replacement side-effect-free staged-reset timestamp-only
 @projects.route("/<key>/info/replace", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
 def info(
@@ -63,9 +51,6 @@ def info(
     return responses.project_info(kwargs["entity"])
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
-# @matrix projects : create-manual
 def create_update_data(form: MultiDict[str, str]) -> ProjectData:
     return {
         "name": form.get("name"),
@@ -73,9 +58,6 @@ def create_update_data(form: MultiDict[str, str]) -> ProjectData:
     }
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004b_info.py::test_project_info_form
-# @matrix projects : info-form update
 @projects.route("<key>/update", methods=["PUT"])
 @permission(Resource.PROJECT, Action.EDIT)
 def update(
@@ -105,9 +87,6 @@ class _GeneratedProject(ProjectData):
     model_tasks: list[_GeneratedModelTask]
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/projects/main.py::create
-# @reason AI response shaping is exercised through the project create route
 def _create_project(generated_data: ai_project.GeneratedProject) -> _GeneratedProject:
     project_data: _GeneratedProject = {
         "name": generated_data.get("project_name"),
@@ -131,10 +110,6 @@ def _create_project(generated_data: ai_project.GeneratedProject) -> _GeneratedPr
     return project_data
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
-# @matrix projects : ai-create create-manual
 @projects.route("/create", methods=["POST"])
 @permission(Resource.PROJECTS, Action.CREATE)
 def create() -> ResponseReturnValue:
@@ -186,9 +161,6 @@ def create() -> ResponseReturnValue:
     return responses.new_project(new_project)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_delete_project
-# @pair projects:delete
 @projects.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.PROJECT, Action.DELETE)
 def delete(

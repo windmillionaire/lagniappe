@@ -29,7 +29,6 @@ from testing.utility.test_file import TestFile as UploadTestFile
 pytestmark = pytest.mark.e2e
 
 
-# @matrix entity-layout : persistence query-tab
 def test_page_url_tab_overrides_saved_tab(get_admin, get_user):
     user = get_admin()
     page = Pages.test_page_loads.get(user)
@@ -54,7 +53,6 @@ def test_page_url_tab_overrides_saved_tab(get_admin, get_user):
     )
 
 
-# @matrix pages : default-form submission
 def test_page_with_default_category_form(get_admin, get_user):
     user = get_admin()
     page = Pages.test_page_with_default_category_form.get(user)
@@ -71,7 +69,6 @@ def test_page_with_default_category_form(get_admin, get_user):
     page.submit_and_verify_submission(submission)
 
 
-# @matrix pages : form-switch info-form
 def test_switch_page_form(get_admin, get_user):
     user = get_admin()
     page = Pages.test_switch_page_form.get(user)
@@ -90,7 +87,6 @@ def test_switch_page_form(get_admin, get_user):
         expect(field.locate(info_form)).to_be_visible()
 
 
-# @matrix pages : form-clear info-form
 def test_clear_page_info_form_selector_keeps_widget_stable(get_admin, get_user):
     user = get_admin()
     page = Pages.test_switch_page_form.get(user)
@@ -121,8 +117,6 @@ def _document_save_response(text):
     return predicate
 
 
-# @matrix pages : document-visibility private public public-document
-# @pair public-directory:category
 def test_document_visibility_can_toggle_public_private(get_admin, get_user, browser_failures):
     user = get_admin()
     page = user.go(Pages.test_document_visibility_page)
@@ -195,7 +189,6 @@ def test_document_visibility_can_toggle_public_private(get_admin, get_user, brow
     expect(settings.locator("a")).to_have_count(0)
 
 
-# @matrix public-pages : document-image metadata preview public-rendering public-route revocation
 # @template public/nav.html::public_nav
 def test_public_document_images_are_anonymous_and_revocable(
     get_admin, get_user,
@@ -296,7 +289,6 @@ def test_public_document_images_are_anonymous_and_revocable(
     assert private_response.status == 404
 
 
-# @matrix pages : delete file-upload
 # @template pages/files.html::file_list_item
 def test_add_file_to_page(get_admin, get_user):
     user = get_admin()
@@ -334,8 +326,6 @@ def test_add_file_to_page(get_admin, get_user):
     expect(file_list.locator("li").filter(has_text="editor_test_image")).to_have_count(0)
 
 
-# @matrix ai : batch-summary provider-boundary
-# @matrix file pages : file-upload multi-file page-upload
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 @pytest.mark.ai
@@ -453,7 +443,6 @@ def test_add_multiple_files_to_page_without_existing_file_select(get_admin, get_
     report.record("persisted_file_summaries", summaries)
 
 
-# @pair pages:category-add
 def test_add_category_to_page(get_admin, get_user):
     user = get_admin()
     page = user.go(Pages.test_add_category_page)
@@ -477,8 +466,6 @@ def test_add_category_to_page(get_admin, get_user):
     expect(user.locate(page.PAGE_TITLE)).to_contain_text(page.definition.name)
 
 
-# @matrix pages : delete parentless title-menu
-# @pair entity-menu:title-positioning
 # @template pages/page.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
@@ -509,7 +496,6 @@ def test_delete_page_from_title_menu(get_admin, get_user):
     assert Entities.fetch_one(page.key, request=Fetch.root()) is None
 
 
-# @pair pages:category-remove
 def test_remove_category_from_page(get_admin, get_user):
     user = get_admin()
     page = user.go(Pages.test_category_edit_page)

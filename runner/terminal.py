@@ -14,16 +14,10 @@ if TYPE_CHECKING:
 _SGR = re.compile(r"\x1b\[[0-9;]*m")
 
 
-# @testable false
-# @covered-by runner/terminal.py::styled
-# @reason ANSI styling has no display width
 def unstyle(message: object) -> str:
     return _SGR.sub("", str(message))
 
 
-# @testable false
-# @covered-by runner/terminal.py::styled
-# @reason optional renderer keeps bootstrap and read-only commands dependency-free
 def _console(stream: TextIO | None = None) -> Console | None:
     stream = sys.stdout if stream is None else stream
     try:
@@ -56,9 +50,6 @@ def _console(stream: TextIO | None = None) -> Console | None:
     return console
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_formatter_preserves_plain_and_colored_output
-# @matrix setup : package-install spinner
 def styled(message: object, style: str, *, stream: TextIO | None = None) -> str:
     """Return a literal styled span without introducing wrapping or markup."""
     text = unstyle(message)

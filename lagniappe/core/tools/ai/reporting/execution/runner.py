@@ -50,23 +50,6 @@ class ExecutionContext(TypedDict, total=False):
     action_record: ActionRecord
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_invalid_completed_task_events_and_continues
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_rejects_saved_pending_submissions_before_execution
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_checks_deferred_execution_guard
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_propagates_deferred_control_stop
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_resumes_after_completed_create_without_duplicate
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_continues_independent_work_after_completed_entity_changes
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_reconciles_applying_create_when_output_already_exists
-# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_uses_category_form_from_stored_key_for_page_submission
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_targets_created_task
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_loads_attached_inputs_only_for_pending_file_work
-# @matrix ai-report : attachments cancellation completed-prefix continue create create-order deterministic-run execute idempotency partial-result permissions persistence post-commit-checkpoint recoverable recovery reuse skip-action stale-proposal validation
-# @matrix ai-report files : execution-inputs initial-load staged-inputs
-# @matrix ai-report : preservation unavailable
 def run_report(
     report: models.AIReport,
     user: models.User,
@@ -118,9 +101,6 @@ def run_report(
     ensure_active()
     Entities.save(report)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-    # @reason a rejected preparation rebuilds only the uncommitted group
     def begin_batch():
         workspace = WorkingEntities()
         for alias, entity in _restore_completed_action_entities(result).items():
@@ -233,9 +213,6 @@ def run_report(
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason rejected batches retain pending actions and a visible manual retry
 def _fail_batch(report, result, batch, error):
     indices = list(batch.indices)
     batch.discard()
@@ -250,8 +227,5 @@ def _fail_batch(report, result, batch, error):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason run-scoped report context setup is verified through report execution
 def _build_report_run_context(proposal: ReportProposal) -> ExecutionContext:
     return {"allocation_actions": proposal.get("actions", []), "action_records": {}}

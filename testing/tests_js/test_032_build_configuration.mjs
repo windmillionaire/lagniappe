@@ -23,7 +23,6 @@ import {
 	viewEntryUrl,
 } from "../../src/script/viewRegistry.mjs";
 
-// @matrix build : optional-credentials release-version sentry source-maps
 test("test_sentry_build_uses_package_release_and_requires_upload_token", () => {
 	for (const settings of [
 		{},
@@ -56,7 +55,6 @@ test("test_sentry_build_uses_package_release_and_requires_upload_token", () => {
 	assert.doesNotMatch(rollupConfig, /name: settings\.VERSION/);
 });
 
-// @pair frontend-build:view-registry
 test("test_frontend_entries_and_startup_budget_contract", () => {
 	assert.equal(
 		viewEntryUrl("manual"),
@@ -168,7 +166,6 @@ test("test_frontend_entries_and_startup_budget_contract", () => {
 	}
 });
 
-// @matrix frontend-build : modulepreload view-registry
 test("test_templates_preload_registered_view_and_interaction_foundations", () => {
 	const base = readFileSync(
 		"lagniappe/web/templates/layouts/base.html",
@@ -238,7 +235,6 @@ test("test_templates_preload_registered_view_and_interaction_foundations", () =>
 	}
 });
 
-// @matrix frontend-build : chunking interaction-foundation modulepreload
 test("test_interaction_preloads_have_stable_manual_chunks", () => {
 	const root = "/checkout/src/script/";
 	for (const module of [
@@ -406,8 +402,6 @@ test("test_interaction_preloads_have_stable_manual_chunks", () => {
 	}
 });
 
-// @source build/publication.mjs::recordBuildArtifacts
-// @matrix frontend-build : artifact-inventory chunking view-registry warnings build-modes
 test("test_rollup_modes_preserve_bundle_and_publication_contracts", async () => {
 	const repositoryRoot = process.cwd();
 	const fixture = mkdtempSync(join(tmpdir(), "lagniappe-build-version-"));

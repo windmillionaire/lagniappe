@@ -29,7 +29,6 @@ pytestmark = pytest.mark.e2e
 FIELD_ID = "input-lifecycle-text"
 
 
-# @matrix cache session timezone : concurrent-permissions property-mask
 def test_masked_timezone_save_preserves_newer_user_state():
     actor = Entities.USER.create({
         "name": "Timezone Concurrency", "email": f"timezone-snapshot-{uuid4().hex}@example.test",
@@ -57,7 +56,6 @@ def test_masked_timezone_save_preserves_newer_user_state():
         persisted.save()
 
 
-# @matrix templates security : safe-html strict-filter
 def test_safe_html_filter_rejects_untyped_values():
     safe = sanitize_html("<strong>safe</strong>")
     assert render_safe_html(safe) == Markup("<strong>safe</strong>")
@@ -187,8 +185,6 @@ def _assert_hash_cached(entity):
     assert details[entity.hash]["id"] == entity.urlsafe_key
 
 
-# @matrix ai-report : delete category-editor file-links created-entities
-# @source lagniappe/core/tools/ai/report_history.py::delete_report_record
 def test_report_deletion_preserves_created_work_and_uploaded_file():
     category = _create_category("undo-editor-category")
     user = Entities.USER.create(
@@ -241,7 +237,6 @@ def test_report_deletion_preserves_created_work_and_uploaded_file():
     assert remaining_file.allowed(Action.VIEW, user=user)
 
 
-# @matrix entities : cache database dependent-owner process-state save
 def test_entity_save_persists_relations_process_payloads_and_cache():
     form = _create_form("save-form")
     category = _create_category("save-category", form=form)
@@ -280,8 +275,6 @@ def test_entity_save_persists_relations_process_payloads_and_cache():
     assert reloaded.submission[FIELD_ID] == "persisted submission"
 
 
-# @matrix entities : assets cache cascade database delete
-# @matrix categories : cascade model-category shared-page
 @pytest.mark.parametrize("category_as_model", [False, True])
 def test_entity_delete_cascades_dependents_assets_and_cache(category_as_model):
     completer = Entities.USER.create(
@@ -375,7 +368,6 @@ def test_entity_delete_cascades_dependents_assets_and_cache(category_as_model):
     assert reloaded_file.task is None
 
 
-# @matrix entities : cache cascade database delete forms
 def test_entity_delete_project_cascades_models_forms_filters_and_cache():
     creator = _create_page("project-filter-creator", [])
     model_only_project = Entities.PROJECT.create(

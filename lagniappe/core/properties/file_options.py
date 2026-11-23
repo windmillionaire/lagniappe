@@ -20,17 +20,10 @@ class ProcessingRequest(TypedDict):
     extract: bool
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/file_options.py::Extract.update
-# @covered-by lagniappe/core/properties/file_options.py::Summarize.update
-# @reason small submitted-field guard is owned by option update behavior
 def _has_any(form_data: Mapping[str, object], *field_names: str) -> bool:
     return any(form_data.get(name) is not None for name in field_names)
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_extract_process
-# @matrix file : extract process
 class Extract(ProcessProperty[_File]):
     """Text extraction options (OCR via Document AI).
 
@@ -47,12 +40,6 @@ class Extract(ProcessProperty[_File]):
     section_id = "extract"
     attributes = ("status", "enabled", "search")
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_extract_process
-    # @tests tests_unit/test_006_file_properties.py::test_extract_update_completes_immediately_for_text_files
-    # @tests tests_unit/test_006_file_properties.py::test_file_update_preserves_processing_options_when_controls_absent
-    # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-    # @matrix file : deferred-dispatch extract option-preservation process-complete text-asset update
     def update(self, data: Mapping[str, object]) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride] -- File forms use the existing data keyword.
         if not _has_any(data, "enable-extract", "extract", "search-text"):
             return False
@@ -72,9 +59,6 @@ class Extract(ProcessProperty[_File]):
         return False
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_summarize_process
-# @matrix file : process summarize
 class Summarize(ProcessProperty[_File]):
     """AI summarization options.
 
@@ -93,13 +77,6 @@ class Summarize(ProcessProperty[_File]):
     section_id = "summarize"
     attributes = ("status", "enabled", "search", "retrieval_terms")
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_summarize_process
-    # @tests tests_unit/test_006_file_properties.py::test_summarize_update_uses_enable_field_name
-    # @tests tests_unit/test_006_file_properties.py::test_summarize_update_upload_search_summary_remains_opt_in
-    # @tests tests_unit/test_006_file_properties.py::test_file_update_preserves_processing_options_when_controls_absent
-    # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-    # @matrix file : deferred-dispatch option-preservation search-opt-in summarize update
     def update(self, data: Mapping[str, object]) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride] -- File forms use the existing data keyword.
         if not _has_any(data, "enable-summarize", "summarize", "search-summary"):
             return False
@@ -126,11 +103,6 @@ class Summarize(ProcessProperty[_File]):
         return False
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-# @matrix deferred-jobs file : deferred-dispatch extraction-follow-up post-save-dispatch summary-first
-# @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatch_uses_explicit_actor
-# @matrix file deferred-jobs : explicit-actor
 def dispatch_file_processing(
     file: File, request: ProcessingRequest, *, actor: User
 ) -> Extract | Summarize | None:
@@ -150,8 +122,6 @@ def dispatch_file_processing(
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/file_options.py::Options.value
 class Options(ColumnMixin, Property[dict[str, object], _File]):
     """Aggregated file processing options (extract, summarize).
 
@@ -161,9 +131,6 @@ class Options(ColumnMixin, Property[dict[str, object], _File]):
 
     _id = "options"
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_options
-    # @matrix file : extract options summarize
     @property
     def value(self) -> dict[str, object]:  # pyright: ignore[reportIncompatibleMethodOverride] -- This projection is computed and read-only.
         if self.is_set:

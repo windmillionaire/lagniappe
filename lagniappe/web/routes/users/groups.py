@@ -19,10 +19,6 @@ from lagniappe.web import responses
 from . import users
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
-# @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
-# @matrix user-groups : group-create nav
 @users.route("/create-group", methods=["POST"])
 @permission(Resource.USER_GROUPS, Action.CREATE)
 def create_group() -> ResponseReturnValue:
@@ -35,10 +31,6 @@ def create_group() -> ResponseReturnValue:
     return responses.create_group(group)
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_public_permissions
-# @tests tests_unit/test_009e_user_groups.py::test_public_permissions
-# @matrix public-groups : permissions public
 @users.route("/public-permissions", methods=["GET", "PUT"])
 @permission(Resource.SITE)
 def public_permissions() -> ResponseReturnValue:
@@ -50,11 +42,6 @@ def public_permissions() -> ResponseReturnValue:
     return responses.group_permissions(public_group, public=True)
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
-# @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
-# @tests tests_e2e/008_users/test_008b_user_groups.py::test_rename_group
-# @matrix user-groups : entity-permissions general-permissions permission-update rename
 @users.route("/group-permissions/<key>", methods=["PUT", "GET"])
 @permission(Resource.USER_GROUPS, Action.EDIT)
 def group_permissions(
@@ -76,9 +63,6 @@ def group_permissions(
     return responses.group_permissions(group)
 
 
-# @testable true
-# @tests tests_unit/test_009a_user.py::test_user_groups_membership_changes_recalculate_permissions
-# @pair user-groups:membership-change
 @users.route("/delete-group/<key>", methods=["DELETE"])
 @permission(Resource.USER_GROUPS, Action.DELETE)
 def delete_group(

@@ -154,7 +154,6 @@ def migration(monkeypatch):
     )
 
 
-# @matrix form-migration : partial-read generation
 def test_pending_definition_resolves_each_generation(migration):
     form = migration.form
     target = record("page", "page", form=form.key)
@@ -168,9 +167,6 @@ def test_pending_definition_resolves_each_generation(migration):
     assert changes.PENDING in form.db
 
 
-# @source lagniappe/core/properties/category.py::CategoryTable
-# @source lagniappe/core/properties/filter.py::FilterTable
-# @matrix form-migration : pending-projection removed-field typed-filter
 @pytest.mark.parametrize("remove", [False, True])
 def test_pending_and_removed_fields_are_withheld_from_tables_and_filters(migration, monkeypatch, remove):
     from lagniappe.core.properties.category import CategoryTable
@@ -215,7 +211,6 @@ def test_pending_and_removed_fields_are_withheld_from_tables_and_filters(migrati
         assert resolve_filter_field(category, published.hash, "answer", migration.actor).field.schema["input"] == "number"
 
 
-# @matrix form-migration : save no-submission-read durable-intent
 def test_start_stages_intent_without_enumerating_submissions(migration, monkeypatch):
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
@@ -249,7 +244,6 @@ def test_start_stages_intent_without_enumerating_submissions(migration, monkeypa
     assert json.loads(migration.rows[form.key]["schema"])[0]["input"] == "text"
 
 
-# @matrix form-migration : completed-task legacy-generation notice masked-write
 @pytest.mark.parametrize(
     "envelope",
     [
@@ -295,7 +289,6 @@ def test_prepare_target_preserves_completion_and_original_answers(migration, env
     assert task.db == before
 
 
-# @matrix form-migration : duplicate-delivery guarded-write effects-retry
 def test_apply_is_guarded_idempotent_and_retries_effects(migration, monkeypatch):
     page = record(
         "page",
@@ -323,7 +316,6 @@ def test_apply_is_guarded_idempotent_and_retries_effects(migration, monkeypatch)
         changes.apply_target(migration.context, page.db)
 
 
-# @matrix form-migration : writer-fence stale-generation completion-race
 def test_mutation_guard_blocks_locked_and_stale_answer_writes(migration):
     page = record(
         "page", "page", form=migration.form.key, submission=json.dumps({"answer": "2"})
@@ -347,7 +339,6 @@ def test_mutation_guard_blocks_locked_and_stale_answer_writes(migration):
     assert changes.mutation_guards([touch], []) == []
 
 
-# @matrix form-migration : writer-fence stale-generation creation reassignment
 def test_new_attachments_adopt_current_generation_without_accepting_stale_answers(
     migration,
 ):
@@ -375,7 +366,6 @@ def test_new_attachments_adopt_current_generation_without_accepting_stale_answer
         changes.mutation_guards([effect], [])
 
 
-# @matrix form-migration : writer-fence pending-delete masked-write attachment
 @pytest.mark.parametrize("operation", [
     "delete-form", "patch-page", "patch-task", "create-page", "create-task",
     "reassign-page", "reassign-task",
@@ -406,7 +396,6 @@ def test_pending_change_fences_conflicting_writes(migration, operation):
     assert migration.writes == []
 
 
-# @matrix form-migration : preflight batch-job publication
 def test_adapter_checks_all_values_before_applying(migration, monkeypatch):
     first = record(
         "page",
@@ -432,7 +421,6 @@ def test_adapter_checks_all_values_before_applying(migration, monkeypatch):
     assert migration.writes == []
 
 
-# @matrix form-migration : form-authority restricted-submissions
 @pytest.mark.parametrize("kind", ["page", "task"])
 def test_form_authority_migrates_restricted_submissions(migration, monkeypatch, kind):
     target = record(
@@ -457,7 +445,6 @@ def test_form_authority_migrates_restricted_submissions(migration, monkeypatch, 
     assert not converted.allowed(Action.VIEW, user=migration.actor)
 
 
-# @matrix form-migration : informational-notice changed-cells
 def test_notice_shows_only_changed_fields_and_cells(migration):
     schema = {
         "id": "table",
@@ -500,7 +487,6 @@ def test_notice_shows_only_changed_fields_and_cells(migration):
     assert page.db == before
 
 
-# @matrix form-migration : retry cancellation ownership
 def test_recovery_retains_partial_changes_and_cancels_only_before_apply(
     migration, monkeypatch
 ):

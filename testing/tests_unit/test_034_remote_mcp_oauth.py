@@ -143,7 +143,6 @@ def _refresh(oauth, token):
     }
 
 
-# @matrix mcp-oauth : cimd validation
 def test_cimd_is_exact_bounded_cached_and_accepts_public_method_intersection(
     oauth, monkeypatch
 ):
@@ -187,7 +186,6 @@ def test_cimd_is_exact_bounded_cached_and_accepts_public_method_intersection(
             auth.client_metadata(oauth.config["client_id"])
 
 
-# @matrix mcp-oauth : authorization validation
 def test_authorization_requires_exact_bindings_state_and_s256(oauth):
     for field in oauth.request:
         invalid = {key: value for key, value in oauth.request.items() if key != field}
@@ -210,10 +208,6 @@ def test_authorization_requires_exact_bindings_state_and_s256(oauth):
     assert not oauth.rows
 
 
-# @matrix mcp-oauth : authorization consent token refresh validation
-# @source lagniappe/core/tools/auth/remote_mcp.py::begin_authorization
-# @source lagniappe/core/tools/auth/remote_mcp.py::consent
-# @source lagniappe/core/tools/auth/remote_mcp.py::exchange_token
 @pytest.mark.parametrize("client", ["chatgpt", "codex"])
 @pytest.mark.parametrize("scope", [None, "", "mcp:use"])
 def test_authorization_without_scopes_preserves_consent_and_token_lifecycle(
@@ -263,9 +257,6 @@ def test_authorization_without_scopes_preserves_consent_and_token_lifecycle(
     assert auth.authenticate_access(refreshed["access_token"])[0] is oauth.actor
 
 
-# @matrix mcp-oauth : authentication existing-grants refresh
-# @source lagniappe/core/tools/auth/remote_mcp.py::exchange_token
-# @source lagniappe/core/tools/auth/remote_mcp.py::authenticate_access
 def test_existing_scoped_credentials_survive_scope_removal(oauth):
     parameters = _code(oauth)
     # Reproduce records issued before scope negotiation was removed, including
@@ -288,7 +279,6 @@ def test_existing_scoped_credentials_survive_scope_removal(oauth):
             auth.authenticate_access(result["access_token"])
 
 
-# @matrix mcp-oauth : consent transaction
 def test_consent_deny_and_pending_replay_do_not_issue_tokens(oauth):
     pending = auth.begin_authorization(oauth.request)
     target, result = auth.consent(pending, oauth.actor, allow=False)
@@ -306,7 +296,6 @@ def test_consent_deny_and_pending_replay_do_not_issue_tokens(oauth):
         auth.consent(pending, oauth.actor, allow=True, now=NOW + timedelta(hours=1))
 
 
-# @matrix mcp-oauth : consent token pkce refresh replay transaction
 def test_code_is_single_use_and_refresh_replay_revokes_the_family(oauth):
     parameters = _code(oauth)
 
@@ -341,7 +330,6 @@ def test_code_is_single_use_and_refresh_replay_revokes_the_family(oauth):
         assert secret not in persisted
 
 
-# @matrix mcp-oauth : token pkce refresh replay transaction authentication expiry revocation user-binding
 def test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion(oauth, monkeypatch):
     parameters = _code(oauth)
     for field, value in (
@@ -400,7 +388,6 @@ def test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion(oauth, 
         auth.authenticate_access(tokens["access_token"])
 
 
-# @matrix mcp-oauth : user-binding oidc audience service-identity token-separation authentication expiry revocation
 def test_oauth_user_and_workload_identity_are_both_required(oauth, monkeypatch):
     tokens = auth.exchange_token(_code(oauth))
     claims = {
@@ -444,7 +431,6 @@ def test_oauth_user_and_workload_identity_are_both_required(oauth, monkeypatch):
         auth.authenticate_access(tokens["access_token"])
 
 
-# @matrix mcp-oauth : oidc certificate-cache
 def test_workload_certificates_are_bounded_cached_and_fail_closed(monkeypatch):
     monkeypatch.setattr(auth, "_certificate_cache", None)
     clock = [100.0]
@@ -499,7 +485,6 @@ def test_workload_certificates_are_bounded_cached_and_fail_closed(monkeypatch):
             auth._certificate_request(auth._CERTIFICATE_URL)
 
 
-# @matrix mcp-oauth : oidc certificate-cache audience service-identity token-separation authentication revocation
 def test_cached_certificates_still_verify_each_signature_and_user_grant(
     oauth, monkeypatch
 ):
@@ -567,7 +552,6 @@ def test_cached_certificates_still_verify_each_signature_and_user_grant(
     assert calls == [auth._CERTIFICATE_URL]
 
 
-# @matrix mcp-oauth : observability privacy service-identity
 def test_oauth_outcomes_log_only_closed_categories_after_workload_verification(oauth, monkeypatch):
     output = io.StringIO()
     monkeypatch.setattr(auth.LOGGER.handlers[0], "stream", output)
@@ -595,7 +579,6 @@ def test_oauth_outcomes_log_only_closed_categories_after_workload_verification(o
     assert auth.LOGGER.propagate is False
 
 
-# @matrix mcp-oauth : revocation reconnect privacy user-binding
 def test_revocation_is_private_and_reconnect_replaces_only_the_old_family(oauth):
     old = auth.exchange_token(_code(oauth))
     new = auth.exchange_token(_code(oauth))
@@ -610,7 +593,6 @@ def test_revocation_is_private_and_reconnect_replaces_only_the_old_family(oauth)
         auth.authenticate_access(new["access_token"])
 
 
-# @matrix mcp-oauth : persistence transaction
 def test_oauth_store_uses_one_transaction_and_unindexed_records(monkeypatch):
     from google.cloud.datastore import Key
 
@@ -648,8 +630,6 @@ def test_oauth_store_uses_one_transaction_and_unindexed_records(monkeypatch):
     assert set(puts[0].exclude_from_indexes) == {"user", "expires_at"}
 
 
-# @matrix error-reporting : payload-bounds privacy redaction
-# @source lagniappe/core/exceptions/request.py::sanitize_error_context
 def test_oauth_secrets_are_redacted_from_diagnostics():
     from lagniappe.core.exceptions.request import sanitize_error_context
 
@@ -681,7 +661,6 @@ def test_oauth_secrets_are_redacted_from_diagnostics():
         assert secret not in sanitized
 
 
-# @matrix mcp-oauth : authorization consent loopback token refresh revocation client-isolation
 def test_codex_loopback_grants_coexist_and_cannot_cross_clients(oauth):
     from config.remote_mcp import CODEX_CLIENT_ID
 
@@ -730,7 +709,6 @@ def test_codex_loopback_grants_coexist_and_cannot_cross_clients(oauth):
         auth.begin_authorization({**request, "client_id": "unregistered"})
 
 
-# @matrix mcp-oauth : cimd authorization consent token refresh revocation client-isolation
 def test_antigravity_cimd_grants_coexist_with_chatgpt_and_codex(oauth, monkeypatch):
     from config.remote_mcp import ANTIGRAVITY_CLIENT_ID, ANTIGRAVITY_REDIRECT_URI
 
@@ -784,9 +762,6 @@ def test_antigravity_cimd_grants_coexist_with_chatgpt_and_codex(oauth, monkeypat
     assert auth.authenticate_access(chatgpt["access_token"])[0] is oauth.actor
 
 
-# @matrix mcp-oauth : site-policy existing-grants user-binding
-# @source lagniappe/core/tools/auth/remote_mcp.py::authenticate_access
-# @source lagniappe/core/tools/auth/remote_mcp.py::eligible_user
 def test_site_policy_blocks_existing_oauth_grants_and_public_users(oauth, monkeypatch):
     tokens = auth.exchange_token(_code(oauth))
     for flag in ("AI_ENABLED", "EXTERNAL_AI_ENABLED"):

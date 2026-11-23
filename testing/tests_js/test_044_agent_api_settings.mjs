@@ -34,8 +34,6 @@ async function loadUserSettings({
 	});
 }
 
-// @matrix agent-api : expiry poll-reconcile revoke rotate shown-once status
-// @matrix user-settings : poll-reconcile status
 test("test_agent_api_key_controls_keep_secret_ephemeral", async (t) => {
 	let stored = false;
 	replaceGlobal(t, "localStorage", {
@@ -165,7 +163,6 @@ test("test_agent_api_key_controls_keep_secret_ephemeral", async (t) => {
 	assert.equal(widget.target.dataset.visible, "true");
 });
 
-// @matrix agent-api user-settings : confirmation-modal
 test("test_agent_api_key_confirmation_uses_app_modal", async () => {
 	const modalInstances = [];
 	class Modal {

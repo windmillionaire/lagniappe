@@ -60,15 +60,10 @@ class BuilderDraft(TypedDict):
 type DraftImages = Mapping[str, DraftImage]
 
 
-# @testable infrastructure
 class FormDraftConflict(exceptions.ValidationError):
     """The saved Form no longer matches this draft's baseline."""
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/drafts.py::builder_draft
-# @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
-# @reason canonical digest helper owned by draft revision and receipt contracts
 def _digest(value: object) -> str:
     return hashlib.sha256(json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
@@ -81,10 +76,6 @@ def _field_records(field: dict[str, object], name: str) -> list[dict[str, object
     return cast(list[dict[str, object]], field.get(name) or [])
 
 
-# @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_draft_schema_rejects_collisions_and_broken_conditions
-# @tests tests_unit/test_004f_form_drafts.py::test_compatible_schema_preserves_representation_and_identity
-# @matrix form-schema : validation identity conditions
 def validate_draft_schema(
     schema: object, form_type: str | None
 ) -> list[FieldDefinition]:
@@ -127,9 +118,6 @@ def validate_draft_schema(
     return canonical
 
 
-# @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_compatible_schema_preserves_representation_and_identity
-# @matrix form-schema : identity migration-required save-guard
 def validate_compatible_schema(
     previous: object, proposed: object, form_type: str | None = None
 ) -> list[FieldDefinition]:
@@ -146,16 +134,10 @@ def validate_compatible_schema(
     return new
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/drafts.py::builder_draft
-# @reason HTML field enumeration is part of the complete builder projection
 def _html_ids(form: Form) -> set[str]:
     return {cast(str, field["id"]) for field in form.schema if field.get("type") == "html"}
 
 
-# @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_builder_draft_and_staged_html_are_read_only
-# @matrix forms html-field : draft baseline no-write
 def builder_draft(form: Form) -> BuilderDraft:
     """Return one complete read-only builder baseline, including static content."""
     html = {
@@ -175,9 +157,6 @@ def builder_draft(form: Form) -> BuilderDraft:
 
 
 
-# @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_archived_generation_preserves_schema_html_and_images
-# @matrix form-schema html-field : history generation immutable-assets
 def archive_form_generation(
     source: Form, *, attempt_owner: AttemptOwner | None = None
 ) -> FormHistory:
@@ -219,15 +198,6 @@ def archive_form_generation(
     return history
 
 
-# @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_publication_reads_saved_form_only_at_save
-# @tests tests_unit/test_004f_form_drafts.py::test_compatible_saves_update_version_without_archiving_generation
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_form_creation_and_content_edits_do_not_queue_reconciliation
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_change_detection_and_forced_retry
-# @matrix forms mutations : guarded-save generation publication
-# @matrix html-field : isolated-assets cleanup
-# @matrix permissions cache : change-detection retry new-form content-only no-queue
-# @pair mutations:rejected-save
 def prepare_form_publication(form: Form, builder: MutationPlanBuilder) -> None:
     """Compare with the saved Form and publish staged content at the save boundary."""
     assert builder.entities is not None
@@ -291,10 +261,6 @@ def prepare_form_publication(form: Form, builder: MutationPlanBuilder) -> None:
         form._permission_sources_changed = True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/drafts.py::prepare_form_publication
-# @covered-by lagniappe/core/tools/forms/changes.py::start_change
-# @reason explicit Save stages isolated content for immediate or deferred publication
 def stage_form_content(form: Form) -> None:
     for field_id, content in getattr(form, "_pending_html", {}).items():
         if field_id not in _html_ids(form):
@@ -310,9 +276,6 @@ def stage_form_content(form: Form) -> None:
             form.db["assets"] = json.dumps(form.assets)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
-# @reason save response projection is shared by accepted requests and their receipts
 def _saved_response(
     form: Form, image_urls: Mapping[str, str], *, post_commit_complete: bool = True
 ) -> FormPublication:
@@ -322,10 +285,6 @@ def _saved_response(
             "post_commit_complete": post_commit_complete}
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
-# @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
-# @reason exact draft image references are part of draft validation
 def _validate_content(schema: list[FieldDefinition], html: object, images: DraftImages):
     html_ids = {field["id"] for field in schema if field["type"] == "html"}
     if not isinstance(html, dict) or set(html) != html_ids or any(not isinstance(value, str) for value in html.values()):
@@ -344,10 +303,6 @@ def _validate_content(schema: list[FieldDefinition], html: object, images: Draft
             raise exceptions.ValidationError("A draft image has invalid ownership or is not referenced by its field.")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
-# @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
-# @reason exact image URL replacement is owned by publication
 def _rewrite_images(content: str, replacements: Mapping[str, str]) -> str:
     soup = BeautifulSoup(content, "html.parser")
     for image in soup.find_all("img"):
@@ -357,10 +312,6 @@ def _rewrite_images(content: str, replacements: Mapping[str, str]) -> str:
     return str(soup)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
-# @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
-# @reason private attempt assets are prepared only after full draft validation
 def _stage_content(
     form: Form, html: dict[str, str], images: DraftImages
 ) -> dict[str, str]:
@@ -379,9 +330,6 @@ def _stage_content(
     return image_urls
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
-# @reason copying source images is part of independent draft publication
 def _stage_copy_content(
     copied: Form, source: Form, html: dict[str, str], images: DraftImages
 ) -> dict[str, str]:
@@ -413,13 +361,6 @@ def _stage_copy_content(
     return _stage_content(copied, html, images)
 
 
-# @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_save_draft_checks_receipt_baseline_and_validation_before_uploads
-# @tests tests_unit/test_004f_form_drafts.py::test_save_draft_publishes_images_once_and_retains_failed_attempt_originals
-# @tests tests_unit/test_004f_form_drafts.py::test_rejected_save_cleans_only_attempt_blobs_and_ambiguous_commit_retains_them
-# @matrix forms : draft save-receipt conflict publication
-# @matrix html-field : upload publication
-# @matrix mutations : conflict rejected-save ambiguous-commit
 def save_form_draft(
     form: Form,
     draft: Mapping[str, object],
@@ -501,9 +442,6 @@ def save_form_draft(
     return _saved_response(current, image_urls, post_commit_complete=outcome.post_commit_complete)
 
 
-# @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_copy_draft_owns_content_and_is_idempotent_without_saving_source
-# @matrix forms html-field : copy draft immutable-assets save-receipt
 def copy_form_draft(
     source: Form,
     draft: Mapping[str, object],

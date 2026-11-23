@@ -43,9 +43,6 @@ UUID_PATTERN = re.compile(
 )
 
 
-# @testable true
-# @tests tests_unit/test_016_config.py::test_installer_database_id_validation
-# @pair data-lifecycle:named-scratch-database
 def validate_database_id(value: object, *, allow_default: bool = True) -> str:
     value = str(value or "").strip()
     if allow_default and value == DEFAULT_DATABASE_ID:
@@ -63,9 +60,6 @@ def validate_database_id(value: object, *, allow_default: bool = True) -> str:
     return value
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_database_aware_urlsafe_key_round_trip
-# @pair database:named-key-encoding
 def encode_urlsafe_key(key: Key) -> str:
     """Encode a Datastore Key, retaining a named database when present."""
     raw_database_id = getattr(key, "database", None)
@@ -95,9 +89,6 @@ def encode_urlsafe_key(key: Key) -> str:
     return base64.urlsafe_b64encode(reference.SerializeToString()).rstrip(b"=").decode("ascii")
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_database_aware_urlsafe_key_round_trip
-# @pair database:named-key-encoding
 def decode_urlsafe_key(value: str | bytes) -> Key:
     """Decode default or named-database legacy Reference tokens."""
     from google.cloud.datastore import Key

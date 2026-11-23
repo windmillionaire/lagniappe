@@ -20,9 +20,6 @@ HELP_SCORE = 0.60
 READY_TIMEOUT = 30
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/help.py::ensure_help_index
-# @reason Redis metadata uses byte values even when its outer keys are decoded
 def _decoded(value):
     if isinstance(value, bytes):
         return value.decode()
@@ -33,9 +30,6 @@ def _decoded(value):
     return value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/help.py::ensure_help_index
-# @reason inspecting the primary schema gates its one-time migration
 def _supports_help() -> bool:
     try:
         info = cast(_IndexInfo, _decoded(cache.redis.ft(cache.INDEX).info()))
@@ -51,10 +45,6 @@ def _supports_help() -> bool:
     )
 
 
-# @testable true
-# @tests tests_unit/test_035_help.py::test_index_upgrade_preserves_hashes_and_is_serialized
-# @tests tests_unit/test_035_help.py::test_index_upgrade_does_not_hide_provider_failures
-# @matrix help : index-upgrade provider-failure
 def ensure_help_index() -> None:
     """Extend an old index's prefix set without deleting its underlying data."""
     if _supports_help():
@@ -71,10 +61,6 @@ def ensure_help_index() -> None:
         _wait_ready()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/help.py::ensure_help
-# @covered-by lagniappe/core/tools/cache/help.py::ensure_help_index
-# @reason bounded indexing readiness is part of publishing the version marker
 def _wait_ready(*, version: str | None = None, count: int | None = None) -> None:
     deadline = time.monotonic() + READY_TIMEOUT
     while True:
@@ -90,18 +76,10 @@ def _wait_ready(*, version: str | None = None, count: int | None = None) -> None
         time.sleep(0.05)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/help.py::ensure_help
-# @reason version filtering is shared by population verification and callers
 def help_clause(version: str) -> str:
     return f"(@kind:{{ help }} @help_version:{{ {version} }})"
 
 
-# @testable true
-# @tests tests_unit/test_035_help.py::test_population_is_versioned_atomic_and_skips_warm_start
-# @tests tests_unit/test_035_help.py::test_failed_population_is_retryable_and_cache_loss_repopulates
-# @tests tests_unit/test_035_help.py::test_population_rechecks_readiness_after_lock
-# @matrix help : publication version cache-recovery
 def ensure_help() -> str:
     """Publish a complete source version once per Redis namespace."""
     version = help_version()

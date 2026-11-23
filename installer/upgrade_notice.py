@@ -24,9 +24,6 @@ RELEASE_VERSION_PATTERN = re.compile(
 )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_maintenance_notice_version_policy
-# @matrix setup migrations : major-version version-validation
 def parse_release_version(value: object) -> tuple[int, ...] | None:
     """Return a stable release-version tuple, or ``None`` for invalid input."""
     match = RELEASE_VERSION_PATTERN.fullmatch(str(value or "").strip())
@@ -35,9 +32,6 @@ def parse_release_version(value: object) -> tuple[int, ...] | None:
     return tuple(int(part) for part in match.groups())
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_maintenance_notice_version_policy
-# @matrix setup migrations : major-version unknown-source
 def post_upgrade_maintenance_required(
     installed_version: object, target_version: object
 ) -> bool:
@@ -53,9 +47,6 @@ def post_upgrade_maintenance_required(
     return target[0] > installed[0]
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_legacy_upgrade_deploy_notice_uses_active_operation
-# @matrix setup migrations : legacy-upgrade major-version
 def legacy_upgrade_deploy_notice_required(settings: SettingsDraft) -> bool:
     """Detect a major release reached through a pre-1.0 upgrade orchestrator."""
     from installer import state
@@ -67,10 +58,6 @@ def legacy_upgrade_deploy_notice_required(settings: SettingsDraft) -> bool:
     return payload.get("mode") == "upgrade" and parsed is not None and parsed[1:] == (0, 0)
 
 
-# @testable false
-# @covered-by installer/upgrade.py::_apply_update
-# @covered-by installer/deploy.py::deploy_to_app_engine
-# @reason shared terminal presentation is asserted through both deployment workflows
 def print_post_upgrade_maintenance_notice(
     formatter: Formatter, installed_version: object, target_version: object
 ) -> None:
@@ -97,10 +84,6 @@ def print_post_upgrade_maintenance_notice(
     )
 
 
-# @testable false
-# @covered-by installer/upgrade.py::_apply_update
-# @covered-by installer/deploy.py::deploy_to_app_engine
-# @reason shared terminal presentation is asserted through both deployment workflows
 def print_post_upgrade_maintenance_steps(formatter: Formatter) -> None:
     """Repeat the required in-app work after a major deployment succeeds."""
     print(wrap_text(f"\n{ui.heading('Required next steps')}"))
@@ -126,9 +109,6 @@ def print_post_upgrade_maintenance_steps(formatter: Formatter) -> None:
     print(wrap_text(f"  {ui.literal('4.')} Select {ui.literal('Refresh Cache')}."))
 
 
-# @testable false
-# @covered-by installer/deploy.py::deploy_to_app_engine
-# @reason compatibility confirmation is exercised through the deployment helper
 def confirm_legacy_upgrade_deployment(
     formatter: Formatter, target_version: object
 ) -> None:

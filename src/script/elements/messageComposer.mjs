@@ -3,10 +3,6 @@ import { createIcon } from "../shared/icons.mjs";
 import { ENDPOINTS, Modal, request } from "../shared/index.mjs";
 import { FacetsBox } from "./combobox/index.mjs";
 
-/**
- * @testable infrastructure
- * @covered-by src/script/elements/messageComposer.mjs::MessageComposer
- */
 class ComposerModal extends Modal {
 	constructor(composer) {
 		super(composer.view, null);
@@ -22,10 +18,6 @@ class ComposerModal extends Modal {
 /**
  * Shared modal used by the notification menu and messages page.
  *
- * @testable true
- * @tests tests_js/test_042_messaging_frontend.mjs::test_message_composer_prefills_peer_and_reuses_operation_on_submit
- * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
- * @matrix messaging : compose-modal operation-id prefilled-peer selection-focus user-kind
  */
 export class MessageComposer {
 	constructor(view, { onSent = null } = {}) {
@@ -51,7 +43,6 @@ export class MessageComposer {
 		return this;
 	}
 
-	/** @testable infrastructure */
 	_buildModal() {
 		const spinner = createIcon("spinner").outerHTML;
 		const modal = document.createElement("div");
@@ -91,11 +82,6 @@ export class MessageComposer {
 		return modal;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/messageComposer.mjs::MessageComposer
-	 * @reason prefill and operation allocation are exercised through the modal contract
-	 */
 	async open(recipient = null) {
 		await this.close();
 		const modal = this._buildModal();
@@ -115,12 +101,10 @@ export class MessageComposer {
 		this._activate(recipient);
 	}
 
-	/** @testable infrastructure */
 	_recipientUpdated(event) {
 		if (Object.keys(event.detail?.options || {}).length) this.body?.focus();
 	}
 
-	/** @testable infrastructure */
 	_setSubmitting(value) {
 		if (!this.submit) return;
 		this.submit.disabled = value;
@@ -128,11 +112,6 @@ export class MessageComposer {
 		if (icon) icon.dataset.visible = value ? "true" : "false";
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/messageComposer.mjs::MessageComposer
-	 * @reason modal state initialization is exercised through the composer contract
-	 */
 	_activate(recipient = null) {
 		this.operationId = this.view.operationId?.() || crypto.randomUUID();
 		this.error.classList.add("hidden");
@@ -151,12 +130,10 @@ export class MessageComposer {
 		(recipient ? this.body : this.input).focus();
 	}
 
-	/** @testable infrastructure */
 	async close() {
 		await this.modalController?.remove();
 	}
 
-	/** @testable infrastructure */
 	_releaseModal(controller) {
 		this.form?.removeEventListener("submit", this._submit);
 		this.input?.removeEventListener("updated", this._recipientUpdated);
@@ -171,11 +148,6 @@ export class MessageComposer {
 		if (this.modalController === controller) this.modalController = null;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/messageComposer.mjs::MessageComposer
-	 * @reason idempotent submission is exercised through the modal contract
-	 */
 	async _submit(event) {
 		event.preventDefault();
 		const selected = this.recipient.selectedOptions?.[0];
@@ -221,11 +193,6 @@ export class MessageComposer {
 	}
 }
 
-/**
- * @testable false
- * @covered-by src/script/elements/messageComposer.mjs::MessageComposer
- * @reason singleton reuse is composition around the tested modal controller
- */
 export const ensureMessageComposer = (view, options = {}) => {
 	if (!view.MessageComposer) {
 		view.MessageComposer = new MessageComposer(view, options).init();

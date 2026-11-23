@@ -65,7 +65,6 @@ def _signed_headers(raw_body, *, event_id="event-1", timestamp=None):
     }
 
 
-# @matrix ai-email webhook : event-id headers raw-body rotation signature
 def test_svix_signature_verification_accepts_raw_body_case_insensitive_headers_and_any_v1_signature():
     raw_body = b'{"type":"email.received","data":{"email_id":"one"}}'
     headers = {
@@ -86,7 +85,6 @@ def test_svix_signature_verification_accepts_raw_body_case_insensitive_headers_a
     )
 
 
-# @matrix ai-email webhook : invalid raw-body signature
 def test_svix_signature_verification_rejects_changed_or_non_bytes_body():
     raw_body = b"{}"
     headers = _signed_headers(raw_body)
@@ -106,7 +104,6 @@ def test_svix_signature_verification_rejects_changed_or_non_bytes_body():
             )
 
 
-# @matrix ai-email webhook : headers invalid secret signature
 def test_svix_signature_verification_rejects_missing_or_malformed_authentication_inputs():
     raw_body = b"{}"
     signed_headers = _signed_headers(raw_body)
@@ -139,7 +136,6 @@ def test_svix_signature_verification_rejects_missing_or_malformed_authentication
         assert str(invalid.value) == ""
 
 
-# @matrix ai-email webhook : future replay timestamp
 def test_svix_signature_verification_rejects_replayed_or_future_events():
     raw_body = b"{}"
     now = int(datetime.now(UTC).timestamp())
@@ -154,7 +150,6 @@ def test_svix_signature_verification_rejects_replayed_or_future_events():
         assert str(invalid.value) == ""
 
 
-# @matrix ai-email webhook : event-shape json malformed webhook
 def test_parse_resend_event_rejects_malformed_shapes():
     assert parse_resend_event(b'{"type":"email.received","data":{}}') == {
         "type": "email.received",
@@ -176,7 +171,6 @@ class _HTTPResponse:
         return self.payload
 
 
-# @matrix ai-email provider-adapter : attachments authorization idempotency outbound-email provider-adapter retrieval
 def test_resend_runtime_client_retrieves_with_full_key_and_sends_with_scoped_key():
     calls = []
 
@@ -203,7 +197,6 @@ def test_resend_runtime_client_retrieves_with_full_key_and_sends_with_scoped_key
     assert calls[3][2]["headers"]["Idempotency-Key"] == "feedback/one"
 
 
-# @matrix ai-email attachments provider-adapter : bounded-stream provider-adapter signed-url size
 def test_resend_attachment_download_is_bounded_and_does_not_return_signed_url():
     closed = []
 
@@ -273,7 +266,6 @@ def test_resend_attachment_download_is_bounded_and_does_not_return_signed_url():
     assert closed == [True, True, True, True]
 
 
-# @matrix ai-email sender-auth : alignment authentication-results dmarc sender-auth telemetry
 def test_authentication_results_candidates_require_aligned_dmarc_pass():
     assert authentication_results_candidates(
         {
@@ -298,7 +290,6 @@ def test_authentication_results_candidates_require_aligned_dmarc_pass():
     )
 
 
-# @matrix ai-email sender-auth : comments folding multiple-results sender-auth telemetry
 def test_authentication_results_candidates_handle_folding_comments_and_multiple_values():
     headers = {
         "Authentication-Results": [
@@ -314,7 +305,6 @@ def test_authentication_results_candidates_handle_folding_comments_and_multiple_
     )
 
 
-# @matrix ai-email normalization : attachments exact-local html-fallback reply-marker routing sender
 def test_inbound_message_normalization_routes_alias_and_strips_reply_marker():
     message = normalize_resend_message(
         {
@@ -364,7 +354,6 @@ def test_inbound_message_normalization_routes_alias_and_strips_reply_marker():
             parse_mailbox(malformed)
 
 
-# @matrix ai-email : aliases attachment-contract limits normalization routing rate-limit
 def test_email_policy_ignores_saved_alias_and_limit_overrides(monkeypatch):
     config = _config()
     config.update(
@@ -410,7 +399,6 @@ def test_email_policy_ignores_saved_alias_and_limit_overrides(monkeypatch):
     assert error.value.code == "attachment_contract"
 
 
-# @matrix ai-email : attachments content-disposition content-id inline
 def test_inbound_attachment_disposition_overrides_content_id():
     attachment = InboundAttachment(
         "attachment-1",
@@ -438,7 +426,6 @@ def test_inbound_attachment_disposition_overrides_content_id():
     ).inline
 
 
-# @matrix ai-email : attachments image-only inline quoted-content routing signature
 def test_inline_attachment_selection_keeps_user_content_and_filters_signature_art(
     monkeypatch,
 ):
@@ -529,7 +516,6 @@ def test_inline_attachment_selection_keeps_user_content_and_filters_signature_ar
     assert [attachment.id for attachment in attachments] == ["photo-only"]
 
 
-# @matrix ai-email ai-report : inbound-manifest legacy-default origin privacy
 def test_email_report_shape_preserves_safe_inbound_display_fields():
     user = TestEntities.get("USER", {"name": "Owner", "owner": False})
     report = TestEntities.get(
@@ -558,7 +544,6 @@ def test_email_report_shape_preserves_safe_inbound_display_fields():
     assert legacy.origin == "web"
 
 
-# @matrix ai-email files : temporary-view-ownership
 def test_email_report_file_is_viewable_only_by_submitter_or_owner():
     submitter = TestEntities.get(
         "USER", {"name": "Submitter", "email": "submitter@example.com", "owner": False}
@@ -572,7 +557,6 @@ def test_email_report_file_is_viewable_only_by_submitter_or_owner():
     assert not file.allowed(Action.VIEW, user=stranger)
 
 
-# @matrix ai-email : acceptance disabled-completion idempotency reply-to terminal-link
 def test_report_feedback_links_to_report_and_remains_available_after_disable(
     monkeypatch,
 ):
@@ -618,7 +602,6 @@ def test_report_feedback_links_to_report_and_remains_available_after_disable(
     assert idempotency_key.startswith("ai-email/success/")
 
 
-# @matrix ai-email : generic-delivery terminal-delivery
 def test_report_terminal_feedback_uses_generic_notification_delivery():
     from lagniappe.core.tools.deferred_jobs.adapters.reports import ReportAdapter
 
@@ -645,7 +628,6 @@ def test_report_terminal_feedback_uses_generic_notification_delivery():
     assert not adapter.external_delivery_required(context(browser_report, {}))
 
 
-# @matrix ai-email webhook : lease privacy replay terminal-compaction transaction transient-release
 def test_ai_email_event_claim_is_durable_and_replay_safe(monkeypatch):
     from lagniappe.core.tools.database import ai_email as email_database
 
@@ -714,7 +696,6 @@ class _InboundClient:
         return []
 
 
-# @matrix ai-email webhook : exact-match replay report-handoff sender user-policy
 def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch):
     from lagniappe.core.entities import Entities
     from lagniappe.core.tools.database import ai_email as email_database
@@ -798,7 +779,6 @@ def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch)
     assert states == ["accepted", "ignored"]
 
 
-# @matrix ai-email : idempotency privacy report-handoff routing
 def test_create_shared_address_email_report_preserves_routing_input(monkeypatch):
     from lagniappe.core.entities import Entities
     from lagniappe.core.tools.database import utility as database_utility
@@ -858,7 +838,6 @@ def test_create_shared_address_email_report_preserves_routing_input(monkeypatch)
     assert starts[0].parameters["attachments"] == [attachment.job_record()]
 
 
-# @matrix ai-email deferred-jobs : acceptance idempotency report-handoff
 def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatch):
     from lagniappe import CONFIG
     from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
@@ -922,7 +901,6 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
     assert feedback == [(report, "acceptance")]
 
 
-# @matrix ai-email deferred-jobs feedback : diagnostics failure privacy terminal-delivery
 def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
     from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
 
@@ -987,7 +965,6 @@ def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
     assert context.parameters == {"_diagnostic_message": expected}
 
 
-# @matrix ai-email : access attachment-contract body-contract rate-limit
 def test_submission_contract_keeps_create_and_organize_report_only(monkeypatch):
     monkeypatch.setattr(
         "lagniappe.core.tools.cache.rate_limit.check_limit",

@@ -27,9 +27,6 @@ from .task_dates import Completed, DueDate
 from .task_related import AssignedTo, HasSignature, HasStatus, TaskCategories
 
 
-# @testable true
-# @tests tests_unit/test_005_project_properties.py::test_model_tasks_load_attach_and_order_from_database
-# @matrix project : db-load model-tasks ordering relation-attach
 class ModelTasks(RelatedEntityListMixin["ModelTask"], Property[list["ModelTask"], "Project"]):
     """Model tasks (workflow stages) belonging to a project.
 
@@ -77,10 +74,6 @@ class ModelTasks(RelatedEntityListMixin["ModelTask"], Property[list["ModelTask"]
             self._invalidate_projections()
 
 
-# @testable true
-# @tests tests_unit/test_005_project_properties.py::test_project_filters
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_conditions_include_task_fields
-# @matrix filters project : completed conditions entity-fields filter-value
 class ProjectFilters(Filters["Project"]):
     def __init__(self, *args: object, entity: Project | None = None, **kwargs: object) -> None:
         super().__init__(*args, entity=entity, **kwargs)
@@ -113,9 +106,6 @@ class ProjectFilters(Filters["Project"]):
         return self._entity_fields
 
 
-# @testable true
-# @tests tests_unit/test_005_project_properties.py::test_model_task_project_parent_details_and_attach
-# @matrix project : attach details model-task-parent
 class ModelTaskProject(
     RelatedEntityMixin["Project"], DetailsMixin, FilterMixin, AIMixin, DBProperty["Project"]
 ):
@@ -144,9 +134,6 @@ class ModelTaskProject(
         return "parent"
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_entity_returns_model_task_form_schema_for_ai_autofill
-# @matrix ai form-schema : attached-form model-task schema
 class ModelTaskForm(AttachedForm, DetailsMixin):
     """The form attached to a model task.
 

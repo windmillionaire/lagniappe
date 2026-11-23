@@ -85,10 +85,6 @@ ANSWER_FIELDS = (
 )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/changes.py::start_change
-# @covered-by lagniappe/core/tools/forms/changes.py::apply_target
-# @reason persisted JSON is read explicitly at job, mutation, and projection boundaries
 def json_value(raw: Mapping[str, object], name: str) -> dict[str, object]:
     value = raw.get(name)
     value = json.loads(value) if isinstance(value, str) else deepcopy(value)
@@ -97,9 +93,6 @@ def json_value(raw: Mapping[str, object], name: str) -> dict[str, object]:
     return value or {}
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/changes.py::apply_target
-# @reason bounded records are checked before any live answer is changed
 def check_size(raw: Mapping[str, object]) -> None:
     if (
         len(json.dumps(dict(raw), default=str, ensure_ascii=False).encode())
@@ -110,9 +103,6 @@ def check_size(raw: Mapping[str, object]) -> None:
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/schema_updates.py::inspect_scope
-# @reason blank collection envelopes should never require a provider call
 def needs_ai_value(value: object) -> bool:
     if value is None or value == "" or value == [] or value == {}:
         return False

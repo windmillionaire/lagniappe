@@ -92,24 +92,14 @@ raise SystemExit(pytest.main(sys.argv[1:], plugins=[evidence_results]))
 """.strip()
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_rejects_unmanaged_uv_with_repair_command
-# @matrix mcp-package : bootstrap fail-closed managed-path repair-guidance
 class McpEnvironmentError(RuntimeError):
     """A fail-closed error from the repository-only package bridge."""
 
 
-# @testable false
-# @covered-by runner/mcp_environment.py::verify_managed_uv
-# @reason consistent actionable diagnostics are asserted through each public bridge boundary
 def _repair_error(message: str) -> McpEnvironmentError:
     return McpEnvironmentError(f"{message} Run {MCP_REPAIR_COMMAND} to repair it.")
 
 
-# @testable false
-# @covered-by runner/mcp_environment.py::sync_environment
-# @covered-by runner/mcp_environment.py::run_python
-# @reason environment isolation is exercised through synchronized and child-process commands
 def _child_environment() -> dict[str, str]:
     environment = os.environ.copy()
     for name in tuple(environment):
@@ -133,10 +123,6 @@ def _child_environment() -> dict[str, str]:
     return environment
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_rejects_unmanaged_uv_with_repair_command
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_uses_managed_uv_lock_and_isolated_python
-# @matrix mcp-package : bootstrap fail-closed managed-path version-verification
 def verify_managed_uv(
     *, run: Callable[..., subprocess.CompletedProcess] = subprocess.run
 ) -> Path:
@@ -168,10 +154,6 @@ def verify_managed_uv(
         raise _repair_error(f"Managed uv verification failed: {error}") from error
 
 
-# @testable false
-# @covered-by runner/mcp_environment.py::prepare_environment
-# @covered-by runner/mcp_environment.py::check_environment
-# @reason interpreter placement is exercised through the local and prebuilt public boundaries
 def _verify_environment_python(*, editable: bool, run=subprocess.run) -> Path:
     try:
         result = run(
@@ -237,10 +219,6 @@ def _verify_environment_python(*, editable: bool, run=subprocess.run) -> Path:
     return MCP_ENVIRONMENT_PYTHON
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_uses_managed_uv_lock_and_isolated_python
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_sync_failure_is_actionable
-# @matrix mcp-package testing : environment-sync fail-closed locked-dependencies repair-guidance
 def sync_environment(
     *, run: Callable[..., subprocess.CompletedProcess] = subprocess.run
 ) -> Path:
@@ -266,9 +244,6 @@ def sync_environment(
     return MCP_ENVIRONMENT_PYTHON
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_uses_managed_uv_lock_and_isolated_python
-# @matrix mcp-package testing : environment-sync interpreter isolation
 def prepare_environment(
     *, run: Callable[..., subprocess.CompletedProcess] = subprocess.run
 ) -> Path:
@@ -277,9 +252,6 @@ def prepare_environment(
     return _verify_environment_python(editable=True, run=run)
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_checks_prebuilt_environment_without_uv
-# @matrix hosted-e2e mcp-package testing : environment-check isolation
 def check_environment(
     *, run: Callable[..., subprocess.CompletedProcess] = subprocess.run
 ) -> Path:
@@ -292,9 +264,6 @@ def check_environment(
     return _verify_environment_python(editable=False, run=run)
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_builds_isolated_adapter_and_pytest_commands
-# @matrix mcp-package testing : command-bridge environment-sync isolation
 def run_python(
     arguments: Sequence[str | Path],
     *,
@@ -316,11 +285,6 @@ def run_python(
     return result.returncode
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_builds_isolated_adapter_and_pytest_commands
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_builds_result_transport_command
-# @matrix mcp-package testing : command-bridge isolation pytest-config
-# @matrix mcp-package testing traceability : result-aggregation test-evidence
 def run_pytest(
     arguments: Sequence[str],
     *,

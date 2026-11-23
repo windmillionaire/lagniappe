@@ -23,11 +23,7 @@ from testing.utility.offline import wait_for_offline_mutations
 pytestmark = pytest.mark.e2e
 
 
-# @source src/script/forms/revisions/reconciler.mjs::EditReconciler
-# @source src/script/forms/migrationNotice.mjs::installMigrationNotice
 # @template pages/info.html::info_form
-# @matrix form-migration : informational-notice readonly-modal
-# @matrix edited-entity-notice : clean-state latest-schema
 def test_clean_open_page_adopts_schema_and_keeps_informational_notice(get_admin, get_user, monkeypatch):
     from dataclasses import replace
     from flask_login import login_user
@@ -85,9 +81,6 @@ def test_clean_open_page_adopts_schema_and_keeps_informational_notice(get_admin,
     expect(page.info_form.get_by_role("button", name="View changes", exact=True)).to_be_hidden()
 
 
-# @source lagniappe/core/tools/deferred_jobs/adapters/form_change.py::FormChangeAdapter
-# @source lagniappe/core/tools/forms/changes.py::apply_target
-# @matrix form-migration : preflight batch-job publication recovery partial-read generation removed-link
 def test_three_submission_migration_resumes_durable_cursors_and_replayed_batch(get_admin, get_user, monkeypatch):
     from flask_login import login_user
     from lagniappe.web import app as web_app
@@ -215,9 +208,6 @@ def test_three_submission_migration_resumes_durable_cursors_and_replayed_batch(g
     assert Entities.fetch_one(deferred_job_lock_key(published_form, "form-change"), request=Fetch.root()) is None
 
 
-# @source lagniappe/core/mixins/submitter.py::SubmitterMixin.form_submission
-# @source lagniappe/web/routes/tasks/main.py::update
-# @matrix form-migration : stale-generation direct-write
 def test_direct_stale_generation_write_is_rejected_after_migration(get_admin, get_user, monkeypatch):
     from flask_login import login_user
     from lagniappe.web import app as web_app
@@ -274,7 +264,6 @@ def test_direct_stale_generation_write_is_rejected_after_migration(get_admin, ge
     expect(resource.task_form.get_by_text("12", exact=True)).to_be_visible()
 
 
-# @matrix form-migration : form-authority restricted-submissions
 @pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("form_type", ["page", "task"])
 def test_form_editor_migrates_restricted_submissions(get_user, form_type):
@@ -337,8 +326,6 @@ def test_form_editor_migrates_restricted_submissions(get_user, form_type):
     expect(editor.locate(builder.FORM_NAME)).to_be_visible()
 
 
-# @matrix task-completion : deleted-form generation raw-values
-# @matrix form-migration : completed-task
 # @template forms/builder.html::main
 # @template pages/tasks.html::task_form
 # @template tasks/history.html::completion_history
@@ -475,7 +462,6 @@ def test_deleted_migrated_form_retains_completed_submissions_and_history(get_adm
     expect(readonly.locator("button[type='submit']")).to_have_count(0)
 
 
-# @matrix form-migration : stale-input queued-conflict explicit-review
 # @template controls.html::edited_marker
 # @template pages/tasks.html::task_form
 @pytest.mark.e2e_group("owner")
@@ -570,7 +556,6 @@ def test_offline_submission_survives_schema_migration_until_review(
         owner.offline = False
 
 
-# @matrix form-migration : progress reload saved-job
 # @template forms/builder.html::main
 def test_builder_observes_migration_completion_without_leaving(get_admin, get_user, monkeypatch):
     from flask_login import login_user
@@ -629,8 +614,6 @@ def test_builder_observes_migration_completion_without_leaving(get_admin, get_us
     assert Entities.fetch_one(task.key, request=Fetch.root()).properties.submission.value == {}
 
 
-# @matrix tasks : active-widget complete uncomplete update-state
-# @matrix form-migration : writer-fence completion-race
 # @template pages/tasks.html::task
 def test_completion_during_migration_returns_inline_error_without_saving(
     get_admin, get_user, monkeypatch, browser_failures,
@@ -724,8 +707,6 @@ def test_completion_during_migration_returns_inline_error_without_saving(
     assert stored.properties.submission.value == {}
 
 
-# @matrix forms : builder-save stable-identity
-# @matrix form-migration : modify-panel
 # @template forms/builder.html::main
 def test_saved_inputs_use_replacement_panel_after_first_save(get_admin, get_user):
     user = get_admin()
@@ -775,7 +756,6 @@ def test_saved_inputs_use_replacement_panel_after_first_save(get_admin, get_user
     assert builder.schema_field(field.id)["input"] == "number"
 
 
-# @matrix form-migration : modify-panel
 # @template forms/builder.html::main
 def test_replacement_choices_and_explanations_match_component_types(get_admin, get_user):
     user = get_admin()
@@ -863,7 +843,6 @@ def test_replacement_choices_and_explanations_match_component_types(get_admin, g
         expect(builder.condition).to_be_hidden()
 
 
-# @matrix form-migration : modify-panel
 # @template forms/builder.html::main
 def test_checkbox_replacement_explains_and_preserves_boolean_choices(get_admin, get_user):
     user = get_admin()
@@ -927,9 +906,6 @@ def test_checkbox_replacement_explains_and_preserves_boolean_choices(get_admin, 
     ] == [{"decision": "true"}, {"decision": "false"}]
 
 
-# @source src/script/forms/migrationNotice.mjs::installMigrationNotice
-# @matrix form-migration : modify-panel no-submission-read draft-undo saved-job progress reload recovery informational-notice readonly-modal
-# @matrix task-completion : original-view readonly permission-gates
 # @style radio.fieldset.column
 # @style radio.label
 # @style radio.default
@@ -1192,7 +1168,6 @@ def test_saved_conversion_runs_after_save_and_preserves_originals(get_admin, get
     assert_lagniappe_error_response(response, status=403)
 
 
-# @matrix html-field : generated-document-undo retained-editor
 # @template forms/builder.html::generate
 def test_generated_document_uses_editor_undo_before_first_open(get_admin, get_user):
     from testing.utility.network import multipart_form_fields, scoped_browser_route
@@ -1253,7 +1228,6 @@ def test_generated_document_uses_editor_undo_before_first_open(get_admin, get_us
     )
 
 
-# @matrix form-migration : status recovery retry reload saved-job
 # @template forms/builder.html::main
 def test_failed_preflight_recovers_after_reload(get_admin, get_user):
     from lagniappe.core.tools.database.utility import save_mutations

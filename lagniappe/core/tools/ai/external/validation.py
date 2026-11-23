@@ -35,9 +35,6 @@ from .definitions import (
 )
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_submission_validation_collects_independent_field_errors
-# @matrix agent-api : envelope schema field-path bounded-validation
 def submission_validation_errors(data: object, report: AIReport, user: User) -> list[dict[str, object]]:
     """Collect safe independent envelope/schema errors before semantic validation."""
     errors = []
@@ -201,9 +198,6 @@ def submission_validation_errors(data: object, report: AIReport, user: User) -> 
     return _bounded_validation_errors(errors)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::submission_validation_errors
-# @reason truncation is asserted through the public collector
 def _bounded_validation_errors(errors):
     unique = []
     seen = set()
@@ -226,9 +220,6 @@ def _bounded_validation_errors(errors):
     ]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::submission_validation_errors
-# @reason the public collector exercises this bounded JSON Schema subset
 def _schema_errors(value, schema, root, path):
     if not isinstance(schema, dict):
         return []
@@ -429,9 +420,6 @@ def _schema_errors(value, schema, root, path):
     return errors
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::submission_validation_errors
-# @reason type discrimination is asserted through public field errors
 def _schema_type_matches(value, expected):
     expected = expected if isinstance(expected, list) else [expected]
     checks = {
@@ -448,9 +436,6 @@ def _schema_type_matches(value, expected):
     return any(checks.get(name, lambda _item: True)(value) for name in expected)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @reason recursive string discovery belongs to external proposal validation
 def _walk_strings(value):
     if isinstance(value, dict):
         for key, child in value.items():
@@ -463,9 +448,6 @@ def _walk_strings(value):
         yield value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @reason reference-field traversal belongs to external proposal validation
 def _reference_values(proposal):
     for action in proposal.get("actions") or []:
         data = action.get("data") if isinstance(action, dict) else None
@@ -489,9 +471,6 @@ def _reference_values(proposal):
                 yield field, value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @reason notation checks are exercised through the public validator
 def _validate_reference_notation(proposal):
     for _field, value in _reference_values(proposal):
         if value.startswith(("$", "action:")):
@@ -509,9 +488,6 @@ def _validate_reference_notation(proposal):
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @reason visibility checks are exercised through the public validator
 def _validate_reference_visibility(proposal, report, user):
     hashes = {
         match
@@ -551,9 +527,6 @@ def _validate_reference_visibility(proposal, report, user):
             )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @reason shape and size checks are exercised through the public validator
 def _validate_top_level(proposal):
     if not isinstance(proposal, dict):
         raise exceptions.AIException("Proposal must be a JSON object.")
@@ -594,20 +567,12 @@ def _validate_top_level(proposal):
         raise exceptions.AIException("Proposal contains too many actions.")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @reason Ask hash-token checks distinguish rendered labels from link destinations
 def _answer_visible_text(field, value):
     if field == "answer_markdown":
         return strip_tags(render_markdown(value))
     return value
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_proposal_validation_enforces_permissions_files_and_shape
-# @tests tests_unit/test_032_agent_api.py::test_external_ask_submission_allows_hash_token_in_named_link_destination
-# @matrix agent-api ai-report : file-placement file-summary permissions proposal-validation references
-# @pairs agent-api:ask ai-report:answer-only
 def validate_external_proposal(
     proposal: object, report: AIReport, user: User, *, file_usage: object, instructions: object = None, resolved_references: dict[str, str] | None = None
 ) -> ReportProposal:

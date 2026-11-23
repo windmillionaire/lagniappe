@@ -4,13 +4,6 @@ import { request } from "../../../shared/request.mjs";
 import { buttons } from "../../buttons.mjs";
 import { primitives } from "../../primitives.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_inserts_ai_markup_with_insert_modes
- * @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_replaces_selection_and_posts_selected_text
- * @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_provider_error_surfaces_in_form
- * @matrix ai editor : error generate-text insert-mode replace-selection selected-text
- */
 class GenerateText {
 	constructor(toolbar) {
 		this.toolbar = toolbar;

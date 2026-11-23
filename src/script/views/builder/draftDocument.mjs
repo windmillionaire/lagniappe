@@ -1,9 +1,5 @@
 import { IndependentDocument } from "../../elements/editor/independent.mjs";
 
-/**
- * @testable infrastructure
- * @covered-by src/script/views/builder/draft.mjs::BuilderDraft
- */
 export class DraftDocument extends IndependentDocument {
 	constructor(attributes) {
 		super(attributes);
@@ -36,10 +32,6 @@ export class DraftDocument extends IndependentDocument {
 		return this._loadPromise;
 	}
 
-	/**
-	 * @testable true
-	 * @matrix forms : draft-history
-	 */
 	flush() {
 		if (
 			this._destroyed ||

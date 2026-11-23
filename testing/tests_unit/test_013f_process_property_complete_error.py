@@ -40,7 +40,6 @@ def _task():
     )
 
 
-# @matrix process-property : complete-state error
 @pytest.mark.unit
 def test_process_property_error_clears_complete():
     """Setting ``error`` removes ``complete`` from the section."""
@@ -54,7 +53,6 @@ def test_process_property_error_clears_complete():
     assert step.complete is None
 
 
-# @matrix process-property : complete error-state
 @pytest.mark.unit
 def test_process_property_complete_clears_error():
     """Setting ``complete`` removes ``error`` from the section."""
@@ -68,7 +66,6 @@ def test_process_property_complete_clears_error():
     assert step.error is None
 
 
-# @matrix process-property : initialization validation
 @pytest.mark.unit
 def test_process_property_contract_errors_are_explicit():
     entity = _task()

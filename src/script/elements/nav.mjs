@@ -1,6 +1,3 @@
-/**
- * @testable infrastructure
- */
 export class NavElement {
 	constructor(component, elt) {
 		this.component = component;

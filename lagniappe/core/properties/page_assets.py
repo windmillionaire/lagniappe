@@ -12,9 +12,6 @@ from .base_asset import AssetProperty
 from .base_property import UNSET
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_image_asset_lifecycle_and_projections
-# @matrix page : asset-lifecycle column filter-value image
 class Image(ColumnMixin, FilterMixin, AssetProperty["Page", ImageAsset, "AssetUpload | None"]):
     """Entity image. Stored as an image asset.
 

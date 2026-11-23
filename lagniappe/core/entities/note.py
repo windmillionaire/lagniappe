@@ -28,9 +28,6 @@ class NoteCreation(TypedDict, total=False):
     visibility: str
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/note.py::Note.create
-# @reason note entity shell metadata is exercised through the homepage activity create path
 class Note(AssetMixin, Entity):
     if TYPE_CHECKING:
         body: str | None
@@ -74,9 +71,6 @@ class Note(AssetMixin, Entity):
             raise AttributeError(f"{type(self).__name__} requires an attached parent")
         return [parent.hash]
 
-    # @testable true
-    # @tests tests_unit/test_002j_notes.py::test_note_permissions_follow_visibility_scope_and_authorship
-    # @matrix notes permissions : creator home owner page private shared
     def allowed(self, action: Action, user: FieldUser = None) -> bool:
         user = current_context_user(user._get_current_object() if isinstance(user, LocalProxy) else user)
         if not user or not user.is_authenticated:
@@ -101,9 +95,6 @@ class Note(AssetMixin, Entity):
             and self.parent.allowed(Action.VIEW, user=user)
         )
 
-    # @testable true
-    # @tests tests_unit/test_002j_notes.py::test_note_create_persists_body_photo_visibility_and_scope
-    # @matrix notes : author body create defaults parent photo scope visibility
     @classmethod
     def create(cls, data: NoteCreation) -> Self:
         parent = data.get("parent") or data.get("user")

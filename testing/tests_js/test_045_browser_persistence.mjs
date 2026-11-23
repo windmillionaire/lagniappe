@@ -80,7 +80,6 @@ async function waitForRequests(tx, count) {
 	throw new Error(`Expected ${count} requests, received ${tx.requests.length}`);
 }
 
-/** @matrix offline sync : connection-lifecycle multi-delete readonly-result transaction-commit */
 test("test_indexeddb_operations_resolve_only_after_transaction_commit", async (t) => {
 	const { db, state } = createIndexedDB(t);
 	const offline = await import("../../src/script/shared/offline.mjs");
@@ -132,7 +131,6 @@ test("test_indexeddb_operations_resolve_only_after_transaction_commit", async (t
 	assert.equal(deleteSettled, true);
 });
 
-/** @matrix offline sync : connection-lifecycle error-ownership transaction-abort */
 test("test_indexeddb_abort_and_errors_reject_once_and_close_the_database", async (t) => {
 	{
 		const { state } = createIndexedDB(t);
@@ -190,7 +188,6 @@ test("test_indexeddb_abort_and_errors_reject_once_and_close_the_database", async
 	}
 });
 
-/** @matrix offline sync : error-ownership executor-error transaction-abort */
 test("test_indexeddb_executor_failures_abort_and_preserve_the_original_error", async (t) => {
 	for (const operation of ["set", "get"]) {
 		const { state } = createIndexedDB(t);
@@ -324,7 +321,6 @@ async function loadToolbar() {
 	});
 }
 
-/** @matrix editor html-field : listener-teardown builder-save */
 test("test_editor_teardown_releases_toolbar_before_editor_view", async (t) => {
 	const env = await setupEditor(t);
 	const { document: owner } = env.makeDocument();
@@ -370,7 +366,6 @@ test("test_editor_teardown_releases_toolbar_before_editor_view", async (t) => {
 	assert.equal(cancellations, 2);
 });
 
-/** @matrix editor html-field : authoritative-content error-reporting initial-load retry */
 test("test_independent_editor_failed_load_stays_inert_and_retries", async (t) => {
 	const env = await setupEditor(t);
 	const owner = new env.IndependentDocument({
@@ -413,7 +408,6 @@ test("test_independent_editor_failed_load_stays_inert_and_retries", async (t) =>
 	);
 });
 
-/** @matrix editor html-field : error-reporting retry server-acknowledgement */
 test("test_independent_editor_failed_save_stays_dirty_and_retries", async (t) => {
 	const env = await setupEditor(t);
 	const { document: owner, setCurrent } = env.makeDocument();
@@ -439,7 +433,6 @@ test("test_independent_editor_failed_save_stays_dirty_and_retries", async (t) =>
 	);
 });
 
-/** @matrix editor html-field : concurrent-edit keepalive serialized-save server-acknowledgement */
 test("test_independent_editor_serializes_inflight_edits_and_acknowledges_in_order", async (t) => {
 	const env = await setupEditor(t);
 	const { document: owner, setCurrent } = env.makeDocument();
@@ -476,7 +469,6 @@ test("test_independent_editor_serializes_inflight_edits_and_acknowledges_in_orde
 	assert.equal(env.requests.put.at(-1)[2].keepalive, false);
 });
 
-/** @matrix editor html-field : intentional-clear server-acknowledgement */
 test("test_independent_editor_saves_intentional_clear", async (t) => {
 	const env = await setupEditor(t);
 	const { document: owner, setCurrent } = env.makeDocument();
@@ -551,7 +543,6 @@ async function loadBuilder(connectivity) {
 	});
 }
 
-/** @matrix editor html-field : teardown */
 test("test_builder_owns_independent_editor_lifecycle_flushes", async (t) => {
 	createBrowser(t);
 	const connectivity = { online: true };

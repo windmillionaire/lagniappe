@@ -26,7 +26,6 @@ from testing.utility.test_entities import TestEntities
 pytestmark = pytest.mark.unit
 
 
-# @matrix notification-email : digest-query recipient-scope
 def test_daily_digest_query_retains_recipient_and_bucket_scope(monkeypatch):
     captured = {}
 
@@ -74,7 +73,6 @@ def test_daily_digest_query_retains_recipient_and_bucket_scope(monkeypatch):
     }
 
 
-# @matrix notification-email : digest message-grouping target-link target-title
 def test_daily_digest_groups_messages_and_uses_named_completion_links(monkeypatch):
     now = datetime(2026, 8, 15, 14, tzinfo=UTC)
     store = MemoryDatastore()
@@ -256,7 +254,6 @@ def test_daily_digest_groups_messages_and_uses_named_completion_links(monkeypatc
     assert report_url in html_body
 
 
-# @matrix notification-email : digest full-roundup future-only-switch item-cap opt-out-suppression timezone
 def test_daily_digest_uses_next_local_eight_and_batches(monkeypatch):
     now = datetime(2026, 8, 15, 14, tzinfo=UTC)
     store = MemoryDatastore()

@@ -22,9 +22,6 @@ REDIS_TLS_DOCUMENTATION_URL = (
 REDIS_CLOUD_CONSOLE_URL = "https://cloud.redis.io/"
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_connection_uses_shared_tls_settings_and_exits_on_failure
-# @matrix setup : redis-connection redis-tls
 def test_redis_connection(
     settings: Mapping[str, object] | None = None, *, exit_on_failure: bool = True
 ) -> bool:
@@ -85,9 +82,6 @@ def test_redis_connection(
                     close()
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_eviction_policy_instructions_require_confirmation
-# @matrix setup : interactive-input operator-guidance redis
 def eviction_policy_instructions() -> None:
     """Print eviction policy instructions."""
     from installer import FORMATTER
@@ -153,9 +147,6 @@ def eviction_policy_instructions() -> None:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cloud_instructions_open_console_and_locate_credentials
-# @matrix setup : browser operator-guidance plan-selection provider-region redis redis-tls
 def redis_cloud_instructions() -> None:
     """Open Redis Cloud and guide database placement and credential copying."""
     from config import SETTINGS, constants
@@ -250,10 +241,6 @@ def redis_cloud_instructions() -> None:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_parser_extracts_connection_details
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_parser_rejects_invalid_commands
-# @matrix setup : credential-parsing redis validation
 def _parse_redis_cli_command(value):
     """Extract host, port, and password from pasted Redis connection input."""
     try:
@@ -328,9 +315,6 @@ def _parse_redis_cli_command(value):
     return {"host": host, "port": port, "password": password}
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_parser_rejects_invalid_commands
-# @matrix setup : credential-parsing redis validation
 def _is_redis_cli_command(value):
     try:
         _parse_redis_cli_command(value)
@@ -339,9 +323,6 @@ def _is_redis_cli_command(value):
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_uses_visible_standard_input
-# @matrix setup : cancellation credential-parsing interactive-input redis
 @validate_input(
     "Paste copied Redis CLI command",
     validation_fn=_is_redis_cli_command,
@@ -356,19 +337,12 @@ def _get_redis_connection_details(value):
     return _parse_redis_cli_command(value)
 
 
-# @testable false
-# @covered-by installer/redis.py::_enable_redis_tls
-# @reason deterministic project-relative destination wrapper
 def _managed_redis_ca_path():
     from config import APP_DIR, constants
 
     return Path(APP_DIR) / constants.REDIS_CA_CERT_RELATIVE_PATH
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_tls_enablement_uses_managed_ca
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_tls_enablement_requires_managed_ca
-# @matrix setup : certificate-validation failure-isolation missing-file operator-guidance redis-tls settings-save
 def _enable_redis_tls():
     """Guide the operator through verified server-side Redis TLS enablement."""
     from config import SETTINGS, constants
@@ -525,9 +499,6 @@ def _enable_redis_tls():
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_tls_disablement_is_transactional
-# @matrix setup : failure-isolation redis-tls rollback settings-save
 def _disable_redis_tls():
     """Guide the operator through a tested Redis TLS rollback."""
     from config import SETTINGS
@@ -606,9 +577,6 @@ def _disable_redis_tls():
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
-# @matrix setup : optional redis-tls settings-save
 def _offer_redis_tls_for_fresh_install():
     """Offer Redis TLS while the initial Redis connection is being configured."""
     f = FORMATTER.initialize()
@@ -635,10 +603,6 @@ def _offer_redis_tls_for_fresh_install():
     return None
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_redis_clears_failed_credentials_and_retries
-# @matrix setup : failure-isolation redis retry rollback settings-save
 def setup_redis() -> bool:
     """Configure Redis connection details."""
     from config import SETTINGS

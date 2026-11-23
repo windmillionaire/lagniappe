@@ -66,18 +66,12 @@ class AIEmailConfigurationError(ValueError):
     """Raised when optional AI email configuration is unsafe or incomplete."""
 
 
-# @testable false
-# @covered-by config/ai_email.py::normalize_ai_email_config
-# @reason structured-value guard exercised through the public normalizer
 def _mapping(value, name):
     if not isinstance(value, Mapping):
         raise AIEmailConfigurationError(f"{name} must be a mapping.")
     return dict(value)
 
 
-# @testable false
-# @covered-by config/ai_email.py::normalize_ai_email_config
-# @reason schema-key guard exercised through the public normalizer
 def _reject_unknown_keys(value, allowed, name):
     unknown = sorted(set(value).difference(allowed))
     if unknown:
@@ -86,9 +80,6 @@ def _reject_unknown_keys(value, allowed, name):
         )
 
 
-# @testable false
-# @covered-by config/ai_email.py::normalize_ai_email_config
-# @reason bounded-text guard exercised through the public normalizer
 def _required_text(value, name, *, maximum=1000):
     text = str(value or "").strip()
     if (
@@ -100,10 +91,6 @@ def _required_text(value, name, *, maximum=1000):
     return text
 
 
-# @testable true
-# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
-# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_rejects_security_weakening_values
-# @matrix ai-email : config domain email-address
 def normalize_email_address(value: object, name: str = "email address") -> str:
     """Normalize one bare mailbox without provider-specific rewrites."""
     address = unicodedata.normalize("NFC", str(value or "").strip())
@@ -116,10 +103,6 @@ def normalize_email_address(value: object, name: str = "email address") -> str:
     return f"{local}@{domain}"
 
 
-# @testable true
-# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
-# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_rejects_security_weakening_values
-# @matrix ai-email : config domain idna
 def normalize_email_domain(value: object, name: str = "AI email domain") -> str:
     """Return a lower-case IDNA ASCII domain without a trailing dot."""
     domain = str(value or "").strip().rstrip(".")
@@ -148,9 +131,6 @@ def normalize_email_domain(value: object, name: str = "AI email domain") -> str:
     return ascii_domain
 
 
-# @testable false
-# @covered-by config/ai_email.py::normalize_ai_email_config
-# @reason provider schema details are exercised through the public normalizer
 def _normalize_resend(value: object) -> dict[str, str]:
     resend = _mapping(value, "AI_EMAIL_CONFIG.resend")
     _reject_unknown_keys(resend, _RESEND_KEYS, "AI_EMAIL_CONFIG.resend")
@@ -192,13 +172,6 @@ def _normalize_resend(value: object) -> dict[str, str]:
     return normalized
 
 
-# @testable true
-# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
-# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_rejects_security_weakening_values
-# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_policy_does_not_depend_on_or_rewrite_saved_settings
-# @tests tests_tooling/test_003_config.py::test_recovery_accepts_and_redacts_optional_ai_email_config
-# @matrix ai-email : aliases config limits normalization secrets validation
-# @pair config:ai-email
 def normalize_ai_email_config(value: object) -> AIEmailConfig | None:
     """Validate installation choices without reading or rewriting code policy."""
     if value in (None, ""):
@@ -220,10 +193,6 @@ def normalize_ai_email_config(value: object) -> AIEmailConfig | None:
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
-# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_policy_does_not_depend_on_or_rewrite_saved_settings
-# @matrix ai-email : aliases config public-projection secrets
 def ai_email_public_config(value: object) -> PublicAIEmailConfig:
     """Expose only enabled addresses; never return provider state or secrets."""
     config = normalize_ai_email_config(value)

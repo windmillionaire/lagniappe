@@ -57,7 +57,6 @@ from ..locks import (
 )
 
 
-# @testable infrastructure
 class AutofillAdapter(DeferredJobAdapter):
     job_type = DeferredJobType.AUTOFILL
     required_ai_access = AI.CREATE
@@ -67,15 +66,11 @@ class AutofillAdapter(DeferredJobAdapter):
     max_lifetime_seconds = 4 * 60
     cancellable_provider = True
 
-    # @testable true
-    # @pair ai:autofill
     def committed_result(self, job: DeferredJob) -> dict[str, object] | None:
         if job.db.get(form_review.RECEIPT):
             return form_review.json_value(job.db, form_review.RECEIPT)
         return None
 
-    # @testable true
-    # @pair ai:autofill
     def start_writes(self, spec: DeferredJobSpec, job: DeferredJob) -> StartWrites:
         if not spec.parameters.get("snapshot"):
             return (), ()
@@ -90,10 +85,6 @@ class AutofillAdapter(DeferredJobAdapter):
         guards = list(getattr(target, "_form_additional_guards", ()))
         return [(effect.entity, effect.property_mask) for effect in writes], guards
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_snapshot_checkpoint_needs_proposal_but_not_file_attachment
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_upload_checkpoint_records_durable_attachment
-    # @matrix ai deferred-jobs files : autofill checkpoint resume upload
     def checkpoint_ready(self, context: DeferredJobContext) -> bool:
         if not super().checkpoint_ready(context):
             return False
@@ -104,9 +95,6 @@ class AutofillAdapter(DeferredJobAdapter):
             dict,
         )
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_page_operation_reference_is_persisted_and_compare_cleared
-    # @pairs deferred-jobs:active-operation pages:create-autofill
     def started(self, context: DeferredJobContext) -> None:
         target = context.input("target")
         if context.parameters.get("snapshot"):
@@ -124,9 +112,6 @@ class AutofillAdapter(DeferredJobAdapter):
         }
         Entities.save_root(target, property_mask=("deferred_job",))
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_revision_tracks_only_form_apply_state
-    # @pairs ai:autofill deferred-jobs:form-revision
     def authorization(self, spec: DeferredJobSpec) -> dict[str, object]:
         authorization = super().authorization(spec)
         target = spec.inputs.get("target")
@@ -137,10 +122,6 @@ class AutofillAdapter(DeferredJobAdapter):
         )
         return authorization
 
-    # @testable true
-    # @tests tests_unit/test_023a_deferred_job_properties.py::test_autofill_start_acquires_one_target_lock
-    # @tests tests_unit/test_024_autofill_form_state.py::test_autofill_explicit_lock_opt_out_skips_target_lock
-    # @pairs ai:autofill deferred-jobs:form-lock
     def start_lock(self, spec: DeferredJobSpec, job: DeferredJob) -> DeferredJobLock | None:
         if spec.parameters.get("lock_target", True) is False:
             return None
@@ -160,9 +141,6 @@ class AutofillAdapter(DeferredJobAdapter):
             }
         )
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_status_is_visible_to_target_editor
-    # @pairs ai:collaboration deferred-jobs:status
     def can_view_status(self, job: DeferredJob, actor: User) -> bool:
         try:
             target = (job.inputs or {}).get("target")
@@ -181,9 +159,6 @@ class AutofillAdapter(DeferredJobAdapter):
             and target.allowed(Action.EDIT, user=actor)
         )
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_uploaded_file_is_attached_to_target
-    # @pairs files:attachment deferred-jobs:loaded-input
     def load(self, context: DeferredJobContext) -> DeferredJobContext:
         super().load(context)
         target = context.input("target")
@@ -199,7 +174,6 @@ class AutofillAdapter(DeferredJobAdapter):
         ) if attachment else None
         return context
 
-    # @testable infrastructure
     def authorize(self, context: DeferredJobContext) -> None:
         super().authorize(context)
         target = context.input("target")
@@ -212,12 +186,6 @@ class AutofillAdapter(DeferredJobAdapter):
                 "You do not have permission to autofill this form."
             )
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_revision_tracks_only_form_apply_state
-    # @tests tests_unit/test_023a_deferred_job_properties.py::test_autofill_lock_cleanup_is_compare_and_delete
-    # @tests tests_unit/test_024_autofill_form_state.py::test_lockless_autofill_keeps_revision_drift_guard
-    # @matrix deferred-jobs : form-lock form-revision
-    # @pair ai:autofill
     def validate_apply(self, context: DeferredJobContext) -> None:
         target = context.input("target")
         if context.parameters.get("snapshot"):
@@ -237,10 +205,6 @@ class AutofillAdapter(DeferredJobAdapter):
                 "The form changed while autofill was running. Run autofill again."
             )
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_prepare_does_not_wait_for_attached_file_summaries
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_upload_checkpoint_records_durable_attachment
-    # @matrix ai deferred-jobs files : autofill checkpoint failed pending upload summary-dependency
     def prepare(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         context.set_phase(DeferredJobPhase.PREPARING_INPUTS)
         if context.parameters.get("snapshot"):
@@ -284,9 +248,6 @@ class AutofillAdapter(DeferredJobAdapter):
             }
         return checkpoint
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_snapshot_passes_prompt_and_staged_original_to_model
-    # @pair ai:autofill
     def prepare_snapshot(self, context: DeferredJobContext) -> dict[str, object]:
         snapshot = context.parameters["snapshot"]
         prompt_data = deepcopy(snapshot["prompt"])
@@ -323,9 +284,6 @@ class AutofillAdapter(DeferredJobAdapter):
         )
         return {"submission": submission, "proposal": proposal}
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_uploaded_file_is_attached_to_target
-    # @matrix ai deferred-jobs files pages tasks : attachment autofill idempotency inspection upload
     def inspect(self, context: DeferredJobContext) -> DeferredJobInspection:
         if context.parameters.get("snapshot"):
             return (DeferredJobInspection.APPLIED if context.job.db.get(form_review.RECEIPT)
@@ -355,9 +313,6 @@ class AutofillAdapter(DeferredJobAdapter):
             else DeferredJobInspection.NOT_APPLIED
         )
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_uploaded_file_is_attached_to_target
-    # @matrix ai deferred-jobs files pages tasks : attachment autofill idempotency naming upload
     def apply(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         context.ensure_active()
         if context.parameters.get("snapshot"):
@@ -423,9 +378,6 @@ class AutofillAdapter(DeferredJobAdapter):
             result["file_key"] = attached_file.urlsafe_key
         return result
 
-    # @testable true
-    # @pair ai:autofill
-    # @matrix ai tasks : autofill conflicts review private-refinement
     def apply_proposal(self, context: DeferredJobContext) -> dict[str, object]:
         snapshot = context.parameters["snapshot"]
         private = context.parameters.get("mode") == "revise"
@@ -485,10 +437,6 @@ class AutofillAdapter(DeferredJobAdapter):
                     raise
         raise AssertionError("Autofill apply retries ended without a result.")
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_terminal_cleanup_releases_target_lock
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_page_operation_reference_is_persisted_and_compare_cleared
-    # @matrix deferred-jobs : compare-and-delete form-lock terminal-cleanup
     def cleanup(self, context: DeferredJobContext, *, terminal: bool) -> None:
         if terminal:
             target = context.input("target")
@@ -515,7 +463,6 @@ class AutofillAdapter(DeferredJobAdapter):
                     current.deferred_job = None
                     Entities.save_root(current, property_mask=("deferred_job",))
 
-    # @testable infrastructure
     def terminal_message(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> str:
         if getattr(context.job, "status", None) in {"cancelled", "superseded"}:
             return "Autofill cancelled. Saved answers were unchanged; Retry can reuse the uploaded file."

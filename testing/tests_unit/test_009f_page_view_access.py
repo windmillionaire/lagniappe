@@ -11,9 +11,6 @@ from testing.utility.mock_restrictions import MockRestrictions
 from testing.utility.test_entities import TestEntities
 
 
-# @source lagniappe/core/properties/common_entity.py::RestrictedTo.value
-# @source lagniappe/core/properties/common_entity.py::RestrictedTo.materialize
-# @matrix permissions : local-restrictions source-clauses no-extra-read
 @pytest.mark.unit
 def test_page_restrictions_keep_local_storage_separate_from_form_without_reads():
     page = TestEntities.get("PAGE", {
@@ -61,8 +58,6 @@ def test_page_restrictions_keep_local_storage_separate_from_form_without_reads()
     assert page.restricted_to == {}
 
 
-# @source lagniappe/core/entities/page.py::Page.allowed
-# @matrix page permissions users : models-scope user-page
 @pytest.mark.unit
 def test_user_page_uses_users_permissions_not_models_permissions():
     """Users-only pages use Users access; attached categories still grant page access."""
@@ -117,7 +112,6 @@ def test_user_page_uses_users_permissions_not_models_permissions():
     assert default_page.allowed(Action.VIEW, user=category_viewer) is False
     assert categorized_page.allowed(Action.VIEW, user=category_viewer) is True
 
-# @matrix page permissions user-groups : group-match restricted-access
 @pytest.mark.unit
 def test_page_restricted_access_group_match(get_test_entities):
     """The viewer must match a group in the Page restriction."""
@@ -134,7 +128,6 @@ def test_page_restricted_access_group_match(get_test_entities):
         assert page.allowed(Action.VIEW, user=outsider) is False
 
 
-# @matrix page permissions : no-category-expansion shallow-page stored-requires
 @pytest.mark.unit
 def test_page_allowed_uses_stored_requirements_without_loading_categories():
     page = TestEntities.get(
@@ -163,7 +156,6 @@ def test_page_allowed_uses_stored_requirements_without_loading_categories():
     assert page.properties.categories.is_set is False
 
 
-# @pair page:view-owner-short-circuit
 @pytest.mark.unit
 def test_page_view_does_not_require_loaded_owner(monkeypatch):
     """View checks do not load the owner needed only by privileged mutations."""
@@ -191,7 +183,6 @@ def test_page_view_does_not_require_loaded_owner(monkeypatch):
     assert page.allowed(Action.VIEW, user=viewer) is True
 
 
-# @matrix page permissions task : restricted-access task-visibility
 @pytest.mark.unit
 def test_page_tasks_filtered_by_task_allowed(get_test_entities, monkeypatch):
     """``Page._load_tasks`` keeps only tasks where ``task.allowed(VIEW)`` is true."""

@@ -3,11 +3,6 @@ import { request } from "../../../shared/request.mjs";
 import { buttons } from "../../buttons.mjs";
 import { primitives } from "../../primitives.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
- * @matrix editor : current-content history-pin validation
- */
 class PinVersion {
 	constructor(toolbar) {
 		this.toolbar = toolbar;

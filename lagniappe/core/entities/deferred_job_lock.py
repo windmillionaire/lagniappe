@@ -22,7 +22,6 @@ class JobLockCreation(TypedDict):
     scope: str
 
 
-# @testable infrastructure
 class DeferredJobLock(Entity):
     """Small deterministic record coupling a target form to one active job."""
     if TYPE_CHECKING:

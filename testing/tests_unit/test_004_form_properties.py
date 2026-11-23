@@ -24,7 +24,6 @@ from testing.utility.test_entities import TestEntities
 from datetime import UTC
 
 
-# @pair form-schema:cache
 @pytest.mark.unit
 def test_form_schema_change_refreshes_table_fields_and_filter_conditions(get_schema):
     """Replacing ``form.schema`` must invalidate table and filter caches."""
@@ -55,7 +54,6 @@ def test_form_schema_change_refreshes_table_fields_and_filter_conditions(get_sch
     ]
 
 
-# @matrix form : form-type schema update
 @pytest.mark.unit
 def test_form_update_sets_name_form_type_and_schema(get_schema):
     """``Form.update`` handles ``name``, ``form-type``, and ``schema`` (str or list)."""
@@ -74,7 +72,6 @@ def test_form_update_sets_name_form_type_and_schema(get_schema):
     assert form.schema == get_schema("number_input_only")
 
 
-# @matrix form-schema : canonicalization membership write-gateway
 @pytest.mark.unit
 def test_form_schema_write_gateway_canonicalizes_without_adding_page_fields():
     page_form = TestEntities.get(
@@ -117,7 +114,6 @@ def test_form_schema_write_gateway_canonicalizes_without_adding_page_fields():
     ]
 
 
-# @matrix form : schema-version update
 @pytest.mark.unit
 def test_schema_version_update_changes_when_schema_changes():
     """Initial publication and changed schemas refresh the content fingerprint."""
@@ -134,7 +130,6 @@ def test_schema_version_update_changes_when_schema_changes():
     assert form.properties.version.update() is False
 
 
-# @matrix form : generation value-conversion
 @pytest.mark.unit
 @pytest.mark.parametrize("previous,proposed", [
     ([{"id": "answer", "type": "textarea"}], []),
@@ -155,7 +150,6 @@ def test_submission_conversion_requires_changes_to_existing_values(previous, pro
     assert requires_submission_conversion(previous, proposed)
 
 
-# @matrix form : generation value-conversion
 @pytest.mark.unit
 def test_submission_conversion_preserves_presentation_and_additions():
     form = TestEntities.get("FORM", {"name": "Presentation", "hash": "versioned-labels"})
@@ -178,7 +172,6 @@ def test_submission_conversion_preserves_presentation_and_additions():
     assert not requires_submission_conversion([], form.schema)
 
 
-# @matrix form : generation value-conversion
 @pytest.mark.unit
 def test_submission_conversion_ignores_fields_without_answers_and_unused_link_setting():
     """Static fields have no answers; Link always stores one value dictionary."""
@@ -200,7 +193,6 @@ def test_submission_conversion_ignores_fields_without_answers_and_unused_link_se
     )
 
 
-# @matrix form : generation defaults
 @pytest.mark.unit
 @pytest.mark.parametrize("legacy", [{}, {"version": "legacy-hash"}, {"schema_version": "older-hash"}])
 def test_form_generation_defaults_to_zero_without_reinterpreting_legacy_versions(legacy):
@@ -213,7 +205,6 @@ def test_form_generation_defaults_to_zero_without_reinterpreting_legacy_versions
     assert form.db == before
 
 
-# @matrix form : generation validation
 @pytest.mark.unit
 def test_form_generation_stores_nonnegative_integers():
     form = TestEntities.get("FORM", {"name": "Generation", "hash": "generation-value"})
@@ -228,7 +219,6 @@ def test_form_generation_stores_nonnegative_integers():
         assert generation.value == form.db["generation"] == 2
 
 
-# @matrix form : schema-version update content-fingerprint
 @pytest.mark.unit
 def test_schema_version_tracks_metadata_and_static_content():
     form = TestEntities.get("FORM", {
@@ -269,7 +259,6 @@ def test_schema_version_tracks_metadata_and_static_content():
     assert form.properties.version.update() is False
 
 
-# @matrix form : schema-version update content-fingerprint
 @pytest.mark.unit
 def test_schema_version_ignores_name_storage_paths_and_unrelated_assets():
     form = TestEntities.get("FORM", {
@@ -292,7 +281,6 @@ def test_schema_version_ignores_name_storage_paths_and_unrelated_assets():
     assert form.version == before
 
 
-# @matrix form : schema-version update content-fingerprint
 @pytest.mark.unit
 def test_schema_version_requires_static_content_fingerprints():
     form = TestEntities.get("FORM", {
@@ -308,7 +296,6 @@ def test_schema_version_requires_static_content_fingerprints():
     assert form.version == before
 
 
-# @matrix form : relations save content-fingerprint generation
 @pytest.mark.unit
 def test_form_save_refreshes_content_version_without_archiving_compatible_edits(get_schema):
     """A label edit changes cached content without archiving an answer generation."""
@@ -345,8 +332,6 @@ def test_form_save_refreshes_content_version_without_archiving_compatible_edits(
     assert all(effect.property_mask is None for effect in writes)
 
 
-# @matrix forms cache : owner-reuse no-extra-read
-# @pair form-schema:cache
 @pytest.mark.unit
 @pytest.mark.parametrize("kind", ["category", "model"])
 def test_form_save_refreshes_users_with_edited_form_schema(monkeypatch, kind):
@@ -397,7 +382,6 @@ def test_form_save_refreshes_users_with_edited_form_schema(monkeypatch, kind):
     assert persisted_form["version"] == "old-version"
 
 
-# @matrix form-type : cache column details property
 @pytest.mark.unit
 def test_form_type(get_test_entities):
     """Test FormType property with ColumnMixin, DetailsMixin, CacheMixin.
@@ -422,7 +406,6 @@ def test_form_type(get_test_entities):
         assert form.to_cache["type"] == expected["cache_value"]
 
 
-# @matrix form-schema : fields property
 @pytest.mark.unit
 def test_form_schema(get_test_entities, get_schema):
     """Test Schema property setter creates correct field objects.
@@ -443,7 +426,6 @@ def test_form_schema(get_test_entities, get_schema):
         } == form.test_spec["expected_fields"]
 
 
-# @matrix form-schema form-table : table-fields
 @pytest.mark.unit
 def test_form_table_fields(get_test_entities, get_schema):
     """Test table_fields returns column fields from Table elements."""
@@ -452,7 +434,6 @@ def test_form_table_fields(get_test_entities, get_schema):
         assert list(form.table_fields) == form.test_spec["expected_table_fields"]
 
 
-# @matrix form-schema html-field : html-fields
 @pytest.mark.unit
 def test_form_html_fields(get_test_entities, get_schema):
     """Test html_fields returns HTML field objects."""
@@ -463,7 +444,6 @@ def test_form_html_fields(get_test_entities, get_schema):
         ]
 
 
-# @matrix filters form : conditions exclude-table-fields schema-fields
 @pytest.mark.unit
 def test_form_filters(get_test_entities, get_schema):
     """Test FormFilters.conditions transforms schema into filter conditions.

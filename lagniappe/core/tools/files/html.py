@@ -54,30 +54,17 @@ IMAGE_STYLE_PROPERTIES = {
 MAX_IMAGE_TEXT_ATTRIBUTE = 500
 
 
-# @testable true
-# @tests tests_unit/test_014_security.py::test_safe_html_policy_is_typed_idempotent_and_ephemeral
-# @matrix security : nominal-type serialization trust-loss
 class SafeHTML(str):
     """HTML that passed its final named server-side safety policy."""
 
     __slots__ = ()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_html
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_form_content_html
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_public_document_html
-# @covered-by lagniappe/core/tools/files/html.py::htmlize
-# @covered-by lagniappe/core/tools/files/html.py::render_markdown
-# @reason private constructor is statically restricted to named final policies
 def _stamp_safe_html(value):
     """Stamp output only after a named policy has completed every transform."""
     return SafeHTML(value)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_html
-# @reason nh3 attribute callback is exercised through the narrow policy
 def _bounded_span_attribute(_tag, attribute, value):
     if attribute not in {"colspan", "rowspan"}:
         return value
@@ -128,9 +115,6 @@ _RICH_CLEANER = nh3.Cleaner(
 )
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_strip_tags
-# @pair utility:html-stripping
 def strip_tags[T](html_content: T, *, preserve_whitespace: bool = False) -> str | T:
     """Strip HTML tags, optionally retaining multiline text's whitespace."""
     if not isinstance(html_content, str):
@@ -140,9 +124,6 @@ def strip_tags[T](html_content: T, *, preserve_whitespace: bool = False) -> str 
     return text if preserve_whitespace else re.sub(r"\s+", " ", text).strip()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::render_markdown
-# @reason task item construction is exercised through Markdown rendering
 def _canonicalize_task_item(soup, item):
     control = item.find(
         lambda tag: tag.name in {"label", "input"}
@@ -172,9 +153,6 @@ def _canonicalize_task_item(soup, item):
         item.append(child)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::render_markdown
-# @reason mixed-list grouping is exercised through Markdown rendering
 def _canonicalize_task_list(soup, task_list, items):
     task_list.name = "ul"
     task_list.attrs = {"data-type": TASK_LIST_TYPE}
@@ -182,9 +160,6 @@ def _canonicalize_task_list(soup, task_list, items):
         _canonicalize_task_item(soup, item)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::render_markdown
-# @reason PyMdown task markup normalization is part of rendering
 def _normalize_task_lists(content):
     soup = BeautifulSoup(content, "html.parser")
     task_lists = [
@@ -224,9 +199,6 @@ def _normalize_task_lists(content):
     return str(soup)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::render_markdown
-# @reason Markdown flow whitespace normalization is exercised through rendering
 def _collapse_flow_newlines(content):
     """Turn source wrapping into spaces without changing semantic hard breaks."""
     soup = BeautifulSoup(content, "html.parser")
@@ -257,9 +229,6 @@ def _collapse_flow_newlines(content):
     return str(soup)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_html
-# @reason task ancestry reduction is exercised through the named policies
 def _prepare_canonical_task_lists(content):
     """Reduce only exact task-list ancestry to semantic list state."""
     soup = BeautifulSoup(content, "html.parser")
@@ -298,9 +267,6 @@ def _prepare_canonical_task_lists(content):
     return str(soup)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_html
-# @reason fixed task scaffolding is exercised through the narrow policy
 def _rebuild_task_item(soup, item):
     """Rebuild fixed inert editor scaffolding from validated semantic state."""
     checked = item.get("data-checked") == "true"
@@ -317,9 +283,6 @@ def _rebuild_task_item(soup, item):
     wrapper = soup.new_tag("div")
     paragraph = None
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/html.py::_rebuild_task_item
-    # @reason local paragraph flush is part of fixed task scaffolding
     def flush_paragraph():
         nonlocal paragraph
         if paragraph is not None:
@@ -360,9 +323,6 @@ def _rebuild_task_item(soup, item):
     item.append(wrapper)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_html
-# @reason link and task canonicalization is exercised through the narrow policy
 def _finalize_clean_html(content):
     """Canonicalize links and rebuild task controls after nh3 cleaning."""
     soup = BeautifulSoup(content, "html.parser")
@@ -401,10 +361,6 @@ def _finalize_clean_html(content):
     return str(soup)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_form_content_html
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_public_document_html
-# @reason image layout parsing is exercised through the richer named policies
 def _canonical_image_style(value):
     if not isinstance(value, str) or not value.strip():
         return None
@@ -447,10 +403,6 @@ def _canonical_image_style(value):
     return "; ".join(styles)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_form_content_html
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_public_document_html
-# @reason owned-image matching is exercised through the richer named policies
 def _same_resource_url(source, target):
     source_url = urlsplit(str(source or ""))
     target_url = urlsplit(str(target or ""))
@@ -461,10 +413,6 @@ def _same_resource_url(source, target):
     return True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_form_content_html
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_public_document_html
-# @reason image metadata bounding is exercised through the richer named policies
 def _bounded_plain_attribute(value):
     if not isinstance(value, str):
         return None
@@ -472,10 +420,6 @@ def _bounded_plain_attribute(value):
     return value[:MAX_IMAGE_TEXT_ATTRIBUTE] or None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_form_content_html
-# @covered-by lagniappe/core/tools/files/html.py::sanitize_public_document_html
-# @reason owned-image transformation is exercised through the richer policies
 def _prepare_owned_images(content, image_sources):
     soup = BeautifulSoup(content, "html.parser")
     sources = list(image_sources or [])
@@ -501,9 +445,6 @@ def _prepare_owned_images(content, image_sources):
     return str(soup)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/html.py::render_markdown
-# @reason generated text retains draft image attributes before the final image safety policy
 def _retain_original_images(content, original_html):
     """Keep existing image layout when Markdown rewrites the surrounding text."""
     originals = BeautifulSoup(original_html, "html.parser").find_all("img")
@@ -518,19 +459,6 @@ def _retain_original_images(content, original_html):
     return str(soup)
 
 
-# @testable true
-# @tests tests_unit/test_014_security.py::test_htmlize_sanitizes_markdown_html
-# @tests tests_unit/test_014_security.py::test_htmlize_sanitizes_text_html
-# @tests tests_unit/test_014_security.py::test_htmlize_preserves_markdown_tables_and_sanitizes_cells
-# @tests tests_unit/test_014_security.py::test_sanitize_html_restricts_task_controls
-# @tests tests_unit/test_014_security.py::test_sanitize_html_drops_active_content_and_unwraps_unknown_markup
-# @tests tests_unit/test_014_security.py::test_sanitize_html_rejects_obfuscated_active_link_schemes
-# @tests tests_unit/test_014_security.py::test_sanitize_html_keeps_reviewed_link_schemes_and_fixed_attributes
-# @tests tests_unit/test_014_security.py::test_sanitize_html_bounds_table_spans
-# @tests tests_unit/test_014_security.py::test_sanitize_html_strips_task_attributes_outside_exact_ancestry
-# @tests tests_unit/test_014_security.py::test_render_markdown_normalizes_indented_html_source
-# @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_plain_html_inserts_safe_formatted_content
-# @matrix files security : active-content comments html-sanitization links malformed-markup relative-url table task-list unknown-wrapper url-scheme
 def sanitize_html(content: object) -> SafeHTML:
     """Apply the narrow semantic HTML policy used by Markdown and files."""
     if not isinstance(content, str) or not content:
@@ -539,10 +467,6 @@ def sanitize_html(content: object) -> SafeHTML:
     return _stamp_safe_html(_finalize_clean_html(_NARROW_CLEANER.clean(reduced)))
 
 
-# @testable true
-# @tests tests_unit/test_014_security.py::test_form_content_policy_keeps_only_owned_images
-# @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
-# @matrix form-html security : html-sanitization inner-html owned-image
 def sanitize_form_content_html(content: object, form: Form | FormHistory, field_id: str) -> SafeHTML:
     """Apply the form-content policy and retain only this field's owned images."""
     if not isinstance(content, str) or not content:
@@ -560,9 +484,6 @@ def sanitize_form_content_html(content: object, form: Form | FormHistory, field_
     return _stamp_safe_html(_finalize_clean_html(_RICH_CLEANER.clean(reduced)))
 
 
-# @testable true
-# @tests tests_unit/test_014_security.py::test_public_document_policy_keeps_only_rewritten_owned_images
-# @matrix public-pages security : html-sanitization owned-image
 def sanitize_public_document_html(content: object, image_sources: Iterable[tuple[str, str]]) -> SafeHTML:
     """Apply the anonymous public-document policy to transformed editor HTML."""
     if not isinstance(content, str) or not content:
@@ -572,15 +493,6 @@ def sanitize_public_document_html(content: object, image_sources: Iterable[tuple
     return _stamp_safe_html(_finalize_clean_html(_RICH_CLEANER.clean(reduced)))
 
 
-# @testable true
-# @tests tests_unit/test_014_security.py::test_render_markdown_collapses_soft_wrapped_lines
-# @tests tests_unit/test_014_security.py::test_render_markdown_preserves_code_block_newlines
-# @tests tests_unit/test_014_security.py::test_render_markdown_creates_editor_task_lists
-# @tests tests_unit/test_014_security.py::test_render_markdown_splits_mixed_task_lists
-# @tests tests_unit/test_014_security.py::test_render_markdown_preserves_adjacent_list_kinds
-# @tests tests_unit/test_014_security.py::test_render_markdown_normalizes_indented_html_source
-# @matrix editor files markdown : code-block hard-break html-source list-kind mixed-list soft-wrap task-list
-# @matrix form-html security : html-sanitization owned-image
 def render_markdown(text: object, *, image_sources: Iterable[tuple[str, str]] | None = None, original_html: str | None = None) -> SafeHTML:
     """Render Markdown safely, optionally retaining images from existing content."""
     if not isinstance(text, str):
@@ -627,12 +539,6 @@ def render_markdown(text: object, *, image_sources: Iterable[tuple[str, str]] | 
     return sanitize_html(_collapse_flow_newlines(normalized))
 
 
-# @testable true
-# @tests tests_unit/test_014_security.py::test_htmlize_sanitizes_markdown_html
-# @tests tests_unit/test_014_security.py::test_htmlize_sanitizes_text_html
-# @tests tests_unit/test_014_security.py::test_htmlize_preserves_markdown_tables_and_sanitizes_cells
-# @tests tests_unit/test_014_security.py::test_htmlize_escapes_code_plain_text_and_mimetype_attributes
-# @matrix files security : code html html-sanitization markdown mimetype plain-text table
 def htmlize(text: object, mimetype: str | None) -> SafeHTML:
     """Convert text content to sanitized HTML for its MIME type."""
     if mimetype == "text/html":

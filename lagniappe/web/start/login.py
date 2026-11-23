@@ -10,14 +10,10 @@ if TYPE_CHECKING:
 from flask_login import LoginManager
 
 
-# @testable infrastructure
 class _LoginView(Protocol):
     login_view: str | None
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_login_manager_wiring_and_anonymous_redirect
-# @matrix auth login : lazy-user-loading login-manager redirect-view
 def initialize(
     app: Flask,
     *,

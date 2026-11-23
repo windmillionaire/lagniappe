@@ -14,12 +14,6 @@ IDENTITY_TOOLKIT_ADMIN_API = "https://identitytoolkit.googleapis.com/admin/v2"
 IDENTITY_REQUEST_TIMEOUT = 10
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/services/identity_platform.py::exchange_google_credential
-# @covered-by lagniappe/core/tools/services/identity_platform.py::google_provider_enabled
-# @covered-by lagniappe/core/tools/services/identity_platform.py::generate_email_action_code
-# @covered-by lagniappe/core/tools/services/identity_platform.py::delete_account_by_email
-# @reason typed provider exception is exercised by the public request operations
 class IdentityPlatformError(RuntimeError):
     """Raised when Identity Platform rejects or cannot complete an operation."""
 
@@ -28,21 +22,12 @@ class IdentityPlatformError(RuntimeError):
         self.provider_code = str(provider_code or "").strip() or None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/services/identity_platform.py::exchange_google_credential
-# @reason provider error normalization is exercised through credential exchange
 def _provider_error_code(value):
     """Extract a stable provider code without retaining diagnostic prose."""
     match = re.match(r"^([A-Z][A-Z0-9_]+)(?:\b|\s|:)", str(value or "").strip())
     return match.group(1) if match else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/services/identity_platform.py::exchange_google_credential
-# @covered-by lagniappe/core/tools/services/identity_platform.py::google_provider_enabled
-# @covered-by lagniappe/core/tools/services/identity_platform.py::generate_email_action_code
-# @covered-by lagniappe/core/tools/services/identity_platform.py::delete_account_by_email
-# @reason response normalization is exercised through public provider operations
 def _response_json(response, operation):
     try:
         data = response.json()
@@ -63,9 +48,6 @@ def _response_json(response, operation):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/services/identity_platform.py::exchange_google_credential
-# @reason client config validation is owned by the public credential exchange
 def _client_config(config):
     api_key = str((config or {}).get("apiKey") or "").strip()
     project_id = str((config or {}).get("projectId") or "").strip()
@@ -76,9 +58,6 @@ def _client_config(config):
     return api_key, project_id
 
 
-# @testable true
-# @tests tests_unit/test_025_identity_platform.py::test_verify_identity_token_enforces_project_issuer_and_subject
-# @matrix login : audience identity-platform issuer token-verification
 def verify_identity_token(token: str, project_id: str, request_adapter: google_requests.Request | None = None) -> Mapping[str, object]:
     """Verify a Secure Token ID token for exactly one Identity Platform project."""
     project_id = str(project_id or "").strip()
@@ -99,9 +78,6 @@ def verify_identity_token(token: str, project_id: str, request_adapter: google_r
     return claims
 
 
-# @testable true
-# @tests tests_unit/test_025_identity_platform.py::test_verify_google_credential_enforces_client_and_verified_email
-# @matrix login : audience email-verification google-oauth token-verification
 def verify_google_credential(credential: str, client_id: str, request_adapter: google_requests.Request | None = None) -> Mapping[str, object]:
     """Verify a Google Identity Services credential before account exchange."""
     client_id = str(client_id or "").strip()
@@ -121,9 +97,6 @@ def verify_google_credential(credential: str, client_id: str, request_adapter: g
     return claims
 
 
-# @testable true
-# @tests tests_unit/test_025_identity_platform.py::test_exchange_google_credential_uses_identity_platform_idp_endpoint
-# @matrix login : google-oauth identity-platform provider-error-code token-exchange
 def exchange_google_credential(
     credential: str,
     client_config: Mapping[str, object],
@@ -175,9 +148,6 @@ def exchange_google_credential(
     return data
 
 
-# @testable true
-# @tests tests_unit/test_025_identity_platform.py::test_google_provider_enabled_reads_live_provider_state
-# @matrix login : google-oauth identity-platform provider-state
 def google_provider_enabled(
     *,
     project_id: str | None = None,
@@ -218,11 +188,6 @@ def google_provider_enabled(
     return isinstance(data, dict) and data.get("enabled") is True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/services/identity_platform.py::google_provider_enabled
-# @covered-by lagniappe/core/tools/services/identity_platform.py::generate_email_action_code
-# @covered-by lagniappe/core/tools/services/identity_platform.py::delete_account_by_email
-# @reason bearer-header construction is exercised through public admin operations
 def _admin_headers(access_token):
     access_token = str(access_token or "").strip()
     if not access_token:
@@ -235,9 +200,6 @@ def _admin_headers(access_token):
     }
 
 
-# @testable true
-# @tests tests_unit/test_025_identity_platform.py::test_generate_email_action_code_returns_provider_code_without_sending
-# @matrix login : action-codes authentication-email identity-platform
 def generate_email_action_code(
     request_type: str,
     email: str,
@@ -301,9 +263,6 @@ def generate_email_action_code(
     return oob_code
 
 
-# @testable true
-# @tests tests_unit/test_025_identity_platform.py::test_delete_account_by_email_looks_up_and_deletes_identity_user
-# @matrix users : account-delete identity-platform
 def delete_account_by_email(
     email: str,
     *,

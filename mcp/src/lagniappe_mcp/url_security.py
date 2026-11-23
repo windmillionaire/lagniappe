@@ -39,8 +39,6 @@ _REQUIRED_SIGNED_QUERY_NAMES = frozenset(
 )
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/url_security.py::normalize_site_url
 def _loopback(host: str | None) -> bool:
     if not host:
         return False
@@ -52,8 +50,6 @@ def _loopback(host: str | None) -> bool:
         return False
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/url_security.py::normalize_site_url
 def _canonical_host(host: str) -> str:
     value = host.casefold()
     if value.endswith(".") or len(value) > 253:
@@ -82,32 +78,21 @@ def _canonical_host(host: str) -> str:
     return f"[{normalized}]" if address.version == 6 else normalized
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_site_url_normalizes_only_canonical_https_or_loopback_origins
 @dataclass(frozen=True, slots=True)
 class SiteAuthority:
     """One normalized site origin used for every authenticated request."""
 
     origin: str
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/url_security.py::SiteAuthority
     @property
     def api_base(self) -> str:
         return f"{self.origin}/api/v1"
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/url_security.py::SiteAuthority
     def api_url(self, path: str = "") -> str:
         clean = path.lstrip("/")
         return self.api_base if not clean else f"{self.api_base}/{clean}"
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_api_request_uses_only_explicit_bearer_credentials
-# @tests tests_unit/test_033_mcp_adapter.py::test_site_url_normalizes_only_canonical_https_or_loopback_origins
 def normalize_site_url(value: str) -> SiteAuthority:
     raw = str(value or "").strip()
     try:
@@ -151,10 +136,6 @@ def normalize_site_url(value: str) -> SiteAuthority:
     return SiteAuthority(urlunsplit((parsed.scheme.casefold(), netloc, "", "", "")))
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-# @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_summary_and_preserves_candidate_and_api_errors
 def validate_api_url(
     authority: SiteAuthority,
     value: str,
@@ -231,10 +212,6 @@ def validate_api_url(
     return urlunsplit(parsed)
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-# @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_summary_and_preserves_candidate_and_api_errors
 def validate_human_url(authority: SiteAuthority, value: str) -> str:
     """Validate, but never fetch, an authenticated preview or review link."""
     try:
@@ -263,9 +240,6 @@ def validate_human_url(authority: SiteAuthority, value: str) -> str:
     return urlunsplit(parsed)
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
 def quote_path_segment(value: str) -> str:
     text = str(value or "")
     if not text or len(text) > 2048:
@@ -275,10 +249,6 @@ def quote_path_segment(value: str) -> str:
     return quote(text, safe="")
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_storage_url_requires_exact_resumable_and_signed_parameters
-# @tests tests_unit/test_033_mcp_adapter.py::test_media_download_does_not_inherit_client_credentials_or_cookies
 def validate_storage_url(value: str, *, upload: bool) -> str:
     """Accept only the frozen path families on the exact GCS HTTPS origin."""
     try:

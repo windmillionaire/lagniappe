@@ -4,11 +4,6 @@ import { captureError } from "./errors.mjs";
 import { request } from "./request.mjs";
 import { withTransition } from "./transitions.mjs";
 
-/**
- * @testable true
- * @tests tests_js/test_046_async_query_lifecycle.mjs::test_modal_owns_exact_node_and_rejects_late_attachment
- * @matrix modal : exact-owner late-publication listener-teardown reuse
- */
 export class Modal {
 	constructor(view, trigger) {
 		this._destroyed = false;
@@ -164,21 +159,6 @@ export class Modal {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002c_home_categories.py::test_delete_category
- * @tests tests_e2e/002_home/test_002b_home_projects.py::test_delete_project
- * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task
- * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_delete_page_from_title_menu
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_delete_page_task_from_page_row
- * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_delete_task_from_row
- * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
- * @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
- * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
- * @matrix categories forms model-tasks pages projects task-index tasks : delete
- * @matrix users : delete options
- * @pair messaging:clear-confirmation
- */
 export class DeleteModal extends Modal {
 	async init() {
 		const entity =
@@ -269,9 +249,6 @@ export class DeleteModal extends Modal {
 	}
 }
 
-/**
- * @testable infrastructure
- */
 export class HelpModal extends Modal {
 	async init() {
 		const section =
@@ -292,11 +269,6 @@ export class HelpModal extends Modal {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_js/test_046_async_query_lifecycle.mjs::test_modal_owns_exact_node_and_rejects_late_attachment
- * @matrix modal : listener-teardown reuse
- */
 export class OfflineModal extends Modal {
 	constructor(view, trigger) {
 		super(view, trigger);

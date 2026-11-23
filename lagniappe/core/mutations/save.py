@@ -28,11 +28,7 @@ if TYPE_CHECKING:
     )
 
 
-# @testable infrastructure
 class PageMutation(StandardMutation["Page"]):
-    # @testable true
-    # @tests tests_unit/test_022_mutation_contracts.py::test_permission_save_reuses_resolved_collection_owner_keys
-    # @matrix permissions mutations : owner-reuse no-extra-read repeated-save
     def plan_save(
         self,
         entity: Page,
@@ -65,11 +61,7 @@ class PageMutation(StandardMutation["Page"]):
             builder.invalidate_public_discovery(reason="public-page-save")
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_category_save_plans_public_discovery_invalidation
-# @matrix categories public-directory : invalidation save
 class CategoryMutation(StandardMutation["Category"]):
-    # @testable infrastructure
     def plan_save(
         self,
         entity: Category,
@@ -87,13 +79,7 @@ class CategoryMutation(StandardMutation["Category"]):
         builder.invalidate_public_discovery(reason="category-save")
 
 
-# @testable infrastructure
 class TaskMutation(StandardMutation["Task"]):
-    # @testable true
-    # @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_task_move_updates_all_owned_file_search_permissions
-    # @tests tests_unit/test_006_file_properties.py::test_task_move_updates_history_only_file_page_without_consuming_pending_move
-    # @matrix permissions search files : task-move ancestor-tags
-    # @matrix files : ownership history parent-key retry
     def plan_save(
         self,
         entity: Task,
@@ -123,9 +109,7 @@ class TaskMutation(StandardMutation["Task"]):
             builder.touch(owner, reason="task-list-owner")
 
 
-# @testable infrastructure
 class TaskHistoryMutation(StandardMutation["TaskHistory"]):
-    # @testable infrastructure
     def plan_save(
         self,
         entity: TaskHistory,
@@ -149,11 +133,7 @@ class TaskHistoryMutation(StandardMutation["TaskHistory"]):
                 builder.touch(owner, reason="task-history-list-owner")
 
 
-# @testable infrastructure
 class UserMutation(StandardMutation["User"]):
-    # @testable true
-    # @tests tests_unit/test_022_mutation_contracts.py::test_existing_user_save_does_not_implicitly_mutate_canonical_page
-    # @matrix mutations user : canonical-page intent-isolation save
     def plan_save(
         self,
         entity: User,
@@ -172,14 +152,7 @@ class UserMutation(StandardMutation["User"]):
         )
 
 
-# @testable infrastructure
 class FormMutation(StandardMutation["Form"]):
-    # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_save_refreshes_content_version_without_archiving_compatible_edits
-    # @tests tests_unit/test_022_mutation_contracts.py::test_permission_save_reuses_resolved_collection_owner_keys
-    # @matrix permissions mutations : owner-reuse no-extra-read repeated-save
-    # @matrix form : relations save content-fingerprint generation
-    # @matrix forms mutations : guarded-save publication
     def plan_save(
         self,
         entity: Form,
@@ -208,11 +181,7 @@ class FormMutation(StandardMutation["Form"]):
             builder.touch(owner, reason="form-user-invalidation")
 
 
-# @testable infrastructure
 class FileMutation(StandardMutation["File"]):
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_file_save_normalizes_task_page_and_restriction_fingerprint
-    # @matrix files : ownership parent-key fingerprint restrictions
     def plan_save(
         self,
         entity: File,
@@ -234,9 +203,7 @@ class FileMutation(StandardMutation["File"]):
                 builder.touch(cast("Task", entity.owner).page, reason="file-task-page-owner")
 
 
-# @testable infrastructure
 class ModelMutation(StandardMutation["ModelTask"]):
-    # @testable infrastructure
     def plan_save(
         self,
         entity: ModelTask,
@@ -257,9 +224,7 @@ class ModelMutation(StandardMutation["ModelTask"]):
             builder.touch(entity.form, reason="model-form-user")
 
 
-# @testable infrastructure
 class FilterMutation(StandardMutation["Filter"]):
-    # @testable infrastructure
     def plan_save(
         self,
         entity: Filter,
@@ -278,11 +243,7 @@ class FilterMutation(StandardMutation["Filter"]):
             builder.touch(entity.parent, reason="filter-parent-owner")
 
 
-# @testable infrastructure
 class ReportMutation(StandardMutation["AIReport"]):
-    # @testable true
-    # @tests tests_unit/test_022_mutation_contracts.py::test_report_save_does_not_touch_input_files
-    # @matrix ai-report mutations : input-files no-database-read owner-touch
     def plan_save(
         self,
         entity: AIReport,
@@ -303,11 +264,7 @@ class ReportMutation(StandardMutation["AIReport"]):
                 builder.touch(owner, reason="report-list-owner")
 
 
-# @testable true
-# @tests tests_unit/test_002j_notes.py::test_note_save_touches_parent_and_author
-# @matrix mutations notes : save owner-invalidation
 class NoteMutation(StandardMutation["Note"]):
-    # @testable infrastructure
     def plan_save(
         self,
         entity: Note,
@@ -328,11 +285,7 @@ class NoteMutation(StandardMutation["Note"]):
                 builder.cache_invalidate(owner, reason="note-list-owner")
 
 
-# @testable infrastructure
 class NotificationMutation(StandardMutation["Notification"]):
-    # @testable true
-    # @tests tests_unit/test_022_mutation_contracts.py::test_notification_save_updates_projection_without_touching_user
-    # @matrix notifications : cache-failure-isolation cache-isolation mutation personal-activity
     def plan_save(
         self,
         entity: Notification,
@@ -359,11 +312,7 @@ class NotificationMutation(StandardMutation["Notification"]):
             )
 
 
-# @testable infrastructure
 class JobMutation(StandardMutation["DeferredJob"]):
-    # @testable true
-    # @tests tests_unit/test_022_mutation_contracts.py::test_job_save_updates_operation_projection_without_touching_relations
-    # @matrix deferred-jobs : cache-isolation mutation redis-projection
     def plan_save(
         self,
         entity: DeferredJob,

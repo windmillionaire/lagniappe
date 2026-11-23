@@ -24,18 +24,11 @@ AI_TASK_MIN_DELAY_SECONDS = 5
 AI_TASK_MAX_DELAY_SECONDS = 30
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_task_start_delay_is_bounded
-# @pair ai:queue-jitter
 def ai_task_start_delay() -> int:
     """Return a small bounded delay for expensive background AI starts."""
     return random.randint(AI_TASK_MIN_DELAY_SECONDS, AI_TASK_MAX_DELAY_SECONDS)
 
 
-# @testable true
-# @tests tests_unit/test_023b_deferred_job_service.py::test_cloud_task_dispatch_uses_key_payload_stable_id_and_deadline
-# @tests tests_unit/test_023b_deferred_job_service.py::test_cancel_deletes_tasks_and_persists_a_tombstone
-# @matrix deferred-jobs : cancellation deterministic-task-id
 def task_name(task_id: str) -> str:
     """Return the fully qualified Cloud Task name for a deterministic id."""
     project = CONFIG.GOOGLE_CLOUD_PROJECT
@@ -46,9 +39,6 @@ def task_name(task_id: str) -> str:
     )
 
 
-# @testable true
-# @tests tests_unit/test_023b_deferred_job_service.py::test_cloud_task_dispatch_uses_key_payload_stable_id_and_deadline
-# @matrix deferred-jobs : deterministic-task-id dispatch-deadline task-payload
 def create_task(
     endpoint: str,
     payload: dict[str, object] | None = None,
@@ -119,8 +109,6 @@ def create_task(
         return task.get("name")
 
 
-# @testable false
-# @reason Cloud Tasks deletion is provider-owned and covered through process/E2E workflows
 def delete_task(task_name: str) -> bool:
     """Delete a scheduled task by its name."""
     if not getattr(CONFIG, "TASK_QUEUE_ENABLED", CONFIG.production):

@@ -21,8 +21,6 @@ BUILD_ID_RE = re.compile(r"^b[0-9a-f]{7}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
-# @testable infrastructure
-# @covered-by runner/frontend_build.py::inspect_frontend_build
 @dataclass(frozen=True)
 class FrontendBuildValidation:
     """Validated metadata and the current generated-output fingerprint."""
@@ -31,8 +29,6 @@ class FrontendBuildValidation:
     output_fingerprint: str
 
 
-# @testable infrastructure
-# @covered-by runner/frontend_build.py::inspect_frontend_build
 class FilesystemFrontendBuildReader:
     """Read frontend publication inputs and outputs from one checkout."""
 
@@ -56,8 +52,6 @@ class FilesystemFrontendBuildReader:
         return sorted(paths)
 
 
-# @testable infrastructure
-# @covered-by runner/frontend_build.py::inspect_frontend_build
 class GitFrontendBuildReader:
     """Read frontend publication inputs and outputs from an index or commit."""
 
@@ -224,10 +218,6 @@ def _source_digest(reader, contract, issues):
     return digest.hexdigest()
 
 
-# @testable true
-# @tests tests_tooling/test_005a_frontend_build.py::test_frontend_build_validator_checks_recursive_artifacts_and_source_identity
-# @tests tests_tooling/test_005a_frontend_build.py::test_frontend_build_validator_rejects_unsafe_and_incoherent_metadata
-# @matrix frontend-build : artifact-integrity build-identity build-metadata path-safety source-integrity
 def inspect_frontend_build(
     reader: FilesystemFrontendBuildReader | GitFrontendBuildReader,
     *,
@@ -393,11 +383,6 @@ def inspect_frontend_build(
     return validation, issues
 
 
-# @testable true
-# @tests tests_tooling/test_005a_frontend_build.py::test_verify_frontend_build_reports_actionable_failure
-# @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
-# @matrix deploy frontend-build : safe-failure validation
-# @pair deploy:build
 def verify_frontend_build(
     *,
     app_dir: str | Path,

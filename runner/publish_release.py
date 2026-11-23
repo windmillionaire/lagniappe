@@ -9,14 +9,12 @@ from collections.abc import Callable
 from pathlib import Path
 
 
-# @testable infrastructure
 def _run(*args):
     return subprocess.run(
         args, check=True, capture_output=True, text=True
     ).stdout.strip()
 
 
-# @testable infrastructure
 def _api(path):
     env = os.environ.copy()
     if "RELEASE_VALIDATION_TOKEN" in env:
@@ -24,9 +22,6 @@ def _api(path):
     return json.loads(subprocess.check_output(["gh", "api", path], env=env))
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_release_rejects_unverified_heads
-# @matrix release : protected-branch source-integrity
 def verified_version(
     repo: str, sha: str, pr: object, api: Callable[[str], object] = _api
 ) -> str:
@@ -81,9 +76,6 @@ def verified_version(
     return branch[1]
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_publication_retries_with_annotated_tag
-# @matrix release : git-upgrade source-integrity
 def publish_tag(repo: str, sha: str, version: str, notes: Path) -> None:
     tag = f"v{version}"
     ref = f"refs/tags/{tag}"
@@ -139,7 +131,6 @@ def publish_tag(repo: str, sha: str, version: str, notes: Path) -> None:
         )
 
 
-# @testable infrastructure
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("repo")

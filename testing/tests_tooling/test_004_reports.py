@@ -128,7 +128,6 @@ def test_browser_review_html_includes_diagnostics_only_when_present(tmp_path):
     assert "failed to load module" in html
 
 
-# @matrix browser-review : attachment failure-cleanup
 @pytest.mark.parametrize(
     ("keep_failed", "exists_after_failure"),
     [(False, False), (True, True)],

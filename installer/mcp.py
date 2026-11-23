@@ -66,7 +66,6 @@ AUTH_LOG_FILTER = (
 AUTH_LOG_EXCLUSION = "remote-mcp-oauth-query"
 
 
-# @testable infrastructure
 @dataclass
 class _Bindings:
     bindings: list[dict[str, object]]
@@ -79,7 +78,6 @@ class _Bindings:
         return cls(bindings)
 
 
-# @testable infrastructure
 @dataclass(frozen=True)
 class Deployment:
     project: str
@@ -92,9 +90,6 @@ class Deployment:
     image: str
 
 
-# @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_version_tracks_only_build_inputs_and_rejects_symlinks
-# @matrix mcp-install : source-version upload-boundary
 def source_version(root: str | Path = REPOSITORY_ROOT) -> str:
     """Identify the exact service build without coupling it to app releases."""
     root = Path(root)
@@ -119,9 +114,6 @@ def source_version(root: str | Path = REPOSITORY_ROOT) -> str:
     return digest.hexdigest()[:32]
 
 
-# @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_policy_preserves_legacy_api_without_implicitly_installing_service
-# @matrix mcp-install : configuration opt-in legacy-settings
 def requested(settings: Mapping[str, object]) -> bool:
     """Legacy REST access alone does not opt an installation into Cloud Run."""
     policy = normalize_ai_features(settings)
@@ -130,9 +122,6 @@ def requested(settings: Mapping[str, object]) -> bool:
     ) is True
 
 
-# @testable false
-# @covered-by installer/mcp.py::_deployment
-# @reason deterministic account naming is exercised through resource provisioning
 def _available_account(project, name, occupied):
     """Keep managed MCP identities separate from the application's accounts."""
     email = f"{name}@{project}.iam.gserviceaccount.com"
@@ -143,9 +132,6 @@ def _available_account(project, name, occupied):
     return email
 
 
-# @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_install_keeps_app_runtime_and_build_accounts_separate
-# @matrix mcp-install : configuration iam resources recovery
 def _deployment(settings, *, version=None):
     project = settings.get("GOOGLE_CLOUD_PROJECT") or SETTINGS.GCLOUD_CONFIG.get("PROJECT")
     if not isinstance(project, str) or not re.fullmatch(r"[a-z][a-z0-9-]{4,28}[a-z0-9]", project):
@@ -172,9 +158,6 @@ def _deployment(settings, *, version=None):
     )
 
 
-# @testable false
-# @covered-by installer/mcp.py::prepare_deployment
-# @reason all provider commands are project-bound and use the shared setup error boundary
 def _run(target, arguments, *, timeout=600, check=True):
     return run_gcloud_command(
         [*arguments, f"--project={target.project}", "--quiet"],
@@ -182,9 +165,6 @@ def _run(target, arguments, *, timeout=600, check=True):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_discovery_distinguishes_absence_from_unavailable_state
-# @matrix mcp-install : fail-closed provider-discovery
 @overload
 def describe(target: Deployment, arguments: Sequence[str], *, optional: Literal[False] = False) -> dict[str, object]: ...
 
@@ -234,9 +214,6 @@ def describe(
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_permissions_are_checked_before_resource_mutation
-# @matrix mcp-install : iam preflight
 def require_permissions(
     target: Deployment, *, client: ProjectsClient | None = None
 ) -> None:
@@ -254,9 +231,6 @@ def require_permissions(
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_iam_preserves_conditions_etags_and_skips_noop_writes
-# @matrix mcp-install : iam idempotence handoff
 def reconcile_access(
     target: Deployment,
     command: Sequence[str],
@@ -294,9 +268,6 @@ def reconcile_access(
     record_mutation("MCP IAM", action="updated", resource="MCP resource policy", identifier=resource)
 
 
-# @testable false
-# @covered-by installer/mcp.py::reconcile_resources
-# @reason account discovery and creation are exercised by the resource reconciler
 def _ensure_account(target, email):
     arguments = ["iam", "service-accounts", "describe", email]
     account = describe(target, arguments, optional=True)
@@ -310,9 +281,6 @@ def _ensure_account(target, email):
             GCLOUD_API_PROPAGATION_DELAYS,
         )
 
-        # @testable false
-        # @covered-by installer/mcp.py::reconcile_resources
-        # @reason newly created account visibility is owned by resource provisioning
         def read_created_account():
             result = describe(target, arguments, optional=True)
             if result is None:
@@ -321,9 +289,6 @@ def _ensure_account(target, email):
                 )
             return result
 
-        # @testable false
-        # @covered-by installer/mcp.py::reconcile_resources
-        # @reason propagation feedback and backoff are exercised by provisioning
         def wait_for_visibility(delay):
             print(wrap_text(
                 f"Waiting for Google IAM to make {email} available; "
@@ -342,13 +307,6 @@ def _ensure_account(target, email):
         raise SetupError("MCP service account is disabled or differs from the saved identity.")
 
 
-# @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_resources_use_separate_build_identity_and_scoped_roles
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_resource_upgrade_covers_oauth_referrers_and_preserves_other_exclusions
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_account_creation_waits_for_visibility
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_account_readback_failure_stops_before_more_resources
-# @matrix mcp-install : iam resources keyless privacy idempotence
-# @matrix mcp-install : provider-convergence fail-closed
 def reconcile_resources(target: Deployment, deployer: str) -> None:
     require_permissions(target)
     _run(target, ["services", "enable", *SERVICES])
@@ -398,9 +356,6 @@ def reconcile_resources(target: Deployment, deployer: str) -> None:
     record_step("MCP resources verified")
 
 
-# @testable false
-# @covered-by installer/mcp.py::reconcile_resources
-# @reason token expiry cleanup and request-log privacy are owned by resource setup
 def _reconcile_oauth_resources(target, *, verify_only=False):
     flags = ["--collection-group=mcp_oauth", "--database=(default)"]
     result = _run(target, ["firestore", "fields", "ttls", "list", *flags, "--format=json"])
@@ -446,18 +401,11 @@ def _resource_field(resource: Mapping[str, object], *path: str) -> object:
     return value
 
 
-# @testable false
-# @covered-by installer/mcp.py::prepare_deployment
-# @covered-by installer/mcp.py::finish_deployment
-# @reason canonical provider state is checked at both deployment boundaries
 def _service(target: Deployment) -> dict[str, object] | None:
     return describe(target, ["run", "services", "describe", SERVICE,
                              f"--region={target.region}"], optional=True)
 
 
-# @testable false
-# @covered-by installer/mcp.py::prepare_deployment
-# @reason a saved exact resource cannot silently follow another service
 def _resource(service):
     url = service.get("status", {}).get("url", "")
     https_url(url, origin=True)
@@ -466,9 +414,6 @@ def _resource(service):
     return url + "/mcp"
 
 
-# @testable false
-# @covered-by installer/mcp.py::prepare_deployment
-# @reason image discovery makes interrupted builds resumable without rebuilding
 def _build(target, *, announce_progress=True):
     image = describe(target, ["artifacts", "docker", "images", "describe", target.image], optional=True)
     if image is not None:
@@ -487,9 +432,6 @@ def _build(target, *, announce_progress=True):
     record_mutation("MCP build", action="built", resource="MCP image", identifier=target.image)
 
 
-# @testable false
-# @covered-by installer/mcp.py::finish_deployment
-# @reason the service revision owns both the image and its fixed API target
 def _environment(target, resource, enabled):
     return {
         "LAGNIAPPE_MCP_ENABLED": "true" if enabled else "false",
@@ -498,10 +440,6 @@ def _environment(target, resource, enabled):
     }
 
 
-# @testable false
-# @covered-by installer/mcp.py::finish_deployment
-# @covered-by installer/mcp.py::inspect_deployment
-# @reason readiness, identity, image version and env determine whether a revision is current
 def _matches(service, target, resource):
     service = service or {}
     status = service.get("status", {})
@@ -523,10 +461,6 @@ def _matches(service, target, resource):
     )
 
 
-# @testable false
-# @covered-by installer/mcp.py::prepare_deployment
-# @covered-by installer/mcp.py::finish_deployment
-# @reason revision writes happen only after preparation or a successful main app deployment
 def _deploy_service(target, resource, *, enabled):
     variables = ",".join(f"{name}={value}" for name, value in _environment(target, resource, enabled).items())
     _run(target, [
@@ -541,11 +475,6 @@ def _deploy_service(target, resource, *, enabled):
                     details={"version": target.version, "enabled": enabled})
 
 
-# @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_prepare_bootstraps_disabled_and_saves_exact_resource_before_app
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_unchanged_update_skips_build_and_revision
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_cloud_operator_requires_preprovisioned_mcp_and_oauth_controls
-# @matrix mcp-install : bootstrap configuration source-version update-order
 def prepare_deployment(
     settings: dict[str, object] | None = None, *, announce_progress: bool = True
 ) -> Deployment | None:
@@ -609,10 +538,6 @@ def prepare_deployment(
     return target
 
 
-# @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_unchanged_update_skips_build_and_revision
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_disable_and_failed_activation_do_not_claim_success
-# @matrix mcp-install : disable failure-recovery update-order verification
 def finish_deployment(
     target: Deployment | None = None,
     settings: Mapping[str, object] | None = None,
@@ -661,19 +586,12 @@ def finish_deployment(
         print(f.success('MCP server is ready'))
 
 
-# @testable false
-# @covered-by installer/mcp.py::finish_deployment
-# @covered-by installer/mcp.py::inspect_deployment
-# @reason persisted service environment is read at disable and diagnostic boundaries
 def _enabled(service):
     spec = (service or {}).get("spec", {}).get("template", {}).get("spec", {})
     return any(entry.get("name") == "LAGNIAPPE_MCP_ENABLED" and entry.get("value") == "true"
                for container in spec.get("containers", []) for entry in container.get("env", []))
 
 
-# @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_inspection_is_read_only_and_detects_version_drift
-# @matrix mcp-install : doctor recovery source-version
 def inspect_deployment(settings: Mapping[str, object]) -> dict[str, object]:
     if not requested(settings):
         if settings.get("MCP_RESOURCE"):
@@ -690,9 +608,6 @@ def inspect_deployment(settings: Mapping[str, object]) -> dict[str, object]:
     return {"state": "AVAILABLE", "details": {"version": target.version}}
 
 
-# @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_handoff_uses_selected_accounts_and_scoped_resources
-# @matrix mcp-install : handoff iam
 def handoff_access(
     settings: Mapping[str, object],
     *,
@@ -720,10 +635,6 @@ def handoff_access(
                          flags=flags, remove_member=remove_member)
 
 
-# @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_focused_mcp_command_uses_normal_deployment_path
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_deployment_decline_preserves_configuration
-# @matrix mcp-install : cli-routing retry confirmation default-no no-mutation
 def configure_mcp() -> int:
     from installer.verify import prepare_existing_installation
     from installer.deploy import deploy_to_app_engine

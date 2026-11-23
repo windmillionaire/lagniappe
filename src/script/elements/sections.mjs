@@ -3,9 +3,6 @@ import { AutofillUpload } from "./autofill.mjs";
 import { buttons } from "./buttons.mjs";
 import { primitives } from "./primitives.mjs";
 
-/**
- * @testable infrastructure
- */
 const autofill = (form) => {
 	const section = form.target.querySelector('[data-role="autofill"]');
 	if (!section) return null;
@@ -19,9 +16,6 @@ const autofill = (form) => {
 	return section;
 };
 
-/**
- * @testable infrastructure
- */
 const generateEntityForm = (form) => {
 	const section = form.target.querySelector('div[data-role="generate"]');
 	if (!section) return null;
@@ -32,11 +26,6 @@ const generateEntityForm = (form) => {
 	const description = section.querySelector('[name="user_description"]');
 	const aiFields = section.querySelectorAll('[data-role="ai"]:not(button)');
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/sections.mjs::generateEntityForm
-	 * @reason mode toggling is private generate-form UI plumbing
-	 */
 	const setMode = (mode) => {
 		form.target.dataset.mode = mode;
 		aiFields.forEach((element) => {
@@ -79,9 +68,6 @@ const generateEntityForm = (form) => {
 	return section;
 };
 
-/**
- * @testable infrastructure
- */
 const generateImageForm = () => {
 	const container = document.createElement("div");
 	container.dataset.role = "generate-image";

@@ -16,12 +16,6 @@ from lagniappe.web import app
 pytestmark = pytest.mark.e2e
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/batch.py::WorkingEntities
-# @source lagniappe/core/properties/project.py::ModelTasks
-# @source lagniappe/core/tools/entity_patches.py::prepare_patch
-# @matrix ai-report : batching identity dependencies
-# @matrix project : db-load model-tasks ordering relation-attach
-# @matrix entity-patch : preservation preparation
 def test_saved_project_and_page_forms_survive_linked_batch_updates(get_admin):
     actor = get_admin().entity
     suffix = uuid4().hex[:8]
@@ -64,11 +58,6 @@ def test_saved_project_and_page_forms_survive_linked_batch_updates(get_admin):
         assert saved_page.submission == {"notes": "Moved answers"}
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @source lagniappe/core/tools/ai/reporting/execution/batch.py::ExecutionBatch
-# @source lagniappe/core/tools/ai/reporting/execution/actions/documents.py::_append_page_document
-# @matrix ai-report : batching atomicity documents dependencies recovery
-# @matrix ai-report : document append persistence
 def test_related_creations_and_document_appends_commit_together(get_admin, monkeypatch):
     user = get_admin()
     actor = user.entity

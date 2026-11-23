@@ -13,7 +13,6 @@ function deferred() {
 	return { promise, resolve };
 }
 
-/** @matrix async-query : cancellation ordering repeated-key */
 test("test_query_lifecycle_publishes_only_the_current_request", async () => {
 	const lifecycle = new QueryLifecycle();
 	const published = [];
@@ -77,7 +76,6 @@ test("test_query_lifecycle_publishes_only_the_current_request", async () => {
 	assert.deepEqual(published, ["new-B", "repeated-new-A"]);
 });
 
-/** @matrix async-query : error-propagation teardown */
 test("test_query_lifecycle_invalidates_repeated_keys_and_destroyed_owners", async () => {
 	let rejectLoader;
 	const lifecycle = new QueryLifecycle();
@@ -106,7 +104,6 @@ test("test_query_lifecycle_invalidates_repeated_keys_and_destroyed_owners", asyn
 	);
 });
 
-/** @pair async-query:error-propagation */
 test("test_query_lifecycle_propagates_current_loader_errors", async () => {
 	const lifecycle = new QueryLifecycle();
 	const expected = new Error("loader failed");
@@ -122,7 +119,6 @@ test("test_query_lifecycle_propagates_current_loader_errors", async () => {
 	);
 });
 
-/** @matrix async-query combobox : debounce dismissal stale-publication teardown */
 test("test_remote_combobox_invalidates_before_debounce_and_on_destroy", async () => {
 	class ElementBoundary {
 		constructor() {
@@ -237,7 +233,6 @@ test("test_remote_combobox_invalidates_before_debounce_and_on_destroy", async ()
 	assert.equal(publications, 0);
 });
 
-/** @matrix search : recent-results stale-publication threshold */
 test("test_search_threshold_settles_stale_work_and_restores_recent_results", async () => {
 	const calls = [];
 	class RemoteQueryCombobox {
@@ -289,7 +284,6 @@ test("test_search_threshold_settles_stale_work_and_restores_recent_results", asy
 	]);
 });
 
-/** @matrix modal : exact-owner late-publication listener-teardown reuse */
 test("test_modal_owns_exact_node_and_rejects_late_attachment", async (t) => {
 	createBrowser(t);
 	const listeners = new Map();
@@ -378,7 +372,6 @@ test("test_modal_owns_exact_node_and_rejects_late_attachment", async (t) => {
 	assert.equal(pending.modal, null);
 });
 
-/** @matrix forms : builder-lifecycle late-publication listener-teardown */
 test("test_builder_destroys_owned_search_modal_and_panels_during_startup", async (t) => {
 	createBrowser(t, {
 		html: `

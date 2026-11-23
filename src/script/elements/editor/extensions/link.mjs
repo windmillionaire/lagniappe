@@ -15,8 +15,6 @@ import { normalizeLinkAttributes } from "./linkAttributes.mjs";
 const LINK_EDIT_EVENT = "editor-link-edit";
 const ACTIONS = new Set(["open", "edit", "remove"]);
 
-// @testable false
-// @reason helper-owned-by-custom-link-normalization
 const equalLinkAttributes = (left = {}, right = {}) => {
 	const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
 	for (const key of keys) {
@@ -25,8 +23,6 @@ const equalLinkAttributes = (left = {}, right = {}) => {
 	return true;
 };
 
-// @testable false
-// @reason helper-owned-by-custom-link-normalization
 const linkAttributesAllowed = (extension, href) =>
 	extension.options.isAllowedUri(href, {
 		defaultValidate: (url) => !!isAllowedUri(url, extension.options.protocols),
@@ -34,8 +30,6 @@ const linkAttributesAllowed = (extension, href) =>
 		defaultProtocol: extension.options.defaultProtocol,
 	});
 
-// @testable false
-// @reason helper-owned-by-custom-link-normalization
 const normalizeLinkMarks = (type) =>
 	new Plugin({
 		key: new PluginKey("normalizeLinkMarks"),
@@ -68,9 +62,6 @@ const normalizeLinkMarks = (type) =>
 		},
 	});
 
-// @testable true
-// @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
-// @matrix editor : click-navigation internal-link link popover
 const linkFromEvent = (editor, event) => {
 	const target = event.target;
 	const AnchorElement = globalThis.HTMLAnchorElement;
@@ -87,17 +78,11 @@ const linkFromEvent = (editor, event) => {
 	return link;
 };
 
-// @testable true
-// @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
-// @matrix editor : click-navigation internal-link link popover
 const opensInCurrentTab = (href) =>
 	Boolean(href) &&
 	!String(href).startsWith("//") &&
 	!/^[a-z][a-z0-9+.-]*:/i.test(String(href));
 
-// @testable false
-// @covered-by src/script/elements/editor/extensions/link.mjs::LinkPopover
-// @reason display fallback supports the editable link popover contract
 const displayUrl = (href) => {
 	const value = String(href || "").trim();
 	if (!value) return "";
@@ -113,9 +98,6 @@ const displayUrl = (href) => {
 	}
 };
 
-// @testable false
-// @covered-by src/script/elements/editor/extensions/link.mjs::LinkPopover
-// @reason link mark discovery is exercised through editable link popover actions
 const linkRangeFromDom = (editor, link) => {
 	try {
 		const from = editor.view.posAtDOM(link, 0);
@@ -130,9 +112,6 @@ const linkRangeFromDom = (editor, link) => {
 	return null;
 };
 
-// @testable false
-// @covered-by src/script/elements/editor/extensions/link.mjs::LinkPopover
-// @reason link mark discovery is exercised through editable link popover actions
 const rangeMatchesLink = (editor, range, href) => {
 	const linkType = editor.state.schema.marks.link;
 	let matched = false;
@@ -151,9 +130,6 @@ const rangeMatchesLink = (editor, range, href) => {
 	return matched;
 };
 
-// @testable false
-// @covered-by src/script/elements/editor/extensions/link.mjs::LinkPopover
-// @reason link mark discovery is exercised through editable link popover actions
 const linkRangeFromPosition = (editor, pos, link) => {
 	const linkType = editor.state.schema.marks.link;
 	if (!linkType) return null;
@@ -175,9 +151,6 @@ const linkRangeFromPosition = (editor, pos, link) => {
 	return null;
 };
 
-// @testable false
-// @covered-by src/script/elements/editor/extensions/link.mjs::LinkPopover
-// @reason link mark discovery is exercised through editable link popover actions
 const linkRangeFromClick = (editor, pos, event, link) => {
 	const directRange = linkRangeFromPosition(editor, pos, link);
 	if (directRange) return directRange;
@@ -194,9 +167,6 @@ const linkRangeFromClick = (editor, pos, event, link) => {
 	return linkRangeFromDom(editor, link);
 };
 
-// @testable true
-// @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
-// @matrix editor : click-navigation internal-link link popover
 const navigateLink = (link) => {
 	const attributes = normalizeLinkAttributes({
 		href: link.getAttribute("href"),
@@ -219,20 +189,10 @@ const navigateLink = (link) => {
 	return true;
 };
 
-/**
- * @testable true
- * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
- * @pair mentions:link-popover
- */
 const editableMentionClickGuard = (editor) =>
 	new Plugin({
 		key: new PluginKey("editableMentionClickGuard"),
 		view: (view) => {
-			/**
-			 * @testable false
-			 * @covered-by src/script/elements/editor/extensions/link.mjs::editableMentionClickGuard
-			 * @reason capture-phase suppression is exercised through the mention popover
-			 */
 			const preventNavigation = (event) => {
 				if (!editor.isEditable || event.button !== 0) return;
 				const link = linkFromEvent(editor, event);
@@ -248,11 +208,6 @@ const editableMentionClickGuard = (editor) =>
 		},
 	});
 
-// @testable true
-// @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
-// @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
-// @matrix mentions : link-popover unlink
-// @pair editor:unlink
 class LinkPopover {
 	constructor(editor) {
 		this.editor = editor;
@@ -523,12 +478,6 @@ class LinkPopover {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
- * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_space_exits_link_at_document_end
- * @matrix editor : click-navigation delimiter internal-link link paste popover readonly
- */
 export const CustomLink = Link.extend({
 	addStorage() {
 		return {

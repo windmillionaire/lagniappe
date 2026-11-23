@@ -18,10 +18,6 @@ from .page_assets import Image
 from ..mixins import ColumnMixin, FilterMixin
 
 
-# @testable true
-# @tests tests_unit/test_007a_category_index.py::test_category_index
-# @matrix category-index : columns table
-# @matrix form-migration : pending-projection removed-field typed-filter
 class CategoryTable(Columns["Category"]):
     _id = "table"
     _kind = "page"
@@ -61,9 +57,6 @@ class CategoryTable(Columns["Category"]):
         return self._fields
 
 
-# @testable true
-# @tests tests_unit/test_007_category_properties.py::test_category_filters
-# @matrix category filters page : conditions entity-fields filter-value
 class CategoryFilters(Filters["Category"]):
     def __init__(self, *args: object, entity: Category | None = None, **kwargs: object) -> None:
         super().__init__(*args, entity=entity, **kwargs)

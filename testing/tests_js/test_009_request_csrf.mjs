@@ -283,7 +283,6 @@ const callsFor = (context, pathname) =>
 		(call) => new URL(call.url, window.location.href).pathname === pathname,
 	);
 
-/** @pair analytics:internal-request-exclusion */
 test("test_analytics_skips_internal_requests", async (t) => {
 	createBrowser(t, {
 		url: "https://example.test/l/update",
@@ -326,7 +325,6 @@ test("test_analytics_skips_internal_requests", async (t) => {
 	);
 });
 
-/** @matrix csrf : concurrent-refresh stale-token */
 test("test_concurrent_stale_writes_share_server_controlled_token_refresh", async (t) => {
 	const context = await setupRequest(t);
 	const [post, put] = await Promise.all([
@@ -359,7 +357,6 @@ test("test_concurrent_stale_writes_share_server_controlled_token_refresh", async
 	);
 });
 
-/** @matrix csrf request-errors : retry-classification */
 test("test_non_csrf_bad_request_is_not_retried", async (t) => {
 	const context = await setupRequest(t);
 	const response = await context.request.post("/bad-request", {
@@ -371,8 +368,6 @@ test("test_non_csrf_bad_request_is_not_retried", async (t) => {
 	assert.equal(callsFor(context, "/l/token").length, 0);
 });
 
-/** @source src/script/shared/request.mjs::_request */
-/** @pair request:abort-signal */
 test("test_requests_forward_abort_signal_to_fetch", async (t) => {
 	const context = await setupRequest(t);
 	const controller = new AbortController();
@@ -390,7 +385,6 @@ test("test_requests_forward_abort_signal_to_fetch", async (t) => {
 	);
 });
 
-/** @matrix polling request-errors : diagnostics structured-validation */
 test("test_request_preserves_structured_validation_error", async (t) => {
 	const { request } = await setupRequest(t);
 	const response = await request.post("/validation-json", { value: "invalid" });
@@ -401,7 +395,6 @@ test("test_request_preserves_structured_validation_error", async (t) => {
 	assert.equal(response.reason, "type");
 });
 
-/** @matrix edited-entity-notice request-errors : structured-conflict */
 test("test_request_parses_conflict_replacement_for_form_review", async (t) => {
 	const { request } = await setupRequest(t);
 	const response = await request.put("/form-conflict", new FormData());
@@ -414,7 +407,6 @@ test("test_request_parses_conflict_replacement_for_form_review", async (t) => {
 	assert.equal(response.submission.summary, "Latest saved");
 });
 
-/** @matrix request-errors : diagnostics plain-validation */
 test("test_request_preserves_plain_validation_error", async (t) => {
 	const { request } = await setupRequest(t);
 	const response = await request.post("/validation-text", { value: "invalid" });
@@ -423,7 +415,6 @@ test("test_request_preserves_plain_validation_error", async (t) => {
 	assert.equal(response.error, "Specific validation message.");
 });
 
-/** @matrix edited-entity-notice request-errors : non-invasive-probe reload-fallback */
 test("test_request_can_return_html_error_without_replacing_page", async (t) => {
 	const { request } = await setupRequest(t);
 	document.documentElement.dataset.mounted = "page";
@@ -436,7 +427,6 @@ test("test_request_can_return_html_error_without_replacing_page", async (t) => {
 	assert.equal(document.documentElement.innerHTML, before);
 });
 
-/** @matrix request-errors : application-error-marker classification dom-replacement */
 test("test_application_marked_html_error_keeps_existing_behavior", async (t) => {
 	const context = await setupRequest(t);
 	const main = document.querySelector("main");
@@ -449,7 +439,6 @@ test("test_application_marked_html_error_keeps_existing_behavior", async (t) => 
 	assert.equal(context.banner.dataset.visible, "false");
 });
 
-/** @matrix request-errors : classification dom-preservation upstream-unavailable */
 test("test_all_unmarked_upstream_html_statuses_are_classified_without_dom_replacement", async (t) => {
 	const context = await setupRequest(t);
 	const main = document.querySelector("main");
@@ -485,7 +474,6 @@ test("test_all_unmarked_upstream_html_statuses_are_classified_without_dom_replac
 	);
 });
 
-/** @matrix request-errors : banner dom-preservation explicit-retry fresh-response retry upstream-unavailable */
 test("test_failed_get_preserves_dom_and_exposes_safe_banner_retry", async (t) => {
 	const context = await setupRequest(t);
 	context.upstream.installUpstreamUnavailableBanner();
@@ -511,7 +499,6 @@ test("test_failed_get_preserves_dom_and_exposes_safe_banner_retry", async (t) =>
 	assert.equal(context.tokenElt.value, "entered-form-state");
 });
 
-/** @matrix request-errors : mutation no-replay outcome-uncertain upstream-unavailable */
 test("test_mutation_upstream_failure_is_uncertain_and_never_replayed", async (t) => {
 	const context = await setupRequest(t);
 	context.upstream.installUpstreamUnavailableBanner();
@@ -537,9 +524,6 @@ test("test_mutation_upstream_failure_is_uncertain_and_never_replayed", async (t)
 	);
 });
 
-/** @source src/script/shared/request.mjs::_request */
-/** @matrix csrf : stale-token */
-/** @matrix request-errors : dom-preservation no-replay outcome-uncertain upstream-unavailable */
 test("test_mutation_upstream_failure_after_csrf_refresh_is_classified_without_replay", async (t) => {
 	const context = await setupRequest(t);
 	const main = document.querySelector("main");
@@ -566,7 +550,6 @@ test("test_mutation_upstream_failure_after_csrf_refresh_is_classified_without_re
 	assert.equal(draft.value, "unsaved edit");
 });
 
-/** @matrix error-tracking request-errors : cooldown fingerprint privacy response-metadata route-class upstream-unavailable warning */
 test("test_upstream_diagnostics_are_bounded_private_and_deduplicated", async (t) => {
 	const context = await setupRequest(t);
 	const upstreamResponse = new Response("<html>private response body</html>", {
@@ -633,7 +616,6 @@ test("test_upstream_diagnostics_are_bounded_private_and_deduplicated", async (t)
 	}
 });
 
-/** @matrix cache request : conditional-response dom-refresh */
 test("test_request_exposes_service_worker_updated_marker", async (t) => {
 	const { request } = await setupRequest(t);
 	const response = await request.get("/unchanged");
@@ -641,8 +623,6 @@ test("test_request_exposes_service_worker_updated_marker", async (t) => {
 	assert.equal(Array.isArray(response.rows), true);
 });
 
-/** @matrix cache : conditional-response etag */
-/** @matrix deferred-jobs request : conditional-response etag post-headers */
 test("test_request_supports_conditional_post_not_modified", async (t) => {
 	const context = await setupRequest(t);
 	const response = await context.request.post(
@@ -659,7 +639,6 @@ test("test_request_supports_conditional_post_not_modified", async (t) => {
 	);
 });
 
-/** @matrix cache request : invalidation reload */
 test("test_request_exposes_client_cache_invalidation_marker", async (t) => {
 	const { request } = await setupRequest(t);
 	const response = await request.post("/invalidate", { targets: [] });
@@ -667,7 +646,6 @@ test("test_request_exposes_client_cache_invalidation_marker", async (t) => {
 	assert.equal(Array.isArray(response.targets), true);
 });
 
-/** @matrix edited-entity-notice request : acknowledgement multiple-entities response-headers */
 test("test_request_dispatches_entity_fingerprint_acknowledgement", async (t) => {
 	const context = await setupRequest(t);
 	const response = await context.request.put("/entity-response", {
@@ -690,7 +668,6 @@ test("test_request_dispatches_entity_fingerprint_acknowledgement", async (t) => 
 	assert.equal(context.entityEvents.length, 0);
 });
 
-/** @matrix request-errors : ajax-upload proxy-text-error */
 test("test_plain_text_upstream_error_stays_in_request_error_path", async (t) => {
 	const { request } = await setupRequest(t);
 	const before = document.documentElement.innerHTML;
@@ -702,7 +679,6 @@ test("test_plain_text_upstream_error_stays_in_request_error_path", async (t) => 
 	assert.equal(document.documentElement.innerHTML, before);
 });
 
-/** @matrix login : button logout */
 test("test_logout_button_posts_without_hidden_form", async (t) => {
 	const context = await setupRequest(t);
 	// Observe the navigation assignment without asking jsdom to navigate.
@@ -768,7 +744,6 @@ test("test_logout_button_posts_without_hidden_form", async (t) => {
 	);
 });
 
-/** @pair login:csrf-refresh */
 test("test_login_handoff_refreshes_csrf_before_submit_and_retries_once", async (t) => {
 	const calls = [];
 	const errors = [];
@@ -870,7 +845,6 @@ test("test_login_handoff_refreshes_csrf_before_submit_and_retries_once", async (
 	);
 });
 
-/** @matrix login : csrf-refresh verify-email */
 test("test_login_verification_email_reuses_refreshed_csrf", async (t) => {
 	const verificationCalls = [];
 	const stored = [];

@@ -25,10 +25,6 @@ from .provider import DataLifecycleError
 from .validation import validate_archive
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_import_planner_is_source_independent_and_resolves_two_pass_references
-# @tests tests_tooling/test_008_data_lifecycle.py::test_history_and_messages_are_nested_and_replanned_under_their_owners
-# @matrix portable-json : import-planner natural-identity owner-scoped-children two-pass-resolution
 class ImportPlanner:
     """Prove a validated v1 bundle can be represented without mutating a target."""
 

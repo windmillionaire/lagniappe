@@ -33,9 +33,6 @@ class RefreshFallback(ValueError):
     """The target must use its established full-fragment refresh path."""
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/refresh.py::load_refresh_view
-# @reason immutable value object only carries the resolved view and fingerprint
 @dataclass(frozen=True)
 class RefreshView:
     """Loaded refresh identity and its cheap collection-level revision."""
@@ -46,9 +43,6 @@ class RefreshView:
     authorization: str | None = None
     collection_revision: str | None = None
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/polling/refresh.py::load_refresh_collection
-    # @reason the parent revision gate is exercised through collection loading
     def matches(self, view: Mapping[str, object]) -> bool:
         return (
             bool(view.get("fingerprint"))
@@ -76,9 +70,6 @@ class RefreshDelta:
     order: tuple[str, ...]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/refresh.py::load_refresh_collection
-# @reason keyed view loading is owned by the allowlisted collection loader
 def _view_entity(view):
     key = view.get("key")
     if not isinstance(key, str) or not key:
@@ -86,11 +77,6 @@ def _view_entity(view):
     return Entities.fetch_one(key, request=Fetch.direct())
 
 
-# @testable true
-# @tests tests_unit/test_021_refresh.py::test_load_refresh_view_uses_entity_or_site_index_fingerprint
-# @tests tests_unit/test_021_refresh.py::test_saved_filter_refresh_reauthorizes_unchanged_rows_after_viewer_change
-# @matrix filters polling : saved-filter permissions revision
-# @matrix reconnect-refresh : entity-view root-fingerprint site-index
 def load_refresh_view(view: object, user: User | None = None) -> RefreshView:
     """Resolve a refresh view once, before any collection membership queries."""
     if not isinstance(view, dict):
@@ -130,9 +116,6 @@ def load_refresh_view(view: object, user: User | None = None) -> RefreshView:
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/refresh.py::load_refresh_collection
-# @reason saved-filter cache refresh and ordering are owned by collection loading
 def _filtered_roots(filter_entity, user, *, unchanged=False):
     if not filter_entity.allowed(Action.VIEW, user=user):
         raise RefreshFallback("Filter context is no longer viewable")
@@ -166,13 +149,6 @@ def _filtered_roots(filter_entity, user, *, unchanged=False):
     return "filtered-page-index", tuple(pages)
 
 
-# @testable true
-# @tests tests_unit/test_021_refresh.py::test_load_refresh_collection_resolves_component_from_view_entity
-# @tests tests_unit/test_021_refresh.py::test_load_refresh_collection_refreshes_saved_filter_cache_before_root_query
-# @tests tests_unit/test_021_refresh.py::test_load_refresh_collection_allows_task_index_without_models_permission
-# @matrix reconnect-refresh : authenticated-access cache-refresh component-identity root-depth target-validation
-# @matrix reconnect-refresh : root-fingerprint membership no-extra-read
-# @pairs filters:cache-refresh permissions:own-page-only
 def load_refresh_collection(view: object, target: object, user: User, refresh_view: RefreshView | None = None) -> RefreshCollection:
     """Load one allowlisted collection without expanding its row relationships."""
     if not isinstance(view, dict) or not isinstance(target, dict):
@@ -230,9 +206,6 @@ def load_refresh_collection(view: object, target: object, user: User, refresh_vi
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
-# @reason manifest validation is part of delta resolution
 def _client_fingerprints(rows):
     if not isinstance(rows, list) or len(rows) > MAX_REFRESH_ROWS:
         raise RefreshFallback("Invalid refresh row manifest")
@@ -252,9 +225,6 @@ def _client_fingerprints(rows):
     return fingerprints
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
-# @reason own Form versions are batched without expanding unchanged rows
 def _form_versions(roots, hashes, details):
     if any(root is not None for root in roots.values()):
         # A changed collection may be observed before its Form cache write.
@@ -290,9 +260,6 @@ def _form_versions(roots, hashes, details):
     return versions
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/refresh.py::resolve_refresh_delta
-# @reason cached row identity and base revisions are checked before skipping a render
 def _cached_fingerprint(key, kind, details, root=None, *, form_version=None):
     if (
         details.get("revision_stale")
@@ -312,19 +279,6 @@ def _cached_fingerprint(key, kind, details, root=None, *, form_version=None):
     return details.get("fingerprint")
 
 
-# @testable true
-# @tests tests_unit/test_021_refresh.py::test_resolve_refresh_delta_expands_only_changed_roots_and_authorizes_before_upsert
-# @tests tests_unit/test_021_refresh.py::test_saved_filter_refresh_reauthorizes_unchanged_rows_after_viewer_change
-# @tests tests_unit/test_021_refresh.py::test_warm_refresh_preserves_rows_without_expanding_relations
-# @matrix filters polling : saved-filter permissions revision
-# @matrix reconnect-refresh : target-validation
-# @matrix permissions cache : identity user-page no-extra-read
-# @matrix permissions reconnect-refresh : authorization direct-depth modified ordering removal
-# @matrix reconnect-refresh permissions : cached-fingerprint authorization no-extra-read
-# @matrix reconnect-refresh : root-fingerprint membership
-# @matrix reconnect-refresh user-index : page-canonical authorization
-# @matrix notes cache : masked-touch authorized-refresh
-# @matrix user-index : page-canonical user-fields no-extra-read
 def resolve_refresh_delta(collection: RefreshCollection, rows: object, user: User, *, reauthorize: bool = False) -> RefreshDelta:
     """Compare cached fingerprints and expand only rows needing authorization."""
     client = _client_fingerprints(rows)

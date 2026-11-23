@@ -48,7 +48,6 @@ def node_declarations(monkeypatch, tmp_path):
     return paths
 
 
-# @matrix dependencies : node-version pinning upgrade
 def test_node_alignment_failure_preserves_all_declarations(monkeypatch, node_declarations):
     before = {path: path.read_bytes() for path in node_declarations.values()}
 
@@ -63,7 +62,6 @@ def test_node_alignment_failure_preserves_all_declarations(monkeypatch, node_dec
     assert report.changes == []
 
 
-# @matrix dependencies : node-version pinning upgrade
 @pytest.mark.parametrize("with_lock", [False, True])
 def test_node_alignment_publishes_all_declarations_and_skips_unchanged_files(
     monkeypatch, tmp_path, node_declarations, with_lock
@@ -112,7 +110,6 @@ def test_node_alignment_publishes_all_declarations_and_skips_unchanged_files(
     assert unchanged_report.errors == []
 
 
-# @matrix dependencies : node-version pinning upgrade
 @pytest.mark.parametrize("existing_pin", [False, True])
 @pytest.mark.parametrize(
     "failure",
@@ -162,7 +159,6 @@ def test_node_alignment_restores_declarations_on_publication_failure(
     assert report.changes == []
 
 
-# @matrix dependencies : node-version pinning upgrade cancellation
 def test_node_alignment_interrupt_restores_declarations(monkeypatch, tmp_path, node_declarations):
     paths = node_declarations
     before = {path: path.read_bytes() for path in paths.values()}
@@ -184,7 +180,6 @@ def test_node_alignment_interrupt_restores_declarations(monkeypatch, tmp_path, n
     assert report.changes == []
 
 
-# @matrix dependencies : node-version pinning upgrade
 @pytest.mark.parametrize("existing_pin", [False, True])
 def test_node_alignment_retains_backups_when_restoration_fails(
     monkeypatch, tmp_path, node_declarations, existing_pin
@@ -230,7 +225,6 @@ def test_node_alignment_retains_backups_when_restoration_fails(
     assert report.changes == []
 
 
-# @matrix dependencies : node-version pinning upgrade
 def test_node_alignment_cleanup_failure_does_not_hide_success(monkeypatch, node_declarations):
     paths = node_declarations
 
@@ -246,7 +240,6 @@ def test_node_alignment_cleanup_failure_does_not_hide_success(monkeypatch, node_
     assert any("injected cleanup failure" in note and str(paths["pin"].parent) in note for note in report.notes)
 
 
-# @matrix dependencies : node-version pinning upgrade
 def test_node_image_lookup_verifies_registry_digest(monkeypatch):
     content = json.dumps({"schemaVersion": 2, "manifests": [{"platform": {"os": "linux", "architecture": "amd64"}}]}).encode()
     digest = "sha256:" + hashlib.sha256(content).hexdigest()
@@ -282,7 +275,6 @@ def test_node_image_lookup_verifies_registry_digest(monkeypatch):
         upgrade.resolve_node_image("26.8.2")
 
 
-# @matrix dependencies : subprocess-output cancellation
 def test_dependency_command_streams_prompts_and_preserves_output():
     child = (
         "import sys; sys.stdout.write('Ready' + '? '); sys.stdout.flush(); "
@@ -333,7 +325,6 @@ def test_dependency_command_streams_prompts_and_preserves_output():
         process.communicate(timeout=5)
 
 
-# @matrix dependencies : subprocess-output isolation
 def test_dependency_command_capture_closes_stdin_and_retains_output():
     child = (
         "import sys; data = sys.stdin.buffer.read(); "
@@ -364,7 +355,6 @@ def test_dependency_command_capture_closes_stdin_and_retains_output():
     assert result.stderr == ""
 
 
-# @matrix dependencies : subprocess-output timeout cancellation
 @pytest.mark.skipif(os.name != "posix", reason="POSIX process-group contract")
 def test_dependency_command_timeout_preserves_output_and_stops_children(tmp_path):
     pid_path = tmp_path / "child.pid"
@@ -389,7 +379,6 @@ def test_dependency_command_timeout_preserves_output_and_stops_children(tmp_path
     assert not state.stdout.strip() or state.stdout.strip().startswith("Z")
 
 
-# @matrix dependencies : upgrade failure-propagation package-lock
 def test_npm_upgrade_uses_one_bounded_lookup_and_preserves_package_metadata(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(upgrade.Path, "home", lambda: tmp_path)
@@ -450,7 +439,6 @@ def test_npm_upgrade_uses_one_bounded_lookup_and_preserves_package_metadata(monk
     }
 
 
-# @matrix dependencies : upgrade failure-propagation package-lock
 @pytest.mark.parametrize("returncode, output", [(1, "registry unavailable"), (0, "invalid JSON")])
 def test_npm_lookup_failure_does_not_modify_or_install_dependencies(monkeypatch, tmp_path, returncode, output):
     monkeypatch.chdir(tmp_path)
@@ -472,7 +460,6 @@ def test_npm_lookup_failure_does_not_modify_or_install_dependencies(monkeypatch,
     assert report.errors
 
 
-# @matrix dependencies : failure-propagation upgrade-report cancellation package-lock
 @pytest.mark.parametrize("failure", [KeyboardInterrupt, subprocess.TimeoutExpired])
 def test_npm_interruption_records_completed_file_changes(monkeypatch, tmp_path, failure):
     monkeypatch.chdir(tmp_path)
@@ -499,7 +486,6 @@ def test_npm_interruption_records_completed_file_changes(monkeypatch, tmp_path, 
     assert ("package-lock.json (direct)", "2.0.0") in changes
 
 
-# @matrix dependencies : failure-propagation upgrade-report
 def test_dependency_upgrade_stops_on_failure_and_saves_report(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(upgrade, "upgrade_node", lambda report: True)
 
@@ -522,7 +508,6 @@ def test_dependency_upgrade_stops_on_failure_and_saves_report(monkeypatch, tmp_p
     assert "more in the report" not in output
 
 
-# @matrix dependencies : cancellation upgrade-report
 def test_dependency_upgrade_saves_report_on_interrupt(monkeypatch, tmp_path):
     def interrupt(report):
         report.record_command(["example"], -15, stdout="Partial command output")

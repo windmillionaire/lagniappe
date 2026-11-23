@@ -4,7 +4,6 @@ import esmock from "esmock";
 import { ENDPOINTS } from "../../src/script/shared/endpoints.mjs";
 import { createBrowser } from "../utility/js/environment.mjs";
 
-/** @pair form-html:error-reporting */
 test("test_html_element_reports_request_failure_without_masking_original", async (t) => {
 	createBrowser(t);
 	const original = new Error("HTML request failed");

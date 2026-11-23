@@ -4,11 +4,6 @@ import { SiteSetting } from "./base.mjs";
 
 const PUBLIC_PAGE_SETTINGS_ENDPOINT = "/l/site-settings/public-pages";
 
-/**
- * @testable true
- * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_public_page_indexing_saves_live_setting
- * @matrix admin public-pages : live-settings sitemap-invalidation
- */
 export class SitePublicPages extends SiteSetting {
 	constructor(attributes) {
 		super(attributes);

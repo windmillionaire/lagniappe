@@ -2,11 +2,6 @@ import { STYLES } from "../generated/styles.mjs";
 import { BaseElement } from "./base/baseElement.mjs";
 import { primitives } from "./primitives.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_selection_submission
- * @matrix pages : read-mode selection-fields submission
- */
 export class RadioElement extends BaseElement {
 	get value() {
 		return Array.from(this.elt.querySelectorAll("input[type='radio']")).find(

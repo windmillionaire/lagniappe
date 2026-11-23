@@ -15,9 +15,6 @@ if TYPE_CHECKING:
     from ..entities.user import User as User
 
 
-# @testable true
-# @tests tests_unit/test_009a_user.py::test_user_last_login
-# @matrix user : column date last-login
 class LastLogin(DateMixin, ColumnMixin, DBProperty[datetime, "User"]):
     """User's last login timestamp.
 
@@ -36,9 +33,6 @@ class LastLogin(DateMixin, ColumnMixin, DBProperty[datetime, "User"]):
     _ordering = Ordering.NUMERIC
 
 
-# @testable true
-# @tests tests_unit/test_009a_user.py::test_user_email
-# @matrix user : column email sort
 class Email(ColumnMixin, DBProperty[str, "User"]):
     """User's email address.
 
@@ -60,9 +54,6 @@ class Email(ColumnMixin, DBProperty[str, "User"]):
         return bool(self.value)
 
 
-# @testable true
-# @tests tests_unit/test_009a_user.py::test_user_profile_photo_value_asset_lifecycle_and_google_download
-# @matrix user : asset-lifecycle default-image google-download profile-photo
 class ProfilePhoto(AssetProperty["User", str, "AssetUpload | None"]):
     """User profile photo. Stored as an image asset. Downloaded on first access if logged in from Google."""
 
@@ -96,8 +87,6 @@ class ProfilePhoto(AssetProperty["User", str, "AssetUpload | None"]):
                 self.value = image
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/user_entity.py::InvalidateCache.value
 class InvalidateCache(DBProperty[bool, "User", object]):
     """Flag to trigger client-side cache invalidation.
 
@@ -114,9 +103,6 @@ class InvalidateCache(DBProperty[bool, "User", object]):
 
     _id = "invalidate_cache"
 
-    # @testable true
-    # @tests tests_unit/test_009a_user.py::test_user_invalidate_cache
-    # @matrix cache user : invalidation test-user
     @property
     def value(self) -> bool | None:
         return super().value
@@ -130,9 +116,6 @@ class InvalidateCache(DBProperty[bool, "User", object]):
             self.entity.db["cache_invalidation_revision"] = uuid4().hex
 
 
-# @testable true
-# @tests tests_unit/test_009f_user_ai_access.py::test_user_ai_access_legacy_defaults_validation_and_invalidation
-# @matrix ai-access : cache-invalidation legacy-default persistence public validation
 class AIAccess(DBProperty[str, "User", object]):
     """Canonical per-user AI entitlement name."""
 
@@ -161,9 +144,6 @@ class AIAccess(DBProperty[str, "User", object]):
             self.entity.invalidate_cache = True
 
 
-# @testable true
-# @tests tests_unit/test_029a_notification_email_policy.py::test_notification_email_preference_defaults_and_eligibility
-# @matrix notification-email : eligibility preference
 class NotificationEmailPreference(DBProperty[str, "User", object]):
     """Canonical per-user notification email mode."""
 
@@ -197,11 +177,6 @@ class NotificationEmailPreference(DBProperty[str, "User", object]):
             )
 
 
-# @testable true
-# @tests tests_unit/test_009a_user.py::test_user_is_owner
-# @tests tests_unit/test_009a_user.py::test_user_admin_role_is_separate_from_owner_and_invalidates_cache
-# @matrix user : owner property
-# @pair owner:singleton
 class IsOwner(DBProperty[bool, "User", object]):
     """Whether this row is the configured singleton primary Owner."""
 
@@ -245,10 +220,6 @@ class IsOwner(DBProperty[bool, "User", object]):
         self._write_db_value(enabled)
 
 
-# @testable true
-# @tests tests_unit/test_009a_user.py::test_user_admin_role_is_separate_from_owner_and_invalidates_cache
-# @matrix admin : ai-independent legacy-default role
-# @pairs cache:cache-invalidation user:property
 class IsAdmin(DBProperty[bool, "User", object]):
     """Stored additional-Administrator role, with Owner inheritance."""
 
@@ -269,17 +240,11 @@ class IsAdmin(DBProperty[bool, "User", object]):
             self.entity.invalidate_cache = True
 
 
-# @testable true
-# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-# @pair messaging:owner-opt-in
 class OwnerInboundToggle(DBProperty[bool, "User", object]):
     """Fail-closed owner opt-in for a collaboration channel."""
 
     _truthy = {True, "true", "True", "1", "on", "yes"}
 
-    # @testable true
-    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-    # @pair messaging:owner-opt-in
     @property
     def value(self) -> bool:
         return self.entity.db.get(self.db_key, False) in self._truthy
@@ -302,9 +267,6 @@ class AllowTaskAssignments(OwnerInboundToggle):
     _id = "allow_task_assignments"
 
 
-# @testable true
-# @tests tests_unit/test_009a_user.py::test_page_update_user_authorization_rules
-# @pair public-users:email-consent
 class AllowSiteEmail(OwnerInboundToggle):
     """Fail-closed public-user consent for email sent by the site owner."""
 

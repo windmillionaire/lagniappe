@@ -36,9 +36,6 @@ from .references import _resolve_entity, _load_result_entity
 from .results import _entity_result
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_source_quote_uses_trusted_origin
-# @matrix agent-api email editor : document source-attribution
 def document_source_quote(report: models.AIReport, timestamp: str) -> str:
     origin = getattr(report, "origin", "web")
     source = {
@@ -55,9 +52,6 @@ def document_source_quote(report: models.AIReport, timestamp: str) -> str:
     return f"<blockquote><p>{escape(timestamp)} · {source}</p></blockquote>"
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
-# @matrix ai-report editor : document append retry
 def prepare_document_append(
     action: ReportAction,
     report: models.AIReport,
@@ -72,10 +66,6 @@ def prepare_document_append(
     record["document_at"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
-# @matrix ai-report editor : document append retry
-# @matrix ai-report editor sync : document append browser-review persistence source-attribution
 def _append_page_document(action, report, user, created, context):
     record = context["action_record"]
     page = _resolve_entity(
@@ -133,9 +123,6 @@ def _append_page_document(action, report, user, created, context):
         return page, [], {"document_after": receipt["signature"]}
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
-# @matrix ai-report editor : document append retry
 def inspect_document_append(
     record: ActionRecord, user: models.User
 ) -> Literal["applied", "drifted", "not-applied"]:

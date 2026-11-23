@@ -39,12 +39,6 @@ let _retry = null;
 let _retrying = false;
 let _clientInstalled = false;
 
-/**
- * @testable false
- * @covered-by src/script/shared/upstreamUnavailable.mjs::receiveUpstreamUnavailable
- * @covered-by src/script/shared/upstreamUnavailable.mjs::receiveUpstreamUnavailableMessage
- * @reason controlled-client state validation is exercised through the message receiver
- */
 function _validWorkerDetails(details) {
 	return Boolean(
 		details &&
@@ -66,11 +60,6 @@ function _validWorkerDetails(details) {
 	);
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/upstreamUnavailable.mjs::isUpstreamUnavailableResponse
- * @reason origin resolution is exercised through the public response classifier
- */
 function _sameOrigin(url) {
 	try {
 		const base = window.location.href || `${window.location.origin}/`;
@@ -80,11 +69,6 @@ function _sameOrigin(url) {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_js/test_009_request_csrf.mjs::test_upstream_diagnostics_are_bounded_private_and_deduplicated
- * @matrix error-tracking request-errors : privacy route-class upstream-unavailable
- */
 export function upstreamRouteClass(url) {
 	try {
 		const base = window.location.href || `${window.location.origin}/`;
@@ -98,12 +82,6 @@ export function upstreamRouteClass(url) {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_js/test_009_request_csrf.mjs::test_all_unmarked_upstream_html_statuses_are_classified_without_dom_replacement
- * @tests tests_js/test_009_request_csrf.mjs::test_application_marked_html_error_keeps_existing_behavior
- * @matrix request-errors : application-error-marker classification upstream-unavailable
- */
 export function isUpstreamUnavailableResponse(response, url) {
 	if (response?.headers?.get(UPSTREAM_UNAVAILABLE_HEADER) === "true") {
 		return true;
@@ -117,13 +95,6 @@ export function isUpstreamUnavailableResponse(response, url) {
 	);
 }
 
-/**
- * @testable true
- * @tests tests_js/test_009_request_csrf.mjs::test_all_unmarked_upstream_html_statuses_are_classified_without_dom_replacement
- * @tests tests_js/test_009_request_csrf.mjs::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
- * @tests tests_js/test_009_request_csrf.mjs::test_mutation_upstream_failure_is_uncertain_and_never_replayed
- * @matrix request-errors : classification dom-preservation explicit-retry mutation no-replay outcome-uncertain upstream-unavailable
- */
 export async function handleUpstreamResponse(
 	response,
 	{
@@ -193,24 +164,12 @@ export async function handleUpstreamResponse(
 	};
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/upstreamUnavailable.mjs::upstreamUnavailableDetails
- * @covered-by src/script/shared/upstreamUnavailable.mjs::reportUpstreamUnavailable
- * @reason server sanitization is asserted through bounded diagnostic payloads
- */
 function _boundedServer(value) {
 	return String(value || "")
 		.replace(/[^\x20-\x7E]/g, "")
 		.slice(0, MAX_SERVER_LENGTH);
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/upstreamUnavailable.mjs::upstreamUnavailableDetails
- * @covered-by src/script/shared/upstreamUnavailable.mjs::receiveUpstreamUnavailable
- * @reason release metadata is asserted through browser diagnostic events
- */
 function _releaseMetadata() {
 	const banner = document.querySelector("[data-role='upstream-unavailable']");
 	return {
@@ -219,11 +178,6 @@ function _releaseMetadata() {
 	};
 }
 
-/**
- * @testable true
- * @tests tests_js/test_009_request_csrf.mjs::test_upstream_diagnostics_are_bounded_private_and_deduplicated
- * @matrix error-tracking request-errors : privacy response-metadata upstream-unavailable
- */
 export function upstreamUnavailableDetails(
 	response,
 	{
@@ -261,11 +215,6 @@ export function upstreamUnavailableDetails(
 	};
 }
 
-/**
- * @testable true
- * @tests tests_js/test_009_request_csrf.mjs::test_upstream_diagnostics_are_bounded_private_and_deduplicated
- * @matrix error-tracking request-errors : cooldown fingerprint privacy upstream-unavailable warning
- */
 export function reportUpstreamUnavailable(details) {
 	const diagnostic = {
 		status: UPSTREAM_STATUSES.has(Number(details.status))
@@ -321,11 +270,6 @@ export function reportUpstreamUnavailable(details) {
 	return true;
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/upstreamUnavailable.mjs::showUpstreamUnavailable
- * @reason DOM state rendering is asserted through the public banner boundary
- */
 function _renderBanner(details) {
 	const banner = document.querySelector("[data-role='upstream-unavailable']");
 	if (!banner) return;
@@ -347,11 +291,6 @@ function _renderBanner(details) {
 	banner.setAttribute("aria-hidden", "false");
 }
 
-/**
- * @testable true
- * @tests tests_js/test_009_request_csrf.mjs::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
- * @matrix request-errors : banner dom-preservation retry upstream-unavailable
- */
 export function showUpstreamUnavailable(details, retry = null) {
 	_retry = typeof retry === "function" ? retry : null;
 	_renderBanner(details);
@@ -360,9 +299,6 @@ export function showUpstreamUnavailable(details, retry = null) {
 /**
  * Clear only at a fresh application-response boundary.
  *
- * @testable true
- * @tests tests_js/test_009_request_csrf.mjs::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
- * @matrix request-errors : banner fresh-response upstream-unavailable
  */
 export function noteFreshApplicationResponse() {
 	const banner = document.querySelector("[data-role='upstream-unavailable']");
@@ -374,11 +310,6 @@ export function noteFreshApplicationResponse() {
 	banner.setAttribute("aria-hidden", "true");
 }
 
-/**
- * @testable true
- * @tests tests_js/test_017_main_lifecycle.mjs::test_upstream_unavailable_worker_message_shows_retryable_banner
- * @matrix browser-protocol request-errors service-worker : banner client-message upstream-unavailable
- */
 export function receiveUpstreamUnavailable(details, retry = null) {
 	if (!_validWorkerDetails(details)) return false;
 	reportUpstreamUnavailable({ ...details, ..._releaseMetadata() });
@@ -392,11 +323,6 @@ export function receiveUpstreamUnavailable(details, retry = null) {
 	return true;
 }
 
-/**
- * @testable true
- * @tests tests_js/test_017_main_lifecycle.mjs::test_upstream_unavailable_worker_message_shows_retryable_banner
- * @matrix browser-protocol request-errors service-worker : banner client-message retry upstream-unavailable validation
- */
 export function receiveUpstreamUnavailableMessage(message) {
 	if (!_validWorkerDetails(message?.state)) return false;
 	return receiveUpstreamUnavailable(message.state, async () => {
@@ -408,12 +334,6 @@ export function receiveUpstreamUnavailableMessage(message) {
 	});
 }
 
-/**
- * @testable true
- * @tests tests_js/test_009_request_csrf.mjs::test_failed_get_preserves_dom_and_exposes_safe_banner_retry
- * @tests tests_js/test_009_request_csrf.mjs::test_mutation_upstream_failure_is_uncertain_and_never_replayed
- * @matrix request-errors : banner explicit-retry no-replay upstream-unavailable
- */
 export function installUpstreamUnavailableBanner() {
 	if (!_clientInstalled) {
 		_clientInstalled = true;

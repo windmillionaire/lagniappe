@@ -117,8 +117,6 @@ def memory_forms(monkeypatch):
                            execute_post_commit=execute_post_commit)
 
 
-# @source lagniappe/core/entities/form.py::Form.get_html_field
-# @matrix forms html-field : draft no-write
 def test_form_reads_do_not_fetch_or_archive_definitions(memory_forms, monkeypatch):
     form = memory_forms.form()
     before = deepcopy(memory_forms.rows), deepcopy(memory_forms.blobs)
@@ -131,7 +129,6 @@ def test_form_reads_do_not_fetch_or_archive_definitions(memory_forms, monkeypatc
     assert (memory_forms.rows, memory_forms.blobs) == before
 
 
-# @matrix form-schema : validation identity conditions
 @pytest.mark.parametrize("fields", [
     [{"id": "pick", "type": "select", "options": [
         {"value": "a", "label": "A"}, {"value": "a", "label": "B"},
@@ -146,7 +143,6 @@ def test_draft_schema_rejects_collisions_and_broken_conditions(fields):
         drafts.validate_draft_schema(fields, "task")
 
 
-# @matrix form-schema : identity migration-required save-guard
 def test_compatible_schema_preserves_representation_and_identity():
     source = [{"id": "pick", "type": "select", "options": [{"value": "stable", "label": "Old"}]},
               {"id": "table", "type": "table", "columns": [{"id": "cell", "type": "input", "input": "text"}]}]
@@ -172,7 +168,6 @@ def test_compatible_schema_preserves_representation_and_identity():
     assert target == original_target
 
 
-# @matrix forms html-field : draft baseline no-write
 def test_builder_draft_and_staged_html_are_read_only(memory_forms):
     form = memory_forms.form()
     before_rows, before_blobs = deepcopy(memory_forms.rows), deepcopy(memory_forms.blobs)
@@ -184,8 +179,6 @@ def test_builder_draft_and_staged_html_are_read_only(memory_forms):
     assert memory_forms.commits == []
 
 
-# @source lagniappe/core/properties/form.py::SchemaVersion
-# @matrix form : schema-version update
 def test_content_version_changes_only_with_definition_content(memory_forms):
     form = memory_forms.form()
     form.properties.version.update()
@@ -199,7 +192,6 @@ def test_content_version_changes_only_with_definition_content(memory_forms):
     assert form.generation == 0
 
 
-# @matrix form-schema html-field : history generation immutable-assets
 def test_archived_generation_preserves_schema_html_and_images(memory_forms):
     source = memory_forms.form()
     source.assets["image_notes_photo"] = {
@@ -221,10 +213,6 @@ def test_archived_generation_preserves_schema_html_and_images(memory_forms):
     assert not history.allowed(Action.VIEW)
 
 
-# @source lagniappe/core/mutations/save.py::FormMutation.plan_save
-# @source lagniappe/core/mutations/executor.py::execute_mutation
-# @matrix forms mutations : guarded-save publication
-# @matrix mutations : save durable-first
 def test_publication_reads_saved_form_only_at_save(memory_forms):
     form = memory_forms.form()
     form.set_html_field("notes", "<p>Accepted</p>")
@@ -237,7 +225,6 @@ def test_publication_reads_saved_form_only_at_save(memory_forms):
     assert memory_forms.rows[memory_forms.key]["restricted_to"] == ["newer-restriction"]
 
 
-# @matrix forms mutations : generation publication
 def test_compatible_saves_update_version_without_archiving_generation(memory_forms):
     for content in ("<p>First edit</p>", "<p>Second edit</p>"):
         form = memory_forms.form()
@@ -251,11 +238,6 @@ def test_compatible_saves_update_version_without_archiving_generation(memory_for
     assert len(memory_forms.rows) == 1
 
 
-# @source lagniappe/core/tools/forms/drafts.py::prepare_form_publication
-# @source lagniappe/core/mutations/executor.py::execute_post_commit
-# @matrix html-field : isolated-assets cleanup
-# @matrix mutations : durable-first rejected-save
-# @pair forms:publication
 @pytest.mark.parametrize("content", ["<p>Replacement</p>", ""], ids=["replace", "clear"])
 @pytest.mark.parametrize("accepted", [True, False], ids=["accepted", "rejected"])
 def test_replaced_live_html_is_deleted_only_after_commit_and_preserves_archive(
@@ -316,7 +298,6 @@ def test_replaced_live_html_is_deleted_only_after_commit_and_preserves_archive(
     assert memory_forms.blobs[archived_path] == "<p>Original</p>"
 
 
-# @matrix forms mutations permissions : guarded-save concurrent-restrictions
 def test_exact_publication_guard_rejects_new_properties_but_document_guard_is_subset(monkeypatch):
     written = []
     transaction = SimpleNamespace(put=written.append)
@@ -338,7 +319,6 @@ def test_exact_publication_guard_rejects_new_properties_but_document_guard_is_su
     assert written == [{"assets": "draft"}]
 
 
-# @matrix form-schema : history generation
 def test_generation_resolution_ignores_legacy_versions(memory_forms, monkeypatch):
     form = memory_forms.form()
     monkeypatch.setattr(definitions, "Query", lambda *args, **kwargs: pytest.fail("Matching generation queried history"))
@@ -347,7 +327,6 @@ def test_generation_resolution_ignores_legacy_versions(memory_forms, monkeypatch
     assert form.version == "legacy-version"
 
 
-# @matrix form-schema : history generation
 def test_generation_resolution_loads_only_the_requested_archive(memory_forms, monkeypatch):
     source = memory_forms.form()
     archived = drafts.archive_form_generation(source)
@@ -368,8 +347,6 @@ def test_generation_resolution_loads_only_the_requested_archive(memory_forms, mo
 
 
 
-# @matrix forms : draft save-receipt conflict publication
-# @pairs html-field:upload mutations:conflict
 def test_save_draft_checks_receipt_baseline_and_validation_before_uploads(memory_forms):
     form = memory_forms.form()
     draft = drafts.builder_draft(form)
@@ -390,8 +367,6 @@ def test_save_draft_checks_receipt_baseline_and_validation_before_uploads(memory
         drafts.save_form_draft(form, draft, baseline, "save-1", object())
 
 
-# @matrix forms : draft save-receipt publication
-# @matrix html-field : upload publication
 def test_save_draft_publishes_images_once_and_retains_failed_attempt_originals(memory_forms):
     form = memory_forms.form()
     draft = drafts.builder_draft(form)
@@ -412,7 +387,6 @@ def test_save_draft_publishes_images_once_and_retains_failed_attempt_originals(m
     assert len(memory_forms.blobs) == count
 
 
-# @matrix form-schema : history generation batch-read
 def test_generation_resolution_batches_current_forms(memory_forms, monkeypatch):
     form = memory_forms.form()
     actual_fetch = Entities.fetch
@@ -429,7 +403,6 @@ def test_generation_resolution_batches_current_forms(memory_forms, monkeypatch):
     assert calls == [((form.key,), Fetch.root())]
 
 
-# @matrix forms html-field : copy draft immutable-assets save-receipt
 def test_copy_draft_owns_content_and_is_idempotent_without_saving_source(memory_forms):
     form = memory_forms.form()
     initial = drafts.builder_draft(form)
@@ -466,7 +439,6 @@ def test_copy_draft_owns_content_and_is_idempotent_without_saving_source(memory_
     assert len(memory_forms.commits) == commits
 
 
-# @matrix form-schema html-field : history permission-boundary
 def test_definition_snapshot_requires_submitter_scoped_authorization(memory_forms):
     snapshot = drafts.archive_form_generation(memory_forms.form())
     snapshot.save()
@@ -477,8 +449,6 @@ def test_definition_snapshot_requires_submitter_scoped_authorization(memory_form
         assert snapshot.allowed(action, user=SimpleNamespace(is_admin=True)) is False
 
 
-# @matrix html-field : isolated-assets cleanup
-# @matrix mutations : rejected-save ambiguous-commit
 @pytest.mark.parametrize("uncertain", [False, True])
 def test_rejected_save_cleans_only_attempt_blobs_and_ambiguous_commit_retains_them(memory_forms, monkeypatch, uncertain):
     form = memory_forms.form()
@@ -502,9 +472,6 @@ def test_rejected_save_cleans_only_attempt_blobs_and_ambiguous_commit_retains_th
         assert memory_forms.blobs == original_blobs
 
 
-# @source lagniappe/core/tools/forms/drafts.py::save_form_draft
-# @matrix forms : draft conflict publication
-# @pair mutations:conflict
 @pytest.mark.parametrize("race_timing", ["after-initial-fetch", "before-commit"])
 def test_save_retry_preserves_concurrent_restrictions(memory_forms, monkeypatch, race_timing):
     form = memory_forms.form()

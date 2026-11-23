@@ -10,9 +10,6 @@ from runner.console import format_prompt, wrap_text
 from installer import FORMATTER
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_domain_ownership_instructions_name_selected_gcloud_account
-# @matrix setup : account-identity custom-domain interactive-input ownership
 def confirm_domain_ownership(domain: str) -> bool:
     """Explain Google ownership verification and require confirmation."""
     from config import SETTINGS
@@ -73,10 +70,6 @@ def confirm_domain_ownership(domain: str) -> bool:
     return verified.casefold() == "y"
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_custom_domain_supports_manual_dns
-# @tests tests_tooling/test_001k_setup_console.py::test_dns_values_remain_verbatim
-# @matrix setup : custom-domain manual-dns provider-records terminal-wrapping
 def print_manual_dns_instructions(
     domain: str, resource_records: Iterable[Mapping[str, object]]
 ) -> None:

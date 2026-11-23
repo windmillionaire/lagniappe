@@ -3,9 +3,6 @@ import { BaseElement } from "./base/baseElement.mjs";
 import { formatting } from "./formatting.mjs";
 import { primitives } from "./primitives.mjs";
 
-/**
- * @testable infrastructure
- */
 export class InputElement extends BaseElement {
 	get value() {
 		const input = this.elt?.matches?.("input")

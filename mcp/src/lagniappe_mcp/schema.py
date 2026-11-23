@@ -93,10 +93,6 @@ _MAX_REFERENCE_CHARS = 512
 _MAX_REFERENCE_TOKENS = 32
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_schema_rejects_dangling_refs_and_non_finite_json
-# @tests tests_unit/test_033_mcp_adapter.py::test_mcp_v2_results_use_direct_structured_values_and_complete_aliases
 def compact_json(value: object) -> str:
     try:
         return json.dumps(
@@ -110,14 +106,10 @@ def compact_json(value: object) -> str:
         raise SchemaError("invalid_json", "Value is not finite JSON data.") from error
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
 def json_size(value: object) -> int:
     return len(compact_json(value).encode("utf-8"))
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
 def _walk(value: object) -> Iterator[object]:
     pending = [(value, 0)]
     while pending:
@@ -131,8 +123,6 @@ def _walk(value: object) -> Iterator[object]:
             pending.extend((child, depth + 1) for child in current)
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
 def _resolve_local_reference(schema: dict[str, object], reference: str) -> object:
     if reference == "#":
         return schema
@@ -165,20 +155,14 @@ def _resolve_local_reference(schema: dict[str, object], reference: str) -> objec
     return current
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
 def _is_json_scalar(value: object) -> bool:
     return value is None or isinstance(value, (str, int, float, bool))
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
 def _bounded_non_negative_integer(value: object) -> TypeGuard[int]:
     return not isinstance(value, bool) and isinstance(value, int) and value >= 0
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
 def _reject_unsafe_schema_subset(schema: dict[str, object]) -> None:
     """Reject remote schema features outside the frozen, bounded subset.
 
@@ -425,8 +409,6 @@ def _reject_unsafe_schema_subset(schema: dict[str, object]) -> None:
                 _resolve_local_reference(schema, reference)
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
 def _reject_expensive_reference_expansion(schema: dict[str, object]) -> None:
     """Bound the validator work hidden behind a compact local-reference DAG."""
     pending: list[tuple[dict[str, object], int]] = [(schema, 0)]
@@ -480,8 +462,6 @@ def _reject_expensive_reference_expansion(schema: dict[str, object]) -> None:
             pending.append((branch, next_applicator_depth))
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
 def _reject_recursive_reference_graph(schema: dict[str, object]) -> None:
     """Reject cycles formed by ordinary local ``$ref`` edges.
 
@@ -492,8 +472,6 @@ def _reject_recursive_reference_graph(schema: dict[str, object]) -> None:
     """
     states: dict[int, int] = {}
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/schema.py::_reject_recursive_reference_graph
     def visit(node: object) -> None:
         if not isinstance(node, (dict, list)):
             return
@@ -519,10 +497,6 @@ def _reject_recursive_reference_graph(schema: dict[str, object]) -> None:
     visit(schema)
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_schema_rejects_dangling_refs_and_non_finite_json
-# @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
 def validate_schema_document(
     schema: object, *, input_root: bool = False
 ) -> dict[str, object]:
@@ -569,9 +543,6 @@ def validate_schema_document(
     return deepcopy(schema)
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_wrapped_result_schema_preserves_local_references
 def wrap_result_schema(schema: dict[str, object]) -> dict[str, object]:
     """Put a validated output schema under an object's required result field."""
     nested = deepcopy(schema)
@@ -600,9 +571,6 @@ def wrap_result_schema(schema: dict[str, object]) -> dict[str, object]:
     return wrapped
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
 def inject_plan_id(schema: object) -> dict[str, object]:
     # ``plan_id`` must genuinely be injectable, not merely present in the
     # rendered ``properties`` map.  Root-level applicators can independently
@@ -665,10 +633,6 @@ def inject_plan_id(schema: object) -> dict[str, object]:
     return projected
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-# @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_summary_and_preserves_candidate_and_api_errors
 def validate_value(schema: dict[str, object], value: object, *, phase: str) -> None:
     try:
         Draft202012Validator(schema, format_checker=FormatChecker()).validate(value)

@@ -33,9 +33,6 @@ ACTIVE_PROGRESS = []
 _PAUSE_DEPTH = 0
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason shared encoding policy exercised by status and progress contracts
 def supports_unicode(stream: TextIO | None, text: str) -> bool:
     try:
         text.encode(getattr(stream, "encoding", None) or "ascii")
@@ -44,30 +41,18 @@ def supports_unicode(stream: TextIO | None, text: str) -> bool:
     return True
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason format-only section heading follows the shared semantic style contract
 def heading(message: object) -> str:
     return styled(str(message).rstrip().rstrip(":.!"), "bold")
 
 
-# @testable false
-# @covered-by runner/terminal.py::styled
-# @reason literal inline emphasis shares the renderer's terminal and plain fallbacks
 def emphasis(message: object, *, stream: TextIO | None = None) -> str:
     return styled(message, "bold", stream=stream)
 
 
-# @testable false
-# @covered-by runner/terminal.py::styled
-# @reason exact action targets share the renderer's literal span contract
 def literal(message: object, *, stream: TextIO | None = None) -> str:
     return styled(message, "cyan", stream=stream)
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_instruction_values_preserve_styles_and_copyable_content
-# @matrix setup : operator-summary terminal-wrapping
 def value(
     label: object,
     content: object,
@@ -85,24 +70,15 @@ def value(
     return format_value(label, content, **layout)
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason format-only annotation follows the shared semantic style contract
 def secondary(message: object) -> str:
     return styled(message, "bright_black")
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason menu choice styling uses the same literal span renderer
 def choice(key: object, label: object, detail: object = None) -> str:
     result = f"  {styled(str(key) + '.', 'cyan')} {label}"
     return wrap_text(result + (f" {secondary('(' + str(detail) + ')')}" if detail else ""))
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_semantic_output
-# @matrix setup : encoding operator-summary portability terminal-wrapping
 def status(
     message: object, kind: str = "neutral", *, stream: TextIO | None = None
 ) -> str:
@@ -124,16 +100,10 @@ def status(
     return styled(glyph, style, stream=stream) + rendered[len(glyph):]
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason semantic status shortcut
 def success(message: object, *, stream: TextIO | None = None) -> str:
     return status(message, "success", stream=stream)
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason semantic status shortcut
 def warning(
     message: object, diagnostic: object = None, *, stream: TextIO | None = None
 ) -> str:
@@ -141,9 +111,6 @@ def warning(
     return result + "\n" + str(diagnostic) if diagnostic else result
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason diagnostic payload is intentionally left verbatim
 def error(
     message: object, diagnostic: object = None, *, stream: TextIO | None = None
 ) -> str:
@@ -151,23 +118,14 @@ def error(
     return result + "\n" + str(diagnostic) if diagnostic else result
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason informational prose has no status color
 def info(message: object) -> str:
     return wrap_text(message)
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason static activity labels share the semantic style contract
 def activity(message: object) -> str:
     return secondary(wrap_text(str(message).rstrip().rstrip(".") + "..."))
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_progress_modes
-# @matrix setup : portability spinner
 def plain_progress(console: Console | None, stream: TextIO | None = None) -> bool:
     stream = sys.stdout if stream is None else stream
     return (
@@ -180,10 +138,6 @@ def plain_progress(console: Console | None, stream: TextIO | None = None) -> boo
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_install_if_missing_pauses_active_spinner_for_prompt
-# @tests tests_tooling/test_001k_setup_console.py::test_progress_output_and_input
-# @matrix setup : package-install spinner
 @contextmanager
 def pause_progress() -> Iterator[None]:
     global _PAUSE_DEPTH
@@ -199,19 +153,12 @@ def pause_progress() -> Iterator[None]:
             ACTIVE_PROGRESS[-1].start()
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_progress_output_and_input
-# @matrix setup : package-install spinner
 def read_input(prompt: str = "") -> str:
     """Preserve builtin input semantics while keeping the prompt stationary."""
     with pause_progress():
         return builtins.input(prompt) if prompt else builtins.input()
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_progress_output_and_input
-# @tests tests_tooling/test_001k_setup_console.py::test_semantic_output
-# @matrix setup : operator-summary terminal-wrapping package-install spinner
 def output(
     *messages: object,
     sep: str = " ",
@@ -242,11 +189,6 @@ def output(
         stream.flush()
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_formatter_tracks_active_spinners
-# @tests tests_tooling/test_001k_setup_console.py::test_progress_output_and_input
-# @tests tests_tooling/test_001k_setup_console.py::test_formatter_preserves_plain_and_colored_output
-# @matrix setup : package-install spinner
 class Progress:
     """One transient Rich indicator, with a static transcript fallback."""
 

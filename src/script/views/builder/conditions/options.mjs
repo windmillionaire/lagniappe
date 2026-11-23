@@ -2,12 +2,6 @@ import { primitives } from "../../../elements/primitives.mjs";
 import { generateElementId } from "../../../shared/utilities.mjs";
 import { Condition } from "./base.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
- * @pair forms:builder-select-options
- * @matrix forms : stable-identity
- */
 export default class Options extends Condition {
 	constructor(builder) {
 		super(builder);

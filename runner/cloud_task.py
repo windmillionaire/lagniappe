@@ -13,10 +13,6 @@ from runner import cloud_settings as settings
 from runner.context import GCLOUD_CLI
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_cloud_connection_requires_target_identity
-# @tests tests_tooling/test_016_cloud_operator.py::test_cloud_connection_accepts_only_the_configured_relay
-# @matrix auth setup : adc project-identity
 def connection_file(account: str) -> str:
     path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     manifest = os.environ.get("OIC_MANIFEST_PATH")
@@ -66,7 +62,6 @@ def connection_file(account: str) -> str:
     return str(Path(path).resolve())
 
 
-# @testable infrastructure
 def _gcloud(*arguments: str, env: dict[str, str]) -> None:
     result = subprocess.run(
         [GCLOUD_CLI or "gcloud", *arguments, "--quiet"], env=env, capture_output=True
@@ -77,9 +72,6 @@ def _gcloud(*arguments: str, env: dict[str, str]) -> None:
         )
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_startup_checks_identity_and_optional_redis
-# @matrix auth setup : adc project-identity
 def probe(project: str, *, check_redis: bool = False) -> None:
     from config import SETTINGS
     from config.experiments import normalize_experiments_config
@@ -111,11 +103,6 @@ def probe(project: str, *, check_redis: bool = False) -> None:
     print(f"Verified direct Redis connectivity for {project}.")
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_task_reuses_pinned_version
-# @tests tests_tooling/test_016_cloud_operator.py::test_check_connection_uses_task_identity_before_restore
-# @tests tests_tooling/test_016_cloud_operator.py::test_default_startup_reads_hosted_status
-# @matrix setup : cli-routing project-identity
 def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

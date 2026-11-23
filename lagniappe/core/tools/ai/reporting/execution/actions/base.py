@@ -29,7 +29,6 @@ ACTION_NOT_APPLIED = "not-applied"
 ACTION_DRIFTED = "drifted"
 
 
-# @testable infrastructure
 class ReportActionAdapter:
     """Recovery contract for one deterministic report action type."""
 
@@ -46,7 +45,6 @@ class ReportActionAdapter:
         self.uses_context = uses_context
         self.required = required
 
-    # @testable infrastructure
     def prepare(
         self,
         action: ReportAction,
@@ -65,7 +63,6 @@ class ReportActionAdapter:
             record,
         )
 
-    # @testable infrastructure
     def inspect_applied(
         self,
         action: ReportAction,
@@ -75,9 +72,6 @@ class ReportActionAdapter:
     ) -> str:
         return _inspect_action_applied(action, report, user, record)
 
-    # @testable true
-    # @tests tests_unit/test_020h_ai_report_execution.py::test_report_action_registry_matches_proposal_contracts
-    # @matrix ai-report : action-registry contract
     def apply(
         self,
         action: ReportAction,
@@ -95,9 +89,6 @@ class ReportActionAdapter:
         return _normalize_handler_result(handler(*arguments))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/base.py::ReportActionAdapter.apply
-# @reason handler result normalization is exercised through the adapter contract
 def _normalize_handler_result(result: HandlerResult) -> ExecutionResult:
     if len(result) == 2:
         entity, to_save = result

@@ -3,9 +3,6 @@ import { test } from "node:test";
 import esmock from "esmock";
 import { createBrowser } from "../utility/js/environment.mjs";
 
-/**
- * @matrix notifications : accessible-state badge cold-seed redis-projection response-header
- */
 test("test_notification_state_updates_badge_and_reports_cache_miss", async (t) => {
 	createBrowser(t, {
 		html: `

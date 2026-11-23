@@ -11,7 +11,6 @@ For **project** and **form** field surfaces, see ``test_012a_project_conditions`
 import pytest
 
 
-# @matrix category filters : condition-definition string
 @pytest.mark.unit
 def test_category_string_filters(get_test_entities, test_condition_definition):
     """Test STRING fields (name, description) with SUBSTRING and EQUALS comparators."""
@@ -21,7 +20,6 @@ def test_category_string_filters(get_test_entities, test_condition_definition):
         test_condition_definition(entity)
 
 
-# @matrix category filters : boolean condition-definition
 @pytest.mark.unit
 def test_category_boolean_filters(get_test_entities, test_condition_definition):
     """Test BOOLEAN fields (has_document, has_image, is_public) with IS_TRUE and IS_FALSE."""
@@ -31,7 +29,6 @@ def test_category_boolean_filters(get_test_entities, test_condition_definition):
         test_condition_definition(entity)
 
 
-# @matrix category filters : condition-definition timestamp
 @pytest.mark.unit
 def test_category_timestamp_filters(get_test_entities, test_condition_definition):
     """Test TIMESTAMP field (modified) with LESS_THAN, EQUALS, GREATER_THAN comparators."""
@@ -42,7 +39,6 @@ def test_category_timestamp_filters(get_test_entities, test_condition_definition
         test_condition_definition(entity)
 
 
-# @matrix category filters : condition-definition entity-valued
 @pytest.mark.unit
 def test_category_entity_filters(get_test_entities, test_condition_definition):
     """Test entity-valued LIST field (categories) with single and multiple values."""

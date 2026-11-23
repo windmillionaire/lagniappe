@@ -41,10 +41,6 @@ from . import assets
 from .main import _asset_metadata_response, _asset_redirect, _large_asset
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
-# @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
-# @matrix html-field : authoritative-content form-asset render-fetch retry submitter-key
 @assets.route("<key>/html/<field_id>", methods=["GET"])
 @permission(requested=Action.VIEW)
 def html_field(
@@ -73,9 +69,6 @@ def html_field(
     )
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_historical_images_are_bound_to_the_authorized_completion
-# @matrix task-completion html-field permissions : schema-version owned-image record-scope
 @assets.route("<key>/form-generation/<int:generation>/<asset_name>", methods=["GET", "HEAD"])
 @permission(requested=Action.VIEW, no_store=True)
 def historical_form_image(
@@ -123,11 +116,6 @@ def historical_form_image(
     return responses.image_response(content, asset.content_type)
 
 
-# @testable true
-# @tests tests_unit/test_004_form_properties.py::test_form_html_fields
-# @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
-# @matrix html-field : form-asset intentional-clear server-acknowledgement
-# @pair html-field:html-fields
 @assets.route("<key>/form-html/<field_id>", methods=["PUT"])
 @permission(requested=Action.EDIT)
 def form_html(
@@ -144,9 +132,6 @@ def form_html(
     return responses.ok()
 
 
-# @testable true
-# @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
-# @pair sync:document
 @assets.route("<key>/document/state", methods=["GET"])
 @permission(requested=Action.VIEW)
 def get_document_state(
@@ -162,10 +147,6 @@ def get_document_state(
     return responses.shared_document(**state)
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image_generate_toggle
-# @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image
-# @matrix editor : image-generate-toggle image-upload
 @assets.route("<key>/document/image", methods=["POST"])
 @permission(requested=Action.EDIT)
 def add_document_image(
@@ -233,9 +214,6 @@ def add_document_image(
     return responses.document_image(url)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/assets/editor.py::add_document_image
-# @reason route permission mirrors the final document image upload endpoint
 @assets.route("<key>/document/image/direct-upload", methods=["POST"])
 @permission(requested=Action.EDIT)
 def add_document_image_direct(key: str, **kwargs: object) -> ResponseReturnValue:
@@ -244,10 +222,6 @@ def add_document_image_direct(key: str, **kwargs: object) -> ResponseReturnValue
     return direct_uploads.direct_upload_response()
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_live_page_context_with_tasks_and_files
-# @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_replaces_selection_and_posts_selected_text
-# @matrix ai : document-context generate-text live-provider page-context selected-text
 @assets.route("<key>/document/generate", methods=["POST"])
 @permission(requested=Action.EDIT)
 def generate_text(
@@ -288,11 +262,6 @@ def generate_text(
     return responses.document_html(ai_references.render_ai_markdown(markdown))
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_saves_do_not_create_automatic_history
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @matrix editor : history-list history-pin history-restore
 @assets.route("<key>/document/history", methods=["GET"])
 @permission(requested=Action.VIEW)
 def list_document_history(
@@ -313,9 +282,6 @@ def list_document_history(
     )
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @matrix editor : current-content history-pin validation
 @assets.route("<key>/document/history/pin", methods=["POST"])
 @permission(requested=Action.EDIT)
 def pin_document_history(
@@ -350,9 +316,6 @@ def pin_document_history(
     return responses.json_response({"entry": history.entry})
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_storage_backup_preview_is_read_only
-# @matrix editor document-history : backups permissions preview
 @assets.route("<key>/document/history/backups", methods=["GET"])
 @permission(requested=Action.VIEW, no_store=True)
 def list_document_backups(
@@ -367,9 +330,6 @@ def list_document_backups(
         return responses.error(str(error))
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_storage_backup_preview_is_read_only
-# @matrix editor document-history : backups permissions preview
 @assets.route("<key>/document/history/backups/<token>", methods=["GET"])
 @permission(requested=Action.VIEW, no_store=True)
 def get_document_backup(
@@ -388,9 +348,6 @@ def get_document_backup(
         return responses.error("This storage backup has expired. Reopen the backup list.")
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @matrix editor : confirmation history-clear
 @assets.route("<key>/document/history/unpinned", methods=["GET", "DELETE"])
 @permission(requested=Action.EDIT)
 def unpinned_document_history(
@@ -414,10 +371,6 @@ def unpinned_document_history(
     return responses.json_response({"cleared": cleared})
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @matrix editor : history-restore parent-scope
 @assets.route("<key>/document/history/<history_key>", methods=["GET"])
 @permission(requested=Action.VIEW)
 def get_document_history(

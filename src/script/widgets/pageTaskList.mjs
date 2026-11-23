@@ -1,26 +1,6 @@
 import { BaseList } from "../elements/base/baseList.mjs";
 import { withTransition } from "../shared/transitions.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_task_without_edit_controls
- * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_assigned_user_can_work_their_assigned_task
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_while_another_task_is_open_keeps_rows_clear
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_update_page_task_settings_from_row
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_empty_page_task_list_shows_marker_only_after_create_closes
- * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_completed_only_task_list_hides_empty_marker
- * @tests tests_js/test_028_form_state_split.mjs::test_task_list_refresh_preserves_rows_with_local_form_state
- * @tests tests_js/test_028_form_state_split.mjs::test_task_list_refresh_does_not_reinsert_unchanged_rows
- * @tests tests_js/test_028_form_state_split.mjs::test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh
- * @tests tests_js/test_028_form_state_split.mjs::test_task_list_initial_reconciliation_publishes_list_visibility
- * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_task_collection_refresh_preserves_active_form_for_revision_review
- * @tests tests_js/test_028_form_state_split.mjs::test_task_list_empty_marker_requires_closed_create_form_and_no_tasks
- * @tests tests_js/test_028_form_state_split.mjs::test_task_list_reconciliation_rejects_incomplete_structure
- * @matrix tasks : active-form-preservation completed-only create create-close dedupe detached-structure dirty-form-preservation empty-state refresh unsaved-marker
- * @matrix tasks : initial-render permission-gates readonly
- * @pair tasks:refresh-order
- */
 export class PageTaskList extends BaseList {
 	constructor(attributes) {
 		super(attributes);
@@ -55,16 +35,6 @@ export class PageTaskList extends BaseList {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_complete_page_task
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_completion_views_follow_generation_and_archive_original_answers
-	 * @tests tests_js/test_028_form_state_split.mjs::test_task_completion_keeps_component_update_route_when_history_is_active
-	 * @tests tests_js/test_028_form_state_split.mjs::test_task_title_click_is_left_to_view_delegate
-	 * @matrix tasks : active-widget complete route-override
-	 * @matrix tasks : delegated-title-click
-	 * @matrix task-completion : archive uncomplete
-	 */
 	_click(e) {
 		const submitter = e.target.closest(
 			"[data-role='save-toggle'], [data-role='complete-toggle']",
@@ -123,11 +93,6 @@ export class PageTaskList extends BaseList {
 		this._setListVisibility();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_task_open_scrolls_row_only_when_mostly_outside_viewport
-	 * @matrix tasks : delegated-title-click open-scroll
-	 */
 	_scrollOpenedTask(e) {
 		const { component, trigger } = e.detail || {};
 		const task = component?.elt;
@@ -158,12 +123,6 @@ export class PageTaskList extends BaseList {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_032_task_settings_lifecycle.mjs::test_task_completion_replaces_closed_row_in_one_transition
-	 * @tests tests_js/test_028_form_state_split.mjs::test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh
-	 * @matrix tasks : active-widget complete create dedupe refresh uncomplete
-	 */
 	_moveTaskIfNecessary(taskElt) {
 		if (this._existingTask(taskElt)) return;
 
@@ -284,11 +243,6 @@ export class PageTaskList extends BaseList {
 		).length;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.mjs::test_collection_manifests_include_hash_and_fingerprint
-	 * @matrix reconnect-refresh : manifest
-	 */
 	refreshDescriptor() {
 		if (
 			this.component.name !== "tasks" ||
@@ -316,12 +270,6 @@ export class PageTaskList extends BaseList {
 		return template.content.querySelector("li[lp-component][data-kind='task']");
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
-	 * @tests tests_js/test_028_form_state_split.mjs::test_task_delta_loads_unknown_rows_without_discarding_local_edits
-	 * @matrix tasks : delta concurrent-create dirty-form-preservation
-	 */
 	async prepareRefreshDelta(delta) {
 		const existing = new Map(
 			Array.from(
@@ -453,11 +401,6 @@ export class PageTaskList extends BaseList {
 		this._isEmpty = !response.html.querySelector("[data-key]");
 		this._updated = updated;
 	}
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state
-	 * @matrix tasks : refresh update-state
-	 */
 	async prepareRefresh(response) {
 		if (!this._queueRefresh(response)) return;
 		await this.prereconcile();
@@ -516,11 +459,6 @@ export class PageTaskList extends BaseList {
 		return taskElt.querySelector(`[data-widget='${widget}']`) ? widget : null;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_task_list_refresh_preserves_rows_with_local_form_state
-	 * @matrix tasks : active-form-preservation dirty-form-preservation stale-widget
-	 */
 	_hasPendingLocalFormState(component, replacement = null) {
 		return Object.values(component?.widgets ?? {}).some((widget) => {
 			if (

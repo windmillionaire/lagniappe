@@ -39,9 +39,6 @@ RUNTIME_NONCURRENT_RETENTION_DAYS = 14 * 7
 RUNTIME_TEMP_UPLOAD_RETENTION_DAYS = 30
 
 
-# @testable false
-# @covered-by config/storage.py::_patch_bucket_metadata
-# @reason provider-neutral classifier is owned by bucket metadata retry behavior
 def _is_storage_transient_error(error: Exception) -> bool:
     """Return whether a provider error is safe to retry."""
     if type(error).__name__ in {
@@ -72,10 +69,6 @@ def _is_storage_transient_error(error: Exception) -> bool:
     return status in {408, 429} or 500 <= status < 600
 
 
-# @testable false
-# @covered-by config/storage.py::storage_bucket_names
-# @covered-by config/storage.py::recovery_bucket_name
-# @reason shared deterministic name construction is exercised through public naming contracts
 def _bucket_name(settings: Mapping[str, object], kind: str) -> str:
     """Return one deterministic full bucket name for an app-settings mapping."""
     digest = hashlib.sha256(str(settings["GIBBERISH"]).encode()).hexdigest()
@@ -83,26 +76,16 @@ def _bucket_name(settings: Mapping[str, object], kind: str) -> str:
     return f"{prefix}{kind}-{digest}"[: len(prefix) + 32].lower()
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_storage_bucket_names_match_runtime_contract
-# @matrix setup storage : naming
 def storage_bucket_names(settings: Mapping[str, object]) -> dict[str, str]:
     """Return Lagniappe's three runtime bucket names for app settings."""
     return {kind: _bucket_name(settings, kind) for kind in BUCKET_KINDS}
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_storage_bucket_names_match_runtime_contract
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_storage_provisioning_is_bucket_scoped_and_idempotent
-# @pairs disaster-recovery:naming storage:provisioning
 def recovery_bucket_name(settings: Mapping[str, object]) -> str:
     """Return the operator-only disaster-recovery bucket name."""
     return _bucket_name(settings, RECOVERY_BUCKET_KIND)
 
 
-# @testable false
-# @covered-by config/storage.py::expected_storage_cors_origins
-# @reason URL parsing helper owned by the public CORS contract
 def _origin(value: object) -> str | None:
     """Return a scheme://host[:port] origin for a configured URL."""
     if not value:
@@ -115,9 +98,6 @@ def _origin(value: object) -> str | None:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_storage_cors_origins_include_configured_urls
-# @matrix storage : cors origins
 def expected_storage_cors_origins(config: object) -> list[str]:
     """Return the browser origins allowed to upload/download bucket objects."""
     origins = []
@@ -144,9 +124,6 @@ def expected_storage_cors_origins(config: object) -> list[str]:
     return sorted(set(origins))
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_expected_storage_cors_shape
-# @pair storage:cors
 def expected_storage_cors(config: object) -> list[_CorsRule]:
     """Return the expected Cloud Storage CORS rule for Lagniappe buckets."""
     origins = expected_storage_cors_origins(config)
@@ -163,10 +140,6 @@ def expected_storage_cors(config: object) -> list[_CorsRule]:
     ]
 
 
-# @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_cors_preserves_standing_and_exact_origin_lifecycles
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_storage_provisioning_is_bucket_scoped_and_idempotent
-# @matrix storage hosted-e2e : cors provisioning
 def has_browser_cors_origin(rules: list[_CorsRule] | None, origin: str | None) -> bool:
     """Check for the explicit origin with all methods and headers used by the app."""
     if not origin:
@@ -182,9 +155,6 @@ def has_browser_cors_origin(rules: list[_CorsRule] | None, origin: str | None) -
     )
 
 
-# @testable false
-# @covered-by config/storage.py::configure_storage_bucket
-# @reason normalization helper owned by idempotent metadata reconciliation
 def _normalized_cors(cors):
     """Return a comparable CORS shape with order-only differences removed."""
     normalized = []
@@ -209,9 +179,6 @@ def _normalized_cors(cors):
     )
 
 
-# @testable false
-# @covered-by config/storage.py::configure_storage_bucket
-# @reason lifecycle normalization is exercised through runtime bucket reconciliation
 def _runtime_lifecycle_rules(rules):
     """Replace only version and temporary-upload deletion rules owned by setup."""
     preserved = []
@@ -259,9 +226,6 @@ def _runtime_lifecycle_rules(rules):
     return preserved
 
 
-# @testable false
-# @covered-by config/storage.py::configure_storage_bucket
-# @reason retry helper owned by bucket metadata reconciliation
 def _patch_bucket_metadata(bucket):
     """Patch bucket metadata, retrying transient Cloud Storage failures."""
     for attempt in range(len(BUCKET_CONFIG_RETRY_DELAYS) + 1):
@@ -283,12 +247,6 @@ def _patch_bucket_metadata(bucket):
             time.sleep(BUCKET_CONFIG_RETRY_DELAYS[attempt])
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_configure_bucket_is_idempotent
-# @tests tests_unit/test_018_database_assets.py::test_configure_bucket_repairs_cors_drift
-# @tests tests_unit/test_018_database_assets.py::test_configure_bucket_enables_versioning_and_reconciles_noncurrent_lifecycle
-# @tests tests_unit/test_018_database_assets.py::test_configure_bucket_retries_transient_patch_failure
-# @matrix storage : bucket-metadata cors idempotent lifecycle-preservation object-versioning storage-class transient-retry
 def configure_storage_bucket(
     bucket: Bucket, config: object, *, preserve_cors_origin: str | None = None
 ) -> bool:
@@ -336,9 +294,6 @@ def configure_storage_bucket(
     return changed
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_configure_recovery_bucket_removes_cors_and_is_idempotent
-# @matrix disaster-recovery : bucket-metadata lifecycle-preservation
 def configure_recovery_bucket(bucket: Bucket) -> bool:
     """Reconcile recovery-bucket metadata without browser-facing CORS."""
     changed = False

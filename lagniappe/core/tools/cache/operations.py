@@ -26,14 +26,12 @@ OPERATION_SCHEMA_VERSION = "1"
 MAX_TRANSACTION_ATTEMPTS = 8
 
 
-# @testable infrastructure
 def _decode(value):
     if isinstance(value, bytes):
         return value.decode("utf-8")
     return str(value) if value is not None else None
 
 
-# @testable infrastructure
 def _operation_id(operation: object) -> str | None:
     if isinstance(operation, str):
         return operation
@@ -48,7 +46,6 @@ def _operation_id(operation: object) -> str | None:
     return str(key) if key else None
 
 
-# @testable infrastructure
 def _redis_key(operation: object) -> str:
     identifier = _operation_id(operation)
     if not identifier:
@@ -57,7 +54,6 @@ def _redis_key(operation: object) -> str:
     return Keys.OPERATION.value.format(digest)
 
 
-# @testable infrastructure
 def _project(raw: Mapping[str | bytes, str | bytes] | None) -> OperationState | None:
     values = _decode_map(raw)
     if values.get("schema") != OPERATION_SCHEMA_VERSION:
@@ -74,7 +70,6 @@ def _project(raw: Mapping[str | bytes, str | bytes] | None) -> OperationState | 
     }
 
 
-# @testable infrastructure
 def _values(operation: object) -> tuple[int, bool]:
     if isinstance(operation, dict):
         revision = operation.get("revision", operation.get("status_revision", 0))
@@ -93,10 +88,6 @@ def _values(operation: object) -> tuple[int, bool]:
     return max(int(revision or 0), 0), bool(terminal)
 
 
-# @testable true
-# @tests tests_unit/test_025b_operation_state.py::test_operation_projection_is_revisioned_and_slides_ttl
-# @matrix deferred-jobs : redis-projection ttl
-# @pair polling:batching
 def peek_operation_states(
     operations: Iterable[object] | None,
 ) -> dict[str, OperationState | None]:
@@ -116,9 +107,6 @@ def peek_operation_states(
     }
 
 
-# @testable true
-# @tests tests_unit/test_025b_operation_state.py::test_operation_projection_is_revisioned_and_slides_ttl
-# @pair deferred-jobs:ttl
 def operation_state_current(
     state: OperationState | None, revision: int, *, now: float | None = None
 ) -> bool:
@@ -129,9 +117,6 @@ def operation_state_current(
     return current - float(state["verified_at"]) < OPERATION_VERIFY_SECONDS
 
 
-# @testable true
-# @tests tests_unit/test_025b_operation_state.py::test_operation_projection_rejects_delayed_older_revision
-# @matrix deferred-jobs : concurrency redis-projection revision
 def update_operation_projection(
     *operations: object, now: float | None = None
 ) -> dict[str, OperationState]:
@@ -186,9 +171,6 @@ def update_operation_projection(
     return results
 
 
-# @testable true
-# @tests tests_unit/test_025b_operation_state.py::test_operation_projection_deletes_with_durable_job
-# @pair deferred-jobs:redis-projection
 def delete_operation_projection(*operations: object) -> None:
     """Delete cache projections for durably deleted job records."""
     keys = list(
@@ -200,10 +182,6 @@ def delete_operation_projection(*operations: object) -> None:
         cache.redis.delete(*keys)
 
 
-# @testable true
-# @tests tests_unit/test_025b_operation_state.py::test_poll_state_read_batches_notifications_and_operations
-# @matrix deferred-jobs notifications : redis-projection
-# @pair polling:batching
 def peek_poll_states(
     user: object, operations: Iterable[object] | None
 ) -> tuple[NotificationState | None, dict[str, OperationState | None]]:

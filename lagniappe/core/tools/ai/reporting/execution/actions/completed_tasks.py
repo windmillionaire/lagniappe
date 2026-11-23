@@ -34,23 +34,14 @@ from .results import (
 from .references import _resolve_action_page, _resolve_entity
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason before-state serialization is exercised through forward recovery tests
 def _snapshot_entity(entity):
     return _entity_result(entity) if entity is not None else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason checkpoint date serialization is exercised through task recovery
 def _checkpoint_datetime(value):
     return value.isoformat() if hasattr(value, "isoformat") else value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason task checkpoint content is asserted through task recovery
 def _task_checkpoint_state(task):
     if task is None:
         return None
@@ -79,9 +70,6 @@ def _task_checkpoint_state(task):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason completed-task checkpointing is asserted through retry
 def _capture_completed_task_before(action, data, user, created):
     page = _resolve_action_page(data, created, user)
     form = _resolve_entity(
@@ -129,42 +117,21 @@ def _capture_completed_task_before(action, data, user, created):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason state fingerprints are exercised through completed-prefix validation
 def _value_fingerprint(value):
     data = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(data.encode("utf-8")).hexdigest()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason task state validation is exercised through completed-task retry
 def _task_state_fingerprint(task):
     return _value_fingerprint(_task_checkpoint_state(task))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/tasks.py::_create_task
-# @reason completed task event detection is covered through report-run behavior
 def _is_completed_task_event(data):
     return bool(
         data.get("completed_on") or data.get("completed-on") or data.get("completed")
     )
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_records_dateless_historical_task_completion
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_records_older_completed_event_without_mutating_live_task
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_promotes_newer_completed_event_to_live_task
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_reuses_one_created_task_for_multiple_completed_events
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_keeps_untargeted_same_model_tasks_distinct
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_loads_model_task_form_from_stored_key_for_history
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_reuses_existing_task_for_completed_event
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_automatically_reuses_dated_completed_task_family
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_keeps_ambiguous_completed_task_families_distinct
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_rejects_completed_task_target_from_another_page
-# @matrix ai-report task-completion tasks : ambiguity attachments automatic-task-family completed-task description distinct-task duplicate-task-prevention existing-task explicit-task-identity history-name lazy-load live-task model-form name newest-completion older-event period-name same-model same-report submission
 def _record_completed_task_event(
     action,
     data,
@@ -313,9 +280,6 @@ def _record_completed_task_event(
     return task, _unique_entities(saved), metadata
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
-# @reason task reuse is covered through completed event report-run tests
 def _find_or_create_completed_task(
     action,
     data,
@@ -353,9 +317,6 @@ def _find_or_create_completed_task(
     return task, True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_find_or_create_completed_task
-# @reason task naming is verified through report-run completed event tests
 def _completed_event_task_name(action, data, page, model):
     raw_name = data.get("name") or ""
     name = _strip_history_event_name(raw_name, getattr(page, "name", None))
@@ -381,9 +342,6 @@ _MONTH_DATE_PATTERN = (
 _EVENT_DATE_PATTERN = rf"(?:{_NUMERIC_DATE_PATTERN}|{_MONTH_DATE_PATTERN})"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_completed_event_task_name
-# @reason normalized names are covered through report-run completed event tests
 def _strip_history_event_name(value, page_name=None):
     name = " ".join(str(value or "").replace("_", " ").split())
     name = re.sub(r"\.(pdf|png|jpe?g|heic|txt|csv)$", "", name, flags=re.I)
@@ -412,9 +370,6 @@ def _strip_history_event_name(value, page_name=None):
     return name or None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_strip_history_event_name
-# @reason page prefix cleanup is covered through report-run tracker reuse tests
 def _strip_leading_page_name(name, page_name):
     if not page_name:
         return name
@@ -426,10 +381,6 @@ def _strip_leading_page_name(name, page_name):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_find_or_create_completed_task
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_capture_completed_task_before
-# @reason deterministic task-family matching is exercised through report-run reuse tests
 def _find_completed_task_match(
     action,
     data,
@@ -471,9 +422,6 @@ def _find_completed_task_match(
     return matches[0] if len(matches) == 1 else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_find_completed_task_match
-# @reason candidate collection is exercised through completed-task reuse and retry tests
 def _completed_task_candidates(page, created):
     candidates = [*_page_task_candidates(page)]
     candidates.extend(
@@ -490,9 +438,6 @@ def _completed_task_candidates(page, created):
     return list(unique.values())
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_find_completed_task_match
-# @reason exact task-family matching is exercised through completed-task reuse tests
 def _completed_task_family_matches(task, page, project, model, form, name):
     if not _same_entity(_safe_entity_relation(task, "page"), page):
         return False
@@ -512,18 +457,12 @@ def _completed_task_family_matches(task, page, project, model, form, name):
     return _normalized_task_name_key(task.name) == _normalized_task_name_key(name)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_completed_task_family_matches
-# @reason normalized task-family names are exercised through dated completed-task reuse tests
 def _normalized_task_name_key(name):
     name = _strip_history_event_name(name) or str(name or "")
     name = re.sub(r"[^a-z0-9]+", " ", name.lower())
     return " ".join(name.split())
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_find_completed_task_match
-# @reason page task loading fallback is covered through completed-task reuse tests
 def _page_task_candidates(page):
     candidates = []
     for attr in ("_tasks", "_completed"):
@@ -546,10 +485,6 @@ def _page_task_candidates(page):
     return list(unique.values())
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_rejects_completed_task_target_from_another_page
-# @matrix ai-report : explicit-task-identity page-validation
-# @matrix task-completion tasks : page-validation
 def _resolve_completed_task_target(
     data,
     created,
@@ -591,25 +526,16 @@ def _resolve_completed_task_target(
     return task
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_resolve_completed_task_target
-# @reason relation identity comparison is exercised through completed-target validation
 def _same_entity(left, right):
     if left is None or right is None:
         return left is right
     return getattr(left, "key", None) == getattr(right, "key", None)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
-# @reason archive suppression is verified through completion promotion tests
 def _should_archive_live_completion(task):
     return bool(task.completed)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
-# @reason dated and dateless event placement is exercised through report-run completion tests
 def _completed_event_belongs_in_history(task, completed_on):
     if not task.completed:
         return False
@@ -619,9 +545,6 @@ def _completed_event_belongs_in_history(task, completed_on):
     return current_completed_on is not None and completed_on <= current_completed_on
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
-# @reason live task mutation is verified through completion event tests
 def _apply_completed_task_event(
     task,
     name,
@@ -651,17 +574,10 @@ def _apply_completed_task_event(
     task.completed_by = None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
-# @reason blank-submission detection is exercised through completion event tests
 def _task_has_submission_data(task):
     return bool(getattr(task, "submission", None))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/tasks.py::_create_task
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
-# @reason model-form inheritance is verified through report-run completed event tests
 def _model_task_form(model):
     if model is None:
         return None
@@ -705,10 +621,6 @@ def _model_task_form(model):
     return form if isinstance(form, Entities.FORM) else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/tasks.py::_create_task
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
-# @reason existing task repair is verified through report-run completed event tests
 def _ensure_task_form_from_model(task, model=None):
     if getattr(task, "form", None):
         return
@@ -717,10 +629,6 @@ def _ensure_task_form_from_model(task, model=None):
         task.form = form
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_invalid_completed_task_events_and_continues
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_completed_event_dates_use_actor_timezone_without_request
-# @matrix ai-report : completed-task validation
 def _parse_completed_task_completed_on(data, *, user=None):
     raw = data.get("completed_on") or data.get("completed-on")
     if not raw and data.get("completed") is True:

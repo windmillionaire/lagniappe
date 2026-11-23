@@ -3,13 +3,6 @@ import { request } from "./request.mjs";
 let userDataUpdate = null;
 let userLocationUpdate = null;
 
-/**
- * @testable true
- * @tests tests_js/test_020_shared_utilities.mjs::test_user_data_sync_posts_timezone_without_requesting_location
- * @tests tests_js/test_020_shared_utilities.mjs::test_unavailable_user_location_does_not_affect_timezone_sync
- * @matrix timezone : page-load session-update
- * @pair location:permission-deferral
- */
 export function updateUserData() {
 	if (userDataUpdate) return userDataUpdate;
 
@@ -27,12 +20,6 @@ export function updateUserData() {
 	return update;
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/user.mjs::updateUserData
- * @covered-by src/script/shared/user.mjs::updateUserLocation
- * @reason shared payload construction keeps serialized timezone and optional location updates consistent
- */
 async function _syncUserData({ includeLocation = false } = {}) {
 	const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 	const sentThisSession = sessionStorage.getItem("timezone_sent");
@@ -73,11 +60,6 @@ async function _syncUserData({ includeLocation = false } = {}) {
 	};
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/user.mjs::updateUserLocation
- * @reason geolocation lookup is private location-update plumbing
- */
 function _getCurrentPosition(options) {
 	return new Promise((resolve) => {
 		if (!("geolocation" in navigator)) {
@@ -92,14 +74,6 @@ function _getCurrentPosition(options) {
 	});
 }
 
-/**
- * @testable true
- * @tests tests_js/test_020_shared_utilities.mjs::test_user_location_sync_starts_on_demand_and_deduplicates
- * @tests tests_js/test_020_shared_utilities.mjs::test_user_location_sync_retries_failed_session_update
- * @tests tests_js/test_020_shared_utilities.mjs::test_unavailable_user_location_does_not_affect_timezone_sync
- * @matrix location : deduplication geolocation on-demand retry session-update unavailable
- * @pair timezone:serialized-update
- */
 export function updateUserLocation() {
 	if (userLocationUpdate) return userLocationUpdate;
 

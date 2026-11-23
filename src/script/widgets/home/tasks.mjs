@@ -5,21 +5,11 @@ import { setIcon } from "../../shared/icons.mjs";
 import { request } from "../../shared/index.mjs";
 import { withTransition } from "../../shared/transitions.mjs";
 
-/**
- * @testable false
- * @covered-by src/script/widgets/home/tasks.mjs::HomeTaskList
- * @reason internal date helper for home task due-date grouping
- */
 function _toDateStr(offset = 0) {
 	const d = new Date();
 	d.setDate(d.getDate() + offset);
 	return d.toLocaleDateString("sv-SE");
 }
-/**
- * @testable false
- * @covered-by src/script/widgets/home/tasks.mjs::HomeTaskList
- * @reason internal date helper for home task due-date grouping
- */
 function _dateInfo(dateStr) {
 	const today = _toDateStr();
 
@@ -36,11 +26,6 @@ function _dateInfo(dateStr) {
 	return { label, due: dateStr < today ? "past" : "future" };
 }
 
-/**
- * @testable false
- * @covered-by src/script/widgets/home/tasks.mjs::HomeTaskList
- * @reason homepage offline mutation helper for deciding optimistic task visibility
- */
 function _isWithinHomeTaskWindow(dueDate) {
 	if (!dueDate) return false;
 
@@ -53,11 +38,6 @@ function _isWithinHomeTaskWindow(dueDate) {
 	return due >= today && due <= nextWeek;
 }
 
-/**
- * @testable false
- * @covered-by src/script/widgets/home/tasks.mjs::HomeTaskList._postpone
- * @reason insertion helper exercised through home task creation and postpone flows
- */
 function _insertSorted(target, task) {
 	const dueDate = task.dataset.dueDate;
 
@@ -70,11 +50,6 @@ function _insertSorted(target, task) {
 	target.append(task);
 }
 
-/**
- * @testable false
- * @covered-by src/script/widgets/home/tasks.mjs::HomeTaskList._postpone
- * @reason menu configuration helper for the tested postpone action
- */
 const _postponeMenu = (button, postponeFn) => {
 	let showingNextWeek = false;
 	let showingThisWeek = false;
@@ -138,11 +113,6 @@ const _postponeMenu = (button, postponeFn) => {
 		},
 	];
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/home/tasks.mjs::_postponeMenu
-	 * @reason internal transition back to the primary postpone choices
-	 */
 	const showPrimary = () => {
 		showingThisWeek = false;
 		showingNextWeek = false;
@@ -150,11 +120,6 @@ const _postponeMenu = (button, postponeFn) => {
 		button._lp_combobox.focusOption(returnFocusIndex);
 	};
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/home/tasks.mjs::_postponeMenu
-	 * @reason internal transition to the tested remaining dates this week
-	 */
 	const showThisWeek = () => {
 		const today = new Date();
 		today.setHours(12, 0, 0, 0);
@@ -185,11 +150,6 @@ const _postponeMenu = (button, postponeFn) => {
 		button._lp_combobox.focusOption(0);
 	};
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/home/tasks.mjs::_postponeMenu
-	 * @reason internal transition to the tested next-week weekday choices
-	 */
 	const showNextWeek = () => {
 		const monday = new Date();
 		monday.setHours(12, 0, 0, 0);
@@ -234,11 +194,6 @@ const _postponeMenu = (button, postponeFn) => {
 	};
 };
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002a_home.py::test_tasks_prefetch
- * @matrix home : prefetch task-count task-list
- */
 export class HomeTaskList extends BaseList {
 	constructor(attributes) {
 		super(attributes);
@@ -297,13 +252,6 @@ export class HomeTaskList extends BaseList {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_task_from_home_page
-	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_recurring_task_from_home_page_reappears
-	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_task_complete_replays_after_reload
-	 * @matrix tasks : complete offline-queue recurring
-	 */
 	async _change(e) {
 		const toggle = e.target.closest("[data-role='complete']");
 		if (!toggle) return;
@@ -388,14 +336,6 @@ export class HomeTaskList extends BaseList {
 		this.target.setAttribute("loaded", "");
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_tomorrow
-	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_this_week
-	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_next_week
-	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_no_due_date
-	 * @matrix tasks : due-date postpone
-	 */
 	async _postpone(elt, button, value) {
 		if (!this.view.online) {
 			this._showNotification(elt, "Connect to postpone this task.");

@@ -4,9 +4,6 @@ import { UploadMenu, uploadElement } from "./upload.mjs";
 
 const AUTOFILL_DROPZONE_TEXT = "Click or drop to add a related image or a pdf";
 
-/**
- * @testable infrastructure
- */
 export class AutofillUpload extends BaseUpload {
 	constructor(attributes) {
 		super(attributes);

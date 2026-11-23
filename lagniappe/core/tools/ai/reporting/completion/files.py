@@ -25,18 +25,10 @@ class ReportInputFiles(Protocol):
 OVERSIZED_REPORT_SUMMARY = "File too large to summarize."
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/completion/files.py::summarize_report_input_files
-# @covered-by lagniappe/core/tools/ai/planner.py::generate_report
-# @reason summary presence is exercised through organize summary and completion tests
 def _has_report_file_summary(file):
     return bool(str(getattr(file, "summary", None) or "").strip())
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/completion/files.py::summarize_report_input_files
-# @covered-by lagniappe/core/tools/ai/planner.py::generate_report
-# @reason warning projection is exercised through the report prepass and result
 def _report_file_summary_warning(file):
     summarize = getattr(getattr(file, "properties", None), "summarize", None)
     if getattr(summarize, "error", None) != UNREADABLE_PDF_SUMMARY_ERROR:
@@ -49,18 +41,12 @@ def _report_file_summary_warning(file):
     return f"Could not read {label}. The PDF may be encrypted or password-protected."
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/completion/files.py::summarize_report_input_files
-# @reason summary eligibility is exercised through the report summary prepass
 def _can_summarize_report_file(file):
     if _has_report_file_summary(file) or _report_file_summary_warning(file):
         return False
     return can_summarize_file(file)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/completion/files.py::summarize_report_input_files
-# @reason large-file metadata fallback is exercised through the summary prepass
 def _is_large_report_file(file):
     large = getattr(file, "large", None)
     if large is not None:
@@ -73,9 +59,6 @@ def _is_large_report_file(file):
         return False
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/completion/files.py::summarize_report_input_files
-# @reason summary state mutation is asserted through the public prepass
 def _complete_report_file_summary(file, *, search):
     summarize = file.properties.summarize
     summarize.enabled = True
@@ -83,9 +66,6 @@ def _complete_report_file_summary(file, *, search):
     summarize.complete = True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/completion/files.py::summarize_report_input_files
-# @reason oversized fallback state is asserted through the public prepass
 def _set_oversized_report_summary(file):
     file.summary = OVERSIZED_REPORT_SUMMARY
     summarize = file.properties.summarize
@@ -93,12 +73,6 @@ def _set_oversized_report_summary(file):
     summarize.error = None
 
 
-# @testable true
-# @tests tests_unit/test_020d_ai_report_prompts.py::test_summarize_report_input_files_saves_missing_summaries
-# @tests tests_unit/test_020d_ai_report_prompts.py::test_summarize_report_input_files_falls_back_for_large_files
-# @tests tests_unit/test_020d_ai_report_prompts.py::test_unreadable_pdf_is_saved_skipped_and_reported
-# @matrix ai-report : issue persistence
-# @matrix ai-report : active-request fallback large-file quota search-opt-in service-tier summary-prepass unreadable-pdf
 def summarize_report_input_files(
     report: ReportInputFiles,
     save: Callable[[models.File], object] | None = None,

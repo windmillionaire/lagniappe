@@ -44,8 +44,6 @@ _CLIENT_LABELS = (
 _CLIENT_NAME_BY_ID = dict(_CLIENT_LABELS)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/oauth/main.py::authorize
 @oauth.before_request
 def guard() -> ResponseReturnValue | None:
     g.NO_CACHE = True
@@ -69,8 +67,6 @@ def guard() -> ResponseReturnValue | None:
         return response
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/oauth/main.py::authorize
 @oauth.errorhandler(auth.OAuthError)
 def oauth_error(error: auth.OAuthError) -> ResponseReturnValue:
     # Codes come from our closed vocabulary; no provider exception or form value.
@@ -80,17 +76,12 @@ def oauth_error(error: auth.OAuthError) -> ResponseReturnValue:
     return render_template("oauth/connection.html", error=True), error.status
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/oauth/main.py::token
 def _parameters(values):
     if len(values) > 16 or any(len(values.getlist(key)) != 1 for key in values):
         raise auth.OAuthError("invalid_request")
     return values.to_dict()
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_metadata_login_consent_and_csrf
-# @matrix mcp-oauth : discovery site-policy
 @oauth_metadata.route("/oauth-authorization-server")
 def metadata() -> ResponseReturnValue:
     g.NO_CACHE = True
@@ -114,14 +105,6 @@ def metadata() -> ResponseReturnValue:
     )
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_browser_consent_names_client_and_revokes_only_its_connection
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_metadata_login_consent_and_csrf
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_consent_rejects_replaced_request_and_changed_account
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_pending_survives_google_callback_session_replacement
-# @matrix mcp-oauth : consent csrf login redirect loopback client-isolation
-# @pair mcp-oauth:consent-binding
-# @pair mcp-oauth:login-continuation
 @oauth.route("/authorize", methods=["GET", "POST"])
 def authorize() -> ResponseReturnValue:
     if request.method == "GET" and request.args:
@@ -183,8 +166,6 @@ def authorize() -> ResponseReturnValue:
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/oauth/main.py::token
 def _public_client_form():
     if request.mimetype != "application/x-www-form-urlencoded" or request.query_string:
         raise auth.OAuthError("invalid_request")
@@ -197,9 +178,6 @@ def _public_client_form():
     return parameters
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_token_api_envelope_and_browser_revocation
-# @matrix mcp-oauth : token csrf-exemption
 @oauth.route("/token", methods=["POST"])
 def token() -> ResponseReturnValue:
     result = auth.exchange_token(_public_client_form())
@@ -209,9 +187,6 @@ def token() -> ResponseReturnValue:
     return response
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_token_api_envelope_and_browser_revocation
-# @matrix mcp-oauth : revocation csrf-exemption
 @oauth.route("/revoke", methods=["POST"])
 def revoke() -> ResponseReturnValue:
     parameters = _public_client_form()
@@ -219,10 +194,6 @@ def revoke() -> ResponseReturnValue:
     return "", 200
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_browser_consent_names_client_and_revokes_only_its_connection
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_token_api_envelope_and_browser_revocation
-# @matrix mcp-oauth : revocation csrf browser-settings client-isolation
 @oauth.route("/connection", methods=["GET", "POST"])
 def connection() -> ResponseReturnValue:
     if not current_user.is_authenticated:

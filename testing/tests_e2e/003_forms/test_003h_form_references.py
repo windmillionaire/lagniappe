@@ -8,7 +8,6 @@ from google.cloud.datastore import Entity
 from lagniappe.core.tools.database import get
 
 
-# @matrix forms database : reference-query primary-secondary batching owner-deduplication
 def test_form_reference_lookup_matches_primary_secondary_and_batched_owners():
     datastore = get.DATA.datastore
     kind = get.KINDS.models.value

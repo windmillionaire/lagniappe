@@ -59,13 +59,6 @@ def _subject(effect: MutationEffect) -> Entity:
     return effect.entity
 
 
-# @testable true
-# @tests tests_unit/test_002_entity_general_properties.py::test_save_entities_updates_hash_before_requires
-# @tests tests_unit/test_002_entity_general_properties.py::test_save_entities_updates_and_persists_user_before_owned_page
-# @tests tests_unit/test_002_entity_general_properties.py::test_save_preparation_discards_retired_entity_fields
-# @matrix requires : hash-before-requires persisted-requires
-# @matrix entity mutations : retired-field save-time-cleanup
-# @pairs entities:save-order users:user-before-page
 def _prepare_write(effect: MutationEffect) -> None:
     entity = _subject(effect)
     if effect.property_mask is None:
@@ -85,14 +78,6 @@ def _prepare_write(effect: MutationEffect) -> None:
         cast(_IndexedRow, entity.db).exclude_from_indexes = entity.exclude_from_index
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_permission_source_marker_is_consumed_only_after_durable_success
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_cold_source_details_preserve_programmatic_restriction_changes
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_form_creation_and_content_edits_do_not_queue_reconciliation
-# @matrix permissions : invalidation-retry
-# @matrix permissions cache : cache-miss source-intent programmatic-save
-# @matrix permissions cache : new-form content-only no-queue
-# @matrix mutations : repeated-save property-mask guards
 def consume_mutation_intents(plan: MutationPlan) -> None:
     for owner, captured in plan.consumed_intents:
         current = list(getattr(owner, "mutation_intents", ()))
@@ -125,13 +110,11 @@ def consume_mutation_intents(plan: MutationPlan) -> None:
                 entity._form_attempt_assets = []
 
 
-# @testable infrastructure
 def _completed(outcome: MutationOutcome, effect_type: MutationEffectType) -> None:
     if effect_type not in outcome.completed_effects:
         outcome.completed_effects.append(effect_type)
 
 
-# @testable infrastructure
 def prepare_durable_writes(plan: MutationPlan) -> list[PreparedWrite]:
     writes = [
         effect
@@ -144,13 +127,6 @@ def prepare_durable_writes(plan: MutationPlan) -> list[PreparedWrite]:
     return cast("list[PreparedWrite]", writes)
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_public_discovery_invalidation_runs_after_durable_write
-# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_note_delete_completes_with_root_only_owners
-# @matrix mutations : durable-first
-# @matrix mutations : full-root masked-touch cache
-# @matrix mutations notes : delete photo-cleanup post-commit
-# @matrix public-pages public-directory sitemap : invalidation
 def execute_post_commit(
     plan: MutationPlan,
 ) -> tuple[list[MutationEffectType], list[str]]:
@@ -158,7 +134,6 @@ def execute_post_commit(
     completed = []
     errors = []
 
-    # @testable infrastructure
     def complete(effect_type: MutationEffectType) -> None:
         if effect_type not in completed:
             completed.append(effect_type)
@@ -308,10 +283,6 @@ def execute_post_commit(
     return completed, errors
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_save_executes_datastore_before_cache_and_reports_cache_failure
-# @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
-# @matrix mutations : cache-failure durable-first mutation-plan post-commit-outcome save typed-intent-preservation
 @timed("entity", "mutation")
 def execute_mutation(
     plan: MutationPlan,

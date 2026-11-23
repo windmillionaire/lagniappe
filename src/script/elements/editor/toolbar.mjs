@@ -9,17 +9,6 @@ import { UserManager } from "./users.mjs";
 
 const DEBOUNCE_DELAY_MS = 100;
 
-/**
- * @testable false
- * @covered-by src/script/elements/editor/options/toolbarButtons.mjs::ToolbarButton
- * @covered-by src/script/elements/editor/options/setColor.mjs::ColorPicker
- * @covered-by src/script/elements/editor/options/setFontFamily.mjs::FontFamilyPicker
- * @covered-by src/script/elements/editor/options/addLink.mjs::AddLink
- * @covered-by src/script/elements/editor/options/addYouTube.mjs::AddYouTube
- * @covered-by src/script/elements/editor/options/addImage.mjs::Image
- * @covered-by src/script/elements/editor/options/documentHistory.mjs::DocumentHistoryButton
- * @reason toolbar shell loads option owners; individual option classes own editor behavior
- */
 export class Toolbar {
 	constructor(document) {
 		this._destroyed = false;
@@ -318,11 +307,6 @@ export class Toolbar {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_045_browser_persistence.mjs::test_editor_teardown_releases_toolbar_before_editor_view
-	 * @matrix editor html-field : listener-teardown builder-save
-	 */
 	destroy() {
 		if (this._destroyed) return;
 		this._destroyed = true;

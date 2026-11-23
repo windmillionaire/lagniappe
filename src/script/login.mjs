@@ -20,11 +20,6 @@ installUpstreamUnavailableBanner();
 
 const REMEMBER_COOKIE_NAME = "lagniappe_remember";
 
-/**
- * @testable true
- * @tests tests_e2e/001_site/test_001b_login.py::test_agent_access_login_form_creates_session
- * @pair login:agent-access
- */
 function initializeAgentLoginForms(root = document) {
 	root.addEventListener("submit", async (event) => {
 		const form = event.target;
@@ -67,11 +62,6 @@ function initializeAgentLoginForms(root = document) {
 
 initializeAgentLoginForms();
 
-/**
- * @testable true
- * @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_native_consent_reaches_loopback_and_shows_submit_progress
- * @matrix mcp-oauth : consent browser-callback submit-progress
- */
 function initializeOAuthForms(root = document) {
 	root.addEventListener("submit", (event) => {
 		const form = event.target;
@@ -110,11 +100,6 @@ function initializeOAuthForms(root = document) {
 
 initializeOAuthForms();
 
-/**
- * @testable true
- * @tests tests_e2e/001_site/test_001b_login.py::test_login_page_loads
- * @pair login:page-load
- */
 async function initializeIdentityPlatform() {
 	try {
 		const response = await fetch("/l/identity-config");
@@ -137,11 +122,6 @@ if (document.getElementById("emailCheck")) {
 
 	const forms = {};
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/login.mjs::setRememberPreference
-	 * @reason read helper is part of the remember-me preference sync contract
-	 */
 	const rememberPreference = () => {
 		const cookie = document.cookie
 			.split("; ")
@@ -150,11 +130,6 @@ if (document.getElementById("emailCheck")) {
 		return cookie.split("=")[1] !== "0";
 	};
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/login.mjs::setRememberPreference
-	 * @reason DOM propagation helper is part of the remember-me preference sync contract
-	 */
 	const syncRememberInputs = () => {
 		const remember = rememberPreference();
 		document.querySelectorAll("input[name='remember-me']").forEach((input) => {
@@ -162,11 +137,6 @@ if (document.getElementById("emailCheck")) {
 		});
 	};
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/001_site/test_001b_login.py::test_login_remember_preference_syncs_across_forms
-	 * @pair login:remember-preference
-	 */
 	const setRememberPreference = (remember) => {
 		const secure = window.location.protocol === "https:" ? "; Secure" : "";
 		// biome-ignore lint/suspicious/noDocumentCookie: this stores a non-sensitive UI preference for Google redirect login.
@@ -174,16 +144,6 @@ if (document.getElementById("emailCheck")) {
 		syncRememberInputs();
 	};
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/001_site/test_001b_login.py::test_login_defaults_to_auth_method_form
-	 * @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
-	 * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
-	 * @tests tests_e2e/001_site/test_001b_login.py::test_reset_password_mode
-	 * @tests tests_e2e/001_site/test_001b_login.py::test_verify_email_mode
-	 * @matrix login : email-check owner-bootstrap query-mode sign-in-transition
-	 * @pair login:auth-method
-	 */
 	const showForm = (form) => {
 		withTransition(() => {
 			Object.values(forms).forEach((form) => {

@@ -22,8 +22,6 @@ from testing.utility.user_cache import acknowledge_user_cache_invalidation
 pytestmark = pytest.mark.e2e
 
 
-# @matrix admin : admin-only page-load route site-settings
-# @pair cache:invalidation-acknowledgement
 # @template home/admin.html::main
 @pytest.mark.e2e_group("owner")
 def test_site_settings_requires_administrator(get_user, browser_failures):
@@ -58,9 +56,6 @@ def test_site_settings_requires_administrator(get_user, browser_failures):
         acknowledge_user_cache_invalidation(user)
 
 
-# @matrix admin : account-preservation confirmation-modal demotion failure-state managed-user-search managed-users owner-only privileged-account promotion read-only responsive roster
-# @matrix cache : cache-invalidation invalidation-acknowledgement
-# @matrix owner : awaiting-first-sign-in owner-only role-controls
 # @template home/site_settings.html::site_settings
 @pytest.mark.e2e_group("owner")
 def test_site_administrator_roster_and_owner_controls(get_user, browser_failures):
@@ -183,8 +178,6 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
     assert response.status == 403
 
 
-# @matrix owner : configuration recovery-export route-gate sensitive-configuration
-# @pair admin:site-settings
 @pytest.mark.e2e_group("owner")
 def test_additional_admin_cannot_access_owner_configuration(get_user, browser_failures):
     owner = get_user(Users.OWNER)
@@ -260,7 +253,6 @@ def test_additional_admin_cannot_access_owner_configuration(get_user, browser_fa
         acknowledge_user_cache_invalidation(administrator)
 
 
-# @matrix owner : authentication-email delegated-handoff identity-metadata provider-cleanup
 # @template home/site_settings.html::site_settings
 @pytest.mark.e2e_group("owner")
 def test_owner_installation_access_distinguishes_handoff_from_provider_cleanup(

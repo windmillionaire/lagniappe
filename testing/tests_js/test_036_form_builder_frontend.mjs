@@ -19,7 +19,6 @@ function replaceGlobal(t, name, value) {
 	});
 }
 
-/** @matrix forms : builder-save retryable-action single-flight stale-acknowledgement */
 test("test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state", async (t) => {
 	const requests = [];
 	const classes = new Set();
@@ -393,7 +392,6 @@ async function loadFormSettings({ request }) {
 	);
 }
 
-/** @matrix forms ui-action : persistent-error retryable-action schema-generation single-flight */
 test("test_builder_generation_failure_stays_visible_and_releases_submitter", async (t) => {
 	let finishRequest;
 	let requestCount = 0;
@@ -538,7 +536,6 @@ async function loadBuilder({ connectivity, generateElementId, ModelElement }) {
 	});
 }
 
-/** @matrix form-table forms : builder-defaults empty-columns unsaved-preview */
 test("test_table_creation_defaults_columns_for_unsaved_preview", async () => {
 	const ModelElement = { table: (schema) => ({ id: schema.id }) };
 	const { default: FormBuilder } = await loadBuilder({
@@ -559,7 +556,6 @@ test("test_table_creation_defaults_columns_for_unsaved_preview", async () => {
 	assert.equal(element.id, schema.id, "renders normalized schema");
 });
 
-/** @matrix forms offline : builder-lifecycle */
 test("test_builder_sync_uses_shared_connectivity_without_orphaned_global_state", async (t) => {
 	const search = { dataset: {} };
 	const indicator = {
@@ -650,7 +646,6 @@ class TestNode {
 	}
 }
 
-/** @matrix forms : action-button-centering builder-list-actions */
 test("test_builder_schema_lists_use_button_surfaces_and_centered_actions", async (t) => {
 	const styles = {
 		builder: {
@@ -764,7 +759,6 @@ test("test_builder_schema_lists_use_button_surfaces_and_centered_actions", async
 	}
 });
 
-/** @matrix forms : access-restrictions explicit-submit retryable-action single-flight */
 test("test_restriction_save_submits_snapshot_and_releases_failed_submitter", async (t) => {
 	const requests = [];
 	let settle;

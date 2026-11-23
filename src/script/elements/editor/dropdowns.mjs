@@ -2,11 +2,6 @@ import { STYLES } from "../../generated/styles.mjs";
 import { setIcon } from "../../shared/icons.mjs";
 import { Dropdown } from "../combobox/dropdown.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004j_editor_menus.py::test_compact_editor_menus
- * @matrix editor : compact-menus
- */
 export const createMenuButton = (settings) => {
 	const button = document.createElement("button");
 	button.title = settings.title;
@@ -22,9 +17,6 @@ export const createMenuButton = (settings) => {
 	return button;
 };
 
-/**
- * @testable infrastructure
- */
 export const toolbarDropdown = (menu, items, beforeOpen) => {
 	const menuButton = createMenuButton(menu);
 

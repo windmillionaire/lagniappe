@@ -13,12 +13,6 @@ from .results import (
 from .references import _resolve_entity
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_rejects_schema_update_without_form_edit_permission
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_adds_schema_fields_persists_all_task_values_and_completes
-# @matrix ai-report submission : schema-update
-# @matrix ai-report form-schema : deterministic-run permission-failure schema-update
-# @matrix ai-report submission : persistence
 def _update_form_schema(action, report, user, created, context):
     from lagniappe.core.definitions import Fetch
     from lagniappe.core.tools.forms import (

@@ -4,13 +4,6 @@ import { request } from "../../shared/request.mjs";
 import { RemoteQueryCombobox } from "./remote.mjs";
 import { Results } from "./results.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/009_search/test_009a_search_page.py::test_search_from_navbar
- * @tests tests_js/test_046_async_query_lifecycle.mjs::test_search_threshold_settles_stale_work_and_restores_recent_results
- * @matrix search : recent-results stale-publication threshold
- * @pair search:page-navigation
- */
 export class SearchBox extends RemoteQueryCombobox {
 	constructor(element) {
 		super(element);
@@ -62,10 +55,6 @@ export class SearchBox extends RemoteQueryCombobox {
 	}
 
 	/**
-	 * @testable true
-	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_click_result_navigates
-	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_result_links_correct
-	 * @matrix search : result-links result-navigation
 	 * @template nav.html::search_results
 	 */
 	selectOption(option) {
@@ -74,11 +63,6 @@ export class SearchBox extends RemoteQueryCombobox {
 		window.location.href = option.dataset.url;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_search_from_navbar
-	 * @pair search:navbar-submit
-	 */
 	elementKeydown(event) {
 		super.elementKeydown(event);
 		if (event.defaultPrevented) return;

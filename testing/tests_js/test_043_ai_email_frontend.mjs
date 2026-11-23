@@ -15,7 +15,6 @@ function replaceGlobal(t, name, value) {
 	});
 }
 
-/** @matrix ai-report : absent-markup clipboard-fallback email-address-selection status-reset */
 test("test_ai_email_address_selection_and_copy_controls", async (t) => {
 	const appended = [];
 	const timers = [];

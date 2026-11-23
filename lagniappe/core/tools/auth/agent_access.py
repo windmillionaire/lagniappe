@@ -12,9 +12,6 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/agent_access.py::enabled
-# @reason boolean parsing helper exercised through the public access gate
 def _enabled_flag(value):
     if isinstance(value, bool):
         return value
@@ -23,9 +20,6 @@ def _enabled_flag(value):
     return bool(value)
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_agent_access_config_and_user_helpers
-# @matrix login : agent-access config
 def enabled() -> bool:
     code = str(getattr(CONFIG, "AGENT_ACCESS_CODE", "") or "").strip()
     email = str(getattr(CONFIG, "AGENT_ACCESS_EMAIL", "") or "").strip()
@@ -34,18 +28,12 @@ def enabled() -> bool:
     )
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_agent_access_config_and_user_helpers
-# @matrix login : agent-access code-validation
 def code_matches(code: str | None) -> bool:
     expected = str(getattr(CONFIG, "AGENT_ACCESS_CODE", ""))
     submitted = str(code or "").strip()
     return bool(submitted and expected and hmac.compare_digest(submitted, expected))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/agent_access.py::get_or_create_user
-# @reason agent login owns repairing stale agent account access before seeding session
 def _ensure_own_page_access(user):
     page = user.page
     if user.has_permission(page, Action.EDIT):
@@ -56,9 +44,6 @@ def _ensure_own_page_access(user):
     user.permissions = permissions
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_agent_access_user_helper_creates_or_loads_user_with_groups
-# @matrix login : agent-access groups user user-page
 def get_or_create_user() -> User:
     email = str(getattr(CONFIG, "AGENT_ACCESS_EMAIL", "")).strip().lower()
     name = str(getattr(CONFIG, "AGENT_ACCESS_NAME", "") or "Agent").strip() or "Agent"

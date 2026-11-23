@@ -87,7 +87,6 @@ def read_details(page, user, **options):
     )
 
 
-# @matrix ai tasks : compact permissions
 def test_compact_tasks_preserve_identity_scope_and_followup_references(task_page):
     page, user = task_page
 
@@ -143,7 +142,6 @@ def test_compact_tasks_preserve_identity_scope_and_followup_references(task_page
     }
 
 
-# @matrix ai tasks : compact pagination permissions
 def test_compact_tasks_paginate_visible_active_and_completed_rows(task_page):
     page, user = task_page
     first = read_tasks(page, user, limit=1)
@@ -158,7 +156,6 @@ def test_compact_tasks_paginate_visible_active_and_completed_rows(task_page):
     assert second["task_list"]["next_cursor"] is None
 
 
-# @matrix ai tasks : compact pagination
 @pytest.mark.parametrize(
     "change", ["revision", "membership", "permission", "page", "user", "scope"]
 )
@@ -183,7 +180,6 @@ def test_compact_tasks_reject_stale_or_mismatched_cursors(task_page, change):
     assert "Restart this task list without a cursor" in result["error"]
 
 
-# @matrix ai tasks : compact pagination
 @pytest.mark.parametrize(
     "options",
     [
@@ -205,7 +201,6 @@ def test_compact_tasks_reject_invalid_paging_arguments(task_page, options):
     assert "error" in read_tasks(page, user, **options)
 
 
-# @matrix ai tasks : compact pagination
 def test_compact_tasks_empty_and_default_bounded_results(task_page):
     page, user = task_page
     page.tasks = []
@@ -221,7 +216,6 @@ def test_compact_tasks_empty_and_default_bounded_results(task_page):
     assert bounded["task_list"]["has_more"] is True
 
 
-# @matrix ai tasks : compact
 def test_compact_tasks_disclose_partial_failure_without_losing_continuation(task_page):
     page, user = task_page
     page.tasks[0]._ai_url = lambda: (_ for _ in ()).throw(
@@ -246,7 +240,6 @@ def test_compact_tasks_disclose_partial_failure_without_losing_continuation(task
     assert final["task_list"]["incomplete"] is True
 
 
-# @matrix ai tasks : compact permissions
 def test_compact_tasks_reject_inaccessible_page(task_page):
     page, user = task_page
     assert get_page_tasks.execute_get_page_tasks({}, user) == {
@@ -259,7 +252,6 @@ def test_compact_tasks_reject_inaccessible_page(task_page):
     assert read_tasks(page, user) == {"error": "Access denied"}
 
 
-# @matrix ai tasks : compact
 def test_compact_tasks_real_entities_support_focused_schema_and_detail_reads(
     monkeypatch,
 ):
@@ -304,7 +296,6 @@ def test_compact_tasks_real_entities_support_focused_schema_and_detail_reads(
     assert details["Notes"] == "Only fetch these details when needed."
 
 
-# @matrix ai tasks : compact pagination permissions
 def test_compact_page_details_keep_active_scope_and_page_context(task_page):
     page, user = task_page
     page.tasks.append(Task(4))
@@ -323,7 +314,6 @@ def test_compact_page_details_keep_active_scope_and_page_context(task_page):
     assert "error" in read_details(page, user, compact_tasks=False, task_limit=1)
 
 
-# @matrix ai tasks : compact
 def test_compact_page_details_exclusions_take_precedence(task_page):
     page, user = task_page
     result = read_details(

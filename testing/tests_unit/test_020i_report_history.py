@@ -7,7 +7,6 @@ from lagniappe.core.tools.ai import report_history
 from testing.utility.ai_report_fakes import _patch_fake_keys, _test_user
 
 
-# @matrix ai-report : delete file-cleanup guarded-delete
 def test_report_delete_preserves_referenced_files_and_fences_cleanup(monkeypatch):
     orphan = SimpleNamespace(has_references=False, db={})
     attached = SimpleNamespace(has_references=True)
@@ -82,7 +81,6 @@ def test_report_delete_preserves_referenced_files_and_fences_cleanup(monkeypatch
     assert effects == []
 
 
-# @matrix ai-report : bulk-delete delete-snapshot ownership delete-failure
 def test_bulk_delete_scopes_ownership_state_snapshot_and_partial_failures(monkeypatch):
     _patch_fake_keys(monkeypatch)
     owner, other = _test_user("history-owner"), _test_user("history-other")

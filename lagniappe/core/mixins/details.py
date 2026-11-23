@@ -1,8 +1,5 @@
 from .field_host import FieldHost
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_entity.py::Name
-# @covered-by lagniappe/core/properties/common_entity.py::Kind.details_value
 class DetailsMixin(FieldHost):
     """Adds API detail output. Collected by Entity.details.
 

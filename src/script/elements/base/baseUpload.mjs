@@ -8,31 +8,11 @@ const CLIPBOARD_ERROR = "Couldn't access clipboard.";
 const CLIPBOARD_PERMISSION_ERROR = "Clipboard permission denied.";
 const CLIPBOARD_ACCESS_NOT_AVAILABLE_ERROR = "Clipboard access not available.";
 const CLIPBOARD_NO_FILE_ERROR = "No valid file found in clipboard.";
-/**
- * @testable false
- * @covered-by src/script/elements/base/baseUpload.mjs::BaseUpload._processNewFile
- * @reason drop error message factory for the upload processing path
- */
 const DROP_ERROR = (error) => `Error dropping file: ${error.message}`;
-/**
- * @testable false
- * @covered-by src/script/elements/base/baseUpload.mjs::BaseUpload._processNewFile
- * @reason processing error message factory for the upload processing path
- */
 const PROCESS_NEW_FILE_ERROR = (error) =>
 	`Error processing file: ${error.message}`;
-/**
- * @testable false
- * @covered-by src/script/elements/base/baseUpload.mjs::BaseUpload._processNewFile
- * @reason size error message factory for the upload processing path
- */
 const FILE_TOO_LARGE_ERROR = (fileSizeMB, maxSizeMB) =>
 	`File is too large (${fileSizeMB}MB). Maximum file size is ${maxSizeMB}MB.`;
-/**
- * @testable false
- * @covered-by src/script/elements/base/baseUpload.mjs::BaseUpload._processImage
- * @reason image load error message factory for image processing
- */
 const IMAGE_LOAD_ERROR = (error) => `Failed to load image: ${error.message}`;
 const IMAGE_PROCESS_ERROR = `Failed to process image`;
 const NOT_IMAGE_ERROR =
@@ -45,11 +25,6 @@ const DIRECT_UPLOAD_REQUIRED_ERROR =
 	"This file is too large for the compatibility upload path. Please try again.";
 const INDIVIDUAL_FILES_ONLY_ERROR = "Only individual files are supported";
 
-/**
- * @testable true
- * @tests tests_js/test_014_direct_upload_retry.mjs::test_directory_drop_is_rejected_before_file_processing
- * @matrix upload : directory-rejection drag-drop
- */
 async function containsDroppedDirectory(
 	dataTransfer,
 	files = Array.from(dataTransfer?.files || []),
@@ -74,11 +49,6 @@ async function containsDroppedDirectory(
 	return files.some((file) => file.size === 0 && !file.type);
 }
 
-/**
- * @testable false
- * @covered-by src/script/elements/base/baseUpload.mjs::BaseUpload._processNewFile
- * @reason image-file predicate is part of the upload validation contract
- */
 function isLikelyImageFile(file) {
 	if (file.type?.startsWith("image/")) return true;
 	if (file.type && file.type !== "application/octet-stream") return false;
@@ -86,11 +56,6 @@ function isLikelyImageFile(file) {
 	return /\.(png|jpe?g|gif|webp|bmp|svg|heic|heif|avif|ico|tiff?)$/.test(name);
 }
 
-/**
- * @testable false
- * @covered-by src/script/elements/base/baseUpload.mjs::defaultClipboardFilename
- * @reason extension normalization exists to build clipboard fallback filenames
- */
 function mimeToExtension(mimeType) {
 	if (!mimeType) return "bin";
 	const map = {
@@ -112,19 +77,11 @@ function mimeToExtension(mimeType) {
  * Clipboard blobs often have no name; File.name must include an extension for
  * BaseUpload#filename.
  *
- * @testable false
- * @covered-by src/script/elements/base/baseUpload.mjs::BaseUpload.processPaste
- * @reason clipboard filename fallback is exercised through the paste path
  */
 function defaultClipboardFilename(mimeType) {
 	return `paste-${Date.now()}.${mimeToExtension(mimeType)}`;
 }
 
-/**
- * @testable false
- * @covered-by src/script/elements/base/baseUpload.mjs::BaseUpload.processPaste
- * @reason clipboard blob filename selection is part of paste processing
- */
 function resolvedClipboardFileName(blob, typeHint) {
 	const mime = blob.type || typeHint;
 	const fromBlob =
@@ -132,9 +89,6 @@ function resolvedClipboardFileName(blob, typeHint) {
 	return fromBlob ? blob.name.trim() : defaultClipboardFilename(mime);
 }
 
-/**
- * @testable infrastructure
- */
 export class BaseUpload {
 	constructor(attributes) {
 		Object.assign(this, attributes);
@@ -197,11 +151,6 @@ export class BaseUpload {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image
-	 * @matrix editor : image-selection image-upload
-	 */
 	_processImage(file) {
 		return new Promise((resolve, reject) => {
 			const img = new Image();
@@ -359,12 +308,6 @@ export class BaseUpload {
 		this.dropzone?.setText(`Uploading ${name} - ${percent}%`);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_014_direct_upload_retry.mjs::test_single_file_keeps_compatibility_multipart_fallback
-	 * @tests tests_js/test_014_direct_upload_retry.mjs::test_large_multi_file_retry_preserves_completed_direct_uploads
-	 * @matrix direct-upload : aggregate-limit compatibility multipart-fallback partial-resume single-file
-	 */
 	async prepareSubmit({ route = null } = {}) {
 		const files = Array.from(this.fileInput?.element?.files || []);
 		if (!files.length) {
@@ -450,12 +393,6 @@ export class BaseUpload {
 		return true;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_file_input
-	 * @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_drag_drop
-	 * @matrix ingress : drag-drop file-input upload-counts
-	 */
 	async _processNewFile(file, options = {}) {
 		const context = { source: options.source || "unknown" };
 		const maxFileSize = this.uploadLimit;
@@ -526,11 +463,6 @@ export class BaseUpload {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_014_direct_upload_retry.mjs::test_file_drop_survives_async_directory_check
-	 * @pair upload:async-file-snapshot
-	 */
 	_initDropZone() {
 		if (!this.dropzone) return;
 
@@ -574,11 +506,6 @@ export class BaseUpload {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_paste_image_on_page
-	 * @pair pages:image-paste
-	 */
 	async processPaste() {
 		const processFile = async (item, type) => {
 			const blob = await item.getType(type);

@@ -5,9 +5,6 @@ from runner.presentation import output as print
 from runner.console import wrap_text
 
 
-# @testable false
-# @covered-by installer/deploy.py::deploy_to_app_engine
-# @reason console-only installation summary
 def print_summary() -> None:
     from config import SETTINGS
     from installer.summary import print_install_summary
@@ -21,11 +18,6 @@ def print_summary() -> None:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_prerequisite_gcloud_and_deploy_helpers
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_legacy_upgrade_warning_can_cancel_before_provider_deploy
-# @matrix setup : deploy failure gcloud-command post-deploy progress
-# @pairs migrations:deploy setup:legacy-upgrade setup:major-version
 def deploy_to_app_engine(
     *,
     print_final_summary: bool = True,

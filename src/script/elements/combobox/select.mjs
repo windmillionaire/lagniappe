@@ -2,9 +2,6 @@ import { Combobox } from "./combobox.mjs";
 import { Results } from "./results.mjs";
 import { Submitter } from "./submitter.mjs";
 
-/**
- * @testable infrastructure
- */
 export class SelectBox extends Submitter(Combobox) {
 	constructor(element) {
 		super(element);

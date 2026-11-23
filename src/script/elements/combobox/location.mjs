@@ -5,12 +5,6 @@ import { request } from "../../shared/request.mjs";
 import { updateUserLocation } from "../../shared/user.mjs";
 import { RemoteQueryCombobox } from "./remote.mjs";
 
-/**
- * @testable true
- * @tests tests_js/test_016_combobox_frontend.mjs::test_location_combobox_starts_location_sync_on_init
- * @tests tests_js/test_016_combobox_frontend.mjs::test_location_combobox_waits_for_session_sync_before_search
- * @matrix location : initialization on-demand request-ordering session-update
- */
 export class LocationBox extends RemoteQueryCombobox {
 	constructor(element, { name = null, onSelect = null } = {}) {
 		super(element);

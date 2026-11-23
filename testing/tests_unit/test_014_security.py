@@ -12,7 +12,6 @@ from lagniappe.core.tools.files import constants as file_constants
 from lagniappe.core.tools.files import html as file_html
 
 
-# @matrix files security : html-sanitization markdown
 @pytest.mark.unit
 def test_htmlize_sanitizes_markdown_html():
     """Markdown rendering should strip active HTML and unsafe links."""
@@ -30,7 +29,6 @@ def test_htmlize_sanitizes_markdown_html():
     assert BeautifulSoup(html, "html.parser").find("a", string="Bad").get("href") is None
 
 
-# @matrix files security : html-sanitization markdown table
 @pytest.mark.unit
 def test_htmlize_preserves_markdown_tables_and_sanitizes_cells():
     """Markdown tables should render while unsafe cell content is stripped."""
@@ -63,7 +61,6 @@ def test_htmlize_preserves_markdown_tables_and_sanitizes_cells():
     )
 
 
-# @matrix files security : html html-sanitization
 @pytest.mark.unit
 def test_htmlize_sanitizes_text_html():
     """HTML previews should keep safe formatting and drop active content."""
@@ -86,7 +83,6 @@ def test_htmlize_sanitizes_text_html():
     assert BeautifulSoup(html, "html.parser").find("strong").get_text() == "world"
 
 
-# @matrix editor files markdown : hard-break soft-wrap
 @pytest.mark.unit
 def test_render_markdown_collapses_soft_wrapped_lines():
     """Soft source wraps should flow while explicit breaks stay meaningful."""
@@ -118,7 +114,6 @@ An explicit break."""
     assert explicit.find("br").next_sibling == "After the break."
 
 
-# @matrix editor files markdown : code-block soft-wrap
 @pytest.mark.unit
 def test_render_markdown_preserves_code_block_newlines():
     """Whitespace normalization must not alter fenced code content."""
@@ -128,8 +123,6 @@ def test_render_markdown_preserves_code_block_newlines():
     assert soup.find("code").get_text() == "first line\nsecond line\n"
 
 
-# @source lagniappe/core/tools/files/html.py::render_markdown
-# @matrix editor files markdown : list-kind soft-wrap
 @pytest.mark.unit
 @pytest.mark.parametrize("marker", ["-", "1."])
 def test_render_markdown_keeps_loose_list_paragraphs_without_spacer_text(marker):
@@ -150,7 +143,6 @@ def test_render_markdown_keeps_loose_list_paragraphs_without_spacer_text(marker)
     assert soup.find_all("li")[-1].p.get_text() == "Second item."
 
 
-# @matrix editor files markdown : task-list
 @pytest.mark.unit
 def test_render_markdown_creates_editor_task_lists():
     """GFM task Markdown should become safe TipTap-compatible task nodes."""
@@ -178,7 +170,6 @@ onto another source line.
     assert "class=" not in html
 
 
-# @matrix editor markdown : mixed-list task-list
 @pytest.mark.unit
 def test_render_markdown_splits_mixed_task_lists():
     """Ordinary items in a task list should remain ordinary list items."""
@@ -195,7 +186,6 @@ def test_render_markdown_splits_mixed_task_lists():
     assert lists[1].find("input") is None
 
 
-# @matrix editor files markdown : list-kind
 @pytest.mark.unit
 def test_render_markdown_preserves_adjacent_list_kinds():
     """A following ordered list should not be folded into a bullet list."""
@@ -208,8 +198,6 @@ def test_render_markdown_preserves_adjacent_list_kinds():
     assert soup.find("ol").get_text(" ", strip=True) == "First step Second step"
 
 
-# @matrix editor files markdown : html-source
-# @matrix files security : html-sanitization
 @pytest.mark.unit
 def test_render_markdown_normalizes_indented_html_source():
     """Explicitly converted HTML source should format safely despite outer indent."""
@@ -226,7 +214,6 @@ def test_render_markdown_normalizes_indented_html_source():
     assert "javascript:" not in html
 
 
-# @matrix files security : html-sanitization task-list
 @pytest.mark.unit
 def test_sanitize_html_restricts_task_controls():
     """Only inert canonical task checkboxes should survive sanitization."""
@@ -247,7 +234,6 @@ def test_sanitize_html_restricts_task_controls():
     assert "onclick" not in html
 
 
-# @matrix files security : active-content comments html-sanitization malformed-markup unknown-wrapper
 @pytest.mark.unit
 def test_sanitize_html_drops_active_content_and_unwraps_unknown_markup():
     content = """<!-- hidden -->
@@ -282,7 +268,6 @@ def test_sanitize_html_drops_active_content_and_unwraps_unknown_markup():
     )
 
 
-# @matrix files security : html-sanitization links url-scheme
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "unsafe_url",
@@ -299,7 +284,6 @@ def test_sanitize_html_rejects_obfuscated_active_link_schemes(unsafe_url):
     assert BeautifulSoup(html, "html.parser").find("a").get("href") is None
 
 
-# @matrix files security : html-sanitization links relative-url url-scheme
 @pytest.mark.unit
 def test_sanitize_html_keeps_reviewed_link_schemes_and_fixed_attributes():
     html = file_html.sanitize_html(
@@ -324,7 +308,6 @@ def test_sanitize_html_keeps_reviewed_link_schemes_and_fixed_attributes():
     assert links[4].get("rel") is None
 
 
-# @matrix files security : html-sanitization table
 @pytest.mark.unit
 def test_sanitize_html_bounds_table_spans():
     html = file_html.sanitize_html(
@@ -339,7 +322,6 @@ def test_sanitize_html_bounds_table_spans():
     assert cells[2].attrs == {}
 
 
-# @matrix files security : html-sanitization task-list
 @pytest.mark.unit
 def test_sanitize_html_strips_task_attributes_outside_exact_ancestry():
     html = file_html.sanitize_html(
@@ -359,7 +341,6 @@ def test_sanitize_html_strips_task_attributes_outside_exact_ancestry():
     assert checkbox.attrs == {"type": "checkbox", "disabled": "", "checked": ""}
 
 
-# @matrix security : nominal-type serialization trust-loss
 @pytest.mark.unit
 def test_safe_html_policy_is_typed_idempotent_and_ephemeral():
     assert isinstance(file_html.sanitize_html(None), file_html.SafeHTML)
@@ -377,7 +358,6 @@ def test_safe_html_policy_is_typed_idempotent_and_ephemeral():
     assert type(restored) is str
 
 
-# @matrix files security : code html-sanitization mimetype plain-text
 @pytest.mark.unit
 def test_htmlize_escapes_code_plain_text_and_mimetype_attributes(monkeypatch):
     mimetype = 'text/x" onmouseover="bad'
@@ -408,7 +388,6 @@ def _image_owner(url):
     return owner
 
 
-# @matrix form-html security : html-sanitization owned-image
 @pytest.mark.unit
 def test_form_content_policy_keeps_only_owned_images():
     owned = "https://assets.test/form/image_intro_owned.png?signature=current"
@@ -448,7 +427,6 @@ def test_form_content_policy_keeps_only_owned_images():
     )
 
 
-# @matrix public-pages security : html-sanitization owned-image
 @pytest.mark.unit
 def test_public_document_policy_keeps_only_rewritten_owned_images():
     source = "https://private.test/page/image_first.png?signature=old"
@@ -468,14 +446,12 @@ def test_public_document_policy_keeps_only_rewritten_owned_images():
     assert file_html.sanitize_public_document_html(None, []) == ""
 
 
-# @matrix files security : mimetype preview svg
 @pytest.mark.unit
 def test_svg_removed_from_preview_mimetypes():
     """SVG should no longer be previewable inline."""
     assert "image/svg+xml" not in file_constants.PREVIEW_MIMETYPES
 
 
-# @matrix file security : html-stripping summary
 @pytest.mark.unit
 def test_file_summary_strips_tags():
     """File summaries should be stored as plain text."""

@@ -1,10 +1,5 @@
 import { withTransition } from "./transitions.mjs";
 
-/**
- * @testable false
- * @covered-by src/script/shared/publicShare.mjs::copyPublicUrl
- * @reason legacy clipboard fallback is exercised through the public copy API
- */
 function legacyCopy(url, documentRef) {
 	const textarea = documentRef.createElement("textarea");
 	textarea.value = url;
@@ -22,11 +17,6 @@ function legacyCopy(url, documentRef) {
 	return copied;
 }
 
-/**
- * @testable true
- * @tests tests_js/test_047_public_sharing.mjs::test_public_share_uses_native_api_and_clipboard_fallbacks
- * @matrix public-pages : clipboard fallback sharing
- */
 export async function copyPublicUrl(url, root = document) {
 	try {
 		if (navigator.clipboard?.writeText) {
@@ -39,11 +29,6 @@ export async function copyPublicUrl(url, root = document) {
 	return legacyCopy(url, root);
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/publicShare.mjs::sharePublicPage
- * @reason share-result labels are exercised through every public sharing outcome
- */
 function updateShareLabel(label, text) {
 	if (!label) return;
 	void withTransition(
@@ -54,11 +39,6 @@ function updateShareLabel(label, text) {
 	);
 }
 
-/**
- * @testable true
- * @tests tests_js/test_047_public_sharing.mjs::test_public_share_uses_native_api_and_clipboard_fallbacks
- * @matrix public-pages : abort clipboard native-share selectable-url
- */
 export async function sharePublicPage(button, root = document) {
 	const container = button.closest('[data-role="public-share"]');
 	const status = container?.querySelector('[data-role="share-status"]');
@@ -107,11 +87,6 @@ export async function sharePublicPage(button, root = document) {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_js/test_047_public_sharing.mjs::test_public_share_initialization_binds_one_click_handler
- * @matrix public-pages : initialization sharing
- */
 export function initializePublicSharing(root = document) {
 	const button = root.querySelector('[data-role="share-button"]');
 	if (!button || button.dataset.shareInitialized === "true") return;

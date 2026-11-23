@@ -24,7 +24,6 @@ def poll_request(subscriptions=None, **overrides):
     return request
 
 
-# @matrix polling : descriptors protocol validation
 def test_poll_contract_accepts_each_descriptor_type():
     descriptors = [
         {
@@ -100,7 +99,6 @@ def test_poll_contract_accepts_each_descriptor_type():
     assert cold.notification_state["seed"] is True
 
 
-# @matrix polling : bounds cursor-types diagnostics strict-fields validation
 @pytest.mark.parametrize(
     ("payload", "path", "reason"),
     [
@@ -272,7 +270,6 @@ def test_poll_contract_reports_exact_invalid_field(payload, path, reason):
     assert captured.value.reason == reason
 
 
-# @matrix notifications polling : duplicates notification-state presence validation
 @pytest.mark.parametrize(
     ("overrides", "path", "reason"),
     [

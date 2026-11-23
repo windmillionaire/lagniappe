@@ -6,14 +6,6 @@ import Core from "./base/core.mjs";
 
 const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
 
-/**
- * @testable true
- * @tests tests_js/test_042_messaging_frontend.mjs::test_messages_view_refreshes_read_races_and_uses_delete_modal
- * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_messages_page_uses_mobile_peer_selector_with_inline_reply
- * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_inbound_message_allows_reply_without_compose_permission
- * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
- * @matrix messaging : active-polling clear-confirmation inline-reply list-race polling-revision preserve-selection read-race reply-permission responsive-peer-selector selection-race unread-peer
- */
 export default class Messages extends Core {
 	_initPollingSubscription() {
 		if (!this.PollingCoordinator) return;
@@ -35,7 +27,6 @@ export default class Messages extends Core {
 		);
 	}
 
-	/** @testable infrastructure */
 	_boostMessagePolling() {
 		this.PollingCoordinator?.boost?.(MESSAGE_POLL_SUBSCRIPTION, {
 			durationMs: 60_000,
@@ -174,7 +165,6 @@ export default class Messages extends Core {
 		return this;
 	}
 
-	/** @testable infrastructure */
 	async refresh() {
 		if (this._messageRefresh) return this._messageRefresh;
 		const pending = this._refreshMessages().finally(() => {
@@ -184,7 +174,6 @@ export default class Messages extends Core {
 		return pending;
 	}
 
-	/** @testable infrastructure */
 	async _refreshMessages() {
 		const selectionRevision = this.conversationSelectionRevision;
 		const active = this.preferredConversation || this.current?.id;
@@ -218,13 +207,11 @@ export default class Messages extends Core {
 		return false;
 	}
 
-	/** @testable infrastructure */
 	_beginConversationSelection(key) {
 		this.preferredConversation = key || null;
 		return ++this.conversationSelectionRevision;
 	}
 
-	/** @testable infrastructure */
 	async handleMessageSent(response) {
 		const conversation = response.conversation.id;
 		const active = this.current?.id || null;
@@ -238,11 +225,6 @@ export default class Messages extends Core {
 		return this.openConversation(conversation, { selectionRevision });
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/messages.mjs::Messages
-	 * @reason private responsive dropdown setup is exercised through the view contract
-	 */
 	async _ensureConversationDropdown() {
 		if (this.conversationDropdown || this._conversationDropdownPromise) {
 			return this.conversationDropdown || this._conversationDropdownPromise;
@@ -273,7 +255,6 @@ export default class Messages extends Core {
 		return this._conversationDropdownPromise;
 	}
 
-	/** @testable infrastructure */
 	async loadConversations({ append = false } = {}) {
 		const listRevision = ++this.conversationListRevision;
 		const params =
@@ -294,7 +275,6 @@ export default class Messages extends Core {
 		this.renderConversations();
 	}
 
-	/** @testable infrastructure */
 	renderConversations() {
 		const conversations = Array.from(this.conversations.values());
 		this.list.replaceChildren(
@@ -358,7 +338,6 @@ export default class Messages extends Core {
 		);
 	}
 
-	/** @testable infrastructure */
 	renderConversationSelector() {
 		const selected =
 			this.current ||
@@ -409,7 +388,6 @@ export default class Messages extends Core {
 		);
 	}
 
-	/** @testable infrastructure */
 	rememberConversation(key) {
 		this.preferredConversation = key || null;
 		if (!this.conversationStorageKey) return;
@@ -417,7 +395,6 @@ export default class Messages extends Core {
 		else localStorage.removeItem(this.conversationStorageKey);
 	}
 
-	/** @testable infrastructure */
 	async openConversation(key, { selectionRevision = null } = {}) {
 		const response = await request.get(ENDPOINTS.messages.history(key));
 		if (!response?.ok) return false;
@@ -447,7 +424,6 @@ export default class Messages extends Core {
 		return true;
 	}
 
-	/** @testable infrastructure */
 	renderHeader() {
 		const title = document.createElement("span");
 		title.className = "font-semibold";
@@ -458,7 +434,6 @@ export default class Messages extends Core {
 		this.renderReply();
 	}
 
-	/** @testable infrastructure */
 	renderReply() {
 		const available = Boolean(this.current?.peer?.replyable);
 		this.replyForm.classList.toggle("hidden", !available);
@@ -469,7 +444,6 @@ export default class Messages extends Core {
 		this.replyError.textContent = "";
 	}
 
-	/** @testable infrastructure */
 	async sendReply(event) {
 		event.preventDefault();
 		if (!this.current?.peer?.replyable || this.replySubmit.disabled) return;
@@ -510,7 +484,6 @@ export default class Messages extends Core {
 		}
 	}
 
-	/** @testable infrastructure */
 	renderMessages(messages, { prepend = false } = {}) {
 		const nodes = messages.map((message) => {
 			const article = document.createElement("article");
@@ -546,7 +519,6 @@ export default class Messages extends Core {
 		if (!prepend) this.history.scrollTop = this.history.scrollHeight;
 	}
 
-	/** @testable infrastructure */
 	async loadHistory({ prepend = false } = {}) {
 		if (!this.current) return;
 		const conversation = this.current.id;
@@ -568,11 +540,6 @@ export default class Messages extends Core {
 		this.renderMessages(response.messages || [], { prepend });
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/messages.mjs::Messages
-	 * @reason stale revision refresh is exercised through the view contract
-	 */
 	async markRead({
 		selectionRevision = this.conversationSelectionRevision,
 	} = {}) {
@@ -604,7 +571,6 @@ export default class Messages extends Core {
 		this.renderConversations();
 	}
 
-	/** @testable infrastructure */
 	async deleteMessage(key) {
 		const response = await request.delete(ENDPOINTS.messages.remove(key));
 		if (!response?.ok) return;

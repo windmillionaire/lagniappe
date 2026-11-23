@@ -63,8 +63,6 @@ from testing.utility import mcp_client_driver
 PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "mcp"
 
 
-# @source mcp/src/lagniappe_mcp/schema.py::validate_schema_document
-# @pair mcp-adapter:product-contract
 def test_canonical_read_output_schemas_fit_the_adapter_contract():
     # Load the app's dependency-free declarations without bootstrapping the app
     # in the standalone MCP environment. One invalid tool blocks all discovery.
@@ -181,9 +179,6 @@ def _contract() -> dict[str, Any]:
     }
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-# @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
 def test_plan_free_reads_compact_contracts_and_revised_brief():
     class ConversationalREST(_WorkflowREST):
         async def request_json(self, method, target, *, body=None, **kwargs):
@@ -374,9 +369,6 @@ class _WorkflowREST:
         return None
 
 
-# @source mcp/src/lagniappe_mcp/catalog.py::build_tool_registry
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-# @matrix mcp-adapter : product-contract
 @pytest.mark.parametrize("allowed", [False, True])
 def test_experiments_execution_is_advertised_only_when_authorized(allowed):
     class ExperimentsREST(_WorkflowREST):
@@ -450,7 +442,6 @@ def test_experiments_execution_is_advertised_only_when_authorized(allowed):
     asyncio.run(exercise())
 
 
-# @pair mcp-adapter:product-contract
 def test_schema_rejects_dangling_refs_and_non_finite_json() -> None:
     with pytest.raises(SchemaError, match="dangling"):
         validate_schema_document(
@@ -497,8 +488,6 @@ def test_schema_rejects_dangling_refs_and_non_finite_json() -> None:
         assert reserved.value.code == "reserved_tool_argument"
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/schema.py::validate_schema_document
 def test_untrusted_schema_work_is_rejected_before_general_validation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -559,8 +548,6 @@ def test_untrusted_schema_work_is_rejected_before_general_validation(
     assert time.monotonic() - started < 1.0
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/schema.py::validate_schema_document
 def test_schema_subset_preserves_current_proposal_contract_features() -> None:
     schema = {
         "type": "object",
@@ -631,8 +618,6 @@ def test_schema_subset_preserves_current_proposal_contract_features() -> None:
     )
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/catalog.py::catalog_tools
 def test_catalog_requires_complete_frozen_metadata_and_result_paths() -> None:
     catalog = asyncio.run(_WorkflowREST().startup())[2]
     converted = catalog_tools(catalog)
@@ -678,7 +663,6 @@ def test_catalog_requires_complete_frozen_metadata_and_result_paths() -> None:
     assert count_error.value.code == "catalog_too_large"
 
 
-# @pair mcp-adapter:product-contract
 def test_model_visibility_screen_rejects_catalog_reflection_and_preserves_safe_result_paths() -> (
     None
 ):
@@ -757,7 +741,6 @@ def test_model_visibility_screen_rejects_catalog_reflection_and_preserves_safe_r
         assert "x-goog-signature" not in rendered.casefold()
 
 
-# @pair mcp-adapter:product-contract
 def test_model_visibility_screen_rejects_successful_output_reflection() -> None:
     api_key = "lgn_exact_result_reflection_secret"
 
@@ -832,7 +815,6 @@ def test_model_visibility_screen_rejects_successful_output_reflection() -> None:
     assert encoded_bearer.value.code == "unsafe_transport_extension"
 
 
-# @pair mcp-adapter:product-contract
 def test_get_file_schema_projects_every_transport_extension() -> None:
     projected = get_file_output_schema(
         {
@@ -895,7 +877,6 @@ def test_get_file_schema_projects_every_transport_extension() -> None:
     assert original["additionalProperties"] is False
 
 
-# @pair mcp-adapter:product-contract
 def test_storage_url_requires_exact_resumable_and_signed_parameters() -> None:
     valid_upload = (
         "https://storage.googleapis.com/upload/storage/v1/b/bucket/o"
@@ -931,7 +912,6 @@ def test_storage_url_requires_exact_resumable_and_signed_parameters() -> None:
         )
 
 
-# @pair mcp-adapter:product-contract
 def test_site_url_normalizes_only_canonical_https_or_loopback_origins() -> None:
     assert (
         normalize_site_url("https://EXAMPLE.com:443/").origin == "https://example.com"
@@ -966,7 +946,6 @@ class _CaptureTransport(httpx.AsyncBaseTransport):
         )
 
 
-# @pair mcp-adapter:product-contract
 def test_media_download_does_not_inherit_client_credentials_or_cookies() -> None:
     async def exercise() -> tuple[bytes, str, httpx.Headers]:
         transport = _CaptureTransport()
@@ -993,8 +972,6 @@ def test_media_download_does_not_inherit_client_credentials_or_cookies() -> None
     assert "cookie" not in headers
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.download_media
 def test_original_media_enforces_length_cap_status_and_redirect_boundaries() -> None:
     class MediaTransport(httpx.AsyncBaseTransport):
         def __init__(self, outcomes: list[tuple[int, dict[str, str], bytes]]) -> None:
@@ -1060,8 +1037,6 @@ def test_original_media_enforces_length_cap_status_and_redirect_boundaries() -> 
     assert calls == 5
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
 @pytest.mark.parametrize(
     ("mime_type", "kind"),
     [("image/png", "image"), ("audio/mpeg", "audio")],
@@ -1108,8 +1083,6 @@ def test_original_media_delivery_matches_the_emitted_content_index(
     asyncio.run(adapter.aclose())
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
 @pytest.mark.parametrize("mime_type,large", [
     ("application/pdf", False), ("application/zip", False), ("text/plain", False),
     ("image/png", True), ("audio/mpeg", True),
@@ -1162,7 +1135,6 @@ def test_original_download_fallback_preserves_source_without_fetching_binary(
         asyncio.run(adapter.aclose())
 
 
-# @pair mcp-adapter:product-contract
 @pytest.mark.parametrize("code", [
     "media_too_large", "download_failed", "download_timeout", "redirect_rejected",
     "invalid_download", "unsafe_storage_url",
@@ -1199,7 +1171,6 @@ def test_oversized_original_media_falls_back_only_for_size_limit(code):
         asyncio.run(adapter.aclose())
 
 
-# @pair mcp-adapter:product-contract
 def test_original_download_capability_is_scoped_to_requested_file_result():
     value = {
         "filename": "source.pdf", "mimetype": "application/pdf",
@@ -1254,7 +1225,6 @@ def test_original_download_capability_is_scoped_to_requested_file_result():
             validate_value(schema, invalid, phase="output")
 
 
-# @pair mcp-adapter:product-contract
 def test_api_request_uses_only_explicit_bearer_credentials() -> None:
     class APICaptureTransport(httpx.AsyncBaseTransport):
         def __init__(self) -> None:
@@ -1300,7 +1270,6 @@ def test_api_request_uses_only_explicit_bearer_credentials() -> None:
     assert request.content == b'{"kind":"ask"}'
 
 
-# @matrix hosted-e2e mcp-adapter : authentication transport origin-isolation
 def test_hosted_driver_transport_scopes_only_run_cookie():
     requests = []
 
@@ -1335,8 +1304,6 @@ def test_hosted_driver_transport_scopes_only_run_cookie():
     assert requests[0].headers["Authorization"] == "Bearer api-key"
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/errors.py::AdapterError
 def test_bounded_error_rendering_remains_valid_json() -> None:
     error = AdapterError(
         "validation_failed",
@@ -1372,7 +1339,6 @@ def test_bounded_error_rendering_remains_valid_json() -> None:
     }
 
 
-# @pair mcp-adapter:product-contract
 def test_api_errors_redact_credentials_and_duplicate_json_is_rejected() -> None:
     signed = _signed_download_url()
 
@@ -1431,8 +1397,6 @@ def test_api_errors_redact_credentials_and_duplicate_json_is_rejected() -> None:
     assert duplicate_error.code == "invalid_response"
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 @pytest.mark.parametrize("status", [401, 403, 404, 409, 422, 429, 500, 503])
 def test_api_status_errors_remain_typed_text_only_and_are_never_retried(
     status: int,
@@ -1490,8 +1454,6 @@ def test_api_status_errors_remain_typed_text_only_and_are_never_retried(
     assert "structuredContent" not in result
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 def test_api_transport_failures_are_bounded_distinct_and_never_retried() -> None:
     async def exercise() -> tuple[list[str], int]:
         outcomes: list[object] = [
@@ -1556,8 +1518,6 @@ def test_api_transport_failures_are_bounded_distinct_and_never_retried() -> None
     assert calls == 7
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 def test_api_retryability_distinguishes_safe_reads_from_ambiguous_posts() -> None:
     async def exercise(method: str, outcome: str) -> TransportError:
         async def handler(request: httpx.Request) -> httpx.Response:
@@ -1592,9 +1552,6 @@ def test_api_retryability_distinguishes_safe_reads_from_ambiguous_posts() -> Non
         assert asyncio.run(exercise("POST", outcome)).retryable is False
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
-# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.download_media
 def test_rest_operations_have_total_wall_clock_deadlines(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1638,8 +1595,6 @@ def test_rest_operations_have_total_wall_clock_deadlines(
     assert (media_error.code, media_error.retryable) == ("download_timeout", True)
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/presentation.py::_success_result
 def test_structured_and_complete_frame_limits_fail_as_tool_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1775,7 +1730,6 @@ def test_mcp_driver_persists_only_owner_only_bounded_privacy_findings(
         assert private.casefold() not in failed_persisted.casefold()
 
 
-# @pair mcp-adapter:product-contract
 def test_failed_concurrent_startup_cancels_sibling_requests() -> None:
     class FailingStartup:
         def __init__(self) -> None:
@@ -1797,8 +1751,6 @@ def test_failed_concurrent_startup_cancels_sibling_requests() -> None:
     assert fake.cancelled == {"me", "tools"}
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
 @pytest.mark.parametrize(
     ("status", "code"), [(401, "unauthorized"), (403, "forbidden")]
 )
@@ -1857,7 +1809,6 @@ def test_published_tools_still_honor_next_request_revocation_or_permission_loss(
     ]
 
 
-# @pair mcp-adapter:product-contract
 def test_adapter_executes_only_typed_lifecycle_and_catalog_routes() -> None:
     async def exercise() -> tuple[_WorkflowREST, dict[str, Any]]:
         rest = _WorkflowREST()
@@ -1933,8 +1884,6 @@ def test_adapter_executes_only_typed_lifecycle_and_catalog_routes() -> None:
         validate_value(lifecycle_tools()[0].output_schema, unsafe_actor, phase="output")
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 def test_read_arguments_and_results_are_validated_at_the_dispatch_boundary() -> None:
     async def exercise() -> None:
         rest = _WorkflowREST()
@@ -1971,8 +1920,6 @@ def test_read_arguments_and_results_are_validated_at_the_dispatch_boundary() -> 
     asyncio.run(exercise())
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 def test_lifecycle_transport_and_human_links_fail_closed() -> None:
     adapter = LagniappeAdapter(
         ConnectionConfig(normalize_site_url("https://example.com"), "api-secret")
@@ -2053,8 +2000,6 @@ def test_lifecycle_transport_and_human_links_fail_closed() -> None:
     ) == 1
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 def test_lifecycle_responses_reject_values_outside_the_frozen_contract() -> None:
     adapter = LagniappeAdapter(
         ConnectionConfig(normalize_site_url("https://example.com"), "api-secret")
@@ -2108,7 +2053,6 @@ def test_lifecycle_responses_reject_values_outside_the_frozen_contract() -> None
         asyncio.run(adapter.aclose())
 
 
-# @pair mcp-adapter:product-contract
 def test_submit_refetches_summary_and_preserves_candidate_and_api_errors() -> None:
     details = {"errors": [{"code": "contract_version", "path": "$.contract_version", "message": "Unsupported plan contract version.", "expected": CONTRACT_VERSION_MAX}]}
 
@@ -2174,8 +2118,6 @@ def test_submit_refetches_summary_and_preserves_candidate_and_api_errors() -> No
     )
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/schema.py::validate_schema_document
 @pytest.mark.parametrize("format_name", ["regex", "uri", "date-time", "unknown", None, ["date"]])
 def test_remote_schema_rejects_unreviewed_formats(format_name, monkeypatch) -> None:
     def unexpected_general_validation(_schema):
@@ -2189,10 +2131,6 @@ def test_remote_schema_rejects_unreviewed_formats(format_name, monkeypatch) -> N
     assert error.value.code == "unsupported_schema"
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-# @source mcp/src/lagniappe_mcp/schema.py::validate_schema_document
-# @source mcp/src/lagniappe_mcp/schema.py::validate_value
 @pytest.mark.parametrize("field,value,valid", [
     ("submission", {"textarea-notes": "Keep these notes"}, True),
     ("due_date", None, True),
@@ -2297,7 +2235,6 @@ def test_submit_forwards_date_candidates_and_preserves_api_validation_errors(fie
     asyncio.run(exercise())
 
 
-# @pair mcp-adapter:product-contract
 def test_mcp_v2_results_use_direct_structured_values_and_complete_aliases() -> None:
     success = _success_result(AdapterResult([{"hash": "abcdefghijkl"}]))
     dumped = success.model_dump(by_alias=True, mode="json", exclude_none=True)
@@ -2312,7 +2249,6 @@ def test_mcp_v2_results_use_direct_structured_values_and_complete_aliases() -> N
     assert "structuredContent" not in dumped_error
 
 
-# @pair mcp-adapter:product-contract
 def test_wrapped_result_schema_preserves_local_references() -> None:
     schema = validate_schema_document(
         {
@@ -2366,7 +2302,6 @@ def test_wrapped_result_schema_preserves_local_references() -> None:
             validate_value(wrapped, invalid, phase="output")
 
 
-# @pair mcp-adapter:product-contract
 def test_requested_unsupported_original_is_a_bounded_tool_error() -> None:
     config = ConnectionConfig(normalize_site_url("https://example.com"), "api-secret")
     adapter = LagniappeAdapter(config)
@@ -2441,7 +2376,6 @@ def test_requested_unsupported_original_is_a_bounded_tool_error() -> None:
         asyncio.run(adapter.aclose())
 
 
-# @pair mcp-adapter:product-contract
 def test_requested_missing_original_is_a_bounded_tool_error() -> None:
     config = ConnectionConfig(normalize_site_url("https://example.com"), "api-secret")
     adapter = LagniappeAdapter(config)
@@ -2457,7 +2391,6 @@ def test_requested_missing_original_is_a_bounded_tool_error() -> None:
         asyncio.run(adapter.aclose())
 
 
-# @pair mcp-adapter:product-contract
 def test_original_download_mime_must_match_upstream_file_metadata() -> None:
     """Transport-only file metadata still constrains emitted MCP media."""
     rest = _WorkflowREST()
@@ -2519,8 +2452,6 @@ _MODERN_META = {
 }
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/rest.py::RESTClient
 def test_rest_rejects_encoded_or_over_cap_raw_bodies_before_buffering() -> None:
     class NeverRead(httpx.AsyncByteStream):
         def __init__(self) -> None:
@@ -2614,8 +2545,6 @@ def test_rest_rejects_encoded_or_over_cap_raw_bodies_before_buffering() -> None:
     assert storage_read is False
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 def test_upstream_error_details_use_a_control_free_safe_key_allowlist() -> None:
     api_key = "error-detail-secret-key"
     hostile_url = _signed_download_url()
@@ -2738,9 +2667,6 @@ class _SelectedStartREST(_WorkflowREST):
         return contract, "contract"
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-# @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
 @pytest.mark.parametrize(
     "actions", [None, [], ["create_task"], ["create_task", "create_page"]]
 )
@@ -2837,8 +2763,6 @@ def test_create_start_selected_schemas_and_submit_reuse_one_plan(actions):
     asyncio.run(exercise())
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
 @pytest.mark.parametrize(
     "actions",
     [
@@ -2866,9 +2790,6 @@ def test_create_start_rejects_malformed_selections_before_creating_plan(actions)
     asyncio.run(exercise())
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-# @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
 @pytest.mark.parametrize("failure", ["transport", "disallowed", "unknown"])
 def test_create_start_schema_recovery_preserves_selection_and_created_plan(failure):
     async def exercise():
@@ -2908,8 +2829,6 @@ def test_create_start_schema_recovery_preserves_selection_and_created_plan(failu
     asyncio.run(exercise())
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/schema.py::validate_value
 @pytest.mark.parametrize("bound, limit, value", [("maximum", 50, 100), ("minimum", 1, 0), ("maxLength", 2, "private"), ("maxItems", 1, ["private", "value"])])
 def test_validation_errors_expose_only_safe_bounds(bound, limit, value):
     schema = {"type": "object", "properties": {"limit": {bound: limit}}}
@@ -2996,8 +2915,6 @@ class _LifecycleContextREST(_WorkflowREST):
             raise asyncio.CancelledError()
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 def test_starters_bundle_current_context_without_an_actor_or_inventory_read():
     async def exercise():
         rest = _LifecycleContextREST()
@@ -3040,8 +2957,6 @@ def test_starters_bundle_current_context_without_an_actor_or_inventory_read():
     assert "repeat only the necessary read with the same plan_id" in instructions
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 @pytest.mark.parametrize("failure", ["transport", "oversize", "private", "incompatible"])
 def test_failed_start_context_preserves_the_created_plan_and_offers_only_a_read(
     failure,
@@ -3069,8 +2984,6 @@ def test_failed_start_context_preserves_the_created_plan_and_offers_only_a_read(
     assert sum(target == "plans" for _, target, _ in requests) == 1
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 @pytest.mark.parametrize("failure", [None, "transport", "pending", "different_files"])
 def test_upload_bundles_final_contract_without_replaying_successful_finalization(
     monkeypatch, failure
@@ -3141,8 +3054,6 @@ def test_upload_bundles_final_contract_without_replaying_successful_finalization
         assert contract["required_file_refs"] == ["hash:mnopqrstuvwx"]
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 def test_context_enrichment_remains_cancellable():
     async def exercise():
         rest = _LifecycleContextREST(failure="cancel")
@@ -3158,8 +3069,6 @@ def test_context_enrichment_remains_cancellable():
     asyncio.run(exercise())
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
 def test_mcp_discovery_exposes_tool_purpose_before_shared_workflow():
     async def exercise():
         from lagniappe_mcp.limits import MCP_INSTRUCTIONS
@@ -3224,8 +3133,6 @@ def test_mcp_discovery_exposes_tool_purpose_before_shared_workflow():
     assert "preview_url for authenticated review" in submit
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/catalog.py::catalog_tools
 def test_read_descriptions_localize_result_recovery_without_changing_catalog_schemas():
     catalog = asyncio.run(_WorkflowREST().startup())[2]
     template = catalog["tools"][0]
@@ -3290,7 +3197,6 @@ def test_read_descriptions_localize_result_recovery_without_changing_catalog_sch
     )
 
 
-# @pair mcp-adapter:product-contract
 @pytest.mark.parametrize("mode", ["auto", "legacy"])
 def test_server_presents_matching_schemas_and_values_for_each_protocol(
     mode: str,

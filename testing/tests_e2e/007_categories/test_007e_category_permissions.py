@@ -15,7 +15,6 @@ from testing.utility.network import (
 pytestmark = pytest.mark.e2e
 
 
-# @matrix categories : index-filter permission-gates
 def test_page_acl_user_sees_one_page_on_category_index_home_and_search(get_admin, get_user):
     owner = get_admin()
     category = Categories.acl_two_pages_lab.get(owner)
@@ -40,7 +39,6 @@ def test_page_acl_user_sees_one_page_on_category_index_home_and_search(get_admin
     search.verify_entity_not_in_results(hidden)
 
 
-# @matrix categories : create-control permission-gates
 def test_category_create_scoped_to_one_category(get_admin, get_user):
     owner = get_admin()
     allowed_cat = Categories.acl_create_allowed.get(owner)
@@ -65,7 +63,6 @@ def test_category_create_scoped_to_one_category(get_admin, get_user):
     expect(tools_denied.locate(Category.CATEGORY_FILTERS_TOGGLE)).to_be_visible()
 
 
-# @matrix categories : default-form info-form labels permission-gates readonly
 # @template categories/index.html::tools_section
 # @template categories/tools.html::category_info
 def test_category_viewer_opens_readonly_settings(get_admin, get_user):

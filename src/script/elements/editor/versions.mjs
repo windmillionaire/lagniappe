@@ -4,11 +4,6 @@ import { request } from "../../shared/request.mjs";
 import { base64ToUint8Array } from "../../shared/utilities.mjs";
 import { previewEditor } from "./editor.mjs";
 
-/**
- * @testable true
- * @tests tests_js/test_047_document_versions.mjs::test_replacement_detection_keeps_the_live_document_untouched
- * @matrix editor sync : replacement offline-replay preview
- */
 export function incomingReplacements(ydoc, remote, offline = null) {
 	const candidate = new Y.Doc();
 	try {
@@ -34,13 +29,6 @@ export function incomingReplacements(ydoc, remote, offline = null) {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_js/test_047_document_versions.mjs::test_recovery_failure_preserves_draft_before_merge
- * @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
- * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_draft_is_pinned_before_document_replacement
- * @matrix editor sync : replacement recovery preview restore offline-replay
- */
 export class DocumentVersions {
 	constructor(doc) {
 		this.doc = doc;

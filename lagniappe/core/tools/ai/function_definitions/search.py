@@ -43,9 +43,6 @@ CANDIDATE_SEARCH_DESCRIPTION = (
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_urls_and_result_scrubbing
-# @pair ai:search-url
 def entity_url(result: SearchRecord) -> str:
     entity_ref = result["id"]
     details = result.get("details")
@@ -65,11 +62,6 @@ def entity_url(result: SearchRecord) -> str:
         return f"/{result['kind']}s/{entity_ref}"
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_urls_and_result_scrubbing
-# @tests tests_unit/test_015e_ai_candidate_search.py::test_external_candidates_use_cached_context_without_entity_loading
-# @matrix ai : parent-hydration result-scrubbing
-# @pair ai:search-url
 def format_search_result(result: SearchRecord) -> SearchRecord:
     formatted = dict(result)
     # Build browser links before projecting canonical IDs into tool references.
@@ -89,9 +81,6 @@ def format_search_result(result: SearchRecord) -> SearchRecord:
     return formatted
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/search.py::format_search_result
-# @reason nested hash-token projection is covered through formatted search results
 def _format_detail_hashes(details):
     if not isinstance(details, dict):
         return details
@@ -155,13 +144,6 @@ SEARCH_ENTITIES = types.FunctionDeclaration(
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_filter_arguments
-# @covered-by lagniappe/core/tools/ai/function_definitions/search.py::format_search_result
-# @matrix ai : search-filter search-limit
-# @tests tests_unit/test_015e_ai_candidate_search.py::test_external_candidates_use_cached_context_without_entity_loading
-# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_scope_preserves_full_text_and_exact_modes
-# @matrix ai search : candidate-routing cached-details parent-scope
 def execute_search(args: Mapping[str, object], user: User, *, candidate_search: bool = False) -> Mapping[str, object] | list[dict[str, object]]:
     query = args.get("query", "")
     if not isinstance(query, str):
@@ -243,9 +225,6 @@ def execute_search(args: Mapping[str, object], user: User, *, candidate_search: 
     return [format_search_result(result) for result in results]
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_exact_name_search_is_parent_scoped_and_returns_permissions
-# @matrix ai search : exact-name parent-scope permissions
 def _exact_results_with_permissions(results, user):
     entities = Entities.fetch(
         *[result.get("id") for result in results if result.get("id")],
@@ -267,9 +246,6 @@ def _exact_results_with_permissions(results, user):
     return formatted
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_filter_arguments
-# @pair ai:search-filter
 def _search_kinds(value):
     if value is None:
         return None, []
@@ -296,9 +272,6 @@ def _search_kinds(value):
     return kinds or None, []
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_filter_arguments
-# @pair ai:search-limit
 def _search_limit(value):
     try:
         limit = int(value)

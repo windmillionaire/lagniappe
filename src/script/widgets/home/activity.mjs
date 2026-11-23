@@ -4,9 +4,6 @@ import { setIcon } from "../../shared/icons.mjs";
 import { request } from "../../shared/index.mjs";
 import { withTransition } from "../../shared/transitions.mjs";
 
-/**
- * @testable infrastructure
- */
 export class HomeActivityList extends BaseList {
 	constructor(attributes) {
 		super(attributes);
@@ -41,11 +38,6 @@ export class HomeActivityList extends BaseList {
 		if (record.action === "create") return this._removeByKey(record.client_key);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_delete_activity_item_from_home
-	 * @matrix activity notes notifications : delete
-	 */
 	async deleteActivity(button) {
 		const key = button.dataset.key;
 		const item = button.closest("li[data-key], [lp-entity][data-key]");
@@ -153,11 +145,6 @@ export class HomeActivityList extends BaseList {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_reload_uses_server_state_until_replay
-	 * @pair offline:optimistic-mutation
-	 */
 	_commitRemoveItem(item) {
 		const list = item.closest("ul");
 		item.remove();

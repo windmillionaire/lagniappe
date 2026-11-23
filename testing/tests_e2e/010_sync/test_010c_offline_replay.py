@@ -21,7 +21,6 @@ SYNC_TEXT_FIELD = "sync-text"
 OFFLINE_INDICATOR = "[data-role='offline']"
 
 
-# @matrix offline sync : cached-read empty-content reload save-guard
 # @template pages/document.html::document_tab
 # @template projects/document.html::document_tab
 @pytest.mark.parametrize("kind,content", [("page", "Read without editing"), ("project", "")])
@@ -89,10 +88,6 @@ def _unique(label):
     return f"test-sync-{label}-{uuid4().hex[:8]}"
 
 
-# @source src/script/elements/editor/collaborative.mjs::CollaborativeDocument.sync
-# @source lagniappe/core/tools/document_history.py::recovery_pin
-# @matrix editor sync : replacement recovery offline-replay
-# @matrix document-history : recovery
 # @template projects/document.html::document_tab
 @pytest.mark.parametrize("headless", [False, True])
 def test_offline_draft_is_pinned_before_document_replacement(get_admin, browser_failures, headless):
@@ -218,7 +213,6 @@ def _reconnect_with_sync(user, sync_id):
     wait_for_offline_sync_records(user, sync_id=sync_id, exact=0)
 
 
-# @matrix sync : offline-replay queue-clear replay-order
 def test_offline_document_edits_replay_in_order(get_admin, get_user, browser_failures):
     user = get_admin()
     project = Projects.test_offline_document_replay.get(user)
@@ -244,7 +238,6 @@ def test_offline_document_edits_replay_in_order(get_admin, get_user, browser_fai
     assert replayed.index(first) < replayed.index(second)
 
 
-# @matrix sync : offline-replay queue-preserved
 def test_failed_offline_replay_keeps_queue_and_retries(get_admin, get_user, browser_failures):
     user = get_admin()
     project = Projects.test_offline_document_retry.get(user)
@@ -305,8 +298,6 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_admin, get_user, brow
     expect(project.editor.text_entry).to_contain_text(text)
 
 
-# @matrix polling : current-state cursor document
-# @matrix sync : concurrency document headless headless-widget merge offline-replay queue-clear
 def test_headless_offline_replay_merges_concurrent_remote_edits(
     get_admin, get_user, browser_failures
 ):

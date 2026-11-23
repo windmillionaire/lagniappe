@@ -136,9 +136,6 @@ QUERY_WORKSPACE_FILTER = types.FunctionDeclaration(
 )
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_filter_query.py::test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors
-# @matrix ai-filter : permissions tool-handler validation
 def execute_get_filter_schema(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     """Return a permission-filtered filter schema for a project/category."""
     parent, error = _filter_parent(args, user)
@@ -151,9 +148,6 @@ def execute_get_filter_schema(args: Mapping[str, object], user: User) -> Mapping
         return {"error": str(error)}
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_filter_query.py::test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors
-# @matrix ai-filter : permissions tool-handler validation
 def execute_query_workspace_filter(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     """Compile and execute a permission-filtered shared-cache query."""
     parent, error = _filter_parent(args, user)
@@ -173,10 +167,6 @@ def execute_query_workspace_filter(args: Mapping[str, object], user: User) -> Ma
         return {"error": str(error)}
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/workspace_filter.py::execute_get_filter_schema
-# @covered-by lagniappe/core/tools/ai/function_definitions/workspace_filter.py::execute_query_workspace_filter
-# @reason parent loading and permission checks are asserted through both public handlers
 def _filter_parent(args, user):
     args = args or {}
     identifier = args.get("id")

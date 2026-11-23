@@ -17,7 +17,6 @@ import re
 from lagniappe.core.entities import Entities
 
 
-# @testable infrastructure
 class ProposalReferenceResolver:
     """Resolve stored action, file, and entity references for display."""
 
@@ -202,9 +201,6 @@ class ProposalReferenceResolver:
             or "Action"
         )
 
-    # @testable true
-    # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_humanize_generated_action_ids
-    # @matrix ai-report files : details fallback-labels proposal
     def action_id_label(self, action: ReportAction) -> str | None:
         action_id = action.get("id")
         if not isinstance(action_id, str) or not action_id.strip():
@@ -286,10 +282,6 @@ class ProposalReferenceResolver:
             return label if isinstance(label, str) else None
         return None
 
-    # @testable true
-    # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_existing_page_category_for_attachments
-    # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_resolve_normalized_entity_refs
-    # @matrix ai-report : existing-page-category normalized-references
     def entity_details(self, value: object) -> dict[str, object] | None:
         if not isinstance(value, str):
             return None
@@ -320,9 +312,6 @@ class ProposalReferenceResolver:
             if getattr(entity, "urlsafe_key", None) and getattr(entity, "name", None)
         }
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/reporting/display/references.py::ProposalReferenceResolver.entity_details
-    # @reason entity_details owns recursive discovery of normalized submission references
     def opaque_submission_references(self, value: object) -> list[str]:
         """Collect possible normalized entity ids for schema-aware projection."""
         if isinstance(value, dict):
@@ -339,9 +328,6 @@ class ProposalReferenceResolver:
             return [value]
         return []
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/reporting/display/references.py::ProposalReferenceResolver.entity_details
-    # @reason entity_details owns persisted reference projection and its tests
     def entity_detail(self, entity: Entity) -> dict[str, object]:
         detail = {
             "label": entity.name,

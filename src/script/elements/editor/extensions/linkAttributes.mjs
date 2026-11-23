@@ -8,14 +8,8 @@ const ROUTE_LINK_CLASSES = new Set([
 	"text-user",
 ]);
 
-// @testable false
-// @covered-by src/script/elements/editor/extensions/linkAttributes.mjs::normalizeLinkAttributes
-// @reason helper-owned-by-link-normalizer
 const currentLocation = () => globalThis.window?.location ?? null;
 
-// @testable false
-// @covered-by src/script/elements/editor/extensions/linkAttributes.mjs::normalizeLinkAttributes
-// @reason helper-owned-by-link-normalizer
 const cleanClassName = (className) => {
 	const classes = String(className || "")
 		.split(/\s+/)
@@ -25,9 +19,6 @@ const cleanClassName = (className) => {
 	return classes.length > 0 ? classes.join(" ") : null;
 };
 
-// @testable false
-// @covered-by src/script/elements/editor/extensions/linkAttributes.mjs::normalizeLinkAttributes
-// @reason helper-owned-by-link-normalizer
 const internalLinkDetails = (href) => {
 	const location = currentLocation();
 	const value = String(href || "").trim();
@@ -58,11 +49,6 @@ const internalLinkDetails = (href) => {
 	}
 };
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
- * @matrix editor : internal-link link
- */
 export const normalizeLinkAttributes = (attributes = {}) => {
 	const details = internalLinkDetails(attributes.href);
 

@@ -29,16 +29,10 @@ def _parse_auto_execute(value: object, *, default: bool = False) -> bool:
     raise AISettingsError("Automatic plan execution setting must be a boolean.")
 
 
-# @testable false
-# @covered-by config/ai_settings.py::normalize_ai_settings
-# @reason fallback exception type for setup-time validation without app imports
 class ConfigAISettingsError(ValueError):
     """Raised when AI settings cannot be applied safely."""
 
 
-# @testable false
-# @covered-by config/ai_settings.py::normalize_ai_settings
-# @reason avoids importing the app package while setup creates config files
 def _ai_settings_error_class():
     try:
         from lagniappe.core.exceptions import AISettingsError
@@ -48,9 +42,6 @@ def _ai_settings_error_class():
         return ConfigAISettingsError
 
 
-# @testable false
-# @covered-by config/ai_settings.py::normalize_ai_settings
-# @reason default extraction covered through public normalization tests
 def _default_settings(current_settings=None):
     from config import constants
 
@@ -69,9 +60,6 @@ def _default_settings(current_settings=None):
     }
 
 
-# @testable false
-# @covered-by config/ai_settings.py::normalize_ai_settings
-# @reason validation branch covered through public normalization tests
 def _validate_model(value, kind, model_options, current_value, label):
     from config.ai_models import known_model_ids
 
@@ -81,9 +69,6 @@ def _validate_model(value, kind, model_options, current_value, label):
         raise AISettingsError(f"{label} must be one of the available {kind} models.")
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_settings_normalize_validates_models_and_keeps_current_custom
-# @matrix ai : custom-current model-settings validation
 def normalize_ai_settings(
     ai_settings: Mapping[str, object] | None = None,
     current_settings: Mapping[str, object] | None = None,
@@ -140,9 +125,6 @@ def normalize_ai_settings(
     return values
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_ai_settings_apply_preserves_unowned_app_config
-# @matrix config : ai-settings app-yaml
 def apply_ai_settings(
     app_settings: MutableMapping[str, object] | None = None,
     updated_settings: Mapping[str, object] | None = None,
@@ -178,9 +160,6 @@ def apply_ai_settings(
     return target
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_feature_policy_is_boolean_and_disables_external_access_with_ai
-# @matrix ai-access : site-policy validation
 def normalize_ai_features(settings: Mapping[str, object]) -> dict[str, bool]:
     """Preserve existing installations while enforcing explicit site switches."""
     enabled = settings.get("AI_ENABLED", True)

@@ -38,9 +38,6 @@ CUSTOM = {
 }
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_operator_grants_stay_in_experiments
-# @matrix hosted-e2e setup : iam project-identity
 def bindings(
     project: str,
     app: dict[str, object],
@@ -187,9 +184,6 @@ def bindings(
     return grants
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_operator_checks_both_build_accounts_before_granting_access
-# @matrix hosted-e2e setup : iam project-identity
 def _build_accounts(base, project, *, apply):
     """Discover the two build identities and check the privileges actAs would convey."""
     build = subprocess.check_output(
@@ -224,7 +218,6 @@ def _build_accounts(base, project, *, apply):
     return build, app_engine
 
 
-# @testable infrastructure
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", required=True)

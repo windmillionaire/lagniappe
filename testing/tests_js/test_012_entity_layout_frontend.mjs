@@ -125,7 +125,6 @@ async function setupEntityLayout(t) {
 	};
 }
 
-/** @matrix entity-layout : nested-layout reconcile-callback */
 test("test_entity_layout_ignores_already_consumed_reconcile_callback", async (t) => {
 	const context = await setupEntityLayout(t);
 	const { Entity, elements, events } = context;
@@ -145,7 +144,6 @@ test("test_entity_layout_ignores_already_consumed_reconcile_callback", async (t)
 	assert.equal(view.getComponent(elements.tabsElement).reconcile, null);
 });
 
-/** @pair startup:view-ready */
 test("test_initial_entity_layout_prepares_widget_before_one_transition", async (t) => {
 	const context = await setupEntityLayout(t);
 	const { Entity, elements } = context;
@@ -179,7 +177,6 @@ test("test_initial_entity_layout_prepares_widget_before_one_transition", async (
 	assert.equal(elements.infoElement.dataset.visible, "true");
 });
 
-/** @pair entity-layout:dynamic-secondary */
 test("test_dynamic_mobile_secondary_uses_final_layout_state", async (t) => {
 	const { Entity, elements } = await setupEntityLayout(t);
 	const view = new Entity(elements.root);
@@ -205,7 +202,6 @@ test("test_dynamic_mobile_secondary_uses_final_layout_state", async (t) => {
 	assert.equal(elements.infoElement.dataset.visible, "true");
 });
 
-/** @matrix entity-layout : dynamic-secondary nested-layout page-mobile */
 test("test_overlapping_mobile_layout_updates_keep_secondary_nonpersistent", async (t) => {
 	const { Entity, elements } = await setupEntityLayout(t);
 	const view = new Entity(elements.root);

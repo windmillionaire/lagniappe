@@ -12,15 +12,6 @@ const ROUTES = {
 	task: (key) => `/tasks/${key}/patch`,
 };
 
-/**
- * @testable true
- * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_quick_edit_updates_editable_cell
- * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_quick_edit_keeps_revealed_completed_column_editable
- * @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_quick_edit_renders_checkbox_cells
- * @matrix category-index : checkbox-cell quick-edit
- * @matrix task-index : checkbox-cell column-visibility editable-cell link-affordance quick-edit
- * @matrix table-controls : quick-edit async-preparation pending-save teardown
- */
 export class TableEditor {
 	constructor(attributes) {
 		Object.assign(this, attributes);
@@ -607,13 +598,6 @@ export class TableEditor {
 		for (const cell of this._savedTimers.keys()) this._clearSavedTimer(cell);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_050_table_lifecycle.mjs::test_table_refresh_releases_replaced_and_removed_edits
-	 * @tests tests_js/test_050_table_lifecycle.mjs::test_table_refresh_rejects_pending_fields_and_save_results
-	 * @tests tests_js/test_050_table_lifecycle.mjs::test_table_refresh_preserves_edits_in_unchanged_rows
-	 * @matrix table-controls : quick-edit row-replacement teardown
-	 */
 	releaseRows(rows) {
 		const retired = new Set(rows.filter(Boolean));
 		// View-level deletion can remove a row before the table delta commits.
@@ -672,11 +656,6 @@ export class TableEditor {
 		if (this.visible) this._commitPreparedCheckboxes();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_050_table_lifecycle.mjs::test_table_editor_destroy_releases_fields_listeners_and_pending_work
-	 * @matrix table-controls : quick-edit teardown
-	 */
 	destroy() {
 		if (this._destroyed) return;
 		this._destroyed = true;

@@ -6,9 +6,6 @@ import { captureError, request } from "../shared/index.mjs";
 import { withTransition } from "../shared/transitions.mjs";
 import { FormWidget } from "./base/formWidget.mjs";
 
-/**
- * @testable infrastructure
- */
 export class PageForm extends FormWidget {
 	constructor(attributes) {
 		super(attributes);
@@ -117,12 +114,6 @@ export class PageForm extends FormWidget {
 		return section;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_category_to_page
-	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_remove_category_from_page
-	 * @matrix pages : category-add category-remove
-	 */
 	get categoriesElement() {
 		return this._facetElement('[data-role="categories"]');
 	}
@@ -131,13 +122,6 @@ export class PageForm extends FormWidget {
 		return sections.autofill(this);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_photo_controls_toggle_and_remember_desktop_visibility
-	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_readonly_viewer_can_toggle_image_without_editing
-	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_image_changes_preserve_page_info_dom_and_draft
-	 * @matrix pages : photo-prompt photo-visibility readonly desktop-tabs unsaved-preservation
-	 */
 	get prepend() {
 		let imageControls = this.target.querySelector("[data-role='photo-prompt']");
 		if (this.revisionPreview) {
@@ -170,11 +154,6 @@ export class PageForm extends FormWidget {
 		return control.elt;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/pageInfo.mjs::CreatePage
-	 * @reason related-form badge parsing is private CreatePage UI plumbing
-	 */
 	_relatedFormDetails(badge) {
 		try {
 			return JSON.parse(badge.dataset.details || "{}");
@@ -184,13 +163,6 @@ export class PageForm extends FormWidget {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
- * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
- * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
- * @matrix pages : lp-offline permission-gates readonly
- */
 export class PageInfo extends PageForm {
 	constructor(attributes) {
 		super(attributes);
@@ -208,11 +180,6 @@ export class PageInfo extends PageForm {
 		this.target.addEventListener("updated", this._changeForm);
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/pageInfo.mjs::PageInfo
-	 * @reason detached page-info resets retain the form-selection listener
-	 */
 	async prepareReset(options = {}) {
 		const afterInit = options.afterInit;
 		await super.prepareReset({
@@ -258,12 +225,6 @@ export class PageInfo extends PageForm {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_switch_page_form
-	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_clear_page_info_form_selector_keeps_widget_stable
-	 * @matrix pages : form-clear form-switch info-form
-	 */
 	async _changeForm(e) {
 		if (!e.target.closest("[data-role='form-select']")) return;
 
@@ -318,17 +279,6 @@ export class PageInfo extends PageForm {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_from_category_index
- * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
- * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_related_form_badge_selects_form
- * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filters_hide_create_page_tool
- * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
- * @matrix pages : category-index create mobile-tools related-forms tool-switch
- * @matrix pages : required-name
- * @pair deferred-jobs:hosted-e2e
- */
 export class CreatePage extends PageForm {
 	constructor(attributes) {
 		super(attributes);
@@ -339,11 +289,6 @@ export class CreatePage extends PageForm {
 		};
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/widgets/pageInfo.mjs::CreatePage
-	 * @reason page creation requires a name even when its fields come from an attached form
-	 */
 	async init() {
 		await super.init();
 		const name = this.target.querySelector("input[name='name']");

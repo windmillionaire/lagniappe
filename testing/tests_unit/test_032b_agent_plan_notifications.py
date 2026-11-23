@@ -70,7 +70,6 @@ def publication_store(monkeypatch):
     return store
 
 
-# @pairs agent-api:atomic-checkpoint agent-api:creator-bound agent-api:ready-state notifications:idempotency notifications:ordinary-count
 @pytest.mark.parametrize("tool", ["ask", "create", "organize"])
 def test_publication_notification_commits_with_plan_and_survives_replay(publication_store, tool):
     store = publication_store
@@ -162,7 +161,6 @@ def test_publication_notification_commits_with_plan_and_survives_replay(publicat
         assert (store.get(notification_key) is None) is dismissed
 
 
-# @matrix agent-api notifications : cache-failure-isolation idempotency target
 def test_publication_delivery_retries_cache_and_email_without_recreating_dismissed_alerts(
     publication_store, monkeypatch
 ):
@@ -219,8 +217,6 @@ def test_publication_delivery_retries_cache_and_email_without_recreating_dismiss
     assert store.get(key) is None
 
 
-# @source lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @pair agent-api:claim
 @pytest.mark.parametrize("phase", ["create", "finalize", "submit"])
 @pytest.mark.parametrize("version", [None, REPORT_FORMAT_VERSION - 1, REPORT_FORMAT_VERSION + 1])
 def test_unavailable_report_formats_cannot_claim_plan_operations(publication_store, phase, version):

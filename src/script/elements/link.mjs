@@ -5,9 +5,6 @@ import { FacetsBox } from "./combobox/index.mjs";
 import { formatting } from "./formatting.mjs";
 import { primitives } from "./primitives.mjs";
 
-/**
- * @testable infrastructure
- */
 export class LinkElement extends BaseElement {
 	constructor(renderer, schema, submission) {
 		super(renderer, schema, submission);
@@ -48,11 +45,6 @@ export class LinkElement extends BaseElement {
 		return true;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_link_submission
-	 * @pair form-link:read-layout
-	 */
 	get read() {
 		if (this._read) return this._read;
 		if (!this.submission) return null;

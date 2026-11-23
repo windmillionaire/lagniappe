@@ -65,7 +65,6 @@ def _fixture():
     return parent, category
 
 
-# @matrix filters : legacy limits malformed request-contract versioning
 @pytest.mark.unit
 def test_parse_filter_request_distinguishes_malformed_and_semantic_errors():
     with pytest.raises(contract.FilterContractError) as malformed:
@@ -94,7 +93,6 @@ def test_parse_filter_request_distinguishes_malformed_and_semantic_errors():
     assert version.value.code == "version"
 
 
-# @matrix filters : compatibility legacy saved-filter
 @pytest.mark.unit
 def test_legacy_definitions_discard_client_type_flags():
     parent, _category = _fixture()
@@ -112,7 +110,6 @@ def test_legacy_definitions_discard_client_type_flags():
     assert compiled.contract["conditions"][0]["values"] == [2.5]
 
 
-# @matrix filters : authorization compilation limits normalization validation
 @pytest.mark.unit
 def test_compile_filter_contract_rederives_types_authorizes_entities_and_bounds_input(
     monkeypatch,
@@ -164,7 +161,6 @@ def test_compile_filter_contract_rederives_types_authorizes_entities_and_bounds_
         contract.compile_filter_contract(parent, too_many, object())
 
 
-# @matrix filters permissions : authorization legacy saved-filter validation
 @pytest.mark.unit
 def test_saved_filter_compiles_legacy_data_per_viewer():
     viewer = object()

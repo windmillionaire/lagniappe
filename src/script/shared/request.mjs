@@ -19,33 +19,12 @@ const UPSTREAM_RESET_PATTERN =
 	/upstream connect error|disconnect\/reset before headers|connection termination/i;
 let _tokenRefresh = null;
 
-/**
- * @testable true
- * @tests tests_js/test_009_request_csrf.mjs::test_non_csrf_bad_request_is_not_retried
- * @matrix csrf request-errors : retry-classification
- */
 const csrfFailed = (response) =>
 	response.status === 400 &&
 	response.headers.get(CSRF_FAILURE_HEADER)?.toLowerCase() === "invalid";
 
-/**
- * @testable false
- * @covered-by src/script/shared/request.mjs::_request
- * @reason CSRF token lookup is part of the shared request envelope
- */
 const _getToken = () => document.getElementById("token")?.value;
 
-/**
- * @testable true
- * @tests tests_js/test_009_request_csrf.mjs::test_request_exposes_service_worker_updated_marker
- * @tests tests_js/test_009_request_csrf.mjs::test_request_exposes_client_cache_invalidation_marker
- * @tests tests_js/test_009_request_csrf.mjs::test_request_dispatches_entity_fingerprint_acknowledgement
- * @tests tests_js/test_009_request_csrf.mjs::test_request_supports_conditional_post_not_modified
- * @matrix cache : conditional-response dom-refresh etag invalidation reload
- * @matrix deferred-jobs : conditional-response etag
- * @matrix edited-entity-notice : acknowledgement multiple-entities response-headers
- * @matrix request : acknowledgement conditional-response dom-refresh etag invalidation multiple-entities reload response-headers
- */
 const _formatResponse = async (
 	response,
 	{ acknowledgeEntities = true } = {},
@@ -107,11 +86,6 @@ const _formatResponse = async (
 	return result;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/request.mjs::_request
- * @reason upload overload detection is part of the shared error envelope
- */
 const _isUploadBody = (body) => {
 	if (!(body instanceof FormData)) return false;
 	if (typeof body.has === "function" && body.has("direct_uploads")) return true;
@@ -125,11 +99,6 @@ const _isUploadBody = (body) => {
 	return false;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/request.mjs::_request
- * @reason proxy reset wording is not useful in upload forms
- */
 const _friendlyError = (message, { body = null } = {}) => {
 	if (_isUploadBody(body) && UPSTREAM_RESET_PATTERN.test(message || "")) {
 		return UPSTREAM_UPLOAD_OVERLOAD_ERROR;
@@ -137,16 +106,6 @@ const _friendlyError = (message, { body = null } = {}) => {
 	return message;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_009_request_csrf.mjs::test_plain_text_upstream_error_stays_in_request_error_path
- * @tests tests_js/test_009_request_csrf.mjs::test_request_can_return_html_error_without_replacing_page
- * @tests tests_js/test_009_request_csrf.mjs::test_application_marked_html_error_keeps_existing_behavior
- * @tests tests_js/test_009_request_csrf.mjs::test_request_parses_conflict_replacement_for_form_review
- * @matrix edited-entity-notice : non-invasive-probe reload-fallback structured-conflict
- * @matrix request-errors : ajax-upload non-invasive-probe proxy-text-error reload-fallback
- * @matrix request-errors : application-error-marker dom-replacement structured-conflict
- */
 const _formatError = async (
 	response,
 	{ replaceErrorPage = true, ...context } = {},
@@ -211,11 +170,6 @@ const _formatError = async (
 	};
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/request.mjs::_request
- * @reason token refresh is the retry branch of the shared request wrapper
- */
 const _refreshToken = async () => {
 	try {
 		const response = await fetch("/l/token", TOKEN_REQUEST);
@@ -239,11 +193,6 @@ const _refreshToken = async () => {
 	}
 };
 
-/**
- * @testable true
- * @tests tests_js/test_009_request_csrf.mjs::test_concurrent_stale_writes_share_server_controlled_token_refresh
- * @matrix csrf : concurrent-refresh stale-token
- */
 const refreshToken = async () => {
 	if (!_tokenRefresh) {
 		_tokenRefresh = _refreshToken().finally(() => {
@@ -253,11 +202,6 @@ const refreshToken = async () => {
 	return _tokenRefresh;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/request.mjs::_request
- * @reason POST helper delegates to the shared request wrapper
- */
 const postRequest = async (
 	url,
 	body,
@@ -272,54 +216,23 @@ const postRequest = async (
 	});
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/request.mjs::_request
- * @reason PATCH helper delegates to the shared request wrapper
- */
 const patchRequest = async (url, body) => {
 	return _request(url, { method: "PATCH", body });
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/request.mjs::_request
- * @reason DELETE helper delegates to the shared request wrapper
- */
 const deleteRequest = async (url, body) => {
 	return _request(url, { method: "DELETE", body });
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/request.mjs::_request
- * @reason GET helper delegates to the shared request wrapper
- */
 const getRequest = async (url, params = null, options = {}) => {
 	url = params ? `${url}?${new URLSearchParams(params).toString()}` : url;
 	return _request(url, { method: "GET", ...options });
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/request.mjs::_request
- * @reason PUT helper delegates to the shared request wrapper
- */
 const putRequest = async (url, body, options = {}) => {
 	return _request(url, { method: "PUT", body, ...options });
 };
 
-/**
- * @testable true
- * @tests tests_js/test_009_request_csrf.mjs::test_request_supports_conditional_post_not_modified
- * @tests tests_js/test_009_request_csrf.mjs::test_request_preserves_structured_validation_error
- * @tests tests_js/test_009_request_csrf.mjs::test_request_preserves_plain_validation_error
- * @matrix deferred-jobs request : post-headers
- * @matrix csrf : stale-token
- * @matrix polling : diagnostics structured-validation
- * @matrix request-errors : diagnostics dom-preservation no-replay outcome-uncertain plain-validation structured-validation upstream-unavailable
- * @pair request:abort-signal
- */
 const _request = async (
 	url,
 	{
@@ -362,11 +275,6 @@ const _request = async (
 	if (!CSRF_METHODS.has(method)) {
 		delete headers["X-CSRFToken"];
 	}
-	/**
-	 * @testable false
-	 * @covered-by src/script/shared/request.mjs::_request
-	 * @reason both the initial response and the CSRF-refresh response share this classifier boundary
-	 */
 	const classifyUpstream = (response, allowRetry = retryUpstream) =>
 		handleUpstreamResponse(response, {
 			method,

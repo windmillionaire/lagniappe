@@ -27,7 +27,6 @@ def field(kind, **settings):
     return {"id": "answer", "title": "Answer", **schema, **settings}
 
 
-# @matrix form-migration : capabilities no-submission-read
 def test_capabilities_are_schema_only():
     catalog = conversion_catalog()
     assert catalog["version"] == 2
@@ -69,7 +68,6 @@ def test_capabilities_are_schema_only():
         )
 
 
-# @matrix form-migration : schema-diff identity validation
 def test_schema_diff_preserves_ids_and_rejects_unsupported_changes():
     source = field("radio", options=[{"value": "a", "label": "One"}])
     assert (
@@ -114,7 +112,6 @@ def test_schema_diff_preserves_ids_and_rejects_unsupported_changes():
             classify_changes([before], [after] if after else [])
 
 
-# @matrix form-migration : conversion invalid-value presence provider-free
 @pytest.mark.parametrize(
     "source,target,value,expected,expected_reason",
     [
@@ -163,7 +160,6 @@ def test_scalar_conversions_and_invalid_values(
     assert reason == expected_reason
 
 
-# @matrix form-migration : conversion invalid-value presence nested-columns provider-free
 def test_table_and_collection_conversions():
     options = [{"value": "yes-id", "label": "Yes"}, {"value": "no-id", "label": "No"}]
     radio, multi = field("radio", options=options), field("multiple", options=options)
@@ -223,7 +219,6 @@ def test_table_and_collection_conversions():
     assert "old" in convert_value(rows, before, field("textarea"))[0]
 
 
-# @matrix form-migration : notice preservation presence repeated-change
 def test_submission_notice_preserves_first_values_and_unrelated_answers():
     first = classify_changes([field("text")], [field("number")])
     values, notice = convert_submission({"answer": "012", "unrelated": False}, first)

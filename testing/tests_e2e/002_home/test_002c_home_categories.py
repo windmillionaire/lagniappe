@@ -86,7 +86,6 @@ def _create_category(user, home, definition, *, results=None, browser_failures=N
     return new_category_key
 
 
-# @matrix categories : attach-form manual-form
 @pytest.mark.e2e
 def test_create_category_form(get_admin, get_user):
     """
@@ -120,7 +119,6 @@ def test_create_category_form(get_admin, get_user):
     expect(form).not_to_be_visible()
 
 
-# @matrix categories : ai-form manual-form
 @pytest.mark.e2e
 def test_category_form_generate_toggle(get_admin, get_user):
     """
@@ -150,7 +148,6 @@ def test_category_form_generate_toggle(get_admin, get_user):
     expect(ai_description).not_to_be_visible()
 
 
-# @matrix categories : retired-preview no-create
 @pytest.mark.e2e
 def test_retired_initial_prompt_request_cannot_create_category(
     get_admin, get_user, browser_failures
@@ -175,7 +172,6 @@ def test_retired_initial_prompt_request_cannot_create_category(
     assert response["text"] == "Initial Prompt is no longer available."
 
 
-# @pair categories:create-manual
 @pytest.mark.e2e
 def test_create_category_manual_mode(get_admin, get_user):
     """
@@ -193,7 +189,6 @@ def test_create_category_manual_mode(get_admin, get_user):
     header_search.verify_entity_in_results(category)
 
 
-# @matrix categories : ai-create ai-generated
 @pytest.mark.ai
 def test_create_category_ai_mode(get_admin, get_user, results, browser_failures):
     """
@@ -213,7 +208,6 @@ def test_create_category_ai_mode(get_admin, get_user, results, browser_failures)
     results.record("category", category.entity.db)
 
 
-# @pair categories:navigate
 # @scaffolding testing/elements/containers.py::List.find_item
 @pytest.mark.e2e
 def test_navigate_to_category(get_admin, get_user):
@@ -233,7 +227,6 @@ def test_navigate_to_category(get_admin, get_user):
     expect(user.page).to_have_title(re.compile(category.definition.name))
 
 
-# @matrix categories : attach-form create-manual
 @pytest.mark.e2e
 def test_create_category_with_form(get_admin, get_user):
     """
@@ -258,8 +251,6 @@ def test_create_category_with_form(get_admin, get_user):
     assert FormSelect(new_page_form).contains(category_form)
 
 
-# @pair categories:delete
-# @matrix categories : cascade model-category
 # @template categories/index.html::view_header
 # @template menus.html::title
 # @template menus.html::delete

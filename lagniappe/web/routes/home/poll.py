@@ -48,10 +48,6 @@ POLL_AFTER_MS = {
 }
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001j_poll_batching.py::test_poll_batches_auth_entities_and_channels
-# @tests tests_e2e/001_site/test_001j_poll_batching.py::test_poll_batching_preserves_validation_and_stale_session_recovery
-# @matrix polling auth : batching session-preload fallback validation
 def _poll_context():
     """Share only validated, bounded polling roots with the fresh auth lookup."""
     try:
@@ -74,9 +70,6 @@ def _poll_context():
     }
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/poll.py::poll
-# @reason common result envelope is exercised through polling route coverage
 def _result(
     descriptor,
     status,
@@ -102,9 +95,6 @@ def _result(
     return result
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/poll.py::poll
-# @reason per-type changed/unchanged projection is exercised through route coverage
 def _revision_result(descriptor, revision, payload=None):
     changed = descriptor["revision"] != revision
     return _result(
@@ -115,9 +105,6 @@ def _revision_result(descriptor, revision, payload=None):
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/poll.py::poll
-# @reason entity permission projection is exercised through route coverage
 def _entity_result(descriptor, entity, *, ingress=False):
     if not entity or not entity.allowed(Action.VIEW, user=authenticated_user()):
         return _result(descriptor, "unavailable")
@@ -136,10 +123,6 @@ def _entity_result(descriptor, entity, *, ingress=False):
     return _revision_result(descriptor, revision, payload)
 
 
-# @testable true
-# @tests tests_e2e/010_sync/test_010d_document_poll.py::test_document_poll_loads_storage_only_on_cache_miss
-# @tests tests_e2e/010_sync/test_010d_document_poll.py::test_document_poll_rejects_unavailable_documents_before_loading_state
-# @matrix polling : authorization document read-path unavailable
 def _document_result(descriptor, entity, client_id):
     if not entity or not entity.allowed(Action.VIEW, user=authenticated_user()):
         return _result(descriptor, "unavailable")
@@ -169,19 +152,6 @@ def _document_result(descriptor, entity, client_id):
     )
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001f_edited_entities.py::test_poll_endpoint_batches_entity_changes
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
-# @tests tests_e2e/001_site/test_001f_edited_entities.py::test_cold_notification_state_seeds_through_one_poll
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
-# @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_presence_appears_and_clears
-# @matrix notifications : cold-seed ping redis-projection
-# @matrix polling : authorization batching channel entity fingerprint identifiers operation owner permissions personal-state piggyback progress protocol revision timing unavailable validation
-# @matrix permissions : batching authorization
-# @pairs notifications:deferred sync:presence web-headers:notification-state
 @internal.route("/poll", methods=["POST"])
 @logged_in(context=_poll_context)
 def poll() -> ResponseReturnValue:

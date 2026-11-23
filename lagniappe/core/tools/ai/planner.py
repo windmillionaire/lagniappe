@@ -66,9 +66,6 @@ REPORT_READ_TOOLS = (
 )
 
 
-# @testable true
-# @tests tests_unit/test_020b_ai_planner.py::test_report_prompt_uses_shared_tools_and_selected_schemas
-# @matrix ai-report : prompt permissions tools
 def report_response_schema() -> ReportResponseSchema:
     """Small discovery envelope; selected action schemas are retrieved as tools."""
     return {
@@ -86,9 +83,6 @@ def report_response_schema() -> ReportResponseSchema:
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/planner.py::report_response_schema
-# @reason shared native and external upload classification contract
 def file_usage_schema() -> dict[str, object]:
     return {
         "type": "array",
@@ -104,9 +98,6 @@ def file_usage_schema() -> dict[str, object]:
     }
 
 
-# @testable true
-# @tests tests_unit/test_020b_ai_planner.py::test_file_usage_requires_exact_coverage_and_files_only_filing
-# @matrix ai-report : validation file-placement
 def validate_file_usage(
     file_usage: object, file_refs: Iterable[str], *, require_organization: bool = False, read_only: bool = False
 ) -> list[FileUsage]:
@@ -143,10 +134,6 @@ def validate_file_usage(
     return deepcopy(file_usage)
 
 
-# @testable true
-# @tests tests_unit/test_020b_ai_planner.py::test_report_prompt_uses_shared_tools_and_selected_schemas
-# @tests tests_unit/test_020b_ai_planner.py::test_native_and_external_plans_share_personal_page_guidance
-# @matrix ai-report : prompt permissions tools file-placement
 def report_prompt(report: AIReport, user: User, feedback: str | None = None) -> Prompt:
     can_create = user.access(AI.CREATE)
     allowed = allowed_report_actions(user) if can_create else ()
@@ -261,18 +248,9 @@ never silently discard a file.
     return prompt
 
 
-# @testable true
-# @tests tests_unit/test_020b_ai_planner.py::test_generate_report_validates_answers_actions_and_file_usage
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @matrix ai-report : generate validation file-placement
-# @matrix ai-report : ask live-provider usable-answer
 def generate_report(prompt: Prompt) -> GeneratedReport:
     """Validate final output in the same provider conversation, including repairs."""
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/planner.py::generate_report
-    # @reason validation callback is exercised through report generation
     def validate_response(response: object) -> GeneratedReport:
         if not isinstance(response, dict):
             raise exceptions.AIException("Report response must be an object.")

@@ -6,9 +6,6 @@ from runner.presentation import output as print
 from installer.errors import SetupError
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_auth_uses_explicit_browser_flow
-# @matrix auth setup : adc explicit-command gcloud-token interactive
 def authenticate() -> int:
     """Refresh the saved gcloud login and align human ADC for this checkout."""
     from runner.gcloud import activate_repository_gcloud

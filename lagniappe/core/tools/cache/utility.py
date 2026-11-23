@@ -19,11 +19,6 @@ MISSING_INDEX_MESSAGES = (
 )
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-# @tests tests_unit/test_017_cache_query.py::test_delete_cache_flushes_db_and_recreates_indexes
-# @tests tests_unit/test_017_cache_query.py::test_delete_cache_clears_only_prefixed_keys_and_recreates_indexes
-# @matrix cache : flush-db prefix-isolation rebuild redis-connection
 def delete_cache() -> None:
     """Clear this environment's cache and recreate its search indexes."""
     if CONFIG.PREFIX:
@@ -37,11 +32,6 @@ def delete_cache() -> None:
     ensure_help()
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-# @tests tests_unit/test_017_cache_query.py::test_cleanup_test_data_ignores_redis_missing_search_index_errors
-# @tests tests_unit/test_017_cache_query.py::test_cleanup_test_data_reraises_unexpected_drop_index_errors
-# @matrix cache : cleanup index-recreation missing-search-index redis-errors
 def cleanup_test_data() -> None:
     """Delete all keys and search indexes scoped to the configured prefix."""
     if not CONFIG.PREFIX:
@@ -56,9 +46,6 @@ def cleanup_test_data() -> None:
     _drop_index_if_exists(filter_cache.INDEX)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/utility.py::cleanup_test_data
-# @reason missing-index handling is part of cleanup_test_data
 def _drop_index_if_exists(index):
     try:
         cache.drop_index(index)
@@ -69,9 +56,6 @@ def _drop_index_if_exists(index):
         raise
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_cache_delete_removes_page_and_user_search_projections
-# @pairs cache:delete search:user-projection
 def delete(entities: Collection[Entity | None]) -> None:
     """Remove entities from both the hash cache and parent JSON indexes."""
     hash_map = {e.hash: e for e in entities if e and e.hash}
@@ -106,9 +90,6 @@ def delete(entities: Collection[Entity | None]) -> None:
         pipe.execute()
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/common_entity.py::Hash
-# @reason collision check when generating entity hashes
 def check_hash(hash: str) -> bool:
     """Return whether a hash exists in the entity hash index."""
     return bool(cache.hget(Keys.ENTITY_HASHES.value, hash))

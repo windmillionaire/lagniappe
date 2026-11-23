@@ -17,9 +17,6 @@ from lagniappe.core.tools.database import migrations as database_migrations
 from lagniappe.core.tools.database import site as site_database
 
 
-# @testable true
-# @tests tests_unit/test_026_site_admin.py::test_deployment_settings_merge_live_values_over_runtime_defaults
-# @matrix admin : config deployment-settings metadata
 def load_deployment_settings(*, config: Config | None = None) -> dict[str, object]:
     """Load normalized deployment settings with live values taking precedence."""
     config = config or CONFIG
@@ -41,9 +38,6 @@ def load_deployment_settings(*, config: Config | None = None) -> dict[str, objec
     return normalize_deployment_settings(defaults, enforce_worker_limit=False)
 
 
-# @testable true
-# @tests tests_unit/test_026_site_admin.py::test_ai_settings_payload_normalizes_runtime_settings_against_discovery
-# @matrix admin : ai-settings config metadata
 def load_ai_settings_payload(settings: Mapping[str, object] | None = None, *, config: Config | None = None) -> tuple[dict[str, object], ModelOptions]:
     """Load normalized runtime AI settings and current model options."""
     config = config or CONFIG
@@ -64,9 +58,6 @@ def load_ai_settings_payload(settings: Mapping[str, object] | None = None, *, co
     )
 
 
-# @testable true
-# @tests tests_unit/test_026_site_admin.py::test_site_updates_return_the_migration_report
-# @matrix admin : audit site-update
 def run_site_updates() -> database_migrations.MigrationStatus:
     """Run data migrations and return their complete status report."""
     return database_migrations.run_data_migrations()

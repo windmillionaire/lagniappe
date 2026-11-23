@@ -7,16 +7,10 @@ from collections.abc import Mapping, MutableMapping
 PUBLIC_PAGE_SETTING_KEYS = ("PUBLIC_PAGE_INDEXING",)
 
 
-# @testable false
-# @covered-by config/public_pages.py::normalize_public_page_settings
-# @reason setup-safe validation type is exercised through the public normalizer
 class ConfigPublicPageSettingsError(ValueError):
     """Raised when public-page settings cannot be applied safely."""
 
 
-# @testable false
-# @covered-by config/public_pages.py::normalize_public_page_settings
-# @reason private coercion is exercised through the public normalizer
 def _boolean(value: object) -> bool:
     if isinstance(value, bool):
         return value
@@ -32,9 +26,6 @@ def _boolean(value: object) -> bool:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_public_page_settings_normalize_boolean_values
-# @matrix config : public-page-indexing validation
 def normalize_public_page_settings(
     settings: Mapping[str, object] | None = None,
     current_settings: Mapping[str, object] | None = None,
@@ -55,9 +46,6 @@ def normalize_public_page_settings(
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_public_page_settings_apply_preserves_unowned_app_config
-# @matrix config : app-yaml public-page-indexing
 def apply_public_page_settings(
     app_settings: MutableMapping[str, object] | None = None,
     updated_settings: Mapping[str, object] | None = None,

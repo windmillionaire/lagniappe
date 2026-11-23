@@ -37,9 +37,6 @@ from .base import DeferredJobAdapter
 from ..locks import deferred_job_lock_key
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_adapter_checks_all_values_before_applying
-# @matrix form-migration : preflight batch-job publication recovery
 class FormChangeAdapter(DeferredJobAdapter):
     job_type = DeferredJobType.FORM_CHANGE
     required_ai_access = None
@@ -151,9 +148,6 @@ class FormChangeAdapter(DeferredJobAdapter):
             if not cursor:
                 return context.checkpoint
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/deferred_jobs/adapters/form_change.py::FormChangeAdapter
-    # @reason validate the complete scope again after a checkpoint resume, before the first write
     def verify_scope(
         self, context: DeferredJobContext, form: Form, change: PendingFormChange
     ) -> None:
@@ -247,10 +241,6 @@ class FormChangeAdapter(DeferredJobAdapter):
         self.publish(context)
         return {"form": form.urlsafe_key, "processed": count}
 
-    # @testable true
-    # @tests tests_unit/test_004l_form_schema_updates.py::test_worker_checkpoints_ai_before_write_and_external_execution_is_provider_free
-    # @matrix form-migration : ai-checkpoint external-provider-free retry
-    # @pair form-migration:ai-telemetry
     def prepare_ai_target(
         self, context: DeferredJobContext, change: PendingFormChange, target: Page | Task
     ) -> Mapping[str, Mapping[str, object]]:
@@ -334,9 +324,6 @@ class FormChangeAdapter(DeferredJobAdapter):
         )
         return prepared
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/deferred_jobs/adapters/form_change.py::FormChangeAdapter.prepare_ai_target
-    # @reason prepared output is loaded only from the immutable approved report
     def report_candidates(
         self, context: DeferredJobContext, change: PendingFormChange
     ) -> list[PreparedCandidate]:
@@ -411,9 +398,6 @@ class FormChangeAdapter(DeferredJobAdapter):
                 "Some submissions may already be updated. Retry this change to finish it."
             )
 
-    # @testable true
-    # @tests tests_unit/test_004l_form_schema_updates.py::test_preflight_rejection_releases_only_unapplied_change
-    # @matrix form-migration : permissions preflight ownership
     def failure(self, context: DeferredJobContext, error: BaseException | str) -> None:
         from lagniappe.core.tools.forms.schema_updates import (
             RESTRICTED_MESSAGE,

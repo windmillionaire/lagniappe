@@ -1,9 +1,5 @@
 from .field_host import FieldHost
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_entity.py::Name.ai_key
-# @covered-by lagniappe/core/properties/form_inputs.py::TextInput
-# @covered-by lagniappe/core/properties/form_textarea.py::Textarea
 class AIMixin(FieldHost):
     """Adds AI context output. Collected by Entity.to_ai().
 

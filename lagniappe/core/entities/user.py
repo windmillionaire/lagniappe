@@ -42,9 +42,6 @@ class UserCreationData(TypedDict, total=False):
     test_user: bool
 
 
-# @testable true
-# @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
-# @pair user:entity-lifecycle
 class User(AssetMixin, UserMixin, Entity):
     if TYPE_CHECKING:
         notification_email_mode: str
@@ -91,9 +88,6 @@ class User(AssetMixin, UserMixin, Entity):
             }
         )
 
-    # @testable true
-    # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
-    # @matrix user : page-canonical search-cache
     @property
     def to_cache(self) -> dict[str, object]:
         return {}
@@ -102,12 +96,6 @@ class User(AssetMixin, UserMixin, Entity):
     def required(self) -> list[str]:
         return ["users", *[g.hash for g in self.groups]]
 
-    # @testable true
-    # @tests tests_unit/test_009b_user_permissions.py::test_user_visibility_uses_users_and_group_permissions_without_page_restrictions
-    # @tests tests_unit/test_009b_user_permissions.py::test_privileged_user_rows_are_owner_managed
-    # @matrix admin : delete edit privileged-account view
-    # @matrix users : group-view owner restriction-independence users-view
-    # @pair owner:owner-only
     def allowed(self, action: Action, user: FieldUser = None) -> bool:
         """Authorize user rows from their own Users/group permission scope."""
         viewer = current_context_user(user)
@@ -123,16 +111,6 @@ class User(AssetMixin, UserMixin, Entity):
             viewer and viewer.is_authenticated and viewer.has_permission(self, action)
         )
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/user_entity.py::Email
-    # @covered-by lagniappe/core/properties/user_entity.py::LastLogin
-    # @covered-by lagniappe/core/properties/user_entity.py::IsOwner
-    # @covered-by lagniappe/core/properties/user_entity.py::ProfilePhoto
-    # @covered-by lagniappe/core/properties/user_related.py::UserPage
-    # @covered-by lagniappe/core/properties/user_related.py::Groups
-    # @covered-by lagniappe/core/properties/user_permissions.py::UserPermissions
-    # @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions
-    # @reason property registry wires behavior owned by concrete user property classes
     def _get_properties(self):
         properties = super()._get_properties()
         properties.update(
@@ -167,19 +145,12 @@ class User(AssetMixin, UserMixin, Entity):
     def is_anonymous(self) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride] -- A missing user row represents an anonymous session.
         return not self.is_authenticated
 
-    # @testable true
-    # @tests tests_unit/test_009b_user_permissions.py::test_user_permissions_fingerprint_tracks_permissions_and_owner_state
-    # @matrix permissions : empty-permissions fingerprint stored-permissions
-    # @pair cache:role
     @property
     def permissions_fingerprint(self) -> str:
         permissions = "" if self.is_admin else self.db.get("permissions", "{}")
         # Permission maps are persisted as JSON strings by Permissions.value.
         return hashlib.md5(cast(str, permissions).encode("utf-8")).hexdigest()
 
-    # @testable true
-    # @tests tests_unit/test_009f_user_ai_access.py::test_user_access_is_independent_hierarchical_and_fail_closed
-    # @matrix ai-access : authentication hierarchy owner-no-bypass permissions-independent site-policy
     def access(self, required: AI) -> bool:
         """Check this user's independent AI entitlement."""
         if (
@@ -191,11 +162,6 @@ class User(AssetMixin, UserMixin, Entity):
             return False
         return AI[self.ai_access].implies(required)
 
-    # @testable true
-    # @tests tests_unit/test_009f_user_ai_access.py::test_authorization_fingerprint_tracks_ai_access
-    # @tests tests_unit/test_009b_user_permissions.py::test_authorization_fingerprint_tracks_group_membership
-    # @matrix permissions cache : authorization-fingerprint group-membership
-    # @matrix ai-access cache : authorization-fingerprint entitlement permissions site-policy
     @property
     def authorization_fingerprint(self) -> str:
         role = "owner" if self.is_owner else "admin" if self.is_admin else "user"
@@ -216,12 +182,6 @@ class User(AssetMixin, UserMixin, Entity):
     def is_test_user(self, value: bool) -> None:
         self.db["test_user"] = value
 
-    # @testable true
-    # @tests tests_unit/test_009b_user_permissions.py::test_global_resources
-    # @tests tests_unit/test_009b_user_permissions.py::test_entity_permissions
-    # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_one_category_permissions
-    # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_category_home_rows_only_offer_star_controls
-    # @matrix permissions : entity-resources global-resources owner requires resource-gates
     def has_permission(self, resource: Entity | Resource, action: Action = Action.ALL) -> bool:
         if isinstance(resource, Entity):
             required, permissions = resource.requires, self.permissions
@@ -240,14 +200,6 @@ class User(AssetMixin, UserMixin, Entity):
             raise KeyError("email")
         return str(self._db["email"])
 
-    # @testable true
-    # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
-    # @tests tests_unit/test_009a_user.py::test_user_create_does_not_leave_initial_cache_invalidation
-    # @tests tests_unit/test_009a_user.py::test_user_create_public_user_assigns_public_group
-    # @tests tests_unit/test_009f_user_ai_access.py::test_user_create_defaults_non_owner_to_none
-    # @tests tests_e2e/008_users/test_008a_user_index.py::test_owner_create_adopts_public_user_and_resets_form
-    # @matrix public-users : create personal-page public-group public-user
-    # @matrix user : cache-invalidation create groups new-user-default owner page page-reassign personal-page public-adoption public-group public-user submitted-create-data
     @classmethod
     def create(
         cls, data: UserCreationData, *, adopt_public: bool = False, key: Key | None = None
@@ -331,17 +283,11 @@ class User(AssetMixin, UserMixin, Entity):
             new_user.invalidate_cache = False
         return new_user
 
-    # @testable true
-    # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
-    # @matrix user : page save
     def save(self) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] -- User.save refreshes only this user.
         if self.db.get("photo") and not self.get_asset("photo"):
             self.properties.photo.save_google_photo()
         super().save()
 
-    # @testable true
-    # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
-    # @pair user:load
     @classmethod
     def load(cls, email: str) -> User | None:
         user = database_get.user(email)

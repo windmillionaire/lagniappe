@@ -2,17 +2,7 @@ import { STYLES } from "../../generated/styles.mjs";
 import { setIcon } from "../../shared/icons.mjs";
 import { Combobox } from "./combobox.mjs";
 
-/**
- * @testable true
- * @tests tests_js/test_016_combobox_frontend.mjs::test_dynamic_dropdown_rerenders_each_open_and_keeps_mixed_option_indexes
- * @matrix dropdown : callback-index dynamic-options mixed-options rerender
- */
 export class Dropdown extends Combobox {
-	/**
-	 * @testable true
-	 * @tests tests_js/test_016_combobox_frontend.mjs::test_combobox_positioning_uses_live_element_by_default_and_explicit_reference_when_configured
-	 * @pair dropdown:positioning
-	 */
 	init(menu) {
 		this.placement = menu.placement ?? "bottom-start";
 		this.items = menu.items || [];

@@ -35,9 +35,6 @@ DELIVERY_EXCLUDED_FIELDS = (
 )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason key normalization is exercised through public capture APIs
 @overload
 def encoded_key(value: Key) -> str: ...
 
@@ -50,17 +47,11 @@ def encoded_key(value: Identifier) -> str | None:
     return urlsafe_key(getattr(value, "key", value))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason deterministic identities are exercised through idempotent capture
 def delivery_key(*parts: object) -> Key:
     identity = sha256("\0".join(str(part) for part in parts).encode()).hexdigest()
     return create_named_key("email_delivery", identity)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason delivery construction is exercised through public capture APIs
 def new_delivery(
     key: Key,
     user: User,
@@ -85,9 +76,6 @@ def new_delivery(
     return row
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason transactional idempotency is exercised through event replay
 def put_if_absent(row: DatastoreEntity) -> tuple[DatastoreEntity, bool]:
     with DATA.datastore.transaction() as transaction:
         existing = DATA.datastore.get(row.key, transaction=transaction)
@@ -97,9 +85,6 @@ def put_if_absent(row: DatastoreEntity) -> tuple[DatastoreEntity, bool]:
     return row, True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason daily batch creation is exercised through digest capture
 def digest_batch(
     user: User, due_at: datetime, now: datetime, *, preference_epoch: int
 ) -> DatastoreEntity:
@@ -118,9 +103,6 @@ def digest_batch(
     return put_if_absent(row)[0]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_message
-# @reason quiet-window replacement is exercised through message capture
 def upsert_message_candidate(
     key: Key,
     recipient: User,
@@ -160,9 +142,6 @@ def upsert_message_candidate(
     return row, schedule
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_message
-# @reason scheduled-sequence compare-and-set is exercised through message capture
 def mark_message_scheduled(
     row: DatastoreEntity, sequence: int, task_name: str | None, now: datetime
 ) -> bool:
@@ -180,17 +159,11 @@ def mark_message_scheduled(
     return True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason direct lookup is exercised through queued delivery
 def get_delivery(identifier: Identifier) -> DatastoreEntity | None:
     key = datastore_key(identifier)
     return DATA.datastore.get(key) if key else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason lease acquisition is exercised through queued delivery
 def claim_delivery(
     row: DatastoreEntity, now: datetime, *, lease_seconds: int
 ) -> tuple[DatastoreEntity, str] | None:
@@ -218,9 +191,6 @@ def claim_delivery(
     return current, token
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason terminal compaction is exercised through queued delivery
 def finish_delivery(
     row: DatastoreEntity,
     token: str,
@@ -243,9 +213,6 @@ def finish_delivery(
     return True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason retry release is exercised through queued delivery failures
 def release_delivery(row: DatastoreEntity, token: str, now: datetime) -> bool:
     with DATA.datastore.transaction() as transaction:
         current = DATA.datastore.get(row.key, transaction=transaction)
@@ -259,9 +226,6 @@ def release_delivery(row: DatastoreEntity, token: str, now: datetime) -> bool:
     return True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason send-time conversation suppression is exercised through delivery
 def message_is_actionable(row: DatastoreEntity, user: User) -> bool:
     conversation = DATA.datastore.get(row.get("conversation"))
     message = DATA.datastore.get(row.get("message"))
@@ -279,9 +243,6 @@ def message_is_actionable(row: DatastoreEntity, user: User) -> bool:
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason send-time notification suppression is exercised through delivery
 def event_is_actionable(row: DatastoreEntity) -> bool:
     if row.get("source_type") != "notification":
         return True
@@ -289,9 +250,6 @@ def event_is_actionable(row: DatastoreEntity) -> bool:
     return bool(key and DATA.datastore.get(key) is not None)
 
 
-# @testable true
-# @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_query_retains_recipient_and_bucket_scope
-# @matrix notification-email : digest-query recipient-scope
 def digest_events(batch: DatastoreEntity) -> list[DatastoreEntity]:
     return list(
         Query(KINDS.email_deliveries)
@@ -308,9 +266,6 @@ def digest_events(batch: DatastoreEntity) -> list[DatastoreEntity]:
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason digest tombstone compaction is exercised through delivery
 def compact_events(rows: Iterable[DatastoreEntity], state: str, now: datetime) -> None:
     compacted = []
     for row in rows:

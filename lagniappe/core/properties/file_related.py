@@ -18,8 +18,6 @@ type _Task = Task
 type _User = User
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/file_related.py::AttachedPage
 class AttachedEntity[T: Entity](RelatedEntityMixin[T], DBProperty[T, _File, T | None]):
     """Typed File links invalidate the permissions derived from their owner."""
 
@@ -39,9 +37,6 @@ class AttachedEntity[T: Entity](RelatedEntityMixin[T], DBProperty[T, _File, T | 
         self.entity.properties.restricted_to.unset()
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_file_move_preserves_single_ownership
-# @matrix files : ownership cardinality parent-key
 class AttachedPage(AttachedEntity[_Page]):
     """The direct Page owning this File."""
 
@@ -57,8 +52,6 @@ class AttachedPage(AttachedEntity[_Page]):
             self.entity.task_page = None
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/file_related.py::AttachedPage
 class AttachedTask(AttachedEntity[_Task]):
     """The single live Task owning this File; histories are references only."""
 
@@ -76,8 +69,6 @@ class AttachedTask(AttachedEntity[_Task]):
             self.entity.task_page = None
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/file_related.py::AttachedPage
 class TaskPage(AttachedEntity[_Page]):
     """The primary Task's Page, persisted for nested relationship loading."""
 
@@ -87,9 +78,6 @@ class TaskPage(AttachedEntity[_Page]):
     _icon = "page"
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_email_report_file_is_viewable_only_by_submitter_or_owner
-# @matrix ai-email files : temporary-view-ownership
 class ReportUser(RelatedEntityMixin[_User], DBProperty[_User, _File]):
     """Uploading user temporarily allowed to view an unattached File."""
 

@@ -2,9 +2,6 @@ import { FormRenderer } from "../../../forms/renderer.mjs";
 import { areEqual, captureError, request } from "../../../shared/index.mjs";
 import { withTransition } from "../../../shared/transitions.mjs";
 
-/**
- * @testable infrastructure
- */
 export class Header {
 	constructor(builder) {
 		this._destroyed = false;
@@ -112,11 +109,6 @@ export class Header {
 		return this.builder.captureDraft();
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/builder/panels/header.mjs::Header.saveForm
-	 * @reason acknowledgements are only valid when the live state matches the submitted snapshot
-	 */
 	acknowledge(state) {
 		const current = this.persistenceState;
 		if (current.name === state.name && areEqual(current.schema, state.schema)) {
@@ -127,11 +119,6 @@ export class Header {
 		return false;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel
-	 * @pair forms:builder-preview
-	 */
 	closePreview() {
 		this._previewGeneration += 1;
 		this.renderer?.destroy();
@@ -142,11 +129,6 @@ export class Header {
 		if (this.draftControls) this.draftControls.dataset.visible = "true";
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel
-	 * @matrix forms : builder-preview focus-recovery
-	 */
 	async togglePreviewPanel() {
 		if (this._destroyed) return;
 		const generation = ++this._previewGeneration;
@@ -202,17 +184,6 @@ export class Header {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
-	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
-	 * @tests tests_e2e/003_forms/test_003e_retryable_builder_actions.py::test_builder_save_failure_releases_control_for_retry
-	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_save_feedback_retains_keyboard_focus
-	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_generation_is_one_undoable_unsaved_command
-	 * @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_saved_relabels_preserve_active_task_answers_and_conditions
-	 * @tests tests_js/test_036_form_builder_frontend.mjs::test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
-	 * @matrix forms : builder-reload builder-save focus-recovery persistent-error retryable-action single-flight stale-acknowledgement
-	 */
 	saveForm() {
 		if (this.builder.pendingChange) return Promise.resolve(false);
 		if (this._savePromise) return this._savePromise;
@@ -333,11 +304,6 @@ export class Header {
 		this.nameInput.select();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
-	 * @pairs entity-menu:title-menu forms:builder-form-name frontend-icons:material-icon-preservation
-	 */
 	_nameBlur() {
 		const newName = this.nameInput.value.trim();
 		this.nameDisplay.textContent = newName;

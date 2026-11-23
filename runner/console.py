@@ -21,9 +21,6 @@ _PROMPT_HINT = re.compile(
 )
 
 
-# @testable false
-# @covered-by runner/console.py::wrap_text
-# @reason shared width policy exercised by text and prompt layout
 def terminal_width(width: int | None = None) -> int:
     """Leave the last terminal column free; explicit widths are exact budgets."""
     if width is None:
@@ -31,9 +28,6 @@ def terminal_width(width: int | None = None) -> int:
     return max(1, int(width))
 
 
-# @testable false
-# @covered-by runner/console.py::wrap_text
-# @reason cell counting is shared by prose, prompts, rows, and progress labels
 def cell_width(message: object) -> int:
     """Count ordinary terminal cells, including combining accents and CJK text."""
     return sum(
@@ -46,10 +40,6 @@ def cell_width(message: object) -> int:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_prose_layout
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_formatter_tracks_active_spinners
-# @matrix setup : portability terminal-wrapping
 def wrap_text(message: object, width: int | None = None) -> str:
     """Wrap at words, preserving paragraphs, list indentation, and long tokens."""
     width = terminal_width(width)
@@ -84,9 +74,6 @@ def wrap_text(message: object, width: int | None = None) -> str:
     return "\n".join(result)
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_prompt_layout
-# @matrix setup : interactive-input terminal-wrapping
 def format_prompt(
     message: object,
     width: int | None = None,
@@ -146,9 +133,6 @@ def format_prompt(
     return leading + styled_body + " "
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_value_layout_preserves_copyable_values
-# @matrix setup : operator-summary terminal-wrapping
 def format_value(
     label: object,
     value: object,
@@ -175,9 +159,6 @@ def format_value(
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_progress_label_tracks_terminal_width
-# @matrix setup : spinner terminal-wrapping
 class ProgressLabel:
     """Fit a neutral label on each progress animation frame."""
 

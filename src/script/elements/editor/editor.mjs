@@ -23,15 +23,7 @@ import {
 	TrackedRanges,
 } from "./extensions/index.mjs";
 
-/**
- * @testable infrastructure
- */
 const focusEditorOnSurfacePointerDown = (editor, target) => {
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/editor/editor.mjs::focusEditorOnSurfacePointerDown
-	 * @reason local event callback owned by the surface focus helper
-	 */
 	const focusEditor = (event) => {
 		if (event.defaultPrevented || event.button !== 0) return;
 		if (!editor.isEditable || editor.isDestroyed || !editor.view?.dom) return;
@@ -47,9 +39,6 @@ const focusEditorOnSurfacePointerDown = (editor, target) => {
 	});
 };
 
-/**
- * @testable infrastructure
- */
 const createFormattingExtensions = () => [
 	TaskList,
 	TaskItem.configure({
@@ -89,9 +78,6 @@ const createFormattingExtensions = () => [
 	}),
 ];
 
-/**
- * @testable infrastructure
- */
 const createEditingExtensions = () => [
 	TrackedRanges,
 	SelectionHighlight,
@@ -102,9 +88,6 @@ const createEditingExtensions = () => [
 	TabCharacter,
 ];
 
-/**
- * @testable infrastructure
- */
 export const collaborativeEditor = (target, ydoc, editable = true) => {
 	const extensions = [
 		StarterKit.configure({
@@ -138,10 +121,6 @@ export const collaborativeEditor = (target, ydoc, editable = true) => {
 	return editor;
 };
 
-/**
- * @testable true
- * @matrix editor : initial-load
- */
 export const independentEditor = (target, content = "") => {
 	const extensions = [
 		StarterKit.configure({
@@ -165,7 +144,6 @@ export const independentEditor = (target, content = "") => {
 	return editor;
 };
 
-/** @testable infrastructure */
 export const previewEditor = (target, content) =>
 	new Editor({
 		element: target,

@@ -45,12 +45,6 @@ GET_SCHEMA = types.FunctionDeclaration(
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_schema_returns_schema_for_form_bearing_entities
-# @tests tests_unit/test_015_ai_tools.py::test_get_schema_includes_values_by_id_without_label_collisions
-# @tests tests_unit/test_015_ai_tools.py::test_get_schema_preserves_collection_rows_and_typed_cells
-# @matrix ai form-schema : form model-task page task tool-context
-# @matrix ai form-schema : permissions schema
 def execute_get_schema(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     """Return the schema for a form, page, task, or model task."""
     identifier = args.get("id")
@@ -131,9 +125,6 @@ def execute_get_schema(args: Mapping[str, object], user: User) -> Mapping[str, o
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_schema.py::execute_get_schema
-# @reason form source selection is asserted through the public schema tool
 def _schema_form(entity):
     if isinstance(entity, Entities.FORM):
         return entity
@@ -146,9 +137,6 @@ def _schema_form(entity):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_schema.py::execute_get_schema
-# @reason stored form relation access is asserted through the public schema tool
 def _attached_form(entity):
     form_property = getattr(getattr(entity, "properties", None), "form", None)
     if not form_property:
@@ -200,9 +188,6 @@ def _attached_form(entity):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_schema.py::execute_get_schema
-# @reason entity projection is asserted through the public schema tool
 def _entity_result(entity):
     return {
         "hash": hash_reference(entity),
@@ -211,9 +196,6 @@ def _entity_result(entity):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_schema.py::execute_get_schema
-# @reason debug-only compact schema logging is not behavior-bearing
 def _schema_debug_fields(schema):
     fields = []
     for field in schema or []:

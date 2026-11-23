@@ -67,10 +67,6 @@ class Environment(Enum):
     PRODUCTION = "production"
 
 
-# @testable false
-# @covered-by config/__init__.py::File.load
-# @covered-by installer/doctor.py::run_doctor
-# @reason shared saved-settings decoding is exercised by normal loading and read-only diagnostics
 def decode_app_settings(data: Mapping[str, object]) -> dict[str, object]:
     """Decode saved scalar/JSON strings while preserving native YAML values."""
     decoded = dict(data)
@@ -110,9 +106,6 @@ class File(Enum):
     def exists(self) -> bool:
         return self.value.exists()
 
-    # @testable true
-    # @tests tests_tooling/test_003_config.py::test_atomic_config_write_preserves_valid_file_and_restricts_secrets
-    # @matrix config : permissions transactional-state utf8
     def save(self, data: Mapping[str, object]) -> bool:
         if self.name.endswith("_YAML"):
             content = self._serialize_yaml(data)
@@ -126,9 +119,6 @@ class File(Enum):
             owner_only=self in SECRET_BEARING_FILES,
         )
 
-    # @testable true
-    # @tests tests_tooling/test_003_config.py::test_python_config_package_resolves_expected_repo_files
-    # @matrix config : config-files parsing
     def load(self) -> dict[str, object]:
         if not self.exists():
             return {}
@@ -140,9 +130,6 @@ class File(Enum):
         else:
             raise ValueError(f"Unknown file: {self.value.name}")
 
-    # @testable false
-    # @covered-by config/__init__.py::File.load
-    # @reason YAML parsing adapter is owned by the public file loader
     def _load_from_yaml(self) -> dict[str, object]:
         with open(self.value, encoding="utf-8", newline="") as f:
             data = yaml.safe_load(f) or {}
@@ -154,9 +141,6 @@ class File(Enum):
 
         return decode_app_settings(data)
 
-    # @testable false
-    # @covered-by config/__init__.py::File.save
-    # @reason deterministic YAML serialization is owned by atomic file save
     def _serialize_yaml(self, data):
         if not data:
             raise ValueError("Nothing to save")
@@ -179,9 +163,6 @@ class File(Enum):
             sort_keys=True,
         )
 
-    # @testable false
-    # @covered-by config/__init__.py::File.load
-    # @reason JSON parsing adapter is owned by the public file loader
     def _load_from_json(self) -> dict[str, object]:
         with open(self.value, encoding="utf-8", newline="") as f:
             data = json.load(f)
@@ -189,9 +170,6 @@ class File(Enum):
             raise ValueError(f"{self.value.name} must contain a mapping")
         return data
 
-    # @testable false
-    # @covered-by config/__init__.py::File.save
-    # @reason deterministic JSON serialization is owned by atomic file save
     def _serialize_json(self, data):
         if not data:
             raise ValueError("Nothing to save")
@@ -218,9 +196,6 @@ SECRET_BEARING_FILES = frozenset(
 )
 
 
-# @testable false
-# @covered-by config/__init__.py::_atomic_write_text
-# @reason Windows ACL application is a platform adapter owned by atomic writes
 def _restrict_windows_acl(path):
     """Best-effort owner ACL for the supported Google Cloud SDK cmd shell."""
     if os.name != "nt":
@@ -247,9 +222,6 @@ def _restrict_windows_acl(path):
     return result.returncode == 0
 
 
-# @testable false
-# @covered-by config/__init__.py::_atomic_write_text
-# @reason platform permission adapter is owned by atomic configuration writes
 def _apply_file_permissions(path, mode, *, owner_only):
     if os.name == "nt":
         if owner_only and not _restrict_windows_acl(path):
@@ -263,9 +235,6 @@ def _apply_file_permissions(path, mode, *, owner_only):
     return True
 
 
-# @testable false
-# @covered-by config/__init__.py::_atomic_write_text
-# @reason platform directory-fsync adapter is owned by atomic writes
 def _fsync_directory(path):
     if os.name == "nt" or not hasattr(os, "O_DIRECTORY"):
         return
@@ -279,9 +248,6 @@ def _fsync_directory(path):
         os.close(descriptor)
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_atomic_config_write_preserves_valid_file_and_restricts_secrets
-# @matrix config setup : permissions transactional-state utf8
 def _atomic_write_text(path, content, *, owner_only=False):
     """Atomically replace one non-empty UTF-8 text file in its own directory."""
     path = Path(path)
@@ -327,10 +293,6 @@ def _atomic_write_text(path, content, *, owner_only=False):
         temporary_path.unlink(missing_ok=True)
 
 
-# @testable false
-# @covered-by config/__init__.py::write_generation_manifest
-# @covered-by config/__init__.py::verify_generation_manifest
-# @reason completeness inspection is owned by generation commit and validation
 def _require_generation_files():
     for file_ref in GENERATION_FILES:
         if not file_ref.exists() or file_ref.value.stat().st_size == 0:
@@ -340,10 +302,6 @@ def _require_generation_files():
             )
 
 
-# @testable false
-# @covered-by config/__init__.py::write_generation_manifest
-# @covered-by config/__init__.py::verify_generation_manifest
-# @reason source fingerprinting is owned by generation commit and validation
 def _generation_source_checksum():
     if (
         not GENERATION_SOURCE_FILE.is_file()
@@ -362,9 +320,6 @@ def _generation_source_checksum():
     return hashlib.sha256(stable_content).hexdigest()
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_generation_manifest_tracks_constants_and_required_outputs
-# @matrix config setup : completeness generation source-marker
 def write_generation_manifest() -> bool:
     """Record the constants generation after every output has been persisted."""
     _require_generation_files()
@@ -382,9 +337,6 @@ def write_generation_manifest() -> bool:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_generation_manifest_tracks_constants_and_required_outputs
-# @matrix config deploy : completeness generation source-marker
 def verify_generation_manifest() -> bool:
     """Fail when required outputs or their constants generation are stale."""
     try:
@@ -415,9 +367,6 @@ def verify_generation_manifest() -> bool:
     return True
 
 
-# @testable false
-# @covered-by config/__init__.py::RuntimeSettings
-# @reason recursive value ownership is exercised through snapshot construction
 def _freeze_settings(value):
     if isinstance(value, Mapping):
         return MappingProxyType(
@@ -430,9 +379,6 @@ def _freeze_settings(value):
     return value
 
 
-# @testable false
-# @covered-by config/__init__.py::RuntimeSettings
-# @reason mutable consumer copies are exercised through the snapshot API
 def _copy_settings(value):
     if isinstance(value, Mapping):
         return {key: _copy_settings(item) for key, item in value.items()}
@@ -443,9 +389,6 @@ def _copy_settings(value):
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_runtime_settings_own_nested_values_and_return_independent_copies
-# @matrix config : configuration transactional-state
 @dataclass(frozen=True)
 class RuntimeSettings:
     """Owned, immutable settings for one environment; values stay out of repr."""
@@ -462,10 +405,6 @@ class RuntimeSettings:
         return {key: _copy_settings(item) for key, item in self.values.items()}
 
 
-# @testable false
-# @covered-by config/__init__.py::load_runtime_settings
-# @covered-by config/__init__.py::SettingsDraft.snapshot
-# @reason shared environment precedence is exercised by saved and draft projections
 def _project_runtime_settings(app_settings, overrides, environment):
     environment = Environment(environment)
     projected = dict(app_settings)
@@ -500,11 +439,6 @@ def _project_runtime_settings(app_settings, overrides, environment):
     return RuntimeSettings(environment, projected)
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_runtime_loading_is_independent_of_drafts_and_generated_documents
-# @tests tests_tooling/test_003_config.py::test_runtime_and_draft_projections_preserve_environment_precedence
-# @tests tests_tooling/test_003_config.py::test_hosted_runtime_projection_preserves_validated_overrides
-# @matrix config : config-files configuration parsing
 def load_runtime_settings(environment: Environment | str) -> RuntimeSettings:
     """Read saved settings for one process without constructing an installer draft."""
     environment = Environment(environment)
@@ -521,9 +455,6 @@ def load_runtime_settings(environment: Environment | str) -> RuntimeSettings:
     return _project_runtime_settings(app_settings, overrides, environment)
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_saved_settings_reader_preserves_raw_values_without_loading_a_draft
-# @matrix config : config-files parsing
 def read_saved_app_settings() -> dict[str, object]:
     """Read canonical persisted values for configuration display and recovery."""
     with open(
@@ -541,9 +472,6 @@ def _dev_section(document: Mapping[str, object], name: str) -> dict[str, object]
     return section
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_settings_drafts_own_documents_and_preserve_internal_aliases
-# @matrix config : configuration transactional-state
 class SettingsDraft:
     """Mutable generated documents owned by one installer or runner session."""
 
@@ -562,9 +490,6 @@ class SettingsDraft:
         self.DEV_CONFIG = _dev_section(self.DEV, "dev_settings")
         self.TEST_CONFIG = _dev_section(self.DEV, "test_settings")
 
-    # @testable true
-    # @tests tests_tooling/test_003_config.py::test_draft_save_preserves_identity_and_publishes_only_selected_files
-    # @matrix config : config-files transactional-state
     def save(self, *file_refs: File) -> tuple[str, ...]:
         """Persist only changed selected files, then commit one generation manifest."""
         selected = tuple(file_refs) or GENERATION_FILES
@@ -595,16 +520,9 @@ class SettingsDraft:
         return tuple(changed)
 
     @property
-    # @testable false
-    # @covered-by config/__init__.py::read_saved_app_settings
-    # @reason compatibility adapter for persisted configuration exports
     def app_settings(self) -> dict[str, object]:
         return read_saved_app_settings()
 
-    # @testable true
-    # @tests tests_tooling/test_003_config.py::test_runtime_and_draft_projections_preserve_environment_precedence
-    # @tests tests_tooling/test_003_config.py::test_draft_projections_observe_edits_without_saving_or_aliasing
-    # @matrix config : configuration transactional-state
     def snapshot(self, environment: str | Environment) -> RuntimeSettings:
         """Project current draft values without reading or writing saved settings."""
         environment = Environment(environment)
@@ -616,23 +534,14 @@ class SettingsDraft:
         return _project_runtime_settings(self.APP, overrides, environment)
 
     @property
-    # @testable false
-    # @covered-by config/__init__.py::SettingsDraft.snapshot
-    # @reason compatibility adapter for an independent production draft projection
     def app_config(self) -> dict[str, object]:
         return self.snapshot(Environment.PRODUCTION).as_dict()
 
     @property
-    # @testable false
-    # @covered-by config/__init__.py::SettingsDraft.snapshot
-    # @reason compatibility adapter for an independent development draft projection
     def dev_config(self) -> dict[str, object]:
         return self.snapshot(Environment.DEVELOPMENT).as_dict()
 
     @property
-    # @testable false
-    # @covered-by config/__init__.py::SettingsDraft.snapshot
-    # @reason compatibility adapter for an independent testing draft projection
     def test_config(self) -> dict[str, object]:
         return self.snapshot(Environment.TESTING).as_dict()
 
@@ -647,9 +556,6 @@ globals().pop("SETTINGS", None)
 _settings_draft: SettingsDraft | None = None
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_settings_singleton_is_lazy_and_reloads_saved_documents
-# @matrix config setup : config-files git-upgrade
 def __getattr__(name: str) -> SettingsDraft:
     if name != "SETTINGS":
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

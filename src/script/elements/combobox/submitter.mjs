@@ -1,12 +1,4 @@
-/**
- * @testable true
- * @tests tests_js/test_016_combobox_frontend.mjs::test_submitter_clear_can_suppress_change_notification
- * @pair combobox:clear-notification
- */
 export const Submitter = (Combobox) =>
-	/**
-	 * @testable infrastructure
-	 */
 	class extends Combobox {
 		init() {
 			this.multiple ??= JSON.parse(this.parent.dataset.multiple || "false");

@@ -11,19 +11,12 @@ if TYPE_CHECKING:
     from ..entities.entity import Entity
 
 
-# @testable false
-# @covered-by lagniappe/core/mutations/document.py::plan_document_checkpoint
-# @covered-by lagniappe/core/mutations/document.py::plan_document_parent_touch
-# @reason parent/list-owner masking is asserted through both public document plans
 def _advance_parent(builder: MutationPlanBuilder, entity: Entity) -> None:
     builder.touch(entity, reason="document-parent")
     for owner in getattr(entity, "page_list_owners", ()):
         builder.touch(owner, reason="document-page-list-owner")
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_document_checkpoint_masks_parent_state_and_optionally_advances_lists
-# @matrix mutations sync : checkpoint document history list-owner parent-fingerprint property-mask
 def plan_document_checkpoint(
     entity: Entity,
     *,
@@ -50,9 +43,6 @@ def plan_document_checkpoint(
     return builder.build()
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_document_parent_touch_only_advances_parent_and_list_fingerprints
-# @matrix mutations sync : document list-owner parent-fingerprint property-mask
 def plan_document_parent_touch(
     entity: Entity, *, registry: EntityRegistry | None = None
 ) -> MutationPlan:

@@ -19,18 +19,12 @@ class Target(RelatedEntityMixin[_Target], DBProperty[_Target]):
     _id = "target"
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/notification.py::Notification.create
-# @reason pending normalization is exercised through notification creation
 class Pending(DBProperty[bool]):
     """Whether a notification represents work still in progress."""
 
     _id = "pending"
     _truthy = {True, "true", "True", "1", "on", "yes"}
 
-    # @testable false
-    # @covered-by lagniappe/core/entities/notification.py::Notification.create
-    # @reason getter and setter form one normalization contract
     @property
     def value(self) -> bool:
         return self.entity.db.get(self.db_key, False) in self._truthy
@@ -45,15 +39,9 @@ class Pending(DBProperty[bool]):
             self.entity.db.pop(self.db_key, None)
 
 
-# @testable true
-# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-# @pair notifications:discriminator
 class NotificationType(DBProperty[str]):
     _id = "notification_type"
 
-    # @testable true
-    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-    # @pair notifications:discriminator
     @property
     def value(self) -> str:
         return super().value or "ordinary"

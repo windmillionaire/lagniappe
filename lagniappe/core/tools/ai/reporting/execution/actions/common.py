@@ -8,17 +8,11 @@ TASK_FORM_TYPE_ERROR = "Create task actions require a task form."
 PAGE_FORM_TYPE_ERROR = "Add form to page actions require a page form."
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason permission failures are covered through runner action handlers
 def _require_allowed(allowed, message):
     if not allowed:
         raise exceptions.ValidationError(message)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason action data extraction is exercised by each handler
 def _data(action):
     data = action.get("data") or {}
     if not isinstance(data, dict):
@@ -26,9 +20,6 @@ def _data(action):
     return data
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
-# @reason reference alias lookup is covered through endpoint resolution tests
 def _first_data_reference(data, *roots):
     for root in roots:
         for key in (root, f"{root}_id", f"{root}_ref", f"{root}_action"):
@@ -38,16 +29,10 @@ def _first_data_reference(data, *roots):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/references.py::_resolve_action_page
-# @reason lookup normalization is covered through task creation and attachment tests
 def _normalized_lookup_name(value):
     return " ".join(str(value or "").strip().casefold().split())
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
-# @reason save-list deduplication supports report-run action results
 def _unique_entities(entities):
     unique = []
     seen = set()
@@ -62,9 +47,6 @@ def _unique_entities(entities):
     return unique
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason page form inheritance is verified through report-run page creation tests
 def _category_form(category):
     if category is None:
         return None
@@ -87,9 +69,6 @@ def _category_form(category):
     return form if isinstance(form, Entities.FORM) else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/results.py::_task_structure_result
-# @reason relation access failures are represented by omitted diagnostics
 def _safe_entity_relation(entity, name):
     try:
         return getattr(entity, name, None)
@@ -97,9 +76,6 @@ def _safe_entity_relation(entity, name):
         return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/tasks.py::_create_task
-# @reason mismatched form type behavior is covered through public report runner tests
 def _require_form_type(form, expected_type, message):
     if form is None:
         return
@@ -108,9 +84,6 @@ def _require_form_type(form, expected_type, message):
         raise exceptions.ValidationError(message)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/results.py::_entity_result
-# @reason telemetry-only relation key projection is covered by result serialization
 def _stored_relation_key(entity, name):
     relation = getattr(getattr(entity, "properties", None), name, None)
     if relation is not None:
@@ -127,9 +100,6 @@ def _stored_relation_key(entity, name):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/references.py::_resolve_report_file
-# @reason helper behavior is covered through public report runner file matching tests
 def _unique_values(values):
     unique = []
     seen = set()

@@ -58,7 +58,6 @@ async function loadEditOwners({
 	return { EditReconciler, EditWatcher };
 }
 
-/** @matrix forms unsaved-state : change input non-sync reset success */
 test("test_base_form_tracks_unsaved_state_without_sync", async () => {
 	const listeners = new Map();
 	const target = {
@@ -120,7 +119,6 @@ test("test_base_form_tracks_unsaved_state_without_sync", async () => {
 	assert.equal(widget.unsavedState, false);
 });
 
-/** @matrix edited-entity-notice forms : canonicalization formdata repeated-values revision-only-state */
 test("test_form_revision_snapshot_is_canonical_and_memory_only", async () => {
 	class FakeFormData {
 		constructor(entries = []) {
@@ -182,9 +180,6 @@ test("test_form_revision_snapshot_is_canonical_and_memory_only", async () => {
 	assert.equal(Boolean(target.dataset?.revisionFingerprint), false);
 });
 
-/**
- * @matrix edited-entity-notice : acknowledgement acknowledgement-no-probe active-state batching clean-state comparison entity-ancestor focused-state overlap-follow-up per-form reload-fallback subscription-lifecycle targeted-reset transition visibility
- */
 test("test_edit_watcher_compares_and_resets_each_form_independently", async (t) => {
 	const events = [];
 	const focusedElement = {};
@@ -417,7 +412,6 @@ test("test_edit_watcher_compares_and_resets_each_form_independently", async (t) 
 	assert.equal(pollTriggers.length, triggersBefore + 1);
 });
 
-/** @matrix edited-entity-notice : clean-state coalescing overlap-follow-up */
 test("test_edit_watcher_coalesces_overlapping_revision_probes", async (t) => {
 	const requests = [];
 	const applications = [];
@@ -519,7 +513,6 @@ test("test_edit_watcher_coalesces_overlapping_revision_probes", async (t) => {
 	);
 });
 
-/** @matrix edited-entity-notice : conflict-fallback */
 test("test_conflict_preview_failure_offers_reload_without_losing_draft", async () => {
 	const errors = [];
 	const { EditReconciler } = await loadEditOwners({
@@ -566,8 +559,6 @@ test("test_conflict_preview_failure_offers_reload_without_losing_draft", async (
 	assert.equal(reconciler._state(marker).conflictPromise, null);
 });
 
-/** @pair edited-entity-notice:unchanged-form */
-/** @source src/script/forms/revisions/reconciler.mjs::EditReconciler */
 test("test_metadata_only_revision_preserves_clean_and_dirty_forms", async (t) => {
 	replaceGlobal(t, "document", { activeElement: null });
 	const { EditReconciler } = await loadEditOwners({
@@ -627,8 +618,6 @@ test("test_metadata_only_revision_preserves_clean_and_dirty_forms", async (t) =>
 	}
 });
 
-/** @matrix offline : conflict-durability reload submission-choice */
-/** @source src/script/forms/revisions/reconciler.mjs::EditReconciler */
 test("test_reloaded_saved_form_does_not_cancel_different_queued_answers", async (t) => {
 	replaceGlobal(t, "document", { activeElement: null });
 	const { EditReconciler } = await loadEditOwners({

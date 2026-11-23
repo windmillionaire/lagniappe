@@ -99,7 +99,6 @@ def _select_file_page_link(info_form, file, page):
     select.input.press("Escape")
 
 
-# @matrix file : load tabs text-asset text-tab
 # @template files/file.html::main
 # @template files/text.html::text_tab
 def test_file_text_tab_renders_uploaded_text_content(get_admin, get_user):
@@ -118,7 +117,6 @@ def test_file_text_tab_renders_uploaded_text_content(get_admin, get_user):
     expect(text_content).to_contain_text("Engineering")
 
 
-# @matrix file : file-upload page-upload
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
@@ -143,7 +141,6 @@ def test_page_uploaded_text_file_renders_original_content_in_text_tab(get_admin,
     expect(text_content).to_contain_text("not through the ingress import flow")
 
 
-# @matrix file : badges linked-entities reverse-links
 # @template files/file.html::main
 # @template files/file.html::linked_badges
 # @template badge.html::entity_badge
@@ -168,9 +165,6 @@ def test_file_page_shows_linked_page_and_task_badges(get_admin, get_user):
     expect(linked.locator("a[href*='/tasks/']")).to_contain_text(task_entity.name)
 
 
-# @pairs file:badge file:delete mutations:delete
-# @pairs tasks:badge tasks:list-owner-fingerprint tasks:unlink
-# @matrix connectivity service-worker : state-publication startup
 # @template files/file.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
@@ -245,7 +239,6 @@ def test_delete_file_removes_attached_task_badge(get_admin, get_user, pending_na
     expect(task_item).not_to_contain_text(file_entity.name)
 
 
-# @matrix file : add linked-pages reload remove
 # @template files/info.html::info_form
 # @template files/file.html::linked_badges
 def test_file_info_moves_between_page_and_task(get_admin, get_user):
@@ -285,7 +278,6 @@ def test_file_info_moves_between_page_and_task(get_admin, get_user):
     assert file_entity.key not in {row.key for row in database_get.page_files(task.page.key)}
 
 
-# @matrix file : file-upload page-upload preview text-tab
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
@@ -312,7 +304,6 @@ def test_page_uploaded_image_shows_desktop_preview(get_admin, get_user):
     expect(info_form).to_contain_text("image/jpeg")
 
 
-# @matrix file : file-upload page-upload pdf-preview preview text-tab
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
@@ -343,7 +334,6 @@ def test_page_uploaded_pdf_renders_pdf_preview_widget(get_admin, get_user):
     expect(info_form).to_contain_text("application/pdf")
 
 
-# @matrix file : loading-state pdf-preview view-transition
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
@@ -378,7 +368,6 @@ def test_pdf_preview_loading_state_paints_before_document_render(get_admin, get_
         expect(first_page).not_to_have_attribute("width", "0")
         expect(first_page).not_to_have_attribute("height", "0")
 
-# @matrix file : file-upload page-upload pdf-preview pdf-toolbar preview
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
@@ -449,7 +438,6 @@ def test_page_uploaded_pdf_toolbar_navigates_pages(get_admin, get_user):
     expect(focus).to_have_attribute("aria-pressed", "false")
 
 
-# @matrix file : file-mobile preview tabs
 # @template files/file.html::mobile_nav
 # @template files/preview.html::preview_tab
 def test_file_mobile_preview_uses_preview_tab(get_admin, get_user):
@@ -478,7 +466,6 @@ def test_file_mobile_preview_uses_preview_tab(get_admin, get_user):
     assert mobile_nav.get_section_title() == "Preview"
 
 
-# @matrix file : file-mobile pdf-preview preview tabs
 # @template files/file.html::mobile_nav
 # @template files/preview.html::preview_tab
 def test_file_mobile_pdf_preview_renders_canvas(get_admin, get_user):
@@ -504,7 +491,6 @@ def test_file_mobile_pdf_preview_renders_canvas(get_admin, get_user):
     assert mobile_nav.get_section_title() == "Preview"
 
 
-# @matrix file : display-name info-update summary
 # @template files/file.html::view_header
 def test_file_info_update_persists_name_and_summary(get_admin, get_user):
     user = get_admin()
@@ -545,7 +531,6 @@ def test_file_info_update_persists_name_and_summary(get_admin, get_user):
     )
 
 
-# @matrix file : download filename mimetype
 def test_file_download_uses_original_filename_and_mimetype(get_admin, get_user):
     user = get_admin()
     upload = Uploads.plain_text_file

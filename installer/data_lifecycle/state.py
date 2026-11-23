@@ -22,9 +22,6 @@ LIFECYCLE_STATE_SCHEMA = 1
 ARCHIVE_SQLITE_SCHEMA = 1
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_secure_directory_and_checkpoint_exact_resume
-# @matrix data-lifecycle : private-state resume
 def secure_directory(path: str | Path) -> Path:
     """Create an owner-only directory, failing closed when that cannot be proved."""
     path = Path(path)
@@ -59,9 +56,6 @@ def secure_directory(path: str | Path) -> Path:
     return path
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/state.py::LifecycleCheckpoint
-# @reason normalized command hashing is exercised through exact checkpoint resumption
 def _identity(project_id: str, command: list[str], output_target: str | None) -> str:
     payload = json.dumps(
         {
@@ -75,9 +69,6 @@ def _identity(project_id: str, command: list[str], output_target: str | None) ->
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_secure_directory_and_checkpoint_exact_resume
-# @matrix data-lifecycle : private-state resume
 class LifecycleCheckpoint:
     """Durable exact-command state independent of the rewritten setup journal."""
 
@@ -211,9 +202,6 @@ CREATE TABLE IF NOT EXISTS assets (
 """
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_archive_state_is_private_transactional_and_resumable
-# @matrix data-lifecycle : resume sqlite-staging
 class ArchiveState:
     """Owner-only SQLite staging store with bounded transaction checkpoints."""
 
@@ -292,9 +280,6 @@ class ArchiveState:
         return json.loads(row[0]) if row else default
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason secure temporary work-area selection is exercised by archive publication
 def archive_work_directory(root: str | Path | None = None) -> Path:
     root = secure_directory(root or (_state_dir() / "data_lifecycle" / "archive-work"))
     path = Path(tempfile.mkdtemp(prefix="archive-", dir=root))

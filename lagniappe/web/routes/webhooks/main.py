@@ -21,9 +21,6 @@ from lagniappe.core.tools.email.ai import (
 from . import webhooks
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/email/ai.py::verify_svix_signature
-# @covered-by lagniappe/core/tools/email/ai.py::process_resend_email
 @webhooks.post("/resend/ai-email")
 def resend_ai_email() -> ResponseReturnValue:
     """Verify and hand one Resend event to the durable report workflow."""

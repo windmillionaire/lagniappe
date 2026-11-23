@@ -18,10 +18,6 @@ function replaceGlobal(t, name, value) {
 	});
 }
 
-/**
- * @source src/script/views/builder/draft.mjs::BuilderDraft
- * @matrix forms : draft-history
- */
 test("test_conversion_instructions_follow_draft_undo_redo_and_publication", () => {
 	const initial = {
 		name: "Conversion",
@@ -51,7 +47,6 @@ test("test_conversion_instructions_follow_draft_undo_redo_and_publication", () =
 	assert.equal(draft.dirty, false);
 });
 
-/** @matrix forms : draft-history stable-identity schema-generation */
 test("test_builder_draft_history_and_generation", () => {
 	const initial = {
 		name: "Draft",
@@ -199,10 +194,6 @@ test("test_builder_draft_history_and_generation", () => {
 	assert.equal(selectionDraft.state.selected_id, "table");
 });
 
-/**
- * @source src/script/views/builder/draft.mjs::BuilderDraft
- * @matrix forms : draft-history schema-generation
- */
 test("test_document_edits_and_html_generation_preserve_schema_redo", () => {
 	const initial = {
 		name: "Original",
@@ -289,10 +280,6 @@ test("test_document_edits_and_html_generation_preserve_schema_redo", () => {
 	assert.equal(draft.revision, lastRevision);
 });
 
-/**
- * @source src/script/views/builder/draft.mjs::BuilderDraft
- * @matrix forms : draft-history stable-identity
- */
 test("test_schema_undo_redo_restores_document_content_only_when_field_returns", () => {
 	const draft = new BuilderDraft(
 		{
@@ -350,10 +337,6 @@ test("test_schema_undo_redo_restores_document_content_only_when_field_returns", 
 	assert.equal(draft.state.html_fields.existing, "");
 });
 
-/**
- * @source src/script/views/builder/draft.mjs::BuilderDraft
- * @matrix forms : draft-history stale-acknowledgement
- */
 test("test_document_edit_during_save_stays_dirty_across_schema_undo_redo", () => {
 	const draft = new BuilderDraft(
 		{
@@ -410,11 +393,6 @@ test("test_document_edit_during_save_stays_dirty_across_schema_undo_redo", () =>
 	assert.equal(draft.state.html_fields.html, latestHtml);
 });
 
-/**
- * @source src/script/views/builder/conditions/options.mjs::Options
- * @source src/script/views/builder/conditions/columns.mjs::Columns
- * @matrix forms : stable-identity
- */
 test("test_builder_option_and_column_labels_keep_ids", async () => {
 	let nextId = 0;
 	class Condition {}
@@ -490,10 +468,6 @@ async function loadFormSettings({ request, FormController = class {} }) {
 	);
 }
 
-/**
- * @source src/script/views/builder/panels/formSettings.mjs::FormSettings._generateSchema
- * @matrix forms : schema-generation draft-history
- */
 test("test_builder_generation_rejects_stale_cancelled_and_destroyed_responses", async (t) => {
 	const requests = [];
 	class FormDataBoundary extends Map {
@@ -701,11 +675,6 @@ async function loadBuilder({
 	});
 }
 
-/**
- * @source src/script/views/builder/builder.mjs::FormBuilder.deselectElement
- * @source src/script/views/builder/panels/model.mjs::ModelPanel.deselectItem
- * @matrix forms : builder-lifecycle draft-history
- */
 test("test_builder_deselection_clears_selection_without_editing_form", async (t) => {
 	replaceGlobal(t, "document", { getElementById: () => ({}) });
 	const { default: FormBuilder } = await loadBuilder();
@@ -759,7 +728,6 @@ test("test_builder_deselection_clears_selection_without_editing_form", async (t)
 	assert.equal(builder.draft.future.length, 0);
 });
 
-/** @matrix forms : draft-history stale-acknowledgement focus-recovery */
 test("test_builder_save_restores_unsubmitted_condition_buffer", async (t) => {
 	let focused = false;
 	const active = { name: "option-name", selectionStart: 4, selectionEnd: 8 };
@@ -875,12 +843,6 @@ test("test_builder_save_restores_unsubmitted_condition_buffer", async (t) => {
 	assert.equal(focused, true);
 });
 
-/**
- * @source src/script/views/builder/draftDocument.mjs::DraftDocument.flush
- * @source src/script/views/builder/builder.mjs::FormBuilder.setHtml
- * @source src/script/elements/html.mjs::HtmlElement.create
- * @matrix forms : draft-history
- */
 test("test_builder_html_flush_stays_local_and_empty_preview_does_not_fetch", async (t) => {
 	replaceGlobal(t, "document", {
 		createElement: () => ({ innerHTML: "", className: "" }),
@@ -999,12 +961,6 @@ test("test_builder_html_flush_stays_local_and_empty_preview_does_not_fetch", asy
 	assert.equal(empty.past.length, 0);
 });
 
-/**
- * @source src/script/views/builder/panels/formSettings.mjs::FormSettings._generateSchema
- * @source src/script/forms/controller.mjs::FormController.success
- * @pair forms:success
- * @matrix forms : schema-generation draft-history
- */
 test("test_stale_generation_retry_label_survives_base_form_error_transition", async (t) => {
 	const transitions = [];
 	const text = { textContent: "Generate" };
@@ -1238,7 +1194,6 @@ test("test_stale_generation_retry_label_survives_base_form_error_transition", as
 	assert.equal(target.dataset.visible, "false");
 });
 
-/** @matrix forms : builder-save stable-identity */
 test("test_saved_controls_refresh_without_replacing_draft_inputs", async (t) => {
 	replaceGlobal(t, "document", {
 		createElement: (tagName) => ({

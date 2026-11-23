@@ -12,9 +12,6 @@ from ...definitions import Comparator, FieldType
 REGEX_ESCAPE = re.compile(r"([\\.^$*+?{}\[\]|()])")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/build.py::FilterExpression.build
-# @reason scalar encoding is exercised through complete JSONPath expressions
 def _literal(value):
     if isinstance(value, bool) or value is None:
         return json.dumps(value)
@@ -27,45 +24,18 @@ def _literal(value):
     raise ValueError("Filter expression requires scalar values")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/build.py::FilterExpression.build
-# @reason regex escaping is exercised through complete JSONPath expressions
 def _regex(value, *, exact=False):
     escaped = REGEX_ESCAPE.sub(r"\\\1", value)
     pattern = f"(?i)^{escaped}$" if exact else f"(?i){escaped}"
     return json.dumps(pattern)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/build.py::FilterExpression.build
-# @reason builder wrapper delegates source-visible behavior to build()
 class FilterExpression:
     """Converts a list of filter definitions into a composite JSONPath query string."""
 
     def __init__(self, definitions: Sequence[FilterDefinition]) -> None:
         self.definitions = definitions
 
-    # @testable true
-    # @tests tests_unit/test_011_filters.py::test_filter_expression_list_contains_accepts_scalar_form_values
-    # @tests tests_unit/test_011_filters.py::test_filter_expression_encodes_field_names_and_literal_regex_values
-    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_matches_escaped_string_literals_after_redis_predicates
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_category
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_multiple_conditions
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_attached_form_text_condition
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_attached_form_number_condition
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_attached_form_checkbox_condition
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_attached_form_select_condition
-    # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_page_name
-    # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_page_description
-    # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_additional_category
-    # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_public_page
-    # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_document_asset
-    # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_text_condition
-    # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_number_condition
-    # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_checkbox_condition
-    # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_select_condition
-    # @matrix filters : attached-form boolean-condition compound description document entity-condition escaping field-name jsonpath number-condition public punctuation regex-literal run-results scalar-list select-condition string-condition
     def build(self, *, ids_only: bool = True) -> str:
         """Convert filter definitions into a single JSONPath query."""
         if not self.definitions:
@@ -79,9 +49,6 @@ class FilterExpression:
             query += ".id"
         return query
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/filters/build.py::FilterExpression.build
-    # @reason per-condition fragments are covered through composite filter expressions
     def _build_single_condition(self, d):
         """Build a single JSONPath condition from a filter definition."""
         field_path = f"@[{json.dumps(d.field)}]"

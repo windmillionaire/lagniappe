@@ -21,9 +21,6 @@ class EmailClaim(TypedDict):
     key: NotRequired[Key]
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
-# @matrix ai-email webhook : lease privacy replay transaction
 @retry_aborted
 def claim_ai_email_event(
     digest: str, lease_token: str, now: datetime, *, lease_seconds: int = 300
@@ -65,9 +62,6 @@ def claim_ai_email_event(
         return {"claimed": True, "key": key}
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
-# @matrix ai-email webhook : replay terminal-compaction transaction
 @retry_aborted
 def finish_ai_email_event(
     digest: str, lease_token: str, state: str, now: datetime
@@ -95,9 +89,6 @@ def finish_ai_email_event(
         return True
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
-# @matrix ai-email webhook : replay transaction transient-release
 @retry_aborted
 def release_ai_email_event(digest: str, lease_token: str, now: datetime) -> bool:
     """Release an owned claim so a provider retry may resume it immediately."""

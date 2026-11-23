@@ -30,10 +30,6 @@ from ..tools.auth.restrictions import normalize_restrictions, permission_relatio
 type RestrictionOwner = Form | Page | Task | File
 
 
-# @testable true
-# @tests tests_unit/test_002_entity_general_properties.py::test_entity_name
-# @tests tests_unit/test_002_entity_general_properties.py::test_entity_name_list_values_normalized_on_write_and_import
-# @matrix name : details filter import list-normalization property
 class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProperty[str]):
     """Entity name. Primary display and search identifier.
 
@@ -83,24 +79,15 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
             )
         self._write_db_value(value or None)
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_name
-    # @pair name:sort
     @property
     def sort_value(self) -> str | None:
         return self.value.removeprefix("The ").lower() if self.value else None
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_name
-    # @pair name:column
     @property
     def column_value(self) -> dict[str, object]:
         return self.entity.details
 
     # AI Attributes
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_name
-    # @pair name:ai
     @property
     def ai_key(self) -> str:
         return f"{self.entity.entity_kind}_name"
@@ -140,9 +127,6 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
         self._parent = value
 
     # Cache Attributes
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_name
-    # @pair name:cache
     @property
     def cache_value(self) -> str | None:
         return self.value
@@ -166,10 +150,6 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
             )
 
 
-# @testable true
-# @tests tests_unit/test_005_project_properties.py::test_project_description
-# @tests tests_unit/test_013_task_properties.py::test_task_description
-# @matrix project task : column
 class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty[str]):
     """Entity description. HTML tags are stripped; text whitespace is preserved.
 
@@ -191,12 +171,6 @@ class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty[str]
     _label = "Description"
     _icon = "textarea"
 
-    # @testable true
-    # @tests tests_unit/test_005_project_properties.py::test_project_description
-    # @tests tests_unit/test_013_task_properties.py::test_task_description
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_description_preserves_whitespace
-    # @matrix project task : description html-stripping
-    # @matrix description : html-stripping whitespace
     @property
     def value(self) -> str | None:
         return super().value
@@ -235,10 +209,6 @@ class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty[str]
     def filter_kind(self, value: str) -> None:
         self._filter_kind = value
 
-    # @testable true
-    # @tests tests_unit/test_005_project_properties.py::test_project_description
-    # @tests tests_unit/test_013_task_properties.py::test_task_description
-    # @matrix project task : filter-value
     @property
     def filter_value(self) -> str | None:
         return self.value if self.value else None
@@ -246,19 +216,11 @@ class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty[str]
     # Cache Attributes
     _cache_key = "desc"
 
-    # @testable true
-    # @tests tests_unit/test_005_project_properties.py::test_project_description
-    # @tests tests_unit/test_013_task_properties.py::test_task_description
-    # @matrix project task : cache
     @property
     def cache_value(self) -> str | None:
         return self.value
 
     # AI Attributes
-    # @testable true
-    # @tests tests_unit/test_005_project_properties.py::test_project_description
-    # @tests tests_unit/test_013_task_properties.py::test_task_description
-    # @matrix project task : ai-value
     @property
     def ai_key(self) -> str:
         if isinstance(self.entity, Entities.PAGE):
@@ -268,9 +230,6 @@ class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty[str]
         return "description"
 
 
-# @testable true
-# @tests tests_unit/test_002_entity_general_properties.py::test_entity_created_update_initializes_once
-# @matrix created : initialized-once update
 class Created(DateMixin, ColumnMixin, FilterMixin, DBProperty[datetime]):
     """Entity creation timestamp. Read-only after creation.
 
@@ -300,9 +259,6 @@ class Created(DateMixin, ColumnMixin, FilterMixin, DBProperty[datetime]):
     _editable = False
 
 
-# @testable true
-# @tests tests_unit/test_002_entity_general_properties.py::test_entity_modified
-# @matrix modified : column date filter property
 class Modified(DateMixin, ColumnMixin, FilterMixin, DBProperty[datetime]):
     """Entity last-modified timestamp.
 
@@ -345,11 +301,6 @@ class Modified(DateMixin, ColumnMixin, FilterMixin, DBProperty[datetime]):
         return cast(datetime, self.value).isoformat()
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/common_entity.py::Kind.db_key
-# @covered-by lagniappe/core/properties/common_entity.py::Kind.details_value
-# @covered-by lagniappe/core/properties/common_entity.py::Kind.cache_value
-# @reason Kind behavior is owned by its db/details/cache accessors
 class Kind(DetailsMixin, CacheMixin, DBProperty[str]):
     """Entity type discriminator (e.g. "page", "task", "user").
 
@@ -370,17 +321,11 @@ class Kind(DetailsMixin, CacheMixin, DBProperty[str]):
     _id = "kind"
 
     # DB Attributes
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_kind
-    # @matrix kind : db-key property
     @property
     def db_key(self) -> str:
         return "type"
 
     # Details Attributes
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_kind
-    # @pair kind:details
     @property
     def details_value(self) -> str | None:
         if isinstance(self.entity, Entities.PAGE) and self.entity.db.get("user"):
@@ -389,19 +334,11 @@ class Kind(DetailsMixin, CacheMixin, DBProperty[str]):
         return self.value
 
     # Cache Attributes
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_kind
-    # @pair kind:cache
     @property
     def cache_value(self) -> str | None:
         return self.details_value
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/common_entity.py::Requires.value
-# @covered-by lagniappe/core/properties/common_entity.py::Requires.cache_value
-# @covered-by lagniappe/core/properties/common_entity.py::Requires.details_value
-# @reason Requires behavior is owned by its value/details/cache accessors
 class Requires(CacheMixin, DetailsMixin, DBProperty[list[str]]):
     """Access-control list for an entity.
 
@@ -420,11 +357,6 @@ class Requires(CacheMixin, DetailsMixin, DBProperty[list[str]]):
     # Property Attributes
     _id = "requires"
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_requires
-    # @tests tests_unit/test_006b_ingress_entity.py::test_model_task_required_reports_unloaded_project_relation
-    # @tests tests_unit/test_009f_page_view_access.py::test_page_allowed_uses_stored_requirements_without_loading_categories
-    # @matrix page permissions requires : no-category-expansion property shallow-page stored-requires validation
     @property
     def value(self) -> list[str]:
         value = super().value
@@ -438,8 +370,6 @@ class Requires(CacheMixin, DetailsMixin, DBProperty[list[str]]):
     def value(self, value: str | list[str] | None) -> None:
         self._write_db_value(self._validate(value))
 
-    # @testable false
-    # @covered-by lagniappe/core/mutations/executor.py::_prepare_write
     def update(self) -> None:
         self._write_db_value(self._required())
 
@@ -472,9 +402,6 @@ class Requires(CacheMixin, DetailsMixin, DBProperty[list[str]]):
         return cast("list[str]", required)
 
     # Cache Attributes
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_requires
-    # @pair requires:cache
     @property
     def cache_value(self) -> str:
         if isinstance(self.entity, Entities.PAGE) and self.entity.user:
@@ -483,18 +410,11 @@ class Requires(CacheMixin, DetailsMixin, DBProperty[list[str]]):
         return ",".join(self.value)
 
     # Details Attributes
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_requires
-    # @pair requires:details
     @property
     def details_value(self) -> list[str]:
         return self.value
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/common_entity.py::Hash.value
-# @covered-by lagniappe/core/properties/common_entity.py::Hash.filter_key
-# @reason Hash behavior is owned by value generation and filter-key projection
 class Hash(DetailsMixin, CacheMixin, FilterMixin, AIMixin, DBProperty[str]):
     """Short unique identifier for an entity.
 
@@ -521,9 +441,6 @@ class Hash(DetailsMixin, CacheMixin, FilterMixin, AIMixin, DBProperty[str]):
         value = self.value
         return f"hash:{value}" if value else None
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_hash
-    # @matrix hash : cache details property
     @property
     def value(self) -> str:  # pyright: ignore[reportIncompatibleMethodOverride] -- Computed from the owner and intentionally read-only.
         value = super().value
@@ -549,17 +466,11 @@ class Hash(DetailsMixin, CacheMixin, FilterMixin, AIMixin, DBProperty[str]):
     # Filter Attributes
     _field_type = FieldType.STRING
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_hash
-    # @pair hash:filter
     @property
     def filter_key(self) -> str:  # pyright: ignore[reportIncompatibleMethodOverride] -- The index uses a fixed key.
         return "cache_key"
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_deferred_job_reference_round_trips
-# @pairs deferred-jobs:active-operation pages:create-autofill
 class DeferredJobReference(DBProperty[dict[str, object]]):
     """Reference metadata for an entity's currently active background job."""
 
@@ -567,9 +478,6 @@ class DeferredJobReference(DBProperty[dict[str, object]]):
     json = True
 
 
-# @testable true
-# @tests tests_unit/test_002_entity_general_properties.py::test_public_id_generation_is_unique_and_persisted
-# @matrix public-id : generation persistence uniqueness
 class PublicID(DBProperty[str]):
     """Public URL identifier for publicly visible entities.
 
@@ -604,10 +512,6 @@ class PublicID(DBProperty[str]):
         return unique_id
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/common_entity.py::IsPublic.value
-# @covered-by lagniappe/core/properties/common_entity.py::IsPublic.filter_value
-# @reason public visibility behavior is owned by value storage and filter projection
 class IsPublic(FilterMixin, DBProperty[bool, "Entity", bool]):
     """Whether an entity is publicly visible.
 
@@ -622,11 +526,6 @@ class IsPublic(FilterMixin, DBProperty[bool, "Entity", bool]):
     _label = "Public"
     _icon = "public"
 
-    # @testable true
-    # @tests tests_unit/test_005_project_properties.py::test_project_is_public
-    # @tests tests_unit/test_008_page_properties.py::test_page_public
-    # @tests tests_unit/test_009a_user.py::test_user_is_public
-    # @matrix page project user : public
     @property
     def value(self) -> bool:
         return cast(bool, self.entity.db.get("public", False))
@@ -645,10 +544,6 @@ class IsPublic(FilterMixin, DBProperty[bool, "Entity", bool]):
     _field_type = FieldType.BOOLEAN
     _field_options = FilterOptions.PUBLIC.value
 
-    # @testable true
-    # @tests tests_unit/test_005_project_properties.py::test_project_is_public
-    # @tests tests_unit/test_008_page_properties.py::test_page_public
-    # @matrix page project : filter-value
     @property
     def filter_value(self) -> bool:
         return bool(self.value)
@@ -670,10 +565,6 @@ class IsPublic(FilterMixin, DBProperty[bool, "Entity", bool]):
         self._filter_kind = value
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
-# @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode
-# @matrix categories projects : ai-create ai-generated
 class AiGenerated(DBProperty[bool]):
     """Flag indicating whether an entity was generated by AI."""
 
@@ -691,9 +582,6 @@ class AiGenerated(DBProperty[bool]):
         self.entity.db["ai_generated"] = True
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/common_entity.py::Active.value
-# @reason Active behavior is owned by the value accessor
 class Active(DBProperty[bool, "Entity", bool]):
     """Whether an entity is active.
 
@@ -711,10 +599,6 @@ class Active(DBProperty[bool, "Entity", bool]):
     # Property Attributes
     _id = "active"
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_active
-    # @tests tests_unit/test_002_entity_general_properties.py::test_entity_active_rejects_non_bool
-    # @matrix active : property public-user validation
     @property
     def value(self) -> bool:
         user = cast("User | None", getattr(self.entity, "user", None))
@@ -729,8 +613,6 @@ class Active(DBProperty[bool, "Entity", bool]):
 
         self._write_db_value(value)
 
-    # @testable false
-    # @covered-by lagniappe/core/mutations/executor.py::_prepare_write
     def update(self) -> None:
         if self.id in self.entity.db:
             return
@@ -738,10 +620,6 @@ class Active(DBProperty[bool, "Entity", bool]):
         self._write_db_value(self.value)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/user_permissions.py::UserPermissions.create
-# @covered-by lagniappe/core/properties/user_groups.py::GroupPermissions.create
-# @covered-by lagniappe/core/properties/user_groups.py::PublicPermissions.create
 class Permissions[Owner: Entity = "Entity"](DBProperty[dict[str, str], Owner, dict[str, str] | None]):
     """Permission map for an entity.
 
@@ -780,10 +658,6 @@ class Permissions[Owner: Entity = "Entity"](DBProperty[dict[str, str], Owner, di
         return self._form
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/common_entity.py::RestrictedTo.value
-# @covered-by lagniappe/core/properties/common_entity.py::RestrictedTo.add
-# @reason restricted-to behavior is owned by value resolution and explicit mutation
 class RestrictedTo(DBProperty[dict[str, list[str]], RestrictionOwner]):
     """Local group storage and effective restrictions separated by source.
 
@@ -800,19 +674,6 @@ class RestrictedTo(DBProperty[dict[str, list[str]], RestrictionOwner]):
     _label = "Restricted To"
     _icon = "group"
 
-    # @testable true
-    # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_owner_can_restrict_form_to_site_owner
-    # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_group_restricted_form_opens_for_group_member_only
-    # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_index_lists_group_restricted_form_only_for_group_member
-    # @tests tests_unit/test_002_entity_general_properties.py::test_restricted_to_effective_projection_does_not_alias_sources
-    # @tests tests_unit/test_013_task_properties.py::test_task_restrictions_require_each_source_with_any_group
-    # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_recalculates_restrictions_after_form_deletion
-    # @tests tests_unit/test_002_entity_general_properties.py::test_task_file_restrictions_use_stored_hashes_without_group_reads
-    # @matrix permissions : source-clauses inherited-restrictions
-    # @matrix task permissions : source-clauses admin-only
-    # @matrix permissions relations : deleted-form recalculation
-    # @matrix permissions relations : stored-restrictions group-free no-extra-read
-    # @matrix forms permissions : access-restrictions group-restricted index-filter inheritance owner-restricted restricted-access side-effect-free stable-order
     @property
     def value(self) -> dict[str, list[str]]:  # pyright: ignore[reportIncompatibleMethodOverride] -- Computed from the owner and intentionally read-only.
         kind = getattr(self.entity, "entity_kind", None)
@@ -839,12 +700,6 @@ class RestrictedTo(DBProperty[dict[str, list[str]], RestrictionOwner]):
             restrictions = {}
         return normalize_restrictions(restrictions)
 
-    # @testable true
-    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_local_restrictions_materialize_without_persisting_inheritance
-    # @tests tests_unit/test_002_entity_general_properties.py::test_direct_fetch_materializes_local_restrictions_from_attached_groups
-    # @tests tests_unit/test_002_entity_general_properties.py::test_materialize_preserves_hashes_until_groups_are_attached
-    # @matrix permissions : local-restrictions materialization owner-only
-    # @matrix permissions relations : local-restrictions materialization unresolved
     def materialize(self, *, admin_only: bool | None = None) -> None:
         """Project attached local groups into storage; inheritance stays computed."""
         if self.entity.entity_kind not in {"form", "page"}:
@@ -872,18 +727,11 @@ class RestrictedTo(DBProperty[dict[str, list[str]], RestrictionOwner]):
         self.entity._details = None
         self.entity._to_cache = None
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_restricted_to_effective_projection_does_not_alias_sources
-    # @matrix forms : access-restrictions side-effect-free stored-projection
     @property
     def stored(self) -> list[str]:
         value = self.entity.db.get(self.id)
         return list(value) if isinstance(value, list) else []
 
-    # @testable true
-    # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_owner_can_restrict_form_to_site_owner
-    # @tests tests_unit/test_002_entity_general_properties.py::test_restricted_to_add_preserves_first_seen_order
-    # @matrix forms : access-restrictions owner-restricted side-effect-free stable-order
     def add(self, value: str) -> None:
         existing = self.stored
 

@@ -19,9 +19,6 @@ class TodoValue(TypedDict):
     items: list[TodoItem]
 
 
-# @testable true
-# @tests tests_unit/test_003g_todo_lists.py::test_todo_list_validation_and_import
-# @matrix form-todo : normalization validation
 def _todo_items(value: object, *, allow_scalar: bool = False) -> list[TodoItem]:
     """Return canonical ordered todo items from a supported value shape."""
 
@@ -63,10 +60,6 @@ def _todo_items(value: object, *, allow_scalar: bool = False) -> list[TodoItem]:
     return items
 
 
-# @testable true
-# @tests tests_unit/test_003g_todo_lists.py::test_todo_list_submission_projections
-# @tests tests_unit/test_003g_todo_lists.py::test_todo_list_validation_and_import
-# @matrix form-todo : ai-value column db-value form-value import search-value submission validation
 class TodoList(SearchMixin, AIMixin, ColumnMixin, SchemaProperty[TodoValue]):
     """Ordered single-line checklist stored as text/checked item objects."""
 
@@ -98,10 +91,6 @@ class TodoList(SearchMixin, AIMixin, ColumnMixin, SchemaProperty[TodoValue]):
         else:
             self.unset()
 
-    # @testable true
-    # @tests tests_unit/test_003g_todo_lists.py::test_todo_list_validation_and_import
-    # @tests tests_unit/test_006b_ingress_entity.py::test_importer_rejects_entire_malformed_todo_row
-    # @matrix form-todo : import validation
     def validate_import(self, value: object) -> None:
         """Raise on malformed input so the importer rejects the whole row."""
         items = _todo_items(value, allow_scalar=True)

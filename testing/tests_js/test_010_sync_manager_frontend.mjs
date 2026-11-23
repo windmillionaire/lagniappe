@@ -15,11 +15,6 @@ function replaceGlobal(t, name, value) {
 	});
 }
 
-/**
- * @matrix offline : offline-replay queue-preserved reconnect-generation retry-boundary
- * @matrix polling : active-widget document visibility
- * @matrix sync : active-widget checkpoint dirty-state offline-replay persistence reconnect-generation retry-boundary visibility
- */
 test("test_sync_manager_uses_polling_subscriptions", async (t) => {
 	const requestCalls = [];
 	const offlineWrites = [];

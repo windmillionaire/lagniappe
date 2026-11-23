@@ -29,13 +29,6 @@ from lagniappe.web import direct_uploads
 from . import files
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_file_input
-# @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_drag_drop
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_opens_with_processed_csv_status
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_error_state_persists_after_reopen
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_rejects_non_csv_upload
-# @matrix ingress : drag-drop file-input non-csv process-csv reopen stage-wizard upload-counts validation
 @files.route("/ingress", methods=["GET", "POST"])
 @permission(Resource.SITE)
 def ingress(**kwargs: object) -> ResponseReturnValue:
@@ -74,19 +67,12 @@ def ingress(**kwargs: object) -> ResponseReturnValue:
         return responses.ingress_progress(file)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/files/ingress.py::ingress
-# @reason route permission mirrors the final ingress upload endpoint
 @files.route("/ingress/direct-upload", methods=["POST"])
 @permission(Resource.SITE)
 def ingress_direct(**kwargs: object) -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
-# @testable true
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_stage_navigation_reconciles_downstream_status
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_error_state_persists_after_reopen
-# @matrix ingress : error-handling persistence set-stage stage-wizard
 @files.route("/ingress/<key>/stage", methods=["PUT", "GET"])
 @permission(Resource.SITE)
 def ingress_stage(
@@ -109,10 +95,6 @@ def ingress_stage(
     return responses.ingress_progress(file)
 
 
-# @testable true
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-# @pair ingress:stage-wizard
 @files.route("/ingress/<key>/update", methods=["PATCH"])
 @permission(Resource.SITE)
 def ingress_update(
@@ -126,11 +108,6 @@ def ingress_update(
     return responses.json_response(section)
 
 
-# @testable true
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-# @tests tests_unit/test_006b_ingress_entity.py::test_next_advances_after_finalize
-# @matrix ingress : finalize stage-wizard
 @files.route("/ingress/<key>/next", methods=["PUT"])
 @permission(Resource.SITE)
 def ingress_next(
@@ -144,13 +121,6 @@ def ingress_next(
     return responses.ingress_progress(file)
 
 
-# @testable true
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_importing_stage_streams_results_and_completes
-# @tests tests_unit/test_006b_ingress_entity.py::test_importer_story_processes_page_rows_into_entities_and_results
-# @matrix ingress : completed import-results stage-wizard verify-import
-# @pair ingress:row-results
 @files.route("/ingress/<key>/import", methods=["POST"])
 @permission(Resource.SITE)
 def ingress_import(
@@ -216,10 +186,6 @@ def ingress_import(
     return responses.ingress_progress(file)
 
 
-# @testable false
-# @manual true
-# @reason production remote import stop/restart depends on asynchronous importing state
-# @matrix ingress : restart stop
 @files.route("/ingress/<key>/stop", methods=["POST"])
 @permission(Resource.SITE)
 def ingress_stop(
@@ -236,10 +202,6 @@ def ingress_stop(
     return responses.ingress_progress(file)
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/ingress.py::Ingress.delete_imported_entities
-# @reason route delegates bulk deletion to the core ingress entity and returns the standard progress payload
-# @matrix ingress : bulk-delete row-results
 @files.route("/ingress/<key>/delete-imported", methods=["GET", "DELETE"])
 @permission(Resource.SITE)
 def ingress_delete_imported(
@@ -257,11 +219,6 @@ def ingress_delete_imported(
     return responses.ingress_progress(file)
 
 
-# @testable true
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_task_page_form_lookup_updates_index_fields
-# @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_builds_or_selects_the_submission_form
-# @matrix ingress : page-form-lookup task-import
-# @pair ingress:default-form
 @files.route("/ingress/<key>/get-page-form", methods=["GET"])
 @permission(Resource.SITE)
 def ingress_get_page_form(

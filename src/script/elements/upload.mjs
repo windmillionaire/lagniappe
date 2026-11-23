@@ -7,9 +7,6 @@ import { primitives } from "./primitives.mjs";
 const DEFAULT_DROPZONE_TEXT =
 	"Drop file here, click to upload, or tap to choose camera/files";
 
-/**
- * @testable infrastructure
- */
 const visibility = () => {
 	const group = document.createElement("fieldset");
 	group.className = "flex flex-row items-center gap-4";
@@ -39,9 +36,6 @@ const visibility = () => {
 	return group;
 };
 
-/**
- * @testable infrastructure
- */
 const hiddenFileInput = (widget) => {
 	const hiddenInput = document.createElement("input");
 	hiddenInput.name = `${widget.inputName}`;
@@ -58,9 +52,6 @@ const hiddenFileInput = (widget) => {
 	};
 };
 
-/**
- * @testable infrastructure
- */
 const mimeType = () => {
 	const mimeTypeInput = document.createElement("input");
 	mimeTypeInput.type = "hidden";
@@ -74,9 +65,6 @@ const mimeType = () => {
 	};
 };
 
-/**
- * @testable infrastructure
- */
 const access = () => {
 	const accessGroup = document.createElement("div");
 	accessGroup.className = `${STYLES.upload.options} hidden`;
@@ -96,9 +84,6 @@ const access = () => {
 	return accessGroup;
 };
 
-/**
- * @testable infrastructure
- */
 const processing = ({ aiCreate = true } = {}) => {
 	const optionsContainer = document.createElement("div");
 	optionsContainer.dataset.role = "options";
@@ -156,31 +141,16 @@ const processing = ({ aiCreate = true } = {}) => {
 		...(aiCreate ? [summarize, searchSummary] : []),
 	);
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/upload.mjs::processing
-	 * @reason option visibility helper is private processing-section plumbing
-	 */
 	const setOptionVisibility = (element, visible) => {
 		element.dataset.visible = visible ? "true" : "false";
 	};
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/upload.mjs::processing
-	 * @reason reset helper is private processing-section plumbing
-	 */
 	const resetOptionVisibility = () => {
 		[extract, searchText, summarize, searchSummary].forEach((element) => {
 			setOptionVisibility(element, false);
 		});
 	};
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/upload.mjs::processing
-	 * @reason display-name visibility is private processing-section plumbing
-	 */
 	const setDisplayNameVisibility = (visible) => {
 		const input = editName.querySelector("input");
 		editName.dataset.visible = visible ? "true" : "false";
@@ -188,11 +158,6 @@ const processing = ({ aiCreate = true } = {}) => {
 		if (!visible) input.value = "";
 	};
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/elements/upload.mjs::processing
-	 * @reason prefill helper is private processing-section plumbing
-	 */
 	const prefill = ({ filename, isTextFile, fileCount = 1 }) => {
 		const singleFile = fileCount <= 1;
 		editName.querySelector("input").value = singleFile ? filename || "" : "";
@@ -240,9 +205,6 @@ const processing = ({ aiCreate = true } = {}) => {
 	};
 };
 
-/**
- * @testable infrastructure
- */
 const menuButton = () => {
 	const menuButtonContainer = document.createElement("div");
 	menuButtonContainer.dataset.role = "upload-menu";
@@ -258,9 +220,6 @@ const menuButton = () => {
 	return menuButtonContainer;
 };
 
-/**
- * @testable infrastructure
- */
 const contextDescription = (settings = {}) => {
 	const description = document.createElement("textarea");
 	description.className = `${STYLES.textarea} grow h-24 placeholder:text-center`;
@@ -270,9 +229,6 @@ const contextDescription = (settings = {}) => {
 	return description;
 };
 
-/**
- * @testable infrastructure
- */
 const contextUpload = (settings = {}) => {
 	const container = document.createElement("div");
 	container.className = "flex flex-col gap-1";
@@ -312,9 +268,6 @@ const contextUpload = (settings = {}) => {
 	};
 };
 
-/**
- * @testable infrastructure
- */
 const dropzone = (options) => {
 	const { text = DEFAULT_DROPZONE_TEXT, element = null } = options;
 
@@ -358,9 +311,6 @@ const dropzone = (options) => {
 	};
 };
 
-/**
- * @testable infrastructure
- */
 export class UploadMenu {
 	constructor(instance) {
 		this.instance = instance;
@@ -460,9 +410,6 @@ export class UploadMenu {
 	}
 }
 
-/**
- * @testable infrastructure
- */
 const generateDocumentImage = () => {
 	const container = document.createElement("div");
 	container.dataset.role = "generate-image";

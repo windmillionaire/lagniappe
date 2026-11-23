@@ -15,11 +15,6 @@ const ERROR_CODES = new Map([
 	["INVALID_OOB_CODE", "auth/invalid-action-code"],
 ]);
 
-/**
- * @testable true
- * @tests tests_js/test_033_identity_platform.mjs::test_identity_platform_rest_client_contract
- * @matrix login : auth-errors identity-platform
- */
 class IdentityPlatformError extends Error {
 	constructor(providerMessage, status = 0) {
 		const providerCode = String(providerMessage || "")
@@ -37,12 +32,6 @@ class IdentityPlatformError extends Error {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_js/test_033_identity_platform.mjs::test_identity_platform_rest_client_contract
- * @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
- * @matrix login : action-codes browser-fetch email-password hosted-e2e identity-platform
- */
 class IdentityPlatformClient {
 	constructor(config) {
 		this.apiKey = String(config?.apiKey || "").trim();

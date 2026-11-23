@@ -36,19 +36,11 @@ class PlanWriter(Protocol):
 
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external_operations.py::save_plan_if_idle
-# @covered-by lagniappe/core/tools/ai/external_operations.py::delete_plan_if_idle
-# @reason exact raw snapshots are asserted by both public guarded mutations
 def report_snapshot(report: AIReport) -> dict[str, object]:
     """Capture the raw Report revision before an in-memory mutation begins."""
     return deepcopy(dict(report.db))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external_operations.py::save_plan_if_idle
-# @covered-by lagniappe/core/tools/ai/external_operations.py::delete_plan_if_idle
-# @reason shared mutation execution is exercised through save and delete races
 def _commit_plan_if_idle(report, expected_report, plan, *, active_job=None):
     writes = prepare_durable_writes(plan)
     deletes = [
@@ -86,9 +78,6 @@ def _commit_plan_if_idle(report, expected_report, plan, *, active_job=None):
     return outcome
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_browser_plan_save_and_delete_use_idle_transaction
-# @matrix agent-api ai-report : browser-review cas save
 def save_plan_if_idle(report: AIReport, expected_report: Mapping[str, object], *entities: Entity, active_job: tuple[Key, str] | None = None) -> str:
     """Save a browser change without racing an external API Plan operation."""
     plan = plan_mutation(
@@ -98,9 +87,6 @@ def save_plan_if_idle(report: AIReport, expected_report: Mapping[str, object], *
     return _commit_plan_if_idle(report, expected_report, plan, active_job=active_job)
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_browser_plan_save_and_delete_use_idle_transaction
-# @matrix agent-api ai-report : browser-review cas delete file-cleanup
 def delete_plan_if_idle(report: AIReport, expected_report: Mapping[str, object], *entities: Entity) -> str:
     """Delete a Plan and owned files only if its reviewed revision is current."""
     plan = plan_mutation(
@@ -110,7 +96,6 @@ def delete_plan_if_idle(report: AIReport, expected_report: Mapping[str, object],
     return _commit_plan_if_idle(report, expected_report, plan)
 
 
-# @testable infrastructure
 class ExternalPlanError(Exception):
     """A safe domain failure translated to HTTP only at the REST boundary."""
 
@@ -122,10 +107,6 @@ class ExternalPlanError(Exception):
         self.details = details
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/uploads.py::create_upload_sessions
-# @covered-by lagniappe/core/tools/ai/external/uploads.py::finalize_upload_batch
-# @reason claim outcomes are exercised through both public upload routes
 def raise_plan_operation_error(outcome: str) -> Never:
     """Map a transactional Plan-operation outcome to a bounded API conflict."""
     if outcome == agent_api_store.PLAN_OPERATION_PENDING:
@@ -151,10 +132,6 @@ def raise_plan_operation_error(outcome: str) -> Never:
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/uploads.py::create_upload_sessions
-# @covered-by lagniappe/core/tools/ai/external/uploads.py::finalize_upload_batch
-# @reason expiry provides recovery when best-effort cleanup itself is unavailable
 def release_plan_operation_claim(
     report: AIReport,
     *,
@@ -174,17 +151,10 @@ def release_plan_operation_claim(
         )
 
 
-# @testable true
-# @tests tests_unit/test_032i_external_contracts.py::test_claimed_save_preserves_definite_and_ambiguous_checkpoint_failures
-# @tests tests_unit/test_032i_external_contracts.py::test_claimed_save_advances_snapshot_and_isolates_post_commit_failure
-# @matrix agent-api : checkpoint concurrency
 def claimed_plan_save(report: AIReport, *, phase: str, operation_id: str, claim_token: str, user: User, request_id: str | None) -> PlanWriter:
     """Return a mutation writer fenced by one exact Plan-operation claim."""
     expected_report = deepcopy(dict(report.db))
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/external_operations.py::claimed_plan_save
-    # @reason the closure delegates each checkpoint to the service-owned claim writer
     def save(*entities: Entity) -> None:
         nonlocal expected_report
         try:

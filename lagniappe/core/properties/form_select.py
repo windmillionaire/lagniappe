@@ -13,11 +13,6 @@ if TYPE_CHECKING:
     from ..entities.entity import Entity
 
 
-# @testable true
-# @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_radio
-# @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_select_single
-# @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_select_multiple
-# @matrix radio select : filter-value
 class CategoricalElement(ColumnMixin, AIMixin, FilterMixin, SchemaProperty[str | list[str]]):
     """Base class for fields with a fixed set of choices (select, radio).
 
@@ -60,9 +55,6 @@ class CategoricalElement(ColumnMixin, AIMixin, FilterMixin, SchemaProperty[str |
     def fuzzy_match(self, value: bool | None) -> None:
         self._fuzzy_match = value
 
-    # @testable true
-    # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_select_multiple
-    # @pair select:multiple
     @property
     def value(self) -> str | list[str] | None:
         return super().value
@@ -89,11 +81,6 @@ class CategoricalElement(ColumnMixin, AIMixin, FilterMixin, SchemaProperty[str |
         else:
             return None
 
-    # @testable true
-    # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_radio
-    # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_select_single
-    # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_select_multiple
-    # @matrix radio select : column
     @property
     def column_value(self) -> dict[str, str] | None:
         if not self.value:
@@ -108,10 +95,6 @@ class CategoricalElement(ColumnMixin, AIMixin, FilterMixin, SchemaProperty[str |
             )
 
     # Ingress Attributes
-    # @testable true
-    # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_radio
-    # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_select_multiple
-    # @matrix radio select : fuzzy-match import
     def _match_value(self, value: object) -> str | None:
         if not value:
             return None
@@ -138,10 +121,6 @@ class CategoricalElement(ColumnMixin, AIMixin, FilterMixin, SchemaProperty[str |
         match_value = next((k for k, v in self.choices.items() if v == matched), None)
         return match_value
 
-    # @testable true
-    # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_select_single
-    # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_select_multiple
-    # @matrix select : import multiple separator
     def validate_import(self, values: object) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] -- existing CSV keyword is plural.
         if not values:
             self.value = None
@@ -171,11 +150,6 @@ class CategoricalElement(ColumnMixin, AIMixin, FilterMixin, SchemaProperty[str |
             matches = [k for k, v in self.choices.items() if v in values]
         self.value = matches
 
-    # @testable true
-    # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_radio
-    # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_select_single
-    # @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_select_multiple
-    # @matrix radio select : ai-value
     @property
     def ai_value(self) -> str | list[str] | None:
         if isinstance(self.value, list):
@@ -206,9 +180,6 @@ class CategoricalElement(ColumnMixin, AIMixin, FilterMixin, SchemaProperty[str |
     def field_type(self) -> FieldType:  # pyright: ignore[reportIncompatibleMethodOverride] -- derived from the form schema and read-only.
         return FieldType.LIST if self.multiple else FieldType.STRING
 
-    # @testable true
-    # @tests tests_unit/test_012b_form_conditions.py::test_form_select_filters
-    # @matrix select : condition-definition multiple select
     def filter_details(self, condition: Condition) -> dict[str, object]:
         """Return display details with option labels."""
         details = super().filter_details(condition)
@@ -228,9 +199,6 @@ class Radio(CategoricalElement):
     _icon = "radio"
 
 
-# @testable true
-# @tests tests_unit/test_003b_submission_links_and_select.py::test_submission_select_multiple
-# @matrix select : multiple separator
 class Select(CategoricalElement):
     """Dropdown select field. Supports single or multi-select via ``multiple``."""
 

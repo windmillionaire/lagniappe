@@ -1,11 +1,6 @@
 import { STYLES } from "../../../generated/styles.mjs";
 import { setIcon } from "../../../shared/icons.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004d_document.py::test_formatting_persists
- * @matrix editor : formatting
- */
 class ToolbarButton {
 	constructor(toolbar) {
 		this.toolbar = toolbar;
@@ -67,9 +62,6 @@ class ToolbarButton {
 	}
 }
 
-/**
- * @testable infrastructure
- */
 class ToggleFocusButton extends ToolbarButton {
 	onClick() {
 		this.active = !this.active;

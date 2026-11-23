@@ -20,7 +20,6 @@ from testing.utility.notification_email_fakes import (
 pytestmark = pytest.mark.unit
 
 
-# @matrix notification-email : clear-suppression hide-suppression latest-only message quiet-window read-suppression reply-suppression
 def test_immediate_messages_wait_for_conversation_quiet(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=UTC)
     store = MemoryDatastore()

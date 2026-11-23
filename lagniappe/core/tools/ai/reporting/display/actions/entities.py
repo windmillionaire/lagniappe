@@ -16,7 +16,6 @@ from ..contracts import (
 )
 
 
-# @testable infrastructure
 def category_details(
     details: ProposalDetailCollector,
     data: ActionData,
@@ -25,7 +24,6 @@ def category_details(
     details.reference("Form", data, "form")
 
 
-# @testable infrastructure
 def page_details(
     details: ProposalDetailCollector,
     data: ActionData,
@@ -41,7 +39,6 @@ def page_details(
         )
 
 
-# @testable infrastructure
 def document_details(
     details: ProposalDetailCollector,
     data: ActionData,

@@ -2,15 +2,8 @@ import { request } from "../shared/request.mjs";
 import { withTransition } from "../shared/transitions.mjs";
 import ShellView from "./base/shell.mjs";
 
-/**
- * @testable infrastructure
- */
 export default class Results extends ShellView {
 	/**
-	 * @testable true
-	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_facets_displayed
-	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_facet_selection_visual_state
-	 * @matrix search : facet-state facets
 	 * @template search/search.html::facet_button
 	 */
 	async init() {
@@ -51,9 +44,6 @@ export default class Results extends ShellView {
 	}
 
 	/**
-	 * @testable true
-	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_pagination_controls_visible
-	 * @pair search:pagination
 	 * @template search/results.html::footer
 	 */
 	addPagination() {
@@ -80,10 +70,6 @@ export default class Results extends ShellView {
 	}
 
 	/**
-	 * @testable true
-	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_next_page
-	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_previous_page
-	 * @matrix search : pagination-next pagination-previous
 	 * @template search/results.html::footer
 	 */
 	async handlePaginationClick(e) {
@@ -106,9 +92,6 @@ export default class Results extends ShellView {
 	}
 
 	/**
-	 * @testable true
-	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_clear_facet_filter
-	 * @pair search:clear-facet
 	 * @template search/search.html::main
 	 */
 	async handleResetClick(e) {
@@ -137,10 +120,6 @@ export default class Results extends ShellView {
 	}
 
 	/**
-	 * @testable true
-	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_click_facet_filters_results
-	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_facet_selection_visual_state
-	 * @matrix search : facet-filter facet-state results url-state
 	 * @template search/search.html::facet_button
 	 */
 	async handleFacetClick(e, facet) {

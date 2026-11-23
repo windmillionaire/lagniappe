@@ -42,9 +42,6 @@ APP_ENGINE_RPC_TIMEOUT = 60
 APP_ENGINE_CREATE_TIMEOUT = 300
 
 
-# @testable false
-# @covered-by installer/gcloud.py::enable_gcloud_apis
-# @reason interactive terms recovery is exercised through required-API reconciliation
 def _guide_google_service_terms_acceptance(
     terms_error,
     *,
@@ -125,9 +122,6 @@ def _guide_google_service_terms_acceptance(
         spinner.start()
 
 
-# @testable false
-# @covered-by installer/gcloud.py::enable_gcloud_apis
-# @reason provider listing adapter is exercised through required-API reconciliation
 def _enabled_google_cloud_apis(project_id):
     result = run_gcloud_command(
         [
@@ -146,10 +140,6 @@ def _enabled_google_cloud_apis(project_id):
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_reuses_confirmed_preflight
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_guides_maps_terms_then_retries_activation
-# @matrix setup : browser gcloud-command google-service-terms identity interactive-input preflight provider-apis timeout
 def enable_gcloud_apis() -> bool:
     """Enable only APIs missing from the confirmed target preflight."""
     from config import SETTINGS
@@ -181,9 +171,6 @@ def enable_gcloud_apis() -> bool:
                     wrap_text("Enabling Google Cloud APIs may take up to 5 minutes...")
                 )
             )
-            # @testable false
-            # @covered-by installer/gcloud.py::enable_gcloud_apis
-            # @reason local adapter converts captured gcloud failures before retry
             guided_terms = set()
 
             def enable_missing_services():
@@ -268,10 +255,6 @@ def enable_gcloud_apis() -> bool:
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_service_account_waits_for_newly_enabled_iam
-# @matrix setup : provider-convergence service-account
 def configure_service_account() -> dict[str, str]:
     """Create or update the explicit keyless runtime service account."""
     from config import SETTINGS
@@ -310,13 +293,7 @@ def configure_service_account() -> dict[str, str]:
     iam_admin_client = iam_admin_v1.IAMClient()
     resource = f"projects/{project_id}"
 
-    # @testable false
-    # @covered-by installer/gcloud.py::configure_service_account
-    # @reason bounded IAM retry is exercised through account provisioning
     def retry_iam(operation, description):
-        # @testable false
-        # @covered-by installer/gcloud.py::configure_service_account
-        # @reason retry feedback and delays are exercised through IAM propagation
         def wait_for_retry(delay):
             print(
                 f.info(
@@ -334,9 +311,6 @@ def configure_service_account() -> dict[str, str]:
             sleep=wait_for_retry,
         )
 
-    # @testable false
-    # @covered-by installer/gcloud.py::configure_service_account
-    # @reason exact runtime and service-account grants belong to provisioning
     def apply_iam_policy(email):
         iam_access.reconcile_runtime_project_policy(
             project_id,
@@ -403,9 +377,6 @@ def configure_service_account() -> dict[str, str]:
                 message="Failed to create service account.",
             ) from e
 
-    # @testable false
-    # @covered-by installer/gcloud.py::configure_service_account
-    # @reason provider readback is exercised through account provisioning
     def wait_for_service_account(name):
         active, count = False, 0
         while not active:
@@ -440,9 +411,6 @@ def configure_service_account() -> dict[str, str]:
     return {"client_email": account.email}
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_storage_provisioning_is_bucket_scoped_and_idempotent
-# @matrix iam setup storage : bucket-location bucket-scope idempotence provisioning storage-class
 def configure_storage_buckets(
     *, include_production: bool = True, include_test: bool = False
 ) -> bool:
@@ -636,11 +604,6 @@ def configure_storage_buckets(
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_app_engine_persists_provider_location_hostname_and_oidc_subject
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_app_engine_creation_prompt_and_bounded_failures
-# @matrix setup : app-engine failure-isolation immutable-location interactive-input provider-state timeout
 def create_app_engine_app() -> Application:
     """Get the immutable App Engine application or create it after confirmation."""
     from config import SETTINGS
@@ -781,9 +744,6 @@ def create_app_engine_app() -> Application:
             raise classified from e
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
-# @pair setup:cloud-tasks
 def create_task_queue() -> bool:
     """Creates a Cloud Tasks queue named 'lagniappe-tasks' if it doesn't exist."""
     from config import SETTINGS
@@ -872,9 +832,6 @@ def create_task_queue() -> bool:
             ) from e
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_deferred_job_reconciler_contract
-# @matrix deferred-jobs setup : cloud-scheduler iam oidc recovery runtime-isolation
 def create_deferred_job_reconciler() -> bool:
     """Create or update the five-minute durable-job recovery schedule."""
     from config import SETTINGS
@@ -998,9 +955,6 @@ def create_deferred_job_reconciler() -> bool:
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_data_protection_contract
-# @matrix disaster-recovery setup : idempotent native-backups pitr retention runtime-isolation
 def configure_data_protection() -> bool:
     """Enable PITR and reconcile daily/weekly native backup schedules."""
     import json
@@ -1097,9 +1051,6 @@ def configure_data_protection() -> bool:
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
-# @pair setup:ocr
 def create_ocr_processor() -> bool | None:
     from config import SETTINGS
 
@@ -1201,10 +1152,6 @@ def create_ocr_processor() -> bool | None:
             ) from e
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_app_engine_persists_provider_location_hostname_and_oidc_subject
-# @matrix setup : app-engine immutable-location keyless-config oidc provider-state service-account
 def setup_app_engine() -> None:
     """Configure App Engine and service account."""
     from config import SETTINGS

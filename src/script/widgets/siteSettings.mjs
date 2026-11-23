@@ -17,12 +17,6 @@ const SETTING_WIDGETS = {
  * Coordinates the shared site-settings section chrome while each section body
  * is owned by a focused persistent widget.
  *
- * @testable true
- * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
- * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_public_page_indexing_saves_live_setting
- * @tests tests_js/test_019_form_sync_frontend.mjs::test_site_settings_coordinates_section_widgets
- * @matrix admin : composite-widgets persistence sections site-settings
- * @matrix public-pages : live-settings
  */
 export class SiteSettings {
 	constructor(attributes) {

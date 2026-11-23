@@ -17,9 +17,6 @@ type _File = File
 type _HTML = SafeHTML
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_display_name
-# @matrix file : display-name filename-fallback
 class DisplayName(Name):
     """Display name for a File entity.
 
@@ -30,9 +27,6 @@ class DisplayName(Name):
         value (str): Explicit name or filename stem.
     """
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_display_name
-    # @matrix file : display-name filename-fallback
     @property
     def value(self) -> str | None:
         if self.is_set:
@@ -53,9 +47,6 @@ class DisplayName(Name):
         return "display_name"
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_filename_mimetype_encoding
-# @pair file:property
 class Filename(AIMixin, DBProperty[str, _File]):
     """Original filename of the uploaded file."""
 
@@ -68,12 +59,6 @@ class Filename(AIMixin, DBProperty[str, _File]):
         return self.id
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_filename_mimetype_encoding
-# @tests tests_unit/test_006_file_properties.py::test_text_asset_extractable_only_for_non_text_document_ai_mimetypes
-# @tests tests_unit/test_006_file_properties.py::test_preview_url_when_mimetype_supported_and_file_present
-# @tests tests_unit/test_006_file_properties.py::test_preview_none_when_mimetype_not_supported
-# @matrix file : extractable mimetype preview property unsupported
 class Mimetype(AIMixin, DBProperty[str, _File]):
     """MIME type of the uploaded file. Determined on upload.
 
@@ -98,9 +83,6 @@ class Mimetype(AIMixin, DBProperty[str, _File]):
         self._write_db_value(value)
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_filename_mimetype_encoding
-# @matrix file : encoding property
 class Encoding(DBProperty[str, _File]):
     """Character encoding for text files. Determined on upload."""
 
@@ -117,9 +99,6 @@ class Encoding(DBProperty[str, _File]):
         self._write_db_value(value)
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_file_size_and_large_use_asset_metadata
-# @matrix file : asset-metadata size
 class Size(Property[int, _File]):
     """Stored byte size for the uploaded file, when known."""
 
@@ -142,11 +121,6 @@ class Size(Property[int, _File]):
         return super().value
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_file_to_ai_exports_metadata_and_uri_to_ai
-# @tests tests_unit/test_006_file_properties.py::test_file_size_and_large_use_asset_metadata
-# @matrix file : asset-metadata large-file
-# @pair ai:large-file
 class Large(AIMixin, Property[bool, _File]):
     """Whether the uploaded file is too large to attach to AI by default."""
 
@@ -173,9 +147,6 @@ class Large(AIMixin, Property[bool, _File]):
         return super().value
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/file_entity.py::Preview.value
-# @reason preview behavior is owned by the value accessor
 class Preview(Property[str, _File]):
     """Preview URL for a file, if the mimetype supports inline preview.
 
@@ -187,11 +158,6 @@ class Preview(Property[str, _File]):
     _label = "Preview"
     _icon = "image"
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_preview_url_when_mimetype_supported_and_file_present
-    # @tests tests_unit/test_006_file_properties.py::test_preview_none_when_mimetype_not_supported
-    # @tests tests_unit/test_006_file_properties.py::test_preview_none_when_no_file_asset
-    # @matrix file : asset mimetype missing-asset preview unsupported
     @property
     def value(self) -> str | None:  # pyright: ignore[reportIncompatibleMethodOverride] -- This projection is computed and read-only.
         if self.is_set:
@@ -210,9 +176,6 @@ class Preview(Property[str, _File]):
         return super().value
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/file_entity.py::AsHTML.value
-# @reason HTML preview behavior is owned by the value accessor
 class AsHTML(Property[_HTML, _File]):
     """HTML rendering of the file's text content (for .rtf, .md, etc).
 
@@ -222,10 +185,6 @@ class AsHTML(Property[_HTML, _File]):
 
     _id = "html"
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_as_html
-    # @tests tests_unit/test_006_file_properties.py::test_text_asset_falls_back_to_original_text_file
-    # @matrix file : fallback html-preview text-asset
     @property
     def value(self) -> _HTML | None:  # pyright: ignore[reportIncompatibleMethodOverride] -- This projection is computed and read-only.
         if self.is_set:
@@ -236,10 +195,6 @@ class AsHTML(Property[_HTML, _File]):
         return super().value
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/file_entity.py::Summary.value
-# @covered-by lagniappe/core/properties/file_entity.py::Summary.cache_value
-# @reason summary behavior is owned by value sanitization and cache projection
 class Summary(CacheMixin, AIMixin, DBProperty[str, _File]):
     """User-facing description/AI-generated summary of a file's content.
 
@@ -262,10 +217,6 @@ class Summary(CacheMixin, AIMixin, DBProperty[str, _File]):
     def ai_key(self) -> str:
         return self.id
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_summary
-    # @tests tests_unit/test_014_security.py::test_file_summary_strips_tags
-    # @matrix file security : html-stripping summary
     @property
     def value(self) -> str | None:
         return super().value
@@ -276,10 +227,6 @@ class Summary(CacheMixin, AIMixin, DBProperty[str, _File]):
             value = strip_tags(value, preserve_whitespace=True).strip()
         self._write_db_value(value)
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_summary
-    # @tests tests_unit/test_006_file_properties.py::test_file_description_form_field_populates_search_cache
-    # @pair file:cache
     @property
     def cache_value(self) -> str | None:
         if self.entity.properties.summarize.search:

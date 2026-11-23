@@ -101,10 +101,6 @@ MCP_BOUNDARY_PNG = base64.b64decode(
 )
 
 
-# @pair mcp-adapter:product-contract
-# @pair agent-api:tool-dispatch
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter._project_file_result
-# @source lagniappe/web/routes/api/main.py::execute_tool
 def test_mcp_original_pdf_download_uses_existing_api_and_storage(
     get_admin, get_user,
     tmp_path,
@@ -227,13 +223,6 @@ def _canonical_sha256(value) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-# @pair mcp-adapter:product-contract
-# @matrix agent-api : submission proposal-contract schema field-path proposal-validation references
-# @source lagniappe/core/tools/ai/external/contracts.py::plan_contract
-# @source lagniappe/core/tools/ai/external/validation.py::submission_validation_errors
-# @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @source lagniappe/core/tools/ai/external/plans.py::submit_plan_request
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 def test_rest_and_mcp_share_submission_validation(get_admin, get_user, tmp_path, monkeypatch, setup_test_server):
     monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", raising=False)
     for cookie in setup_test_server.browser_cookies:
@@ -622,36 +611,6 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
     assert get_file["additionalProperties"] is False
 
 
-# @pairs agent-api:bearer-only agent-api:build-marker agent-api:contract
-# @pairs agent-api:create-revision agent-api:discovery agent-api:entitlement-independent
-# @pairs agent-api:origin-validation agent-api:plan-capability agent-api:plan-isolation
-# @pairs agent-api:plan-session agent-api:proposal-contract agent-api:request-recheck
-# @pairs agent-api:revoke agent-api:session-independent agent-api:submission
-# @pairs agent-api:tool-catalog agent-api:tool-dispatch agent-api:tool-selection
-# @pairs agent-api:uploads mcp-adapter:product-contract mcp-upload:safe-result
-# @pairs mcp-upload:upload-all
-# @pair user-settings:revoke
-# @matrix agent-api task-scheduling : periodic recurring scheduled structured-output validation
-# @source lagniappe/core/tools/ai/reporting/contracts/schema.py::external_task_schedule_response_schema
-# @source lagniappe/web/routes/api/main.py::authenticate_request
-# @source lagniappe/web/routes/api/main.py::annotate_response
-# @source lagniappe/web/routes/api/main.py::api_index
-# @source lagniappe/web/routes/api/main.py::openapi_document
-# @source lagniappe/web/routes/api/main.py::me
-# @source lagniappe/web/routes/api/main.py::tools
-# @source lagniappe/web/routes/api/main.py::create_plan
-# @source lagniappe/core/tools/ai/external/plans.py::load_plan
-# @source lagniappe/web/routes/api/main.py::get_plan
-# @source lagniappe/web/routes/api/main.py::get_plan_contract
-# @source lagniappe/core/tools/ai/external/uploads.py::create_upload_sessions
-# @source lagniappe/core/tools/ai/external/uploads.py::finalize_upload_batch
-# @source lagniappe/web/routes/api/main.py::execute_tool
-# @source lagniappe/core/tools/ai/external/plans.py::submit_plan_request
-# @source lagniappe/web/routes/users/api_key.py::api_key
-# @source lagniappe/core/tools/email/notifications/links.py::origin
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
-# @source mcp/src/lagniappe_mcp/files.py::upload_local_files
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
 # @styles modal.wrapper modal.content modal.header modal.actions button.close label.default
 # @template notifications.html::item
 def test_managed_mcp_adapter_exercises_the_real_api_boundary(

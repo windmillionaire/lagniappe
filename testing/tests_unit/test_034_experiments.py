@@ -37,7 +37,6 @@ def _enable(monkeypatch):
     )
 
 
-# @matrix experiments : execution-policy
 def test_execution_requires_designated_admin_and_current_policy(monkeypatch):
     actor = _enable(monkeypatch)
     assert experiments.can_execute(actor, remote_mcp=True)
@@ -63,7 +62,6 @@ def test_execution_requires_designated_admin_and_current_policy(monkeypatch):
         assert not experiments.can_execute(other, remote_mcp=True)
 
 
-# @matrix experiments : bootstrap
 @pytest.mark.parametrize("concurrent", [False, True])
 def test_bootstrap_is_guarded_idempotent_and_preserves_roles(monkeypatch, concurrent):
     from config import Environment
@@ -119,7 +117,6 @@ def test_bootstrap_is_guarded_idempotent_and_preserves_roles(monkeypatch, concur
         experiments.bootstrap()
 
 
-# @matrix experiments : execution-policy
 def test_execution_rejects_stale_proposals_and_reuses_exact_operations(monkeypatch):
     from lagniappe.core.tools.ai.reporting.execution import request as execution
     from lagniappe.core.tools.ai.reporting import corrections, schema_updates
@@ -220,8 +217,6 @@ def test_execution_rejects_stale_proposals_and_reuses_exact_operations(monkeypat
         execution.request_execution(report, actor, **kwargs)
 
 
-# @source lagniappe/core/tools/deferred_jobs/adapters/reports.py::ReportExecutionAdapter
-# @matrix deferred-jobs : report-execution
 def test_execution_rechecks_admin_role_at_ledger_boundaries(monkeypatch):
     from lagniappe.core.tools.deferred_jobs.adapters.reports import (
         ReportExecutionAdapter,
@@ -242,7 +237,6 @@ def test_execution_rechecks_admin_role_at_ledger_boundaries(monkeypatch):
         adapter._ensure_execution_active(context)
 
 
-# @matrix experiments : request-measurements
 def test_measurements_are_bounded_private_and_context_local():
     assert measurements.CURRENT.get() is None
     with measurements.span("auth", "context"):
@@ -267,7 +261,6 @@ def test_measurements_are_bounded_private_and_context_local():
     assert measurements.CURRENT.get() is None
 
 
-# @matrix experiments : provider-measurements
 def test_measurements_count_provider_calls_without_arguments():
     api = SimpleNamespace(
         lookup=lambda *args, **kwargs: SimpleNamespace(

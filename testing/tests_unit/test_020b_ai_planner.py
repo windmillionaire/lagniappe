@@ -33,7 +33,6 @@ def _report(user, **values):
     )
 
 
-# @matrix ai-report : prompt permissions tools
 def test_report_prompt_uses_shared_tools_and_selected_schemas(monkeypatch):
     user = _test_user("planner-owner")
     monkeypatch.setattr(type(user), "access", lambda self, access: True)
@@ -67,8 +66,6 @@ def test_report_prompt_uses_shared_tools_and_selected_schemas(monkeypatch):
     assert '"allowed_actions": []' in answer_prompt.build()
 
 
-# @source lagniappe/core/tools/ai/planner.py::report_prompt
-# @matrix ai-report : prompt permissions file-placement
 @pytest.mark.parametrize(
     "instructions,uploaded,can_create,feedback,require_filing",
     [
@@ -121,7 +118,6 @@ def test_report_prompt_scopes_file_guidance_to_uploads_and_permissions(
         assert feedback in text
 
 
-# @matrix ai-report : permissions
 @pytest.mark.parametrize("feedback", [None, "Put this on my personal Page instead."])
 def test_native_and_external_plans_share_personal_page_guidance(monkeypatch, feedback):
     from lagniappe.core.tools.ai import external_api
@@ -148,7 +144,6 @@ def test_native_and_external_plans_share_personal_page_guidance(monkeypatch, fee
         assert feedback in prompt
 
 
-# @matrix ai-report : validation file-placement
 def test_file_usage_requires_exact_coverage_and_files_only_filing():
     usage = [{"file": "hash:receipt12345", "usage": "evidence"}]
     validated = planner.validate_file_usage(usage, ["hash:receipt12345"])
@@ -173,10 +168,6 @@ def test_file_usage_requires_exact_coverage_and_files_only_filing():
         planner.validate_file_usage(usage, ["hash:receipt12345"], read_only=True)
 
 
-# @source lagniappe/core/tools/ai/references.py::render_ai_markdown
-# @pair markdown:html-sanitization
-# @pair ai-report:answer-only
-# @matrix ai-report : generate validation file-placement
 def test_generate_report_validates_answers_actions_and_file_usage(monkeypatch):
     prompt = SimpleNamespace(
         allowed_actions=(),
@@ -214,7 +205,6 @@ def test_generate_report_validates_answers_actions_and_file_usage(monkeypatch):
         planner.generate_report(prompt)
 
 
-# @matrix ai-report : validation status
 def test_report_availability_rejects_old_and_malformed_records():
     user = _test_user("availability-owner")
     report = _report(user)
@@ -239,10 +229,6 @@ def test_report_availability_rejects_old_and_malformed_records():
     assert report.output_kind is None
 
 
-# @source lagniappe/core/properties/user_restrictions.py::Restrictions.ai_action_capabilities
-# @source lagniappe/core/tools/ai/reporting/contracts/permissions.py::allowed_report_actions
-# @matrix ai-report : action-capabilities permissions
-# @pair permissions:own-page
 def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
     from testing.utility.ai_report_fakes import _permissioned_user
     from testing.utility.mock_restrictions import MockRestrictions
@@ -264,8 +250,6 @@ def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
     )
 
 
-# @source lagniappe/core/tools/ai/reporting/contracts/permissions.py::allowed_report_actions
-# @matrix ai-report : action-capabilities permissions
 @pytest.mark.parametrize(
     "permissions,expected_capabilities,additional_actions",
     [
@@ -338,8 +322,6 @@ def test_action_catalog_uses_create_update_delete_permissions(
     } | additional_actions
 
 
-# @source lagniappe/core/tools/ai/reporting/contracts/schema.py::report_proposal_response_schema
-# @matrix ai-report : allowed-actions provider-validation schema structured-output
 def test_selected_response_schema_keeps_complete_action_values():
     from google.genai import types as genai_types
     from lagniappe.core.tools.ai.reporting.contracts.schema import (

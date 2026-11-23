@@ -83,14 +83,10 @@ PATCH_KEYS = frozenset(
 )
 
 
-# @testable infrastructure
 class RestrictedFormChange(ValidationError):
     """A migration cannot expose all of its inputs to the requesting actor."""
 
 
-# @testable true
-# @tests tests_unit/test_004l_form_schema_updates.py::test_operations_preserve_identity_and_validate_final_schema
-# @matrix form-migration : schema-operations stable-identity validation
 def apply_operations(
     schema: list[FieldDefinition], operations: object, form_type: str | None
 ) -> list[FieldDefinition]:
@@ -186,9 +182,6 @@ def apply_operations(
         raise ValidationError(str(error)) from error
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/schema_updates.py::inspect_scope
-# @reason canonical fingerprints are shared by preview, approval and worker preflight
 def fingerprint(value: object) -> str:
     return hashlib.sha256(
         json.dumps(
@@ -198,9 +191,6 @@ def fingerprint(value: object) -> str:
 
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/schema_updates.py::inspect_scope
-# @reason value preconditions bind an exact entity, generation and schema pair
 def value_fingerprint(
     entity: Page | Task, change: conversions.FieldChange, values: Mapping[str, object]
 ) -> str:
@@ -217,9 +207,6 @@ def value_fingerprint(
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/schema_updates.py::inspect_scope
-# @reason scope checks materialize the relations needed by normal permission rules
 def require_visible(entity: Page | Task, actor: User) -> Page | Task:
     loaded = Entities.fetch_one(
         entity,
@@ -232,9 +219,6 @@ def require_visible(entity: Page | Task, actor: User) -> Page | Task:
     return loaded
 
 
-# @testable true
-# @tests tests_unit/test_004l_form_schema_updates.py::test_scope_is_exhaustive_permission_checked_and_projects_only_affected_values
-# @matrix form-migration : complete-scope permissions affected-values pagination
 def inspect_scope(
     form: Form,
     changes: Sequence[conversions.FieldChange],
@@ -323,9 +307,6 @@ def inspect_scope(
     }
 
 
-# @testable true
-# @tests tests_unit/test_004l_form_schema_updates.py::test_external_candidates_require_exact_coverage_and_source_fingerprints
-# @matrix form-migration : candidate-validation stale-value complete-scope
 def validate_candidates(
     candidates: object,
     scope: MigrationScope,

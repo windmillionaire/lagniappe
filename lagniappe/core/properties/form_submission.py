@@ -15,12 +15,6 @@ if TYPE_CHECKING:
     from ..entities.task import Task
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/form_submission.py::FormSubmission.value
-# @covered-by lagniappe/core/properties/form_submission.py::FormSubmission.fields
-# @covered-by lagniappe/core/properties/form_submission.py::FormSubmission.tables
-# @covered-by lagniappe/core/properties/form_submission.py::FormSubmission.links
-# @reason behavior is owned by focused submission projection properties and methods
 class FormSubmission(SubmissionProperty, DBProperty[dict[str, object], "Page | Task | TaskHistory"]):  # pyright: ignore[reportIncompatibleMethodOverride] -- db_value is a read-only projection over submission fields.
     """Full form submission for an entity with a user-created form.
 
@@ -43,9 +37,6 @@ class FormSubmission(SubmissionProperty, DBProperty[dict[str, object], "Page | T
     _id = "submission"
     _fields: dict[str, SchemaField] | None
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_get_task_history_returns_dates_submissions_and_files
-    # @matrix submission task-completion : ai missing-schema raw-values
     @property
     def ai_value(self) -> dict[str, object] | None:
         if self.entity.submission_schema_error:
@@ -62,11 +53,6 @@ class FormSubmission(SubmissionProperty, DBProperty[dict[str, object], "Page | T
         super().__init__(*args, entity=entity, **kwargs)
         self._set_submission(self.entity.db.get("submission"))
 
-    # @testable true
-    # @tests tests_unit/test_003_submission.py::test_submission_value
-    # @tests tests_unit/test_003_submission.py::test_submission_save
-    # @matrix submission : db-value save
-    # @pair submission:schema-version
     @property
     def value(self) -> dict[str, object]:
         return super().value
@@ -77,14 +63,6 @@ class FormSubmission(SubmissionProperty, DBProperty[dict[str, object], "Page | T
         self._set_submission(value)
         self._write_db_value(self._submission)
 
-    # @testable true
-    # @tests tests_unit/test_003_submission.py::test_submission_fields
-    # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_fields_stale_when_db_submission_changes
-    # @tests tests_unit/test_003a_submission_basic.py::test_submission_text_input_empty_column_value_is_blank
-    # @tests tests_unit/test_004e_submission_behavior.py::test_missing_stored_checkbox_is_unset_and_omitted
-    # @tests tests_unit/test_004e_submission_behavior.py::test_stored_explicit_checkbox_false_survives_load_save
-    # @tests tests_unit/test_004e_submission_behavior.py::test_stored_null_checkbox_normalizes_away_on_resave
-    # @matrix submission : cache column empty-field empty-value fields load-save missing-field normalization projection stale-db stored-false stored-null unset
     @property
     def fields(self) -> dict[str, SchemaField]:
         if cached := getattr(self, "_fields", None):
@@ -106,18 +84,12 @@ class FormSubmission(SubmissionProperty, DBProperty[dict[str, object], "Page | T
         if column_id in self.fields:
             return self.fields[column_id]
 
-    # @testable true
-    # @tests tests_unit/test_003_submission.py::test_submission_patch
-    # @pair submission:patch
     def patch(self, field_id: str, value: object) -> SchemaField:
         require_mutable_submission(self.entity)
         field = self.fields[field_id]
         field.validate_submission(value)
         return field
 
-    # @testable true
-    # @tests tests_unit/test_003_submission.py::test_submission_is_visible
-    # @pair submission:visibility
     def is_visible(self, field_id: str) -> bool:
         visibility = self.fields[field_id].visibility
 
@@ -145,10 +117,6 @@ class FormSubmission(SubmissionProperty, DBProperty[dict[str, object], "Page | T
 
         return True
 
-    # @testable true
-    # @tests tests_unit/test_003_submission.py::test_submission_is_visible
-    # @tests tests_unit/test_003c_submission_complex.py::test_submission_status
-    # @matrix status submission : condition-matching
     def condition_matches(
         self, condition: dict[str, object], require_visible: bool = True
     ) -> bool:
@@ -178,16 +146,10 @@ class FormSubmission(SubmissionProperty, DBProperty[dict[str, object], "Page | T
 
         return field_value == condition_value
 
-    # @testable true
-    # @tests tests_unit/test_003_submission.py::test_submission_tables
-    # @pair submission:tables
     @property
     def tables(self) -> list[Table]:
         return [t for t in self.fields.values() if isinstance(t, Table)]
 
-    # @testable true
-    # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_links_internal_top_level_and_table_row
-    # @matrix submission : internal links row-submission
     @property
     def links(self) -> list[LinkValue | None]:
         links = [

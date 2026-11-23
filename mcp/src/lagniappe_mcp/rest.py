@@ -61,28 +61,20 @@ _SAFE_DETAIL_KEYS = frozenset(
 )
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient
 def _content_type(response: httpx.Response) -> str:
     return response.headers.get("content-type", "").split(";", 1)[0].strip().casefold()
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 def _retryable_status(method: str, status: int) -> bool:
     if status == 429:
         return True
     return method.upper() == "GET" and status in {408, 425, 502, 503, 504}
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 def _reject_json_constant(_value: str) -> None:
     raise ValueError("non-finite JSON constant")
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 def _finite_json_float(value: str) -> float:
     result = float(value)
     if not math.isfinite(result):
@@ -90,8 +82,6 @@ def _finite_json_float(value: str) -> float:
     return result
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> JsonObject:
     result: JsonObject = {}
     for key, value in pairs:
@@ -101,8 +91,6 @@ def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> JsonObject:
     return result
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 def _redact_upstream_text(value: str, *, api_key: str) -> str:
     result = _CONTROL_CHARACTER_PATTERN.sub(" ", value)
     result = result.replace(api_key, "[redacted]") if api_key else result
@@ -110,8 +98,6 @@ def _redact_upstream_text(value: str, *, api_key: str) -> str:
     return _SIGNED_PARAMETER_PATTERN.sub("[redacted parameter]", result)
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 def _redact_upstream_value(value: object, *, api_key: str, depth: int = 0) -> JsonValue:
     if depth > 8:
         return None
@@ -142,9 +128,6 @@ def _redact_upstream_value(value: object, *, api_key: str, depth: int = 0) -> Js
     return None
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
-# @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.download_media
 def _reject_content_encoding(response: httpx.Response, *, storage: bool) -> None:
     encoding = response.headers.get("content-encoding", "").strip().casefold()
     if encoding not in {"", "identity"}:
@@ -159,9 +142,6 @@ def _reject_content_encoding(response: httpx.Response, *, storage: bool) -> None
         )
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
-# @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.download_media
 async def _raw_chunks(response: httpx.Response) -> AsyncIterator[bytes]:
     """Yield transport bytes, including already-buffered synthetic responses."""
     if response.is_stream_consumed:
@@ -173,9 +153,6 @@ async def _raw_chunks(response: httpx.Response) -> AsyncIterator[bytes]:
         yield chunk
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
-# @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.download_media
 async def _raw_chunks_before(response: httpx.Response, *, deadline: float) -> AsyncIterator[bytes]:
     """Yield response bytes within one wall-clock deadline."""
     iterator = _raw_chunks(response).__aiter__()
@@ -189,12 +166,6 @@ async def _raw_chunks_before(response: httpx.Response, *, deadline: float) -> As
             return
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_api_request_uses_only_explicit_bearer_credentials
-# @tests tests_unit/test_033_mcp_adapter.py::test_api_errors_redact_credentials_and_duplicate_json_is_rejected
-# @tests tests_unit/test_033_mcp_adapter.py::test_failed_concurrent_startup_cancels_sibling_requests
-# @tests tests_unit/test_033_mcp_adapter.py::test_media_download_does_not_inherit_client_credentials_or_cookies
 class RESTClient:
     """A no-redirect client whose sole authenticated authority is configured."""
 
@@ -227,35 +198,23 @@ class RESTClient:
             headers={"Accept": "*/*"},
         )
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient
     async def aclose(self) -> None:
         if self._owns_client:
             await self.client.aclose()
         if self._owns_storage_client:
             await self.storage_client.aclose()
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient
     async def __aenter__(self) -> RESTClient:
         return self
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient
     async def __aexit__(self, *_exc: object) -> None:
         await self.aclose()
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
     def _resolve_api_url(self, target: str) -> str:
         if target.startswith("http://") or target.startswith("https://"):
             return validate_api_url(self.config.authority, target)
         return self.config.authority.api_url(target)
 
-    # @testable true
-    # @pair mcp-adapter:product-contract
-    # @tests tests_unit/test_033_mcp_adapter.py::test_api_request_uses_only_explicit_bearer_credentials
-    # @tests tests_unit/test_033_mcp_adapter.py::test_api_errors_redact_credentials_and_duplicate_json_is_rejected
     async def request_json(
         self,
         method: str,
@@ -435,10 +394,6 @@ class RESTClient:
             if response is not None:
                 await response.aclose()
 
-    # @testable true
-    # @pair mcp-adapter:product-contract
-    # @tests tests_unit/test_033_mcp_adapter.py::test_failed_concurrent_startup_cancels_sibling_requests
-    # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
     async def startup(self) -> tuple[JsonObject, JsonObject, JsonObject]:
         """Fetch only authenticated discovery, actor, and catalog concurrently."""
         tasks = (
@@ -467,8 +422,6 @@ class RESTClient:
         self._validate_discovery(discovery)
         return discovery, actor, catalog
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.startup
     def _validate_discovery(self, discovery: JsonObject) -> None:
         if discovery.get("version") != "v1":
             raise TransportError(
@@ -490,9 +443,6 @@ class RESTClient:
                 )
             validate_api_url(self.config.authority, value, expected_path=path)
 
-    # @testable true
-    # @pair mcp-adapter:product-contract
-    # @tests tests_unit/test_033_mcp_adapter.py::test_media_download_does_not_inherit_client_credentials_or_cookies
     async def download_media(self, url: str, *, cap: int) -> tuple[bytes, str]:
         """Consume a signed original without forwarding API authentication."""
         safe_url = validate_storage_url(url, upload=False)

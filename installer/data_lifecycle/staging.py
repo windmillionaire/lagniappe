@@ -44,9 +44,6 @@ QUIET_OMITTED_TYPES = {"notification"}
 HASH_PATTERN = re.compile(r"\A[a-z0-9]{6,128}\Z")
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::stage_database
-# @reason provider pagination adapter is exercised by the bounded staging contract
 def _query_pages(query, *, page_size=SCAN_PAGE_SIZE, read_time=None):
     cursor = None
     while True:
@@ -68,9 +65,6 @@ def _query_pages(query, *, page_size=SCAN_PAGE_SIZE, read_time=None):
             return
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::stage_database
-# @reason namespace discovery is exercised through multi-namespace staging
 def _namespaces(client, *, read_time=None) -> list[str]:
     values = {""}
     query = client.query(kind="__namespace__")
@@ -83,9 +77,6 @@ def _namespaces(client, *, read_time=None) -> list[str]:
     return sorted(values)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::stage_database
-# @reason physical-kind discovery is exercised through excluded-kind warnings
 def _physical_kinds(client, namespace: str, *, read_time=None) -> list[str]:
     values = set()
     query = client.query(kind="__kind__", namespace=namespace or None)
@@ -97,16 +88,10 @@ def _physical_kinds(client, namespace: str, *, read_time=None) -> list[str]:
     return sorted(values)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::stage_database
-# @reason source-key serialization is private staging state only
 def _urlsafe(key) -> str:
     return encode_urlsafe_key(key)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::portable_records
-# @reason source-key normalization is exercised by recursive key replacement
 def _source_key(key, project_id: str, database_id: str):
     return Key(
         *key.flat_path,
@@ -116,9 +101,6 @@ def _source_key(key, project_id: str, database_id: str):
     )
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::stage_database
-# @reason partition-free IDs are exercised by nested-history and messaging staging
 def _partitionless_id(key) -> str:
     """Return a deterministic opaque ID without project or database partition data."""
     parts = []
@@ -136,9 +118,6 @@ def _partitionless_id(key) -> str:
     return f"key-{hashlib.sha256(payload).hexdigest()}"
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::stage_database
-# @reason user natural identities are exercised through portable staging references
 def _user_id(entity) -> str:
     """Return a key-independent portable identity for one unique user email."""
     email = str(entity.get("email") or "").strip().casefold()
@@ -147,9 +126,6 @@ def _user_id(entity) -> str:
     return f"user-email-{hashlib.sha256(email.encode('utf-8')).hexdigest()}"
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::portable_records
-# @reason typed child-key tails are exercised through owner-scoped portable records
 def _child_key(key) -> dict[str, Any]:
     identifier = key.id_or_name
     if isinstance(identifier, int) and not isinstance(identifier, bool):
@@ -159,9 +135,6 @@ def _child_key(key) -> dict[str, Any]:
     raise DataLifecycleError("Portable child has an incomplete Datastore key.")
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::portable_records
-# @reason natural conversation IDs are exercised through owner-scoped portable records
 def _normalize_conversation_ids(state: ArchiveState) -> None:
     """Derive conversation IDs from portable participant identities, not source keys."""
     rows = list(
@@ -201,9 +174,6 @@ def _normalize_conversation_ids(state: ArchiveState) -> None:
         )
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_staging_selects_durable_types_and_builds_typed_identity_map
-# @matrix portable-json : bounded-scan entity-selection portable-identity
 def stage_database(
     client: Client,
     state: ArchiveState,
@@ -333,9 +303,6 @@ def stage_database(
     return dict(counts)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::portable_records
-# @reason staged key-map lookup is exercised through portable record conversion
 class _Resolver:
     def __init__(self, state: ArchiveState) -> None:
         self.state = state
@@ -439,9 +406,6 @@ class _Resolver:
         return value
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::portable_records
-# @reason structural ancestor conversion is part of portable record assembly
 def _ancestor_references(key, resolver):
     ancestors = []
     parent = key.parent
@@ -457,9 +421,6 @@ def _ancestor_references(key, resolver):
     return ancestors
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::portable_records
-# @reason asset tag normalization is part of portable record assembly
 def _asset_tags(state, owner, raw_assets):
     if not raw_assets:
         return {}
@@ -506,11 +467,6 @@ def _asset_tags(state, owner, raw_assets):
     return result
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_staging_selects_durable_types_and_builds_typed_identity_map
-# @tests tests_tooling/test_008_data_lifecycle.py::test_staging_replaces_source_and_scratch_keys_recursively
-# @tests tests_tooling/test_008_data_lifecycle.py::test_history_and_messages_are_nested_and_replanned_under_their_owners
-# @matrix portable-json : entity-envelope key-replacement natural-identity owner-scoped-children typed-references
 def portable_records(state: ArchiveState) -> list[dict[str, Any]]:
     """Build top-level records with durable child rows nested under their owners."""
     if state.connection is None:
@@ -615,9 +571,6 @@ def portable_records(state: ArchiveState) -> list[dict[str, Any]]:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_staging_replaces_source_and_scratch_keys_recursively
-# @pair portable-json:key-replacement
 def normalize_text(state: ArchiveState, value: str) -> str:
     """Replace every known source/scratch key token in one textual payload."""
     return str(_Resolver(state).string(str(value), ("text",)))

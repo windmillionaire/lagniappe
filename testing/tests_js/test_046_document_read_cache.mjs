@@ -32,7 +32,6 @@ function cacheStorage(t) {
 	t.after(() => Object.assign(globalThis, previous));
 }
 
-/** @matrix offline sync : cached-read delta empty-content persistence */
 test("test_document_reads_retain_snapshots_and_deltas_without_pending_work", async (t) => {
 	cacheStorage(t);
 	const cache = new DocumentReadCache("alice:permissions", "page:document");
@@ -91,7 +90,6 @@ test("test_document_reads_retain_snapshots_and_deltas_without_pending_work", asy
 	);
 });
 
-/** @matrix offline sync : cached-read invalidation storage-failure user-scope */
 test("test_document_read_cache_is_scoped_best_effort_and_invalidatable", async (t) => {
 	cacheStorage(t);
 	const cache = new DocumentReadCache("alice:permissions", "page:document");

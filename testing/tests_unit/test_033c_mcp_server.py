@@ -31,8 +31,6 @@ MODERN_META = {
 }
 
 
-# @matrix mcp-remote : parity privacy
-# @matrix mcp-upload : remote terminal cleanup partial-failure upload-all finalize-once upload-batch-identity safe-result
 @pytest.mark.parametrize("storage_failure", [False, True])
 @pytest.mark.parametrize("terminal", [False, True])
 def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
@@ -452,7 +450,6 @@ async def _rpc(
     return await client.post("/mcp", json=payload, headers=headers)
 
 
-# @matrix mcp-remote : configuration discovery bounds
 def test_hosted_configuration_and_public_discovery_are_exact():
     for issuer, resource in (
         ("http://example.com", CONFIG.resource),
@@ -484,7 +481,6 @@ def test_hosted_configuration_and_public_discovery_are_exact():
     asyncio.run(scenario())
 
 
-# @matrix mcp-remote : catalog isolation parity discovery bounds
 @pytest.mark.parametrize("version", ["2025-03-26", "2026-07-28"])
 def test_remote_catalog_and_calls_reuse_adapter_behavior_and_isolate_users(version):
     async def scenario():
@@ -584,7 +580,6 @@ def test_remote_catalog_and_calls_reuse_adapter_behavior_and_isolate_users(versi
     asyncio.run(scenario())
 
 
-# @matrix mcp-remote : authentication bounds privacy
 @pytest.mark.parametrize("version", ["2025-03-26", "2026-07-28"])
 def test_http_errors_are_private_and_mid_request_expiry_requests_reconnect(
     version, caplog
@@ -706,7 +701,6 @@ def test_http_errors_are_private_and_mid_request_expiry_requests_reconnect(
     )
 
 
-# @matrix mcp-remote : privacy token-separation
 def test_hosted_catalog_and_error_results_cannot_reflect_workload_identity(monkeypatch):
     proof = "google.identity.proof"
 
@@ -754,10 +748,6 @@ def test_hosted_catalog_and_error_results_cannot_reflect_workload_identity(monke
     asyncio.run(scenario())
 
 
-# @matrix mcp-remote : privacy token-separation parity isolation
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/server.py::create_app
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 @pytest.mark.parametrize("version", ["2025-03-26", "2026-07-28"])
 def test_hosted_original_download_preserves_capability_but_rejects_credentials(version):
     proof = "google.identity.proof"
@@ -852,7 +842,6 @@ def test_hosted_original_download_preserves_capability_but_rejects_credentials(v
     asyncio.run(scenario())
 
 
-# @matrix mcp-remote : authentication isolation bounds
 def test_http_authentication_preflights_every_request_and_reconnects_on_revocation():
     async def scenario():
         requests, revoked = [], set()
@@ -895,9 +884,6 @@ def test_http_authentication_preflights_every_request_and_reconnects_on_revocati
     asyncio.run(scenario())
 
 
-# @matrix mcp-remote : service-identity token-separation
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/url_security.py::validate_api_url
 def test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin(
     monkeypatch,
 ):

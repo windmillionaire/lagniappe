@@ -21,7 +21,6 @@ from runner.context import REPOSITORY_ROOT, setup_command
 from installer.summary import expected_resource_lines
 
 
-# @testable infrastructure
 class _GcloudRunner(Protocol):
     def __call__(
         self, command: list[str], *, check: bool
@@ -45,9 +44,6 @@ SECRET_FILES = (
 )
 
 
-# @testable false
-# @covered-by installer/doctor.py::run_doctor
-# @reason private UTF-8 parser is exercised through the public read-only diagnostic
 def _load_document(path):
     with path.open("r", encoding="utf-8", newline="") as document:
         if path.suffix == ".json":
@@ -58,9 +54,6 @@ def _load_document(path):
         return data
 
 
-# @testable false
-# @covered-by installer/doctor.py::run_doctor
-# @reason local checksum and permission collection is owned by the public diagnostic
 def _local_state(root):
     issues = []
     documents = {}
@@ -122,9 +115,6 @@ def _local_state(root):
     return documents, issues
 
 
-# @testable false
-# @covered-by installer/doctor.py::run_doctor
-# @reason read-only command normalization is exercised through the public diagnostic
 def _gcloud_value(runner, command):
     try:
         result = runner(command, check=False)
@@ -135,9 +125,6 @@ def _gcloud_value(runner, command):
     return str(result.stdout or "").strip() or None
 
 
-# @testable false
-# @covered-by installer/doctor.py::run_doctor
-# @reason active identity collection is owned by the public diagnostic
 def _active_cli_identity(runner):
     return {
         "configuration": _gcloud_value(
@@ -161,9 +148,6 @@ def _active_cli_identity(runner):
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_reads_adc_identity_without_changing_it
-# @matrix setup : adc doctor provider-identity read-only
 def _read_adc_identity(
     *,
     auth_default=None,
@@ -219,9 +203,6 @@ def _read_adc_identity(
         }
 
 
-# @testable true
-# @tests tests_tooling/test_001g_setup_release_readiness.py::test_default_doctor_provider_checker_targets_saved_project
-# @matrix setup : doctor operator-permissions project-identity provider-apis provider-discovery
 def _default_provider_checker(settings, project):
     from config import constants
     from installer.iam import inspect_operator_permissions
@@ -283,9 +264,6 @@ def _default_provider_checker(settings, project):
     return report
 
 
-# @testable false
-# @covered-by installer/doctor.py::run_doctor
-# @reason identity drift comparison is exercised through the public diagnostic
 def _identity_issues(saved, active):
     expected = {
         "configuration": saved.get("NAME"),
@@ -302,9 +280,6 @@ def _identity_issues(saved, active):
     return issues
 
 
-# @testable true
-# @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_reports_keyless_identity_drift
-# @matrix setup : adc doctor keyless-config project-identity
 def _keyless_identity_issues(settings, deploy):
     """Return local keyless identity and deployment attachment drift."""
     runtime_email = (
@@ -343,10 +318,6 @@ def _keyless_identity_issues(settings, deploy):
     return issues
 
 
-# @testable true
-# @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_reports_drift_without_writing
-# @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_decodes_saved_settings_and_guides_adc_alignment
-# @matrix setup : adc doctor drift independent-provider-check parsing provider-identity read-only
 def run_doctor(
     *,
     root: str | Path = REPOSITORY_ROOT,

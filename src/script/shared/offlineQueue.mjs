@@ -11,21 +11,11 @@ const REPLAY_RESULT = Object.freeze({
 	REBASED: "rebased",
 });
 
-/**
- * @testable false
- * @covered-by src/script/shared/offlineQueue.mjs::OfflineQueue
- * @reason private queue id helper exercised through queued offline mutations
- */
 function createId() {
 	if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
 	return `offline-mutation-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/offlineQueue.mjs::OfflineQueue
- * @reason private response helper used by optimistic offline rendering
- */
 function elementResponse(element) {
 	const html = document.implementation.createHTMLDocument("");
 	if (element) html.body.appendChild(element);
@@ -35,11 +25,6 @@ function elementResponse(element) {
 	};
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/offlineQueue.mjs::OfflineQueue
- * @reason private IndexedDB serialization helper owned by offline queue behavior
- */
 function serializeFormData(data) {
 	const fields = [];
 	const files = [];
@@ -62,11 +47,6 @@ function serializeFormData(data) {
 	return { fields, files };
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/offlineQueue.mjs::OfflineQueue
- * @reason private request payload rehydration helper owned by replay behavior
- */
 function formDataFromRecord(record) {
 	const data = new FormData();
 	for (const [name, value] of record.fields || []) {
@@ -84,18 +64,10 @@ function formDataFromRecord(record) {
 	return data;
 }
 
-/**
- * @testable false
- * @covered-by src/script/shared/offlineQueue.mjs::OfflineQueue
- * @reason private queued-record field lookup used by optimistic renderers
- */
 function field(record, name) {
 	return (record.fields || []).find(([key]) => key === name)?.[1] || "";
 }
 
-/**
- * @testable infrastructure
- */
 export class OfflineQueue {
 	constructor(view) {
 		this.view = view;
@@ -132,9 +104,6 @@ export class OfflineQueue {
 	 * A task form can mount after the first reconnect replay found its conflict.
 	 * Give that form the retained record instead of requiring another replay.
 	 *
-	 * @testable true
-	 * @tests tests_js/test_045_offline_queue.mjs::test_late_form_receives_persisted_conflict_after_replay
-	 * @matrix offline : conflict-durability late-widget
 	 */
 	async presentFor(target) {
 		if (!target?.key || typeof target.handleOfflineQueue !== "function") return;
@@ -159,12 +128,6 @@ export class OfflineQueue {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_offline_submit_record_keeps_originating_entity_fingerprint
-	 * @tests tests_js/test_028_form_state_split.mjs::test_offline_submit_record_keeps_renderer_snapshot_out_of_replay_payload
-	 * @matrix offline : fingerprint immutable-command queue-submit renderer-snapshot
-	 */
 	async queueSubmit(component, data, route, method = "POST") {
 		const widget = component.active;
 		const target = widget?.target;
@@ -250,20 +213,6 @@ export class OfflineQueue {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_offline_replay_polls_mounted_form_without_direct_acknowledgement
-	 * @tests tests_js/test_028_form_state_split.mjs::test_offline_replay_keeps_stale_submission_queued_for_reconciliation
-	 * @tests tests_js/test_045_offline_queue.mjs::test_offline_replay_blocks_later_records_after_the_oldest_record_fails
-	 * @tests tests_js/test_045_offline_queue.mjs::test_offline_replay_returns_the_completed_prefix_and_retries_the_oldest_record
-	 * @tests tests_js/test_045_offline_queue.mjs::test_offline_replay_retries_rebased_record_before_later_record
-	 * @tests tests_js/test_045_offline_queue.mjs::test_offline_replay_releases_ownership_after_handler_errors
-	 * @tests tests_js/test_045_offline_queue.mjs::test_offline_queue_recovers_persisted_mutation_and_replaces_optimistic_dom
-	 * @tests tests_js/test_028_form_state_split.mjs::test_offline_replay_retries_a_conflict_rebased_by_the_form
-	 * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
-	 * @matrix offline : conflict-durability conflict-rebase dispatch queue-preserved queue-submit reload replay replay-order replay-reconciliation retry-boundary
-	 * @pair edited-entity-notice:replayed-response
-	 */
 	async replay() {
 		if (!this.view.online || this._replaying) return 0;
 
@@ -294,11 +243,6 @@ export class OfflineQueue {
 		return completed;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/shared/offlineQueue.mjs::OfflineQueue.replay
-	 * @reason one-record replay outcomes are exercised through the ordered queue boundary
-	 */
 	async _replayRecord(record) {
 		const response = await this._send(record);
 		if (response?.conflict) {
@@ -343,12 +287,6 @@ export class OfflineQueue {
 		return { state: REPLAY_RESULT.COMPLETED };
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_offline_replay_polls_mounted_form_without_direct_acknowledgement
-	 * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
-	 * @pairs edited-entity-notice:replayed-response offline:replay-reconciliation
-	 */
 	_mountedUpdateTargets(record, targets = this.targets) {
 		return targets.filter(
 			(target) =>
@@ -505,12 +443,6 @@ export class OfflineQueue {
 		return [...this.records].sort((a, b) => a.created_at - b.created_at);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.mjs::test_offline_replay_keeps_stale_submission_queued_for_reconciliation
-	 * @tests tests_js/test_028_form_state_split.mjs::test_offline_submit_record_keeps_renderer_snapshot_out_of_replay_payload
-	 * @matrix offline : fingerprint-precondition reload replay-payload
-	 */
 	async _send(record) {
 		if (record.method === "DELETE") return request.delete(record.route);
 

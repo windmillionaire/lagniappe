@@ -22,10 +22,6 @@ class CategoryData(TypedDict, total=False):
     form: Form | None
 
 
-# @testable true
-# @tests tests_unit/test_007_category_properties.py::test_category_schema
-# @matrix category form-schema : delegation schema
-# @matrix category permissions : attached-form cache restricted-access
 class Category(Entity):
     if TYPE_CHECKING:
         description: str | None
@@ -74,9 +70,6 @@ class Category(Entity):
     def schema(self) -> list[dict[str, object]] | None:
         return self.form.schema if self.form else None
 
-    # @testable true
-    # @tests tests_unit/test_032h_report_batches.py::test_dependent_creations_share_one_commit
-    # @matrix ai-report : identity
     @classmethod
     def create(cls, data: CategoryData, *, key: Key | None = None) -> Self:
         new_category = cls(key)
@@ -85,20 +78,11 @@ class Category(Entity):
         new_category.update(data)
         return new_category
 
-    # @testable true
-    # @tests tests_unit/test_012_category_conditions.py::test_category_string_filters
-    # @tests tests_unit/test_012_category_conditions.py::test_category_boolean_filters
-    # @tests tests_unit/test_012_category_conditions.py::test_category_timestamp_filters
-    # @tests tests_unit/test_012_category_conditions.py::test_category_entity_filters
-    # @matrix category : boolean condition-definition entity-valued string timestamp
     def update(self, data: CategoryData) -> None:
         self.form = data.get("form")
         self.name = data.get("name")
         self.description = data.get("description")
 
-    # @testable true
-    # @tests tests_unit/test_007_category_properties.py::test_uncategorized_pages_get_create
-    # @matrix category pages : default-category get-create
     @classmethod
     def get_uncategorized_pages(cls) -> Self:
         exists = database_get.category_by_name(UNCATEGORIZED_PAGES_NAME)
@@ -110,9 +94,6 @@ class Category(Entity):
         return category
 
 
-# @testable true
-# @tests tests_unit/test_009b_user_permissions.py::test_users_category_uses_users_scope_not_models_scope
-# @matrix category permissions users : models-scope users-category
 class UserCategory(Category):
     entity_kind = "users"
 

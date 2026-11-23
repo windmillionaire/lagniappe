@@ -35,9 +35,6 @@ else:
     _AssetHost = object
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/mixins/assets.py::AssetMixin.get_asset
-# @covered-by lagniappe/core/mixins/assets.py::AssetMixin.save_asset
 class AssetRegistry:
     def __init__(self) -> None:
         self._types = AssetTypes
@@ -65,9 +62,6 @@ class AssetRegistry:
 Assets = AssetRegistry()
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_assets.py::Document.add_image
-# @covered-by lagniappe/core/properties/common_assets.py::Document.save
 class AssetMixin(_AssetHost):
     """Adds cloud-stored asset management to an entity.
 
@@ -94,10 +88,6 @@ class AssetMixin(_AssetHost):
 
         return self._assets
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/common_assets.py::Document.add_image
-    # @covered-by lagniappe/core/properties/common_assets.py::Document.save
-    # @reason production asset lookup mechanics are exercised through E2E asset-backed property flows
     def get_asset(self, name: str) -> StoredAsset | None:
         name = name.split(".")[0] if isinstance(name, str) else name
         asset = Assets.get(name, self)
@@ -105,9 +95,6 @@ class AssetMixin(_AssetHost):
             return None
         return asset
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/common_assets.py::Document.save
-    # @reason asset deletion is owned by property save/delete contracts
     def delete_asset(self, name: str) -> None:
         asset = self.get_asset(name)
         if not asset:
@@ -118,10 +105,6 @@ class AssetMixin(_AssetHost):
         self.assets.pop(name)
         self.db["assets"] = json.dumps(self._assets)
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/common_assets.py::Document.add_image
-    # @covered-by lagniappe/core/properties/common_assets.py::Document.save
-    # @reason asset persistence plumbing is owned by the asset-backed property contracts
     @overload
     def save_asset(self, content: str | None, name: str, type: Literal["html"],
                    visibility: str = "private", *, isolated: bool = False) -> HTMLAsset | None: ...
@@ -192,9 +175,6 @@ class AssetMixin(_AssetHost):
         self.db["assets"] = json.dumps(self.assets)
         return asset
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_asset_mixin_copy_asset_copies_storage_and_updates_definition
-    # @matrix asset-storage : copy metadata visibility
     def copy_asset(self, asset: StoredAsset | None, name: str | None = None, *, isolated: bool = False) -> StoredAsset | None:
         if not asset:
             return None

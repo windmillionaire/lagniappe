@@ -35,11 +35,6 @@ class _PreparedUpload(Protocol):
     lagniappe_content_type: str | None
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_direct_upload_file_asset_sniffs_generic_video_from_sample_without_full_read
-# @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_records_metadata_before_asset_save
-# @tests tests_unit/test_006_file_properties.py::test_file_asset_detects_mislabeled_png_upload
-# @matrix file storage : asset-extension asset-lifecycle direct-upload encoding large-video metadata mimetype upload
 class FileAsset(AssetProperty[_FileOwner, "StoredFile", "FileStorage | DirectUploadFile"]):
     """The uploaded file for a File entity.
 
@@ -83,9 +78,6 @@ class FileAsset(AssetProperty[_FileOwner, "StoredFile", "FileStorage | DirectUpl
     def url(self) -> str | None:
         return self.value.url if self.value else None
 
-    # @testable true
-    # @tests tests_unit/test_014_security.py::test_svg_removed_from_preview_mimetypes
-    # @matrix files security : mimetype preview svg
     @property
     def preview(self) -> str | None:
         mimetype = self.entity.mimetype
@@ -104,9 +96,6 @@ class FileAsset(AssetProperty[_FileOwner, "StoredFile", "FileStorage | DirectUpl
     def uri(self) -> str | None:
         return self.value.uri if self.value else None
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_file_to_ai_exports_metadata_and_uri_to_ai
-    # @matrix ai file : mimetype uri
     @property
     def uri_to_ai(self) -> FilePart | None:
         from ..tools.ai.constants import gemini_mimetype
@@ -121,13 +110,6 @@ class FileAsset(AssetProperty[_FileOwner, "StoredFile", "FileStorage | DirectUpl
         return {"uri": uri, "mime_type": mime_type}
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/file_assets.py::TextAsset.is_text_file
-# @covered-by lagniappe/core/properties/file_assets.py::TextAsset.extractable
-# @covered-by lagniappe/core/properties/file_assets.py::TextAsset.value
-# @covered-by lagniappe/core/properties/file_assets.py::TextAsset.asset
-# @covered-by lagniappe/core/properties/file_assets.py::TextAsset.markup
-# @reason text asset behavior is owned by availability, fallback, and markup accessors
 class TextAsset(CacheMixin, AssetProperty[_FileOwner, bool, "str | None"]):
     """Extracted text content for a File entity.
 
@@ -151,9 +133,6 @@ class TextAsset(CacheMixin, AssetProperty[_FileOwner, bool, "str | None"]):
     _label = "Text"
     _icon = "text"
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_text_asset_extractable_only_for_non_text_document_ai_mimetypes
-    # @matrix file : mimetype text-asset
     @property
     def is_text_file(self) -> bool:
         mimetype = self.entity.mimetype
@@ -161,9 +140,6 @@ class TextAsset(CacheMixin, AssetProperty[_FileOwner, bool, "str | None"]):
             mimetype and mimetype in file_constants.TEXT_MIMETYPES.values()
         )
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_text_asset_extractable_only_for_non_text_document_ai_mimetypes
-    # @matrix file : extractable mimetype
     @property
     def extractable(self) -> bool:
         mimetype = self.entity.mimetype
@@ -173,12 +149,6 @@ class TextAsset(CacheMixin, AssetProperty[_FileOwner, bool, "str | None"]):
             and mimetype in file_constants.DOCUMENT_AI_MIMETYPES
         )
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_as_html
-    # @tests tests_unit/test_006_file_properties.py::test_text_asset_falls_back_to_original_text_file
-    # @tests tests_unit/test_006_file_properties.py::test_text_asset_skips_oversized_original_before_download
-    # @tests tests_unit/test_006_file_properties.py::test_extract_update_completes_immediately_for_text_files
-    # @matrix file : extract fallback process-complete text-asset
     @property
     def value(self) -> bool | None:
         if self.is_set:
@@ -198,9 +168,6 @@ class TextAsset(CacheMixin, AssetProperty[_FileOwner, bool, "str | None"]):
         self._store_asset_value(value)
         self._value = True if value else None
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_text_asset_falls_back_to_original_text_file
-    # @matrix file : fallback text-asset
     @property
     def asset(self) -> str | None:
         if getattr(self, "_asset", UNSET) is not UNSET:
@@ -231,10 +198,6 @@ class TextAsset(CacheMixin, AssetProperty[_FileOwner, bool, "str | None"]):
 
         return self._asset
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_as_html
-    # @tests tests_unit/test_006_file_properties.py::test_text_asset_falls_back_to_original_text_file
-    # @matrix file : fallback html-preview text-asset
     @property
     def markup(self) -> SafeHTML | None:
         if getattr(self, "_markup", UNSET) is not UNSET:
@@ -257,9 +220,6 @@ class TextAsset(CacheMixin, AssetProperty[_FileOwner, bool, "str | None"]):
         return "doc"
 
 
-# @testable true
-# @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_parses_the_uploaded_csv_into_rows_and_columns
-# @matrix ingress : asset-storage rows
 class Rows(AssetProperty["Ingress"]):
     """Parsed CSV rows for an ingress file. Stored as a JSON asset.
 
@@ -278,11 +238,6 @@ class Rows(AssetProperty["Ingress"]):
     _asset_type = "json"
 
 
-# @testable true
-# @tests tests_unit/test_006b_ingress_entity.py::test_importer_story_processes_page_rows_into_entities_and_results
-# @tests tests_unit/test_006b_ingress_entity.py::test_completed_ingress_shows_results
-# @tests tests_unit/test_006b_ingress_entity.py::test_results_asset_loads_stored_json_without_recursing
-# @matrix ingress : asset-storage completed regression row-results
 class Results(AssetProperty["Ingress", "list[dict[str, Any] | None]", "list[dict[str, Any] | None] | None"]):
     """Import results for an ingress file. Stored as a JSON asset.
 

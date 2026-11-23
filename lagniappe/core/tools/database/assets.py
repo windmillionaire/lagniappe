@@ -60,10 +60,6 @@ class AttemptOwner(Protocol):
     _form_attempt_assets: list[dict[str, object]] | None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
-# @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
-# @reason attempt ownership bounds cleanup to newly allocated objects
 def record_attempt_asset(owner: AttemptOwner, definition: dict[str, object]) -> None:
     owned = getattr(owner, "_form_attempt_assets", None)
     if owned is None:
@@ -71,9 +67,6 @@ def record_attempt_asset(owner: AttemptOwner, definition: dict[str, object]) -> 
     owned.append(deepcopy(definition))
 
 
-# @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_rejected_save_cleans_only_attempt_blobs_and_ambiguous_commit_retains_them
-# @matrix html-field : isolated-assets cleanup
 def cleanup_rejected_attempt(owner: AttemptOwner) -> None:
     """Retire known rejected attempt objects, never accepted/history objects."""
     for definition in getattr(owner, "_form_attempt_assets", None) or []:
@@ -91,9 +84,6 @@ class DirectUploadError(ValueError):
     """Raised when direct-upload metadata or storage state fails validation."""
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_direct_upload_attempt_path_is_unique_and_validated
-# @matrix direct-upload storage : attempt-isolation destination-path
 def direct_upload_destination_path(path: str, upload: object) -> str:
     """Add an internal attempt nonce without trusting user-controlled paths."""
     nonce = getattr(upload, "lagniappe_asset_nonce", None)
@@ -107,8 +97,6 @@ def direct_upload_destination_path(path: str, upload: object) -> str:
     return f"{stem}_{nonce}.{extension}"
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/database/assets.py::verify_direct_upload
 class DirectUploadFile:
     """File-like wrapper around a verified direct-to-GCS upload."""
 
@@ -211,17 +199,10 @@ class DirectUploadFile:
         return self._ensure_buffer().read(size)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/assets.py::create_direct_upload_session
-# @covered-by lagniappe/core/tools/database/assets.py::verify_direct_upload
-# @reason serializer construction is a tiny wrapper around app secret configuration
 def _direct_upload_serializer():
     return URLSafeTimedSerializer(CONFIG.SECRET_KEY, salt=DIRECT_UPLOAD_SALT)
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_create_direct_upload_session_uses_private_tmp_object
-# @matrix storage : direct-upload session token
 def create_direct_upload_session(
     filename: str,
     content_type: str | None = None,
@@ -264,11 +245,6 @@ def create_direct_upload_session(
     }
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_bad_token
-# @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_mismatched_size
-# @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_generation_mismatch
-# @matrix storage : direct-upload expiry token validation
 def load_direct_upload_token(
     token: object, max_age: int | None = DIRECT_UPLOAD_TOKEN_MAX_AGE
 ) -> UploadToken:
@@ -296,9 +272,6 @@ def load_direct_upload_token(
     return cast(UploadToken, payload)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/assets.py::verify_direct_upload
-# @reason content-type comparison is exercised through direct-upload validation
 def _content_types_match(expected, actual):
     if expected in GENERIC_CONTENT_TYPES:
         return True
@@ -309,11 +282,6 @@ def _content_types_match(expected, actual):
     )
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_mismatched_size
-# @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_generation_mismatch
-# @tests tests_unit/test_018_database_assets.py::test_verified_direct_upload_pins_generation_for_later_cleanup
-# @matrix storage : direct-upload object validation
 def verify_direct_upload(
     record: object,
     max_age: int | None = DIRECT_UPLOAD_TOKEN_MAX_AGE,
@@ -375,9 +343,6 @@ def verify_direct_upload(
     return upload
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/assets.py::verify_direct_upload
-# @reason direct-upload wrapping delegates to the validation helper
 def direct_upload_file(
     record: object, *, consumer: FileConsumer | str | None = None
 ) -> DirectUploadFile:
@@ -385,9 +350,6 @@ def direct_upload_file(
     return verify_direct_upload(record, consumer=consumer)
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_copy_direct_upload_file_copies_and_deletes_temp_object
-# @matrix storage : direct-upload final-copy generation-conditional-cleanup idempotency
 def copy_direct_upload_file(
     upload: DirectUploadFile,
     path: str,
@@ -439,9 +401,6 @@ def copy_direct_upload_file(
     return copied
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_delete_file_generation_never_deletes_a_replacement
-# @matrix storage : attempt-isolation generation-conditional-cleanup
 def delete_file_generation(path: str, visibility: str, generation: str | int) -> bool:
     """Delete only the exact blob generation created by one failed attempt."""
     try:
@@ -458,9 +417,6 @@ def delete_file_generation(path: str, visibility: str, generation: str | int) ->
         return False
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_delete_direct_upload_is_idempotent_and_generation_conditional
-# @matrix direct-upload storage : cleanup generation-conditional-cleanup idempotency
 def delete_direct_upload(record: object) -> bool:
     """Delete exactly one signed temporary upload, treating absence as success."""
     try:
@@ -496,10 +452,6 @@ def delete_direct_upload(record: object) -> bool:
         return False
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_save_file_preserves_direct_upload_source_when_requested
-# @tests tests_unit/test_018_database_assets.py::test_save_file_returns_reloaded_blob_metadata
-# @matrix direct-upload file storage : asset-size deferred-cleanup metadata
 def _is_direct_upload(file: object) -> TypeGuard[DirectUploadFile]:
     return bool(getattr(file, "lagniappe_direct_upload", False))
 
@@ -535,10 +487,6 @@ def save_file(
     return blob
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_download_file_passes_optional_byte_range
-# @tests tests_unit/test_018_database_assets.py::test_missing_blob_download_and_size_return_none
-# @matrix file storage : byte-range missing-object
 def download_file(
     path: str, visibility: str, start: int | None = None, end: int | None = None
 ) -> bytes | None:
@@ -556,10 +504,6 @@ def download_file(
         return None
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_file_size_reloads_blob_metadata
-# @tests tests_unit/test_018_database_assets.py::test_missing_blob_download_and_size_return_none
-# @matrix file storage : byte-range metadata missing-object
 def file_size(path: str, visibility: str) -> int | None:
     """Return a blob's byte size from storage metadata."""
     bucket = DATA.bucket(visibility)
@@ -571,8 +515,6 @@ def file_size(path: str, visibility: str) -> int | None:
     return blob.size
 
 
-# @testable true
-# @matrix storage : generation-pinned read copy
 def get_text(
     path: str,
     visibility: str,
@@ -590,8 +532,6 @@ def get_text(
     return text
 
 
-# @testable false
-# @reason cloud storage behavior is owned by E2E coverage against configured services
 def save_text(text: str, path: str, content_type: str | None, visibility: str) -> Blob:
     """Upload a text string as a blob to the specified bucket.
 
@@ -609,8 +549,6 @@ def save_text(text: str, path: str, content_type: str | None, visibility: str) -
     return blob
 
 
-# @testable true
-# @matrix storage : generation-pinned read copy
 def copy_file(
     source_path: str,
     source_visibility: str,
@@ -634,17 +572,12 @@ def copy_file(
     )
 
 
-# @testable false
-# @reason cloud storage listing behavior is provider-owned; export tests mock this helper
 def list_files(prefix: str, visibility: str) -> list[Blob]:
     """List blobs under a prefix in the selected bucket."""
     bucket = DATA.bucket(visibility)
     return list(bucket.list_blobs(prefix=prefix))
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_signed_url_uses_remote_iam_signing
-# @matrix storage : adc iam-signing signed-url token-refresh
 def get_signed_url(
     path: str,
     expires_in: int = 3600,
@@ -670,9 +603,6 @@ def get_signed_url(
     return url
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_delete_file_ignores_missing_blob
-# @matrix storage : idempotent-delete missing-object
 def delete_file(path: str, visibility: str) -> None:
     """Delete a blob from the specified bucket."""
     bucket = DATA.bucket(visibility)
@@ -681,9 +611,6 @@ def delete_file(path: str, visibility: str) -> None:
         blob.delete()
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @pair admin:site-image-upload
 def upload_site_image(filename: str, image_data: bytes) -> dict[str, str]:
     """Upload a site image and return its path and immutable generation."""
     if filename.endswith(".png"):

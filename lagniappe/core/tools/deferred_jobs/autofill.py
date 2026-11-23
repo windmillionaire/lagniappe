@@ -36,9 +36,6 @@ class AutofillJobOptions(TypedDict, total=False):
     file_key: str | None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/deferred_jobs/autofill.py::autofill_job_spec
-# @reason entity-specific destination projection is asserted through the public job spec
 def _destination(entity):
     if isinstance(entity, Entities.TASK):
         page = entity.page
@@ -56,11 +53,6 @@ def _destination(entity):
     }
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_autofill_job_spec_contains_only_durable_inputs
-# @matrix ai : autofill deferred
-# @matrix pages tasks : autofill
-# @matrix ai tasks : current-answers
 def autofill_job_spec(
     entity: Page | Task,
     user: User,
@@ -111,11 +103,6 @@ def autofill_job_spec(
     )
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_autofill_upload_is_validated_before_job_start
-# @matrix ai : autofill deferred
-# @matrix ai tasks : attachment current-answers
-# @pair notifications:autofill
 def start_autofill_job(entity: Page | Task, user: User, form: Mapping[str, str | None], *, upload_record: dict[str, object] | None = None, trusted_retry_upload: bool = False, **options: Unpack[AutofillJobOptions]) -> tuple[DeferredJob, Notification | None]:
     """Validate any direct upload before creating a job or notification."""
     form = dict(form)

@@ -50,9 +50,6 @@ def _saved_report_key(report: AIReport) -> Key:
     return key
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_upload_batch_identity_is_preserved_in_every_record
-# @matrix agent-api ai-report : upload-batch-identity upload-manifest
 def prepare_upload_manifest(records: Iterable[object] | None, *, upload_batch_id: str) -> list[dict[str, object]]:
     """Normalize an external upload batch with one server-issued identity."""
     return prepare_report_upload_manifest(
@@ -62,9 +59,6 @@ def prepare_upload_manifest(records: Iterable[object] | None, *, upload_batch_id
     )
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_upload_file_identity_is_deterministic_per_batch_record
-# @matrix agent-api ai-report mcp-upload : deterministic-file-identity upload-manifest
 def bind_upload_file_identities(report: AIReport, manifest: object, *, upload_batch_id: str) -> list[dict[str, object]]:
     """Bind each external upload record to one deterministic future File key."""
     if not isinstance(manifest, list) or len(manifest) > MAX_PLAN_FILES:
@@ -100,9 +94,6 @@ def bind_upload_file_identities(report: AIReport, manifest: object, *, upload_ba
     return result
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_upload_finalization_binds_report_user
-# @matrix agent-api ai-report mcp-upload : deterministic-file-identity lease-renewal temporary-view-ownership upload-finalization
 def finalize_uploads(
     report: AIReport,
     user: User,
@@ -131,9 +122,6 @@ def finalize_uploads(
         upload_batch_id=upload_batch_id,
     )
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/external/uploads.py::finalize_uploads
-    # @reason callback binds report ownership inside the public finalizer
     def create_file(*, upload, data):
         record = getattr(upload, "record", None)
         if not isinstance(record, dict):
@@ -161,9 +149,6 @@ def finalize_uploads(
         file._agent_upload_asset_nonce = asset_nonce
         return file
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/external/uploads.py::finalize_uploads
-    # @reason failure cleanup is exercised through the public external finalizer
     def cleanup_failed_file(
         *,
         file,
@@ -207,9 +192,6 @@ def finalize_uploads(
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/uploads.py::finalize_upload_batch
-# @reason persisted batch-record consistency is asserted through the bound finalize route
 def current_upload_batch_id(report: AIReport) -> str | None:
     """Return the persisted batch identity, rejecting inconsistent state."""
     manifest = (
@@ -243,9 +225,6 @@ def current_upload_batch_id(report: AIReport) -> str | None:
     return batch_id
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/uploads.py::create_upload_sessions
-# @reason aggregate limits are exercised through the public upload resource
 def _upload_sizes(report, requested):
     existing_sizes = [int(file.size or 0) for file in report.input_files]
     requested_sizes = [int(item["size"]) for item in requested]
@@ -261,13 +240,6 @@ def _upload_sizes(report, requested):
         )
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_upload_batch_identity_rejects_a_same_metadata_last_writer
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_claimed_upload_routes_reload_before_storage_side_effects
-# @matrix agent-api mcp-upload : last-writer upload-batch-identity uploads
-# @pairs agent-api:authoritative-reload agent-api:concurrency agent-api:stale-snapshot
-# @pairs mcp-upload:authoritative-reload mcp-upload:concurrency mcp-upload:stale-snapshot
 def create_upload_sessions(report: AIReport, user: User, data: dict[str, object], *, request_id: str | None) -> dict[str, object]:
     require_plan_access(report, user)
     plan_id = report.urlsafe_key
@@ -450,12 +422,6 @@ def create_upload_sessions(report: AIReport, user: User, data: dict[str, object]
         )
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_upload_batch_identity_rejects_a_same_metadata_last_writer
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_claimed_upload_routes_reload_before_storage_side_effects
-# @matrix agent-api mcp-upload : last-writer upload-batch-identity uploads
-# @matrix agent-api mcp-upload : authoritative-reload concurrency checkpoint resume stale-snapshot
 def finalize_upload_batch(report: AIReport, user: User, data: dict[str, object], *, request_id: str | None) -> AIReport:
     require_plan_access(report, user)
     plan_id = report.urlsafe_key
@@ -520,9 +486,6 @@ def finalize_upload_batch(report: AIReport, user: User, data: dict[str, object],
         if not report.upload_manifest:
             return report
 
-        # @testable false
-        # @covered-by lagniappe/core/tools/ai/external/uploads.py::finalize_upload_batch
-        # @reason the service-owned callback only maps lease renewal loss to its API conflict
         def ensure_active():
             if not agent_api_store.renew_plan_operation(
                 _saved_report_key(report),
@@ -560,9 +523,6 @@ def finalize_upload_batch(report: AIReport, user: User, data: dict[str, object],
     return report
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/uploads.py::create_upload_sessions
-# @reason preserve draft/pending checks before HTTP body parsing and after acquiring a claim
 def require_uploads_available(report: AIReport) -> None:
     require_draft(report)
     if report.upload_manifest:

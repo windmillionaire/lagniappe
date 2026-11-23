@@ -99,7 +99,6 @@ class DeferredJobSpec:
     delay_seconds: int = 0
 
 
-# @testable infrastructure
 @dataclass(frozen=True)
 class DeferredJobResult:
     """Stable result returned to process routes and local dispatchers."""
@@ -109,9 +108,6 @@ class DeferredJobResult:
     error: str | None = None
 
     @property
-    # @testable true
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_checkpoints_before_apply_and_resumes_without_prepare
-    # @pair deferred-jobs:delivery-result
     def success(self) -> bool:
         return self.state in {
             DeferredJobRunState.COMPLETE,

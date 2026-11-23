@@ -17,7 +17,6 @@ from .references import ProposalReferenceResolver
 from .registry import proposal_action_display
 
 
-# @testable infrastructure
 class ProposalDisplayProjector:
     """Compose registered action adapters into a grouped display tree."""
 
@@ -29,11 +28,6 @@ class ProposalDisplayProjector:
     def value(self) -> object:
         return self.proposal.value
 
-    # @testable true
-    # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_decision_details
-    # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_shows_proposed_submission_values
-    # @matrix ai-report : details proposal submission-review
-    # @pair form-schema:submission-review
     @property
     def display_actions(self) -> list[dict[str, object]]:
         if not isinstance(self.value, dict):
@@ -81,9 +75,6 @@ class ProposalDisplayProjector:
 
         return display_actions
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/reporting/display/projector.py::ProposalDisplayProjector.display_actions
-    # @reason display_actions owns the schema-aware proposal detail projection
     def _add_submission_preview(self, details, data, actions_by_id):
         preview = self._proposal_submission_details(data, actions_by_id)
         if not preview:
@@ -93,9 +84,6 @@ class ProposalDisplayProjector:
                 detail["items"] = preview
                 return
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/reporting/display/projector.py::ProposalDisplayProjector.display_actions
-    # @reason display_actions owns the schema-aware proposal detail projection
     def _proposal_submission_details(self, data, actions_by_id):
         submission = data.get("submission")
         if not isinstance(submission, dict) or not submission:
@@ -119,9 +107,6 @@ class ProposalDisplayProjector:
             for field_id, value in submission.items()
         ]
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/reporting/display/projector.py::ProposalDisplayProjector.display_actions
-    # @reason display_actions owns the schema-aware proposal detail projection
     def _proposal_submission_schema(self, data, actions_by_id, visited=None):
         schema = data.get("schema")
         if isinstance(schema, list):
@@ -151,9 +136,6 @@ class ProposalDisplayProjector:
                 return entity_schema
         return []
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/reporting/display/projector.py::ProposalDisplayProjector.display_actions
-    # @reason display_actions owns the human-readable proposal value projection
     def _proposal_submission_value(self, value, field):
         def display(item, item_field=None):
             item_field = item_field or {}
@@ -234,12 +216,6 @@ class ProposalDisplayProjector:
         rendered = " ".join(display(value, field).split())
         return f"{rendered[:297]}..." if len(rendered) > 300 else rendered
 
-    # @testable true
-    # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_move_files_under_target_page
-    # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_existing_page_category_for_attachments
-    # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_completed_task_events
-    # @matrix ai-report files : grouped-display
-    # @pairs ai-report:existing-page-category form-schema:schema-section
     def _group_proposal_display_actions(self, actions, action_labels, file_labels):
         by_id = {action["id"]: action for action in actions if action.get("id")}
         for action in actions:

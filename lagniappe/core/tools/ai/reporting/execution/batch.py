@@ -33,9 +33,6 @@ MAX_BATCH_ACTIONS = 50
 MAX_BATCH_BYTES = 4 * 1024 * 1024
 
 
-# @testable true
-# @tests tests_unit/test_032h_report_batches.py::test_document_publication_retries_without_reapplying_changes
-# @matrix ai-report : batching documents recovery
 def publish_pending_documents(
     report: models.AIReport, workspace: WorkingEntities | None = None
 ) -> None:
@@ -60,12 +57,6 @@ def publish_pending_documents(
         report._form_additional_guards = []
 
 
-# @testable true
-# @tests tests_unit/test_032h_report_batches.py::test_dependent_creations_share_one_commit
-# @tests tests_unit/test_032h_report_batches.py::test_updates_reuse_loaded_entities_and_merge_final_state
-# @tests tests_unit/test_032h_report_batches.py::test_report_inputs_isolate_attachment_changes_from_retries
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
-# @matrix ai-report files : batching identity dependencies attachments recovery
 class WorkingEntities(dict["Key | str | None", "Entity"]):
     """Resolve saved references once and share staged outputs by key and alias."""
 
@@ -157,13 +148,6 @@ class WorkingEntities(dict["Key | str | None", "Entity"]):
         return self[entity.key]
 
 
-# @testable true
-# @tests tests_unit/test_032h_report_batches.py::test_dependent_creations_share_one_commit
-# @tests tests_unit/test_032h_report_batches.py::test_batch_failure_and_ambiguous_commit_do_not_duplicate_creations
-# @tests tests_unit/test_032h_report_batches.py::test_documents_upload_before_combined_commit_and_publish_after
-# @tests tests_unit/test_032h_report_batches.py::test_batch_boundaries_resume_without_replaying_completed_work
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
-# @matrix ai-report : batching atomicity documents dependencies recovery attachments
 class ExecutionBatch:
     """Stage final entity states; publish documents only after their receipt commits."""
 

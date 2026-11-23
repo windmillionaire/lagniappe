@@ -48,10 +48,6 @@ from lagniappe.web import experiments
 from . import pages
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
-# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_file_and_photo_actions_are_forbidden
-# @matrix public-users : file-photo-gates own-page
 def _is_public_users_own_page(page):
     return bool(
         getattr(current_user, "is_public", False)
@@ -59,11 +55,6 @@ def _is_public_users_own_page(page):
     )
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_preloads_existing_groups
-# @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_group_restricted_page_opens_for_member_only
-# @matrix user-settings : group-selector preload relation-loading
-# @matrix pages : access-restrictions group-restricted
 def _load_page_settings_relations(page, *, restrictions=False):
     """Attach the group relations rendered by Page settings at the route boundary."""
     entities = [page.form] if restrictions and page.form else []
@@ -75,9 +66,6 @@ def _load_page_settings_relations(page, *, restrictions=False):
     return page
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_empty_notes_skip_fetch_without_hiding_new_notes
-# @matrix notes : empty-presence etag
 def _page_view_fingerprint(page, user):
     """Empty-notes discovery changes initial HTML, not the Page's content revision."""
     base = f"{deferred_autofill.form_fingerprint(page, user)}:{int(page.has_notes)}"
@@ -94,13 +82,6 @@ def _user_settings_fingerprint(page, user):
     return f"{page.fingerprint}:{int(site_auto_execute_enabled())}"
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_is_forbidden_without_model_or_page_permission
-# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
-# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_can_read_document_content
-# @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_page_restriction_summary_does_not_invent_local_badges
-# @matrix pages : document-tab load permission-gates readonly tabs
-# @matrix pages : access-restrictions source-summary
 @pages.route("<key>", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW, fingerprint=_page_view_fingerprint)
 def view(key: str, **kwargs: Unpack[EntityContext[models.Page]]) -> ResponseReturnValue:
@@ -112,9 +93,6 @@ def view(key: str, **kwargs: Unpack[EntityContext[models.Page]]) -> ResponseRetu
     return responses.page(page)
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-# @matrix ai : autofill completion-refresh deferred
 @pages.route("<key>/info/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
 def info(key: str, **kwargs: Unpack[EntityContext[models.Page]]) -> ResponseReturnValue:
@@ -122,8 +100,6 @@ def info(key: str, **kwargs: Unpack[EntityContext[models.Page]]) -> ResponseRetu
     return responses.page_info(page)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::user_settings
 @pages.route("<key>/user-settings/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW, fingerprint=_user_settings_fingerprint)
 def user_settings(
@@ -139,8 +115,6 @@ def user_settings(
     return responses.user_settings(page)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::page_permissions
 @pages.route("<key>/permissions/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.PERMISSIONS)
 def permissions(
@@ -150,8 +124,6 @@ def permissions(
     return responses.page_permissions(page)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::page_document_settings
 @pages.route("<key>/document-settings/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.PUBLISH)
 def document_settings(
@@ -160,11 +132,6 @@ def document_settings(
     return responses.page_document_settings(kwargs["entity"])
 
 
-# @testable true
-# @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
-# @matrix tasks : basic create
-# @matrix tasks cache : conditional-response durable-revision viewer-scope job-lifecycle concurrent-render
-# @matrix tasks cache permissions : conditional-response immediate-revocation inherited-restrictions
 @pages.route("<key>/tasks", methods=["GET"])
 @permission(
     Resource.PAGE, Action.VIEW,
@@ -183,9 +150,6 @@ def tasks(
     return response
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_sees_empty_files_tab_without_upload_affordances
-# @matrix files : async-load empty-state permission-gates readonly
 @pages.route("<key>/files", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def files(
@@ -198,10 +162,6 @@ def files(
     return responses.page_files(page)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::create
-# @covered-by lagniappe/web/routes/pages/main.py::update
-# @reason page form parsing helper owned by page create/update workflows
 def _page_data(
     form: MultiDict[str, str], page: models.Page | None = None, category: models.Category | None = None,
 ) -> PageData:
@@ -283,34 +243,21 @@ def _page_data(
     return page_data
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_switch_page_form
-# @matrix pages : form-switch info-form
 def _page_form_submission_response(page):
     return responses.form_submission(page)
 
 
-# @testable true
 # @scaffolding testing/resources/page.py::Page.submit_and_verify_submission
-# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_submission_rejects_hidden_internal_link_target
-# @matrix pages : basic-inputs default-form link-field selection-fields submission submitted-reference
 def _apply_page_submission(page, form):
     page.form_submission(form, actor=current_user)
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_category_to_page
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_remove_category_from_page
-# @matrix pages : category-add category-remove
 def _apply_page_metadata_update(page, page_data, user=None):
     page.update(page_data)
     if page.user:
         page.update_user(page_data, user=user)
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_submit_preserves_attached_form_and_categories
-# @matrix user-settings : attached-form categories restrictions submit-boundary
 def _apply_user_settings_update(page, page_data, user=None):
     if not page.user:
         return
@@ -318,9 +265,6 @@ def _apply_user_settings_update(page, page_data, user=None):
     page.update_user(page_data, user=user)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::update
-# @reason notification persistence policy belongs to page update replay handling
 def _offline_update_notification(page):
     notification = Entities.NOTIFICATION.create(
         {
@@ -333,19 +277,10 @@ def _offline_update_notification(page):
     return notification
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::update
-# @reason form flag parsing is a route coordination detail
 def _is_offline_replay(form):
     return str(form.get("offline", "")).lower() == "true"
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_submit_preserves_attached_form_and_categories
-# @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_invalid_typed_submission_returns_error_without_saving
-# @pair pages:submission-validation
-# @matrix user-settings : restrictions submit-boundary
 @pages.route("<key>/update", methods=["PUT", "GET"])
 @permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
 def update(
@@ -487,9 +422,6 @@ def update(
     return responses.page_info(page)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::update
-# @reason route permission mirrors page update for autofill uploads
 @pages.route("<key>/update/direct-upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def update_direct(
@@ -504,9 +436,6 @@ def update_direct(
     return direct_uploads.direct_upload_response()
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_quick_edit_updates_text_cell
-# @matrix category-index : editable-cell quick-edit
 @pages.route("<key>/patch", methods=["PATCH"])
 @permission(Resource.PAGE, Action.EDIT)
 def patch(
@@ -555,13 +484,6 @@ def patch(
     )
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_from_category_index
-# @matrix pages : required-name
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
-# @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
-# @matrix pages : category-index create mobile-tools
-# @pair deferred-jobs:hosted-e2e
 @pages.route("<key>/create", methods=["POST"])
 @permission(Resource.CATEGORY, Action.EDIT)
 def create(
@@ -626,9 +548,6 @@ def create(
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::create
-# @reason route permission mirrors page create for upload-backed form data
 @pages.route("<key>/create/direct-upload", methods=["POST"])
 @permission(Resource.CATEGORY, Action.EDIT)
 def create_direct(key: str, **kwargs: object) -> ResponseReturnValue:
@@ -638,9 +557,6 @@ def create_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002k_home_pages.py::test_create_page_from_home
-# @matrix home pages : category-select create default-category
 @pages.route("create", methods=["POST"])
 @logged_in
 def create_from_home() -> ResponseReturnValue:
@@ -685,11 +601,6 @@ def create_from_home() -> ResponseReturnValue:
     return responses.new_page(page)
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_delete_page_from_title_menu
-# @matrix pages : delete parentless title-menu
-# @pair entities:delete
 @pages.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.PAGE, Action.DELETE)
 def delete(
@@ -718,12 +629,6 @@ def delete(
     return responses.ok()
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_document_visibility_can_toggle_public_private
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
-# @matrix pages : document-visibility private public
-# @matrix public-pages : metadata preview
-# @pair public-directory:category
 @pages.route("<key>/visibility", methods=["PUT"])
 @permission(Resource.PAGE, Action.PUBLISH)
 def visibility(
@@ -762,12 +667,6 @@ def visibility(
     return responses.page_document_settings(page)
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_public
-# @tests tests_unit/test_008_page_properties.py::test_page_to_cache_public_user
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_document_visibility_can_toggle_public_private
-# @matrix page : public public-user
-# @pair pages:public-document
 @pages.route("public/<public_id>", methods=["GET"])
 def public(public_id: str) -> ResponseReturnValue:
     public_pages = Entities.fetch(
@@ -781,9 +680,6 @@ def public(public_id: str) -> ResponseReturnValue:
     return responses.public_document(page)
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
-# @matrix public-pages : document-image public-route revocation
 @pages.route("public/<public_id>/images/<asset_name>", methods=["GET", "HEAD"])
 def public_image(public_id: str, asset_name: str) -> ResponseReturnValue:
     candidates = Entities.fetch(
@@ -816,10 +712,6 @@ def public_image(public_id: str, asset_name: str) -> ResponseReturnValue:
     return Response(content, mimetype=asset.content_type)
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_owner_restricted_page_is_hidden_from_model_viewer
-# @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_group_restricted_page_opens_for_member_only
-# @matrix pages : access-restrictions group-restricted owner-restricted submitted-reference
 def _apply_page_access_restrictions(page, form):
     admin_only = form.get("admin") in {"on", "true"}
     keys = [] if admin_only else form.getlist("group-key")
@@ -830,10 +722,6 @@ def _apply_page_access_restrictions(page, form):
     page.properties.restricted_to.materialize(admin_only=admin_only)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::_apply_page_access_restrictions
-# @covered-by lagniappe/web/responses.py::page_permissions
-# @reason endpoint coordinates page access requests while focused helpers own response and mutation behavior
 @pages.route("<key>/view-access", methods=["GET", "PUT"])
 @permission(Resource.PAGE, Action.PERMISSIONS)
 def view_access(

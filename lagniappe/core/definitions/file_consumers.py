@@ -18,9 +18,6 @@ LARGE_ASSET_BYTES = 30 * MIB
 INDIVIDUAL_FILES_ONLY_ERROR = "Only individual files are supported"
 
 
-# @testable false
-# @covered-by lagniappe/core/definitions/file_consumers.py::enforce_file_consumer
-# @reason enum values are exercised through the public consumer boundary
 class FileConsumer(Enum):
     """Named reasons an application path may inspect file content."""
 
@@ -36,9 +33,6 @@ class FileConsumer(Enum):
     SITE_IMAGE = "site-image"
 
 
-# @testable false
-# @covered-by lagniappe/core/definitions/file_consumers.py::enforce_file_consumer
-# @reason immutable capability records are exercised through enforcement
 @dataclass(frozen=True)
 class FileConsumerCapability:
     """Resource contract for one named file consumer."""
@@ -74,9 +68,6 @@ FILE_CONSUMER_CAPABILITIES = {
 }
 
 
-# @testable false
-# @covered-by lagniappe/core/definitions/file_consumers.py::enforce_file_consumer
-# @reason exception attributes are exercised through enforcement failures
 class FileConsumerLimitError(ValueError):
     """Raised before a file consumer would exceed its byte contract."""
 
@@ -94,9 +85,6 @@ class FileConsumerLimitError(ValueError):
         self.max_bytes = max_bytes
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_file_consumer_limits_use_metadata_before_reading
-# @pair files:size-limit
 def known_file_size(source: object) -> int | None:
     """Return a file-like object's byte size without reading its contents."""
     if isinstance(source, int):
@@ -133,18 +121,11 @@ def known_file_size(source: object) -> int | None:
         return None
 
 
-# @testable false
-# @covered-by lagniappe/core/definitions/file_consumers.py::enforce_file_consumer
-# @reason error formatting is owned by the public consumer boundary
 def _megabyte_label(size):
     megabytes = size / MIB
     return str(int(megabytes)) if megabytes.is_integer() else f"{megabytes:.1f}"
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_file_consumer_limits_use_metadata_before_reading
-# @tests tests_unit/test_018_database_assets.py::test_direct_upload_full_read_requires_named_bounded_consumer
-# @matrix files : bounded-consumer size-limit
 def enforce_file_consumer(
     source: object,
     consumer: FileConsumer | str,

@@ -18,11 +18,6 @@ from . import external_operations
 from .reporting import uploads as report_uploads
 
 
-# @testable true
-# @tests tests_unit/test_020i_report_history.py::test_report_delete_preserves_referenced_files_and_fences_cleanup
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
-# @matrix ai-report : delete file-cleanup guarded-delete
-# @matrix ai-report : category-editor created-entities file-links
 def delete_report_record(report: AIReport) -> str:
     """Fence every deletion against concurrent execution and correction links."""
     from .reporting.schema_updates import migration_pending
@@ -59,10 +54,6 @@ def delete_report_record(report: AIReport) -> str:
     return agent_api_store.PLAN_OPERATION_COMMITTED
 
 
-# @testable true
-# @tests tests_unit/test_020i_report_history.py::test_bulk_delete_scopes_ownership_state_snapshot_and_partial_failures
-# @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_delete_executed_reports_confirms_snapshot_and_preserves_workspace
-# @matrix ai-report : bulk-delete delete-snapshot ownership delete-failure
 def delete_executed_reports(user: User, keys: Iterable[str]) -> dict[str, list[str]]:
     """Delete only the supplied, still-executed proposals owned by this user."""
     results = {"deleted": [], "skipped": [], "failed": []}
@@ -98,8 +89,5 @@ def delete_executed_reports(user: User, keys: Iterable[str]) -> dict[str, list[s
     return results
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/report_history.py::delete_report_record
-# @reason shared evidence survives while any linked report still exists
 def _other_report_references(file, report):
     return any(Entities.fetch_one(reference, request=Fetch.root()) is not None for reference in file.db.get("report_refs", []) if reference != report.urlsafe_key)

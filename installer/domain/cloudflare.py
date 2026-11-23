@@ -30,9 +30,6 @@ CLOUDFLARE_EMAIL_RECORD_COMMENT = (
 DMARC_DEFAULT_POLICY = "v=DMARC1; p=none;"
 
 
-# @testable false
-# @covered-by installer/domain/cloudflare.py::_cloudflare_request
-# @reason bearer header adapter is owned by Cloudflare DNS reconciliation
 def _cloudflare_headers(api_token):
     return {
         "Authorization": f"Bearer {api_token}",
@@ -40,9 +37,6 @@ def _cloudflare_headers(api_token):
     }
 
 
-# @testable false
-# @covered-by installer/domain/cloudflare.py::_cloudflare_request
-# @reason provider error adapter is owned by Cloudflare DNS reconciliation
 def _cloudflare_error_message(payload, status_code):
     errors = payload.get("errors") if isinstance(payload, dict) else None
     if isinstance(errors, list):
@@ -57,17 +51,10 @@ def _cloudflare_error_message(payload, status_code):
     return f"Cloudflare API returned HTTP {status_code}."
 
 
-# @testable false
-# @covered-by installer/domain/cloudflare.py::get_cloudflare_zone
-# @covered-by installer/domain/cloudflare.py::reconcile_cloudflare_dns_records
-# @reason bounded HTTP adapter is exercised through zone and record contracts
 def _cloudflare_request(method, path, api_token, *, params=None, json_data=None):
     install_if_missing("requests", "HTTP library for Cloudflare DNS setup")
     import requests
 
-    # @testable false
-    # @covered-by installer/domain/cloudflare.py::_cloudflare_request
-    # @reason one-attempt closure is owned by the bounded retrying HTTP adapter
     def request():
         try:
             response = requests.request(
@@ -101,9 +88,6 @@ def _cloudflare_request(method, path, api_token, *, params=None, json_data=None)
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_cloudflare_token_prompt_explains_dashboard_steps_and_scope
-# @matrix setup : cloudflare-api interactive-input least-privilege
 def get_cloudflare_api_token() -> str:
     """Prompt for a scoped token without echoing or persisting it."""
     print(
@@ -170,9 +154,6 @@ def get_cloudflare_api_token() -> str:
         print(ui.error(wrap_text("Enter a non-empty scoped Cloudflare API token.")))
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_cloudflare_dns_only_reconciliation
-# @matrix setup : cloudflare-api zone-resolution
 def get_cloudflare_zone(domain: str, api_token: str) -> dict[str, object]:
     """Resolve the longest provider-owned zone suffix for a hostname."""
     zones = []
@@ -209,9 +190,6 @@ def get_cloudflare_zone(domain: str, api_token: str) -> dict[str, object]:
     return max(matches, key=lambda zone: len(str(zone.get("name") or "")))
 
 
-# @testable false
-# @covered-by installer/domain/cloudflare.py::ensure_cloudflare_dmarc_record
-# @reason policy parsing is exercised through exact DMARC reconciliation
 def _valid_dmarc_policy(content):
     items = [item.strip() for item in str(content or "").split(";") if item.strip()]
     if not items:
@@ -230,9 +208,6 @@ def _valid_dmarc_policy(content):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_cloudflare_dmarc_reconciliation_creates_or_reuses_valid_policy
-# @matrix setup : authentication-email cloudflare-dns dmarc idempotence
 def ensure_cloudflare_dmarc_record(
     domain: str, zone: Mapping[str, object], api_token: str
 ) -> dict[str, object]:
@@ -343,9 +318,6 @@ def ensure_cloudflare_dmarc_record(
     }
 
 
-# @testable false
-# @covered-by installer/domain/cloudflare.py::reconcile_cloudflare_dns_records
-# @reason provider record normalization is owned by exact DNS reconciliation
 def _desired_cloudflare_records(domain, zone_name, resource_records):
     desired = []
     seen = set()
@@ -381,9 +353,6 @@ def _desired_cloudflare_records(domain, zone_name, resource_records):
     return desired
 
 
-# @testable false
-# @covered-by installer/domain/cloudflare.py::reconcile_cloudflare_dns_records
-# @reason journal projection excludes provider metadata not needed for repair
 def _record_snapshot(record):
     return {
         "type": record.get("type"),
@@ -394,9 +363,6 @@ def _record_snapshot(record):
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_cloudflare_dns_only_reconciliation
-# @matrix setup : cloudflare-dns dns-only idempotence partial-failure provider-records
 def reconcile_cloudflare_dns_records(
     domain: str,
     zone: Mapping[str, object],

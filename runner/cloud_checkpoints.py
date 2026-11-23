@@ -37,7 +37,6 @@ OBJECT = "hosted-e2e/checkpoint.json"
 DOCUMENTS = {"setup.json": "setup", "state.json": "state"}
 
 
-# @testable infrastructure
 def _bucket(project, number, *, credentials=None):
     from google.cloud import storage
 
@@ -56,9 +55,6 @@ def _bucket(project, number, *, credentials=None):
     return bucket
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_checkpoint_resumes_and_excludes_competing_writers
-# @matrix hosted-e2e : lifecycle recovery transactional-state
 class Checkpoint:
     def __init__(self, bucket: Bucket, project: str) -> None:
         self.bucket = bucket
@@ -192,9 +188,6 @@ class Checkpoint:
 ACTIVE: ContextVar[Checkpoint | None] = ContextVar("hosted_checkpoint", default=None)
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_checkpoint_seed_is_create_only
-# @matrix hosted-e2e setup : project-identity transactional-state
 def seed(root: Path, project: str) -> None:
     """Import the existing verified installation's last completed setup and teardown once."""
     from google.oauth2.credentials import Credentials
@@ -243,9 +236,6 @@ def seed(root: Path, project: str) -> None:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_checkpoint_is_opt_in
-# @matrix hosted-e2e : isolation project-identity
 @contextmanager
 def lifecycle(hosted: ModuleType, args: Namespace) -> Iterator[None]:
     project = os.environ.get("LAGNIAPPE_CLOUD_CHECKPOINT_PROJECT")

@@ -4,9 +4,6 @@ import json
 from enum import Enum
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/entities/condition.py::Condition.set_value
-# @covered-by lagniappe/core/entities/filter.py::Filter.conditions
 class FieldType(Enum):
     """Data types for filter fields. Determines available comparators."""
 
@@ -17,9 +14,6 @@ class FieldType(Enum):
     LIST = "list"
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/entities/condition.py::Condition.set_value
-# @covered-by lagniappe/core/entities/filter.py::Filter.conditions
 class Comparator(Enum):
     """Comparison operators for filter conditions."""
 
@@ -160,9 +154,6 @@ class CheckboxOptions(Enum):
     IS_FALSE = "not checked"
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/entities/condition.py::Condition.set_value
-# @covered-by lagniappe/core/properties/form.py::FormFilters.conditions
 class FilterOptions(Enum):
     """Maps field types to their available comparator option enums."""
 
@@ -183,10 +174,6 @@ class FilterOptions(Enum):
     CHECKBOX = CheckboxOptions
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/condition.py::Condition.set_value
-# @covered-by lagniappe/core/entities/filter.py::Filter.conditions
-# @reason serialized filter definitions are owned by condition creation workflows
 class FilterDefinition:
     """Serializable filter condition (entity_hash, field, type, comparator, value).
 
@@ -213,9 +200,6 @@ class FilterDefinition:
     def __str__(self) -> str:
         return f"{self.entity_hash} {self.field} {self.field_type.value} {self.comparator.value} {self.value} {self.is_entity_valued}"
 
-    # @testable true
-    # @tests tests_unit/test_012b_form_conditions.py::test_zero_number_condition_survives_saved_filter_serialization
-    # @matrix filters : condition-definition number round-trip zero
     @property
     def description(self) -> list[object]:
         """Serializable list representation for storage."""

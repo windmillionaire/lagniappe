@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
 
-/** @matrix home polling : foreground lazy-widget mounted-scope targeted-refresh */
 test("test_home_polling_subscribes_loaded_widgets_and_refreshes_only_owner", async () => {
 	class Core {
 		constructor(element) {

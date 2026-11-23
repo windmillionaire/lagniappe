@@ -1,9 +1,6 @@
 import { STYLES } from "../generated/styles.mjs";
 import { setIcon } from "../shared/icons.mjs";
 
-/**
- * @testable infrastructure
- */
 const setAttributes = (elt, attributes) => {
 	if (attributes.name) elt.name = attributes.name;
 	if (attributes.id) elt.id = attributes.id;
@@ -21,9 +18,6 @@ const setAttributes = (elt, attributes) => {
 	}
 };
 
-/**
- * @testable infrastructure
- */
 export const label = (attributes) => {
 	const {
 		label,
@@ -52,9 +46,6 @@ export const label = (attributes) => {
 	return labelElt;
 };
 
-/**
- * @testable infrastructure
- */
 export const input = (attributes) => {
 	const { type = "text", placeholder, styles = {} } = attributes;
 
@@ -93,9 +84,6 @@ export const input = (attributes) => {
 	return elt;
 };
 
-/**
- * @testable infrastructure
- */
 export const textarea = (attributes) => {
 	const { rows = 3, placeholder, styles = {} } = attributes;
 
@@ -115,9 +103,6 @@ export const textarea = (attributes) => {
 	return elt;
 };
 
-/**
- * @testable infrastructure
- */
 export const checkbox = (attributes) => {
 	const { checked = false, styles = {}, visible = true } = attributes;
 
@@ -152,9 +137,6 @@ export const checkbox = (attributes) => {
 	return element;
 };
 
-/**
- * @testable infrastructure
- */
 const radio = (attributes) => {
 	const { checked = false, styles = {} } = attributes;
 
@@ -175,9 +157,6 @@ const radio = (attributes) => {
 	return labelElt;
 };
 
-/**
- * @testable infrastructure
- */
 const select = (attributes) => {
 	const { placeholder, options = [], styles = {} } = attributes;
 
@@ -229,9 +208,6 @@ const select = (attributes) => {
 	return container;
 };
 
-/**
- * @testable infrastructure
- */
 const badge = (attributes) => {
 	const { icon, text, kind, styles = {} } = attributes;
 
@@ -249,9 +225,6 @@ const badge = (attributes) => {
 	return badge;
 };
 
-/**
- * @testable infrastructure
- */
 const toggle = (attributes) => {
 	const { icon, styles = {} } = attributes;
 	const toggle = document.createElement("button");
@@ -264,9 +237,6 @@ const toggle = (attributes) => {
 	return toggle;
 };
 
-/**
- * @testable infrastructure
- */
 const loading = () => {
 	const wrapper = document.createElement("div");
 	wrapper.className = STYLES.loading.wrapper;
@@ -283,9 +253,6 @@ const loading = () => {
 	return wrapper;
 };
 
-/**
- * @testable infrastructure
- */
 const icon = (attributes) => {
 	const { icon, kind = null, role = null, style = null } = attributes;
 
@@ -297,9 +264,6 @@ const icon = (attributes) => {
 	return elt;
 };
 
-/**
- * @testable infrastructure
- */
 const div = (attributes) => {
 	const { kind = null, role = null, style = null, data = {} } = attributes;
 
@@ -314,9 +278,6 @@ const div = (attributes) => {
 	return elt;
 };
 
-/**
- * @testable infrastructure
- */
 export const error = (message) => {
 	const error = document.createElement("div");
 	error.className = STYLES.message;
@@ -327,9 +288,6 @@ export const error = (message) => {
 	return error;
 };
 
-/**
- * @testable infrastructure
- */
 export const span = (attributes) => {
 	const { text = "", style = null, data = {} } = attributes;
 	const span = document.createElement("span");

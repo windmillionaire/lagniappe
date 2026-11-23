@@ -27,9 +27,6 @@ const INDENTED_CODE_PATTERN = /^(?: {4}|\t)/;
 const HARD_BREAK_PATTERN = /(?: {2,}|\\)$/;
 const SOFT_WRAP_MINIMUM = 40;
 
-// @testable false
-// @covered-by src/script/elements/editor/extensions/paste.mjs::looksLikeConvertibleMarkup
-// @reason clipboard line-ending normalization is part of Markdown detection
 const normalizeLineEndings = (value) =>
 	String(value || "")
 		.replaceAll("\r\n", "\n")
@@ -39,9 +36,6 @@ const normalizeLineEndings = (value) =>
  * Conservatively identify plain clipboard text worth offering to the shared
  * Markdown renderer. This detects; it never interprets or converts source.
  *
- * @testable true
- * @tests tests_js/test_048_markdown_paste.mjs::test_markdown_detection_is_conservative
- * @matrix editor markdown : detection paste soft-wrap
  */
 export const looksLikeConvertibleMarkup = (content) => {
 	const source = normalizeLineEndings(content);
@@ -89,9 +83,6 @@ export const looksLikeConvertibleMarkup = (content) => {
  * Insert source as one MarkdownSource node and atomically register its exact
  * transaction-produced range.
  *
- * @testable true
- * @tests tests_js/test_048_markdown_paste.mjs::test_source_insertion_tracks_the_inserted_block
- * @matrix editor markdown : inserted-range paste source-block
  */
 export const insertMarkdownSource = (view, content, rangeKey) => {
 	const { state } = view;
@@ -123,12 +114,6 @@ export const insertMarkdownSource = (view, content, rangeKey) => {
  * Intercept only detected plain-text markup when an owning toolbar can offer
  * an explicit conversion decision.
  *
- * @testable true
- * @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_markdown_table_preserves_table_after_reload
- * @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_plain_html_inserts_safe_formatted_content
- * @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_common_markdown_preserves_formatting
- * @tests tests_e2e/004_projects/test_004d_document.py::test_keeping_pasted_markdown_preserves_source_block
- * @matrix editor markdown : conversion paste source-block
  */
 export const EditorPaste = Extension.create({
 	name: "editorPaste",

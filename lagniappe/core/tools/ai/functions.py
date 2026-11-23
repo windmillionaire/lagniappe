@@ -113,9 +113,6 @@ DECLARATIONS = {
 FUNCTION_TOOL = types.Tool(function_declarations=list(DECLARATIONS.values()))
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_config_combines_search_tools_json_and_thinking_settings
-# @matrix ai : config tools
 def build_function_tool(*names: str) -> types.Tool | None:
     """Build a types.Tool with only the requested function declarations."""
     declarations = [DECLARATIONS[n] for n in names if n in DECLARATIONS]
@@ -146,9 +143,6 @@ HANDLERS: dict[str, Callable[[Mapping[str, object], User], ToolResult | ToolResp
 }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/functions.py::tool_catalog
-# @reason provider-schema conversion is asserted through the public JSON catalog
 def _provider_schema_to_json(value):
     """Convert Google schema models into ordinary JSON Schema values."""
     if hasattr(value, "model_dump"):
@@ -179,9 +173,6 @@ TOOL_DEFINITIONS: dict[str, ToolDefinition] = {
 }
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_tool_catalog_and_dispatch_share_registered_tools
-# @matrix agent-api ai : provider-neutral-schema tool-catalog
 @overload
 def tool_catalog(*, names: Iterable[str] | None = None, names_only: Literal[False] = False, transport: str | None = None) -> list[ToolDefinition]: ...
 @overload
@@ -213,12 +204,6 @@ def tool_catalog(*, names: Iterable[str] | None = None, names_only: bool = False
     return catalog
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_tool_catalog_and_dispatch_share_registered_tools
-# @matrix agent-api ai : permission-context provider-neutral-dispatch tool-registry
-# @tests tests_unit/test_032d_external_guidance.py::test_organize_guidance_is_shared_across_provider_and_external_dispatch
-# @tests tests_unit/test_032d_external_guidance.py::test_search_dispatch_and_catalog_match_across_ai_entry_points
-# @matrix ai agent-api : guidelines tool-dispatch
 def execute_registered_tool(name: str, args: object, user: User, *, external: bool = False) -> ToolResponse:
     """Execute one registered read tool without constructing provider parts."""
     if name not in HANDLERS:
@@ -241,9 +226,6 @@ def execute_registered_tool(name: str, args: object, user: User, *, external: bo
     return result, list(file_parts or [])
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/functions.py::execute_function_calls
-# @reason compact value formatting is exercised through traced tool dispatch
 def _trace_value(value, depth=0):
     """Return a compact, JSON-safe value for AI tool diagnostics."""
     if depth >= TRACE_DEPTH_LIMIT:
@@ -272,9 +254,6 @@ def _trace_value(value, depth=0):
     return str(value)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/functions.py::execute_function_calls
-# @reason compact result summaries are exercised through traced tool dispatch
 def _result_summary(result):
     """Summarize a tool result without copying full workspace data into logs."""
     if isinstance(result, dict):
@@ -300,9 +279,6 @@ def _result_summary(result):
     return {"type": type(result).__name__}
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/core.py::GenAI._tool_loop
-# @reason requested-call summaries are emitted through tool-loop exception context
 def summarize_function_calls(function_calls: Iterable[types.FunctionCall]) -> list[dict[str, object]]:
     """Compact function-call summary for exception context."""
     return [
@@ -311,9 +287,6 @@ def summarize_function_calls(function_calls: Iterable[types.FunctionCall]) -> li
     ]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/functions.py::execute_function_calls
-# @reason limit annotation is part of the tool-dispatch contract
 def _mark_file_parts_omitted(result):
     if not isinstance(result, dict):
         return result
@@ -331,10 +304,6 @@ def _mark_file_parts_omitted(result):
     return marked
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_function_call_dispatch_serializes_caches_and_attaches_files
-# @tests tests_unit/test_015_ai_tools.py::test_ai_function_call_dispatch_caps_file_parts_per_turn
-# @matrix ai : caching file-parts limit tool-dispatch trace unknown-tool
 def execute_function_calls(
     function_calls: Iterable[types.FunctionCall],
     user: User,

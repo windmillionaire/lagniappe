@@ -31,9 +31,6 @@ class GeneratedProject(TypedDict):
 GENERIC_MESSAGE = "Generation failed. Please try again. "
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_generation_validators_reject_bad_payloads_and_clean_citations
-# @matrix ai : project validation
 def validate_project(project_data: object) -> GeneratedProject:
     """Validate that generated project data has all required fields."""
     if not isinstance(project_data, dict) or not isinstance(project_data.get("project_name"), str):
@@ -65,9 +62,6 @@ def validate_project(project_data: object) -> GeneratedProject:
     return cast(GeneratedProject, project_data)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
-# @matrix projects : ai-create ai-generated
 def generate_project(prompt: Prompt) -> GeneratedProject:
     """Generate and validate a project specification from a Prompt."""
     try:
@@ -76,9 +70,6 @@ def generate_project(prompt: Prompt) -> GeneratedProject:
         raise AIException(f"{GENERIC_MESSAGE} {str(e)}") from e
 
 
-# @testable true
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_prompt_builders_capture_product_context_and_tool_choices
-# @matrix ai : output-format prompt-builders
 def project_creation_prompt(user_description: str) -> Prompt:
     """Build the AI prompt for creating a project from a user description."""
     intro = """You are a project creation AI. Based on the user's description, create a comprehensive project specification with appropriate model tasks and forms for data collection."""

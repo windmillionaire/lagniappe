@@ -2,7 +2,6 @@ import pytest
 from datetime import UTC
 
 
-# @matrix task-scheduling : periodic recurring skipped
 @pytest.mark.unit
 def test_skipped_recurring(get_test_entities):
     """Test skipped calculation for recurring/periodic schedules.
@@ -51,7 +50,6 @@ def test_skipped_recurring(get_test_entities):
             )
 
 
-# @matrix task-scheduling : scheduled skipped
 @pytest.mark.unit
 def test_skipped_scheduled(get_test_entities):
     """Test skipped calculation for scheduled schedules.
@@ -106,7 +104,6 @@ def test_skipped_scheduled(get_test_entities):
             )
 
 
-# @matrix task-scheduling : scheduled skipped
 @pytest.mark.unit
 def test_skipped_scheduled_calendar_boundaries():
     """Both endpoints are excluded, and invalid calendar dates are skipped."""
@@ -168,7 +165,6 @@ def test_skipped_scheduled_calendar_boundaries():
         ) == 0
 
 
-# @matrix task-scheduling : scheduled skipped exact-boundary timezone
 @pytest.mark.unit
 @pytest.mark.parametrize("rule, start, today, expected", [
     pytest.param({"mode": "daily"}, "2025-06-17", "2025-06-18", 0, id="daily-yesterday"),
@@ -218,7 +214,6 @@ def test_skipped_scheduled_counts_only_occurrences_between_baseline_and_today(
     assert task.properties.schedule.skipped == expected
 
 
-# @matrix task-scheduling : scheduled skipped postponed
 @pytest.mark.unit
 @pytest.mark.parametrize("due, postponed", [("2025-06-17", "2025-06-15"), ("2025-06-15", "2025-06-17")])
 def test_skipped_scheduled_preserves_earliest_due_date_baseline(monkeypatch, due, postponed):

@@ -10,7 +10,6 @@ import {
 	TrackedRanges,
 } from "../../src/script/elements/editor/extensions/trackedRanges.mjs";
 
-/** @matrix editor : replace-selection selected-text */
 test("test_selection_highlight_decorations_and_range_mapping", () => {
 	const schema = getSchema([StarterKit]);
 	const doc = schema.nodeFromJSON({
@@ -138,7 +137,6 @@ test("test_selection_highlight_decorations_and_range_mapping", () => {
 	assert.equal(decorationUpdates.length, 2);
 });
 
-/** @matrix ai editor markdown : inserted-range range-mapping */
 test("test_named_tracked_ranges_map_independently", () => {
 	const schema = getSchema([StarterKit]);
 	let state = EditorState.create({
@@ -194,7 +192,6 @@ test("test_named_tracked_ranges_map_independently", () => {
 	assert.deepEqual(storage.ranges.get("second"), { from: 7, to: 11 });
 });
 
-/** @pair editor:remote-highlight */
 test("test_remote_change_flash_decorations_map_and_expire", (t) => {
 	const scheduled = new Map();
 	let nextTimeout = 0;

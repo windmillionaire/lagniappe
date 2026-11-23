@@ -15,7 +15,6 @@ function replaceGlobal(t, name, value) {
 	});
 }
 
-/** @matrix mentions : keyboard mouse node-attributes pending-occurrence profile-link query-detection */
 test("test_mention_node_collection_insertion_and_keyboard_contract", async () => {
 	const searches = [];
 	const queryKeys = [];
@@ -260,7 +259,6 @@ test("test_mention_node_collection_insertion_and_keyboard_contract", async () =>
 	assert.deepEqual(searches.at(-1), ["/l/search-index/user", "New"]);
 });
 
-/** @matrix messaging : compose-modal operation-id prefilled-peer selection-focus user-kind */
 test("test_message_composer_prefills_peer_and_reuses_operation_on_submit", async (t) => {
 	const posts = [];
 	const calls = [];
@@ -397,7 +395,6 @@ async function loadNotifications({
 	});
 }
 
-/** @matrix notifications : bounded-page exact-count message-ordering */
 test("test_notification_menu_keeps_authoritative_aggregate_count", async (t) => {
 	replaceGlobal(t, "window", {});
 	const rendered = [];
@@ -448,7 +445,6 @@ test("test_notification_menu_keeps_authoritative_aggregate_count", async (t) => 
 	assert.deepEqual(actions[0], ["compose", menu.view]);
 });
 
-/** @matrix notifications : menu-open reconnect */
 test("test_notification_refresh_waits_for_pending_connectivity", async (t) => {
 	const windowBoundary = {};
 	replaceGlobal(t, "window", windowBoundary);
@@ -500,7 +496,6 @@ test("test_notification_refresh_waits_for_pending_connectivity", async (t) => {
 	assert.equal(calls.length, 1);
 });
 
-/** @matrix messaging : active-polling clear-confirmation inline-reply list-race polling-revision preserve-selection read-race responsive-peer-selector selection-race */
 test("test_messages_view_refreshes_read_races_and_uses_delete_modal", async (t) => {
 	const calls = [];
 	const stored = new Map();

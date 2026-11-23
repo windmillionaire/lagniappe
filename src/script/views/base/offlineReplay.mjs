@@ -3,9 +3,6 @@
  * mounted-form polling; the broad refresh covers collection consumers after
  * successful writes.
  *
- * @testable true
- * @tests tests_js/test_028_form_state_split.mjs::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
- * @pairs offline:background-replay polling:nonblocking
  */
 export const replayOfflineQueue = async (view, existingQueue = null) => {
 	try {

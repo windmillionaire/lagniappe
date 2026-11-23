@@ -62,9 +62,6 @@ def _http(user, method, path, **kwargs):
     )
 
 
-# @source src/script/views/builder/draft.mjs::BuilderDraft
-# @source src/script/views/builder/panels/formSettings.mjs::FormSettings._generateSchema
-# @matrix forms : draft-history stable-identity schema-generation builder-save builder-reload
 # @template forms/builder.html::header
 # @template forms/builder.html::generate
 def test_generation_is_one_undoable_unsaved_command(get_admin, get_user):
@@ -120,8 +117,6 @@ def test_generation_is_one_undoable_unsaved_command(get_admin, get_user):
     assert dict(Entities.fetch_one(form.key, request=Fetch.root()).db) == saved_form
 
 
-# @source src/script/views/builder/panels/header.mjs::Header.togglePreviewPanel
-# @matrix forms : builder-preview focus-recovery
 # @template forms/builder.html::header
 # @style builder.switch.container
 def test_preview_toggle_retains_keyboard_focus(get_admin, get_user):
@@ -150,7 +145,6 @@ def test_preview_toggle_retains_keyboard_focus(get_admin, get_user):
     expect(preview).to_have_css("outline-width", "2px")
 
 
-# @matrix forms : builder-save focus-recovery
 # @template forms/builder.html::header
 # @style nav.button
 @pytest.mark.parametrize("reconnect_during_save", [False, True])
@@ -211,8 +205,6 @@ def test_save_feedback_retains_keyboard_focus(
     expect(save).to_have_attribute("data-saved", "true")
 
 
-# @source src/script/views/builder/panels/header.mjs::Header.saveForm
-# @matrix forms : builder-save builder-reload
 # @template forms/builder.html::header
 # @template forms/builder.html::main
 def test_save_preserves_open_option_editor(get_admin, get_user):
@@ -280,9 +272,6 @@ def test_save_preserves_open_option_editor(get_admin, get_user):
     expect(user.locate(builder.SAVED)).to_have_css("opacity", "1")
 
 
-# @source src/script/views/builder/panels/model.mjs::ModelPanel.focusItem
-# @source src/script/views/builder/panels/model.mjs::ModelPanel.blurItem
-# @matrix forms : builder-lifecycle
 # @template forms/builder.html::main
 # @template forms/builder.html::header
 def test_condition_panels_fit_outline_to_selected_field(get_admin, get_user):
@@ -344,8 +333,6 @@ def test_condition_panels_fit_outline_to_selected_field(get_admin, get_user):
         expect(user.locate(builder.SAVED)).to_be_disabled()
 
 
-# @source src/script/views/builder/draft.mjs::BuilderDraft
-# @matrix forms : draft-history schema-generation
 # @template forms/builder.html::header
 # @template forms/builder.html::generate
 def test_manual_edit_after_undo_discards_generated_redo(get_admin, get_user):
@@ -415,12 +402,6 @@ def test_manual_edit_after_undo_discards_generated_redo(get_admin, get_user):
     expect(redo).to_have_css("opacity", "0.5")
 
 
-# @source src/script/views/builder/draft.mjs::BuilderDraft
-# @source src/script/views/builder/draftDocument.mjs::DraftDocument.flush
-# @source src/script/elements/editor/independent.mjs::IndependentDocument._initEditor
-# @source src/script/elements/editor/editor.mjs::independentEditor
-# @matrix forms : draft-history
-# @matrix editor : initial-load
 # @template forms/builder.html::header
 def test_form_undo_preserves_document_edits(get_admin, get_user):
     user = get_admin()
@@ -497,7 +478,6 @@ def test_form_undo_preserves_document_edits(get_admin, get_user):
     expect(builder.model).to_contain_text("Renamed notes")
 
 
-# @matrix editor html-field : image-layout
 # @template forms/builder.html::header
 @pytest.mark.parametrize(("position", "float_value", "right_margin"), [
     ("Align right", "none", "0px"),
@@ -563,11 +543,6 @@ def test_image_layout_survives_builder_save_and_reload(get_admin, get_user, posi
     assert image.evaluate("image => image.style.marginRight") == right_margin
 
 
-# @source lagniappe/core/tools/files/html.py::render_markdown
-# @source src/script/views/builder/panels/formSettings.mjs::FormSettings._generateSchema
-# @source src/script/views/builder/panels/header.mjs::Header.saveForm
-# @matrix forms : schema-generation builder-save builder-reload
-# @matrix form-html security : html-sanitization owned-image
 # @template forms/builder.html::header
 # @template forms/builder.html::generate
 def test_generated_instructions_preserve_current_image_layout(get_admin, get_user):
@@ -661,8 +636,6 @@ def test_generated_instructions_preserve_current_image_layout(get_admin, get_use
         expect(builder.condition).not_to_be_visible()
 
 
-# @source src/script/views/builder/panels/formSettings.mjs::FormSettings._generateSchema
-# @matrix forms : draft-history schema-generation stale-response
 # @template forms/builder.html::generate
 def test_generation_rejects_result_after_intervening_edit(get_admin, get_user):
     user = get_admin()
@@ -692,7 +665,6 @@ def test_generation_rejects_result_after_intervening_edit(get_admin, get_user):
         assert builder.schema_field("notes")["title"] == "Intervening edit"
 
 
-# @matrix forms : builder-save stale-acknowledgement persistent-error concurrent-edit
 # @template forms/builder.html::header
 def test_stale_save_preserves_local_draft_after_another_editor_saves(get_admin, get_user, browser_failures):
     owner = get_admin()
@@ -723,7 +695,6 @@ def test_stale_save_preserves_local_draft_after_another_editor_saves(get_admin, 
     assert persisted.schema[0]["title"] == "First editor saved"
 
 
-# @matrix forms : builder-save migration-required save-receipt
 def test_builder_publication_rejects_incompatible_payload_and_reuses_receipt(get_admin, get_user):
     user = get_admin()
     form, _ = _form(user, "BSU publication contract")
@@ -746,7 +717,6 @@ def test_builder_publication_rejects_incompatible_payload_and_reuses_receipt(get
     assert Builder(user).schema_field("notes")["title"] == "Accepted label"
 
 
-# @matrix task-completion html-field permissions : schema-version owned-image record-scope
 def test_historical_images_are_bound_to_the_authorized_completion(get_admin, get_user):
     user = get_admin()
     page = Pages.test_create_page_task.get(user)
@@ -816,10 +786,6 @@ def test_historical_images_are_bound_to_the_authorized_completion(get_admin, get
     assert _http(outsider, "GET", current_image_url).status_code == 403
 
 
-# @source src/script/views/builder/conditions/options.mjs::Options
-# @source src/script/views/builder/conditions/columns.mjs::Columns
-# @matrix forms : stable-identity builder-select-options builder-table-column builder-save builder-reload
-# @matrix tasks forms : cache-invalidation live-metadata
 # @template forms/builder.html::header
 # @template pages/tasks.html::task_form
 def test_saved_relabels_preserve_active_task_answers_and_conditions(get_admin, get_user):

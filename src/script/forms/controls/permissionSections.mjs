@@ -3,11 +3,6 @@ import { withTransition } from "../../shared/transitions.mjs";
 
 /**
  * Enhances server-rendered permission fields without owning a form lifecycle.
- * @testable true
- * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
- * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
- * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_public_permissions
- * @matrix user-groups public-groups : general-permissions entity-permissions permission-update
  */
 export default class PermissionSections {
 	constructor(root, { readonly = false, onChange = () => {} } = {}) {

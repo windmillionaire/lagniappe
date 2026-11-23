@@ -79,9 +79,6 @@ STORY_TARGETS = (
 TARGETS = (*PROTOCOL_TARGETS, *STORY_TARGETS)
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_pilot_arguments_are_bounded_and_keep_normal_runs_unchanged
-# @matrix testing : parallel-e2e
 def pilot_arguments(
     arguments: list[str],
 ) -> tuple[str | Literal[False], int, list[str]]:
@@ -111,7 +108,6 @@ def pilot_arguments(
     return scope, workers, [*rest, *(TARGETS if scope == "pilot" else ("e2e",))]
 
 
-# @testable infrastructure
 @contextmanager
 def pilot_authority(
     local_authority: TestSessionAuthority | None,
@@ -135,9 +131,6 @@ def pilot_authority(
             cleanup_test_data(authority)
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_pilot_targets_resolve_collected_browser_parameters
-# @matrix testing : parallel-e2e collection browser-parameters
 def resolve_pilot_targets(
     records: Sequence[CollectedTest], targets: Sequence[str]
 ) -> list[CollectedTest]:
@@ -162,9 +155,6 @@ def resolve_pilot_targets(
     return list(selected.values())
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task
-# @matrix testing : parallel-e2e
 def run_pilot(
     authority: TestSessionAuthority | E2ELease,
     command: list[str],

@@ -18,9 +18,6 @@ from config.datastore import encode_urlsafe_key
 from .base_db import DBProperty
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/messaging/views.py::serialize_conversation
-# @reason key encoding is exercised through browser projections
 def encoded_identifier(value: object) -> str | None:
     """Return the stable urlsafe identity for an entity or Datastore key."""
     key = getattr(value, "key", value)
@@ -32,9 +29,6 @@ def encoded_identifier(value: object) -> str | None:
     return str(key) if key is not None else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::send_message_record
-# @reason participant normalization is exercised through transactional state
 @overload
 def participant_id(user: models.User | Key | str) -> str: ...
 
@@ -47,24 +41,15 @@ def participant_id(user: models.User | Key | str | None) -> str | None:
     return encoded_identifier(user)
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @pair messaging:deterministic-key
 def conversation_identity(first: models.User | Key, second: models.User | Key) -> str:
     participants = sorted((participant_id(first), participant_id(second)))
     return hashlib.sha256("\0".join(participants).encode()).hexdigest()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::require_participant
-# @reason membership comparison is exercised through authorized reads and writes
 def participant(conversation: DatastoreEntity, user: models.User | Key) -> bool:
     return getattr(user, "key", user) in set(conversation.get("participants") or ())
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/messaging/views.py::serialize_conversation
-# @reason peer selection is exercised through conversation projection
 def peer_key(conversation: DatastoreEntity, user: models.User | Key) -> Key | None:
     user_key = getattr(user, "key", user)
     return next(
@@ -73,9 +58,6 @@ def peer_key(conversation: DatastoreEntity, user: models.User | Key) -> Key | No
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::send_message_record
-# @reason exact raw conversation construction is exercised through first send
 def initial_values(actor: models.User, recipient: models.User, now: datetime) -> dict[str, object]:
     actor_id = participant_id(actor)
     recipient_id = participant_id(recipient)
@@ -101,9 +83,6 @@ def initial_values(actor: models.User, recipient: models.User, now: datetime) ->
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::send_message_record
-# @reason the pure transition is exercised within the atomic send contract
 def apply_send(conversation: DatastoreEntity, actor: models.User, recipient: models.User, now: datetime) -> int:
     """Advance one conversation after accepting a new message."""
     actor_id = participant_id(actor)
@@ -129,9 +108,6 @@ def apply_send(conversation: DatastoreEntity, actor: models.User, recipient: mod
     return sequence
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::mark_conversation_read
-# @reason the pure transition is exercised within the atomic read contract
 def apply_read(conversation: DatastoreEntity, user: models.User, now: datetime) -> int:
     """Clear a participant's unread cursor and return the prior unread count."""
     user_id = participant_id(user)
@@ -149,9 +125,6 @@ def apply_read(conversation: DatastoreEntity, user: models.User, now: datetime) 
     return prior
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::hide_message_for_user
-# @reason the pure transition is exercised within the atomic hide contract
 def apply_hidden_message(conversation: DatastoreEntity, message: DatastoreEntity, user: models.User) -> bool:
     """Remove one still-unread hidden inbound message from conversation counts."""
     user_id = participant_id(user)
@@ -169,9 +142,6 @@ def apply_hidden_message(conversation: DatastoreEntity, message: DatastoreEntity
     return True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::clear_message_conversation
-# @reason the pure transition is exercised within the atomic clear contract
 def apply_clear(conversation: DatastoreEntity, user: models.User, now: datetime) -> int:
     """Advance one participant's clear horizon and return cleared unread count."""
     user_id = participant_id(user)

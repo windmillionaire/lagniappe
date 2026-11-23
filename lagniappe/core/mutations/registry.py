@@ -52,9 +52,6 @@ SAVE_PLANNERS = {
 }
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
-# @matrix mutations : completeness contract planner-registry
 def planner_for(entity: Entity) -> StandardMutation[Entity]:
     kind = getattr(entity, "entity_kind", None) or getattr(entity, "kind", None)
     try:
@@ -63,8 +60,5 @@ def planner_for(entity: Entity) -> StandardMutation[Entity]:
         raise ValueError(f"No mutation planner registered for kind: {kind}") from error
 
 
-# @testable false
-# @covered-by lagniappe/core/mutations/registry.py::planner_for
-# @reason registry keys are exposed through the package completeness check
 def registered_kinds() -> frozenset[str]:
     return frozenset(SAVE_PLANNERS)

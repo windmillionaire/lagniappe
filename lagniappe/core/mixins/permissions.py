@@ -26,9 +26,6 @@ ASSIGNED_CONFIG = {
 }
 
 
-# @testable true
-# @tests tests_unit/test_009c_user_permissions_form.py::test_form_permissions
-# @matrix permissions : form-data no-groups restricted
 class PermissionsMixin[Owner: User | UserGroup]:
     """Base permission management shared by User, Group, and Public mixins.
 
@@ -97,11 +94,6 @@ class PermissionsMixin[Owner: User | UserGroup]:
                     permissions[parent] = parent_action
                     permissions[hash] = action
 
-    # @testable true
-    # @tests tests_unit/test_009c_user_permissions_form.py::test_form_permissions
-    # @tests tests_unit/test_009e_user_groups.py::test_group_permissions
-    # @tests tests_unit/test_009e_user_groups.py::test_general_forms_none_round_trips_for_default_view_permission
-    # @matrix permissions user-groups : default-denial form-data restricted
     def create_permissions(self, form_data: Mapping[str, str] | None) -> dict[str, str]:
         """Build a {hash: Action.name} dict from form submission data."""
         form_data = form_data or {}
@@ -135,9 +127,6 @@ class PermissionsMixin[Owner: User | UserGroup]:
         }
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/user_permissions.py::UserPermissions.create
-# @covered-by lagniappe/core/mixins/permissions.py::UserPermissionsMixin.combine_group_permissions
 class UserPermissionsMixin(PermissionsMixin["User"]):
     """Permission management for User entities.
 
@@ -147,9 +136,6 @@ class UserPermissionsMixin(PermissionsMixin["User"]):
         permissions_form(): Build section config for the permissions UI.
     """
 
-    # @testable true
-    # @tests tests_unit/test_009b_user_permissions.py::test_combine_groups
-    # @matrix permissions user-groups : combine-groups highest-permission restricted
     def combine_group_permissions(self) -> dict[str, str]:
         """Merge permissions from all groups (most permissive wins)."""
         permissions = {}
@@ -194,9 +180,6 @@ class UserPermissionsMixin(PermissionsMixin["User"]):
         return {"sections": sections}
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/user_groups.py::PublicPermissions.create
-# @covered-by lagniappe/core/mixins/permissions.py::PublicPermissionsMixin.permissions_form
 class PublicPermissionsMixin(PermissionsMixin["PublicGroup"]):
     """Permission management for the PublicGroup entity.
 
@@ -207,9 +190,6 @@ class PublicPermissionsMixin(PermissionsMixin["PublicGroup"]):
         permissions_form(): Build section config for the public permissions UI.
     """
 
-    # @testable true
-    # @tests tests_unit/test_009e_user_groups.py::test_general_forms_none_round_trips_for_default_view_permission
-    # @matrix permissions public-groups user-groups : default-denial form-data permission-form
     def permissions_form(self) -> dict[str, object]:
         """Build section config for the public permissions UI."""
         specific_permissions = self.get_specific_permissions()
@@ -239,9 +219,6 @@ class PublicPermissionsMixin(PermissionsMixin["PublicGroup"]):
         return {"sections": sections}
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/user_groups.py::GroupPermissions.create
-# @covered-by lagniappe/core/mixins/permissions.py::GroupPermissionsMixin.permissions_form
 class GroupPermissionsMixin(PermissionsMixin["UserGroup"]):
     """Permission management for UserGroup entities.
 

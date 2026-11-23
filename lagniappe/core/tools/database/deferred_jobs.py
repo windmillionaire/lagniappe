@@ -93,7 +93,6 @@ class JobTransition(JobOutcome[Entity]):
     transitioned: bool
 
 
-# @testable infrastructure
 def recent_records(limit: int = 100) -> list[Entity]:
     """Return the newest durable job records for the admin projection."""
     query = DATA.datastore.query(kind=KINDS.jobs.value)
@@ -101,7 +100,6 @@ def recent_records(limit: int = 100) -> list[Entity]:
     return list(query.fetch(limit=min(max(int(limit), 1), 250)))
 
 
-# @testable infrastructure
 def recovery_records(*, limit: int) -> list[Entity]:
     """Return active or delivery-pending records in recovery order."""
     records = []
@@ -137,9 +135,6 @@ def recovery_records(*, limit: int) -> list[Entity]:
     return records
 
 
-# @testable true
-# @tests tests_unit/test_023b_deferred_job_service.py::test_delete_terminal_jobs_preserves_active_and_incomplete_delivery
-# @matrix deferred-jobs : retention terminal-delivery
 def delete_terminal_records(
     *, before: datetime | None = None, batch_size: int = 500
 ) -> int:
@@ -184,7 +179,6 @@ def delete_terminal_records(
     return deleted
 
 
-# @testable infrastructure
 def _deferred_job_key(identifier):
     if isinstance(identifier, Key):
         return identifier
@@ -195,9 +189,6 @@ def _deferred_job_key(identifier):
     return datastore_key(identifier)
 
 
-# @testable true
-# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_tracking_membership_follows_recovery_required_state
-# @matrix cloud-scheduler deferred-jobs : durable-membership idempotency terminal-delivery
 def _deferred_job_requires_recovery(entity):
     """Return whether a durable job still needs scheduled recovery coverage."""
     return bool(
@@ -209,8 +200,6 @@ def _deferred_job_requires_recovery(entity):
     )
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/database/deferred_jobs.py::_update_deferred_job_scheduler_tracking
 def _deferred_job_recovery_query_state(entity):
     if not entity:
         return (None, False)
@@ -221,14 +210,10 @@ def _deferred_job_recovery_query_state(entity):
     )
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/database/deferred_jobs.py::_update_deferred_job_scheduler_tracking
 def _deferred_job_scheduler_control_key():
     return DATA.datastore.key(KINDS.site.value, DEFERRED_JOB_SCHEDULER_CONTROL_ID)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/database/deferred_jobs.py::_update_deferred_job_scheduler_tracking
 def _deferred_job_tracking_id(identifier):
     key = _deferred_job_key(identifier)
     if key is None:
@@ -238,8 +223,6 @@ def _deferred_job_tracking_id(identifier):
     return encode_urlsafe_key(key)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/database/deferred_jobs.py::_update_deferred_job_scheduler_tracking
 def _deferred_job_scheduler_control(transaction):
     key = _deferred_job_scheduler_control_key()
     control = DATA.datastore.get(key, transaction=transaction)
@@ -251,8 +234,6 @@ def _deferred_job_scheduler_control(transaction):
     return control
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/database/deferred_jobs.py::get_deferred_job_scheduler_control
 def _deferred_job_scheduler_snapshot(control=None) -> SchedulerSnapshot:
     control = control or {}
     tracked_jobs: list[str] = sorted(set(control.get("tracked_jobs") or ()))
@@ -272,9 +253,6 @@ def _deferred_job_scheduler_snapshot(control=None) -> SchedulerSnapshot:
     }
 
 
-# @testable true
-# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_tracking_membership_follows_recovery_required_state
-# @matrix cloud-scheduler deferred-jobs : desired-state durable-membership transaction
 def _update_deferred_job_scheduler_tracking(
     transaction,
     job_key,
@@ -314,9 +292,6 @@ def _update_deferred_job_scheduler_tracking(
     return _deferred_job_scheduler_snapshot(control)
 
 
-# @testable true
-# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_control_repair_is_revision_checked
-# @matrix cloud-scheduler deferred-jobs : drift-repair optimistic-concurrency
 @retry_aborted
 def repair_deferred_job_scheduler_control(
     job_keys: Iterable[Key], expected_generation: int, now: datetime
@@ -358,9 +333,6 @@ def repair_deferred_job_scheduler_control(
         }
 
 
-# @testable true
-# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
-# @matrix cloud-scheduler deferred-jobs : distributed-lease generation race
 @retry_aborted
 def acquire_deferred_job_scheduler_sync(
     lease_token: str, now: datetime, *, lease_seconds: int
@@ -388,9 +360,6 @@ def acquire_deferred_job_scheduler_sync(
         }
 
 
-# @testable true
-# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
-# @matrix cloud-scheduler deferred-jobs : distributed-lease generation provider-state
 @retry_aborted
 def record_deferred_job_scheduler_sync(
     lease_token: str,
@@ -425,9 +394,6 @@ def record_deferred_job_scheduler_sync(
         }
 
 
-# @testable true
-# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_releases_lease_after_provider_failure
-# @matrix cloud-scheduler deferred-jobs : distributed-lease provider-failure
 @retry_aborted
 def release_deferred_job_scheduler_sync(lease_token: str, now: datetime) -> bool:
     """Release a Scheduler synchronization lease still owned by the caller."""
@@ -443,19 +409,12 @@ def release_deferred_job_scheduler_sync(lease_token: str, now: datetime) -> bool
         return True
 
 
-# @testable true
-# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_control_repair_is_revision_checked
-# @matrix cloud-scheduler deferred-jobs : defaults state-read
 def get_deferred_job_scheduler_control() -> SchedulerSnapshot:
     """Read normalized recovery/Scheduler control state without creating it."""
     control = DATA.datastore.get(_deferred_job_scheduler_control_key())
     return _deferred_job_scheduler_snapshot(control)
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_create_is_transactionally_idempotent
-# @matrix deferred-jobs : get-or-create idempotency notification start
-# @pair notifications:aggregate-count
 @retry_aborted
 def create_deferred_job_if_absent(
     job: DomainEntity,
@@ -568,9 +527,6 @@ def create_deferred_job_if_absent(
         return result
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_autofill_lock_cleanup_is_compare_and_delete
-# @matrix deferred-jobs : compare-and-set form-lock
 @retry_aborted
 def release_deferred_job_lock(identifier: Identifier, operation: str | None) -> bool:
     """Delete a lock only when it still belongs to ``operation``."""
@@ -586,11 +542,6 @@ def release_deferred_job_lock(identifier: Identifier, operation: str | None) -> 
         return True
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_claim_and_checkpoint_are_compare_and_set
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_status_transactions_do_not_write_actor
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_transactions_retry_aborted_contention
-# @matrix deferred-jobs : claim compare-and-set duplicate-delivery lease retry revision transaction transaction-contention user-write-isolation
 @retry_aborted
 def claim_deferred_job(
     identifier: Identifier, lease_token: str, lease_expires: datetime, now: datetime
@@ -637,10 +588,6 @@ def claim_deferred_job(
         return {"claimed": True, "reason": "claimed", "entity": entity}
 
 
-# @testable true
-# @tests tests_unit/test_023h_deferred_job_control.py::test_claim_checks_observe_durable_ownership_without_writes
-# @tests tests_unit/test_023h_deferred_job_control.py::test_blocking_work_renews_only_on_the_heartbeat_cadence
-# @matrix deferred-jobs : cancellation lease read-path heartbeat
 def owns_deferred_job_claim(identifier: Identifier, lease_token: str) -> bool:
     """Read current token ownership without extending or modifying the lease.
 
@@ -654,10 +601,6 @@ def owns_deferred_job_claim(identifier: Identifier, lease_token: str) -> bool:
     return entity is not None and entity.get("lease_token") == lease_token
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_claim_and_checkpoint_are_compare_and_set
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_status_transactions_do_not_write_actor
-# @matrix deferred-jobs : checkpoint compare-and-set lease revision transaction user-write-isolation
 @retry_aborted
 def update_claimed_deferred_job(
     identifier: Identifier,
@@ -699,9 +642,6 @@ def update_claimed_deferred_job(
         return True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/deferred_jobs.py::claim_deferred_job_recovery
-# @reason recovery-only timestamp normalization is exercised through the transactional claim
 def _deferred_datetime(value):
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=UTC)
@@ -714,9 +654,6 @@ def _deferred_datetime(value):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/deferred_jobs.py::claim_deferred_job_recovery
-# @reason private due-state matrix is exercised through the transactional recovery claim
 def _deferred_recovery_due(entity, now, grace):
     dispatching_at = _deferred_datetime(entity.get("dispatched_at"))
     if (
@@ -743,9 +680,6 @@ def _deferred_recovery_due(entity, now, grace):
     return False
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_recovery_claim_is_compare_and_set
-# @matrix deferred-jobs : compare-and-set grace lease maximum-age reconciliation
 @retry_aborted
 def claim_deferred_job_recovery(
     identifier: Identifier,
@@ -824,9 +758,6 @@ def claim_deferred_job_recovery(
         }
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_recovery_claim_is_compare_and_set
-# @matrix deferred-jobs : compare-and-set dispatch reconciliation worker-race
 @retry_aborted
 def update_deferred_job_recovery_dispatch(
     identifier: Identifier,
@@ -856,9 +787,6 @@ def update_deferred_job_recovery_dispatch(
         return True
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_terminal_transition_revokes_the_active_lease
-# @matrix deferred-jobs : cancellation compare-and-set lease terminal-race tombstone
 @retry_aborted
 def transition_active_deferred_job(
     identifier: Identifier, updates: Mapping[str, object], now: datetime

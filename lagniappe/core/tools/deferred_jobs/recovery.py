@@ -30,11 +30,7 @@ from .common import _error_record, _publish_operation_projection, _utc
 from .errors import DeferredJobInfrastructureError
 
 
-# @testable infrastructure
 class DeferredJobRecovery:
-    # @testable true
-    # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_reconciler_repairs_control_before_self_pausing
-    # @matrix cloud-scheduler deferred-jobs : drift-repair optimistic-concurrency self-pause
     def _repair_reconciler_control(self, now, *, attempts=4):
         """Scan durable recovery work and publish it without losing raced changes."""
         if not CONFIG.production:
@@ -59,13 +55,6 @@ class DeferredJobRecovery:
         )
         return jobs
 
-    # @testable true
-    # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_redispatches_one_cas_claimed_stale_job
-    # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_terminalizes_one_cas_claimed_expired_job
-    # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_resumes_stale_terminal_delivery_after_grace
-    # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_completes_terminal_delivery_when_input_was_deleted
-    # @matrix deferred-jobs : compare-and-set deterministic-task-id grace maximum-age orphaned-input reconciliation redispatch terminal-delivery
-    # @pair notifications:terminal-delivery
     def reconcile(self, *, now: datetime | None = None, limit: int = 250) -> dict[str, int]:
         """Redispatch stranded work and bound the age of every operation."""
         service = cast("DeferredJobService", self)
@@ -191,15 +180,11 @@ class DeferredJobRecovery:
         service._sync_reconciler()
         return result
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/deferred_jobs/recovery.py::DeferredJobRecovery.reconcile
     def _reconcile_candidates(self, *, limit):
         records = database_deferred_jobs.recovery_records(limit=limit)
         jobs = [Entities.DEFERRED_JOB(record) for record in records]
         return Entities.fetch(*jobs, request=Fetch.direct())
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/deferred_jobs/recovery.py::DeferredJobRecovery.reconcile
     def _finish_stale_delivery(self, job, *, error=None):
         service = cast("DeferredJobService", self)
         error = error or exceptions.AIException(

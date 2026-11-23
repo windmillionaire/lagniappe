@@ -15,8 +15,6 @@ from .reports import (
 )
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/deferred_jobs/adapters/registry.py::DeferredJobAdapterRegistry.adapter
 def register_adapters(registry: DeferredJobAdapterRegistry) -> None:
     """Register the clean-cutover deferred workflow cohort."""
     for adapter in (

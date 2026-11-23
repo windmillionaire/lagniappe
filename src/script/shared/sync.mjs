@@ -13,7 +13,6 @@ import { waitForAttribute } from "./utilities.mjs";
 /**
  * Coordinate Yjs document updates through the shared polling protocol.
  *
- * @testable infrastructure
  */
 export class SyncManager {
 	constructor(view) {
@@ -161,13 +160,6 @@ export class SyncManager {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_010_sync_manager_frontend.mjs::test_sync_manager_uses_polling_subscriptions
-	 * @tests tests_js/test_029_core_startup.mjs::test_collaborative_document_renders_before_initial_state
-	 * @matrix sync : editor-readiness offline-replay state-only
-	 * @pair polling:document
-	 */
 	async state(widget) {
 		await this.ready;
 		const offline = await getSyncRecord(widget.syncId);
@@ -209,10 +201,6 @@ export class SyncManager {
 	 * one reconnect. A failed durable replay is attempted once per connectivity
 	 * generation and remains queued for the next genuine recovery.
 	 *
-	 * @testable true
-	 * @tests tests_js/test_010_sync_manager_frontend.mjs::test_sync_manager_uses_polling_subscriptions
-	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_failed_offline_replay_keeps_queue_and_retries
-	 * @matrix offline sync : offline-replay queue-preserved reconnect-generation retry-boundary
 	 */
 	register() {
 		if (this._registerPromise) return this._registerPromise;
@@ -259,9 +247,6 @@ export class SyncManager {
 	 * Keep document presence and its fast polling cadence scoped to the active,
 	 * visible document widget.
 	 *
-	 * @testable true
-	 * @tests tests_js/test_010_sync_manager_frontend.mjs::test_sync_manager_uses_polling_subscriptions
-	 * @matrix polling sync : active-widget visibility
 	 */
 	async reconcileSubscriptions() {
 		if (!this.view.online || this.view.hidden) return;
@@ -310,11 +295,6 @@ export class SyncManager {
 	/**
 	 * Fetch the authoritative state newer than an offline record's base cursor.
 	 *
-	 * @testable true
-	 * @tests tests_js/test_010_sync_manager_frontend.mjs::test_sync_manager_uses_polling_subscriptions
-	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
-	 * @matrix polling : current-state cursor document
-	 * @matrix sync : headless merge offline-replay
 	 */
 	async _pollOfflineState(offline) {
 		const id = `replay:${offline.sync_id}`;
@@ -354,12 +334,6 @@ export class SyncManager {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_010_sync_manager_frontend.mjs::test_sync_manager_uses_polling_subscriptions
-	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
-	 * @matrix sync : headless merge offline-replay queue-clear
-	 */
 	async _reconcile(offlineRecords) {
 		const replays = [];
 		const headless = [];
@@ -480,12 +454,6 @@ export class SyncManager {
 		return batch;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_prevents_sync_requests
-	 * @tests tests_js/test_010_sync_manager_frontend.mjs::test_sync_manager_uses_polling_subscriptions
-	 * @matrix sync : checkpoint dirty-state offline-replay persistence queue-clear
-	 */
 	async _sendUpdatesNow(
 		save = false,
 		updates = null,

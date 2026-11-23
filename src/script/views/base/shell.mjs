@@ -2,21 +2,12 @@ import { connectivity } from "../../shared/connectivity.mjs";
 
 const MOBILE_QUERY = "(max-width: 640px)";
 
-/**
- * @testable false
- * @covered-by src/script/views/base/shell.mjs::ShellView
- */
 export const markPerformance = (name) => {
 	if (typeof performance === "undefined" || !performance.mark) return;
 	if (performance.getEntriesByName?.(name, "mark")?.length) return;
 	performance.mark(name);
 };
 
-/**
- * @testable false
- * @covered-by src/script/views/base/services.mjs::initializeCoreServices
- * @reason idle scheduling is an implementation detail of deferred service startup
- */
 export const whenIdle = () =>
 	new Promise((resolve) => {
 		if (typeof globalThis.requestIdleCallback === "function") {
@@ -31,7 +22,6 @@ export const whenIdle = () =>
  * publication, pointer tracking, and the final ready markers shared by every
  * view. Feature managers belong to Core's deferred service layer.
  *
- * @testable infrastructure
  */
 export default class ShellView {
 	constructor(node) {
@@ -70,11 +60,6 @@ export default class ShellView {
 		this.servicesReady = Promise.resolve(this);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_shell_intercepts_interactions_before_deferred_services
-	 * @pair startup:performance-marks
-	 */
 	async init() {
 		if (this._interactive) return this;
 		this._interactive = true;
@@ -235,12 +220,6 @@ export default class ShellView {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_lazy_search_replays_the_latest_live_input_after_loading
-	 * @matrix startup : first-interaction single-flight
-	 * @pair search:navbar-results
-	 */
 	_activateSearchBox(box) {
 		if (!box) return;
 		const input = box.element;
@@ -263,11 +242,6 @@ export default class ShellView {
 		else await this.PollingCoordinator?.resume();
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_shell_intercepts_interactions_before_deferred_services
-	 * @pair startup:performance-marks
-	 */
 	publish() {
 		if (this._destroyed || this._published) return this;
 		this._published = true;
@@ -339,13 +313,6 @@ export default class ShellView {
 
 	_click() {}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_installation_commands_are_copyable_and_scroll_on_mobile
-	 * @tests tests_e2e/008_users/test_008d_admin_data_protection.py::test_backups_tab_reveals_static_status_panel
-	 * @tests tests_js/test_038_startup_specializations.mjs::test_command_copy_falls_back_when_clipboard_is_unavailable
-	 * @matrix manual admin : clipboard-fallback command-copy
-	 */
 	async copyCommand(button) {
 		const command = button
 			.closest("[data-role='manual-command-shell']")
@@ -398,11 +365,6 @@ export default class ShellView {
 		);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_shell_intercepts_interactions_before_deferred_services
-	 * @pair forms:submit-interception
-	 */
 	_handleSubmit(event) {
 		if (!this.ensureSubmissionManager || event.defaultPrevented) return;
 		const form = event.target;
@@ -427,11 +389,6 @@ export default class ShellView {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_shell_intercepts_interactions_before_deferred_services
-	 * @pair startup:single-flight
-	 */
 	runColdAction(owner, load, activate, busyOwner = owner) {
 		if (!owner || this._destroyed) return Promise.resolve(null);
 		if (this._coldActions.has(owner)) return this._coldActions.get(owner);
@@ -459,11 +416,6 @@ export default class ShellView {
 		return pending;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.mjs::test_shell_intercepts_interactions_before_deferred_services
-	 * @pair startup:destroy-safety
-	 */
 	destroy() {
 		this._destroyed = true;
 		for (const timer of this.copyResetTimers.values()) clearTimeout(timer);

@@ -5,9 +5,6 @@ from enum import Enum, auto
 from .default import DefaultEnum
 
 
-# @testable true
-# @tests tests_unit/test_009f_user_ai_access.py::test_ai_access_tiers_are_hierarchical_and_fail_closed
-# @matrix ai-access : fail-closed hierarchy validation
 class AI(Enum, metaclass=DefaultEnum):
     """Hierarchical provider entitlements, independent from permissions."""
 

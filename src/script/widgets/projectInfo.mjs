@@ -3,12 +3,6 @@ import { sections } from "../elements/sections.mjs";
 import { TextareaElement } from "../elements/textarea.mjs";
 import { FormWidget } from "./base/formWidget.mjs";
 
-/**
- * @testable false
- * @covered-by src/script/widgets/projectInfo.mjs::CreateProject
- * @covered-by src/script/widgets/projectInfo.mjs::ProjectInfo
- * @reason shared field construction is exercised through concrete project widgets
- */
 class ProjectForm extends FormWidget {
 	get nameElement() {
 		return new InputElement(
@@ -43,12 +37,6 @@ class ProjectForm extends FormWidget {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/004_projects/test_004b_info.py::test_project_info_form
- * @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_reads_project_without_editing_controls
- * @matrix projects : info-form metadata-sync readonly
- */
 export class ProjectInfo extends ProjectForm {
 	constructor(attributes) {
 		super(attributes);
@@ -69,12 +57,6 @@ export class ProjectInfo extends ProjectForm {
 	}
 }
 
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_form
- * @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
- * @matrix projects : ai-form manual-form
- */
 export class CreateProject extends ProjectForm {
 	constructor(attributes) {
 		super(attributes);

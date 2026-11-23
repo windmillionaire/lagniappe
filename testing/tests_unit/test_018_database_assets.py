@@ -25,10 +25,6 @@ from lagniappe.core.definitions import (
 _DATA_SERVICES_INITIALIZE = core.DataServices.initialize
 
 
-# @source lagniappe/core/tools/database/assets.py::get_text
-# @source lagniappe/core/tools/database/assets.py::copy_file
-# @source lagniappe/core/definitions/asset.py::Asset.get
-# @matrix storage : generation-pinned read copy
 @pytest.mark.unit
 def test_text_reads_and_version_copies_use_recorded_generation(monkeypatch):
     from lagniappe.core.definitions.asset import HTMLAsset
@@ -63,7 +59,6 @@ def test_text_reads_and_version_copies_use_recorded_generation(monkeypatch):
     assert calls[0] == ("blob", "legacy.html", {})
 
 
-# @matrix file storage : byte-range
 @pytest.mark.unit
 def test_download_file_passes_optional_byte_range(monkeypatch):
     calls = []
@@ -94,7 +89,6 @@ def test_download_file_passes_optional_byte_range(monkeypatch):
     ]
 
 
-# @matrix file storage : byte-range metadata
 @pytest.mark.unit
 def test_file_size_reloads_blob_metadata(monkeypatch):
     calls = []
@@ -121,7 +115,6 @@ def test_file_size_reloads_blob_metadata(monkeypatch):
     assert calls == [{"path": "files/source.pdf"}, "reload"]
 
 
-# @matrix file storage : missing-object
 @pytest.mark.unit
 def test_missing_blob_download_and_size_return_none(monkeypatch):
     calls = []
@@ -156,7 +149,6 @@ def test_missing_blob_download_and_size_return_none(monkeypatch):
     ]
 
 
-# @matrix storage : idempotent-delete missing-object
 @pytest.mark.unit
 def test_delete_file_ignores_missing_blob(monkeypatch):
     calls = []
@@ -181,7 +173,6 @@ def test_delete_file_ignores_missing_blob(monkeypatch):
     assert calls == [("blob", "missing.jpeg"), "delete"]
 
 
-# @matrix file storage : asset-size metadata
 @pytest.mark.unit
 def test_save_file_returns_reloaded_blob_metadata(monkeypatch):
     calls = []
@@ -227,7 +218,6 @@ def test_save_file_returns_reloaded_blob_metadata(monkeypatch):
     ]
 
 
-# @matrix direct-upload storage : deferred-cleanup
 @pytest.mark.unit
 def test_save_file_preserves_direct_upload_source_when_requested(monkeypatch):
     captured = {}
@@ -289,7 +279,6 @@ def test_direct_upload_file_read_sample_uses_bounded_range():
     assert calls == [{"start": 0, "end": 8191}]
 
 
-# @pair files:size-limit
 @pytest.mark.unit
 def test_file_consumer_limits_use_metadata_before_reading():
     limit = FILE_CONSUMER_CAPABILITIES[FileConsumer.AI_INLINE].max_bytes
@@ -332,7 +321,6 @@ def test_file_consumer_limits_use_metadata_before_reading():
     assert stream.stream.tell() == 4
 
 
-# @pair files:bounded-consumer
 @pytest.mark.unit
 def test_direct_upload_full_read_requires_named_bounded_consumer():
     downloads = []
@@ -377,7 +365,6 @@ def test_direct_upload_exposes_a_string_content_type(record, payload, expected):
     assert upload.content_type == upload.lagniappe_content_type == expected
 
 
-# @matrix storage : cors origins
 @pytest.mark.unit
 def test_storage_cors_origins_include_configured_urls():
     config = SimpleNamespace(
@@ -394,7 +381,6 @@ def test_storage_cors_origins_include_configured_urls():
     ]
 
 
-# @matrix disaster-recovery setup storage : naming
 @pytest.mark.unit
 def test_storage_bucket_names_match_runtime_contract():
     settings = {
@@ -413,7 +399,6 @@ def test_storage_bucket_names_match_runtime_contract():
     assert recovery not in names.values()
 
 
-# @matrix disaster-recovery : bucket-metadata lifecycle-preservation
 @pytest.mark.unit
 def test_configure_recovery_bucket_removes_cors_and_is_idempotent():
     lifecycle = [{"action": {"type": "Delete"}, "condition": {"age": 365}}]
@@ -444,7 +429,6 @@ def test_configure_recovery_bucket_removes_cors_and_is_idempotent():
     assert bucket.patches == 1
 
 
-# @pair storage:cors
 @pytest.mark.unit
 def test_expected_storage_cors_shape():
     config = SimpleNamespace(
@@ -469,7 +453,6 @@ def test_expected_storage_cors_shape():
     ]
 
 
-# @matrix storage : cors idempotent
 @pytest.mark.unit
 def test_storage_cors_comparison_is_order_insensitive():
     left = [
@@ -492,7 +475,6 @@ def test_storage_cors_comparison_is_order_insensitive():
     assert core._normalized_cors(left) == core._normalized_cors(right)
 
 
-# @matrix storage : cors idempotent
 @pytest.mark.unit
 def test_configure_bucket_is_idempotent():
     config = SimpleNamespace(
@@ -528,7 +510,6 @@ def test_configure_bucket_is_idempotent():
     assert core.configure_storage_bucket(Bucket(), config=config) is False
 
 
-# @matrix storage : cors idempotent
 @pytest.mark.unit
 def test_configure_bucket_repairs_cors_drift():
     config = SimpleNamespace(
@@ -568,7 +549,6 @@ def test_configure_bucket_repairs_cors_drift():
     assert patches == [{"cors": bucket.cors, "uniform": True}]
 
 
-# @matrix storage : bucket-metadata lifecycle-preservation object-versioning storage-class
 @pytest.mark.unit
 def test_configure_bucket_enables_versioning_and_reconciles_noncurrent_lifecycle():
     config = SimpleNamespace(
@@ -629,7 +609,6 @@ def test_configure_bucket_enables_versioning_and_reconciles_noncurrent_lifecycle
     assert patches == ["STANDARD"]
 
 
-# @matrix storage : bucket-metadata transient-retry
 @pytest.mark.unit
 def test_configure_bucket_retries_transient_patch_failure(monkeypatch):
     config = SimpleNamespace(
@@ -679,7 +658,6 @@ def test_configure_bucket_retries_transient_patch_failure(monkeypatch):
     assert warnings[0][1]["exc_info"] is True
 
 
-# @matrix database storage : adc
 @pytest.mark.unit
 def test_data_services_initialize_uses_shared_adc(monkeypatch):
     # Keep this ADC-construction contract independent of the checkout's optional
@@ -723,7 +701,6 @@ def test_data_services_initialize_uses_shared_adc(monkeypatch):
     assert storage_clients == [expected]
 
 
-# @matrix storage : adc iam-signing signed-url token-refresh
 @pytest.mark.unit
 def test_signed_url_uses_remote_iam_signing(monkeypatch):
     from lagniappe.core.tools.database import assets
@@ -772,7 +749,6 @@ def test_signed_url_uses_remote_iam_signing(monkeypatch):
     ]
 
 
-# @matrix iam storage : provisioning-boundary runtime
 @pytest.mark.unit
 def test_runtime_storage_only_reads_setup_provisioned_buckets():
     bucket = SimpleNamespace(name="public-bucket")
@@ -803,7 +779,6 @@ def test_runtime_storage_only_reads_setup_provisioned_buckets():
         data._create_bucket("missing")
 
 
-# @matrix iam storage : provisioning-boundary test-cleanup
 @pytest.mark.unit
 def test_test_cleanup_deletes_objects_without_deleting_buckets():
     deleted = []
@@ -846,7 +821,6 @@ def test_test_cleanup_deletes_objects_without_deleting_buckets():
     assert data._public_bucket is None
 
 
-# @matrix storage : direct-upload session token
 @pytest.mark.unit
 def test_create_direct_upload_session_uses_private_tmp_object(monkeypatch):
     calls = []
@@ -896,7 +870,6 @@ def test_create_direct_upload_session_uses_private_tmp_object(monkeypatch):
     ]
 
 
-# @matrix storage : direct-upload token validation
 @pytest.mark.unit
 def test_verify_direct_upload_rejects_bad_token():
     with pytest.raises(assets.DirectUploadError, match="Invalid direct upload token"):
@@ -916,15 +889,12 @@ def _direct_upload_token(**overrides):
     return assets._direct_upload_serializer().dumps(payload)
 
 
-# @source lagniappe/core/tools/database/assets.py::load_direct_upload_token
-# @matrix storage : direct-upload token validation expiry
 @pytest.mark.unit
 def test_direct_upload_token_expires():
     with pytest.raises(assets.DirectUploadError, match="token expired"):
         assets.load_direct_upload_token(_direct_upload_token(), max_age=-1)
 
 
-# @matrix storage : direct-upload object validation
 @pytest.mark.unit
 def test_verify_direct_upload_rejects_mismatched_size(monkeypatch):
     class Blob:
@@ -952,8 +922,6 @@ def test_verify_direct_upload_rejects_mismatched_size(monkeypatch):
         )
 
 
-# @source lagniappe/core/tools/database/assets.py::verify_direct_upload
-# @matrix storage : direct-upload object validation
 @pytest.mark.unit
 def test_verify_direct_upload_rejects_mismatched_content_type(monkeypatch):
     class Blob:
@@ -981,7 +949,6 @@ def test_verify_direct_upload_rejects_mismatched_content_type(monkeypatch):
         )
 
 
-# @matrix storage : direct-upload object validation
 @pytest.mark.unit
 def test_verify_direct_upload_rejects_generation_mismatch(monkeypatch):
     class Blob:
@@ -1009,9 +976,6 @@ def test_verify_direct_upload_rejects_generation_mismatch(monkeypatch):
         )
 
 
-# @pair storage:object
-# @pair storage:generation-conditional-cleanup
-# @source lagniappe/core/tools/database/assets.py::delete_direct_upload
 @pytest.mark.unit
 def test_verified_direct_upload_pins_generation_for_later_cleanup(monkeypatch):
     calls = []
@@ -1051,7 +1015,6 @@ def test_verified_direct_upload_pins_generation_for_later_cleanup(monkeypatch):
     assert calls == [{"if_generation_match": 7}]
 
 
-# @matrix storage : direct-upload final-copy
 @pytest.mark.unit
 def test_copy_direct_upload_file_copies_and_deletes_temp_object(monkeypatch):
     calls = []
@@ -1147,8 +1110,6 @@ def test_copy_direct_upload_file_copies_and_deletes_temp_object(monkeypatch):
     assert all(call[0] != "delete-source" for call in calls)
 
 
-# @source lagniappe/core/tools/database/assets.py::copy_direct_upload_file
-# @matrix storage : direct-upload final-copy generation-conditional-cleanup idempotency
 @pytest.mark.unit
 @pytest.mark.parametrize("source_state", ["missing", "replaced", "unavailable"])
 def test_copy_direct_upload_cleanup_preserves_replacements_and_reports_failures(
@@ -1190,8 +1151,6 @@ def test_copy_direct_upload_cleanup_preserves_replacements_and_reports_failures(
     }
 
 
-# @source lagniappe/core/tools/database/assets.py::copy_direct_upload_file
-# @pair storage:final-copy
 @pytest.mark.unit
 def test_copy_direct_upload_registers_destination_before_metadata_patch(monkeypatch):
     class SourceBlob:
@@ -1235,7 +1194,6 @@ def test_copy_direct_upload_registers_destination_before_metadata_patch(monkeypa
     }
 
 
-# @matrix direct-upload storage : attempt-isolation destination-path
 @pytest.mark.unit
 def test_direct_upload_attempt_path_is_unique_and_validated():
     upload = SimpleNamespace(lagniappe_asset_nonce="a" * 32)
@@ -1256,7 +1214,6 @@ def test_direct_upload_attempt_path_is_unique_and_validated():
         assets.direct_upload_destination_path("ordinary.pdf", upload)
 
 
-# @matrix storage : attempt-isolation generation-conditional-cleanup
 @pytest.mark.unit
 def test_delete_file_generation_never_deletes_a_replacement(monkeypatch):
     calls = []
@@ -1286,7 +1243,6 @@ def test_delete_file_generation_never_deletes_a_replacement(monkeypatch):
     assert calls[-1] == {"if_generation_match": 17}
 
 
-# @matrix direct-upload storage : cleanup generation-conditional-cleanup idempotency
 @pytest.mark.unit
 def test_delete_direct_upload_is_idempotent_and_generation_conditional(monkeypatch):
     calls = []
@@ -1328,7 +1284,6 @@ def test_delete_direct_upload_is_idempotent_and_generation_conditional(monkeypat
     assert assets.delete_direct_upload(record) is False
 
 
-# @matrix admin : metadata site-image-upload
 @pytest.mark.unit
 def test_save_site_image_persists_version_without_mutating_input(monkeypatch):
     saved = []
@@ -1367,7 +1322,6 @@ def test_upload_site_image_rejects_unknown_format_before_opening_storage(monkeyp
         assets.upload_site_image("site.webp", b"image data")
 
 
-# @pair admin:site-image-upload
 @pytest.mark.unit
 def test_site_image_rejects_oversized_input_before_decode():
     upload = SimpleNamespace(
@@ -1387,7 +1341,6 @@ def test_site_image_rejects_oversized_input_before_decode():
         site_image.create_site_image(upload)
 
 
-# @matrix admin : deployment-settings metadata
 @pytest.mark.unit
 def test_save_site_deployment_persists_canonical_payload_and_prunes_old_keys(
     monkeypatch,
@@ -1445,7 +1398,6 @@ def test_save_site_deployment_persists_canonical_payload_and_prunes_old_keys(
     ]
 
 
-# @matrix admin : ai-settings metadata
 @pytest.mark.unit
 def test_save_site_ai_persists_canonical_payload_and_prunes_old_keys(monkeypatch):
     saved = []
@@ -1492,7 +1444,6 @@ def test_save_site_ai_persists_canonical_payload_and_prunes_old_keys(monkeypatch
     ]
 
 
-# @matrix admin : metadata public-page-indexing
 @pytest.mark.unit
 def test_save_site_public_pages_persists_canonical_payload(monkeypatch):
     saved = []

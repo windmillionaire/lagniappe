@@ -41,11 +41,6 @@ def _payload(page):
     }
 
 
-# @source lagniappe/web/auth.py::_load_session_user_context
-# @source lagniappe/web/auth.py::_load_request_context
-# @source lagniappe/web/auth.py::logged_in
-# @source lagniappe/web/routes/home/poll.py::poll
-# @matrix polling auth : batching session-preload fallback validation
 # An unchanged global Tasks revision requires a quiet site between requests.
 @pytest.mark.e2e_serial
 def test_poll_batches_auth_entities_and_channels(polling_client, monkeypatch):
@@ -79,11 +74,6 @@ def test_poll_batches_auth_entities_and_channels(polling_client, monkeypatch):
     assert changed.json["results"][0]["revision"] != payload["subscriptions"][0]["revision"]
 
 
-# @source lagniappe/web/auth.py::_load_session_user_context
-# @source lagniappe/web/auth.py::_load_request_context
-# @source lagniappe/web/auth.py::logged_in
-# @source lagniappe/web/routes/home/poll.py::poll
-# @matrix polling auth : batching session-preload fallback validation
 def test_poll_batching_preserves_validation_and_stale_session_recovery(polling_client, monkeypatch):
     client, user, page = polling_client
     payload = _payload(page)
@@ -104,10 +94,6 @@ def test_poll_batching_preserves_validation_and_stale_session_recovery(polling_c
     assert missing.json["results"][0]["status"] == "unavailable"
 
 
-# @source lagniappe/web/auth.py::_load_session_user_context
-# @source lagniappe/web/routes/home/poll.py::poll
-# @matrix polling permissions : batching authorization
-# @matrix auth : session-preload
 @pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("restriction", ["page", "page-form", "task-form", "user"])
 def test_batched_poll_rechecks_permissions(polling_client, get_user, restriction):

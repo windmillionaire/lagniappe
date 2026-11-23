@@ -3,9 +3,6 @@ import { withTransition } from "../shared/transitions.mjs";
 import { buttons } from "./buttons.mjs";
 import { primitives } from "./primitives.mjs";
 
-/**
- * @testable infrastructure
- */
 export class DueDate {
 	constructor(button, widget) {
 		this.widget = widget;
@@ -301,11 +298,6 @@ export class DueDate {
 		return this.groups.dueDate;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_due_date
-	 * @matrix tasks : badge create due-date
-	 */
 	_createDueDate() {
 		const dueDateGroup = primitives.div({
 			style: "pb-1",

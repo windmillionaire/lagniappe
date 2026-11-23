@@ -57,8 +57,6 @@ def _create_reconciliation_page(user):
     return page, form
 
 
-# @matrix forms : latest-schema readonly-preview submission-choice
-# @pairs edited-entity-notice:submission-choice form-schema:notice reconnect-refresh:dirty-form-preservation
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
 def test_form_submission_reconciliation_uses_latest_schema(
@@ -182,7 +180,6 @@ def test_form_submission_reconciliation_uses_latest_schema(
     ).to_be_visible()
 
 
-# @pair tasks:active-form-preservation
 # @template controls.html::edited_marker
 # @template pages/tasks.html::task_form
 def test_task_collection_refresh_preserves_active_form_for_revision_review(

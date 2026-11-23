@@ -41,9 +41,6 @@ CREATABLES = {
 FORM_TYPES = {"page", "task"}
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_quick_create_command_requires_opt_in_and_create_permission
-# @matrix facets quick-create search : permissions
 def _can_quick_create(kind):
     creatable = CREATABLES.get(kind)
     if not creatable:
@@ -51,11 +48,6 @@ def _can_quick_create(kind):
     return current_user.has_permission(creatable["resource"], Action.CREATE)
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_quick_create_command_requires_opt_in_and_create_permission
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_model_task_form_selector_quick_creates_form
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_home_create_category_form_selector_quick_creates_form
-# @matrix quick-create : command-row form-type opt-in
 def _quick_create_command(kind, query):
     name = query.strip()
     if request.values.get("creatable") != "true" or not name:
@@ -73,12 +65,6 @@ def _quick_create_command(kind, query):
     }
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_page_quick_create_uses_visible_uncategorized_pages_category
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_model_task_form_selector_quick_creates_form
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_home_create_category_form_selector_quick_creates_form
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_page_info_category_multiselect_quick_creates_category
-# @pair quick-create:created-option
 def _index_result(entity):
     details = entity.details
     return {
@@ -89,12 +75,6 @@ def _index_result(entity):
     }
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_category_search_permission_filter_returns_editable_categories
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_user_assign_search_permission_filter_returns_assignable_users
-# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_administrator_roster_and_owner_controls
-# @matrix permissions : assign category-edit
-# @pairs admin:owner-only search:permission-filter
 def _search_restrictions(kind):
     permission = request.values.get("permission")
     if not permission:
@@ -120,9 +100,6 @@ def _search_restrictions(kind):
     abort(400)
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_administrator_roster_and_owner_controls
-# @matrix admin : managed-user-search privileged-account
 def _administrator_results(results):
     """Keep the role selector limited to ordinary managed-user pages."""
     pages = {
@@ -143,13 +120,6 @@ def _administrator_results(results):
     ]
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_page_quick_create_uses_visible_uncategorized_pages_category
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_project_combobox_quick_create_selects_new_project
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_model_task_form_selector_quick_creates_form
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_home_create_category_form_selector_quick_creates_form
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_page_info_category_multiselect_quick_creates_category
-# @matrix quick-create : create-entity default-category
 def _quick_create_entity(kind, form):
     name = (form.get("name") or "").strip()
     if not name:
@@ -174,16 +144,6 @@ def _quick_create_entity(kind, form):
     return entity
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_page_acl_user_sees_one_page_on_category_index_home_and_search
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_quick_create_command_requires_opt_in_and_create_permission
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_project_combobox_quick_create_selects_new_project
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_model_task_form_selector_quick_creates_form
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_home_create_category_form_selector_quick_creates_form
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_page_info_category_multiselect_quick_creates_category
-# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_administrator_roster_and_owner_controls
-# @matrix quick-create : created-option form-type
-# @pairs admin:managed-user-search categories:index-filter facets:command-row search:search-results
 @internal.route("/search-index/<kind>")
 @logged_in
 def index(kind: str) -> ResponseReturnValue:
@@ -243,13 +203,6 @@ def index(kind: str) -> ResponseReturnValue:
     return responses.index_results(results, create_command=create_command)
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_page_quick_create_uses_visible_uncategorized_pages_category
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_project_combobox_quick_create_selects_new_project
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_model_task_form_selector_quick_creates_form
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_home_create_category_form_selector_quick_creates_form
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_page_info_category_multiselect_quick_creates_category
-# @matrix quick-create : create-route created-option
 @internal.route("/search-index/<kind>/create", methods=["POST"])
 @logged_in
 def create_index(kind: str) -> ResponseReturnValue:
@@ -264,11 +217,6 @@ def create_index(kind: str) -> ResponseReturnValue:
     return responses.created_index_result(_index_result(entity))
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_navbar_task_results_render_current_completion_state
-# @matrix search : navbar-results task-model
-# @pair projects:search
 @internal.route("/search-bar")
 @logged_in
 def search_bar() -> ResponseReturnValue:
@@ -287,11 +235,6 @@ def search_bar() -> ResponseReturnValue:
     return responses.search_results(q, results, total)
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_page_shows_query
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_no_results
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_result_titles
-# @matrix search : no-results query-display result-title
 @internal.route("/search-page")
 @logged_in
 def search_page() -> ResponseReturnValue:
@@ -305,11 +248,6 @@ def search_page() -> ResponseReturnValue:
     return responses.search_page(q, results, pagination)
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_from_navbar
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_returns_results
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_no_results
-# @matrix search : no-results results
 def _search_page_results(q, page, kinds):
     return cache.search(
         q,
@@ -321,11 +259,6 @@ def _search_page_results(q, page, kinds):
     )
 
 
-# @testable true
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_pagination_controls_visible
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_next_page
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_previous_page
-# @matrix search : pagination pagination-next pagination-previous
 def _search_page_pagination(page, results, total, per_page=10):
     previous_page = None if page == 0 else page - 1
     next_page = page + 1 if math.floor(total / per_page) >= page + 1 else None
@@ -342,10 +275,6 @@ def _search_page_pagination(page, results, total, per_page=10):
     }
 
 
-# @testable true
-# @tests tests_unit/test_003d_submission_location.py::test_resolve_location_query_first_hit_wins
-# @tests tests_unit/test_003d_submission_location.py::test_resolve_location_query_retries_after_simplify
-# @matrix location : first-hit suite-stripping
 @internal.route("/search-location")
 @logged_in
 def location_search() -> ResponseReturnValue:

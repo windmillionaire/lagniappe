@@ -72,7 +72,6 @@ def _assert_site_image_links(site_image, image_data):
         expect(link).to_have_attribute("href", url)
 
 
-# @matrix admin : configuration-display configuration-modal environment-variables external-links recovery-export secrets sections service-providers site-settings web-headers
 # @template home/admin.html::main
 # @template home/site_settings.html::site_settings
 @pytest.mark.e2e_group("owner")
@@ -180,7 +179,6 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     modal.close()
 
 
-# @matrix admin : deployment-settings metadata scaling-controls validation
 # @template home/site_settings.html::site_settings
 @pytest.mark.e2e_group("owner")
 def test_site_settings_deployment_form_saves_and_updates_summary(
@@ -249,7 +247,6 @@ def test_site_settings_deployment_form_saves_and_updates_summary(
     assert "Worker count" in rejected["text"]
 
 
-# @matrix admin : ai-settings metadata model-selection saved-values validation
 # @template home/site_settings.html::site_settings
 @pytest.mark.e2e_group("owner")
 def test_site_settings_ai_form_saves_current_models_through_route(
@@ -324,9 +321,6 @@ def test_site_settings_ai_form_saves_current_models_through_route(
     assert "global" in rejected["text"]
 
 
-# @matrix admin public-pages : live-settings sitemap-invalidation validation
-# @matrix public-pages sitemap : disabled enabled redis-cache
-# @matrix robots : disabled enabled
 # @template home/site_settings.html::site_settings
 @pytest.mark.e2e_group("owner")
 def test_site_settings_public_page_indexing_saves_live_setting(
@@ -399,8 +393,6 @@ def test_site_settings_public_page_indexing_saves_live_setting(
             save(original)
 
 
-# @matrix admin : site-update success
-# @pair cache:current
 # @template home/site_settings.html::site_settings
 # Rebuild clears the entire test cache, including active document write locks.
 @pytest.mark.e2e_serial
@@ -424,7 +416,6 @@ def test_site_maintenance_update_and_cache_refresh_use_real_routes(get_user):
     expect(maintenance.locator("[data-role='cache-status-summary']")).to_contain_text("records processed")
 
 
-# @matrix admin : generated-images lazy-initialization metadata public-preview site-image-upload
 # @template home/site_settings.html::site_settings
 @pytest.mark.e2e_group("owner")
 def test_site_settings_image_upload_generates_and_persists_site_images(get_user):

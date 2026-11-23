@@ -33,9 +33,6 @@ def _fragment(doc: Document) -> XmlFragment:
     return cast(XmlFragment, doc["default"])
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_append_preserves_existing_crdt_and_is_idempotent
-# @matrix editor sync : document append idempotency offline-replay
 def load_document(snapshot: object = None) -> Document:
     doc = Doc(
         {"default": XmlFragment(), "lagniappeReports": Map(), "lagniappeReplacements": Map()},
@@ -48,16 +45,10 @@ def load_document(snapshot: object = None) -> Document:
     return doc
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_append_preserves_existing_crdt_and_is_idempotent
-# @matrix editor sync : document append idempotency offline-replay
 def encode_document(doc: Document) -> str:
     return base64.b64encode(doc.get_update()).decode("ascii")
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_append_preserves_existing_crdt_and_is_idempotent
-# @matrix editor sync : document append idempotency offline-replay
 def merge_documents(*snapshots: str | bytes | None) -> str:
     doc = load_document()
     for snapshot in snapshots:
@@ -66,13 +57,7 @@ def merge_documents(*snapshots: str | bytes | None) -> str:
     return encode_document(doc)
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
-# @matrix ai-report editor : document append retry
 def document_structure(snapshot: str | bytes | None) -> str:
-    # @testable false
-    # @covered-by lagniappe/core/tools/document_crdt.py::document_structure
-    # @reason canonical recursive XML projection
     def project(node):
         if isinstance(node, XmlText):
             return ["text", node.diff()]
@@ -89,9 +74,6 @@ def document_structure(snapshot: str | bytes | None) -> str:
     )
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_append_requires_a_checkpointed_collaborative_baseline
-# @matrix editor sync : document append checkpoint conflict
 def document_state(
     snapshot: str | bytes | None,
 ) -> tuple[
@@ -101,9 +83,6 @@ def document_state(
     doc = load_document(snapshot)
     values = iter(doc.get_state())
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/document_crdt.py::document_state
-    # @reason Yjs state-vector unsigned varint decoding
     def integer():
         value = shift = 0
         for byte in values:
@@ -117,9 +96,6 @@ def document_state(
     return vector, document_structure(snapshot), dict(report_receipts(doc).items()), dict(_replacements(doc).items())
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/document_crdt.py::append_fragment
-# @reason converter is restricted to the shared sanitized Markdown renderer's output
 def _append_nodes(parent, nodes, marks=None):
     marks = marks or {}
     text = None
@@ -261,11 +237,6 @@ def _append_nodes(parent, nodes, marks=None):
             _append_nodes(element, node.contents, marks)
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_append_preserves_existing_crdt_and_is_idempotent
-# @tests tests_unit/test_010b_document_append.py::test_append_converts_supported_markdown_blocks
-# @matrix editor sync : document append idempotency offline-replay browser-interop
-# @matrix editor markdown : document append formatting
 def append_fragment(
     snapshot: str | None, html: str, operation_id: str, *, html_after: str | None = None
 ) -> tuple[str | None, DocumentReceipt]:
@@ -290,9 +261,6 @@ def append_fragment(
     return encode_document(doc), receipt
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_replacement_preserves_crdt_lineage_and_retry_receipts
-# @matrix editor sync : document replacement idempotency offline-replay
 def replace_fragment(
     snapshot: str | None,
     html: str,

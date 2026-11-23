@@ -70,9 +70,6 @@ class MigrationStatus(TypedDict):
     migrations: list[dict[str, object]]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::_run_form_schema_migration
-# @reason form and form-history references are exercised through migration audit details
 def _form_record_reference(entity):
     key = getattr(entity, "key", None)
     if entity.get("type") == "form_history":
@@ -91,17 +88,9 @@ def _form_record_reference(entity):
     }
 
 
-# @testable true
-# @tests tests_unit/test_018b_database_migrations.py::test_registered_form_schema_migration_scans_forms_and_history
-# @tests tests_unit/test_018b_database_migrations.py::test_form_schema_migration_links_unreadable_row_failure_to_form
-# @matrix form-schema : canonicalization history-snapshot malformed-data
-# @matrix migrations : audit runner
 def _run_form_schema_migration(context):
     result = _result("FSM-001", "Canonical form schemas")
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/migrations.py::_run_form_schema_migration
-    # @reason runner-local adapter for attaching repair details to scan outcomes
     def transform(row, *, snapshot=False):
         repairs = []
         changed = canonicalize_form_schema_record(
@@ -130,9 +119,6 @@ def _run_form_schema_migration(context):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migration_steps/v0_1_messaging.py::canonicalize_notification_record
-# @reason migration runner composes the tested transform with the shared resumable scan and writer framework
 def _run_messaging_notification_migration(context):
     """Backfill ordinary discriminators and one exact aggregate per user."""
     result = _result("MSG-001", "Messaging notification aggregates")
@@ -196,16 +182,10 @@ def _run_messaging_notification_migration(context):
     return result
 
 
-# @testable true
-# @tests tests_unit/test_018b_database_migrations.py::test_asset_generation_migration_backfills_legacy_descriptors
-# @pairs disaster-recovery:asset-generation migrations:runner
 def _run_asset_generation_migration(context):
     """Bind pre-v3 asset descriptors to their current immutable generations."""
     result = _result("AST-001", "Asset generation metadata")
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/migrations.py::_run_asset_generation_migration
-    # @reason row transformation is exercised by the registered migration workflow
     def transform(row):
         changed = False
         raw = row.get("assets")
@@ -311,27 +291,16 @@ MIGRATION_CATALOG = (
 )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason timestamp normalization is exercised through public status behavior
 def _utc(value):
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason timestamp serialization is exercised through public status behavior
 def _iso(value):
     return _utc(value).isoformat() if isinstance(value, datetime) else str(value)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @reason lease expiry parsing is exercised through stale lease tests
 def _parse_iso(value):
     if not value:
         return None
@@ -343,45 +312,25 @@ def _parse_iso(value):
         return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason deterministic site key construction is exercised through ledger tests
 def _migration_key(datastore, migration_id):
     return datastore.key(KINDS.site.value, migration_status_identifier(migration_id))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason deterministic control key construction is exercised through lease tests
 def _control_key(datastore):
     return datastore.key(KINDS.site.value, MIGRATION_CONTROL_ID)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @covered-by lagniappe/core/tools/database/migrations.py::initialize_fresh_install
-# @reason provider transaction selection is exercised through public ledger writes
 def _transaction(datastore):
     factory = getattr(datastore, "transaction", None)
     return factory() if factory else nullcontext(None)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @covered-by lagniappe/core/tools/database/migrations.py::initialize_fresh_install
-# @reason transaction-aware reads are exercised through public ledger writes
 def _transaction_get(datastore, key, transaction):
     if transaction is None:
         return datastore.get(key)
     return datastore.get(key, transaction=transaction)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @covered-by lagniappe/core/tools/database/migrations.py::initialize_fresh_install
-# @reason transaction-aware writes are exercised through public ledger writes
 def _transaction_put(datastore, transaction, entity):
     if transaction is None:
         datastore.put(entity)
@@ -389,9 +338,6 @@ def _transaction_put(datastore, transaction, entity):
         transaction.put(entity)
 
 
-# @testable true
-# @tests tests_unit/test_018b_database_migrations.py::test_fresh_install_retries_transaction_contention
-# @matrix database-migrations setup : retry transaction-contention
 def _run_transaction(datastore, operation):
     """Retry a complete migration-ledger transaction after contention."""
     for attempt in range(len(MIGRATION_TRANSACTION_RETRY_DELAYS) + 1):
@@ -404,9 +350,6 @@ def _run_transaction(datastore, operation):
             time.sleep(MIGRATION_TRANSACTION_RETRY_DELAYS[attempt])
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @reason batch loading behavior is exercised through catalog status tests
 def _get_multi(datastore, keys):
     if not keys:
         return {}
@@ -421,10 +364,6 @@ def _get_multi(datastore, keys):
     return {record.key: record for record in records if record is not None}
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason bounded attempt decoding is exercised through malformed ledger tests
 def _attempts(record):
     raw = record.get("attempts", "[]") if record else "[]"
     value = json.loads(raw) if isinstance(raw, str) else raw
@@ -433,9 +372,6 @@ def _attempts(record):
     return deepcopy(value[-MAX_RECORDED_ATTEMPTS:])
 
 
-# @testable true
-# @tests tests_unit/test_018b_database_migrations.py::test_catalog_rejects_identity_and_order_errors
-# @matrix admin database-migrations : catalog identity order runner version
 def validate_catalog(
     catalog: Sequence[MigrationDefinition] = MIGRATION_CATALOG,
 ) -> tuple[MigrationDefinition, ...]:
@@ -463,9 +399,6 @@ def validate_catalog(
     return tuple(catalog)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @reason normalized audit errors are exercised through public status tests
 def _audit_error_view(definition, message):
     return {
         "id": definition.id,
@@ -483,9 +416,6 @@ def _audit_error_view(definition, message):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @reason durable record projection is exercised through catalog status tests
 def _record_view(definition, record):
     if not record:
         return {
@@ -538,9 +468,6 @@ def _record_view(definition, record):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @reason legacy read-through is exercised through legacy audit adoption tests
 def _legacy_view(definition, record):
     try:
         runs = _attempts({"attempts": record.get("runs", "[]")})
@@ -600,9 +527,6 @@ def _legacy_view(definition, record):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @reason catalog record composition is exercised through public status tests
 def _load_views(datastore, catalog):
     status_keys = [_migration_key(datastore, definition.id) for definition in catalog]
     legacy_ids = tuple(
@@ -633,9 +557,6 @@ def _load_views(datastore, catalog):
     return views, records.get(_control_key(datastore))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @reason status regression verifies old failures gain links without changing stored audit history
 def _link_saved_file_failures(datastore, views):
     """Make pre-link FIL-001 failures actionable without rerunning the migration."""
     failures = []
@@ -658,9 +579,6 @@ def _link_saved_file_failures(datastore, views):
         ))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @reason lease state projection is exercised through running and stale lease tests
 def _active_lease(control, now):
     if not control or not control.get("run_id"):
         return False
@@ -668,9 +586,6 @@ def _active_lease(control, now):
     return bool(expires_at and expires_at > now)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
-# @reason aggregate counts are exercised through public status tests
 def _status_counts(views):
     states = ("complete", "pending", "running", "failed", "interrupted", "blocked", "audit-error")
     counts = {state.replace("-", "_"): 0 for state in states}
@@ -680,13 +595,6 @@ def _status_counts(views):
     return counts
 
 
-# @testable true
-# @tests tests_unit/test_018b_database_migrations.py::test_status_reads_completed_migrations_across_builds_and_blocks_after_failure
-# @tests tests_unit/test_018b_database_migrations.py::test_legacy_audit_projects_as_completed
-# @tests tests_unit/test_018b_database_migrations.py::test_migration_status_rejects_malformed_ledger
-# @tests tests_unit/test_018b_database_migrations.py::test_saved_file_migration_failures_gain_links_without_rewriting_history
-# @matrix admin database-migrations : audit build-history catalog failure-order identity invalid-storage legacy-audit persistence read-through release-metadata sticky-completion
-# @pair database-migrations:actionable-links
 def get_migration_status(
     *,
     datastore: Client | None = None,
@@ -741,15 +649,9 @@ def get_migration_status(
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason transactional lease claims are exercised through concurrent runner tests
 def _claim_lease(datastore, run_id, now):
     key = _control_key(datastore)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/migrations.py::_claim_lease
-    # @reason transaction callback is exercised through the lease claim owner
     def claim(transaction):
         record = _transaction_get(datastore, key, transaction)
         if record and _active_lease(record, now) and record.get("run_id") != run_id:
@@ -772,15 +674,9 @@ def _claim_lease(datastore, run_id, now):
     return _run_transaction(datastore, claim)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason lease heartbeat behavior is exercised through runner recovery tests
 def _renew_lease(datastore, run_id, migration_id, now):
     key = _control_key(datastore)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/migrations.py::_renew_lease
-    # @reason transaction callback is exercised through the lease renewal owner
     def renew(transaction):
         record = _transaction_get(datastore, key, transaction)
         if not record or record.get("run_id") != run_id:
@@ -797,15 +693,9 @@ def _renew_lease(datastore, run_id, migration_id, now):
     _run_transaction(datastore, renew)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason lease cleanup is exercised through successful and failed runner tests
 def _release_lease(datastore, run_id, now):
     key = _control_key(datastore)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/migrations.py::_release_lease
-    # @reason transaction callback is exercised through the lease release owner
     def release(transaction):
         record = _transaction_get(datastore, key, transaction)
         if not record or record.get("run_id") != run_id:
@@ -823,10 +713,6 @@ def _release_lease(datastore, run_id, now):
     _run_transaction(datastore, release)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @covered-by lagniappe/core/tools/database/migrations.py::initialize_fresh_install
-# @reason status entity creation is exercised through public ledger writes
 def _status_entity(datastore, definition, record=None):
     if record:
         return record
@@ -836,10 +722,6 @@ def _status_entity(datastore, definition, record=None):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @covered-by lagniappe/core/tools/database/migrations.py::initialize_fresh_install
-# @reason immutable identity fields are exercised through persisted status tests
 def _set_identity(record, definition):
     record.update(
         {
@@ -852,9 +734,6 @@ def _set_identity(record, definition):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason interrupted attempt recovery is exercised through stale run tests
 def _interrupted_attempt(record, finished_at):
     return {
         "run_id": record.get("active_run_id"),
@@ -869,9 +748,6 @@ def _interrupted_attempt(record, finished_at):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason running checkpoints are exercised through runner recovery tests
 def _start_migration(datastore, definition, run_id, started_at):
     key = _migration_key(datastore, definition.id)
     record = datastore.get(key)
@@ -893,9 +769,6 @@ def _start_migration(datastore, definition, run_id, started_at):
     datastore.put(record)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason attempt construction is exercised through durable runner tests
 def _attempt(definition, result, run_id, started_at, finished_at):
     totals = _totals((result,))
     return {
@@ -911,9 +784,6 @@ def _attempt(definition, result, run_id, started_at, finished_at):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason completed and failed checkpoints are exercised through durable runner tests
 def _finish_migration(datastore, definition, attempt):
     key = _migration_key(datastore, definition.id)
     record = _status_entity(datastore, definition, datastore.get(key))
@@ -943,9 +813,6 @@ def _finish_migration(datastore, definition, attempt):
     datastore.put(record)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason legacy normalization is exercised through legacy audit adoption tests
 def _persist_projected_view(datastore, definition, view):
     key = _migration_key(datastore, definition.id)
     if datastore.get(key):
@@ -965,9 +832,6 @@ def _persist_projected_view(datastore, definition, view):
     datastore.put(record)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-# @reason aggregate result counts are exercised through durable runner tests
 def _totals(results):
     return {
         key: sum(result.get(key, 0) for result in results)
@@ -975,15 +839,6 @@ def _totals(results):
     }
 
 
-# @testable true
-# @tests tests_unit/test_018b_database_migrations.py::test_ordered_runner_checkpoints_completion_and_resumes_after_failure
-# @tests tests_unit/test_018b_database_migrations.py::test_runner_rejects_concurrent_lease_and_recovers_interrupted_attempt
-# @tests tests_unit/test_018b_database_migrations.py::test_registered_form_schema_migration_scans_forms_and_history
-# @tests tests_unit/test_018b_database_migrations.py::test_legacy_audit_projects_as_completed
-# @tests tests_unit/test_018b_database_migrations.py::test_no_registered_migrations_is_a_noop_success
-# @tests tests_unit/test_018b_database_migrations.py::test_attempt_history_retains_only_the_latest_five_runs
-# @matrix admin database-migrations : bounded-history catalog checkpoint concurrency failure idempotence interrupted-attempt lease lost-lease no-op normalization ordered-run resume retries stale-recovery
-# @pair form-schema:history-snapshot
 def run_data_migrations(
     *,
     query_factory: Callable[[KINDS], Query] | None = None,
@@ -1010,9 +865,6 @@ def run_data_migrations(
 
     active_id: list[str | None] = [None]
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
-    # @reason closure carries the current catalog id into chunk heartbeats
     def heartbeat():
         _renew_lease(datastore, run_id, active_id[0], _utc(now()))
 
@@ -1059,10 +911,6 @@ def run_data_migrations(
     return get_migration_status(datastore=datastore, catalog=catalog, now=now)
 
 
-# @testable true
-# @tests tests_unit/test_018b_database_migrations.py::test_fresh_install_baselines_catalog_without_running_steps
-# @tests tests_unit/test_018b_database_migrations.py::test_fresh_install_retries_transaction_contention
-# @matrix database-migrations setup : baseline fresh-install idempotence
 def initialize_fresh_install(
     fresh_install: bool,
     *,
@@ -1080,9 +928,6 @@ def initialize_fresh_install(
     for definition in catalog:
         key = _migration_key(datastore, definition.id)
 
-        # @testable false
-        # @covered-by lagniappe/core/tools/database/migrations.py::initialize_fresh_install
-        # @reason per-ledger callback is exercised through fresh-install baseline tests
         def baseline(transaction, *, definition=definition, key=key):
             record = _transaction_get(datastore, key, transaction)
             if record:

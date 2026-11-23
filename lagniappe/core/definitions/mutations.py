@@ -74,9 +74,6 @@ class DeletePolicy(Enum):
     DELETE_IF_ORPHANED = "delete-if-orphaned"
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
-# @matrix mutations : contract serialization
 @dataclass(frozen=True)
 class RelationMutationContract:
     """Declared storage and lifecycle behavior for one entity relation."""
@@ -93,9 +90,6 @@ class RelationMutationContract:
     replace_effects: tuple[MutationEffectType, ...] = (MutationEffectType.UPSERT,)
     remove_effects: tuple[MutationEffectType, ...] = (MutationEffectType.UPSERT,)
 
-    # @testable false
-    # @covered-by lagniappe/core/definitions/mutations.py::RelationMutationContract
-    # @reason relation serialization is exercised through the public contract
     def to_dict(self) -> dict[str, object]:
         return {
             "name": self.name,
@@ -112,9 +106,6 @@ class RelationMutationContract:
         }
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
-# @matrix mutations : completeness contract
 @dataclass(frozen=True)
 class EntityMutationContract:
     """Mutation inventory for one persisted entity kind."""
@@ -127,9 +118,6 @@ class EntityMutationContract:
         MutationEffectType.BLOB_DELETE,
     )
 
-    # @testable false
-    # @covered-by lagniappe/core/definitions/mutations.py::EntityMutationContract
-    # @reason entity serialization is exercised through the public contract
     def to_dict(self) -> dict[str, object]:
         return {
             "kind": self.kind,
@@ -138,9 +126,6 @@ class EntityMutationContract:
         }
 
 
-# @testable false
-# @covered-by lagniappe/core/definitions/mutations.py::MutationEffect
-# @reason compact entity identifiers are exercised through plan serialization
 def _entity_key(entity: Entity) -> str | None:
     try:
         return entity.urlsafe_key
@@ -149,16 +134,10 @@ def _entity_key(entity: Entity) -> str | None:
         return str(key) if key is not None else None
 
 
-# @testable false
-# @covered-by lagniappe/core/definitions/mutations.py::MutationEffect
-# @reason compact entity kinds are exercised through plan serialization
 def _entity_kind(entity: Entity) -> str | None:
     return getattr(entity, "entity_kind", None) or getattr(entity, "kind", None)
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
-# @matrix mutations : plan serialization
 @dataclass(frozen=True)
 class MutationEffect:
     """Serializable description of one planned mutation effect."""
@@ -178,9 +157,6 @@ class MutationEffect:
     cache_key: str | None = None
     cache_kind: str | None = None
 
-    # @testable false
-    # @covered-by lagniappe/core/definitions/mutations.py::MutationEffect
-    # @reason effect serialization is exercised through plan serialization
     def to_dict(self) -> dict[str, object]:
         data: dict[str, object] = {
             "effect": self.effect.value,
@@ -222,11 +198,6 @@ class MutationEffect:
         return data
 
 
-# @testable true
-# @tests tests_unit/test_002_entity_general_properties.py::test_entity_add_mutation_intents_requires_typed_intents_and_dedupes
-# @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
-# @matrix entity : dedupe typed-intent validation
-# @pair mutations:save
 @dataclass(frozen=True)
 class MutationIntent:
     """Typed related or post-commit work awaiting a root mutation."""
@@ -244,9 +215,6 @@ class MutationIntent:
     depends_on: tuple[Entity, ...] | None = field(default=None, repr=False, compare=False)
 
     @classmethod
-    # @testable false
-    # @covered-by lagniappe/core/properties/common_assets.py::Document.save
-    # @reason superseded document assets use the existing post-commit blob cleanup
     def delete_blob(cls, path: str, visibility: str, *, reason: str) -> Self:
         return cls(
             MutationIntentType.BLOB_DELETE,
@@ -257,16 +225,10 @@ class MutationIntent:
         )
 
     @classmethod
-    # @testable false
-    # @covered-by lagniappe/core/definitions/mutations.py::MutationIntent
-    # @reason intent factories are exercised through typed intent planning
     def standard(cls, entity: Entity, *, reason: str) -> Self:
         return cls(MutationIntentType.STANDARD, entity=entity, reason=reason)
 
     @classmethod
-    # @testable false
-    # @covered-by lagniappe/core/definitions/mutations.py::MutationIntent
-    # @reason intent factories are exercised through typed intent planning
     def patch(
         cls,
         entity: Entity,
@@ -290,9 +252,6 @@ class MutationIntent:
         )
 
     @classmethod
-    # @testable false
-    # @covered-by lagniappe/core/definitions/mutations.py::MutationIntent
-    # @reason intent factories are exercised through typed intent planning
     def touch(
         cls,
         entity: Entity,
@@ -312,9 +271,6 @@ class MutationIntent:
         )
 
     @classmethod
-    # @testable false
-    # @covered-by lagniappe/core/definitions/mutations.py::MutationIntent
-    # @reason intent factories are exercised through typed intent planning
     def clear_cache_state(cls, cache_key: str, *, reason: str) -> Self:
         return cls(
             MutationIntentType.CACHE_STATE_DELETE,
@@ -324,9 +280,6 @@ class MutationIntent:
         )
 
     @classmethod
-    # @testable false
-    # @covered-by lagniappe/core/definitions/mutations.py::MutationIntent
-    # @reason intent factories are exercised through typed intent planning
     def delete_from_search(cls, kind: str, entity: Entity, *, reason: str) -> Self:
         return cls(
             MutationIntentType.CACHE_SEARCH_DELETE,
@@ -337,9 +290,6 @@ class MutationIntent:
         )
 
     @classmethod
-    # @testable true
-    # @tests tests_unit/test_022_mutation_contracts.py::test_scheduled_uncomplete_dispatch_is_planned_after_task_write
-    # @matrix mutations task-scheduling : durable-first post-commit
     def dispatch_scheduled_uncomplete(cls, entity: Entity, *, reason: str) -> Self:
         """Dispatch one tokenized uncompletion only after ``entity`` commits."""
         return cls(
@@ -349,9 +299,6 @@ class MutationIntent:
         )
 
     @classmethod
-    # @testable false
-    # @covered-by lagniappe/core/mutations/base.py::MutationPlanBuilder.consume_intents
-    # @reason factory is exercised through page visibility mutation planning
     def invalidate_public_discovery(cls, *, reason: str) -> Self:
         return cls(
             MutationIntentType.PUBLIC_DISCOVERY_INVALIDATE,
@@ -360,10 +307,6 @@ class MutationIntent:
         )
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
-# @tests tests_unit/test_022_mutation_contracts.py::test_save_root_persists_full_exclusions_without_lifecycle_intents_or_cache
-# @matrix mutations : plan serialization
 @dataclass
 class MutationPlan:
     """Executable entity mutation and its ordered public effect inventory."""
@@ -372,9 +315,6 @@ class MutationPlan:
     effects: list[MutationEffect]
     consumed_intents: tuple[tuple[Entity, tuple[MutationIntent, ...]], ...] = field(default=(), repr=False)
 
-    # @testable false
-    # @covered-by lagniappe/core/definitions/mutations.py::MutationPlan
-    # @reason plan serialization is exercised through the public plan contract
     def to_dict(self) -> dict[str, object]:
         return {
             "operation": self.operation.value,
@@ -382,9 +322,6 @@ class MutationPlan:
         }
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_save_executes_datastore_before_cache_and_reports_cache_failure
-# @matrix mutations : cache-failure post-commit-outcome
 @dataclass
 class MutationOutcome:
     """Progress boundary returned after executing a mutation plan."""
@@ -395,16 +332,10 @@ class MutationOutcome:
     completed_effects: list[MutationEffectType] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
-    # @testable false
-    # @covered-by lagniappe/core/definitions/mutations.py::MutationOutcome
-    # @reason completion is asserted through the public outcome contract
     @property
     def complete(self) -> bool:
         return self.durable_committed and self.post_commit_complete and not self.errors
 
-    # @testable false
-    # @covered-by lagniappe/core/definitions/mutations.py::MutationOutcome
-    # @reason outcome serialization is exercised through the public contract
     def to_dict(self) -> dict[str, object]:
         return {
             "operation": self.operation.value,

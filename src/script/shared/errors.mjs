@@ -1,8 +1,3 @@
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::captureError
- * @reason context extraction is reported through the public error capture helper
- */
 const getElementContext = (element) => {
 	const context = {};
 	if (!(element instanceof Element)) return context;
@@ -41,11 +36,6 @@ const getElementContext = (element) => {
 	return context;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::captureError
- * @reason context value normalization is reported through the public error capture helper
- */
 const sanitizedObjectContext = (value) =>
 	Object.fromEntries(
 		Object.entries(value).filter(([, child]) => {
@@ -57,11 +47,6 @@ const sanitizedObjectContext = (value) =>
 		}),
 	);
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::captureError
- * @reason context value normalization is reported through the public error capture helper
- */
 const normalizeContextValue = (value) => {
 	if (
 		value === undefined ||
@@ -75,11 +60,6 @@ const normalizeContextValue = (value) => {
 	return { value };
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::captureError
- * @reason context normalization is reported through the public error capture helper
- */
 const normalizeContext = (context) => {
 	if (!(context instanceof Object)) return {};
 
@@ -90,11 +70,6 @@ const normalizeContext = (context) => {
 	);
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::isSkippedViewTransitionError
- * @reason error text normalization only supports transition-noise filtering
- */
 const getErrorText = (error) => {
 	if (!error) return "";
 	if (typeof error === "string") return error;
@@ -105,9 +80,6 @@ const getErrorText = (error) => {
  * View transition skips/aborts are expected during fast navigation, concurrent
  * transitions, and cross-document transitions. They should not be reported.
  *
- * @testable false
- * @covered-by src/script/shared/transitions.mjs::withTransition
- * @reason transition-noise predicate is exercised through the transition wrapper
  */
 export const isSkippedViewTransitionError = (error) => {
 	if (!error) return false;
@@ -216,11 +188,6 @@ const SENTRY_AUTH_VALUE_PATTERN = /\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi;
 const SENTRY_JWT_PATTERN =
 	/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::configureSentry
- * @reason event key normalization is exercised through Sentry privacy filtering
- */
 const _normalizedSentryKey = (key) =>
 	String(key)
 		.replace(/([a-z0-9])([A-Z])/g, "$1_$2")
@@ -228,11 +195,6 @@ const _normalizedSentryKey = (key) =>
 		.replace(/[^a-z0-9]+/g, "_")
 		.replace(/^_+|_+$/g, "");
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::configureSentry
- * @reason sensitive-key matching is exercised through Sentry privacy filtering
- */
 const _isSensitiveSentryKey = (key) => {
 	const normalized = _normalizedSentryKey(key);
 	if (SENTRY_SENSITIVE_KEYS.has(normalized)) return true;
@@ -263,11 +225,6 @@ const _isSensitiveSentryKey = (key) => {
 	);
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::configureSentry
- * @reason event text redaction and bounds are exercised through Sentry privacy filtering
- */
 const _sanitizeSentryText = (value) => {
 	let text = String(value);
 	if (
@@ -289,11 +246,6 @@ const _sanitizeSentryText = (value) => {
 		: text;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::configureSentry
- * @reason recursive event sanitization is owned by the public Sentry setup helper
- */
 const _sanitizeSentryValue = (value, key = null, depth = 0) => {
 	if (key !== null && _isSensitiveSentryKey(key)) return SENTRY_REDACTED;
 	if (depth >= SENTRY_MAX_CONTEXT_DEPTH) return "[MAX DEPTH]";
@@ -319,11 +271,6 @@ const _sanitizeSentryValue = (value, key = null, depth = 0) => {
 	return `<${typeof value}>`;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::configureSentry
- * @reason SDK request fields are reduced through Sentry privacy filtering
- */
 const _sanitizeSentryRequest = (request) => {
 	if (!request || typeof request !== "object") return undefined;
 
@@ -340,11 +287,6 @@ const _sanitizeSentryRequest = (request) => {
 	return Object.keys(sanitized).length > 0 ? sanitized : undefined;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::configureSentry
- * @reason Sentry-generated trace contexts are normalized through the public setup helper
- */
 const _invalidSentryTraceContext = (trace) => {
 	if (!trace) return false;
 	return (
@@ -353,11 +295,6 @@ const _invalidSentryTraceContext = (trace) => {
 	);
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::configureSentry
- * @reason notification transaction detection only feeds Sentry warning filtering
- */
 const _isNotificationTransaction = (event) => {
 	const values = [
 		event?.transaction,
@@ -371,11 +308,6 @@ const _isNotificationTransaction = (event) => {
 	);
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::configureSentry
- * @reason Sentry-generated blocking-operation events bypass beforeSend
- */
 const _isMalformedBlockingOperationWarning = (event) => {
 	return (
 		event?.type === "generic" &&
@@ -386,11 +318,6 @@ const _isMalformedBlockingOperationWarning = (event) => {
 	);
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::configureSentry
- * @reason malformed Sentry trace contexts otherwise create invalid Relay events
- */
 const _sanitizeSentryEvent = (event) => {
 	if (!event) return event;
 	if (_isMalformedBlockingOperationWarning(event)) return null;
@@ -433,11 +360,6 @@ const _sanitizeSentryEvent = (event) => {
 	return sanitized;
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::configureSentry
- * @reason notification refresh long-task spans are noisy Sentry-generated warnings
- */
 const _filterNotificationBlockingSpans = (event) => {
 	if (!_isNotificationTransaction(event) || !Array.isArray(event?.spans)) {
 		return event;
@@ -453,15 +375,6 @@ const _filterNotificationBlockingSpans = (event) => {
  * Initialize the locally bundled browser Sentry client with the installation's
  * configured DSN, then apply the shared privacy and noise filters.
  *
- * @testable true
- * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_drops_malformed_blocking_operation_warning
- * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_removes_invalid_trace_context_without_dropping_event
- * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_filters_notification_long_task_spans
- * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_redacts_browser_request_and_context_payloads
- * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_drops_malformed_breadcrumb_container
- * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_uses_installation_dsn_without_default_pii
- * @tests tests_js/test_015_error_tracking_frontend.mjs::test_configure_sentry_does_not_initialize_without_dsn
- * @matrix error-tracking : blocking-operation configured-dsn disabled malformed-blocking-operation malformed-breadcrumbs notification-transaction payload-bounds privacy redaction request-context sentry-context trace-normalization
  */
 export const configureSentry = () => {
 	const Sentry = typeof window !== "undefined" ? window.Sentry : null;
@@ -476,21 +389,11 @@ export const configureSentry = () => {
 
 	Sentry.addEventProcessor?.(_sanitizeSentryEvent);
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/shared/errors.mjs::configureSentry
-	 * @reason private beforeSend predicate for Sentry transition-noise filtering
-	 */
 	const filterTransitionNoise = (_event, hint) => {
 		if (isSkippedViewTransitionError(hint?.originalException)) return null;
 		return _event;
 	};
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/shared/errors.mjs::configureSentry
-	 * @reason callback composition is exercised through configureSentry setup tests
-	 */
 	const beforeSend = (prior) => (event, hint) => {
 		const transitionFiltered = filterTransitionNoise(event, hint);
 		if (transitionFiltered === null) return null;
@@ -501,11 +404,6 @@ export const configureSentry = () => {
 		return prior ? prior(sanitized, hint) : sanitized;
 	};
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/shared/errors.mjs::configureSentry
-	 * @reason callback composition is exercised through configureSentry setup tests
-	 */
 	const beforeSendTransaction = (prior) => (event, hint) => {
 		const sanitized = _sanitizeSentryEvent(event);
 		if (sanitized === null) return null;
@@ -541,9 +439,6 @@ export const configureSentry = () => {
  * Fetch threw before a response (offline, navigation abort, tab freeze, etc.).
  * Not useful as a Sentry exception — noise on mobile especially.
  *
- * @testable false
- * @covered-by src/script/shared/errors.mjs::captureNetworkError
- * @reason transient-network predicate feeds network capture suppression
  */
 export const isTransientNetworkError = (error) => {
 	if (!error) return false;
@@ -559,11 +454,6 @@ export const isTransientNetworkError = (error) => {
 	return false;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_015_error_tracking_frontend.mjs::test_capture_error_normalizes_sentry_context_values
- * @matrix error-tracking : normalization sentry-context
- */
 export const captureError = (error, element, context) => {
 	if (isSkippedViewTransitionError(error)) {
 		return;
@@ -592,11 +482,6 @@ export const captureError = (error, element, context) => {
 	if (hasContext) console.error("Context:", context);
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/request.mjs::_request
- * @reason network capture is reached through shared request failure handling
- */
 export const captureNetworkError = (error, url, options = {}) => {
 	if (!options.forceReport && isTransientNetworkError(error)) {
 		return;

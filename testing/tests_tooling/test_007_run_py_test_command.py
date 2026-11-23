@@ -607,7 +607,6 @@ def test_behavior_snapshot_fingerprints_style_records_independently(tmp_path):
     assert before["@style/label.default"] == after["@style/label.default"]
 
 
-# @matrix testing : cli-routing pytest-options target-selection
 @pytest.mark.parametrize(
     ("arguments", "expected_args", "expected_targets", "includes_e2e"),
     (
@@ -737,7 +736,6 @@ def test_pytest_cli_options_are_not_registered_in_suite_conftests():
     assert violations == []
 
 
-# @matrix setup testing : cli-routing opt-in pytest-markers
 @pytest.mark.parametrize(
     ("marker_expression", "expected_markers"),
     (
@@ -800,7 +798,6 @@ def test_normalize_pytest_invocation_handles_strict_and_pytest_separator():
     assert literal_target.collection_targets == ("--strict",)
 
 
-# @matrix testing : cli-routing pytest-options target-selection
 @pytest.mark.parametrize(
     "arguments",
     (
@@ -940,7 +937,6 @@ def test_normalize_pytest_invocation_isolates_parser_imports_and_cwd(
     )
 
 
-# @matrix testing : cli-routing target-selection
 def test_normalized_targets_control_actual_pytest_collection(
     monkeypatch, tmp_path
 ):
@@ -1014,7 +1010,6 @@ def test_normalized_targets_control_actual_pytest_collection(
         assert invocation.includes_e2e is includes_e2e
 
 
-# @matrix setup testing : pytest-markers
 def test_pytest_routing_plugin_normalizes_provider_marker_tokens():
     config = types.SimpleNamespace(
         option=types.SimpleNamespace(markexpr="provider and not ai_provider")
@@ -1027,7 +1022,6 @@ def test_pytest_routing_plugin_normalizes_provider_marker_tokens():
     )
 
 
-# @matrix mcp-package testing : cli-routing environment-isolation no-duplicate-collection
 def test_partition_mcp_adapter_test_selection():
     repository_root = Path(run.__file__).parent
     adapter = pytest_routing.MCP_ADAPTER_TEST
@@ -1088,7 +1082,6 @@ def test_partition_mcp_adapter_test_selection():
     )
 
 
-# @matrix mcp-package testing : cli-routing local-preflight
 def test_targets_include_repository_file():
     repository_root = Path(run.__file__).parent
     target = "testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py"
@@ -1118,7 +1111,6 @@ def _transported_adapter_results(path, status=0):
     )
 
 
-# @matrix mcp-package testing : cli-routing environment-isolation
 @pytest.mark.parametrize(
     "selector",
     [
@@ -1176,7 +1168,6 @@ def test_run_py_focused_adapter_uses_only_locked_package_bridge(
     ]
 
 
-# @matrix mcp-package testing : cli-routing exit-status no-duplicate-collection result-aggregation
 def test_run_py_unit_partitions_adapter_once_and_merges_results(monkeypatch):
     from runner import mcp_environment
 
@@ -1230,7 +1221,6 @@ def test_run_py_unit_partitions_adapter_once_and_merges_results(monkeypatch):
     assert calls[:2] == ["prepare", "gcloud"]
 
 
-# @matrix testing mcp-package : junit result-aggregation environment-isolation
 @pytest.mark.parametrize("root_status,mcp_status", [(1, 0), (0, 1), (0, 0)])
 @pytest.mark.parametrize("option", ["--junitxml", "--junit-xml"])
 def test_run_py_merges_partition_junit(monkeypatch, tmp_path, root_status, mcp_status, option):
@@ -1266,7 +1256,6 @@ def test_run_py_merges_partition_junit(monkeypatch, tmp_path, root_status, mcp_s
     assert destination not in written
 
 
-# @matrix testing mcp-package : junit result-aggregation environment-isolation
 def test_partition_junit_reports_preserves_single_run_and_rejects_missing_results(tmp_path):
     from runner.pytest_reports import partition_junit_reports
 
@@ -1290,7 +1279,6 @@ def test_partition_junit_reports_preserves_single_run_and_rejects_missing_result
     assert not target.exists()
 
 
-# @matrix mcp-package testing : fail-closed local-preflight repair-guidance
 def test_run_py_adapter_preflight_stops_before_root_test_work(monkeypatch, capsys):
     from runner import mcp_environment
 
@@ -1320,7 +1308,6 @@ def test_run_py_adapter_preflight_stops_before_root_test_work(monkeypatch, capsy
     assert "./setup.sh development" in capsys.readouterr().out
 
 
-# @matrix hosted-e2e mcp-package testing : environment-check isolation
 def test_run_py_hosted_adapter_selection_checks_prebuilt_environment(monkeypatch):
     from runner import mcp_environment
 
@@ -1356,7 +1343,6 @@ def test_run_py_hosted_adapter_selection_checks_prebuilt_environment(monkeypatch
     assert calls == ["check", "adapter"]
 
 
-# @matrix mcp-package testing traceability : result-aggregation test-evidence
 def test_merge_mcp_test_evidence_validates_and_forwards_outcomes(
     monkeypatch, tmp_path
 ):
@@ -1442,7 +1428,6 @@ def test_run_py_test_argument_errors_stop_before_preflight(monkeypatch, capsys):
     assert "suite aliases cannot be combined" in capsys.readouterr().err
 
 
-# @pair testing:environment
 def test_configure_test_environment_only_sets_import_environment(monkeypatch):
     calls = []
     config_module = types.ModuleType("config")
@@ -1464,7 +1449,6 @@ def test_configure_test_environment_only_sets_import_environment(monkeypatch):
     assert calls == []
 
 
-# @matrix hosted-e2e testing : cli-routing frontend-build provider-auth
 def test_hosted_e2e_runner_skips_local_build_and_gcloud_activation(monkeypatch):
     calls = []
     from runner import testing as testing_module
@@ -1490,7 +1474,6 @@ def test_hosted_e2e_runner_skips_local_build_and_gcloud_activation(monkeypatch):
     assert [name for name, *_rest in calls] == ["pytest"]
 
 
-# @matrix hosted-e2e testing : cleanup fail-closed prefix
 def test_cleanup_scope_requires_the_reserved_test_prefix():
     from runner import testing as testing_module
 
@@ -1506,7 +1489,6 @@ def test_cleanup_scope_requires_the_reserved_test_prefix():
             testing_module._require_test_cleanup_scope(config)
 
 
-# @matrix hosted-e2e testing : cache database initialization migrations
 def test_initialize_test_services_replays_server_persistence_startup():
     from runner import testing as testing_module
 
@@ -1584,7 +1566,6 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
     assert os.environ["LAGNIAPPE_TEST_COMMAND"] == '["outer", "test"]'
 
 
-# @pair testing:adc
 def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
     from runner import mcp_environment
 
@@ -1690,7 +1671,6 @@ def test_run_py_e2e_adc_mismatch_stops_before_pytest(monkeypatch, capsys):
     assert "run.py auth" in output
 
 
-# @matrix development : adc gcloud-config launch-order
 def test_run_dev_server_aligns_adc_before_flask_launch(monkeypatch):
     from runner import development
 
@@ -1756,7 +1736,6 @@ def test_run_dev_server_aligns_adc_before_flask_launch(monkeypatch):
     ]
 
 
-# @matrix development : adc gcloud-config launch-order noninteractive
 def test_run_dev_server_adc_mismatch_stops_before_flask(monkeypatch, capsys):
     from runner import development
 
@@ -1779,7 +1758,6 @@ def test_run_dev_server_adc_mismatch_stops_before_flask(monkeypatch, capsys):
     assert "run.py auth" in output
 
 
-# @matrix development : lifecycle process-ownership signals
 def test_run_dev_server_forwards_signals_and_restores_handlers(monkeypatch):
     from runner import development
 
@@ -1824,7 +1802,6 @@ def test_run_dev_server_forwards_signals_and_restores_handlers(monkeypatch):
     assert restored == [development.signal.SIGINT, development.signal.SIGTERM]
 
 
-# @matrix development : escalation exceptional-cleanup process-ownership
 def test_run_dev_server_cleans_up_process_group_after_runner_failure(monkeypatch):
     from runner import development
 
@@ -1865,7 +1842,6 @@ def test_run_dev_server_cleans_up_process_group_after_runner_failure(monkeypatch
     ]
 
 
-# @matrix auth : adc explicit-command interactive runtime-identity
 def test_run_py_auth_runs_interactive_human_adc_alignment(
     monkeypatch,
     capsys,
@@ -1892,7 +1868,6 @@ def test_run_py_auth_runs_interactive_human_adc_alignment(
     )
 
 
-# @matrix auth : adc explicit-command interactive runtime-identity
 def test_run_py_auth_reports_alignment_failure(monkeypatch, capsys):
     monkeypatch.setattr(run, "GCLOUD_CLI", "/usr/bin/gcloud")
     monkeypatch.setattr(
@@ -2003,7 +1978,6 @@ def test_run_py_test_forwards_signals_to_pytest_process_group(monkeypatch):
     assert restored_handlers == [run.signal.SIGINT, run.signal.SIGTERM]
 
 
-# @pair setup:gcloud-token
 def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch, capsys):
     from runner import adc as runner_adc
     from runner import gcloud as runner_gcloud
@@ -2092,7 +2066,6 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch, capsys
     assert "Verified:" not in output
 
 
-# @matrix auth : gcloud-token interactive refresh
 def test_runner_gcloud_source_login_refreshes_stale_token(monkeypatch):
     from runner import adc as runner_adc
 
@@ -2153,7 +2126,6 @@ def test_runner_gcloud_source_login_refreshes_stale_token(monkeypatch):
     ]
 
 
-# @matrix setup : gcloud-token safe-failure
 def test_runner_gcloud_source_login_stops_before_authentication_by_default(
     monkeypatch,
 ):
@@ -2188,7 +2160,6 @@ def test_runner_gcloud_source_login_stops_before_authentication_by_default(
     ]
 
 
-# @matrix development setup testing : adc identity project-identity
 def test_runner_adc_identity_is_secret_free_and_project_bound():
     from runner import adc as runner_adc
 
@@ -2225,7 +2196,6 @@ def test_runner_adc_identity_is_secret_free_and_project_bound():
     assert "secret-access-token" not in repr(identity)
 
 
-# @matrix setup testing : adc automatic-activation identity project-identity quota-project
 def test_runner_adc_alignment_reauthenticates_and_sets_quota_project(monkeypatch):
     from runner import adc as runner_adc
 
@@ -2297,7 +2267,6 @@ def test_runner_adc_alignment_reauthenticates_and_sets_quota_project(monkeypatch
     ]
 
 
-# @matrix auth : adc automatic-activation identity project-identity quota-project
 def test_runner_adc_auth_selects_account_then_project_before_login(monkeypatch):
     from runner import adc as runner_adc
 
@@ -2432,7 +2401,6 @@ def test_runner_adc_auth_selects_account_then_project_before_login(monkeypatch):
     ]
 
 
-# @matrix development testing : adc automatic-activation identity project-identity quota-project
 @pytest.mark.parametrize(
     "identity",
     [
@@ -2481,7 +2449,6 @@ def test_runner_local_adc_mismatch_directs_to_auth_command(
         )
 
 
-# @matrix setup testing : adc automatic-activation quota-project
 def test_runner_adc_alignment_updates_only_stale_quota_project(monkeypatch):
     from runner import adc as runner_adc
 
@@ -2533,7 +2500,6 @@ def test_runner_adc_alignment_updates_only_stale_quota_project(monkeypatch):
     ]
 
 
-# @matrix auth development setup testing : activation gcloud-config unconfigured
 def test_runner_gcloud_activation_skips_unconfigured_repository(monkeypatch):
     from runner import gcloud as runner_gcloud
 
@@ -2544,7 +2510,6 @@ def test_runner_gcloud_activation_skips_unconfigured_repository(monkeypatch):
     assert runner_gcloud.activate_repository_gcloud() is False
 
 
-# @matrix auth development setup testing : activation gcloud-config validation
 def test_runner_gcloud_activation_rejects_partial_saved_target(monkeypatch):
     from runner import gcloud as runner_gcloud
 
@@ -2561,7 +2526,6 @@ def test_runner_gcloud_activation_rejects_partial_saved_target(monkeypatch):
         runner_gcloud.activate_repository_gcloud()
 
 
-# @matrix dependencies : cli-routing upgrade
 @pytest.mark.parametrize("only", [None, "node", "npm", "python"])
 def test_run_py_upgrade_dependencies_runs_dependency_upgrade(monkeypatch, only):
     config_module = types.ModuleType("config")
@@ -2577,7 +2541,6 @@ def test_run_py_upgrade_dependencies_runs_dependency_upgrade(monkeypatch, only):
     assert received == [{"only": only}]
 
 
-# @matrix dependencies : cli-routing upgrade
 def test_run_py_upgrade_dependencies_rejects_software_upgrade_branch(capsys):
     with pytest.raises(SystemExit, match="2"):
         run.run_dependency_upgrade_command(["--branch", "release/candidate"])
@@ -2835,7 +2798,6 @@ def test_main_release_workflow_contract():
     assert "pr-clean" not in workflow_text
 
 
-# @pair release:delivery-tree
 def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
     repo = _release_check_repository(tmp_path)
     _write_release_candidate(repo)
@@ -2864,7 +2826,6 @@ def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
     assert "Release check passed against main" in result.stdout
 
 
-# @matrix release : build-mode delivery-tree
 @pytest.mark.parametrize("change", ["runner", "documentation", "backend"])
 def test_run_py_release_check_reuses_valid_production_build(tmp_path, change):
     repo = _release_check_repository(tmp_path)
@@ -2879,7 +2840,6 @@ def test_run_py_release_check_reuses_valid_production_build(tmp_path, change):
     assert run.run_release_check_command(["--base", base], repo_root=repo) == 0
 
 
-# @matrix release : build-mode delivery-tree
 @pytest.mark.parametrize("change", ["source", "artifact", "missing-artifact", "build-id"])
 def test_run_py_release_check_rejects_stale_or_modified_build(tmp_path, capsys, change):
     repo = _release_check_repository(tmp_path)
@@ -2898,7 +2858,6 @@ def test_run_py_release_check_rejects_stale_or_modified_build(tmp_path, capsys, 
     assert "Frontend build:" in capsys.readouterr().out
 
 
-# @pair release:delivery-tree
 @pytest.mark.parametrize(
     "declaration",
     [".nvmrc", "package.json", "package-lock.json", "docker-version", "docker-digest"],
@@ -2954,7 +2913,6 @@ def _write_candidate_migration(repo: Path, *, introduced_in: str) -> None:
     _git(repo, "add", str(path.relative_to(repo)))
 
 
-# @matrix migrations release : major-version release-note version-metadata
 def test_run_py_release_check_requires_major_version_for_new_migration(
     tmp_path,
     capsys,
@@ -2977,7 +2935,6 @@ def test_run_py_release_check_requires_major_version_for_new_migration(
     assert "NEXT-001" in output
 
 
-# @matrix migrations release : major-version release-note version-metadata
 def test_run_py_release_check_requires_matching_migration_release_metadata(
     tmp_path,
     capsys,
@@ -3011,7 +2968,6 @@ def test_run_py_release_check_requires_matching_migration_release_metadata(
     assert "Release check passed against main" in capsys.readouterr().out
 
 
-# @matrix release : build-mode delivery-tree
 def test_run_py_release_check_rejects_development_build(tmp_path, capsys):
     repo = _release_check_repository(tmp_path)
     _write_release_candidate(repo, mode="development")
@@ -3021,7 +2977,6 @@ def test_run_py_release_check_rejects_development_build(tmp_path, capsys):
     assert "must identify a production build" in output
 
 
-# @pair release:delivery-tree
 def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
     repo = _release_check_repository(tmp_path)
     (repo / "package.json").write_text(
@@ -3047,7 +3002,6 @@ def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
     assert "must identify a production build" in output
 
 
-# @pair version:cli-routing
 @pytest.mark.parametrize(
     ("settings_exist", "settings_version", "expected_version"),
     [
@@ -3082,7 +3036,6 @@ def test_run_py_version_show_uses_package_only_before_generated_settings_exist(
     ]
 
 
-# @pair version:cli-routing
 def test_run_py_version_note_appends_concise_release_entry(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(run, "RELEASES_DIR", tmp_path / "documentation" / "releases")
 
@@ -3098,8 +3051,6 @@ def test_run_py_version_note_appends_concise_release_entry(monkeypatch, tmp_path
     assert "Added version note" in capsys.readouterr().out
 
 
-# @pair version:cli-routing
-# @source run.py::run_version_command
 @pytest.mark.parametrize("version", ["", "1.25", "1.2.3-rc1", "../outside", "01.2.3"])
 @pytest.mark.parametrize("action", ["set", "explicit-note", "current-note"])
 def test_run_py_version_rejects_invalid_values_before_mutation(
@@ -3147,7 +3098,6 @@ def test_run_py_version_rejects_invalid_values_before_mutation(
     assert not list(tmp_path.iterdir())
 
 
-# @pair version:cli-routing
 def test_run_py_version_set_updates_package_settings_and_release_file(
     monkeypatch, tmp_path, capsys
 ):

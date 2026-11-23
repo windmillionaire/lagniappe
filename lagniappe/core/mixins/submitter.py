@@ -51,11 +51,6 @@ class _Revision(Protocol):
 type NormalizedValues = dict[str, list[object] | dict[str, object]]
 
 
-# @testable true
-# @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_skips_keys_not_in_schema
-# @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_multipart_keys_merge_under_field_id
-# @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_drops_falsy_entries_in_lists
-# @matrix submission : list-filtering multipart normalize unknown-keys
 def normalize_submission_values(values: FormValues | Mapping[str, object], fields: Container[str]) -> NormalizedValues:
     updated: NormalizedValues = {}
 
@@ -84,9 +79,6 @@ def normalize_submission_values(values: FormValues | Mapping[str, object], field
     return updated
 
 
-# @testable false
-# @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.validate_browser_submission_references
-# @reason link identifier extraction is exercised through browser submission preflight
 def _link_identifier(value: object) -> str | None:
     if isinstance(value, str):
         return value or None
@@ -96,9 +88,6 @@ def _link_identifier(value: object) -> str | None:
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.validate_browser_submission_references
-# @reason recursive link discovery is exercised through browser submission preflight
 def _internal_link_ids(field: object, value: object) -> set[str]:
     """Extract internal Link identifiers without resolving or mutating fields."""
     from ..properties.form_links import Link
@@ -147,10 +136,6 @@ def _internal_link_ids(field: object, value: object) -> set[str]:
     return identifiers
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.form_submission
-# @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.patch_submission
-# @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.import_submission
 class SubmitterMixin:
     """Adds form submission handling to entities with a Form schema.
 
@@ -171,9 +156,6 @@ class SubmitterMixin:
         # These three registered entity classes supply the concrete field and datastore contracts.
         return cast("SubmissionOwner", self)
 
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_autofill_preview_validates_draft_without_saving_or_changing_cached_fields
-    # @matrix submission ai : autofill draft snapshot no-save
     def preview_form_submission(self, values: Request | FormValues, *, actor: SubmissionActor) -> dict[str, dict[str, object]]:
         """Validate a browser draft without changing the entity or its saved answers."""
         from ..properties.form_submission import FormSubmission
@@ -202,13 +184,6 @@ class SubmitterMixin:
             "ai_values": values_by_id(submission.fields, actor),
         }
 
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_full_form_submit_missing_checkbox_persists_explicit_false
-    # @tests tests_unit/test_004e_submission_behavior.py::test_empty_submission_pops_submission_db_key
-    # @tests tests_unit/test_004e_submission_behavior.py::test_html_field_is_ignored_by_form_submission
-    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
-    # @matrix submission : asset-isolation blank-persistence empty-submission explicit-false form-submit preservation submit-boundary validation
-    # @matrix form-migration : stale-generation direct-write
     def form_submission(self, values: Request | FormValues, *, actor: SubmissionActor | None = None) -> None:
         owner = self._submission_owner
         require_mutable_submission(owner)
@@ -243,10 +218,6 @@ class SubmitterMixin:
 
         self.save_submission()
 
-    # @testable true
-    # @tests tests_unit/test_031_submitted_references.py::test_browser_submission_references_require_view_and_preserve_hidden_existing_values
-    # @tests tests_unit/test_031_submitted_references.py::test_browser_submission_references_validate_table_links_before_mutation
-    # @matrix submitted-references : browser internal-link no-partial-mutation preflight preservation table
     def validate_browser_submission_references(
         self,
         values: FormValues | Mapping[str, object],
@@ -323,11 +294,6 @@ class SubmitterMixin:
 
         return preserved
 
-    # @testable true
-    # @tests tests_unit/test_003f_submission_normalize_patch.py::test_patch_submission_merges_single_field
-    # @tests tests_unit/test_003f_submission_normalize_patch.py::test_patch_submission_accepts_json_string
-    # @tests tests_unit/test_004d_submitter.py::test_patch_submission_merges_multiple_fields
-    # @matrix submission : json-payload multiple-fields patch single-field
     def patch_submission(self, update: str | Mapping[str, object], *, actor: SubmissionActor | None = None) -> None:
         owner = self._submission_owner
         require_mutable_submission(owner)
@@ -343,9 +309,6 @@ class SubmitterMixin:
 
         self.save_submission()
 
-    # @testable true
-    # @tests tests_unit/test_004i_form_definitions.py::test_generated_answers_reject_unknown_fields_before_resetting_values
-    # @matrix submission : ai unknown-fields preservation validation
     def ai_submission(self, generated_submission: Mapping[str, object], *, actor: FieldUser = None, preserve_existing: bool = False) -> None:
         from ..properties.schema import SchemaFields
 
@@ -369,14 +332,6 @@ class SubmitterMixin:
 
         self.save_submission()
 
-    # @testable true
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_validation_error_includes_field_and_payload
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_space_joins_input_list_values
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_preserves_table_row_lists_during_input_list_normalization
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_internal_link_fuzzy_match_warning
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_fuzzy_match_warning
-    # @tests tests_unit/test_006b_ingress_entity.py::test_importer_rejects_entire_malformed_todo_row
-    # @matrix form-table submission text-input : error-message fuzzy-match import list-normalization save validation
     def import_submission(self, imported_submission: Mapping[str, object], import_process: ImportSettings) -> None:
         owner = self._submission_owner
         require_mutable_submission(owner)
@@ -404,23 +359,14 @@ class SubmitterMixin:
 
         self.save_submission()
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/forms/definitions.py::original_completion
-    # @reason cache revision metadata remains independent from original-completion generation
     @property
     def schema_version(self) -> str | None:
         return cast("str | None", self._submission_owner.db.get("schema_version"))
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/forms/definitions.py::definition_for
-    # @reason missing generation is the shared legacy baseline for flat submissions
     @property
     def generation(self) -> int:
         return cast(int, self._submission_owner.db.get("generation", 0) or 0)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/forms/definitions.py::definition_for
-    # @reason shared read boundary delegates exact-version resolution
     @property
     def submission_definition(self) -> SubmissionDefinition:
         return definition_for(self._submission_owner)
@@ -433,12 +379,6 @@ class SubmitterMixin:
     def submission_schema_error(self) -> str | None:
         return self.submission_definition.error
 
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_stored_explicit_checkbox_false_survives_load_save
-    # @tests tests_unit/test_004e_submission_behavior.py::test_stored_null_checkbox_normalizes_away_on_resave
-    # @tests tests_unit/test_004e_submission_behavior.py::test_empty_submission_pops_submission_db_key
-    # @tests tests_unit/test_004d_submitter.py::test_save_submission_discards_legacy_defaults_and_keeps_current_answers
-    # @matrix submission : blank-persistence empty-submission load-save normalization reconciliation stored-false stored-null
     def save_submission(self) -> None:
         owner = self._submission_owner
         require_mutable_submission(owner)
@@ -456,18 +396,12 @@ class SubmitterMixin:
         if "description" in submission_value:
             owner.description = cast("str | None", submission_value["description"])
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/forms/changes.py::notice_projection
-    # @reason shared Page and Task read-only template projection
     @property
     def migration_notice(self) -> list[dict[str, object]]:
         from lagniappe.core.tools.forms.changes import notice_projection
         owner = self._submission_owner
         return notice_projection(owner) if owner.db.get("pre_migration") else []
 
-    # @testable true
-    # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_links_internal_top_level_and_table_row
-    # @pairs form-table:derived-page-keys submission:derived-page-keys
     @property
     def derived_page_keys(self) -> list[Key]:
         owner = self._submission_owner
@@ -482,9 +416,6 @@ class SubmitterMixin:
 
         return keys
 
-    # @testable true
-    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_restricted_fingerprints_share_the_entity_and_cache_formula
-    # @matrix permissions cache : fingerprint form-version
     @property
     def fingerprint(self) -> str:
         # TaskHistory resolves Entity.fingerprint before this mixin.
@@ -501,9 +432,6 @@ class SubmitterMixin:
             form_version=version or "",
         )
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_revision_tracks_only_form_apply_state
-    # @pairs ai:autofill deferred-jobs:form-revision
     @property
     def autofill_revision(self) -> str:
         """Stable revision for state that autofill reads and may overwrite."""

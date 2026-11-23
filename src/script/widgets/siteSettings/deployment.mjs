@@ -14,11 +14,6 @@ const DEFAULT_INSTANCE_CLASS = {
 const MEMORY_SAFE_WORKER_CLASSES = new Set(["F2", "B2"]);
 const MEMORY_SAFE_WORKER_LIMIT = 3;
 
-/**
- * @testable true
- * @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
- * @matrix admin : deployment-settings metadata scaling-controls
- */
 export class SiteDeployment extends SiteSetting {
 	constructor(attributes) {
 		super(attributes);
@@ -196,11 +191,6 @@ export class SiteDeployment extends SiteSetting {
 		});
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_019_form_sync_frontend.mjs::test_site_deployment_caps_workers_only_for_f2_and_b2
-	 * @matrix admin : deployment-settings memory-pressure scaling-controls
-	 */
 	_syncWorkerLimit() {
 		if (!this.deploymentForm) return;
 		const instanceClass = this.deploymentForm.querySelector(

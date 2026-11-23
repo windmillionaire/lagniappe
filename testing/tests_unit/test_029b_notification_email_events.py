@@ -24,7 +24,6 @@ from testing.utility.notification_email_fakes import (
 pytestmark = pytest.mark.unit
 
 
-# @matrix agent-api testing web-headers : origin-validation
 def test_managed_local_test_origin_ignores_request_host_headers(monkeypatch):
     configuration = SimpleNamespace(
         testing=True,
@@ -61,7 +60,6 @@ def test_managed_local_test_origin_ignores_request_host_headers(monkeypatch):
     assert email_links.origin() == "https://app.example.test"
 
 
-# @matrix notification-email : html idempotency immediate notification pending-filter presence-suppression retry-release
 def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=UTC)
     store = MemoryDatastore()
@@ -251,7 +249,6 @@ def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
     assert len(sent) == 2
 
 
-# @pair notification-email:document-mention
 def test_document_mention_email_uses_concise_copy_and_document_tab(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=UTC)
     store = MemoryDatastore()
@@ -323,7 +320,6 @@ def test_document_mention_email_uses_concise_copy_and_document_tab(monkeypatch):
     )
 
 
-# @pair notification-email:task-assignment
 def test_task_assignment_email_uses_task_copy_without_headers(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=UTC)
     store = MemoryDatastore()

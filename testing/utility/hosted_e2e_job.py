@@ -42,9 +42,6 @@ def _hosted_environment() -> str:
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_individual_nodeids
-# @matrix hosted-e2e : argument-injection focused-execution target-validation
 def validate_focused_targets(targets) -> tuple[str, ...]:
     """Validate individual nodeid syntax and file scope before job overrides."""
     normalized = tuple(str(target).strip() for target in targets or ())
@@ -104,11 +101,6 @@ def validate_focused_targets(targets) -> tuple[str, ...]:
     return normalized
 
 
-# @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_individual_nodeids
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract
-# @matrix hosted-e2e : argument-injection focused-execution target-validation
-# @pair hosted-e2e:suite-scope
 def _pytest_command(
     targets=(),
     *,
@@ -147,9 +139,6 @@ def _pytest_command(
     ]
 
 
-# @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_complete_run_merges_all_phases_without_hiding_failure
-# @matrix hosted-e2e testing : suite-scope result-aggregation failure-retention
 def _run_complete_suites(environment):
     """Keep non-browser suites serial, then coordinate the complete E2E suite."""
     from runner.pytest_reports import merge_junit_reports
@@ -292,9 +281,6 @@ def _upload_artifacts(manifest: dict) -> None:
                 bucket.blob(f"{prefix}/{name}").upload_from_filename(path)
 
 
-# @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_container_runs_complete_or_nodeids_and_records_scope
-# @matrix hosted-e2e : cli-routing suite-scope focused-execution target-validation
 def main(arguments=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

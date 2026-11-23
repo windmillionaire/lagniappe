@@ -1,10 +1,5 @@
 import { captureError, isSkippedViewTransitionError } from "./errors.mjs";
 
-/**
- * @testable false
- * @covered-by src/script/shared/transitions.mjs::withTransition
- * @reason no-transition fallback is part of the transition wrapper
- */
 const runWithoutTransition = async (callback, label = "unlabeled") => {
 	try {
 		const result = callback();
@@ -23,20 +18,10 @@ const runWithoutTransition = async (callback, label = "unlabeled") => {
 	}
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/transitions.mjs::withTransition
- * @reason transition queue prevents concurrent View Transitions API aborts
- */
 let transitionQueue = Promise.resolve();
 let transitionDepth = 0;
 let pendingTransitionBatch = null;
 
-/**
- * @testable false
- * @covered-by src/script/shared/transitions.mjs::withTransition
- * @reason development-only timing diagnostic is part of the transition wrapper
- */
 const reportSlowCommit = (label, started) => {
 	if (typeof performance === "undefined" || !performance.now) return;
 	if (typeof __BUILD_ID__ !== "undefined") return;
@@ -48,11 +33,6 @@ const reportSlowCommit = (label, started) => {
 	);
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/transitions.mjs::withTransition
- * @reason exact-once commit execution is exercised through the public transition wrapper
- */
 const runCommit = (callback, label) => {
 	const started =
 		typeof performance !== "undefined" && performance.now
@@ -86,11 +66,6 @@ const runCommit = (callback, label) => {
 	}
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/transitions.mjs::withTransition
- * @reason same-turn commit batching is exercised through the public transition wrapper
- */
 const runTransitionBatch = (entries) => {
 	const results = new Array(entries.length).fill(false);
 	const pending = [];
@@ -122,19 +97,9 @@ const runTransitionBatch = (entries) => {
 	};
 };
 
-/**
- * @testable false
- * @covered-by src/script/shared/transitions.mjs::withTransition
- * @reason single-transition runner is private to the queued wrapper
- */
 const executeTransition = async (entries) => {
 	let batch = null;
 	let updateStarted = false;
-	/**
-	 * @testable false
-	 * @covered-by src/script/shared/transitions.mjs::withTransition
-	 * @reason browser update callback is private transition-wrapper plumbing
-	 */
 	const update = () => {
 		updateStarted = true;
 		batch = runTransitionBatch(entries);
@@ -159,11 +124,6 @@ const executeTransition = async (entries) => {
 		return;
 	}
 
-	/**
-	 * @testable false
-	 * @covered-by src/script/shared/transitions.mjs::withTransition
-	 * @reason transition promise observation is exercised through public error handling
-	 */
 	const observeTransitionError = (error) => {
 		if (!isSkippedViewTransitionError(error)) captureError(error);
 	};
@@ -184,14 +144,6 @@ const executeTransition = async (entries) => {
 	});
 };
 
-/**
- * @testable true
- * @tests tests_js/test_011_view_transitions_frontend.mjs::test_nested_transition_joins_active_transition_without_error_report
- * @tests tests_js/test_011_view_transitions_frontend.mjs::test_transition_resolves_after_update_without_waiting_for_animation
- * @tests tests_js/test_011_view_transitions_frontend.mjs::test_same_turn_commits_share_one_transition_and_run_once
- * @tests tests_js/test_011_view_transitions_frontend.mjs::test_ready_rejection_does_not_replay_commit
- * @matrix view-transition : animation-lifecycle coalescing error-reporting exact-once nested-callback queueing ready-rejection update-completion
- */
 export const withTransition = (callback, { label = "unlabeled" } = {}) => {
 	if (transitionDepth > 0) {
 		// Nested callers are already inside the browser's transition update.

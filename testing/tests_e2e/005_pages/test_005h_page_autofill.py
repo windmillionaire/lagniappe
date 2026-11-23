@@ -21,9 +21,6 @@ FILE_SUMMARY = "Parcel 123 is assessed at $245,000 from the attached report."
 EXPECTED_VALUE = "$245,000"
 
 
-# @source lagniappe/web/deferred_autofill.py::form_state
-# @source lagniappe/web/deferred_autofill.py::form_fingerprint
-# @pair ai:autofill
 # @template pages/info.html::info_form
 @pytest.mark.parametrize("task_state", ["none", "active", "completed"])
 def test_page_form_state_does_not_load_task_collection(get_admin, get_user, monkeypatch, task_state):
@@ -81,10 +78,6 @@ def _attach_evidence(page):
     return file
 
 
-# @matrix ai : attached-files autofill completion-refresh deferred
-# @matrix deferred-jobs : cloud-tasks conflict form-lock form-schema hosted-e2e oidc process-route provider-delivery refresh reload
-# @matrix notifications : autofill deferred
-# @matrix pages : autofill deferred form-schema refresh
 # @template pages/info.html::info_form
 @pytest.mark.ai
 @pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])

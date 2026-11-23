@@ -100,7 +100,6 @@ def isolated_state(monkeypatch, tmp_path):
     return state_path, lock_path
 
 
-# @matrix test-session : concurrency durable-state ownership subprocess
 def test_two_subprocess_starts_produce_one_owner(tmp_path):
     script = """
 import os
@@ -165,7 +164,6 @@ else:
     assert not (tmp_path / "test-session.json").exists()
 
 
-# @matrix test-session : mutation-order ownership preflight
 def test_busy_session_stops_before_mutation(isolated_state):
     first = test_session.acquire_test_session(
         "local-e2e",
@@ -202,7 +200,6 @@ def test_busy_session_stops_before_mutation(isolated_state):
         managed.rollback_without_cleanup()
 
 
-# @matrix test-session : managed-start mutation-order ownership
 def test_managed_start_conflict_stops_before_mutation(isolated_state, monkeypatch):
     from runner import testing
 
@@ -233,7 +230,6 @@ def test_managed_start_conflict_stops_before_mutation(isolated_state, monkeypatc
         first.rollback_without_cleanup()
 
 
-# @matrix test-session : corrupt-state fail-closed schema
 def test_corrupt_session_state_fails_closed(isolated_state):
     state_path, _lock_path = isolated_state
     invalid = _state()
@@ -246,7 +242,6 @@ def test_corrupt_session_state_fails_closed(isolated_state):
         test_session.load_session_state()
 
 
-# @matrix test-session : pid-reuse process-start
 def test_process_identity_rejects_reused_pid(monkeypatch):
     expected = _identity(started="Mon Aug 25 12:00:00 2026")
     monkeypatch.setattr(
@@ -258,7 +253,6 @@ def test_process_identity_rejects_reused_pid(monkeypatch):
     assert test_session.inspect_process_identity(expected) == "mismatch"
 
 
-# @matrix test-session : command-fingerprint portability process-start
 def test_capture_process_identity_uses_portable_ps_fingerprint(monkeypatch):
     values = {
         (4321, "pid"): "4321",
@@ -286,7 +280,6 @@ def test_capture_process_identity_uses_portable_ps_fingerprint(monkeypatch):
     ).hexdigest()
 
 
-# @matrix test-session : cross-platform fail-closed port-ownership
 def test_occupied_port_is_refused_without_signaling(monkeypatch):
     from runner import testing
 
@@ -306,7 +299,6 @@ def test_occupied_port_is_refused_without_signaling(monkeypatch):
         testing.require_server_port_available("http://127.0.0.1:5000")
 
 
-# @matrix test-session : health-nonce process-identity readiness
 def test_wait_for_session_server_requires_exact_nonce_and_pid(monkeypatch, capsys):
     from runner import testing
 
@@ -351,7 +343,6 @@ def test_wait_for_session_server_requires_exact_nonce_and_pid(monkeypatch, capsy
     assert "identity mismatch" in capsys.readouterr().out
 
 
-# @matrix test-session : pid-reuse signal-safety
 def test_reused_recorded_pid_is_never_signaled(monkeypatch):
     from runner import testing
 
@@ -365,7 +356,6 @@ def test_reused_recorded_pid_is_never_signaled(monkeypatch):
     assert testing._terminate_verified_process_group(_identity()) is False
 
 
-# @matrix test-session : legacy-migration pid-reuse signal-safety
 def test_live_legacy_pid_is_refused_without_signaling(monkeypatch, tmp_path):
     from runner import testing
 
@@ -394,7 +384,6 @@ def test_live_legacy_pid_is_refused_without_signaling(monkeypatch, tmp_path):
     assert pid_path.exists()
 
 
-# @matrix test-session : health-nonce recovery signal-safety
 def test_recovery_rejects_wrong_health_nonce_without_signaling(monkeypatch):
     from runner import testing
 
@@ -412,7 +401,6 @@ def test_recovery_rejects_wrong_health_nonce_without_signaling(monkeypatch):
         testing._terminate_recoverable_server(state)
 
 
-# @matrix test-session : mode-isolation teardown
 def test_managed_teardown_cannot_touch_local_e2e_owner(monkeypatch):
     from runner import testing
 
@@ -433,7 +421,6 @@ def test_managed_teardown_cannot_touch_local_e2e_owner(monkeypatch):
         testing.teardown_managed_test_server()
 
 
-# @matrix test-session : browser-attachment mode-isolation teardown
 def test_managed_teardown_refuses_live_browser_attachment(
     isolated_state, monkeypatch
 ):
@@ -464,7 +451,6 @@ def test_managed_teardown_refuses_live_browser_attachment(
         testing.teardown_managed_test_server()
 
 
-# @matrix test-session : browser-attachment detach exclusivity
 def test_browser_attachment_is_exclusive_and_detaches(
     isolated_state, monkeypatch
 ):
@@ -488,7 +474,6 @@ def test_browser_attachment_is_exclusive_and_detaches(
     assert test_session.load_session_state()["attachment"] is None
 
 
-# @matrix test-session : live-owner recovery
 def test_recovery_refuses_while_owner_is_live(monkeypatch):
     from runner import testing
 
@@ -511,7 +496,6 @@ def test_recovery_refuses_while_owner_is_live(monkeypatch):
         testing.recover_managed_test_server()
 
 
-# @matrix test-session : idempotence recovery
 def test_recovery_is_idempotent_without_state(monkeypatch, tmp_path):
     from runner import testing
 
@@ -545,7 +529,6 @@ def test_recovery_is_idempotent_without_state(monkeypatch, tmp_path):
     }
 
 
-# @matrix test-session : seed-loading lease-ownership
 def test_seed_loading_requires_authority_before_import_or_mutation(monkeypatch):
     from testing.utility import test_server_seed
 

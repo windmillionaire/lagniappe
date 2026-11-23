@@ -48,9 +48,6 @@ from .state import LifecycleCheckpoint
 DEFAULT_DATABASE = "(default)"
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
-# @reason terminal animation wraps tested restore phases without changing their contracts
 @contextmanager
 def _progress(formatter, message):
     with formatter.progress(text=message) as spinner:
@@ -62,9 +59,6 @@ def _progress(formatter, message):
         spinner.ok()
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
-# @reason recovery catalog trust checks are exercised by public restore orchestration
 def _load_catalog(context, uri):
     bucket, name = parse_gs_uri(uri)
     if bucket != context.recovery_bucket:
@@ -73,9 +67,6 @@ def _load_catalog(context, uri):
     return payload
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_plan
-# @reason key classification is part of read-only restore preflight
 def _merge_counts(context, manifest):
     """Count keys the import will overwrite or resurrect without writing."""
     inventory = _load_catalog(context, manifest.inventory_uri)
@@ -92,9 +83,6 @@ def _merge_counts(context, manifest):
     }
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_restore_dry_run_is_deterministic_and_read_only
-# @matrix data-lifecycle : dry-run in-place-merge restore-preflight safety-collision
 def restore_plan(backup_id: str, context: ProviderContext | None = None) -> RestorePlan:
     """Perform a read-only preflight for an in-place default-database merge."""
     context = context or ProviderContext.from_settings()
@@ -235,9 +223,6 @@ def restore_plan(backup_id: str, context: ProviderContext | None = None) -> Rest
     }
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
-# @reason console rendering presents an already validated restore plan
 def _print_plan(plan):
     from installer import FORMATTER, wrap_text
 
@@ -268,9 +253,6 @@ def _print_plan(plan):
         print(wrap_text(f"  {ui.literal(f'{number}.')} {step}"))
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
-# @reason whole-minute safety selection is exercised by restore orchestration
 def _safety_snapshot_time(context):
     now = context.now().astimezone(UTC)
     target = now.replace(second=0, microsecond=0) + timedelta(minutes=1)
@@ -278,9 +260,6 @@ def _safety_snapshot_time(context):
     return target
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
-# @reason safety generation inventory is an in-place restore checkpoint
 def _publish_safety_assets(context, plan, snapshot_time):
     _inventory, assets = inventory_database(
         context.datastore_client(DEFAULT_DATABASE), snapshot_time=snapshot_time
@@ -305,9 +284,6 @@ def _publish_safety_assets(context, plan, snapshot_time):
     }
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_restore_assets_rebinds_owner_to_new_generation
-# @matrix data-lifecycle disaster-recovery : asset-generation restore-assets
 def restore_generation_bound_assets(
     context: ProviderContext, plan: RestorePlan
 ) -> dict[str, int]:
@@ -380,9 +356,6 @@ def restore_generation_bound_assets(
     return {"assets": len(assets), "owners": len(owners)}
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_restore_requeues_only_durable_scheduled_uncompletion
-# @matrix data-lifecycle disaster-recovery : queue-reconciliation scheduled-uncomplete
 def reconcile_scheduled_uncomplete_tasks(
     context: ProviderContext, plan: RestorePlan, *, now: datetime | None = None
 ) -> dict[str, int]:
@@ -444,9 +417,6 @@ def reconcile_scheduled_uncomplete_tasks(
     return {"queued": queued, "backfilled": backfilled}
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
-# @reason completion publication occurs only after the public workflow converges
 def _completion_record(context, plan, checkpoint):
     object_name = f"{RESTORE_ROOT_PREFIX}/{plan['restore_id']}/record.json"
     payload = {
@@ -474,11 +444,6 @@ def _completion_record(context, plan, checkpoint):
     return payload
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_restore_dry_run_is_deterministic_and_read_only
-# @tests tests_tooling/test_008_data_lifecycle.py::test_in_place_restore_is_confirmed_resumable_and_has_no_rollback
-# @tests tests_tooling/test_008_data_lifecycle.py::test_in_place_restore_rejects_legacy_named_database_checkpoint
-# @matrix data-lifecycle : cache-invalidation confirmation dry-run in-place-merge legacy-journal-rejection progress queue-purge-audit remote-journal restore resume
 def restore_backup(
     backup_id: str,
     *,

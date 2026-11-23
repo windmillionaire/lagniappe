@@ -30,14 +30,6 @@ const ACTIONS = [
 	["delete", "delete", "Delete row"],
 ];
 
-/**
- * @testable true
- * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_table_submission_row_actions
- * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_table_submission_mobile_row_action_gestures
- * @tests tests_js/test_027_table_element_frontend.mjs::test_table_validation_uses_form_key_for_detached_preview
- * @tests tests_js/test_027_table_element_frontend.mjs::test_table_touch_movement_threshold_distinguishes_tap_from_swipe
- * @matrix form-table : delete detached-revision-preview edit mobile reload reorder row-actions touch-gesture validation-route
- */
 export class TableElement extends BaseElement {
 	constructor(renderer, schema, submission) {
 		super(renderer, schema, submission);

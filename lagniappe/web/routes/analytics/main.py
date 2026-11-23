@@ -100,38 +100,23 @@ CLEAR_RETENTION_OPTIONS = {
 }
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::index
-# @reason analytics records change outside normal entity fingerprinting
 @analytics.before_request
 def _no_cache():
     g.NO_CACHE = True
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::track
-# @reason analytics is intentionally route-local and covered through the owner dashboard workflow
 def enabled() -> bool:
     return bool(getattr(CONFIG, "ANALYTICS", False))
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::index
-# @reason AI observability enablement is exercised through independent dashboard gates
 def ai_enabled() -> bool:
     return bool(getattr(CONFIG, "AI_OBSERVABILITY", False))
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::index
-# @reason period parsing is dashboard-owned display behavior
 def _period(value):
     return value if value in PERIODS else "7d"
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::index
-# @reason route-local analytics window helper
 def _period_start(period):
     now = datetime.now(UTC)
     if period == "today":
@@ -143,32 +128,20 @@ def _period_start(period):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::_save_event
-# @reason route-local event classification
 def _route_prefix(path):
     parts = [p for p in (path or "/").split("/") if p]
     return parts[0] if parts else "home"
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::_activity_details
-# @reason action label presentation is route-local analytics view-model plumbing
 def _action_label(action):
     return ACTION_LABELS.get(action, action.replace("_", " ").title())
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::_dashboard
-# @reason route icon lookup is dashboard-owned analytics view-model plumbing
 def _route_icon(prefix):
     key = ROUTE_ICON_KEYS.get(prefix, prefix)
     return ".".join(key) if isinstance(key, tuple) else key or "analytics"
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::_activity_details
-# @reason analytics detail rows aggregate noisy event records by activity target
 def _activity_key(event):
     action = event.get("action") or "view"
     identity = (
@@ -181,23 +154,14 @@ def _activity_key(event):
     return (action, identity)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::_activity_details
-# @reason analytics detail titles favor entity names but fall back to routes
 def _activity_title(event):
     return event.get("page_title") or event.get("path") or "Untitled"
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::_activity_details
-# @reason analytics detail visitor labels compact user identity for grouped rows
 def _visitor_label(event):
     return event.get("user_name") or event.get("user_email") or "Public visitor"
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::events
-# @reason owner activity detail view intentionally summarizes event records instead of listing every hit
 def _activity_details(events, limit=DETAIL_LIMIT):
     grouped = {}
     for event in events:
@@ -237,9 +201,6 @@ def _activity_details(events, limit=DETAIL_LIMIT):
     return details[:limit]
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_excludes_internal_requests
-# @pair analytics:internal-request-exclusion
 def _save_event(data):
     if not enabled():
         return None
@@ -271,9 +232,6 @@ def _save_event(data):
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::_save_event
-# @reason login events are a dashboard analytics signal and intentionally share route-local persistence
 def record_login(user: models.User, provider: str | None = None) -> None:
     if not enabled() or not user:
         return
@@ -293,9 +251,6 @@ def record_login(user: models.User, provider: str | None = None) -> None:
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::index
-# @reason analytics queries intentionally live with the analytics route
 def _events(period, prefix=None, limit=QUERY_LIMIT):
     events = analytics_database.events(start=_period_start(period), limit=limit)
     if prefix:
@@ -303,9 +258,6 @@ def _events(period, prefix=None, limit=QUERY_LIMIT):
     return events
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::index
-# @reason AI summary queries are dashboard-owned period-window plumbing
 def _ai_records(period, limit=QUERY_LIMIT):
     return analytics_database.ai_observability_records(
         start=_period_start(period),
@@ -313,9 +265,6 @@ def _ai_records(period, limit=QUERY_LIMIT):
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::index
-# @reason owner-dashboard presentation projection for privacy-bounded live rows
 def _inflight_ai_records(records, job_keys_by_telemetry=None):
     """Project privacy-bounded live generations without payload content."""
     rows = []
@@ -351,9 +300,6 @@ def _inflight_ai_records(records, job_keys_by_telemetry=None):
     return rows[:50]
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::operation_diagnostic
-# @reason displayed operation lookup is bounded by the dashboard cohort
 def _recent_operation(key):
     for operation in DeferredJobs.recent(limit=250):
         if operation.get("key") == key:
@@ -361,9 +307,6 @@ def _recent_operation(key):
     abort(404)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::clear_records
-# @reason retention cutoff parsing is route-local analytics cleanup behavior
 def _clear_cutoff(retention):
     option = CLEAR_RETENTION_OPTIONS.get(retention)
     if option is None:
@@ -376,9 +319,6 @@ def _clear_cutoff(retention):
     return datetime.now(UTC) - timedelta(days=days)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::clear_records
-# @reason key-only datastore cleanup is owned by the analytics retention route
 def _delete_events(retention, batch_size=DELETE_BATCH_SIZE):
     return analytics_database.delete_events(
         before=_clear_cutoff(retention),
@@ -386,9 +326,6 @@ def _delete_events(retention, batch_size=DELETE_BATCH_SIZE):
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::clear_ai_records
-# @reason key-only AI cleanup is owned by its dataset-specific retention route
 def _delete_ai_records(retention, batch_size=DELETE_BATCH_SIZE):
     return analytics_database.delete_ai_observability(
         before=_clear_cutoff(retention),
@@ -396,9 +333,6 @@ def _delete_ai_records(retention, batch_size=DELETE_BATCH_SIZE):
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::index
-# @reason dashboard view model is route-local presentation logic
 def _dashboard(events):
     action_counts = Counter(event.get("action") or "view" for event in events)
     known_users = {
@@ -444,12 +378,6 @@ def _dashboard(events):
     }
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
-# @matrix ai-observability : ai-only independent-flags job-correlation
-# @matrix analytics : dashboard page-tracking period-controls
-# @pair deferred-jobs:diagnostics
 @analytics.route("/", methods=["GET"])
 @permission(Resource.SITE, Action.EDIT)
 def index() -> ResponseReturnValue:
@@ -525,9 +453,6 @@ def index() -> ResponseReturnValue:
     )
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
-# @pairs ai-observability:job-correlation deferred-jobs:diagnostics
 @analytics.route("/ai/operations/<job_id>.json", methods=["GET"])
 @permission(Resource.SITE, Action.EDIT)
 def operation_diagnostic(job_id: str) -> ResponseReturnValue:
@@ -542,9 +467,6 @@ def operation_diagnostic(job_id: str) -> ResponseReturnValue:
     )
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
-# @matrix analytics : accordion dashboard
 @analytics.route("/events/<prefix>", methods=["GET"])
 @permission(Resource.SITE, Action.EDIT)
 def events(prefix: str) -> ResponseReturnValue:
@@ -561,9 +483,6 @@ def events(prefix: str) -> ResponseReturnValue:
     )
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
-# @matrix analytics : owner-filter retention-clear
 @analytics.route("/clear/<retention>", methods=["DELETE"])
 @permission(Resource.SITE, Action.EDIT)
 def clear_records(retention: str) -> ResponseReturnValue:
@@ -580,9 +499,6 @@ def clear_records(retention: str) -> ResponseReturnValue:
     )
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
-# @pair ai-observability:independent-clear
 @analytics.route("/ai/clear/<retention>", methods=["DELETE"])
 @permission(Resource.SITE, Action.EDIT)
 def clear_ai_records(retention: str) -> ResponseReturnValue:
@@ -602,9 +518,6 @@ def clear_ai_records(retention: str) -> ResponseReturnValue:
     )
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
-# @matrix analytics : owner-filter page-load
 @analytics.route("/track", methods=["POST"])
 def track() -> ResponseReturnValue:
     if not enabled():

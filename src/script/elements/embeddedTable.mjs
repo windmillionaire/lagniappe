@@ -6,12 +6,6 @@ import { withTransition } from "../shared/transitions.mjs";
 import { primitives } from "./primitives.mjs";
 import { TableElement } from "./table.mjs";
 
-/**
- * @testable true
- * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload
- * @matrix table-controls : column-visibility persistence
- * @pair tasks:history
- */
 export class EmbeddedTableVisibility {
 	constructor(tableElt, storageKey = null) {
 		const preload = JSON.parse(tableElt.dataset.preload);
@@ -155,9 +149,6 @@ export class EmbeddedTableVisibility {
 	}
 }
 
-/**
- * @testable infrastructure
- */
 export class ExpandedTableCell {
 	constructor(view, button) {
 		this.view = view;
