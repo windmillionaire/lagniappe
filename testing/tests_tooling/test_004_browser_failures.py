@@ -194,6 +194,52 @@ def test_expected_request_failure_requires_exact_context_bound_count():
         collector.assert_clean()
 
 
+@pytest.mark.parametrize("console_first", [False, True])
+def test_offline_poll_scope_only_accounts_for_one_matching_fallback(console_first: bool) -> None:
+    collector = BrowserFailureCollector()
+    context = FakeContext()
+    collector.monitor_context(context, label="Owner")
+    page = context.new_page()
+    url = "http://test.local/l/poll"
+    fallback = '{"ok":false,"error":"You are offline"}'
+    message = SimpleNamespace(
+        type="error", text="Failed to load resource: the server responded with a status of 503 ()",
+        location={"url": url, "lineNumber": 0},
+    )
+
+    def emit_failure(method: str, body: str) -> None:
+        if console_first:
+            page.emit("console", message)
+        page.emit("response", SimpleNamespace(
+            status=503, url=url, request=SimpleNamespace(method=method),
+            headers={"content-type": "application/json"}, text=lambda: body,
+        ))
+        if not console_first:
+            page.emit("console", message)
+
+    for method, body, expected in [
+        ("GET", fallback, False),
+        ("POST", "Service Unavailable", False),
+        ("POST", fallback, True),
+    ]:
+        with collector.expect_http_error(
+            _user(page), status=503, path="/l/poll", method="POST", body=fallback,
+            count=0, max_count=1,
+        ):
+            emit_failure(method, body)
+        assert (collector.events[-1].expected_by is not None) is expected
+
+    with (
+        pytest.raises(AssertionError, match="between 0 and 1"),
+        collector.expect_http_error(
+            _user(page), status=503, path="/l/poll", method="POST", body=fallback,
+            count=0, max_count=1,
+        ),
+    ):
+        emit_failure("POST", fallback)
+        emit_failure("POST", fallback)
+
+
 def test_offline_scope_uses_native_ping_failure_and_ignores_late_console_copy():
     collector = BrowserFailureCollector()
     context = FakeContext()
