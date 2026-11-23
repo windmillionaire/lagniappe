@@ -1,5 +1,7 @@
 """Bound and sanitize request context used in error reports."""
 
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, cast, overload
 
