@@ -9,12 +9,14 @@ from ..properties import deferred_job_lock
 
 if TYPE_CHECKING:
     from . import property_types
+    from .entity import EntityProperties
 
 
 # @testable infrastructure
 class DeferredJobLock(Entity):
     """Small deterministic record coupling a target form to one active job."""
     if TYPE_CHECKING:
+        scope: str | None
         operation: str | None
 
         @property
@@ -24,7 +26,7 @@ class DeferredJobLock(Entity):
     entity_kind = "job_lock"
 
     @property
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         return frozenset(
             {
                 "target",
@@ -35,14 +37,14 @@ class DeferredJobLock(Entity):
         )
 
     @property
-    def to_cache(self):
+    def to_cache(self) -> dict[str, object]:
         return {}
 
     @property
-    def required(self):
+    def required(self) -> list[str]:
         return []
 
-    def _get_properties(self):
+    def _get_properties(self) -> EntityProperties:
         properties = super()._get_properties()
         properties.update(
             {

@@ -62,7 +62,7 @@ class ReportProcess(ProcessProperty[_Report]):
         self.summary = proposal.get("summary")
         self.result = None
 
-    def retry(self, message: str, result: ReportLedger | dict[str, object] | None = None) -> None:
+    def retry(self, message: str | None, result: ReportLedger | dict[str, object] | None = None) -> None:
         self.status = "pending"
         self.pending = True
         self.error = message

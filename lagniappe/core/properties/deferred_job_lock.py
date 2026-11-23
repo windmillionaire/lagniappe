@@ -6,7 +6,7 @@ from google.cloud.datastore import Key
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from lagniappe.core.entities import types as models
+    from lagniappe.core.tools.deferred_jobs.locks import LockJobView, LockView
     from lagniappe.core.entities.entity import Entity
 
 
@@ -29,7 +29,7 @@ class Operation(DBProperty[Key]):
     # @testable true
     # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lock_properties_own_identity_and_projection
     # @pair deferred-jobs:browser-projection
-    def descriptor(lock: models.DeferredJobLock, job: models.DeferredJob) -> dict[str, object]:
+    def descriptor(lock: LockView, job: LockJobView) -> dict[str, object]:
         return {
             "locked": True,
             "blocks_edit": lock.scope == Scope.FORM_CHANGE,
