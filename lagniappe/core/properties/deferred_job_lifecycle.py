@@ -42,6 +42,7 @@ class JobStatus(TypedDict):
     source_widget: str | None
     destination: str | None
     entity_key: str | None
+    can_cancel: NotRequired[bool]
     target_key: NotRequired[str | None]
     operation_id: NotRequired[str | None]
     snapshot_revision: NotRequired[str | None]
