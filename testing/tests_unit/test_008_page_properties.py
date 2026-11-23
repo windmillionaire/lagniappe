@@ -617,6 +617,9 @@ def test_page_files_loads_database_files():
     page_files.assert_called_once_with(page.key)
     load.assert_called_once_with(raw_file.key, page, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
     assert files == [file_entity]
+    with pytest.raises(AttributeError):
+        page.properties.files.value = []
+
     assert again is files
     assert page.properties.files.sort_value == 1
 
