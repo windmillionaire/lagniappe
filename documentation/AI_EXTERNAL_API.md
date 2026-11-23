@@ -29,7 +29,11 @@ clients can execute safe submitted proposals either via standalone
 via `submitPlan` / `submit_plan` with `execute: true` and a stable
 `operation_id`. Proposals containing `update_form_schema`, `needs_review`
 actions, non-empty `issues`, or per-request `require_review: true` always pause
-in `ready` state for authenticated browser review. `POST /plans/{plan_id}/execute`
+in `ready` state for authenticated browser review on standard user
+auto-execution; a designated experiments-installation admin agent over verified
+remote MCP may execute `update_form_schema`, `needs_review`, and `issues`
+proposals directly without opting into `User.allow_auto_execute` (still
+honoring explicit `require_review: true`). `POST /plans/{plan_id}/execute`
 returns a compact plan receipt (`include_proposal=false`), and
 `GET /plans/{plan_id}` accepts `?include_proposal=false` (the default for MCP
 `get_plan`, with optional `include_proposal=true`) for compact status polling.

@@ -232,6 +232,70 @@ def test_app_wide_auto_execute_api_key_compact_get_and_one_step_submit(monkeypat
     assert submitted_paused.json["execution"]["started"] is False
     assert "form schema" in submitted_paused.json["execution"]["reason"].lower()
 
+    # Designated experiments agent over remote MCP bypasses allow_auto_execute,
+    # site AI_AUTO_EXECUTE, and the normal-user safety pause on one-step submit.
+    agent_actor = SimpleNamespace(
+        email=CONFIG.AGENT_ACCESS_EMAIL,
+        key="agent-key",
+        urlsafe_key="agent-key",
+        hash="agenthash123",
+        name="Agent",
+        db={"timezone": "UTC"},
+        page=SimpleNamespace(
+            hash="agenthash123",
+            name="Agent",
+            url="/pages/agent",
+            allowed=lambda *_a, **_k: True,
+        ),
+        is_authenticated=True,
+        is_active=True,
+        is_public=False,
+        is_admin=True,
+        allow_auto_execute=False,
+    )
+    for name, value in {
+        "EXPERIMENTS_ENABLED": True,
+        "EXPERIMENTS_EXECUTION_ENABLED": True,
+        "EXPERIMENTS_PROJECT": CONFIG.GOOGLE_CLOUD_PROJECT,
+        "AGENT_ACCESS_ENABLED": True,
+    }.items():
+        monkeypatch.setattr(CONFIG, name, value)
+    monkeypatch.setattr(
+        auto_execute,
+        "runtime_ai_settings",
+        lambda config=CONFIG: {"AI_AUTO_EXECUTE": False},
+    )
+    monkeypatch.setattr(
+        remote_mcp, "authenticate_envelope", lambda *args: (agent_actor, {"active": True})
+    )
+    remote_headers = {
+        "Authorization": "Bearer service-token",
+        USER_TOKEN_HEADER: "oauth-token",
+    }
+    agent_me = client.get("/api/v1/me", headers=remote_headers)
+    assert agent_me.status_code == 200
+    assert agent_me.json["capabilities"] == {"plans": True, "execute_plan": True}
+
+    report.status = "ready"
+    submitted_agent = client.post(
+        "/api/v1/plans/plan-1/submit",
+        headers=remote_headers,
+        json={
+            "contract_version": 10,
+            "proposal": {},
+            "file_usage": [],
+            "execute": True,
+            "operation_id": "one-step-agent-schema",
+        },
+    )
+    assert submitted_agent.status_code == 200
+    assert submitted_agent.json["status"] == "running"
+    assert submitted_agent.json["execution"] == {"started": True}
+    assert submitted_agent.json["operation"] == {
+        "id": "one-step-agent-schema",
+        "status": "queued",
+    }
+
 
 # @matrix experiments : request-measurements
 @pytest.mark.parametrize(
