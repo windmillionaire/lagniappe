@@ -1,3 +1,11 @@
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.page import Page
+    from lagniappe.core.entities.task import Task
+    from lagniappe.core.entities.user import User
+
 import hashlib
 from dataclasses import dataclass
 from datetime import datetime, UTC
@@ -18,8 +26,8 @@ _MIN_DATETIME = datetime.min.replace(tzinfo=UTC)
 # @reason immutable result only carries the persisted combine outcome
 @dataclass(frozen=True)
 class TaskCombineResult:
-    main: object
-    removed: tuple
+    main: Task
+    removed: tuple[Task, ...]
     histories: tuple
 
 
@@ -134,7 +142,7 @@ def _source_histories(tasks):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
 # @matrix task-combine : attachments completed-on current-snapshot delete existing-history migrate-history winner
-def combine_tasks(task, selected_keys, page, user):
+def combine_tasks(task: Task, selected_keys: Iterable[str] | None, page: Page, user: User) -> TaskCombineResult:
     """Combine ``task`` with selected compatible peers and return the outcome."""
     selected_keys = tuple(selected_keys or ())
     if not selected_keys:
@@ -158,8 +166,7 @@ def combine_tasks(task, selected_keys, page, user):
         if isinstance(candidate, Entities.TASK)
     }
     current = loaded_by_key.get(task.urlsafe_key)
-    selected = tuple(loaded_by_key.get(key) for key in selected_keys)
-    if not current or any(candidate is None for candidate in selected):
+    if not current or any(key not in loaded_by_key for key in selected_keys):
         raise ValidationError("One or more selected tasks can no longer be combined")
 
     if not isinstance(page, Entities.PAGE) or not any(
@@ -167,6 +174,7 @@ def combine_tasks(task, selected_keys, page, user):
     ):
         raise ValidationError("One or more selected tasks can no longer be combined")
 
+    selected = tuple(loaded_by_key[key] for key in selected_keys)
     combined = (current, *selected)
     if not current.allowed(Action.DELETE, user=user) or any(
         not _compatible(current, candidate, page)

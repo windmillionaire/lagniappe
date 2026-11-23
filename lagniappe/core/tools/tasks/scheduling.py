@@ -1,6 +1,7 @@
 """Task recurrence, postponement, and durable uncomplete scheduling."""
 
 import hashlib
+from typing import Literal, TypedDict
 from datetime import datetime, timedelta, UTC
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import DAILY, MONTHLY, WEEKLY, YEARLY, MO, rrule
@@ -16,10 +17,17 @@ from ..dates import (
 from ..services import task_queue
 
 
+class CalendarRuleArguments(TypedDict, total=False):
+    wkst: rrule_weekday
+    byweekday: rrule_weekday | tuple[rrule_weekday, ...]
+    bymonthday: int
+    bymonth: int
+
+
 # @testable false
 # @covered-by lagniappe/core/tools/tasks/scheduling.py::add_uncomplete_task_to_queue
 # @reason midnight delay calculation is part of task uncomplete scheduling
-def user_tomorrow_in_seconds():
+def user_tomorrow_in_seconds() -> float:
     """Return seconds until midnight in the user's timezone."""
     now_user = datetime.now(user_timezone())
     tomorrow_user = beginning_of_day(now_user + timedelta(days=1))
@@ -31,7 +39,7 @@ def user_tomorrow_in_seconds():
 # @testable true
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_add_uncomplete_task_to_queue_future_due_queues_in_production
 # @matrix task-scheduling : durable-uncomplete timezone
-def scheduled_uncomplete_time():
+def scheduled_uncomplete_time() -> datetime:
     """Return the next user-local midnight as an absolute UTC timestamp."""
     now_user = datetime.now(user_timezone())
     tomorrow_user = beginning_of_day(now_user + timedelta(days=1))
@@ -71,7 +79,7 @@ def calculate_next_recurring_due_date(date, recurring):
 # @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_next_scheduled_due_date
 # @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_skipped_scheduled_tasks
 # @reason private validation and translation are exercised by scheduled stepping and skipped counting
-def _scheduled_rrule_args(scheduled):
+def _scheduled_rrule_args(scheduled: object) -> tuple[Literal[0, 1, 2, 3], CalendarRuleArguments] | None:
     """Translate a valid stored calendar schedule into ``rrule`` arguments."""
     if not isinstance(scheduled, dict):
         return None
@@ -94,6 +102,7 @@ def _scheduled_rrule_args(scheduled):
     if mode not in {"monthly", "yearly"}:
         return None
 
+    arguments: CalendarRuleArguments
     schedule_type = scheduled.get("type")
     if schedule_type == "specific_day":
         day = scheduled.get("day")
@@ -126,17 +135,19 @@ def _scheduled_rrule_args(scheduled):
         maximum_day = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)[
             month - 1
         ]
-        if day > maximum_day:
+        if arguments.get("bymonthday", 0) > maximum_day:
             return None
 
-    return YEARLY, {"bymonth": month, **arguments}
+    yearly: CalendarRuleArguments = {"bymonth": month}
+    yearly.update(arguments)
+    return YEARLY, yearly
 
 
 # @testable true
 # @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_scheduled_due_date
 # @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_scheduled_due_date_rejects_invalid_rules
 # @matrix task-scheduling : scheduled calendar-validation exact-boundary timezone
-def calculate_next_scheduled_due_date(due_date, scheduled):
+def calculate_next_scheduled_due_date(due_date: object, scheduled: object) -> datetime | None:
     """Return the first valid calendar occurrence strictly after ``due_date``."""
     if not isinstance(due_date, datetime):
         return None
@@ -146,6 +157,7 @@ def calculate_next_scheduled_due_date(due_date, scheduled):
         return None
 
     frequency, arguments = translated
+    assert isinstance(scheduled, dict)
     mode = scheduled["mode"]
     if mode == "yearly":
         rule_start = datetime(due_date.year, 1, 1, tzinfo=user_timezone())
@@ -169,7 +181,7 @@ def calculate_next_scheduled_due_date(due_date, scheduled):
 # @testable true
 # @tests tests_unit/test_013d_date_utilities.py::test_find_ordinal_weekday_in_month
 # @pair dates:ordinal-weekday
-def find_ordinal_weekday_in_month(month_start, ordinal, weekday):
+def find_ordinal_weekday_in_month(month_start: object, ordinal: object, weekday: object) -> datetime | None:
     """Find the nth weekday in one month, or the last when ordinal is -1."""
     if not isinstance(month_start, datetime):
         return None
@@ -195,7 +207,7 @@ def find_ordinal_weekday_in_month(month_start, ordinal, weekday):
 # @testable true
 # @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_monthly_occurrence
 # @pair dates:monthly-occurrence
-def calculate_next_monthly_occurrence(due_date, scheduled):
+def calculate_next_monthly_occurrence(due_date: object, scheduled: object) -> datetime | None:
     """Find the next monthly calendar occurrence after ``due_date``."""
     if not isinstance(scheduled, dict):
         return None
@@ -206,7 +218,7 @@ def calculate_next_monthly_occurrence(due_date, scheduled):
 # @testable true
 # @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_yearly_occurrence
 # @pair dates:yearly-occurrence
-def calculate_next_yearly_occurrence(due_date, scheduled):
+def calculate_next_yearly_occurrence(due_date: object, scheduled: object) -> datetime | None:
     """Find the next yearly calendar occurrence after ``due_date``."""
     if not isinstance(scheduled, dict):
         return None
@@ -472,7 +484,7 @@ def calculate_skipped_recurring_tasks(task, periodic):
 # @testable false
 # @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_skipped_scheduled_tasks
 # @reason monthly occurrence lookup is part of skipped scheduled-task counting
-def calculate_monthly_occurrence_for_date(month_start, scheduled):
+def calculate_monthly_occurrence_for_date(month_start: object, scheduled: object) -> datetime | None:
     """Calculate the configured occurrence bounded to one month."""
     if not isinstance(month_start, datetime) or not isinstance(scheduled, dict):
         return None
@@ -498,7 +510,7 @@ def calculate_monthly_occurrence_for_date(month_start, scheduled):
 # @testable false
 # @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_skipped_scheduled_tasks
 # @reason yearly occurrence lookup is part of skipped scheduled-task counting
-def calculate_yearly_occurrence_for_year(year, scheduled):
+def calculate_yearly_occurrence_for_year(year: object, scheduled: object) -> datetime | None:
     """Calculate the configured occurrence bounded to one year."""
     if type(year) is not int or not isinstance(scheduled, dict):
         return None
