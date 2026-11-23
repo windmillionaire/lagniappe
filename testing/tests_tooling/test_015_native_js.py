@@ -7,8 +7,9 @@ import pytest
 from testing.utility import (
     native_js,
     template_contracts,
-    traceability,
-    traceability_results,
+    contract_common,
+    test_evidence,
+    evidence_results,
 )
 
 
@@ -45,17 +46,13 @@ def test_native_metadata_uses_existing_test_and_template_contracts(
     tmp_path, native_inventory
 ):
     path, _ = native_inventory
-    tests = traceability.discover_tests(tmp_path, ["testing/tests_js"])
+    tests = contract_common.collect_contract_tests(tmp_path)
     case = tests["tests_js/test_example.mjs::test_example"]
-    assert case.metadata.features == ["example"]
-    assert case.metadata.styles == ["button.submit"]
-    assert case.start_lineno == 1
-    assert "package-lock.json" in case._execution_dependencies
+    assert case.styles == ["button.submit"]
+    assert "package-lock.json" in native_js.execution_dependencies(path, tmp_path)
     refs = template_contracts.collect_template_references(tmp_path, path.name)
     assert [ref.nodeid for ref in refs] == [case.nodeid]
     assert refs[0].template_ref == "example.html::form"
-    assert traceability.NODEID_LINE_RE.match(case.nodeid)
-    assert traceability.test_matches_target(case, "test_example.mjs")
     template = tmp_path / "lagniappe/web/templates/example.html"
     template.parent.mkdir(parents=True)
     template.write_text('{% macro form() %}<p data-role="saved"></p>{% endmacro %}')
@@ -66,145 +63,66 @@ def test_native_metadata_uses_existing_test_and_template_contracts(
     )
 
 
-def test_native_helper_changes_focus_and_invalidate_evidence(
-    tmp_path, monkeypatch, native_inventory
+@pytest.mark.parametrize("changed", ["testing/utility/native_js.py", ".nvmrc", "package-lock.json"])
+def test_changed_native_runner_input_expires_contract_evidence(
+    tmp_path, monkeypatch, native_inventory, changed
 ):
-    tests = traceability.discover_tests(tmp_path, ["testing/tests_js"])
-    case = next(iter(tests.values()))
-    dependency = "testing/utility/native_js.py"
-    case.execution_current = True
-    case._execution_snapshots = [{dependency: "old"}]
-    monkeypatch.setattr(
-        traceability, "behavior_path_fingerprints", lambda root: {dependency: "new"}
-    )
-    traceability.apply_test_dependency_fingerprints(
-        tests, {case.nodeid: set(case._execution_dependencies)}, tmp_path
-    )
-    assert not case.execution_current
-    assert traceability.changed_tests_for_paths(tests, [dependency], {}) == [case]
+    path, _ = native_inventory
+    case = "tests_js/test_example.mjs::test_example"
+    fingerprints = dict.fromkeys(native_js.execution_dependencies(path, tmp_path), "old")
+    monkeypatch.setattr(contract_common, "behavior_path_fingerprints", lambda _: fingerprints)
+    test_evidence.write_json(tmp_path / test_evidence.LATEST_TEST_RUN, {
+        "schema_version": 2,
+        "snapshots": {"run": {"paths": fingerprints}},
+        "tests": {case: {"outcome": "passed", "snapshot": "run"}},
+    })
+    tests = contract_common.collect_contract_tests(tmp_path)
+    contract_common.attach_contract_results(tmp_path, tests)
+    assert tests[case].execution_current
+    fingerprints[changed] = "new"
+    contract_common.attach_contract_results(tmp_path, tests)
+    assert not tests[case].execution_current
 
 
-@pytest.fixture
-def python_node_program(tmp_path, monkeypatch, native_inventory):
+@pytest.mark.parametrize(
+    "changed",
+    ["testing/utility/js/interop.mjs", "testing/utility/js/fixtures/value.mjs"],
+)
+def test_python_style_case_tracks_program_and_imported_helpers(tmp_path, monkeypatch, changed):
     program = tmp_path / "testing/utility/js/interop.mjs"
-    helper = program.parent / "fixtures/value.mjs"
-    helper.parent.mkdir(parents=True)
-    program.write_text('import "./fixtures/value.mjs";\n')
-    helper.write_text("export const value = 1;\n")
-    (tmp_path / ".nvmrc").write_text("26.8.2\n")
-    (tmp_path / "package-lock.json").write_text('{"lockfileVersion": 3}\n')
+    child = program.parent / "fixtures/value.mjs"
+    child.parent.mkdir(parents=True)
+    program.write_text('import "./fixtures/value.mjs";')
+    child.write_text("export const value = 1;")
     bridge = tmp_path / "testing/tests_js/test_bridge.py"
-    bridge.write_text(
-        "# @node-program testing/utility/js/interop.mjs\n"
-        "def test_bridge(): pass\n\n"
-        "def test_unrelated(): pass\n"
-    )
-    monkeypatch.setattr(
-        native_js,
-        "inventory",
-        lambda path: {
-            "cases": [],
-            "imports": ["./fixtures/value.mjs"] if path == program else [],
-        },
-    )
-    return traceability.discover_tests(tmp_path, ["testing/tests_js/test_bridge.py"])
-
-
-@pytest.mark.parametrize(
-    "dependency",
-    [
-        "testing/utility/js/interop.mjs",
-        "testing/utility/js/fixtures/value.mjs",
-        ".nvmrc",
-        "package-lock.json",
-    ],
-)
-def test_python_node_program_changes_focus_and_invalidate_its_evidence(
-    tmp_path, python_node_program, dependency
-):
-    tests = python_node_program
+    bridge.parent.mkdir(parents=True)
+    bridge.write_text("# @style button.submit\n# @node-program testing/utility/js/interop.mjs\ndef test_bridge(): pass\n")
+    monkeypatch.setattr(native_js, "inventory", lambda path: {
+        "cases": [], "imports": ["./fixtures/value.mjs"] if path == program else [],
+    })
+    tests = contract_common.collect_contract_tests(tmp_path)
     case = tests["tests_js/test_bridge.py::test_bridge"]
-    unrelated = tests["tests_js/test_bridge.py::test_unrelated"]
-    assert case.metadata.node_programs == ["testing/utility/js/interop.mjs"]
-    assert case.metadata.sources == []
-    assert traceability.feature_dimension_pairs(case.metadata) == set()
-    assert not traceability.traceability_metadata_issues([], tests.values())
-    dependencies = {
-        test.nodeid: set(test._execution_dependencies) for test in tests.values()
-    }
-    for test in tests.values():
-        test.execution_current = True
-        test._execution_snapshots = [traceability.behavior_path_fingerprints(tmp_path)]
-    traceability.apply_test_dependency_fingerprints(tests, dependencies, tmp_path)
-    assert case.execution_current and unrelated.execution_current
-
-    path = tmp_path / dependency
-    if path.suffix == ".mjs":
-        path.write_text("export const value = 2;\n")
-    elif path.name == ".nvmrc":
-        path.write_text("26.9.0\n")
-    else:
-        path.write_text('{"lockfileVersion": 4}\n')
-    traceability.apply_test_dependency_fingerprints(tests, dependencies, tmp_path)
-
+    dependencies = native_js.execution_dependencies(program, tmp_path) | {"testing/tests_js/test_bridge.py"}
+    fingerprints = dict.fromkeys(dependencies, "old")
+    monkeypatch.setattr(contract_common, "behavior_path_fingerprints", lambda _: fingerprints)
+    test_evidence.write_json(tmp_path / test_evidence.LATEST_TEST_RUN, {
+        "schema_version": 2,
+        "snapshots": {"run": {"paths": fingerprints}},
+        "tests": {case.nodeid: {"outcome": "passed", "snapshot": "run"}},
+    })
+    contract_common.attach_contract_results(tmp_path, tests)
+    assert case.execution_current
+    fingerprints[changed] = "new"
+    contract_common.attach_contract_results(tmp_path, tests)
     assert not case.execution_current
-    assert unrelated.execution_current
-    assert traceability.changed_tests_for_paths(tests, [dependency], {}) == [case]
-
-
-def test_deleted_node_program_remains_a_dependency_and_reports_an_error(
-    tmp_path, python_node_program
-):
-    program = "testing/utility/js/interop.mjs"
-    (tmp_path / program).unlink()
-    tests = traceability.discover_tests(tmp_path, ["testing/tests_js/test_bridge.py"])
-    case = tests["tests_js/test_bridge.py::test_bridge"]
-
-    assert traceability.changed_tests_for_paths(tests, [program], {}) == [case]
-    issues = traceability.traceability_metadata_issues([], tests.values())
-    assert len(issues) == 1
-    assert issues[0]["severity"] == "error"
-    assert issues[0]["message"] == f"@node-program file does not exist: {program}"
-
-
-@pytest.mark.parametrize(
-    "program",
-    ["", "/absolute/program.mjs", "../program.mjs", "testing/utility/program.js"],
-)
-def test_node_program_rejects_invalid_declarations(tmp_path, native_inventory, program):
-    bridge = tmp_path / "testing/tests_js/test_bridge.py"
-    bridge.write_text(f"# @node-program {program}\ndef test_bridge(): pass\n")
-    tests = traceability.discover_tests(tmp_path, ["testing/tests_js/test_bridge.py"])
-    case = next(iter(tests.values()))
-
-    assert not case._execution_dependencies
-    issues = traceability.traceability_metadata_issues([], tests.values())
-    assert len(issues) == 1
-    assert issues[0]["severity"] == "error"
-    assert "@node-program" in issues[0]["message"]
 
 
 def test_native_evidence_prunes_removed_case(tmp_path, native_inventory):
     _, rows = native_inventory
     nodeid = "tests_js/test_example.mjs::test_example"
-    assert traceability_results._test_node_exists(tmp_path, nodeid, {})
+    assert evidence_results._test_node_exists(tmp_path, nodeid, {})
     rows.clear()
-    assert not traceability_results._test_node_exists(tmp_path, nodeid, {})
-
-
-def test_native_node_pin_changes_invalidate_evidence(tmp_path, native_inventory):
-    pin = tmp_path / ".nvmrc"
-    pin.write_text("26.8.2\n")
-    tests = traceability.discover_tests(tmp_path, ["testing/tests_js"])
-    case = next(iter(tests.values()))
-    case.execution_current = True
-    case._execution_snapshots = [traceability.behavior_path_fingerprints(tmp_path)]
-    dependencies = {case.nodeid: set(case._execution_dependencies)}
-    traceability.apply_test_dependency_fingerprints(tests, dependencies, tmp_path)
-    assert case.execution_current
-    pin.write_text("26.9.0\n")
-    traceability.apply_test_dependency_fingerprints(tests, dependencies, tmp_path)
-    assert not case.execution_current
+    assert not evidence_results._test_node_exists(tmp_path, nodeid, {})
 
 
 def test_native_reporter_requires_one_result_and_rejects_late_failures():

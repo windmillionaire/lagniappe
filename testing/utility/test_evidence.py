@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import ast
-from datetime import datetime, timezone
+from contextlib import suppress
+from datetime import UTC, datetime
 import hashlib
 import json
 from pathlib import Path
@@ -44,10 +45,10 @@ BEHAVIOR_EXCLUDED_PREFIXES = (
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
-def _git(
+def git_query(
     repo_root: Path, *args: str, check: bool = False, text: bool = False
 ) -> subprocess.CompletedProcess:
     command = ["git", *args]
@@ -163,24 +164,22 @@ def behavior_file_fingerprint(path: Path) -> str:
             )
         content = _python_behavior_bytes(content)
     elif path.suffix in {".js", ".mjs"}:
-        try:
+        with suppress(UnicodeDecodeError):
             content = _javascript_without_comments(content.decode("utf-8")).encode()
-        except UnicodeDecodeError:
-            pass
     return hashlib.sha256(content).hexdigest()
 
 
 def behavior_path_fingerprints(repo_root: Path) -> dict[str, str]:
     """Return semantic fingerprints for behavior files and virtual records."""
     paths: set[str] = set()
-    tracked = _git(repo_root, "ls-files", "-z")
+    tracked = git_query(repo_root, "ls-files", "-z")
     if tracked.returncode == 0:
         paths.update(
             value.decode(errors="surrogateescape")
             for value in tracked.stdout.split(b"\0")
             if value
         )
-    untracked = _git(repo_root, "ls-files", "--others", "--exclude-standard", "-z")
+    untracked = git_query(repo_root, "ls-files", "--others", "--exclude-standard", "-z")
     if untracked.returncode == 0:
         paths.update(
             value.decode(errors="surrogateescape")

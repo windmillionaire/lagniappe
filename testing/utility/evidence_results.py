@@ -1,14 +1,16 @@
-"""Pytest plugin that records the latest test outcomes for traceability."""
+"""Pytest plugin that records the test outcomes for local and hosted test evidence."""
 
 from __future__ import annotations
 
 import ast
+from collections.abc import Mapping
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+from typing import NotRequired, TypedDict
 
 from testing.utility import native_js
 
@@ -24,7 +26,15 @@ from testing.utility.test_evidence import (
 )
 
 
-_OUTCOMES: dict[str, dict[str, object]] = {}
+class _TestOutcome(TypedDict):
+    outcome: str
+    duration: float
+    failed_phase: NotRequired[str]
+    traceback: NotRequired[str]
+    traceback_truncated: NotRequired[bool]
+
+
+_OUTCOMES: dict[str, _TestOutcome] = {}
 MAX_TRACEBACK_CHARS = 100_000
 TRACEBACK_TRUNCATION_MARKER = "\n... traceback truncated ...\n"
 PARAMETER_SUFFIX_RE = re.compile(r"\[.*\]$")
@@ -186,7 +196,7 @@ def _test_node_exists(
 
 def _completed_parameter_sets(
     recorded_command: list[str],
-    outcomes: dict[str, dict[str, object]],
+    outcomes: Mapping[str, Mapping[str, object]],
     exitstatus: int,
 ) -> set[str]:
     """Find whole parametrized functions explicitly completed by this command."""
@@ -216,7 +226,7 @@ def _completed_parameter_sets(
 def _write_manifest(
     repo_root: Path,
     recorded_command: list[str],
-    outcomes: dict[str, dict[str, object]],
+    outcomes: Mapping[str, Mapping[str, object]],
     exitstatus: int,
 ) -> None:
     """Merge one pytest session into the result manifest."""
@@ -227,10 +237,10 @@ def _write_manifest(
         "behavior_snapshot": snapshot_id,
     }
     destination = repo_root / LATEST_TEST_RUN
-    previous = load_json(destination)
+    previous = load_json(destination) or {}
     tests: dict[str, object] = {}
     snapshots: dict[str, dict[str, str]] = {}
-    previous_schema = previous.get("schema_version") if previous else None
+    previous_schema = previous.get("schema_version")
     if isinstance(previous_schema, int) and previous_schema in {
         2,
         TEST_RUN_SCHEMA_VERSION,

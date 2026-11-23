@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import re
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
@@ -10,12 +11,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from testing.utility import native_js
-from testing.utility.traceability_common import (
+from testing.utility.test_evidence import (
+    git_query,
+    utc_now,
     LATEST_TEST_RUN,
     behavior_path_fingerprints,
     decode_test_run_snapshots,
     load_json,
 )
+
+CONTRACT_REPORT_SCHEMA_VERSION = 3
 
 _TAG = re.compile(r"^@([\w-]+)(?:\s*[:=]\s*|\s+)?(.*)$")
 _TAG_NAMES = {
@@ -165,3 +170,88 @@ def attach_contract_results(repo_root: Path, tests: dict[str, ContractTest]) -> 
                 dependencies.update(native_js.execution_dependencies(program_path, repo_root))
         test.execution_current = test.execution != "not_run" and test.matches(dependencies, current)
     return current
+
+
+def git_head(repo_root: Path) -> str | None:
+    result = git_query(repo_root, "rev-parse", "HEAD", text=True)
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def git_changed_paths(repo_root: Path, base: str = "HEAD") -> list[str]:
+    """Return tracked, staged, and untracked paths changed from ``base``."""
+    paths: set[str] = set()
+    commands = [
+        ("diff", "--name-only", "-z", base),
+        ("diff", "--cached", "--name-only", "-z"),
+        ("ls-files", "--others", "--exclude-standard", "-z"),
+    ]
+    for command in commands:
+        result = git_query(repo_root, *command)
+        if result.returncode != 0:
+            message = result.stderr.decode(errors="replace").strip()
+            raise RuntimeError(message or f"git {' '.join(command)} failed")
+        paths.update(
+            value.decode(errors="surrogateescape")
+            for value in result.stdout.split(b"\0")
+            if value
+        )
+    return sorted(paths)
+
+
+def working_tree_fingerprint(repo_root: Path) -> str:
+    """Hash HEAD plus the content and identity of every dirty path."""
+    digest = hashlib.sha256()
+    digest.update((git_head(repo_root) or "no-head").encode())
+    try:
+        paths = git_changed_paths(repo_root)
+    except RuntimeError:
+        paths = []
+
+    for relative in paths:
+        digest.update(b"\0path\0")
+        digest.update(relative.encode(errors="surrogateescape"))
+        path = repo_root / relative
+        if path.is_file():
+            digest.update(b"\0file\0")
+            try:
+                digest.update(path.read_bytes())
+            except OSError:
+                digest.update(b"unreadable")
+        elif path.exists():
+            digest.update(b"\0other\0")
+        else:
+            digest.update(b"\0deleted\0")
+    return digest.hexdigest()
+
+
+def provenance(repo_root: Path, *, command: Iterable[str] = ()) -> dict[str, object]:
+    return {
+        "generated_at": utc_now(),
+        "git_head": git_head(repo_root),
+        "working_tree_fingerprint": working_tree_fingerprint(repo_root),
+        "command": list(command),
+    }
+
+
+def stable_finding_id(kind: str, location: str, message: str) -> str:
+    """Return the shared content-derived identifier for a report finding."""
+    digest = hashlib.sha256(f"{kind}\0{location}\0{message}".encode()).hexdigest()[:16]
+    return f"{kind}:{digest}"
+
+
+def structured_report_payload(
+    *,
+    kind: str,
+    report: object,
+    report_provenance: dict[str, object],
+    findings: list[dict[str, str]],
+) -> dict[str, object]:
+    """Wrap a contract report in the repository's versioned JSON envelope."""
+    return {
+        "schema_version": CONTRACT_REPORT_SCHEMA_VERSION,
+        "kind": kind,
+        "provenance": report_provenance,
+        "findings": findings,
+        "finding_ids": [finding["id"] for finding in findings],
+        "report": report,
+    }

@@ -10,7 +10,8 @@ from testing.utility import (
     style_candidates,
     style_registry,
     style_traceability,
-    traceability_common,
+    contract_common,
+    test_evidence,
 )
 
 pytestmark = pytest.mark.tooling
@@ -511,7 +512,7 @@ unused:
     report, _manifest = style_traceability.build_report(tmp_path)
     payload = style_traceability.report_payload(report)
 
-    assert payload["schema_version"] == traceability_common.TRACEABILITY_SCHEMA_VERSION
+    assert payload["schema_version"] == contract_common.CONTRACT_REPORT_SCHEMA_VERSION
     assert payload["kind"] == "style-traceability-report"
     assert payload["finding_ids"] == [
         finding["id"] for finding in payload["findings"]
@@ -569,9 +570,9 @@ def test_dropdown_panel():
     assert manifest.styles["dropdown.panel"].fingerprint
 
     nodeid = "tests_js/test_dropdown.py::test_dropdown_panel"
-    paths = traceability_common.behavior_path_fingerprints(tmp_path)
-    traceability_common.write_json(
-        tmp_path / traceability_common.LATEST_TEST_RUN,
+    paths = test_evidence.behavior_path_fingerprints(tmp_path)
+    test_evidence.write_json(
+        tmp_path / test_evidence.LATEST_TEST_RUN,
         {
             "schema_version": 2,
             "tests": {nodeid: {"snapshot": "run", "outcome": "passed"}},

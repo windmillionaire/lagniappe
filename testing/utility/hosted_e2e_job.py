@@ -154,7 +154,7 @@ def _run_complete_suites(environment):
     """Keep non-browser suites serial, then coordinate the complete E2E suite."""
     from runner.pytest_reports import merge_junit_reports
     from testing.utility.test_evidence import load_json
-    from testing.utility.traceability_results import _write_manifest
+    from testing.utility.evidence_results import _write_manifest
 
     # Each hosted execution owns its container. Historical or partial evidence
     # must never masquerade as part of this execution's complete selection.
@@ -179,7 +179,7 @@ def _run_complete_suites(environment):
     merge_junit_reports(reports, destination)
     evidence = load_json(EVIDENCE_PATH)
     if not evidence or evidence.get("kind") != "test-run":
-        raise RuntimeError("Hosted phases did not produce traceability evidence")
+        raise RuntimeError("Hosted phases did not produce test evidence")
     _write_manifest(REPOSITORY_ROOT, _pytest_command(environment=environment), evidence["tests"], status)
     return status
 
@@ -237,7 +237,7 @@ def _stamp_evidence(manifest: dict) -> None:
 
     evidence = load_json(EVIDENCE_PATH)
     if not evidence or evidence.get("kind") != "test-run":
-        raise RuntimeError("pytest did not produce valid traceability evidence")
+        raise RuntimeError("pytest did not produce valid test evidence")
     provenance = dict(evidence.get("provenance") or {})
     provenance["hosted_e2e"] = {
         key: manifest[key]
@@ -279,7 +279,7 @@ def _upload_artifacts(manifest: dict) -> None:
         )
         _archive_reports(archive_path)
         if not EVIDENCE_PATH.is_file():
-            raise RuntimeError("pytest did not produce traceability evidence")
+            raise RuntimeError("pytest did not produce test evidence")
         uploads = (
             ("evidence.json", EVIDENCE_PATH),
             ("junit.xml", HOSTED_REPORT_ROOT / "junit.xml"),

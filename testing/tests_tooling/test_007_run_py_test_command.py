@@ -16,36 +16,16 @@ import run
 from runner import pytest_routing
 from testing.utility import (
     test_evidence,
-    traceability_results,
+    evidence_results,
 )
 
 pytestmark = pytest.mark.tooling
 
 
-def test_traceability_discovers_unit_tests_within_testing_root(tmp_path):
-    from testing.utility import traceability
-
-    path = tmp_path / "testing/tests_unit/test_internal.py"
-    path.parent.mkdir(parents=True)
-    path.write_text("def test_internal():\n    pass\n", encoding="utf-8")
-    roots = ["tests_unit"]
-    nodeid = "tests_unit/test_internal.py::test_internal"
-    discovered = traceability.discover_tests(tmp_path, roots)
-    assert set(discovered) == {nodeid}
-    assert traceability.pytest_collect_root_args(roots) == ["testing/tests_unit"]
-    assert traceability.test_path_from_nodeid(nodeid, tmp_path) == path
-    assert [test.nodeid for test in traceability.changed_tests_for_paths(
-        discovered, ["testing/tests_unit/test_internal.py"]
-    )] == [nodeid]
-    for unsafe in ("repo:clients/example/tests", "../outside", "/outside"):
-        with pytest.raises(ValueError, match="must stay within"):
-            traceability.test_files_in_roots(tmp_path, [unsafe])
-
-
 def test_traceability_result_plugin_can_skip_manifest_output(monkeypatch, tmp_path):
     writes = []
     monkeypatch.setattr(
-        traceability_results,
+        evidence_results,
         "_write_manifest",
         lambda *arguments: writes.append(arguments),
     )
@@ -54,7 +34,7 @@ def test_traceability_result_plugin_can_skip_manifest_output(monkeypatch, tmp_pa
         getoption=lambda name, default=False: name == "no_test_evidence",
     )
 
-    traceability_results.pytest_sessionfinish(
+    evidence_results.pytest_sessionfinish(
         types.SimpleNamespace(config=config),
         0,
     )
@@ -68,9 +48,9 @@ def test_traceability_result_plugin_records_failure_tracebacks(
 ):
     outcomes = {}
     with monkeypatch.context() as patch:
-        patch.setattr(traceability_results, "_OUTCOMES", outcomes)
+        patch.setattr(evidence_results, "_OUTCOMES", outcomes)
         patch.setattr(
-            traceability_results,
+            evidence_results,
             "behavior_snapshot",
             lambda repo_root: (
                 "snapshot",
@@ -78,7 +58,7 @@ def test_traceability_result_plugin_records_failure_tracebacks(
             ),
         )
 
-        traceability_results.pytest_runtest_logreport(
+        evidence_results.pytest_runtest_logreport(
             types.SimpleNamespace(
                 nodeid="tests_unit/test_failure.py::test_failure",
                 duration=0.25,
@@ -88,7 +68,7 @@ def test_traceability_result_plugin_records_failure_tracebacks(
                 longreprtext=f"{phase} failure traceback",
             )
         )
-        traceability_results._write_manifest(
+        evidence_results._write_manifest(
             tmp_path,
             ["run.py", "test", "tests_unit/test_failure.py::test_failure"],
             outcomes,
@@ -105,11 +85,11 @@ def test_traceability_result_plugin_records_failure_tracebacks(
 
 def test_traceability_result_plugin_bounds_failure_tracebacks(monkeypatch):
     outcomes = {}
-    oversized = "begin\n" + ("x" * traceability_results.MAX_TRACEBACK_CHARS) + "\nend"
+    oversized = "begin\n" + ("x" * evidence_results.MAX_TRACEBACK_CHARS) + "\nend"
 
     with monkeypatch.context() as patch:
-        patch.setattr(traceability_results, "_OUTCOMES", outcomes)
-        traceability_results.pytest_runtest_logreport(
+        patch.setattr(evidence_results, "_OUTCOMES", outcomes)
+        evidence_results.pytest_runtest_logreport(
             types.SimpleNamespace(
                 nodeid="tests_unit/test_failure.py::test_failure",
                 duration=0.25,
@@ -121,10 +101,10 @@ def test_traceability_result_plugin_bounds_failure_tracebacks(monkeypatch):
         )
 
     result = outcomes["tests_unit/test_failure.py::test_failure"]
-    assert len(result["traceback"]) == traceability_results.MAX_TRACEBACK_CHARS
+    assert len(result["traceback"]) == evidence_results.MAX_TRACEBACK_CHARS
     assert result["traceback"].startswith("begin\n")
     assert result["traceback"].endswith("\nend")
-    assert traceability_results.TRACEBACK_TRUNCATION_MARKER in result["traceback"]
+    assert evidence_results.TRACEBACK_TRUNCATION_MARKER in result["traceback"]
     assert result["traceback_truncated"] is True
 
 
@@ -175,7 +155,7 @@ def test_behavior_snapshot_excludes_tracked_test_evidence(monkeypatch, tmp_path)
         )
         return subprocess.CompletedProcess(args, 0, stdout=stdout, stderr=b"")
 
-    monkeypatch.setattr(test_evidence, "_git", fake_git)
+    monkeypatch.setattr(test_evidence, "git_query", fake_git)
 
     fingerprints = test_evidence.behavior_path_fingerprints(tmp_path)
 
@@ -190,7 +170,7 @@ def test_source_archive_snapshot_excludes_installed_mcp_environment(monkeypatch,
     installed.parent.mkdir(parents=True)
     source.write_text("VALUE = 1\n")
     installed.write_text("VALUE = 2\n")
-    monkeypatch.setattr(test_evidence, "_git", lambda *_a, **_kw:
+    monkeypatch.setattr(test_evidence, "git_query", lambda *_a, **_kw:
                         subprocess.CompletedProcess([], 1, stdout=b"", stderr=b"no git"))
     fingerprints = test_evidence.behavior_path_fingerprints(tmp_path)
     assert "mcp/server.py" in fingerprints
@@ -208,13 +188,13 @@ def test_traceability_result_plugin_merges_focused_results_without_session_histo
     (tests_root / "test_b.py").write_text("def test_b():\n    pass\n")
     generated_at = "2026-01-01T00:00:00+00:00"
     monkeypatch.setattr(
-        traceability_results,
+        evidence_results,
         "utc_now",
         lambda: generated_at,
     )
     for nodeid in ("tests_unit/test_a.py::test_a", "tests_unit/test_b.py::test_b"):
         command = ["run.py", "test", nodeid]
-        traceability_results._write_manifest(
+        evidence_results._write_manifest(
             tmp_path,
             command,
             {nodeid: {"outcome": "passed", "duration": 0.1}},
@@ -262,10 +242,10 @@ def test_traceability_result_plugin_replaces_a_tests_previous_result(
         ]
     )
     monkeypatch.setattr(
-        traceability_results, "behavior_snapshot", lambda repo_root: next(snapshots)
+        evidence_results, "behavior_snapshot", lambda repo_root: next(snapshots)
     )
     nodeid = "tests_unit/test_a.py::test_a"
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", nodeid],
         {
@@ -277,7 +257,7 @@ def test_traceability_result_plugin_replaces_a_tests_previous_result(
         },
         1,
     )
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", nodeid],
         {nodeid: {"outcome": "passed", "duration": 0.1}},
@@ -313,10 +293,10 @@ def test_traceability_result_plugin_replaces_a_completed_parameter_set(
         ]
     )
     monkeypatch.setattr(
-        traceability_results, "behavior_snapshot", lambda repo_root: next(snapshots)
+        evidence_results, "behavior_snapshot", lambda repo_root: next(snapshots)
     )
     base_nodeid = "tests_unit/test_a.py::test_a"
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", base_nodeid],
         {
@@ -326,7 +306,7 @@ def test_traceability_result_plugin_replaces_a_completed_parameter_set(
         0,
     )
 
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", base_nodeid],
         {
@@ -360,16 +340,16 @@ def test_traceability_result_plugin_keeps_other_tests_across_tree_changes(
         ]
     )
     monkeypatch.setattr(
-        traceability_results,
+        evidence_results,
         "utc_now",
         lambda: next(generated_times),
     )
     monkeypatch.setattr(
-        traceability_results, "behavior_snapshot", lambda repo_root: next(snapshots)
+        evidence_results, "behavior_snapshot", lambda repo_root: next(snapshots)
     )
 
     for nodeid in ("tests_unit/test_a.py::test_a", "tests_unit/test_b.py::test_b"):
-        traceability_results._write_manifest(
+        evidence_results._write_manifest(
             tmp_path,
             ["run.py", "test", nodeid],
             {nodeid: {"outcome": "passed", "duration": 0.1}},
@@ -411,11 +391,11 @@ def test_traceability_result_plugin_prunes_deleted_test_modules(monkeypatch, tmp
         ]
     )
     monkeypatch.setattr(
-        traceability_results, "behavior_snapshot", lambda repo_root: next(snapshots)
+        evidence_results, "behavior_snapshot", lambda repo_root: next(snapshots)
     )
     deleted_nodeid = "tests_unit/test_deleted.py::test_deleted"
     retained_nodeid = "tests_unit/test_retained.py::test_retained"
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", "testing/tests_unit"],
         {
@@ -426,7 +406,7 @@ def test_traceability_result_plugin_prunes_deleted_test_modules(monkeypatch, tmp
     )
 
     deleted_path.unlink()
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", retained_nodeid],
         {retained_nodeid: {"outcome": "passed", "duration": 0.1}},
@@ -458,11 +438,11 @@ def test_traceability_result_plugin_prunes_deleted_test_functions(
         ]
     )
     monkeypatch.setattr(
-        traceability_results, "behavior_snapshot", lambda repo_root: next(snapshots)
+        evidence_results, "behavior_snapshot", lambda repo_root: next(snapshots)
     )
     removed = "tests_unit/test_example.py::test_removed"
     retained = "tests_unit/test_example.py::test_retained"
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", "testing/tests_unit"],
         {
@@ -473,7 +453,7 @@ def test_traceability_result_plugin_prunes_deleted_test_functions(
     )
 
     module.write_text("def test_retained():\n    pass\n")
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", retained],
         {retained: {"outcome": "passed", "duration": 0.1}},
@@ -519,7 +499,7 @@ def test_traceability_result_plugin_migrates_legacy_snapshot_maps(
         )
     )
     monkeypatch.setattr(
-        traceability_results,
+        evidence_results,
         "behavior_snapshot",
         lambda repo_root: (
             "snapshot-two",
@@ -530,7 +510,7 @@ def test_traceability_result_plugin_migrates_legacy_snapshot_maps(
         ),
     )
 
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", "tests_unit/test_b.py::test_b"],
         {
@@ -852,7 +832,7 @@ def _configured_value_option_cases(tmp_path):
     repository_root = Path(run.__file__).parent
     config = _prepareconfig(
         ["-c", pytest_routing.PYTEST_CONFIG, "--noconftest"],
-        plugins=[pytest_routing, traceability_results],
+        plugins=[pytest_routing, evidence_results],
         prog="run.py test",
     )
     special_values = {
@@ -1389,7 +1369,7 @@ def test_merge_mcp_test_evidence_validates_and_forwards_outcomes(
     ] = {"outcome": "passed", "duration": 0.02}
     result_path.write_text(json.dumps(payload), encoding="utf-8")
     monkeypatch.setattr(
-        traceability_results,
+        evidence_results,
         "_write_manifest",
         lambda *arguments: writes.append(arguments),
     )
@@ -1591,7 +1571,7 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
         "-c",
         "testing/pytest.ini",
         "-p",
-        "testing.utility.traceability_results",
+        "testing.utility.evidence_results",
         "-p",
         "runner.pytest_routing",
         "testing/tests_tooling/test_007_run_py_test_command.py",

@@ -983,7 +983,7 @@ def test_mcp_environment_builds_result_transport_command(monkeypatch, tmp_path):
 
     command = events[-1][0]
     assert command[:3] == [str(python), "-I", "-c"]
-    assert "traceability_results._write_manifest = capture_results" in command[3]
+    assert "evidence_results._write_manifest = capture_results" in command[3]
     assert command[4:6] == [str(REPOSITORY_ROOT), str(result_path)]
     assert command[-7:] == [
         "-c",

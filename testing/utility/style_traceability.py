@@ -20,13 +20,12 @@ from yaml.nodes import MappingNode, ScalarNode
 
 from testing.utility import contract_common, icon_traceability, style_candidates, style_registry
 from testing.utility.artifacts import write_markdown_report
-from testing.utility.traceability_common import (
+from testing.utility.test_evidence import load_json, write_json
+from testing.utility.contract_common import (
     git_changed_paths,
-    load_json,
     provenance,
     stable_finding_id,
     structured_report_payload,
-    write_json,
 )
 
 
@@ -1937,11 +1936,6 @@ def main(argv: list[str] | None = None) -> int:
     return run_contracts(parser.parse_args(arguments), ["style-contracts", *arguments])
 
 
-def run_from_traceability(args: argparse.Namespace, argv: list[str] | None = None) -> int:
-    """Accept the old entry point until the symbol checker is retired."""
-    return run_contracts(args, ["traceability", *(argv or [])])
-
-
 def run_contracts(args: argparse.Namespace, command: list[str]) -> int:
     repo_root = args.repo_root.resolve()
     try:
@@ -2075,5 +2069,5 @@ __all__ = [
     "report_findings",
     "report_payload",
     "report_to_json",
-    "run_from_traceability",
+    "main",
 ]

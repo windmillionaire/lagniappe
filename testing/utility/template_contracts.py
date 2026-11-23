@@ -35,12 +35,11 @@ from testing.utility.artifacts import (
     write_markdown_report,
 )
 from testing.utility import contract_common, native_js
-from testing.utility.traceability_common import (
-    TRACEABILITY_SCHEMA_VERSION,
+from testing.utility.test_evidence import load_json, write_json
+from testing.utility.contract_common import (
+    CONTRACT_REPORT_SCHEMA_VERSION,
     git_changed_paths,
-    load_json,
     provenance,
-    write_json,
 )
 
 
@@ -2500,7 +2499,7 @@ def report_payload(report: Report) -> dict[str, object]:
     body.pop("provenance", None)
     findings = report_findings(report)
     return {
-        "schema_version": TRACEABILITY_SCHEMA_VERSION,
+        "schema_version": CONTRACT_REPORT_SCHEMA_VERSION,
         "kind": "template-contract-report",
         "provenance": report.provenance,
         "findings": findings,

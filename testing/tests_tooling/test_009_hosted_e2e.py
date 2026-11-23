@@ -921,7 +921,7 @@ def test_hosted_container_runs_complete_or_nodeids_and_records_scope(
 # @matrix mcp-package : junit result-aggregation environment-isolation
 @pytest.mark.parametrize("statuses", [(0, 0), (1, 0), (0, 1)])
 def test_hosted_complete_run_merges_all_phases_without_hiding_failure(tmp_path, monkeypatch, statuses):
-    from testing.utility.traceability_results import _write_manifest
+    from testing.utility.evidence_results import _write_manifest
 
     report_root = tmp_path / "reports/hosted-e2e"
     report_root.mkdir(parents=True)
