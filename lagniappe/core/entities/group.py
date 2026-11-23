@@ -1,8 +1,14 @@
+from typing import TYPE_CHECKING
+
 from ..definitions import Fetch
 from ..properties import user_groups
 from lagniappe.core.tools.database import get as database_get
 from .entity import Entity
 from . import Entities
+
+
+if TYPE_CHECKING:
+    from . import property_types
 
 
 # @testable true
@@ -11,6 +17,10 @@ from . import Entities
 # @matrix user-groups : create permissions reserved-name save
 # @pair user-groups:views
 class UserGroup(Entity):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.UserGroupProperties: ...
+
     entity_kind = "group"
 
     @property

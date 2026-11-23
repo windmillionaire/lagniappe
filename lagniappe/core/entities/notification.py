@@ -1,13 +1,23 @@
+from typing import TYPE_CHECKING
+
 from .entity import Entity
 from ..properties import activity, notification, notification_aggregate
 from lagniappe.core.tools.database import notifications as database_notifications
 from lagniappe.core.tools.database import utility as database_utility
 
 
+if TYPE_CHECKING:
+    from . import property_types
+
+
 # @testable false
 # @covered-by lagniappe/core/entities/notification.py::Notification.create
 # @reason notification entity shell metadata is exercised through the process notification create path
 class Notification(Entity):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.NotificationProperties: ...
+
     entity_kind = "notification"
 
     @property

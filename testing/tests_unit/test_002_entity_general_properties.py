@@ -1103,3 +1103,61 @@ def test_entity_kind(get_test_entities):
         assert entity.details["kind"] == expected_details_kind
         if cache := _cache_payload(entity):
             assert cache["kind"] == expected_details_kind
+
+
+def test_typed_property_interfaces_match_each_registered_entity():
+    import ast
+    import inspect
+    from collections import defaultdict
+    from typing import get_args, get_type_hints
+
+    from lagniappe.core.entities import property_types
+    from lagniappe.core.entities.types import EntityType
+
+    observed = defaultdict(set)
+    for member in EntityType.__members__.values():
+        entity_type = member.value
+        if not issubclass(entity_type, Entity):
+            continue
+        # UserCategory inherits Category's registry. PublicGroup overrides the
+        # permissions implementation exposed by UserGroup's two concrete kinds.
+        shape = None
+        for owner in entity_type.__mro__:
+            if not issubclass(owner, Entity):
+                continue
+            getters = (
+                node for node in ast.walk(ast.parse(inspect.getsource(owner)))
+                if isinstance(node, ast.FunctionDef) and node.name == "properties"
+            )
+            getter = next(getters, None)
+            if getter is not None:
+                assert isinstance(getter.returns, ast.Attribute), owner.__name__
+                assert ast.unparse(getter.returns.value) == "property_types"
+                shape = getattr(property_types, getter.returns.attr)
+                break
+        assert shape is not None, entity_type.__name__
+        declarations = get_type_hints(shape)
+        entity = object.__new__(entity_type)
+        registry = entity._get_properties()._registry
+        assert set(declarations) == set(registry), entity_type.__name__
+        for key, implementation in registry.items():
+            declaration = declarations[key]
+            assert implementation in (get_args(declaration) or (declaration,)), key
+            observed[declaration].add(implementation)
+    for declaration, implementations in observed.items():
+        assert implementations == set(get_args(declaration) or (declaration,))
+
+
+def test_property_registry_update_preserves_cached_instances_and_lazy_names():
+    from lagniappe.core.entities.entity import EntityProperties
+
+    owner = object()
+    properties = EntityProperties(owner, {"display": _SiteLazyProperty})
+    assert not properties._instances
+    instance = properties.display
+    properties.update({"display": _DBBlankProperty, "extra": _DBBlankProperty})
+    assert properties["display"] is instance
+    assert properties.get("display") is instance
+    assert isinstance(properties.extra, _DBBlankProperty)
+    assert properties.extra is properties["extra"]
+    assert properties.get("missing") is None

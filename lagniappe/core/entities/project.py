@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from flask import url_for
 
 from ..definitions import Action
@@ -7,10 +9,18 @@ from .entity import Entity
 from .index import TaskIndex
 
 
+if TYPE_CHECKING:
+    from . import property_types
+
+
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_project_update_sets_identity_and_description
 # @pair project:update
 class Project(Entity, AssetMixin):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.ProjectProperties: ...
+
     entity_kind = "project"
     retired_fields = frozenset({"attributes"})
 

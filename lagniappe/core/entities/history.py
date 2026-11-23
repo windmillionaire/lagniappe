@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from datetime import datetime, UTC
 from copy import deepcopy
 
@@ -20,6 +22,10 @@ from lagniappe.core.tools.forms import definitions as form_definitions
 from ..tools.database import get as database_get
 
 
+if TYPE_CHECKING:
+    from . import property_types
+
+
 # @testable true
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_snapshots_completed_task_state
@@ -36,6 +42,10 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     generic entity/ETag contract for directly loaded history rows; it is not an
     edit-revision signal.
     """
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.TaskHistoryProperties: ...
+
 
     entity_kind = "task_history"
 
@@ -192,6 +202,10 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
 # @tests tests_unit/test_004f_form_drafts.py::test_archived_generation_preserves_schema_html_and_images
 # @matrix form-schema html-field : history generation immutable-assets
 class FormHistory(Entity, AssetMixin):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.FormHistoryProperties: ...
+
     entity_kind = "form_history"
 
     # @testable true
@@ -308,6 +322,10 @@ class FormHistory(Entity, AssetMixin):
 # @matrix document-history : asset-copy asset-path batch-delete current-content legacy named ordering validation
 # @matrix editor : history-list validation
 class DocumentHistory(AssetMixin, Entity):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.DocumentHistoryProperties: ...
+
     entity_kind = "document_history"
 
     DOCUMENT_ASSET = "document"

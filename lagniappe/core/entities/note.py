@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from .entity import Entity
 from ..definitions import Action
 from ..mixins import AssetMixin
@@ -5,10 +7,18 @@ from ..properties import activity
 from ..tools.auth.context import current_context_user
 
 
+if TYPE_CHECKING:
+    from . import property_types
+
+
 # @testable false
 # @covered-by lagniappe/core/entities/note.py::Note.create
 # @reason note entity shell metadata is exercised through the homepage activity create path
 class Note(AssetMixin, Entity):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.NoteProperties: ...
+
     entity_kind = "note"
 
     @property

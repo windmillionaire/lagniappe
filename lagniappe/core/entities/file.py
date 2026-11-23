@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from flask import url_for
 
 from ..definitions import Action, MutationIntent
@@ -9,12 +11,20 @@ from .entity import Entity
 from ..tools.auth.restrictions import permission_relation
 
 
+if TYPE_CHECKING:
+    from . import property_types
+
+
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_records_metadata_before_asset_save
 # @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_lists_pages_that_reference_it
 # @tests tests_unit/test_006_file_properties.py::test_file_reverse_task_links_drive_permissions_and_references
 # @matrix file : asset-lifecycle attached-pages attached-tasks badges permissions references reverse-links task-history upload
 class File(AssetMixin, Entity):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.FileProperties: ...
+
     entity_kind = "file"
 
     # @testable true

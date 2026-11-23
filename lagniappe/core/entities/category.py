@@ -1,8 +1,14 @@
+from typing import TYPE_CHECKING
+
 from flask import url_for
 from ..properties import category, common_entity, common_related
 from lagniappe.core.tools.database import get as database_get
 from .entity import Entity
 from .index import PageIndex
+
+
+if TYPE_CHECKING:
+    from . import property_types
 
 UNCATEGORIZED_PAGES_NAME = "Uncategorized Pages"
 
@@ -12,6 +18,10 @@ UNCATEGORIZED_PAGES_NAME = "Uncategorized Pages"
 # @matrix category form-schema : delegation schema
 # @matrix category permissions : attached-form cache restricted-access
 class Category(Entity):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.CategoryProperties: ...
+
     entity_kind = "category"
     retired_fields = frozenset({"attributes"})
 

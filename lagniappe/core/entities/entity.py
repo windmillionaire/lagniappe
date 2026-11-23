@@ -1,5 +1,8 @@
 import json
 from datetime import datetime, UTC
+from collections.abc import Iterator, Mapping
+from typing import TYPE_CHECKING, Protocol, cast, overload, runtime_checkable
+
 
 from google.cloud import datastore
 
@@ -15,7 +18,18 @@ from ..tools.auth.context import current_context_user
 from ..tools.auth.restrictions import restriction_fields
 
 
+if TYPE_CHECKING:
+    from ..properties.base_property import Property
+    from .page import Page
+
+
 # @testable infrastructure
+@runtime_checkable
+class _KeyedRecord(Protocol):
+    @property
+    def key(self) -> datastore.Key | None: ...
+
+
 class EntityProperties:
     """Lazy-instantiating property container for an entity.
 
@@ -28,12 +42,12 @@ class EntityProperties:
     PropertyError (entity context) and the original exception is chained.
     """
 
-    def __init__(self, entity, registry):
+    def __init__(self, entity: Entity, registry: Mapping[str, type[Property]]) -> None:
         self._entity = entity
         self._registry = dict(registry)
-        self._instances = {}
+        self._instances: dict[str, Property] = {}
 
-    def _get(self, name):
+    def _get(self, name: str) -> Property | None:
         if name in self._instances:
             return self._instances[name]
 
@@ -56,32 +70,38 @@ class EntityProperties:
 
         return None
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Property:
         prop = self._get(name)
         if prop is not None:
             return prop
         raise AttributeError(f"Property {name} not found")
 
-    def __getitem__(self, name):
+    def __getitem__(self, name: str) -> Property:
         prop = self._get(name)
         if prop is not None:
             return prop
         raise KeyError(f"Property {name} not found")
 
-    def __contains__(self, name):
+    def __contains__(self, name: str) -> bool:
         return name in self._registry
 
-    def get(self, name, default=None):
+    @overload
+    def get(self, name: str) -> Property | None: ...
+
+    @overload
+    def get[Default](self, name: str, default: Default) -> Property | Default: ...
+
+    def get(self, name: str, default: object = None) -> object:
         prop = self._get(name)
         return prop if prop is not None else default
 
-    def update(self, mapping):
+    def update(self, mapping: Mapping[str, type[Property]]) -> None:
         self._registry.update(mapping)
 
-    def implementing(self, *mixins):
+    def implementing[Capability](self, *mixins: type[Capability]) -> Iterator[Capability]:
         for name, cls in self._registry.items():
             if issubclass(cls, mixins):
-                yield self._get(name)
+                yield cast("Capability", self[name])
 
 
 # @testable true
@@ -101,7 +121,17 @@ class Entity:
     serialization (``details``), and permission checking (``allowed``).
     """
 
-    _properties = None
+    if TYPE_CHECKING:
+        # Values exposed by the common entity property registry.
+        name: str
+        hash: str
+        kind: str
+        modified: datetime | None
+        created: datetime | None
+        active: bool
+
+    entity_kind: str
+    _properties: EntityProperties | None = None
     _related_keys = None
     _relations = None
     _mutation_intents = None
@@ -109,8 +139,8 @@ class Entity:
     _to_cache = None
     _details = None
     _readonly = None
-    _key = None
-    _db = None
+    _key: datastore.Key | None = None
+    _db: datastore.Entity | dict[str, object] | None = None
     _state = None
     retired_fields = frozenset()
 
@@ -132,7 +162,7 @@ class Entity:
     def exclude_from_index(self):
         return frozenset()
 
-    def _get_properties(self):
+    def _get_properties(self) -> EntityProperties:
         properties = {
             "name": common_entity.Name,
             "created": common_entity.Created,
@@ -161,13 +191,13 @@ class Entity:
         return base_fingerprint(modified)
 
     @property
-    def properties(self):
+    def properties(self) -> EntityProperties:
         if self._properties is not None:
             return self._properties
 
-        super().__setattr__("_properties", self._get_properties())
-
-        return self._properties
+        properties = self._get_properties()
+        super().__setattr__("_properties", properties)
+        return properties
 
     def __getattr__(self, name):
         prop = self.properties.get(name)
@@ -249,7 +279,7 @@ class Entity:
             if value and p.details_key:
                 details[p.details_key] = value
         details["id"] = (
-            self.page.urlsafe_key
+            cast("Page", self.page).urlsafe_key
             if getattr(self, "entity_kind", None) == "user"
             else self.urlsafe_key
         )
@@ -293,7 +323,7 @@ class Entity:
         elif self._to_cache is not None:
             return self._to_cache
 
-        cache = {
+        cache: dict[str, object] = {
             p.cache_key: p.cache_value
             for p in self.properties.implementing(mixins.CacheMixin)
             if isinstance(p.cache_value, str)
@@ -420,8 +450,10 @@ class Entity:
         return bool(user and user.has_permission(self, action))
 
     @property
-    def key(self):
+    def key(self) -> datastore.Key | None:
         if self._db and not self._key:
+            if not isinstance(self._db, _KeyedRecord):
+                raise AttributeError(f"{type(self._db).__name__!r} object has no attribute 'key'")
             self._key = self._db.key
 
         return self._key
@@ -430,22 +462,26 @@ class Entity:
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_key_access_without_key_raises_runtime_error
     # @pair entity:key-validation
     @property
-    def urlsafe_key(self):
+    def urlsafe_key(self) -> str:
         if not self.key:
             raise RuntimeError("no key assigned")
 
-        if getattr(self, "_urlsafe_key", None):
-            return self._urlsafe_key
+        cached = getattr(self, "_urlsafe_key", None)
+        if cached:
+            return cached
 
-        self._urlsafe_key = database_get.urlsafe_key(self.key)
-        return self._urlsafe_key
+        encoded = database_get.urlsafe_key(self.key)
+        if encoded is None:
+            raise RuntimeError("no key assigned")
+        self._urlsafe_key = encoded
+        return encoded
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_key_access_without_key_raises_runtime_error
     # @pair entity:key-validation
     @property
-    def db(self):
-        if self._db or self._temporary or self._testing:
+    def db(self) -> datastore.Entity | dict[str, object]:
+        if self._db is not None and (self._db or self._temporary or self._testing):
             return self._db
 
         if not self.key:
@@ -513,7 +549,10 @@ class Entity:
         if process_id in self.processes:
             return self.processes[process_id]
         elif process_id in self.db:
-            self.processes[process_id] = json.loads(self.db.get(process_id, "{}"))
+            raw = self.db.get(process_id, "{}")
+            if not isinstance(raw, (str, bytes, bytearray)):
+                raise TypeError(f"Stored process {process_id!r} must contain JSON")
+            self.processes[process_id] = json.loads(raw)
             return self.processes[process_id]
         else:
             return self.processes.setdefault(process_id, {})

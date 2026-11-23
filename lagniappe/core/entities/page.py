@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from flask import url_for
 
 from ..definitions import Action, Fetch, FetchReason, MutationIntent, NotificationEmailMode
@@ -19,17 +21,26 @@ from .category import UNCATEGORIZED_PAGES_NAME
 from .entity import Entity
 
 
+if TYPE_CHECKING:
+    from . import property_types
+    from .task import Task
+
+
 # @testable true
 # @tests tests_unit/test_008_page_properties.py::test_page_to_cache_public_user
 # @matrix cache page : public-user
 class Page(AssetMixin, SubmitterMixin, Entity):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.PageProperties: ...
+
     entity_kind = "page"
     retired_fields = frozenset({"attributes"})
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._tasks = None
-        self._completed = None
+        self._tasks: list[Task] | None = None
+        self._completed: list[Task] | None = None
 
     @property
     def exclude_from_index(self):
@@ -152,20 +163,20 @@ class Page(AssetMixin, SubmitterMixin, Entity):
         self._tasks = sort_tasks([t for t in tasks if not t.completed])
 
     @property
-    def tasks(self):
+    def tasks(self) -> list[Task]:
         if self._tasks is None:
             self._load_tasks()
-
+            assert self._tasks is not None
         return self._tasks
 
     # @testable false
     # @covered-by lagniappe/core/entities/page.py::Page._load_tasks
     # @reason shares the permission-filtered task collection load
     @property
-    def completed_tasks(self):
+    def completed_tasks(self) -> list[Task]:
         if self._completed is None:
             self._load_tasks()
-
+            assert self._completed is not None
         return self._completed
 
     # @testable true

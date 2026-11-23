@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from datetime import datetime, UTC
 from uuid import uuid4
 import json
@@ -32,11 +34,19 @@ from ..tools.auth.context import current_context_user
 from ..tools.auth.restrictions import permission_relation
 
 
+if TYPE_CHECKING:
+    from . import property_types
+
+
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_entity_lifecycle_readonly_and_save_relations
 # @matrix task : entity-lifecycle readonly save
 # @matrix task-completion mutations : hydration no-extra-read
 class Task(AssetMixin, SubmitterMixin, Entity):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.TaskProperties: ...
+
     entity_kind = "task"
 
     @property

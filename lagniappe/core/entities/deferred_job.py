@@ -1,5 +1,8 @@
 """Durable envelope for user-facing background work."""
 
+from typing import TYPE_CHECKING
+
+
 from .entity import Entity
 from ..definitions import DEFERRED_JOB_VERSION, DeferredJobStatus
 from ..properties import (
@@ -9,11 +12,19 @@ from ..properties import (
 )
 
 
+if TYPE_CHECKING:
+    from . import property_types
+
+
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_property_split_preserves_persisted_schema
 # @matrix deferred-jobs : index-exclusion json-encoding persisted-schema property-ownership
 class DeferredJob(Entity):
     """Internal versioned job record; domain entities remain the UI contract."""
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.DeferredJobProperties: ...
+
 
     entity_kind = "job"
 

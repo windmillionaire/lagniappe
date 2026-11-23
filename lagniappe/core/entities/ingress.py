@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from ..definitions import (
     Fetch,
     FetchReason,
@@ -8,12 +10,20 @@ from . import Entities
 from .entity import Entity
 
 
+if TYPE_CHECKING:
+    from . import property_types
+
+
 # @testable true
 # @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_project
 # @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_category_and_form
 # @tests tests_unit/test_006b_ingress_entity.py::test_related_entities_model_project_form
 # @matrix ingress : model parent related-entities
 class Ingress(AssetMixin, Entity):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.IngressProperties: ...
+
     entity_kind = "ingress"
 
     @property

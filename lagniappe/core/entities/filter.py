@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import json
 import hashlib
 
@@ -12,9 +14,17 @@ from .condition import Condition
 from .entity import Entity
 
 
+if TYPE_CHECKING:
+    from . import property_types
+
+
 # @testable false
 # @covered-by lagniappe/core/entities/filter.py::Filter.conditions
 class Filter(Entity):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.FilterProperties: ...
+
     entity_kind = "filter"
 
     def __init__(self, *args, **kwargs):

@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import json
 from flask import url_for
 from ..definitions import Fetch
@@ -14,12 +16,20 @@ from . import Entities
 from lagniappe.core.tools.database import get as database_get
 
 
+if TYPE_CHECKING:
+    from . import property_types
+
+
 # @testable false
 # @covered-by lagniappe/core/entities/form.py::Form.update
 # @covered-by lagniappe/core/mutations/save.py::FormMutation.plan_save
 # @covered-by lagniappe/core/properties/form.py::SchemaVersion
 # @reason focused methods/properties own the durable Form behavior
 class Form(Entity, AssetMixin):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.FormProperties: ...
+
     entity_kind = "form"
 
     @property

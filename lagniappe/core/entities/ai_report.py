@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from .entity import Entity
 from ..definitions import Action
 from ..properties import activity
@@ -6,6 +8,10 @@ from ..properties import ai_report_process
 from ..properties import ai_report_proposal
 from ..properties import ai_report_result
 from ..tools.auth.context import current_context_user
+
+
+if TYPE_CHECKING:
+    from . import property_types
 
 REPORT_FORMAT_VERSION = 2
 UNAVAILABLE_PLAN_MESSAGE = "this plan is no longer available"
@@ -18,6 +24,10 @@ UNAVAILABLE_PLAN_MESSAGE = "this plan is no longer available"
 # @pair agent-api:report-session
 class AIReport(Entity):
     """AI-generated report containing an ordered, deterministic action proposal."""
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.AIReportProperties: ...
+
 
     entity_kind = "report"
 

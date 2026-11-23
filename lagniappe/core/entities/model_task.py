@@ -1,7 +1,13 @@
+from typing import TYPE_CHECKING
+
 from ..properties import project
 from ..exceptions import PropertyError
 from ..tools.database.get import urlsafe_key
 from .entity import Entity
+
+
+if TYPE_CHECKING:
+    from . import property_types
 
 
 # @testable true
@@ -9,6 +15,10 @@ from .entity import Entity
 # @tests tests_unit/test_005_project_properties.py::test_model_task_access_is_independent_of_attached_form_restrictions
 # @matrix model-task permissions project : attached-form create ordering relation-save restricted-access update
 class ModelTask(Entity):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.ModelTaskProperties: ...
+
     entity_kind = "model"
 
     # @testable true

@@ -1,12 +1,23 @@
 """Durable target-scoped ownership for a deferred operation."""
 
+from typing import TYPE_CHECKING
+
+
 from .entity import Entity
 from ..properties import deferred_job_lock
+
+
+if TYPE_CHECKING:
+    from . import property_types
 
 
 # @testable infrastructure
 class DeferredJobLock(Entity):
     """Small deterministic record coupling a target form to one active job."""
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.DeferredJobLockProperties: ...
+
 
     entity_kind = "job_lock"
 

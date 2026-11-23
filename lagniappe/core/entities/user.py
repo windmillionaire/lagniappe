@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import hashlib
 
 from flask_login import UserMixin
@@ -19,10 +21,18 @@ from .entity import Entity
 from . import Entities
 
 
+if TYPE_CHECKING:
+    from . import property_types
+
+
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
 # @pair user:entity-lifecycle
 class User(AssetMixin, UserMixin, Entity):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.UserProperties: ...
+
     entity_kind = "user"
 
     @property

@@ -1,9 +1,16 @@
 """Internal one-to-one messaging entities."""
 
+from typing import TYPE_CHECKING
+
+
 from .entity import Entity
 from ..properties import message as message_properties
 from ..properties import message_conversation
 from lagniappe.core.tools.database import utility as database_utility
+
+
+if TYPE_CHECKING:
+    from . import property_types
 
 
 # @testable true
@@ -11,6 +18,10 @@ from lagniappe.core.tools.database import utility as database_utility
 # @matrix messaging : entity-contract polling-revision
 class MessageConversation(Entity):
     """Durable participant state and cursors for a direct-message thread."""
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.MessageConversationProperties: ...
+
 
     entity_kind = "message_conversation"
 
@@ -62,6 +73,10 @@ class MessageConversation(Entity):
 # @pair messaging:entity-contract
 class Message(Entity):
     """One immutable plain-text message in a conversation ancestor group."""
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.MessageProperties: ...
+
 
     entity_kind = "message"
 
