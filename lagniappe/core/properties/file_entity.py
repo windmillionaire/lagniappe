@@ -83,7 +83,7 @@ class Mimetype(AIMixin, DBProperty):
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
 
 # @testable true
@@ -102,7 +102,7 @@ class Encoding(DBProperty):
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
 
 # @testable true
@@ -262,7 +262,7 @@ class Summary(CacheMixin, AIMixin, DBProperty):
     def value(self, value):
         if isinstance(value, str):
             value = strip_tags(value, preserve_whitespace=True).strip()
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_summary

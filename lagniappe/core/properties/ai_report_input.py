@@ -49,14 +49,14 @@ class Origin(DBProperty):
 
     @property
     def value(self):
-        return DBProperty.value.fget(self) or "web"
+        return DBProperty._read_db_value(self) or "web"
 
     @value.setter
     def value(self, value):
         normalized = str(value or "web").strip().casefold()
         if normalized not in {"web", "email", "api"}:
             raise ValueError("AI report origin must be web, email, or api")
-        DBProperty.value.fset(self, normalized)
+        DBProperty._write_db_value(self, normalized)
 
 
 # @testable true

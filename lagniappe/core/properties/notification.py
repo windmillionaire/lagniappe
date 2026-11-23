@@ -51,7 +51,7 @@ class NotificationType(DBProperty):
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
 
 class EventType(DBProperty):

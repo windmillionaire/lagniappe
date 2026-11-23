@@ -115,7 +115,7 @@ class InvalidateCache(DBProperty):
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
         if value:
             # Each mutation owns a distinct acknowledgement, including a
             # second invalidation while an earlier one is still outstanding.
@@ -132,7 +132,7 @@ class AIAccess(DBProperty):
 
     @property
     def value(self):
-        stored = DBProperty.value.fget(self)
+        stored = DBProperty._read_db_value(self)
         if stored is None:
             return (
                 AI.NONE.name
@@ -148,7 +148,7 @@ class AIAccess(DBProperty):
     def value(self, value):
         name = AI.name_for(value)
         previous = self.value
-        DBProperty.value.fset(self, name)
+        DBProperty._write_db_value(self, name)
         if previous != name:
             self.entity.invalidate_cache = True
 
@@ -165,7 +165,7 @@ class NotificationEmailPreference(DBProperty):
     def value(self):
         if getattr(self.entity, "is_public", False):
             return NotificationEmailMode.NONE.name
-        stored = DBProperty.value.fget(self)
+        stored = DBProperty._read_db_value(self)
         if stored is None:
             return NotificationEmailMode.DAILY.name
         try:
@@ -182,7 +182,7 @@ class NotificationEmailPreference(DBProperty):
         ):
             raise ValueError("Public users cannot receive notification email.")
         previous = self.value
-        DBProperty.value.fset(self, name)
+        DBProperty._write_db_value(self, name)
         if name == NotificationEmailMode.NONE.name and previous != name:
             self.entity.db["notification_email_opt_out_epoch"] = (
                 int(self.entity.db.get("notification_email_opt_out_epoch") or 0) + 1
@@ -201,7 +201,7 @@ class IsOwner(DBProperty):
 
     @property
     def value(self):
-        stored = bool(DBProperty.value.fget(self))
+        stored = bool(DBProperty._read_db_value(self))
         if getattr(self.entity, "_testing", False):
             return stored
 
@@ -234,7 +234,7 @@ class IsOwner(DBProperty):
                 raise ValueError("The configured primary Owner cannot be demoted.")
             if enabled:
                 self._validated_owner_email = owner_email
-        DBProperty.value.fset(self, enabled)
+        DBProperty._write_db_value(self, enabled)
 
 
 # @testable true
@@ -249,14 +249,14 @@ class IsAdmin(DBProperty):
     @property
     def value(self):
         return bool(
-            getattr(self.entity, "is_owner", False) or DBProperty.value.fget(self)
+            getattr(self.entity, "is_owner", False) or DBProperty._read_db_value(self)
         )
 
     @value.setter
     def value(self, value):
         enabled = bool(value)
-        previous = bool(DBProperty.value.fget(self))
-        DBProperty.value.fset(self, enabled)
+        previous = bool(DBProperty._read_db_value(self))
+        DBProperty._write_db_value(self, enabled)
         if previous != enabled:
             self.entity.invalidate_cache = True
 

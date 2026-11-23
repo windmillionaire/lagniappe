@@ -80,7 +80,7 @@ class OrdinaryCount(DBProperty):
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
 
 # @testable true
@@ -98,7 +98,7 @@ class UnreadMessageCount(DBProperty):
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
 
 # @testable true
@@ -116,7 +116,7 @@ class AggregateRevision(DBProperty):
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
 
 # @testable true
@@ -134,7 +134,7 @@ class MessageRevision(DBProperty):
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
 
 # @testable true
@@ -152,4 +152,4 @@ class AggregateGeneration(DBProperty):
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)

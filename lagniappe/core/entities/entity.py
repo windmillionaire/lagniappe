@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, UTC
 from collections.abc import Iterator, Mapping
-from typing import TYPE_CHECKING, Protocol, cast, overload, runtime_checkable
+from typing import TYPE_CHECKING, Literal, Protocol, cast, overload, runtime_checkable
 
 
 from google.cloud import datastore
@@ -20,6 +20,10 @@ from ..tools.auth.restrictions import restriction_fields
 
 if TYPE_CHECKING:
     from ..properties.base_property import Property
+    from ..properties.base_process import ProcessProperty
+    from ..properties.form_submission import FormSubmission
+
+    type RegisteredProperty = Property | ProcessProperty
     from .page import Page
 
 
@@ -42,12 +46,12 @@ class EntityProperties:
     PropertyError (entity context) and the original exception is chained.
     """
 
-    def __init__(self, entity: Entity, registry: Mapping[str, type[Property]]) -> None:
+    def __init__(self, entity: Entity, registry: Mapping[str, type[RegisteredProperty]]) -> None:
         self._entity = entity
         self._registry = dict(registry)
-        self._instances: dict[str, Property] = {}
+        self._instances: dict[str, RegisteredProperty] = {}
 
-    def _get(self, name: str) -> Property | None:
+    def _get(self, name: str) -> RegisteredProperty | None:
         if name in self._instances:
             return self._instances[name]
 
@@ -70,13 +74,13 @@ class EntityProperties:
 
         return None
 
-    def __getattr__(self, name: str) -> Property:
+    def __getattr__(self, name: str) -> RegisteredProperty:
         prop = self._get(name)
         if prop is not None:
             return prop
         raise AttributeError(f"Property {name} not found")
 
-    def __getitem__(self, name: str) -> Property:
+    def __getitem__(self, name: str) -> RegisteredProperty:
         prop = self._get(name)
         if prop is not None:
             return prop
@@ -86,16 +90,19 @@ class EntityProperties:
         return name in self._registry
 
     @overload
-    def get(self, name: str) -> Property | None: ...
+    def get(self, name: Literal["submission"]) -> FormSubmission | None: ...
 
     @overload
-    def get[Default](self, name: str, default: Default) -> Property | Default: ...
+    def get(self, name: str) -> RegisteredProperty | None: ...
+
+    @overload
+    def get[Default](self, name: str, default: Default) -> RegisteredProperty | Default: ...
 
     def get(self, name: str, default: object = None) -> object:
         prop = self._get(name)
         return prop if prop is not None else default
 
-    def update(self, mapping: Mapping[str, type[Property]]) -> None:
+    def update(self, mapping: Mapping[str, type[RegisteredProperty]]) -> None:
         self._registry.update(mapping)
 
     def implementing[Capability](self, *mixins: type[Capability]) -> Iterator[Capability]:
@@ -135,7 +142,7 @@ class Entity:
     _related_keys = None
     _relations = None
     _mutation_intents = None
-    _processes = None
+    _processes: dict[str, dict[str, object]] | None = None
     _to_cache = None
     _details = None
     _readonly = None
@@ -224,7 +231,10 @@ class Entity:
             return self.properties[field_id]
 
         if isinstance(self, mixins.SubmitterMixin):
-            return self.properties.submission.column(field_id)
+            submission = self.properties.get("submission")
+            if submission is None:
+                raise AttributeError("Property submission not found")
+            return submission.column(field_id)
 
         raise PropertyError(
             f"Column {field_id!r} not found on {self.entity_kind}",
@@ -337,8 +347,8 @@ class Entity:
         if isinstance(parent, dict) and parent.get("hash"):
             cache["parent_key"] = parent["hash"]
 
-        if self.properties.get("submission"):
-            cache.update(self.properties.submission.search_value)
+        if submission := self.properties.get("submission"):
+            cache.update(submission.search_value)
 
         self._to_cache = cache
         return cache
@@ -362,9 +372,9 @@ class Entity:
             p.user = user
             values[p.ai_key] = p.ai_value
 
-        if self.properties.get("submission"):
-            self.properties.submission.user = user
-            submission = self.properties.submission.ai_value
+        if submission_field := self.properties.get("submission"):
+            submission_field.user = user
+            submission = submission_field.ai_value
             if submission:
                 values.update(submission)
 
@@ -397,11 +407,11 @@ class Entity:
         for p in self.properties.implementing(mixins.FilterMixin):
             values[p.filter_key] = p.filter_value
 
-        if self.properties.get("submission"):
+        if submission := self.properties.get("submission"):
             values.update(
                 {
                     key: value
-                    for key, value in self.properties.submission.filter_value.items()
+                    for key, value in submission.filter_value.items()
                     if value is not None
                 }
             )
@@ -542,7 +552,7 @@ class Entity:
             self._mutation_intents = []
         return self._mutation_intents
 
-    def get_process(self, process_id):
+    def get_process(self, process_id: str) -> dict[str, object]:
         if process_id in self.processes:
             return self.processes[process_id]
         elif process_id in self.db:
@@ -555,7 +565,7 @@ class Entity:
             return self.processes.setdefault(process_id, {})
 
     @property
-    def processes(self):
+    def processes(self) -> dict[str, dict[str, object]]:
         if self._processes is None:
             self._processes = {}
         return self._processes

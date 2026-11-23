@@ -27,7 +27,7 @@ class Visibility(DBProperty):
         value = value or "private"
         if value not in NOTE_VISIBILITIES:
             raise ValueError("visibility must be 'private' or 'everyone'")
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
 
 # @testable true
@@ -47,7 +47,7 @@ class Scope(DBProperty):
         value = value or "home"
         if value not in NOTE_SCOPES:
             raise ValueError("scope must be 'home' or 'page'")
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
 
 class AttachedParent(RelatedEntityMixin, DBProperty):
@@ -101,7 +101,7 @@ class Body(DBProperty):
     @value.setter
     def value(self, value):
         body = strip_tags(value).strip() if value else None
-        DBProperty.value.fset(self, body)
+        DBProperty._write_db_value(self, body)
 
 
 # @testable true

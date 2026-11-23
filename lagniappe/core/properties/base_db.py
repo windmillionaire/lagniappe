@@ -1,4 +1,8 @@
 import json
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
 
 from .base_property import Property
 
@@ -8,7 +12,7 @@ from .base_property import Property
 # @tests tests_unit/test_002_entity_general_properties.py::test_db_property_custom_blank_values_can_keep_empty_lists
 # @tests tests_unit/test_002_entity_general_properties.py::test_db_property_write_refreshes_entity_details_and_cache
 # @matrix db-property : blank-values cache-invalidation custom-blank-values explicit-false missing-key
-class DBProperty(Property):
+class DBProperty[Value = object, Owner: Entity = Entity](Property[Value, Owner]):
     """Property that persists its value in entity.db.
 
     Reads from entity.db on first access and writes back on set.
@@ -25,9 +29,12 @@ class DBProperty(Property):
     _blank_values = (None, [], {})
 
     @property
-    def value(self):
+    def value(self) -> Value | None:
+        return self._read_db_value()
+
+    def _read_db_value(self) -> Value | None:
         if self.is_set:
-            return self._value
+            return cast("Value | None", self._value)
 
         if self.db_key not in self.entity.db:
             return None
@@ -41,10 +48,14 @@ class DBProperty(Property):
 
         self._value = value
 
-        return self._value
+        # A concrete property supplies the stored value type for its db_key.
+        return cast("Value", self._value)
 
     @value.setter
-    def value(self, value):
+    def value(self, value: Value | None) -> None:
+        self._write_db_value(value)
+
+    def _write_db_value(self, value: Value | None) -> None:
         if value in self._blank_values:
             self.entity.db.pop(self.db_key, None)
             self.unset()
@@ -61,5 +72,5 @@ class DBProperty(Property):
             self.entity._to_cache = None
 
     @property
-    def db_key(self):
+    def db_key(self) -> str:
         return self.id

@@ -29,14 +29,14 @@ class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty):
 
     @property
     def value(self):
-        return DBProperty.value.fget(self) is True
+        return DBProperty._read_db_value(self) is True
 
     @value.setter
     def value(self, value):
         if not isinstance(value, bool):
             raise TypeError("completed must be a boolean")
 
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
     @property
     def details_value(self):

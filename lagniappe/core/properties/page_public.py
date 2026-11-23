@@ -96,13 +96,13 @@ class PublicSettings(DBProperty):
 
     @property
     def value(self):
-        return normalize_public_settings(DBProperty.value.fget(self))
+        return normalize_public_settings(DBProperty._read_db_value(self))
 
     @value.setter
     def value(self, value):
         previous = self.value
         normalized = normalize_public_settings(value)
-        DBProperty.value.fset(self, normalized)
+        DBProperty._write_db_value(self, normalized)
         if (
             normalized["allow_indexing"] != previous["allow_indexing"]
             or normalized["directory_category"] != previous["directory_category"]

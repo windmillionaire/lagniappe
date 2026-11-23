@@ -61,7 +61,7 @@ class FormSubmission(SubmissionProperty, DBProperty):
     def value(self, value):
         require_mutable_submission(self.entity)
         SubmissionProperty.value.fset(self, value)
-        DBProperty.value.fset(self, self._submission)
+        DBProperty._write_db_value(self, self._submission)
 
     # @testable true
     # @tests tests_unit/test_003_submission.py::test_submission_fields

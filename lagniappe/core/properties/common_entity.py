@@ -62,7 +62,7 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
 
     @property
     def value(self):
-        return DBProperty.value.fget(self)
+        return DBProperty._read_db_value(self)
 
     @value.setter
     def value(self, value):
@@ -70,7 +70,7 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
             value = " ".join(
                 str(v).strip() for v in value if v is not None and str(v).strip()
             )
-        DBProperty.value.fset(self, value or None)
+        DBProperty._write_db_value(self, value or None)
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_name
@@ -192,7 +192,7 @@ class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty):
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, strip_tags(value, preserve_whitespace=True))
+        DBProperty._write_db_value(self, strip_tags(value, preserve_whitespace=True))
 
     @property
     def kind(self):
@@ -281,7 +281,7 @@ class Created(DateMixin, ColumnMixin, FilterMixin, DBProperty):
         if super().value:
             return
 
-        DBProperty.value.fset(self, datetime.now(UTC))
+        DBProperty._write_db_value(self, datetime.now(UTC))
 
     # Column Attributes
     _ordering = Ordering.NUMERIC
@@ -310,7 +310,7 @@ class Modified(DateMixin, ColumnMixin, FilterMixin, DBProperty):
     _icon = "date"
 
     def update(self):
-        DBProperty.value.fset(self, datetime.now(UTC))
+        DBProperty._write_db_value(self, datetime.now(UTC))
 
     # Column Attributes
     _ordering = Ordering.NUMERIC
@@ -425,12 +425,12 @@ class Requires(CacheMixin, DetailsMixin, DBProperty):
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, self._validate(value))
+        DBProperty._write_db_value(self, self._validate(value))
 
     # @testable false
     # @covered-by lagniappe/core/mutations/executor.py::_prepare_write
     def update(self):
-        DBProperty.value.fset(self, self._required())
+        DBProperty._write_db_value(self, self._required())
 
     def _required(self):
         try:
@@ -533,7 +533,7 @@ class Hash(DetailsMixin, CacheMixin, FilterMixin, AIMixin, DBProperty):
         return self._value
 
     def update(self):
-        DBProperty.value.fset(self, self.value)
+        DBProperty._write_db_value(self, self.value)
 
     # Filter Attributes
     _field_type = FieldType.STRING
@@ -589,7 +589,7 @@ class PublicID(DBProperty):
             if not entity:
                 unique_id = new_id
 
-        DBProperty.value.fset(self, unique_id)
+        DBProperty._write_db_value(self, unique_id)
         return unique_id
 
 
@@ -712,7 +712,7 @@ class Active(DBProperty):
         if not isinstance(value, bool):
             raise TypeError("active must be a boolean")
 
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
     # @testable false
     # @covered-by lagniappe/core/mutations/executor.py::_prepare_write
@@ -720,7 +720,7 @@ class Active(DBProperty):
         if self.id in self.entity.db:
             return
 
-        DBProperty.value.fset(self, self.value)
+        DBProperty._write_db_value(self, self.value)
 
 
 # @testable infrastructure
@@ -751,7 +751,7 @@ class Permissions(DBProperty):
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
     @property
     def form(self):

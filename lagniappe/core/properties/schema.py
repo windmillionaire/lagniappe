@@ -234,13 +234,13 @@ class Schema(AIMixin, DBProperty):
     @value.setter
     def value(self, value):
         self.fields = None
-        self._previous = DBProperty.value.fget(self) or []
+        self._previous = DBProperty._read_db_value(self) or []
         canonical = canonicalize_schema(
             value,
             form_type=getattr(self.entity, "form_type", None),
             snapshot=getattr(self.entity, "entity_kind", None) == "form_history",
         )
-        DBProperty.value.fset(self, canonical)
+        DBProperty._write_db_value(self, canonical)
         if "schema_format" in self.entity.properties:
             self.entity.properties.schema_format.value = SCHEMA_FORMAT_VERSION
         else:

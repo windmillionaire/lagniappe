@@ -164,7 +164,7 @@ class FormGeneration(DBProperty):
     def value(self, value):
         if type(value) is not int or value < 0:
             raise ValidationError("Form generation must be a nonnegative integer.")
-        DBProperty.value.fset(self, value)
+        DBProperty._write_db_value(self, value)
 
 
 # @testable true
