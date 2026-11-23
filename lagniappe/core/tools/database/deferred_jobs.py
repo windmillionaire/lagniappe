@@ -73,23 +73,23 @@ class JobUpdate(TypedDict):
     scheduler_control: SchedulerSnapshot | None
 
 
-class JobOutcome(TypedDict):
-    entity: Entity | dict[str, object] | None
+class JobOutcome[Row = Entity](TypedDict):
+    entity: Row | None
     reason: str
     scheduler_control: NotRequired[SchedulerSnapshot]
 
 
-class JobCreate(JobOutcome):
+class JobCreate(JobOutcome[Entity | dict[str, object]]):
     created: bool
     lock: NotRequired[Entity | dict[str, object]]
 
 
-class JobClaim(JobOutcome):
+class JobClaim(JobOutcome[Entity]):
     claimed: bool
     action: NotRequired[str]
 
 
-class JobTransition(JobOutcome):
+class JobTransition(JobOutcome[Entity]):
     transitioned: bool
 
 
