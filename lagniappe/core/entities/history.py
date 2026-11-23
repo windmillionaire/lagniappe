@@ -42,6 +42,7 @@ if TYPE_CHECKING:
 
 
 class TaskHistoryOverrides(TypedDict, total=False):
+    copy_assets: bool
     _key: Key
     completed_on: datetime | None
     completed_by: Page | User | None
@@ -90,7 +91,7 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
         def completed_on(self) -> datetime | None: ...
 
         @completed_on.setter
-        def completed_on(self, value: datetime | str | float | None) -> None: ...
+        def completed_on(self, value: datetime | None) -> None: ...
 
         @property
         def completed_by(self) -> Page | None: ...
@@ -514,7 +515,7 @@ class DocumentHistory(AssetMixin, Entity):
 
     @classmethod
     def ordered(cls, histories: Iterable[Self]) -> list[Self]:
-        def newest(history):
+        def newest(history: Self) -> datetime:
             return history.created or datetime.min.replace(tzinfo=UTC)
 
         pinned = sorted(

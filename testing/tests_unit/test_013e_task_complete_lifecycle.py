@@ -74,7 +74,8 @@ def test_task_complete_without_schedule(get_test_entities):
 
 # @matrix submission task-completion : required-fields validation
 @pytest.mark.unit
-def test_task_complete_raises_when_required_submission_missing():
+@pytest.mark.parametrize(("field_label", "expected"), [("Required Field", "Required Field"), (None, "field-id")])
+def test_task_complete_raises_when_required_submission_missing(field_label, expected):
     """``TaskCompletionError`` when form exists and required fields are incomplete."""
     task = TestEntities.get(
         "TASK",
@@ -93,13 +94,13 @@ def test_task_complete_raises_when_required_submission_missing():
             "page": {"name": "Completer Page", "hash": "cpg002"},
         },
     )
-    missing = SimpleNamespace(label="Required Field")
+    missing = SimpleNamespace(label=field_label, id="field-id")
 
     with (
         patch(_USER_TZ, return_value=ZoneInfo("UTC")),
         patch.object(Task, "_check_required", return_value=[missing]),
         patch("lagniappe.core.entities.task.current_user", completer),
-        pytest.raises(TaskCompletionError, match="Required Field"),
+        pytest.raises(TaskCompletionError, match=expected),
     ):
         task.complete()
     assert task.completed is False

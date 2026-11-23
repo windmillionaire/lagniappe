@@ -41,6 +41,7 @@ class FormSubmission(SubmissionProperty, DBProperty[dict[str, object], "Page | T
 
     json = True
     _id = "submission"
+    _fields: dict[str, SchemaField] | None
 
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_get_task_history_returns_dates_submissions_and_files
@@ -86,8 +87,8 @@ class FormSubmission(SubmissionProperty, DBProperty[dict[str, object], "Page | T
     # @matrix submission : cache column empty-field empty-value fields load-save missing-field normalization projection stale-db stored-false stored-null unset
     @property
     def fields(self) -> dict[str, SchemaField]:
-        if getattr(self, "_fields", None):
-            return self._fields
+        if cached := getattr(self, "_fields", None):
+            return cached
         schema = self.entity.submission_schema
         fields = [SchemaFields.create_field(f, self.entity) for f in schema]
         self._fields = {f.id: f for f in fields if f is not None}
