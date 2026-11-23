@@ -67,9 +67,9 @@ def _load_cached_details(hashes):
 
     names = cache.hmget(Keys.ENTITY_HASHES.value, hashes)
     return {
-        h: _redis_detail(json.loads(names[i]))
+        h: _redis_detail(json.loads(raw))
         for i, h in enumerate(hashes)
-        if names[i]
+        if (raw := names[i])
     }
 
 

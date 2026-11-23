@@ -164,10 +164,10 @@ def update(*entities, update=True):
 
             if cache_map.get("keys") and cache_map.get("values"):
                 cache_map["keys"] = "|".join(
-                    _escape_pipe(k) for k in cache_map.get("keys")
+                    _escape_pipe(k) for k in cache_map["keys"]
                 )
                 cache_map["values"] = "|".join(
-                    _escape_pipe(v) for v in cache_map.get("values")
+                    _escape_pipe(v) for v in cache_map["values"]
                 )
 
             pipe.hset(key, mapping=cache_map)

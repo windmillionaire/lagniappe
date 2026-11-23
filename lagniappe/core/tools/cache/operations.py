@@ -7,6 +7,7 @@ from redis import WatchError
 from config.datastore import encode_urlsafe_key
 
 from .core import cache
+from .notification_state import decode_map as _decode_map
 from .keys import Keys
 
 
@@ -21,11 +22,6 @@ def _decode(value):
     if isinstance(value, bytes):
         return value.decode("utf-8")
     return str(value) if value is not None else None
-
-
-# @testable infrastructure
-def _decode_map(values):
-    return {_decode(key): _decode(value) for key, value in (values or {}).items()}
 
 
 # @testable infrastructure
