@@ -1,5 +1,15 @@
 """Deferred autofill contracts independent of HTTP response handling."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, TypedDict, Unpack
+
+if TYPE_CHECKING:
+    from ...entities.page import Page
+    from ...entities.task import Task
+    from ...entities.user import User
+    from ...entities.deferred_job import DeferredJob
+    from ...entities.notification import Notification
+
 from uuid import uuid4
 
 from lagniappe.core.definitions import (
@@ -11,6 +21,19 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import assets as storage_assets
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.tools.forms.review import launch_snapshot
+
+
+class AutofillJobOptions(TypedDict, total=False):
+    key: str | None
+    source_widget: str | None
+    destination: str | None
+    lock_target: bool
+    mode: str
+    submission: dict[str, object] | None
+    prompt_submission: dict[str, object] | None
+    target_context: dict[str, object] | None
+    review_context: dict[str, object] | None
+    file_key: str | None
 
 
 # @testable false
@@ -39,22 +62,22 @@ def _destination(entity):
 # @matrix pages tasks : autofill
 # @matrix ai tasks : current-answers
 def autofill_job_spec(
-    entity,
-    user,
-    form,
+    entity: Page | Task,
+    user: User,
+    form: Mapping[str, str | None],
     *,
-    upload_record=None,
-    key=None,
-    source_widget=None,
-    destination=None,
-    lock_target=True,
-    mode="fill",
-    submission=None,
-    prompt_submission=None,
-    target_context=None,
-    review_context=None,
-    file_key=None,
-):
+    upload_record: dict[str, object] | None = None,
+    key: str | None = None,
+    source_widget: str | None = None,
+    destination: str | None = None,
+    lock_target: bool = True,
+    mode: str = "fill",
+    submission: dict[str, object] | None = None,
+    prompt_submission: dict[str, object] | None = None,
+    target_context: dict[str, object] | None = None,
+    review_context: dict[str, object] | None = None,
+    file_key: str | None = None,
+) -> DeferredJobSpec:
     """Build the durable contract for one page/task autofill job."""
     client = _destination(entity)
     client.update(
@@ -93,7 +116,7 @@ def autofill_job_spec(
 # @matrix ai : autofill deferred
 # @matrix ai tasks : attachment current-answers
 # @pair notifications:autofill
-def start_autofill_job(entity, user, form, *, upload_record=None, trusted_retry_upload=False, **options):
+def start_autofill_job(entity: Page | Task, user: User, form: Mapping[str, str | None], *, upload_record: dict[str, object] | None = None, trusted_retry_upload: bool = False, **options: Unpack[AutofillJobOptions]) -> tuple[DeferredJob, Notification | None]:
     """Validate any direct upload before creating a job or notification."""
     form = dict(form)
     form["operation-id"] = form.get("operation-id") or str(uuid4())

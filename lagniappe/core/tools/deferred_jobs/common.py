@@ -68,7 +68,7 @@ def _json_copy(value):
 
 
 # @testable infrastructure
-def _utc(value=None):
+def _utc(value: datetime | None = None) -> datetime:
     return value or datetime.now(UTC)
 
 

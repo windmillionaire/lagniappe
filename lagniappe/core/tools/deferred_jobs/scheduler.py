@@ -1,5 +1,12 @@
 """Cloud Scheduler state convergence for durable deferred-job recovery."""
 
+from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe import Config
+    from ..database.deferred_jobs import SchedulerSnapshot
+
 import time
 import uuid
 from datetime import datetime, UTC
@@ -33,7 +40,7 @@ def _utc():
 # @testable true
 # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_provider_pause_and_resume_use_exact_job_resource
 # @matrix cloud-scheduler deferred-jobs : exact-resource provider-api
-def scheduler_job_url(config=CONFIG):
+def scheduler_job_url(config: Config = CONFIG) -> str:
     """Return the exact Cloud Scheduler REST resource owned by this app."""
     project = str(getattr(config, "GOOGLE_CLOUD_PROJECT", None) or "").strip()
     region = str(getattr(config, "RESOURCE_REGION", None) or "").strip()
@@ -93,7 +100,7 @@ def _request_state(session, method, url):
 # @testable true
 # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_provider_pause_and_resume_use_exact_job_resource
 # @matrix cloud-scheduler deferred-jobs : idempotency pause provider-api resume
-def set_scheduler_state(desired_state, *, session, config=CONFIG):
+def set_scheduler_state(desired_state: str, *, session: AuthorizedSession, config: Config = CONFIG) -> str:
     """Read and, when necessary, move the Scheduler job to one exact state."""
     if desired_state not in SCHEDULER_STATES:
         raise ValueError(f"Unsupported desired Scheduler state: {desired_state!r}")
@@ -133,13 +140,13 @@ def _control_converged(control):
 # @pair deferred-jobs:provider-failure
 def synchronize_deferred_job_reconciler(
     *,
-    force=False,
-    initial_control=None,
-    config=CONFIG,
-    session=None,
-    now_fn=_utc,
-    sleep=time.sleep,
-):
+    force: bool = False,
+    initial_control: SchedulerSnapshot | None = None,
+    config: Config = CONFIG,
+    session: AuthorizedSession | None = None,
+    now_fn: Callable[[], datetime] = _utc,
+    sleep: Callable[[float], None] = time.sleep,
+) -> dict[str, object]:
     """Converge provider state to the latest serialized Datastore intent."""
     if not bool(getattr(config, "production", False)):
         return {

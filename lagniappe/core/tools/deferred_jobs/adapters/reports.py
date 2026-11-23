@@ -571,9 +571,10 @@ class ReportExecutionAdapter(DeferredJobAdapter):
                         break
             report.properties.process.fail(str(error), result=result)
         else:
+            previous_status = active_job.get("previous_status")
             report.properties.process.restore_after_execution_failure(
                 str(error),
-                previous_status=active_job.get("previous_status"),
+                previous_status=previous_status if isinstance(previous_status, str) else None,
             )
         if external_snapshot is not None:
             if hasattr(report, "add_mutation_intents"):

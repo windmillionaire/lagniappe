@@ -1,12 +1,17 @@
 """Claim-through-terminal deferred-job execution."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities import Identifier
+
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     # Dispatch, recovery, and execution are composed by the same service.
     from .service import DeferredJobService
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 import uuid
 
 from lagniappe.core import exceptions
@@ -66,7 +71,7 @@ class DeferredJobRunner:
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_rechecks_ai_access_before_apply
     # @matrix deferred-jobs : cancellation checkpoint reauthorization recovery retry
     # @pair deferred-jobs:preparation-context
-    def run(self, job_key, *, now=None):
+    def run(self, job_key: Identifier, *, now: datetime | None = None) -> DeferredJobResult:
         service = cast("DeferredJobService", self)
         now = _utc(now)
         lease_token = uuid.uuid4().hex
@@ -375,7 +380,7 @@ class DeferredJobRunner:
 
     # @testable infrastructure
     def _heartbeat(self, job, lease_token, phase=None):
-        values = {
+        values: dict[str, object] = {
             "lease_expires": _utc() + timedelta(seconds=DEFERRED_JOB_LEASE_SECONDS),
         }
         if phase:
@@ -412,7 +417,7 @@ class DeferredJobRunner:
             client=job.client or {},
             checkpoint=checkpoint,
         )
-        values = {
+        values: dict[str, object] = {
             "checkpoint": checkpoint,
             "status_revision": int(getattr(job, "status_revision", 0) or 0) + 1,
         }

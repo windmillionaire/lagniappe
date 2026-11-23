@@ -1,5 +1,11 @@
 """Cloud Tasks and local-provider dispatch for durable deferred jobs."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.deferred_job import DeferredJob
+    from lagniappe.core.definitions import DeferredJobResult
+
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
@@ -32,7 +38,7 @@ class DeferredJobDispatch:
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_production_dispatch_rejects_disabled_task_queue
     # @matrix deferred-jobs : disabled-queue dispatch task-identity
-    def dispatch(self, job, *, attempt, delay_seconds=0, task_suffix=None):
+    def dispatch(self, job: DeferredJob, *, attempt: int, delay_seconds: int = 0, task_suffix: str | None = None) -> str | DeferredJobResult | None:
         service = cast("DeferredJobService", self)
         adapter = service.adapter(job.job_type)
         if CONFIG.production:
@@ -69,7 +75,7 @@ class DeferredJobDispatch:
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_long_running_feedback_dispatch_is_delayed_and_deterministic
     # @matrix deferred-jobs notifications : feedback long-running scheduling
-    def dispatch_feedback(self, job):
+    def dispatch_feedback(self, job: DeferredJob) -> str | None:
         """Schedule a bounded user-facing update for unusually long work."""
         if (
             not CONFIG.production

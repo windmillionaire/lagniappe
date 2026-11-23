@@ -1,12 +1,21 @@
 """Public durable lifecycle service for deferred jobs."""
 
+from collections.abc import Iterable
+from datetime import datetime
+
 import hashlib
 import json
 import uuid
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from google.cloud.datastore import Entity as DatastoreRow
+    from lagniappe.core.properties.deferred_job_lifecycle import JobStatus, AdminJobStatus
+    from lagniappe.core.entities import Identifier
+    from lagniappe.core.entities.user import User
+    from lagniappe.core.entities.notification import Notification
     from lagniappe.core.entities.deferred_job import DeferredJob
+    from .adapters.base import DeferredJobAdapter
 
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
@@ -54,17 +63,17 @@ _feedback_task_id = TaskIdentity.feedback
 
 # @testable infrastructure
 class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRunner):
-    def __init__(self, adapter_registry=None):
+    def __init__(self, adapter_registry: DeferredJobAdapterRegistry | None = None) -> None:
         self.adapter_registry = adapter_registry or DeferredJobAdapterRegistry()
 
     # @testable infrastructure
     # @covered-by lagniappe/core/tools/deferred_jobs/adapters/registry.py::DeferredJobAdapterRegistry.register
-    def register(self, adapter):
+    def register[T: DeferredJobAdapter](self, adapter: T) -> T:
         return self.adapter_registry.register(adapter)
 
     # @testable infrastructure
     # @covered-by lagniappe/core/tools/deferred_jobs/adapters/registry.py::DeferredJobAdapterRegistry.adapter
-    def adapter(self, job_type):
+    def adapter(self, job_type: object) -> DeferredJobAdapter:
         return self.adapter_registry.adapter(job_type)
 
     # @testable true
@@ -168,7 +177,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
     # @tests tests_unit/test_023b_deferred_job_service.py::test_start_dispatch_marker_does_not_overwrite_a_fast_worker
     # @matrix deferred-jobs : compare-and-set dispatch-worker-race mismatch no-apply operation-fingerprint start transactional-start transient-dispatch
     # @pair notifications:pending-state
-    def start(self, spec):
+    def start(self, spec: DeferredJobSpec) -> tuple[DeferredJob, Notification | None]:
         from lagniappe.core.tools.measurements import link_job
 
         if not isinstance(spec, DeferredJobSpec):
@@ -206,7 +215,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
             )
         storage_id = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
         job_key = database_utility.create_named_key("job", storage_id, spec.actor)
-        existing = Entities.fetch_one(job_key, request=Fetch.direct())
+        existing = cast("DeferredJob | None", Entities.fetch_one(job_key, request=Fetch.direct()))
         if existing is not None:
             if (
                 getattr(existing, "request_fingerprint", None)
@@ -262,10 +271,11 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
         options = {"writes": writes, "guards": guards} if writes or guards else {}
         creation = database_deferred_jobs.create_deferred_job_if_absent(job, notification, lock, **options)
         if not creation.get("created"):
-            raw = creation.get("entity")
+            # A duplicate creation always returns the persisted datastore row.
+            raw = cast("DatastoreRow | None", creation.get("entity"))
             existing = Entities.DEFERRED_JOB(raw) if raw is not None else None
             existing = (
-                Entities.fetch_one(existing, request=Fetch.direct())
+                cast("DeferredJob | None", Entities.fetch_one(existing, request=Fetch.direct()))
                 if existing is not None
                 else None
             )
@@ -336,7 +346,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
                 delay_seconds=spec.delay_seconds,
             )
             if isinstance(task_identity, DeferredJobResult):
-                current = Entities.fetch_one(job.key, request=Fetch.direct())
+                current = cast("DeferredJob | None", Entities.fetch_one(job.key, request=Fetch.direct()))
                 job = current or task_identity.job or job
                 notification = getattr(job, "notification", notification)
             else:
@@ -353,7 +363,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
                     job.dispatch_state = "dispatched"
                     job.task_identity = task_identity
                 else:
-                    current = Entities.fetch_one(job.key, request=Fetch.direct())
+                    current = cast("DeferredJob | None", Entities.fetch_one(job.key, request=Fetch.direct()))
                     if current is None:
                         raise DeferredJobInfrastructureError(
                             "Deferred operation disappeared during dispatch."
@@ -379,7 +389,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
                 job.task_identity = None
                 job.error = error_record
             else:
-                current = Entities.fetch_one(job.key, request=Fetch.direct())
+                current = cast("DeferredJob | None", Entities.fetch_one(job.key, request=Fetch.direct()))
                 if current is None:
                     raise
                 job = current
@@ -439,16 +449,17 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
     # @matrix deferred-jobs : cancellation deterministic-task-id
     def cancel(
         self,
-        job,
+        job: DeferredJob | str | dict[str, object] | None,
         *,
-        status=DeferredJobStatus.CANCELLED,
-        message="Operation cancelled.",
-    ):
+        status: DeferredJobStatus = DeferredJobStatus.CANCELLED,
+        message: str = "Operation cancelled.",
+    ) -> bool:
         """Tombstone work durably so an already-running delivery loses its lease."""
         if isinstance(job, dict):
-            job = job.get("key")
+            key = job.get("key")
+            job = key if isinstance(key, str) else None
         if isinstance(job, str):
-            job = Entities.fetch_one(job, request=Fetch.direct())
+            job = cast("DeferredJob | None", Entities.fetch_one(job, request=Fetch.direct()))
         if job is None:
             return False
 
@@ -499,7 +510,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
         if not transition.get("transitioned"):
             return transition.get("reason") == "terminal"
         job = Entities.DEFERRED_JOB(transition["entity"])
-        job = Entities.fetch_one(job, request=Fetch.direct()) or job
+        job = cast("DeferredJob | None", Entities.fetch_one(job, request=Fetch.direct())) or job
         _publish_operation_projection(job, operation="cancel_projection")
         self._sync_reconciler(control=transition.get("scheduler_control"))
         if task_identity:
@@ -523,7 +534,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
     # @testable false
     # @covered-by lagniappe/core/tools/deferred_jobs/service.py::DeferredJobService.cancel
     # @reason one-line status-specialized delegation retains cancel as the behavior owner
-    def supersede(self, job):
+    def supersede(self, job: DeferredJob | str | dict[str, object] | None) -> bool:
         """Replace active work while retaining a terminal operation record."""
         return self.cancel(
             job,
@@ -534,9 +545,9 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_long_running_feedback_updates_pending_notification
     # @matrix deferred-jobs notifications : feedback long-running terminal-safety
-    def feedback(self, job_key):
+    def feedback(self, job_key: Identifier) -> bool:
         """Publish a progress message when a job remains queued or running."""
-        job = Entities.fetch_one(job_key, request=Fetch.direct())
+        job = cast("DeferredJob | None", Entities.fetch_one(job_key, request=Fetch.direct()))
         if (
             job is None
             or job.status
@@ -559,7 +570,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
     # @tests tests_unit/test_023b_deferred_job_service.py::test_statuses_returns_only_jobs_visible_to_the_actor
     # @tests tests_unit/test_023b_deferred_job_service.py::test_statuses_rejects_more_than_fifty_jobs
     # @matrix deferred-jobs : batching owner progress status timing
-    def statuses(self, job_keys, actor, *, now=None):
+    def statuses(self, job_keys: Iterable[str] | None, actor: User, *, now: datetime | None = None) -> list[JobStatus]:
         """Project a bounded owner-safe status list for browser reconciliation."""
         actor_key = getattr(actor, "urlsafe_key", None)
         keys = list(dict.fromkeys(str(key) for key in (job_keys or ()) if key))
@@ -586,17 +597,17 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
         return statuses
 
     # @testable infrastructure
-    def recent(self, *, limit=100, now=None):
+    def recent(self, *, limit: int = 100, now: datetime | None = None) -> list[AdminJobStatus]:
         """Return privacy-bounded operation rows for the owner dashboard."""
         records = database_deferred_jobs.recent_records(limit)
         jobs = [Entities.DEFERRED_JOB(record) for record in records]
         jobs = Entities.fetch(*jobs, request=Fetch.direct())
-        return [_admin_projection(job, now=_utc(now)) for job in jobs]
+        return [_admin_projection(cast("DeferredJob", job), now=_utc(now)) for job in jobs]
 
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_delete_terminal_jobs_preserves_active_and_incomplete_delivery
     # @matrix deferred-jobs : retention terminal-delivery
-    def delete_terminal(self, *, before=None, batch_size=500):
+    def delete_terminal(self, *, before: datetime | None = None, batch_size: int = 500) -> int:
         """Delete retained terminal jobs without interrupting unfinished work."""
         before = _utc(before) if before is not None else None
         return database_deferred_jobs.delete_terminal_records(

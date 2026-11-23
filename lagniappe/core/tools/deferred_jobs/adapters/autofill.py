@@ -258,7 +258,7 @@ class AutofillAdapter(DeferredJobAdapter):
         )
         if "submission" not in existing_checkpoint:
             prompt_data = ai_autofill.autofill_prompt_data(
-                context.input("target"),
+                required_input(context, "target"),
                 context.actor,
                 user_context=context.parameters.get("user_context"),
                 file=upload,
@@ -267,7 +267,7 @@ class AutofillAdapter(DeferredJobAdapter):
             prompt = ai_autofill.form_autofill_prompt(**prompt_data)
             context.set_phase(DeferredJobPhase.GENERATING)
             prepared_submission = ai_autofill.generate_autofilled_submission(
-                prompt, entity=context.input("target"), user=context.actor
+                prompt, entity=required_input(context, "target"), user=context.actor
             )
 
         checkpoint = {"submission": prepared_submission}
@@ -287,7 +287,7 @@ class AutofillAdapter(DeferredJobAdapter):
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_snapshot_passes_prompt_and_staged_original_to_model
     # @pair ai:autofill
-    def prepare_snapshot(self, context):
+    def prepare_snapshot(self, context: DeferredJobContext) -> dict[str, object]:
         snapshot = context.parameters["snapshot"]
         prompt_data = deepcopy(snapshot["prompt"])
         prompt_data["user"] = context.actor
@@ -426,7 +426,7 @@ class AutofillAdapter(DeferredJobAdapter):
     # @testable true
     # @pair ai:autofill
     # @matrix ai tasks : autofill conflicts review private-refinement
-    def apply_proposal(self, context):
+    def apply_proposal(self, context: DeferredJobContext) -> dict[str, object]:
         snapshot = context.parameters["snapshot"]
         private = context.parameters.get("mode") == "revise"
         for attempt in range(3):
@@ -483,6 +483,7 @@ class AutofillAdapter(DeferredJobAdapter):
                     return form_review.json_value(persisted.db, form_review.RECEIPT)
                 if attempt == 2:
                     raise
+        raise AssertionError("Autofill apply retries ended without a result.")
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_terminal_cleanup_releases_target_lock

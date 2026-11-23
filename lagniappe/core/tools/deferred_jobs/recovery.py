@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from .service import DeferredJobService
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
@@ -66,7 +66,7 @@ class DeferredJobRecovery:
     # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_completes_terminal_delivery_when_input_was_deleted
     # @matrix deferred-jobs : compare-and-set deterministic-task-id grace maximum-age orphaned-input reconciliation redispatch terminal-delivery
     # @pair notifications:terminal-delivery
-    def reconcile(self, *, now=None, limit=250):
+    def reconcile(self, *, now: datetime | None = None, limit: int = 250) -> dict[str, int]:
         """Redispatch stranded work and bound the age of every operation."""
         service = cast("DeferredJobService", self)
         now = _utc(now)

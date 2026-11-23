@@ -15,7 +15,7 @@ from .base import DeferredJobAdapter
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_adapter_registry_loads_defaults_once_across_threads
 # @matrix deferred-jobs : adapter-registry domain-strategy
 class DeferredJobAdapterRegistry:
-    def __init__(self):
+    def __init__(self) -> None:
         self._adapters: dict[DeferredJobType, DeferredJobAdapter] = {}
         self._defaults_loaded = False
         self._lock = RLock()
@@ -38,7 +38,7 @@ class DeferredJobAdapterRegistry:
     # @testable true
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
     # @pair deferred-jobs:adapter-lookup
-    def adapter(self, job_type: DeferredJobType | str) -> DeferredJobAdapter:
+    def adapter(self, job_type: object) -> DeferredJobAdapter:
         self._load_default_adapters()
         if not isinstance(job_type, DeferredJobType):
             job_type = DeferredJobType(job_type)

@@ -62,7 +62,8 @@ class FileAdapter(DeferredJobAdapter):
             return super().validate_apply(context)
         file = context.input("file")
         try:
-            current = file.get_asset("file").fingerprint if file is not None else None
+            asset = file.get_asset("file") if file is not None else None
+            current = asset.fingerprint if asset is not None else None
         except AttributeError:
             current = None
         if current != expected:
