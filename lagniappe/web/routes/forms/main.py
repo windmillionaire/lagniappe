@@ -140,10 +140,12 @@ def view(key: str, **kwargs: Unpack[EntityContext[models.Form]]) -> ResponseRetu
     form = kwargs["entity"]
 
     from lagniappe.core.tools.forms import changes as form_changes, conversions as form_conversions
-    draft = form_drafts.builder_draft(form)
+    draft = dict(form_drafts.builder_draft(form))
     if form.db.get(form_changes.PENDING):
-        result = form_changes.change_response(form, current_user)
-        draft.update(result["draft"], pending_change=result["pending_change"])
+        result = form_changes.change_response(form, authenticated_user())
+        draft.update(result["draft"])
+        if "pending_change" in result:
+            draft["pending_change"] = result["pending_change"]
     return render_template("forms/builder.html", form=form, builder_draft=draft,
                            conversion_catalog=form_conversions.conversion_catalog())
 
@@ -158,9 +160,9 @@ def form_change(
 ) -> ResponseReturnValue:
     from lagniappe.core.tools.forms import changes as form_changes
     try:
-        result = (form_changes.change_response(kwargs["entity"], current_user) if request.method == "GET"
-                  else form_changes.recover_change(kwargs["entity"], current_user,
-                      (request.get_json(silent=True) or request.form).get("action")))
+        result = (form_changes.change_response(kwargs["entity"], authenticated_user()) if request.method == "GET"
+                  else form_changes.recover_change(kwargs["entity"], authenticated_user(),
+                      (request.get_json(silent=True) or request.form).get("action") or ""))
         return responses.json_response(result)
     except (exceptions.ValidationError, exceptions.MutationConflict) as error:
         return responses.error(str(error))
@@ -183,7 +185,7 @@ def update(
     try:
         draft, images = _builder_request(data, form)
         result = form_drafts.save_form_draft(
-            form, draft, data.get("baseline"), data.get("save_id"), current_user,
+            form, draft, data.get("baseline") or "", data.get("save_id") or "", authenticated_user(),
             images=images,
         )
     except form_drafts.FormDraftConflict as error:
@@ -229,7 +231,7 @@ def copy_form(
     try:
         draft, images = _builder_request(data, source)
         result = form_drafts.copy_form_draft(
-            source, draft, data.get("baseline"), data.get("save_id"), current_user,
+            source, draft, data.get("baseline") or "", data.get("save_id") or "", authenticated_user(),
             images=images,
         )
     except form_drafts.FormDraftConflict as error:
@@ -237,8 +239,9 @@ def copy_form(
     except (exceptions.ValidationError, ValueError) as error:
         return responses.error(str(error))
     direct_uploads.cleanup_direct_uploads(request.form)
-    result["url"] = url_for("forms.view", key=result.pop("form_key"))
-    return responses.json_response(result)
+    payload = dict(result)
+    payload["url"] = url_for("forms.view", key=payload.pop("form_key"))
+    return responses.json_response(payload)
 
 
 # @testable false
@@ -292,7 +295,7 @@ def validate_row(
         )
     except exceptions.ValidationError as error:
         return responses.error(str(error))
-    row_submission = field.validate_row_submission(values)
+    row_submission = field.validate_row_submission(dict(values))
     return responses.json_response({"row": row_submission})
 
 
@@ -402,7 +405,7 @@ def create_schema() -> ResponseReturnValue:
             value, draft, form_type=form_type, image_sources=sources,
         ))
         current = Entities.fetch_one(form.key, request=Fetch.direct())
-        if current is None or not current.allowed(Action.EDIT, user=current_user):
+        if not isinstance(current, Entities.FORM) or not current.allowed(Action.EDIT, user=current_user):
             raise exceptions.ValidationError("This Form is no longer editable.")
         if form_drafts.builder_draft(current)["baseline"] != baseline:
             raise form_drafts.FormDraftConflict("The saved Form changed during generation. Your draft is preserved.")

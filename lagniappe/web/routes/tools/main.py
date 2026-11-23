@@ -58,7 +58,7 @@ def cancel_generation(job_key: str) -> ResponseReturnValue:
         if request.form.get("operation-id") != job.idempotency_key:
             abort(409, description="This autofill control is stale. Refresh before trying again.")
         DeferredJobs.cancel(job)
-        statuses = DeferredJobs.statuses([job_key], current_user)
+        statuses = DeferredJobs.statuses([job_key], authenticated_user())
         was_cancelled = bool(statuses and statuses[0]["status"] in {"cancelled", "superseded"})
         return responses.json_response({"status": statuses[0] if statuses else None,
             "message": "Autofill cancelled. Saved answers and files were kept." if was_cancelled else "Autofill has already finished or applied its results."})
@@ -105,9 +105,9 @@ def refine_autofill(key: str) -> ResponseReturnValue:
         from lagniappe.core.tools.ai.autofill import validate_submission
         editable_ids = {field["id"] for field in target.submission_schema if field.get("type") not in {"signature", "status", "html"}}
         submission = {key: value for key, value in submission.items() if key in editable_ids}
-        submission = validate_submission(submission, entity=target, user=current_user, schema=target.submission_schema)
-        context = {
-            "previous_suggestions": form_review.review_projection(target, current_user),
+        submission = validate_submission(submission, entity=target, user=authenticated_user(), schema=target.submission_schema)
+        context: dict[str, object] = {
+            "previous_suggestions": form_review.review_projection(target, authenticated_user()),
         }
         return deferred_autofill.start_deferred_autofill(
             target, authenticated_user(), request.form, mode="revise", submission=submission,

@@ -27,6 +27,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user
+from lagniappe.web import auth
 from lagniappe.core.definitions.asset import FileAsset
 from smartypants import smartypants
 import yaml
@@ -207,11 +208,11 @@ def index(name: str, index: Index | Entity, **context: object) -> tuple[str, int
     poll_revision = (
         channel_revision(
             poll_channel,
-            current_user,
+            auth.authenticated_user(),
             site_fingerprints={f"/{name}/index": fingerprint},
         )
         if fingerprint
-        else channel_revisions((poll_channel,), current_user)[poll_channel]
+        else channel_revisions((poll_channel,), auth.authenticated_user())[poll_channel]
     )
     return (
         render_template(
@@ -388,6 +389,8 @@ def form_submission(
 ) -> tuple[Response, int]:
     if original or archived:
         if original:
+            if not isinstance(entity, Entities.TASK):
+                raise exceptions.ValidationError("Original completion requires a task.")
             completion = original_completion(entity)
             definition = completion["definition"]
             values = completion["submission"]
@@ -767,13 +770,12 @@ def deferred_tool_report(
 def tool_report(report: models.AIReport) -> tuple[str, int]:
     if not report.available:
         return render_template("tools/report.html", report=report), 200
-    render_operation_statuses((report,), current_user)
+    render_operation_statuses((report,), auth.authenticated_user())
     from lagniappe.core.tools.ai.reporting.schema_updates import report_impact, migration_pending
-    from lagniappe.web.auth import authenticated_user
 
     page = max(1, request.args.get("schema_page", 1, type=int))
     return render_template("tools/report.html", report=report,
-                           schema_impacts=report_impact(report, authenticated_user(), page=page),
+                           schema_impacts=report_impact(report, auth.authenticated_user(), page=page),
                            migration_pending=migration_pending(report)), 200
 
 
@@ -785,7 +787,7 @@ def tool_report(report: models.AIReport) -> tuple[str, int]:
 # @template home/directory.html::list
 # @template home/home.html::create
 def home_page(home: models.Home) -> tuple[str, int]:
-    poll_revisions = channel_revisions(("home-notes", "tasks"), current_user)
+    poll_revisions = channel_revisions(("home-notes", "tasks"), auth.authenticated_user())
     return (
         render_template(
             "home/home.html",
@@ -906,9 +908,8 @@ def home_section(section: HomeProperty) -> tuple[str, int] | None:
 # @covered-by lagniappe/web/routes/tasks/main.py::update
 # @reason route response adapter is exercised through its owning task mutation
 def home_task_list() -> tuple[str, int]:
-    from lagniappe.web.auth import authenticated_user
 
-    home = Entities.HOME(user=authenticated_user())
+    home = Entities.HOME(user=auth.authenticated_user())
     template = get_template_attribute("home/tasks.html", "list")
     task_list_html = template(home.section("tasks"))
 
@@ -944,18 +945,18 @@ def home_task_removed() -> tuple[Response, int]:
 # @reason filtered index response tests exercise the rendered polling contract
 def _filtered_index_poll_context(entity):
     if not entity.temporary:
-        context = {"fingerprint": filter_result_revision(entity, current_user)}
+        context = {"fingerprint": filter_result_revision(entity, auth.authenticated_user())}
         if entity.parent.kind == "project":
             context.update(
-                entity_revision=filter_revision(entity, current_user),
+                entity_revision=filter_revision(entity, auth.authenticated_user()),
                 poll_channel="tasks",
-                poll_revision=channel_revisions(("tasks",), current_user)["tasks"],
+                poll_revision=channel_revisions(("tasks",), auth.authenticated_user())["tasks"],
             )
         return context
     channel = "tasks" if entity.parent.kind == "project" else "categories"
     return {
         "poll_channel": channel,
-        "poll_revision": channel_revisions((channel,), current_user)[channel],
+        "poll_revision": channel_revisions((channel,), auth.authenticated_user())[channel],
     }
 
 

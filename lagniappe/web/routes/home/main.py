@@ -10,6 +10,7 @@ from flask import abort, request, g, make_response
 
 from flask_login import current_user
 from lagniappe.core.definitions import Action, Fetch, Resource
+from lagniappe.core.properties.home import ToolsList
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.properties.notification_aggregate import counts as aggregate_counts
@@ -52,15 +53,15 @@ def get(kind: str) -> ResponseReturnValue:
         abort(403)
     home = Entities.HOME(user=authenticated_user())
     section = home.section(kind, cursor=request.args.get("cursor"))
-    if kind == "tools":
-        render_operation_statuses(section.list, current_user)
+    if isinstance(section, ToolsList):
+        render_operation_statuses(section.list, authenticated_user())
 
     response = make_response(responses.home_section(section))
     channel = {
         "notes": "home-notes",
         "tools": "tool-reports",
     }.get(kind, kind)
-    revision = channel_revisions((channel,), current_user)[channel]
+    revision = channel_revisions((channel,), authenticated_user())[channel]
     response.headers["X-Lagniappe-Poll-Channel"] = channel
     response.headers["X-Lagniappe-Poll-Revision"] = revision
     return response

@@ -90,7 +90,11 @@ def prepare_schema_updates(
         baseline = form_drafts.builder_draft(form)["baseline"]
         if (verify or data.get("baseline")) and data.get("baseline") != baseline:
             raise ValidationError(updates.STALE_MESSAGE)
-        scope = updates.inspect_scope(form, changes, user)
+        from lagniappe.core.tools.auth.context import current_context_user
+        actor = current_context_user(user)
+        if actor is None:
+            raise ValidationError("You do not have permission to update this Form.")
+        scope = updates.inspect_scope(form, changes, actor)
         if (verify or changes) and data.get(
             "scope_fingerprint"
         ) != scope["scope_fingerprint"]:

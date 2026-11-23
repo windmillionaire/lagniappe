@@ -4,6 +4,9 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities.page import PageData
+    from lagniappe.core.entities.entity import Entity
+    from werkzeug.datastructures import MultiDict
     from lagniappe.core.entities import types as models
     from lagniappe.web.auth import EntityContext
     from typing import Unpack
@@ -199,9 +202,11 @@ def files(
 # @covered-by lagniappe/web/routes/pages/main.py::create
 # @covered-by lagniappe/web/routes/pages/main.py::update
 # @reason page form parsing helper owned by page create/update workflows
-def _page_data(form, page=None, category=None):
+def _page_data(
+    form: MultiDict[str, str], page: models.Page | None = None, category: models.Category | None = None,
+) -> PageData:
     """Resolve form data into a dict suitable for Page.create() or Page.update()."""
-    entities = [page, category]
+    entities: list[Entity | str | None] = [page, category]
     # A user-Page save also persists its owning User, whose requirements use
     # groups, while Page.update() registers forms with the reserved Users model.
     # Make both entities direct roots without widening every Page update to a
@@ -248,17 +253,19 @@ def _page_data(form, page=None, category=None):
     ):
         selected_form = current_form
 
-    page_data = {
+    model = loaded.get(category.urlsafe_key) if category else None
+    page_data: PageData = {
         "name": form.get("name"),
         "description": form.get("description"),
         "email": form.get("email"),
         "categories": categories,
         "form": selected_form,
-        "model": loaded.get(category.urlsafe_key) if category else None,
-        "groups": [loaded.get(k) for k in form.getlist("group") if loaded.get(k)],
+        "model": model if isinstance(model, Entities.CATEGORY) else None,
+        "groups": [group for k in form.getlist("group") if isinstance(group := loaded.get(k), Entities.USER_GROUP)],
     }
     if "reassign-page" in form:
-        page_data["reassign-page"] = loaded.get(form.get("reassign-page"))
+        replacement = loaded.get(form.get("reassign-page") or "")
+        page_data["reassign-page"] = replacement if isinstance(replacement, Entities.PAGE) else None
     if "remove-user" in form:
         page_data["remove-user"] = form.get("remove-user") == "true"
     if "ai_access" in form:
@@ -414,7 +421,7 @@ def update(
 
     if role == "autofill-submit":
         require_ai_access(AI.CREATE)
-        if getattr(page_data["form"], "key", None) != getattr(page.form, "key", None):
+        if getattr(page_data.get("form"), "key", None) != getattr(page.form, "key", None):
             return responses.error("Save the form selection before running autofill.")
         draft = None
         if page.form:
@@ -422,9 +429,9 @@ def update(
                 draft = page.preview_form_submission(request, actor=current_user)
             except exceptions.ValidationError as error:
                 return responses.error(str(error))
-        target_context = {
-            "name": page_data["name"],
-            "description": page_data["description"],
+        target_context: dict[str, object] = {
+            "name": page_data.get("name"),
+            "description": page_data.get("description"),
         }
         return responses.entity_response(
             deferred_autofill.start_deferred_autofill(

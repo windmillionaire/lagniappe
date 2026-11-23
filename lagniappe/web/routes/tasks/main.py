@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
     from lagniappe.core.entities import types as models
     from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.entities.task import TaskData
     from lagniappe.web.auth import EntityContext
     from typing import Unpack
 
@@ -147,7 +148,7 @@ def view(key: str, **kwargs: Unpack[EntityContext[models.Task]]) -> ResponseRetu
     page = Entities.fetch_one(task.page, request=Fetch.direct())
     if not isinstance(page, Entities.PAGE):
         return responses.not_found("Page not found")
-    if not page.allowed(Action.VIEW) and task.is_assigned_to(current_user):
+    if not page.allowed(Action.VIEW) and task.is_assigned_to(authenticated_user()):
         page = Entities.fetch_one(current_user.page, request=Fetch.direct())
         if not isinstance(page, Entities.PAGE):
             return responses.not_found("Page not found")
@@ -347,7 +348,7 @@ def _create_task_file():
 # @testable false
 # @covered-by lagniappe/web/routes/tasks/main.py::task_data
 # @reason shared form fields are part of task create/update data assembly
-def _task_base_data(request):
+def _task_base_data(request: Request) -> TaskData:
     return {
         "name": request.form.get("name"),
         "description": request.form.get("description"),
@@ -417,7 +418,7 @@ def _task_create_due_date_data(request):
 # @reason aggregate task form-data assembly is exercised through task mutation endpoints
 def task_data(
     request: Request, page: models.Page, task: models.Task | None = None
-) -> dict[str, object]:
+) -> TaskData:
     """Resolve form data into a dict suitable for Task.create() or Task.update()."""
     assets = _upload_assets_payload(request)
     asset_file_keys = _asset_file_keys(assets)
@@ -535,7 +536,7 @@ def task_data(
     ):
         assigned_to = current_assignee
 
-    task_data = {
+    task_data: TaskData = {
         **_task_base_data(request),
         "page": page,
         "task": None,
@@ -712,7 +713,7 @@ def update(
         except exceptions.ValidationError as error:
             return responses.error(str(error))
 
-    if "TaskSettings" in active:
+    if update_data is not None:
         try:
             task.update(update_data)
         except exceptions.ValidationError as e:
@@ -898,9 +899,10 @@ def history(
     key: str, **kwargs: Unpack[EntityContext[models.Task]]
 ) -> ResponseReturnValue:
     task = kwargs["entity"]
-    groups = history_groups(task.history)
-    for group in groups:
-        group["index"] = index.TaskHistoryIndex(entity=group["records"][0])
+    groups = [
+        {**group, "index": index.TaskHistoryIndex(entity=group["records"][0])}
+        for group in history_groups(task.history)
+    ]
     template = get_template_attribute("tasks/history.html", "completion_history")
     return template(groups), 200
 

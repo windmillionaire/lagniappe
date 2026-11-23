@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
+    from lagniappe.core.tools.cache.notification_state import NotificationState
 
 from flask import g, request
-from flask_login import current_user
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason
@@ -29,9 +29,13 @@ from lagniappe.core.tools.polling.projections import (
     operation_statuses as _operation_statuses,
 )
 from lagniappe.web import responses
-from lagniappe.web.auth import logged_in
+from lagniappe.web.auth import authenticated_user, logged_in
 
 from . import internal
+
+
+class _NotificationRevisionOptions(TypedDict, total=False):
+    notification_state: NotificationState | None
 
 
 POLL_AFTER_MS = {
@@ -115,10 +119,10 @@ def _revision_result(descriptor, revision, payload=None):
 # @covered-by lagniappe/web/routes/home/poll.py::poll
 # @reason entity permission projection is exercised through route coverage
 def _entity_result(descriptor, entity, *, ingress=False):
-    if not entity or not entity.allowed(Action.VIEW, user=current_user):
+    if not entity or not entity.allowed(Action.VIEW, user=authenticated_user()):
         return _result(descriptor, "unavailable")
     revision = (
-        filter_revision(entity, current_user)
+        filter_revision(entity, authenticated_user())
         if isinstance(entity, Entities.FILTER) else entity.fingerprint
     )
     payload = (
@@ -137,7 +141,7 @@ def _entity_result(descriptor, entity, *, ingress=False):
 # @tests tests_e2e/010_sync/test_010d_document_poll.py::test_document_poll_rejects_unavailable_documents_before_loading_state
 # @matrix polling : authorization document read-path unavailable
 def _document_result(descriptor, entity, client_id):
-    if not entity or not entity.allowed(Action.VIEW, user=current_user):
+    if not entity or not entity.allowed(Action.VIEW, user=authenticated_user()):
         return _result(descriptor, "unavailable")
     document = entity.sync_ids.get("document")
     document_id = document.get("id") if isinstance(document, dict) else None
@@ -147,7 +151,7 @@ def _document_result(descriptor, entity, client_id):
         descriptor["sync_id"],
         seed=lambda: entity.state(descriptor["sync_id"]),
         client_id=client_id,
-        user=current_user.details,
+        user=authenticated_user().details,
         generation=descriptor["generation"],
         revision=descriptor["revision"],
         presence_digest=descriptor["presence_digest"],
@@ -230,7 +234,7 @@ def poll() -> ResponseReturnValue:
         entity
         for entity in lock_entities
         if entity
-        and entity.allowed(Action.EDIT, user=current_user)
+        and entity.allowed(Action.EDIT, user=authenticated_user())
         and isinstance(entity, (Entities.PAGE, Entities.TASK))
     ]
     active_locks = deferred_job_lock_descriptors(lock_entities) if lock_entities else {}
@@ -241,7 +245,7 @@ def poll() -> ResponseReturnValue:
     if operations and notification_polled:
         try:
             notification_state, prefetched_operation_states = cache.peek_poll_states(
-                current_user,
+                authenticated_user(),
                 [descriptor["key"] for descriptor in operations],
             )
         except Exception as error:
@@ -251,7 +255,7 @@ def poll() -> ResponseReturnValue:
     operation_statuses, unchanged_operations = (
         _operation_statuses(
             operations,
-            current_user,
+            authenticated_user(),
             state_loader=(
                 (
                     lambda keys: {
@@ -269,9 +273,9 @@ def poll() -> ResponseReturnValue:
     if notification_polled:
         try:
             if prefetched_operation_states is None:
-                notification_state = cache.peek_notification_state(current_user)
+                notification_state = cache.peek_notification_state(authenticated_user())
             if notification_state is None and notification_request and notification_request["seed"]:
-                notification_state = cache.seed_notification_state(current_user)
+                notification_state = cache.seed_notification_state(authenticated_user())
             responses.publish_notification_state(notification_state)
         except Exception as error:
             exceptions.capture(
@@ -280,13 +284,16 @@ def poll() -> ResponseReturnValue:
             )
 
     channels = [descriptor["channel"] for descriptor in descriptors if descriptor["type"] == "channel"]
+    revision_options: _NotificationRevisionOptions = {}
+    if notification_polled:
+        revision_options["notification_state"] = notification_state
     channel_revisions = _channel_revisions(
         channels,
-        current_user,
+        authenticated_user(),
         fingerprint_loader=lambda paths: database_utility.site_fingerprints(
             paths, records=g.get("request_context_records"),
         ),
-        **({"notification_state": notification_state} if notification_polled else {}),
+        **revision_options,
     )
 
     results = []
@@ -308,7 +315,7 @@ def poll() -> ResponseReturnValue:
                     descriptor,
                     entities.get(descriptor["key"]),
                     active_locks,
-                    user=current_user,
+                    user=authenticated_user(),
                 )
             elif descriptor["type"] == "channel":
                 revision = channel_revisions[descriptor["channel"]]

@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from typing import Unpack
+    from lagniappe.core.tools.deferred_jobs.autofill import AutofillJobOptions
     from collections.abc import Iterable
     from flask import Response
     from google.cloud.datastore import Key
@@ -129,7 +131,7 @@ def form_state(
         key = None
     cached_status = g.get("autofill_bootstrap_statuses", {}).get(key)
     statuses = [dict(cached_status)] if cached_status else DeferredJobs.statuses([key], user) if key else []
-    status = statuses[0] if statuses else None
+    status = dict(statuses[0]) if statuses else None
     if status and descriptor:
         status.update(scope=descriptor["scope"], blocks_edit=descriptor.get("blocks_edit", False))
     reviews = review.review_projection(entity, user)
@@ -141,7 +143,7 @@ def form_state(
         job = Entities.fetch_one(key, request=Fetch.direct())
         if isinstance(job, Entities.DEFERRED_JOB) and ((job.parameters or {}).get("mode") != "revise" or (job.actor is not None and job.actor.key == user.key)):
             snapshot = (job.parameters or {}).get("snapshot")
-            stale_autofill = bool(snapshot) and not review.snapshot_matches_form(snapshot, entity)
+            stale_autofill = bool(snapshot) and (not isinstance(snapshot, dict) or not review.snapshot_matches_form(snapshot, entity))
         status = None
     result = {
         "revision": entity.autofill_revision,
@@ -281,7 +283,7 @@ def staged_upload_for_update(
                 or ((job.inputs or {}).get("target") or {}).get("id") != entity.urlsafe_key):
             continue
         snapshot = (job.parameters or {}).get("snapshot")
-        stale = bool(snapshot) and not review.snapshot_matches_form(snapshot, entity)
+        stale = bool(snapshot) and (not isinstance(snapshot, dict) or not review.snapshot_matches_form(snapshot, entity))
         record = (job.parameters or {}).get("upload_record")
         if not isinstance(record, dict) or not record:
             continue
@@ -326,7 +328,7 @@ def staged_upload_for_update(
         if current_key in reviewed or (
             isinstance(current, Entities.DEFERRED_JOB) and (current.status in {"failed", "cancelled"}
                          or (current.status == "succeeded" and snapshot
-                             and not review.snapshot_matches_form(snapshot, entity)))
+                             and (not isinstance(snapshot, dict) or not review.snapshot_matches_form(snapshot, entity))))
             and current.actor is not None and current.actor.key == actor.key
         ):
             entity.deferred_job = None
@@ -354,14 +356,10 @@ def cleanup_staged_uploads(records: Iterable[Mapping[str, object]]) -> None:
 def start_deferred_autofill(
     entity: models.Page | models.Task,
     user: models.User,
-    form: Mapping[str, object],
+    form: Mapping[str, str | None],
     *,
     multipart_file: bool = False,
-    key: str | None = None,
-    source_widget: str | None = None,
-    destination: str | None = None,
-    lock_target: bool = True,
-    **options: object,
+    **options: Unpack[AutofillJobOptions],
 ) -> Response | tuple[Response, int]:
     """Create the pending notification and enqueue one persisted autofill job."""
     if multipart_file:
@@ -382,11 +380,16 @@ def start_deferred_autofill(
                     or previous.actor.key != user.key or previous.status not in {"failed", "cancelled"}
                     or ((previous.inputs or {}).get("target") or {}).get("id") != entity.urlsafe_key):
                 return responses.error("This autofill retry is no longer available.")
-            form = dict(form)
-            form["autofill-description"] = (previous.parameters or {}).get("user_context")
-            options["file_key"] = (previous.parameters or {}).get("file_key")
+            parameters = previous.parameters or {}
+            context = parameters.get("user_context")
+            file_key = parameters.get("file_key")
+            form = {**form, "autofill-description": context if isinstance(context, str) else None}
+            options["file_key"] = file_key if isinstance(file_key, str) else None
             if not upload_record:
-                upload_record = (previous.parameters or {}).get("upload_record")
+                saved_record = parameters.get("upload_record")
+                if saved_record is not None and not isinstance(saved_record, dict):
+                    return responses.error("This autofill attachment is no longer available.")
+                upload_record = saved_record
                 trusted_retry_upload = bool(upload_record)
         job, notification = start_autofill_job(
             entity,
@@ -394,10 +397,6 @@ def start_deferred_autofill(
             form,
             upload_record=upload_record,
             trusted_retry_upload=trusted_retry_upload,
-            key=key,
-            source_widget=source_widget,
-            destination=destination,
-            lock_target=lock_target,
             **options,
         )
     except (DirectUploadError, FileConsumerLimitError) as error:
@@ -442,8 +441,8 @@ def start_deferred_autofill(
         "name": entity.name,
         "description": entity.description,
         "status": DeferredJobs.statuses([job.urlsafe_key], user)[0],
-        "notification": responses.notification_item(notification),
+        "notification": responses.notification_item(notification) if notification is not None else None,
     }
-    if lock_target:
+    if options.get("lock_target", True):
         result.update({"locked": True, "blocks_edit": False, "scope": AUTOFILL_FORM_LOCK_SCOPE})
     return responses.json_response(result)

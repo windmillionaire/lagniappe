@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 from dataclasses import dataclass
 
 from flask import request
-from flask_login import current_user
 
 from lagniappe.core.definitions import AI, Action, Resource
 from lagniappe.core.entities import Entities
@@ -124,7 +123,7 @@ def update(
             return responses.error(str(error))
     file.update(request.form)
     Entities.save(file)
-    file.dispatch_pending_processing(actor=current_user._get_current_object())
+    file.dispatch_pending_processing(actor=authenticated_user())
     if changed:
         return responses.json_response({"reload": True})
     return responses.file_info(file)
@@ -244,7 +243,7 @@ def upload(
     _summarize_page_uploads(uploaded_files)
     Entities.save(*uploaded_files, page)
     for uploaded_file in uploaded_files:
-        uploaded_file.dispatch_pending_processing(actor=current_user._get_current_object())
+        uploaded_file.dispatch_pending_processing(actor=authenticated_user())
 
     return responses.new_file_upload(uploaded_files, page)
 

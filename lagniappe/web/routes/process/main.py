@@ -82,11 +82,12 @@ def deferred_job_process() -> ResponseReturnValue:
     payload = authenticate_task(request)
     if payload is None:
         return make_response("Unauthorized", 401)
-    if set(payload) != {"job_key"} or not payload.get("job_key"):
+    job_key = payload.get("job_key")
+    if set(payload) != {"job_key"} or not isinstance(job_key, str) or not job_key:
         return jsonify({"success": False, "error": "Invalid job payload."}), 400
 
     try:
-        result = DeferredJobs.run(payload["job_key"])
+        result = DeferredJobs.run(job_key)
     except DeferredJobInfrastructureError as error:
         return jsonify({"success": False, "error": str(error)}), 503
 
@@ -109,12 +110,13 @@ def deferred_job_feedback() -> ResponseReturnValue:
     payload = authenticate_task(request)
     if payload is None:
         return make_response("Unauthorized", 401)
-    if set(payload) != {"job_key"} or not payload.get("job_key"):
+    job_key = payload.get("job_key")
+    if set(payload) != {"job_key"} or not isinstance(job_key, str) or not job_key:
         return jsonify({"success": False, "error": "Invalid job payload."}), 400
     return jsonify(
         {
             "success": True,
-            "updated": DeferredJobs.feedback(payload["job_key"]),
+            "updated": DeferredJobs.feedback(job_key),
         }
     )
 

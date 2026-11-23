@@ -163,8 +163,7 @@ def request_execution(
                     form = Entities.fetch_one(
                         record.get("migration_form"), request=Fetch.direct()
                     )
-                    form_db = getattr(form, "db", None)
-                    if isinstance(form_db, dict) and form_db.get(form_changes.PENDING):
+                    if isinstance(form, Entities.FORM) and form.db.get(form_changes.PENDING):
                         form_changes.recover_change(form, actor, "retry")
     except exceptions.ValidationError as error:
         if not retryable and str(error).startswith(form_schema_updates.STALE_MESSAGE):

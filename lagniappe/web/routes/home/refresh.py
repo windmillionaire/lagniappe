@@ -8,7 +8,6 @@ if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
 
 from flask import get_template_attribute, request
-from flask_login import current_user
 
 from lagniappe.core import exceptions
 from lagniappe.core.tools.polling.refresh import (
@@ -19,7 +18,7 @@ from lagniappe.core.tools.polling.refresh import (
     resolve_refresh_delta,
 )
 from lagniappe.web import responses
-from lagniappe.web.auth import logged_in
+from lagniappe.web.auth import authenticated_user, logged_in
 
 from . import internal
 
@@ -84,9 +83,9 @@ def _render_empty(collection, order):
 # @covered-by lagniappe/web/routes/home/refresh.py::refresh
 # @reason target orchestration is owned by the public batched route
 def _refresh_target(view, target, refresh_view):
-    collection = load_refresh_collection(view, target, current_user, refresh_view)
+    collection = load_refresh_collection(view, target, authenticated_user(), refresh_view)
     delta = resolve_refresh_delta(
-        collection, target.get("rows"), current_user,
+        collection, target.get("rows"), authenticated_user(),
         reauthorize=refresh_view.reauthorize,
     )
     return {
@@ -122,7 +121,7 @@ def refresh() -> ResponseReturnValue:
         return responses.error("Invalid refresh targets.")
 
     try:
-        refresh_view = load_refresh_view(view, current_user)
+        refresh_view = load_refresh_view(view, authenticated_user())
     except RefreshFallback:
         return responses.json_response(
             {"targets": [_fallback(target) for target in targets]}

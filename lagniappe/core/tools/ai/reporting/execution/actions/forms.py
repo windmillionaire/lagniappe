@@ -45,8 +45,9 @@ def _update_form_schema(action, report, user, created, context):
     pending = form_changes.json_value(form.db, form_changes.PENDING)
     receipt = form_changes.json_value(form.db, "form_draft_receipt")
     if migration_id and pending.get("id") == migration_id:
-        job = Entities.fetch_one(pending.get("job"), request=Fetch.direct())
-        if job is None or job.status in {"failed", "cancelled", "superseded"}:
+        job_key = pending.get("job")
+        job = Entities.fetch_one(job_key, request=Fetch.direct()) if isinstance(job_key, str) else None
+        if not isinstance(job, Entities.DEFERRED_JOB) or job.status in {"failed", "cancelled", "superseded"}:
             raise DeferredJobDependencyFailedError(
                 "The Form migration needs attention. Retry this report to resume it."
             )
@@ -94,7 +95,7 @@ def _update_form_schema(action, report, user, created, context):
     migration_id = migration_id or record["idempotency_key"]
     record.update(migration_id=migration_id, migration_form=form.urlsafe_key)
     Entities.save(report)
-    draft = form_drafts.builder_draft(form)
+    draft = dict(form_drafts.builder_draft(form))
     draft.pop("baseline")
     draft.update(
         schema=schema,
@@ -111,8 +112,8 @@ def _update_form_schema(action, report, user, created, context):
         raise DeferredJobDependencyPendingError(
             "Waiting for Form migration publication."
         )
-    if response.get("rejected_change"):
-        raise exceptions.ValidationError(response["rejected_change"]["error"])
+    if rejection := response.get("rejected_change"):
+        raise exceptions.ValidationError(rejection["error"])
     form = Entities.fetch_one(form.key, request=Fetch.direct())
     if form is None or form_changes.json_value(form.db, "form_draft_receipt").get("id") != migration_id:
         raise DeferredJobDependencyFailedError(
