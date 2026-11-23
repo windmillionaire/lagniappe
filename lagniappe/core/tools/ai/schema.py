@@ -1,5 +1,7 @@
 """AI-powered form schema generation from natural language descriptions."""
 
+from typing import overload
+
 from collections.abc import Callable
 
 from ... import exceptions
@@ -46,7 +48,11 @@ def _valid_schema_attribute(value):
 # @covered-by lagniappe/core/tools/ai/schema.py::validate_schema
 # @covered-by lagniappe/core/tools/ai/schema.py::form_generation_prompt
 # @reason provider-call wrapper; deterministic schema validation and prompt construction are tracked separately
-def generate_schema(prompt: Prompt, *, validator: Callable[[object], list[dict[str, object]]] = validate_schema) -> list[dict[str, object]]:
+@overload
+def generate_schema(prompt: Prompt) -> list[dict[str, object]]: ...
+@overload
+def generate_schema[T](prompt: Prompt, *, validator: Callable[[object], T]) -> T: ...
+def generate_schema[T](prompt: Prompt, *, validator: Callable[[object], T] | Callable[[object], list[dict[str, object]]] = validate_schema) -> T | list[dict[str, object]]:
     """Generate and validate a form schema from a Prompt."""
     try:
         return ai_model.generate_content(prompt, validator=validator)

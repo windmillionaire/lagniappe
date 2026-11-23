@@ -1,11 +1,24 @@
 """Pure, identity-addressed AI proposals for the form builder's local draft."""
 
+from collections.abc import Iterable, Mapping
+from typing import TypedDict
+
 from copy import deepcopy
 import re
 
 from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.tools.files.html import render_markdown
 from lagniappe.core.tools.forms.drafts import validate_draft_schema
+
+class FormDraft(TypedDict):
+    schema: list[dict[str, object]]
+    html_fields: dict[str, str]
+
+
+class GeneratedFormChanges(TypedDict):
+    operations: list[dict[str, object]]
+    html_fields: dict[str, str]
+
 
 NEW_IDENTITY = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
 
@@ -56,13 +69,14 @@ def _new_identities(field):
 # @testable true
 # @tests tests_unit/test_004f_form_draft_generation.py::*
 # @matrix forms ai : draft-generation stable-identity validation no-side-effects
-def prepare_generated_changes(result, draft, *, form_type, image_sources=None):
+def prepare_generated_changes(result: object, draft: FormDraft, *, form_type: str, image_sources: Mapping[str, Iterable[tuple[str, str]]] | None = None) -> GeneratedFormChanges:
     """Validate an entire proposal without mutating its draft or any entity.
 
     The provider writes Markdown sidecars; the browser receives sanitized HTML.
     Existing fields are patched by identity, so omitted settings survive exactly.
     """
     _members(result, ("operations",), ("content_markdown",))
+    assert isinstance(result, dict)
     if not isinstance(result["operations"], list):
         raise ValidationError("Generated operations must be a list.")
     content = result.get("content_markdown", {})
