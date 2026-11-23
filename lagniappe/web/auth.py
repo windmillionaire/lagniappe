@@ -452,10 +452,10 @@ def permission[T](
                 )
                 g.fingerprint = _etag_fingerprint(base_fingerprint, user)
 
-            if entity:
-                allowed = entity.allowed(requested or Action.ALL, user)
-            elif resource and user.has_permission(resource, requested):
-                allowed = True
+            if entity and requested is not None:
+                allowed = entity.allowed(requested, user)
+            elif resource is not None:
+                allowed = user.has_permission(resource, requested or Action.ALL)
 
             if not allowed:
                 abort(403)

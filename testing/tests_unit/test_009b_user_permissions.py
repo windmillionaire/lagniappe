@@ -19,6 +19,42 @@ def permission_user(*, authenticated=True, owner=False, admin=False, permissions
     )
 
 
+@pytest.mark.unit
+@pytest.mark.parametrize("admin", [False, True])
+def test_resource_only_permission_checks_the_resource_for_keyed_requests(monkeypatch, admin):
+    import importlib.util
+    from pathlib import Path
+
+    from flask import Flask
+    from werkzeug.exceptions import Forbidden
+
+    import lagniappe
+    from lagniappe.core.definitions import Resource
+
+    # Exercise the route wrapper without starting the production app and its services.
+    path = Path(lagniappe.__file__).parent / "web" / "auth.py"
+    spec = importlib.util.spec_from_file_location("isolated_web_auth", path)
+    assert spec is not None and spec.loader is not None
+    auth = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(auth)
+
+    viewer = permission_user(admin=admin)
+    viewer.has_permission = lambda resource, action: resource.allowed(action, user=viewer)
+    entity = SimpleNamespace(allowed=lambda action, user: True)
+    monkeypatch.setattr(auth, "_load_request_context", lambda *_args, **_kwargs: (viewer, entity))
+
+    @auth.permission(Resource.SITE)
+    def handler(*, key, entity):
+        return entity
+
+    with Flask(__name__).test_request_context(method="POST"):
+        if admin:
+            assert handler(key="example") is entity
+        else:
+            with pytest.raises(Forbidden):
+                handler(key="example")
+
+
 # @matrix permissions : action-lattice admin aliases anonymous default-deny resource-gates
 @pytest.mark.unit
 def test_resource_allowed_direct_contract():
