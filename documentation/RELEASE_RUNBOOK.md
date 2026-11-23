@@ -172,12 +172,16 @@ git push origin next/X.Y.Z
 The hosted lifecycle is tied to the exact committed source/build pair. Do not
 amend or replace that commit after creation.
 
+Before opening the PR, wait for **Resolve hosted release request** in the
+initial push run to finish and confirm that hosted execution was skipped.
+The resolver looks up open PRs when it runs. Opening the PR earlier can
+schedule the same hosted suite from both the push and the PR event.
+
 ### 6. Open the release pull request
 
 ```bash
 gh pr create --base main --head next/X.Y.Z --title "Release X.Y.Z"
-gh pr merge --auto --squash
-gh pr checks --watch
+gh pr checks next/X.Y.Z --watch
 ```
 
 Candidate creation runs the offline preflight before deployment. For a release
@@ -205,7 +209,16 @@ venv/bin/python run.py hosted-e2e teardown
 Keep a failed lifecycle available while diagnosing its logs. A failed result
 cannot produce the required green status.
 
-### 8. Publish the merged release
+For candidate validation alone, leave the green PR open with auto-merge disabled.
+
+### 8. Merge and publish the release
+
+Once the Owner explicitly authorizes merging the verified PR, enable squash
+auto-merge.
+
+```bash
+gh pr merge next/X.Y.Z --auto --squash
+```
 
 After GitHub squash-merges the pull request:
 
