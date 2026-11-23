@@ -25,7 +25,7 @@ from .prompt import Prompt
 
 class SchedulePromptOptions(TypedDict, total=False):
     mode: str
-    user_prompt: str
+    user_prompt: str | None
 
 
 

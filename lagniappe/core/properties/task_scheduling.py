@@ -6,6 +6,11 @@ if TYPE_CHECKING:
     from ..entities.task import Task
     from ..tools.ai.prompt import Prompt
 
+    from ..tools.tasks.scheduling import Recurrence, ScheduleRule
+
+    class _ScheduleParameters(Recurrence, ScheduleRule):
+        """Calendar or interval fields read from a persisted schedule section."""
+
 from ..tools import dates
 from ..tools.ai import dates as ai_dates
 from ..tools.tasks import scheduling
@@ -40,7 +45,7 @@ class ScheduleType(ProcessProperty):
 
     @prompt.setter
     def prompt(self, value: str | None) -> None:
-        mode = self._mode or self.mode
+        mode = self._mode or cast("str | None", self.mode)
         if not mode:
             return
 
@@ -131,7 +136,7 @@ class Periodic(ScheduleType):
             self.error = "Please provide a start date"
             return
 
-        self._start_date = dates.user_date_string_to_utc_datetime(start_date)
+        self._start_date = dates.user_date_string_to_utc_datetime(cast(str, start_date))
 
         if user_prompt:
             self.prompt = cast(str, user_prompt)
@@ -284,15 +289,17 @@ class Schedule(Property[dict[str, object], "Task"]):
     # @matrix task-scheduling : periodic recurring scheduled skipped
     @property
     def skipped(self) -> int:
-        if not self.active:
+        active = self.active
+        if not active:
             return 0
-        elif self.active.section_id == "scheduled":
+        parameters = cast("_ScheduleParameters", active.section)
+        if active.section_id == "scheduled":
             return scheduling.calculate_skipped_scheduled_tasks(
-                self.entity, self.active.section
+                self.entity, parameters
             )
-        elif self.active.section_id == "periodic":
+        elif active.section_id == "periodic":
             return scheduling.calculate_skipped_recurring_tasks(
-                self.entity, self.active.section
+                self.entity, parameters
             )
         return 0
 
@@ -303,24 +310,26 @@ class Schedule(Property[dict[str, object], "Task"]):
     # @matrix task-scheduling : next-due-date periodic postponed recurring scheduled
     def set_next_due_date(self) -> None:
         task: Task = self.entity
-        if not self.active:
+        active = self.active
+        if not active:
             return
+        parameters = cast("_ScheduleParameters", active.section)
 
-        if self.active.section_id == "recurring":
-            next_due_date = scheduling.get_next_recurring_date(self.active.section)
-        elif self.active.section_id == "scheduled":
+        if active.section_id == "recurring":
+            next_due_date = scheduling.get_next_recurring_date(parameters)
+        elif active.section_id == "scheduled":
             starting_due_date = scheduling.get_starting_due_date(task)
             next_due_date = scheduling.get_next_scheduled_date(
-                starting_due_date, self.active.section
+                starting_due_date, parameters
             )
-        elif self.active.section_id == "periodic":
+        elif active.section_id == "periodic":
             starting_due_date = scheduling.get_starting_due_date(task)
             next_due_date = scheduling.get_next_periodic_date(
-                starting_due_date, self.active.section
+                starting_due_date, parameters
             )
 
         else:
-            raise ValueError(f"Unknown schedule type: {self.active.section_id!r}")
+            raise ValueError(f"Unknown schedule type: {active.section_id!r}")
 
         if next_due_date is None:
             raise TypeError("Schedule has no next due date")
