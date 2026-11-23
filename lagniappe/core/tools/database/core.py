@@ -28,7 +28,7 @@ def expected_storage_cors_origins(config: Config = CONFIG) -> list[str]:
 # @testable false
 # @covered-by config/storage.py::expected_storage_cors
 # @reason compatibility wrapper for the shared setup/runtime storage contract
-def expected_storage_cors(config: Config = CONFIG):
+def expected_storage_cors(config: Config = CONFIG) -> list[storage_contract._CorsRule]:
     return storage_contract.expected_storage_cors(config)
 
 

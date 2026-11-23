@@ -2,30 +2,31 @@
 
 from __future__ import annotations
 
-from contextlib import nullcontext
-from copy import deepcopy
-from datetime import datetime, timedelta, UTC
 import json
 import time
+from collections.abc import Callable, Sequence
+from contextlib import nullcontext
+from copy import deepcopy
+from datetime import UTC, datetime, timedelta
+from typing import TypedDict
 from uuid import uuid4
 
 from google.api_core import exceptions as google_exceptions
+from google.cloud.datastore import Client
 from google.cloud.datastore import Entity as DatastoreEntity
+
 from config.data_migrations import (
     ASSET_GENERATION_MIGRATION_ID,
     LEDGER_SCHEMA_VERSION,
     migration_status_identifier,
 )
 from config.datastore import encode_urlsafe_key
-
 from lagniappe import CONFIG
 
 from . import utility
-from .migration_steps.v2_0_permissions import migrate_file_ownership, migrate_local_restrictions
-from .migration_steps.v2_0_file_pages import migrate_file_pages, migrate_canonical_restrictions
-from .get import datastore_key
 from .core import DATA, KINDS
 from .filter import Query
+from .get import datastore_key
 from .migration_steps.base import (
     MAX_RECORDED_ERRORS,
     MAX_RECORDED_REPAIRS,
@@ -43,12 +44,30 @@ from .migration_steps.base import (
 )
 from .migration_steps.v0_1_form_schema import canonicalize_form_schema_record
 from .migration_steps.v0_1_messaging import canonicalize_notification_record
+from .migration_steps.v2_0_file_pages import (
+    migrate_canonical_restrictions,
+    migrate_file_pages,
+)
+from .migration_steps.v2_0_permissions import (
+    migrate_file_ownership,
+    migrate_local_restrictions,
+)
 
 
 MIGRATION_LEASE_SECONDS = 600
 MIGRATION_CONTROL_ID = "data-migrations-control"
 MAX_RECORDED_ATTEMPTS = 5
 MIGRATION_TRANSACTION_RETRY_DELAYS = (0.05, 0.1, 0.2)
+
+
+class MigrationStatus(TypedDict):
+    status: str
+    current_version: str | None
+    updates_available: bool
+    cache_refresh_allowed: bool
+    counts: dict[str, int]
+    active_run_id: str | None
+    migrations: list[dict[str, object]]
 
 
 # @testable false
@@ -214,7 +233,7 @@ def _run_asset_generation_migration(context):
                     else definitions
                 )
 
-        if row.key.kind == KINDS.site.value and row.key.id_or_name == "image":
+        if row.key is not None and row.key.kind == KINDS.site.value and row.key.id_or_name == "image":
             generations = dict(row.get("asset_generations") or {})
             for name, path in row.items():
                 if (
@@ -241,7 +260,7 @@ def _run_asset_generation_migration(context):
             kind,
             lambda row: bool(row.get("assets"))
             or (
-                row.key.kind == KINDS.site.value
+                row.key is not None and row.key.kind == KINDS.site.value
                 and row.key.id_or_name == "image"
             ),
             transform,
@@ -417,7 +436,9 @@ def _attempts(record):
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_catalog_rejects_identity_and_order_errors
 # @matrix admin database-migrations : catalog identity order runner version
-def validate_catalog(catalog=MIGRATION_CATALOG):
+def validate_catalog(
+    catalog: Sequence[MigrationDefinition] = MIGRATION_CATALOG,
+) -> tuple[MigrationDefinition, ...]:
     """Reject mutable or ambiguous migration catalog definitions."""
 
     ids = set()
@@ -668,10 +689,10 @@ def _status_counts(views):
 # @pair database-migrations:actionable-links
 def get_migration_status(
     *,
-    datastore=None,
-    catalog=MIGRATION_CATALOG,
-    now=None,
-):
+    datastore: Client | None = None,
+    catalog: Sequence[MigrationDefinition] = MIGRATION_CATALOG,
+    now: Callable[[], datetime] | None = None,
+) -> MigrationStatus:
     """Return catalog-wide migration status from durable ``site`` records."""
 
     catalog = validate_catalog(catalog)
@@ -679,12 +700,12 @@ def get_migration_status(
     now_value = _utc((now or (lambda: datetime.now(UTC)))())
     views, control = _load_views(datastore, catalog)
     _link_saved_file_failures(datastore, views)
-    lease_active = _active_lease(control, now_value)
-    active_id = control.get("active_migration_id") if lease_active else None
+    lease_active = control is not None and _active_lease(control, now_value)
+    active_id = control.get("active_migration_id") if control is not None and lease_active else None
 
     for view in views:
         if view["state"] == "running":
-            owns_lease = lease_active and view.get("active_run_id") == control.get("run_id")
+            owns_lease = control is not None and lease_active and view.get("active_run_id") == control.get("run_id")
             if not owns_lease:
                 view["state"] = "interrupted"
         if active_id == view["id"] and view["state"] == "pending":
@@ -715,7 +736,7 @@ def get_migration_status(
         "updates_available": status != "current",
         "cache_refresh_allowed": status == "current",
         "counts": counts,
-        "active_run_id": control.get("run_id") if lease_active else None,
+        "active_run_id": control.get("run_id") if control is not None and lease_active else None,
         "migrations": views,
     }
 
@@ -965,13 +986,13 @@ def _totals(results):
 # @pair form-schema:history-snapshot
 def run_data_migrations(
     *,
-    query_factory=None,
-    writer=None,
-    datastore=None,
-    now=None,
-    run_id_factory=None,
-    catalog=MIGRATION_CATALOG,
-):
+    query_factory: Callable[[KINDS], Query] | None = None,
+    writer: Callable[[Sequence[DatastoreEntity]], object] | None = None,
+    datastore: Client | None = None,
+    now: Callable[[], datetime] | None = None,
+    run_id_factory: Callable[[], str] | None = None,
+    catalog: Sequence[MigrationDefinition] = MIGRATION_CATALOG,
+) -> MigrationStatus:
     """Run incomplete catalog entries in order and checkpoint each result."""
 
     catalog = validate_catalog(catalog)
@@ -987,7 +1008,7 @@ def run_data_migrations(
     if not _claim_lease(datastore, run_id, claimed_at):
         return get_migration_status(datastore=datastore, catalog=catalog, now=now)
 
-    active_id = [None]
+    active_id: list[str | None] = [None]
 
     # @testable false
     # @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
@@ -1043,12 +1064,12 @@ def run_data_migrations(
 # @tests tests_unit/test_018b_database_migrations.py::test_fresh_install_retries_transaction_contention
 # @matrix database-migrations setup : baseline fresh-install idempotence
 def initialize_fresh_install(
-    fresh_install,
+    fresh_install: bool,
     *,
-    datastore=None,
-    catalog=MIGRATION_CATALOG,
-    now=None,
-):
+    datastore: Client | None = None,
+    catalog: Sequence[MigrationDefinition] = MIGRATION_CATALOG,
+    now: Callable[[], datetime] | None = None,
+) -> bool:
     """Baseline bundled migrations only when startup created a new database."""
 
     if not fresh_install:

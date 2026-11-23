@@ -1,10 +1,15 @@
 """Datastore records and transactions for notification-email delivery."""
 
+from __future__ import annotations
+
+import uuid
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from hashlib import sha256
-import uuid
+from typing import TYPE_CHECKING
 
 from google.cloud.datastore import Entity as DatastoreEntity
+from google.cloud.datastore import Key
 
 from ...definitions import NotificationEmailMode
 from ...properties import notification_email as delivery_values
@@ -13,6 +18,11 @@ from .core import DATA, KINDS
 from .filter import Filter, Query
 from .get import datastore_key, urlsafe_key
 from .utility import create_named_key
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
+    from .get import Identifier
 
 
 DELIVERY_EXCLUDED_FIELDS = (
@@ -28,14 +38,14 @@ DELIVERY_EXCLUDED_FIELDS = (
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
 # @reason key normalization is exercised through public capture APIs
-def encoded_key(value):
+def encoded_key(value: Identifier) -> str | None:
     return urlsafe_key(getattr(value, "key", value))
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
 # @reason deterministic identities are exercised through idempotent capture
-def delivery_key(*parts):
+def delivery_key(*parts: object) -> Key:
     identity = sha256("\0".join(str(part) for part in parts).encode()).hexdigest()
     return create_named_key("email_delivery", identity)
 
@@ -44,15 +54,15 @@ def delivery_key(*parts):
 # @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
 # @reason delivery construction is exercised through public capture APIs
 def new_delivery(
-    key,
-    user,
+    key: Key,
+    user: User,
     *,
-    record_type,
-    mode,
-    due_at,
-    preference_epoch,
-    now,
-):
+    record_type: str,
+    mode: NotificationEmailMode | str,
+    due_at: datetime,
+    preference_epoch: int,
+    now: datetime,
+) -> DatastoreEntity:
     row = DatastoreEntity(key=key, exclude_from_indexes=DELIVERY_EXCLUDED_FIELDS)
     row.update(
         delivery_values.initial_values(
@@ -70,7 +80,7 @@ def new_delivery(
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
 # @reason transactional idempotency is exercised through event replay
-def put_if_absent(row):
+def put_if_absent(row: DatastoreEntity) -> tuple[DatastoreEntity, bool]:
     with DATA.datastore.transaction() as transaction:
         existing = DATA.datastore.get(row.key, transaction=transaction)
         if existing is not None:
@@ -82,7 +92,9 @@ def put_if_absent(row):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
 # @reason daily batch creation is exercised through digest capture
-def digest_batch(user, due_at, now, *, preference_epoch):
+def digest_batch(
+    user: User, due_at: datetime, now: datetime, *, preference_epoch: int
+) -> DatastoreEntity:
     bucket = due_at.strftime("%Y%m%dT%H%M%SZ")
     key = delivery_key("digest-batch", encoded_key(user), bucket)
     row = new_delivery(
@@ -102,14 +114,14 @@ def digest_batch(user, due_at, now, *, preference_epoch):
 # @covered-by lagniappe/core/tools/email/notifications/capture.py::record_message
 # @reason quiet-window replacement is exercised through message capture
 def upsert_message_candidate(
-    key,
-    recipient,
-    values,
+    key: Key,
+    recipient: User,
+    values: Mapping[str, object],
     *,
-    due_at,
-    preference_epoch,
-    now,
-):
+    due_at: datetime,
+    preference_epoch: int,
+    now: datetime,
+) -> tuple[DatastoreEntity, bool]:
     with DATA.datastore.transaction() as transaction:
         row = DATA.datastore.get(key, transaction=transaction)
         schedule = bool(
@@ -143,7 +155,9 @@ def upsert_message_candidate(
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/capture.py::record_message
 # @reason scheduled-sequence compare-and-set is exercised through message capture
-def mark_message_scheduled(row, sequence, task_name, now):
+def mark_message_scheduled(
+    row: DatastoreEntity, sequence: int, task_name: str, now: datetime
+) -> bool:
     if not task_name:
         return False
     with DATA.datastore.transaction() as transaction:
@@ -161,7 +175,7 @@ def mark_message_scheduled(row, sequence, task_name, now):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason direct lookup is exercised through queued delivery
-def get_delivery(identifier):
+def get_delivery(identifier: Identifier) -> DatastoreEntity | None:
     key = datastore_key(identifier)
     return DATA.datastore.get(key) if key else None
 
@@ -169,7 +183,9 @@ def get_delivery(identifier):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason lease acquisition is exercised through queued delivery
-def claim_delivery(row, now, *, lease_seconds):
+def claim_delivery(
+    row: DatastoreEntity, now: datetime, *, lease_seconds: int
+) -> tuple[DatastoreEntity, str] | None:
     token = str(uuid.uuid4())
     with DATA.datastore.transaction() as transaction:
         current = DATA.datastore.get(row.key, transaction=transaction)
@@ -197,7 +213,14 @@ def claim_delivery(row, now, *, lease_seconds):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason terminal compaction is exercised through queued delivery
-def finish_delivery(row, token, state, now, *, expected_sequence=None):
+def finish_delivery(
+    row: DatastoreEntity,
+    token: str,
+    state: str,
+    now: datetime,
+    *,
+    expected_sequence: int | None = None,
+) -> bool:
     with DATA.datastore.transaction() as transaction:
         current = DATA.datastore.get(row.key, transaction=transaction)
         if current is None or current.get("lease_token") != token:
@@ -215,7 +238,7 @@ def finish_delivery(row, token, state, now, *, expected_sequence=None):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason retry release is exercised through queued delivery failures
-def release_delivery(row, token, now):
+def release_delivery(row: DatastoreEntity, token: str, now: datetime) -> bool:
     with DATA.datastore.transaction() as transaction:
         current = DATA.datastore.get(row.key, transaction=transaction)
         if current is None or current.get("lease_token") != token:
@@ -231,7 +254,7 @@ def release_delivery(row, token, now):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason send-time conversation suppression is exercised through delivery
-def message_is_actionable(row, user):
+def message_is_actionable(row: DatastoreEntity, user: User) -> bool:
     conversation = DATA.datastore.get(row.get("conversation"))
     message = DATA.datastore.get(row.get("message"))
     if conversation is None or message is None:
@@ -251,7 +274,7 @@ def message_is_actionable(row, user):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason send-time notification suppression is exercised through delivery
-def event_is_actionable(row):
+def event_is_actionable(row: DatastoreEntity) -> bool:
     if row.get("source_type") != "notification":
         return True
     key = datastore_key(row.get("source_key"))
@@ -261,7 +284,7 @@ def event_is_actionable(row):
 # @testable true
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_query_retains_recipient_and_bucket_scope
 # @matrix notification-email : digest-query recipient-scope
-def digest_events(batch):
+def digest_events(batch: DatastoreEntity) -> list[DatastoreEntity]:
     return list(
         Query(KINDS.email_deliveries)
         .filter(
@@ -280,7 +303,7 @@ def digest_events(batch):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason digest tombstone compaction is exercised through delivery
-def compact_events(rows, state, now):
+def compact_events(rows: Iterable[DatastoreEntity], state: str, now: datetime) -> None:
     compacted = []
     for row in rows:
         item = DatastoreEntity(key=row.key)

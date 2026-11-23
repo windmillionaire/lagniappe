@@ -6,13 +6,17 @@ import the catalog, ledger runner, or historical migration implementations.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from copy import deepcopy
 from dataclasses import dataclass
-from collections.abc import Callable, Iterable
+from typing import TypedDict
 
+from google.cloud.datastore import Client
 from google.cloud.datastore import Entity as DatastoreEntity
 
 from config.datastore import encode_urlsafe_key
+
+from ..core import KINDS
 
 
 MIGRATION_CHUNK_SIZE = 100
@@ -26,6 +30,18 @@ class MigrationDataError(ValueError):
 
 
 # @testable infrastructure
+class MigrationResult(TypedDict):
+    id: str
+    label: str
+    examined: int
+    changed: int
+    repaired: int
+    skipped: int
+    failed: int
+    repairs: list[dict[str, str]]
+    errors: list[dict[str, str]]
+
+
 @dataclass(frozen=True)
 class MigrationChange:
     """A transform outcome with successful repair details for the audit."""
@@ -46,7 +62,7 @@ class MigrationContext:
 
     query_factory: Callable
     writer: Callable
-    datastore: object
+    datastore: Client
     heartbeat: Callable[[], None] = lambda: None
 
 
@@ -59,7 +75,7 @@ class MigrationDefinition:
     id: str
     introduced_in: str
     label: str
-    runner: Callable[[MigrationContext], dict]
+    runner: Callable[[MigrationContext], MigrationResult]
     legacy_audit_keys: tuple[str, ...] = ()
 
 
@@ -78,7 +94,7 @@ def _file_record_reference(entity):
 # @testable false
 # @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
 # @reason result-envelope construction is exercised through registered runners
-def _result(migration_id, label):
+def _result(migration_id: str, label: str) -> MigrationResult:
     return {
         "id": migration_id,
         "label": label,
@@ -217,7 +233,14 @@ def _save_changed(result, changed, writer, reference=None):
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_scan_kind_is_copy_on_write_chunked_and_failure_isolated
 # @matrix database migrations : chunks copy-on-write failures heartbeat inactive-rows raw-scan
-def scan_kind(result, context, kind, predicate, transform, reference=None):
+def scan_kind(
+    result: MigrationResult,
+    context: MigrationContext,
+    kind: KINDS,
+    predicate: Callable[[DatastoreEntity], bool],
+    transform: Callable[[DatastoreEntity], bool | MigrationChange],
+    reference: Callable[[DatastoreEntity], dict[str, str] | None] | None = None,
+) -> MigrationResult:
     """Apply one transform to matching raw rows and update ``result`` counts."""
 
     try:

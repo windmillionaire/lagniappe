@@ -1,15 +1,20 @@
 """Cloud Storage file upload, download, and deletion helpers."""
 
-from contextlib import suppress
+from __future__ import annotations
+
 import base64
-from copy import deepcopy
 import datetime
 import io
 import re
 import uuid
+from contextlib import suppress
+from copy import deepcopy
+from typing import BinaryIO, NotRequired, Protocol, Self, TypedDict, TypeGuard, cast
 
 from google.api_core import exceptions as google_exceptions
+from google.cloud.storage import Blob
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
 from lagniappe import CONFIG
@@ -31,11 +36,30 @@ GENERIC_CONTENT_TYPES = {"", None, "application/octet-stream"}
 DIRECT_UPLOAD_ASSET_NONCE = re.compile(r"^[a-f0-9]{32}$")
 
 
+class UploadSession(TypedDict):
+    token: str
+    session_url: str
+    chunk_size: int
+
+
+class UploadToken(TypedDict):
+    path: str
+    visibility: NotRequired[str | None]
+    filename: NotRequired[str | None]
+    content_type: NotRequired[str | None]
+    size: NotRequired[int | str | None]
+    input_name: NotRequired[str | None]
+
+
+class AttemptOwner(Protocol):
+    _form_attempt_assets: list[dict[str, object]] | None
+
+
 # @testable false
 # @covered-by lagniappe/core/tools/forms/drafts.py::save_form_draft
 # @covered-by lagniappe/core/tools/forms/drafts.py::copy_form_draft
 # @reason attempt ownership bounds cleanup to newly allocated objects
-def record_attempt_asset(owner, definition):
+def record_attempt_asset(owner: AttemptOwner, definition: dict[str, object]) -> None:
     owned = getattr(owner, "_form_attempt_assets", None)
     if owned is None:
         owner._form_attempt_assets = owned = []
@@ -45,7 +69,7 @@ def record_attempt_asset(owner, definition):
 # @testable true
 # @tests tests_unit/test_004f_form_drafts.py::test_rejected_save_cleans_only_attempt_blobs_and_ambiguous_commit_retains_them
 # @matrix html-field : isolated-assets cleanup
-def cleanup_rejected_attempt(owner):
+def cleanup_rejected_attempt(owner: AttemptOwner) -> None:
     """Retire known rejected attempt objects, never accepted/history objects."""
     for definition in getattr(owner, "_form_attempt_assets", None) or []:
         if not definition.get("generation"):
@@ -65,7 +89,7 @@ class DirectUploadError(ValueError):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_direct_upload_attempt_path_is_unique_and_validated
 # @matrix direct-upload storage : attempt-isolation destination-path
-def direct_upload_destination_path(path, upload):
+def direct_upload_destination_path(path: str, upload: object) -> str:
     """Add an internal attempt nonce without trusting user-controlled paths."""
     nonce = getattr(upload, "lagniappe_asset_nonce", None)
     if nonce is None:
@@ -84,42 +108,45 @@ class DirectUploadFile:
     """File-like wrapper around a verified direct-to-GCS upload."""
 
     lagniappe_direct_upload = True
+    lagniappe_asset_nonce: str
     lagniappe_preserve_source: bool
 
-    def __init__(self, record, payload, blob):
+    def __init__(
+        self, record: dict[str, object], payload: UploadToken, blob: Blob
+    ) -> None:
         self.record = record
         self.payload = payload
         self.blob = blob
-        self.filename = payload.get("filename") or record.get("filename") or "upload"
+        self.filename = str(payload.get("filename") or record.get("filename") or "upload")
         self.content_type = (
             payload.get("content_type")
             or record.get("content_type")
             or "application/octet-stream"
         )
         self.lagniappe_content_type = self.content_type
-        self._buffer = None
-        self._file_consumer = None
-        self.lagniappe_saved_blob = None
-        self.lagniappe_saved_destination = None
+        self._buffer: io.BytesIO | None = None
+        self._file_consumer: FileConsumer | None = None
+        self.lagniappe_saved_blob: Blob | None = None
+        self.lagniappe_saved_destination: dict[str, str] | None = None
 
     @property
-    def stream(self):
+    def stream(self) -> Self:
         return self
 
     @property
-    def path(self):
+    def path(self) -> str:
         return self.payload["path"]
 
     @property
-    def visibility(self):
+    def visibility(self) -> str:
         return self.payload.get("visibility") or DIRECT_UPLOAD_VISIBILITY
 
     @property
-    def size(self):
+    def size(self) -> int | None:
         return getattr(self.blob, "size", None)
 
     @property
-    def md5_hex(self):
+    def md5_hex(self) -> str | None:
         blob = self.lagniappe_saved_blob or self.blob
         md5_hash = getattr(blob, "md5_hash", None)
         if not md5_hash:
@@ -129,13 +156,13 @@ class DirectUploadFile:
         except Exception:
             return None
 
-    def _source_blob_for_download(self):
+    def _source_blob_for_download(self) -> Blob:
         return self.lagniappe_saved_blob or self.blob
 
-    def _authorize_file_consumer(self, consumer):
+    def _authorize_file_consumer(self, consumer: FileConsumer) -> None:
         self._file_consumer = consumer
 
-    def _ensure_buffer(self):
+    def _ensure_buffer(self) -> io.BytesIO:
         if self._buffer is not None:
             return self._buffer
 
@@ -154,10 +181,15 @@ class DirectUploadFile:
         self._buffer = io.BytesIO(data)
         return self._buffer
 
-    def read_sample(self, size=8192):
+    def read_sample(self, size: int = 8192) -> bytes:
         """Read a small prefix of the upload without materializing the full object."""
         sample_limit = FILE_CONSUMER_CAPABILITIES[FileConsumer.MIME_SAMPLE].max_bytes
-        size = min(int(size or 0), sample_limit)
+        size = int(size or 0)
+        if sample_limit is None:
+            raise FileConsumerLimitError(
+                "MIME sample reads require a byte limit.", consumer=FileConsumer.MIME_SAMPLE
+            )
+        size = min(size, sample_limit)
         if size <= 0:
             return b""
         return self._source_blob_for_download().download_as_bytes(
@@ -165,14 +197,14 @@ class DirectUploadFile:
             end=size - 1,
         )
 
-    def seek(self, *args, **kwargs):
-        return self._ensure_buffer().seek(*args, **kwargs)
+    def seek(self, offset: int, whence: int = 0, /) -> int:
+        return self._ensure_buffer().seek(offset, whence)
 
-    def tell(self):
+    def tell(self) -> int:
         return self._ensure_buffer().tell()
 
-    def read(self, *args, **kwargs):
-        return self._ensure_buffer().read(*args, **kwargs)
+    def read(self, size: int | None = -1, /) -> bytes:
+        return self._ensure_buffer().read(size)
 
 
 # @testable false
@@ -187,12 +219,12 @@ def _direct_upload_serializer():
 # @tests tests_unit/test_018_database_assets.py::test_create_direct_upload_session_uses_private_tmp_object
 # @matrix storage : direct-upload session token
 def create_direct_upload_session(
-    filename,
-    content_type=None,
-    size=None,
-    input_name=None,
-    origin=None,
-):
+    filename: str,
+    content_type: str | None = None,
+    size: int | str | None = None,
+    input_name: str | None = None,
+    origin: str | None = None,
+) -> UploadSession:
     """Create a browser-usable resumable upload session for a private temp blob."""
     safe_name = secure_filename(filename or "") or "upload.bin"
     upload_id = uuid.uuid4().hex
@@ -209,6 +241,8 @@ def create_direct_upload_session(
         origin=origin,
         if_generation_match=0,
     )
+    if not session_url:
+        raise DirectUploadError("Cloud Storage did not return an upload session URL.")
     payload = {
         "path": path,
         "visibility": DIRECT_UPLOAD_VISIBILITY,
@@ -231,8 +265,12 @@ def create_direct_upload_session(
 # @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_mismatched_size
 # @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_generation_mismatch
 # @matrix storage : direct-upload expiry token validation
-def load_direct_upload_token(token, max_age=DIRECT_UPLOAD_TOKEN_MAX_AGE):
+def load_direct_upload_token(
+    token: object, max_age: int | None = DIRECT_UPLOAD_TOKEN_MAX_AGE
+) -> UploadToken:
     """Load and validate a direct-upload token payload."""
+    if not isinstance(token, (str, bytes)):
+        raise DirectUploadError("Invalid direct upload token")
     try:
         payload = _direct_upload_serializer().loads(token, max_age=max_age)
     except SignatureExpired as e:
@@ -242,10 +280,16 @@ def load_direct_upload_token(token, max_age=DIRECT_UPLOAD_TOKEN_MAX_AGE):
 
     if not isinstance(payload, dict) or not payload.get("path"):
         raise DirectUploadError("Invalid direct upload token")
-    if not str(payload["path"]).startswith(f"{DIRECT_UPLOAD_PREFIX}/"):
+    if not isinstance(payload["path"], str) or not payload["path"].startswith(f"{DIRECT_UPLOAD_PREFIX}/"):
         raise DirectUploadError("Invalid direct upload path")
 
-    return payload
+    for field in ("filename", "visibility", "content_type", "input_name"):
+        value = payload.get(field)
+        if value is not None and not isinstance(value, str):
+            raise DirectUploadError("Invalid direct upload metadata")
+    if payload.get("size") is not None and not isinstance(payload["size"], (str, int)):
+        raise DirectUploadError("Invalid direct upload size")
+    return cast(UploadToken, payload)
 
 
 # @testable false
@@ -267,11 +311,11 @@ def _content_types_match(expected, actual):
 # @tests tests_unit/test_018_database_assets.py::test_verified_direct_upload_pins_generation_for_later_cleanup
 # @matrix storage : direct-upload object validation
 def verify_direct_upload(
-    record,
-    max_age=DIRECT_UPLOAD_TOKEN_MAX_AGE,
+    record: object,
+    max_age: int | None = DIRECT_UPLOAD_TOKEN_MAX_AGE,
     *,
-    consumer=None,
-):
+    consumer: FileConsumer | str | None = None,
+) -> DirectUploadFile:
     """Verify a direct-upload token and the object now present in Cloud Storage."""
     if not isinstance(record, dict):
         raise DirectUploadError("Invalid direct upload metadata")
@@ -307,6 +351,8 @@ def verify_direct_upload(
         raise DirectUploadError("Direct upload content type mismatch")
 
     observed_generation = getattr(blob, "generation", None)
+    if observed_generation is None:
+        raise DirectUploadError("Direct upload generation is invalid")
     try:
         observed_generation = int(observed_generation)
     except (TypeError, ValueError) as error:
@@ -328,7 +374,9 @@ def verify_direct_upload(
 # @testable false
 # @covered-by lagniappe/core/tools/database/assets.py::verify_direct_upload
 # @reason direct-upload wrapping delegates to the validation helper
-def direct_upload_file(record, *, consumer=None):
+def direct_upload_file(
+    record: object, *, consumer: FileConsumer | str | None = None
+) -> DirectUploadFile:
     """Return a file-like wrapper for verified direct-upload metadata."""
     return verify_direct_upload(record, consumer=consumer)
 
@@ -337,17 +385,19 @@ def direct_upload_file(record, *, consumer=None):
 # @tests tests_unit/test_018_database_assets.py::test_copy_direct_upload_file_copies_and_deletes_temp_object
 # @matrix storage : direct-upload final-copy generation-conditional-cleanup idempotency
 def copy_direct_upload_file(
-    upload,
-    path,
-    visibility,
-    content_type=None,
+    upload: DirectUploadFile,
+    path: str,
+    visibility: str,
+    content_type: str | None = None,
     *,
-    delete_source=True,
-):
+    delete_source: bool = True,
+) -> Blob:
     """Copy a verified direct-upload temp object into its permanent asset path."""
     source_bucket = DATA.bucket(upload.visibility)
     destination_bucket = DATA.bucket(visibility)
     try:
+        if upload.blob.generation is None:
+            raise DirectUploadError("Direct upload generation is invalid")
         source_generation = int(upload.blob.generation)
     except (AttributeError, TypeError, ValueError) as error:
         raise DirectUploadError("Direct upload generation is invalid") from error
@@ -374,12 +424,10 @@ def copy_direct_upload_file(
         }
     if content_type and getattr(copied, "content_type", None) != content_type:
         copied.content_type = content_type
-        patch_options = (
-            {"if_generation_match": int(destination_generation)}
-            if destination_generation is not None
-            else {}
-        )
-        copied.patch(**patch_options)
+        if destination_generation is None:
+            copied.patch()
+        else:
+            copied.patch(if_generation_match=int(destination_generation))
     if delete_source:
         # An absent source needs no cleanup; a replacement is not ours to delete.
         with suppress(google_exceptions.NotFound, google_exceptions.PreconditionFailed):
@@ -390,7 +438,7 @@ def copy_direct_upload_file(
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_delete_file_generation_never_deletes_a_replacement
 # @matrix storage : attempt-isolation generation-conditional-cleanup
-def delete_file_generation(path, visibility, generation):
+def delete_file_generation(path: str, visibility: str, generation: str | int) -> bool:
     """Delete only the exact blob generation created by one failed attempt."""
     try:
         expected_generation = int(generation)
@@ -409,7 +457,7 @@ def delete_file_generation(path, visibility, generation):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_delete_direct_upload_is_idempotent_and_generation_conditional
 # @matrix direct-upload storage : cleanup generation-conditional-cleanup idempotency
-def delete_direct_upload(record):
+def delete_direct_upload(record: object) -> bool:
     """Delete exactly one signed temporary upload, treating absence as success."""
     try:
         if not isinstance(record, dict):
@@ -432,6 +480,8 @@ def delete_direct_upload(record):
         if generation is None:
             blob.reload()
             generation = blob.generation
+        if generation is None:
+            return False
         blob.delete(if_generation_match=int(generation))
         return True
     except google_exceptions.NotFound:
@@ -446,7 +496,16 @@ def delete_direct_upload(record):
 # @tests tests_unit/test_018_database_assets.py::test_save_file_preserves_direct_upload_source_when_requested
 # @tests tests_unit/test_018_database_assets.py::test_save_file_returns_reloaded_blob_metadata
 # @matrix direct-upload file storage : asset-size deferred-cleanup metadata
-def save_file(file, path, content_type, visibility):
+def _is_direct_upload(file: object) -> TypeGuard[DirectUploadFile]:
+    return bool(getattr(file, "lagniappe_direct_upload", False))
+
+
+def save_file(
+    file: BinaryIO | FileStorage | DirectUploadFile,
+    path: str,
+    content_type: str,
+    visibility: str,
+) -> Blob:
     """Upload a file object to the specified bucket.
 
     Args:
@@ -455,7 +514,7 @@ def save_file(file, path, content_type, visibility):
         content_type: MIME type for the uploaded blob.
         visibility: Bucket name — 'private', 'public', or 'history'.
     """
-    if getattr(file, "lagniappe_direct_upload", False):
+    if _is_direct_upload(file):
         return copy_direct_upload_file(
             file,
             path,
@@ -476,7 +535,9 @@ def save_file(file, path, content_type, visibility):
 # @tests tests_unit/test_018_database_assets.py::test_download_file_passes_optional_byte_range
 # @tests tests_unit/test_018_database_assets.py::test_missing_blob_download_and_size_return_none
 # @matrix file storage : byte-range missing-object
-def download_file(path, visibility, start=None, end=None):
+def download_file(
+    path: str, visibility: str, start: int | None = None, end: int | None = None
+) -> bytes | None:
     """Download a blob's contents as bytes from the specified bucket."""
     bucket = DATA.bucket(visibility)
     blob = bucket.blob(path)
@@ -495,7 +556,7 @@ def download_file(path, visibility, start=None, end=None):
 # @tests tests_unit/test_018_database_assets.py::test_file_size_reloads_blob_metadata
 # @tests tests_unit/test_018_database_assets.py::test_missing_blob_download_and_size_return_none
 # @matrix file storage : byte-range metadata missing-object
-def file_size(path, visibility):
+def file_size(path: str, visibility: str) -> int | None:
     """Return a blob's byte size from storage metadata."""
     bucket = DATA.bucket(visibility)
     blob = bucket.blob(path)
@@ -508,7 +569,13 @@ def file_size(path, visibility):
 
 # @testable true
 # @matrix storage : generation-pinned read copy
-def get_text(path, visibility, encoding="utf-8", *, generation=None):
+def get_text(
+    path: str,
+    visibility: str,
+    encoding: str = "utf-8",
+    *,
+    generation: int | str | None = None,
+) -> str:
     """Read text, optionally pinning a descriptor's recorded object generation."""
     bucket = DATA.bucket(visibility)
     blob = bucket.blob(path, **({"generation": int(generation)} if generation else {}))
@@ -521,7 +588,7 @@ def get_text(path, visibility, encoding="utf-8", *, generation=None):
 
 # @testable false
 # @reason cloud storage behavior is owned by E2E coverage against configured services
-def save_text(text, path, content_type, visibility):
+def save_text(text: str, path: str, content_type: str, visibility: str) -> Blob:
     """Upload a text string as a blob to the specified bucket.
 
     Args:
@@ -539,7 +606,14 @@ def save_text(text, path, content_type, visibility):
 
 # @testable true
 # @matrix storage : generation-pinned read copy
-def copy_file(source_path, source_visibility, destination_path, destination_visibility, *, source_generation=None):
+def copy_file(
+    source_path: str,
+    source_visibility: str,
+    destination_path: str,
+    destination_visibility: str,
+    *,
+    source_generation: int | str | None = None,
+) -> Blob | None:
     """Copy a live or generation-pinned blob without downloading it into memory."""
     source_bucket = DATA.bucket(source_visibility)
     destination_bucket = DATA.bucket(destination_visibility)
@@ -551,13 +625,13 @@ def copy_file(source_path, source_visibility, destination_path, destination_visi
 
     return source_bucket.copy_blob(
         source_blob, destination_bucket, destination_path,
-        **({"source_generation": int(source_generation)} if source_generation else {}),
+        source_generation=int(source_generation) if source_generation else None,
     )
 
 
 # @testable false
 # @reason cloud storage listing behavior is provider-owned; export tests mock this helper
-def list_files(prefix, visibility):
+def list_files(prefix: str, visibility: str) -> list[Blob]:
     """List blobs under a prefix in the selected bucket."""
     bucket = DATA.bucket(visibility)
     return list(bucket.list_blobs(prefix=prefix))
@@ -567,11 +641,11 @@ def list_files(prefix, visibility):
 # @tests tests_unit/test_018_database_assets.py::test_signed_url_uses_remote_iam_signing
 # @matrix storage : adc iam-signing signed-url token-refresh
 def get_signed_url(
-    path,
-    expires_in=3600,
-    response_disposition=None,
-    response_type=None,
-):
+    path: str,
+    expires_in: int = 3600,
+    response_disposition: str | None = None,
+    response_type: str | None = None,
+) -> str:
     """Generate a v4 signed URL through IAM Credentials remote signing."""
     blob = DATA.private_bucket.blob(path)
     options = {}
@@ -594,7 +668,7 @@ def get_signed_url(
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_delete_file_ignores_missing_blob
 # @matrix storage : idempotent-delete missing-object
-def delete_file(path, visibility):
+def delete_file(path: str, visibility: str) -> None:
     """Delete a blob from the specified bucket."""
     bucket = DATA.bucket(visibility)
     blob = bucket.blob(path)
@@ -605,7 +679,7 @@ def delete_file(path, visibility):
 # @testable true
 # @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @pair admin:site-image-upload
-def upload_site_image(filename, image_data):
+def upload_site_image(filename: str, image_data: bytes) -> dict[str, str]:
     """Upload a site image and return its path and immutable generation."""
     if filename.endswith(".png"):
         content_type = "image/png"

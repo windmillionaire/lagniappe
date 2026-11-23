@@ -1,8 +1,9 @@
 """Durable AI-email webhook event claims."""
 
 from datetime import datetime, timedelta
+from typing import NotRequired, TypedDict
 
-from google.cloud.datastore import Entity
+from google.cloud.datastore import Entity, Key
 
 from .core import DATA
 from .transactions import retry_aborted
@@ -13,11 +14,20 @@ AI_EMAIL_EVENT_SCHEMA_VERSION = 1
 AI_EMAIL_EVENT_PREFIX = "ai-email-event:"
 
 
+class EmailClaim(TypedDict):
+    claimed: bool
+    reason: NotRequired[str]
+    state: NotRequired[str]
+    key: NotRequired[Key]
+
+
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
 # @matrix ai-email webhook : lease privacy replay transaction
 @retry_aborted
-def claim_ai_email_event(digest, lease_token, now, *, lease_seconds=300):
+def claim_ai_email_event(
+    digest: str, lease_token: str, now: datetime, *, lease_seconds: int = 300
+) -> EmailClaim:
     """Claim one HMAC-digested provider event without storing its raw ID."""
     digest = str(digest or "").strip().casefold()
     if len(digest) != 64 or any(
@@ -59,7 +69,9 @@ def claim_ai_email_event(digest, lease_token, now, *, lease_seconds=300):
 # @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
 # @matrix ai-email webhook : replay terminal-compaction transaction
 @retry_aborted
-def finish_ai_email_event(digest, lease_token, state, now):
+def finish_ai_email_event(
+    digest: str, lease_token: str, state: str, now: datetime
+) -> bool:
     """Compact an owned event claim to a minimal permanent tombstone."""
     if state not in {"accepted", "rejected", "ignored"}:
         raise ValueError("AI email event terminal state is invalid")
@@ -87,7 +99,7 @@ def finish_ai_email_event(digest, lease_token, state, now):
 # @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
 # @matrix ai-email webhook : replay transaction transient-release
 @retry_aborted
-def release_ai_email_event(digest, lease_token, now):
+def release_ai_email_event(digest: str, lease_token: str, now: datetime) -> bool:
     """Release an owned claim so a provider retry may resume it immediately."""
     key = create_named_key("site", f"{AI_EMAIL_EVENT_PREFIX}{digest}")
     with DATA.datastore.transaction() as transaction:

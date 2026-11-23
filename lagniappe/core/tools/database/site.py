@@ -1,6 +1,10 @@
 """Datastore persistence for singleton site settings."""
 
 import uuid
+from collections.abc import Mapping
+
+from google.cloud.datastore import Entity as DatastoreEntity
+from google.cloud.datastore import Key
 
 from config.ai_settings import AI_PERSISTED_SETTING_KEYS
 from config.constants import DEFAULT_DEPLOYMENT_SETTINGS
@@ -11,7 +15,7 @@ from .core import DATA, KINDS
 
 # @testable false
 # @reason site config persistence is owned by route/E2E workflows
-def get_or_create(key):
+def get_or_create(key: Key) -> DatastoreEntity:
     """Fetch a site config entity by key, creating it if missing."""
     entity = DATA.datastore.get(key)
     if entity:
@@ -23,7 +27,7 @@ def get_or_create(key):
 
 
 # @testable infrastructure
-def key(identifier):
+def key(identifier: str) -> Key:
     """Build a Datastore key for a site config entry."""
     return DATA.datastore.key(KINDS.site.value, identifier)
 
@@ -31,7 +35,7 @@ def key(identifier):
 # @testable true
 # @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @matrix admin : metadata public-preview
-def image():
+def image() -> DatastoreEntity | None:
     """Fetch the stored site image metadata entity."""
     return DATA.datastore.get(key("image"))
 
@@ -39,7 +43,7 @@ def image():
 # @testable true
 # @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
 # @matrix admin : deployment-settings metadata
-def deployment():
+def deployment() -> DatastoreEntity | None:
     """Fetch the stored deployment settings metadata entity."""
     return DATA.datastore.get(key("deployment"))
 
@@ -47,7 +51,7 @@ def deployment():
 # @testable true
 # @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_ai_form_saves_current_models_through_route
 # @matrix admin : ai-settings metadata
-def ai():
+def ai() -> DatastoreEntity | None:
     """Fetch the stored AI model settings metadata entity."""
     return DATA.datastore.get(key("ai"))
 
@@ -55,7 +59,7 @@ def ai():
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_save_site_public_pages_persists_canonical_payload
 # @matrix admin : metadata public-page-indexing
-def public_pages():
+def public_pages() -> DatastoreEntity | None:
     """Fetch the stored public-page discovery settings entity."""
     return DATA.datastore.get(key("public_pages"))
 
@@ -64,7 +68,7 @@ def public_pages():
 # @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @tests tests_unit/test_018_database_assets.py::test_save_site_image_persists_version_without_mutating_input
 # @matrix admin : metadata site-image-upload
-def save_image(data):
+def save_image(data: Mapping[str, object]) -> None:
     """Persist site image metadata and increment its version."""
     image_key = key("image")
     entity = DATA.datastore.get(image_key)
@@ -79,7 +83,7 @@ def save_image(data):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_save_site_deployment_persists_canonical_payload_and_prunes_old_keys
 # @matrix admin : deployment-settings metadata
-def save_deployment(data):
+def save_deployment(data: Mapping[str, object]) -> None:
     """Persist canonical deployment settings and increment their version."""
     deployment_key = key("deployment")
     entity = DATA.datastore.get(deployment_key)
@@ -98,7 +102,7 @@ def save_deployment(data):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_save_site_ai_persists_canonical_payload_and_prunes_old_keys
 # @matrix admin : ai-settings metadata
-def save_ai(data):
+def save_ai(data: Mapping[str, object]) -> None:
     """Persist canonical AI settings and increment their version."""
     ai_key = key("ai")
     entity = DATA.datastore.get(ai_key)
@@ -117,7 +121,7 @@ def save_ai(data):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_save_site_public_pages_persists_canonical_payload
 # @matrix admin : metadata public-page-indexing
-def save_public_pages(data):
+def save_public_pages(data: Mapping[str, object]) -> None:
     """Persist canonical public-page settings and increment their version."""
     settings_key = key("public_pages")
     entity = DATA.datastore.get(settings_key)

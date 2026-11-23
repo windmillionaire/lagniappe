@@ -1,6 +1,11 @@
 """Datastore persistence for analytics and AI observability records."""
 
+from collections.abc import Mapping, Sequence
+from datetime import datetime
+
+from google.cloud.datastore import Entity
 from google.cloud.datastore import query as datastore_query
+
 from config.datastore import encode_urlsafe_key
 
 from .core import DATA, KINDS
@@ -9,7 +14,7 @@ from .core import DATA, KINDS
 # @testable false
 # @covered-by lagniappe/web/routes/analytics/main.py::_save_event
 # @reason event persistence is exercised through the route-owned write boundary
-def create_event(data):
+def create_event(data: Mapping[str, object]) -> Entity:
     """Persist one application analytics event."""
     key = DATA.datastore.allocate_ids(DATA.datastore.key(KINDS.analytics.value), 1)[0]
     event = DATA.datastore.entity(key=key)
@@ -21,7 +26,7 @@ def create_event(data):
 # @testable false
 # @covered-by lagniappe/web/routes/analytics/main.py::_events
 # @reason event queries are exercised through the owner analytics dashboard
-def events(*, start=None, limit=1000):
+def events(*, start: datetime | None = None, limit: int = 1000) -> list[Entity]:
     """Fetch analytics events newest first, optionally within a time window."""
     query = DATA.datastore.query(kind=KINDS.analytics.value)
     if start is not None:
@@ -35,7 +40,12 @@ def events(*, start=None, limit=1000):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/observability.py::_write_summary
 # @reason summary persistence is exercised through the typed observability boundary
-def create_ai_observability(identifier, payload, *, exclude_from_indexes=()):
+def create_ai_observability(
+    identifier: str,
+    payload: Mapping[str, object],
+    *,
+    exclude_from_indexes: Sequence[str] = (),
+) -> Entity:
     """Persist one privacy-bounded AI observability summary."""
     key = DATA.datastore.key(KINDS.ai_observability.value, identifier)
     entity = DATA.datastore.entity(
@@ -50,7 +60,9 @@ def create_ai_observability(identifier, payload, *, exclude_from_indexes=()):
 # @testable false
 # @covered-by lagniappe/web/routes/analytics/main.py::_ai_records
 # @reason summary queries are exercised through the owner analytics dashboard
-def ai_observability_records(*, start=None, limit=1000):
+def ai_observability_records(
+    *, start: datetime | None = None, limit: int = 1000
+) -> list[Entity]:
     """Fetch AI observability summaries newest first."""
     query = DATA.datastore.query(kind=KINDS.ai_observability.value)
     if start is not None:
@@ -64,7 +76,7 @@ def ai_observability_records(*, start=None, limit=1000):
 # @testable false
 # @covered-by lagniappe/web/routes/analytics/main.py::_delete_events
 # @reason event cleanup is exercised through the analytics retention route
-def delete_events(*, before=None, batch_size=500):
+def delete_events(*, before: datetime | None = None, batch_size: int = 500) -> int:
     """Delete analytics events in bounded key-only batches."""
     return _delete_records(KINDS.analytics, before=before, batch_size=batch_size)
 
@@ -73,7 +85,9 @@ def delete_events(*, before=None, batch_size=500):
 # @covered-by lagniappe/core/tools/ai/observability.py::prune_old_records
 # @covered-by lagniappe/web/routes/analytics/main.py::_delete_ai_records
 # @reason summary cleanup is exercised through retention and owner-clear workflows
-def delete_ai_observability(*, before=None, batch_size=500, once=False):
+def delete_ai_observability(
+    *, before: datetime | None = None, batch_size: int = 500, once: bool = False
+) -> int:
     """Delete AI observability summaries in bounded key-only batches."""
     return _delete_records(
         KINDS.ai_observability,

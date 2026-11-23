@@ -1,11 +1,36 @@
 """Ingress cursor and row-commit transactions."""
 
-import json
+from __future__ import annotations
 
+import json
+from collections.abc import Iterable
+from datetime import datetime
+from typing import TYPE_CHECKING, NotRequired, TypedDict
+
+from google.cloud.datastore import Entity as Row
 from google.cloud.datastore import Key
 
 from .core import DATA
 from .utility import _put_mutation, update_site_fingerprints
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity as DomainEntity
+
+    from .get import Identifier
+
+
+class StatusUpdate(TypedDict):
+    updated: bool
+    reason: str
+    entity: Row | dict[str, object] | None
+    execution: NotRequired[dict[str, object]]
+
+
+class RowCommit(TypedDict):
+    committed: bool
+    reason: str
+    entity: NotRequired[Row | dict[str, object]]
+    execution: NotRequired[dict[str, object]]
 
 
 # @testable false
@@ -37,7 +62,14 @@ def _ingress_execution(entity):
 # @tests tests_unit/test_006d_ingress_service.py::test_ingress_status_update_is_cursor_checked
 # @tests tests_unit/test_006d_ingress_service.py::test_ingress_stop_is_durable_and_preserves_current_row_boundary
 # @matrix ingress : compare-and-set cursor failure status stop
-def update_ingress_status(identifier, status, now, *, expected_cursor=None, error=None):
+def update_ingress_status(
+    identifier: Identifier,
+    status: str,
+    now: datetime,
+    *,
+    expected_cursor: int | None = None,
+    error: str | None = None,
+) -> StatusUpdate:
     """Atomically stop or fail active ingress work without replacing its cursor."""
     key = _ingress_key(identifier)
     if key is None:
@@ -85,7 +117,13 @@ def update_ingress_status(identifier, status, now, *, expected_cursor=None, erro
 # @tests tests_unit/test_006d_ingress_service.py::test_ingress_row_commit_requires_expected_cursor_and_applies_masks
 # @tests tests_unit/test_006d_ingress_service.py::test_ingress_row_commit_rejects_duplicate_cursor
 # @matrix ingress : compare-and-set cursor duplicate-delivery durable-commit property-mask
-def commit_ingress_row(identifier, expected_cursor, ingress_entity, writes, now):
+def commit_ingress_row(
+    identifier: Identifier,
+    expected_cursor: int,
+    ingress_entity: DomainEntity,
+    writes: Iterable[tuple[DomainEntity, Iterable[str] | None]],
+    now: datetime,
+) -> RowCommit:
     """Commit one planned row and advance its ingress cursor atomically."""
     key = _ingress_key(identifier)
     if key is None:
