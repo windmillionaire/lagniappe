@@ -320,6 +320,8 @@ def config_gcloud(*, announce: bool = True) -> None:
     expected_name = config.get("NAME")
     expected_account = config.get("ACCOUNT")
     expected_project = config.get("PROJECT")
+    if not (isinstance(expected_name, str) and isinstance(expected_account, str) and isinstance(expected_project, str)):
+        raise RuntimeError("Saved gcloud configuration requires a name, account, and project.")
 
     # Re-activation must inspect the saved configuration without overrides
     # inherited from an earlier activation in this process or its parent.

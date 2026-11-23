@@ -3009,3 +3009,13 @@ def test_gcloud_switcher_exports_project_for_child_processes(monkeypatch):
         capture_output=True, text=True, check=True,
     )
     assert json.loads(result.stdout) == ["owner@example.com", "project-1"]
+
+
+def test_incomplete_saved_gcloud_config_fails_before_provider_access(monkeypatch):
+    import config
+    from runner import gcloud as switcher
+
+    monkeypatch.setattr(config, "SETTINGS", types.SimpleNamespace(GCLOUD_CONFIG={"NAME": "lagniappe"}))
+    monkeypatch.setattr(switcher, "get_active_configuration", lambda: pytest.fail("unexpected provider access"))
+    with pytest.raises(RuntimeError, match="name, account, and project"):
+        switcher.config_gcloud()
