@@ -2,9 +2,27 @@
 
 from datetime import datetime, UTC
 import re
+from typing import TYPE_CHECKING, cast, overload
+
+from .field_host import FieldHost
 
 from ..definitions import FieldType, FilterOptions, Ordering
 from ..tools import dates
+
+if TYPE_CHECKING:
+    from ..entities.condition import Condition
+
+    class _DateHost(FieldHost):
+        @property
+        def value(self) -> datetime | None: ...
+        @value.setter
+        def value(self, value: object) -> None: ...
+        def filter_details(self, condition: Condition) -> dict[str, object]: ...
+else:
+    _DateHost = object
+
+type UTCDate = datetime | None | list[UTCDate]
+
 
 OLD_FORMAT = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
 
@@ -14,7 +32,7 @@ OLD_FORMAT = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
 # @covered-by lagniappe/core/properties/user_entity.py::LastLogin
 # @covered-by lagniappe/core/properties/form_inputs.py::DateInput
 # @covered-by lagniappe/core/properties/task_dates.py::DueDate.value
-class DateMixin:
+class DateMixin(_DateHost):
     """Adds UTC datetime storage with timezone conversion.
 
     All values are stored in UTC. The setter accepts datetimes (with or
@@ -33,19 +51,34 @@ class DateMixin:
 
     # Property Attributes
     @property
-    def value(self):
+    def value(self) -> datetime | None:
         return super().value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: object) -> None:
+        self._set_date_value(value)
+
+    def _set_date_value(self, value: object) -> None:
         try:
             utc_value = self.set_utc_datetime(value)
         except Exception as e:
             raise ValueError(f"Invalid date value '{value}': {e}") from e
 
-        super(DateMixin, type(self)).value.fset(self, utc_value)
+        # A schema field and a database field use different storage descriptors.
+        # Locate the next value descriptor on the concrete field's existing MRO.
+        descriptor = cast(property, getattr(super(DateMixin, type(self)), "value"))  # noqa: B009
+        setter = descriptor.fset
+        if setter is None:
+            raise TypeError("Date storage requires a writable value descriptor")
+        setter(self, utc_value)
 
-    def set_utc_datetime(self, value):
+    @overload
+    def set_utc_datetime(self, value: datetime | str | float | None) -> datetime | None: ...
+    @overload
+    def set_utc_datetime(self, value: list[object]) -> list[UTCDate]: ...
+    @overload
+    def set_utc_datetime(self, value: object) -> UTCDate: ...
+    def set_utc_datetime(self, value: object) -> UTCDate:
         if isinstance(value, list):
             return [self.set_utc_datetime(v) for v in value]
         elif not value:
@@ -73,19 +106,19 @@ class DateMixin:
     _ordering = Ordering.NUMERIC
 
     @property
-    def column_value(self):
+    def column_value(self) -> datetime | None:
         value = super().value
         if not value:
             return None
         return dates.utc_datetime_to_user_datetime(value, user=self.user)
 
     @property
-    def sort_value(self):
+    def sort_value(self) -> float | None:
         return self.filter_value
 
     # AI Attributes
     @property
-    def ai_value(self):
+    def ai_value(self) -> str | None:
         return (
             dates.utc_datetime_to_user_date_string(self.value, user=self.user) if self.value else None
         )
@@ -95,13 +128,13 @@ class DateMixin:
     _field_options = FilterOptions.DATE.value
 
     @property
-    def filter_value(self):
+    def filter_value(self) -> float | None:
         value = super().value
         if not value:
             return None
         return value.timestamp()
 
-    def filter_details(self, condition):
+    def filter_details(self, condition: Condition) -> dict[str, object]:
         details = super().filter_details(condition)
         if isinstance(condition.value, list):
             details["value"] = [
@@ -110,21 +143,21 @@ class DateMixin:
             ]
         else:
             details["value"] = datetime.fromtimestamp(
-                condition.value, dates.user_timezone(self.user)
+                cast(float, condition.value), dates.user_timezone(self.user)
             )
         return details
 
     # Submission Attributes
     @property
-    def db_value(self):
+    def db_value(self) -> str | None:
         return self.value.isoformat() if self.value else None
 
     @db_value.setter
-    def db_value(self, value):
+    def db_value(self, value: object) -> None:
         self.value = value
 
     @property
-    def form_value(self):
+    def form_value(self) -> str | None:
         return (
             self.value.astimezone(dates.user_timezone(self.user)).date().isoformat()
             if self.value

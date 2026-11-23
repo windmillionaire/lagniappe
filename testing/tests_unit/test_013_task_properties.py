@@ -122,6 +122,8 @@ def test_task_completed(get_test_entities):
     tasks = get_test_entities()
     assert tasks
     for task in tasks:
+        with pytest.raises(AttributeError):
+            task.properties.completed.editable = False
         is_completed = task.test_spec.get("completed", False)
 
         if is_completed:

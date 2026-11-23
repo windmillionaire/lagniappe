@@ -109,6 +109,9 @@ def test_date_input_preserves_explicit_timezone_offset(monkeypatch):
     field.validate_ai("2026-09-24T12:00:00+09:00")
     assert field.value == datetime(2026, 9, 24, 3, tzinfo=UTC)
     assert field.ai_value == "2026-09-23"
+    assert field.set_utc_datetime([None, ["2026-09-24 03:00:00"]]) == [
+        None, [datetime(2026, 9, 24, 3, tzinfo=UTC)]
+    ]
 
 
 # @matrix time-input : ai-value column filter-value import

@@ -1,15 +1,24 @@
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from ..definitions import FieldType, FilterOptions, Ordering
 from ..mixins import AIMixin, ColumnMixin, DateMixin, DetailsMixin, FilterMixin
 from ..tools import dates
 from .base_db import DBProperty
 
+if TYPE_CHECKING:
+    from ..entities.condition import Condition
+    from ..entities.task import Task
+    from ..entities.history import TaskHistory
+
+type TaskRecord = Task | TaskHistory
+
+
 
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_completed
 # @matrix task : completed details
-class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty):
+class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty[bool, TaskRecord, bool]):
     """Task completion status. Stored and exposed as a boolean.
 
     Set:
@@ -23,23 +32,23 @@ class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty):
 
     # Property Attributes
     _id = "completed"
-    _kind = "task"
+    _kind: str | None = "task"
     _label = "Completed"
     _icon = "completed"
 
     @property
-    def value(self):
-        return DBProperty._read_db_value(self) is True
+    def value(self) -> bool:
+        return self._read_db_value() is True
 
     @value.setter
-    def value(self, value):
+    def value(self, value: bool) -> None:
         if not isinstance(value, bool):
             raise TypeError("completed must be a boolean")
 
-        DBProperty._write_db_value(self, value)
+        self._write_db_value(value)
 
     @property
-    def details_value(self):
+    def details_value(self) -> bool:
         return self.value
 
     # Column Attributes
@@ -50,11 +59,11 @@ class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty):
     # @tests tests_unit/test_013_task_properties.py::test_task_completed
     # @pair task:column
     @property
-    def column_value(self):
+    def column_value(self) -> bool:
         return self.filter_value
 
     @property
-    def sort_value(self):
+    def sort_value(self) -> bool:
         return self.filter_value
 
     # Filter Attributes
@@ -67,33 +76,33 @@ class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty):
     # @tests tests_unit/test_013_task_properties.py::test_task_completed
     # @matrix task : details filter-value
     @property
-    def filter_value(self):
+    def filter_value(self) -> bool:
         return self.value
 
-    def filter_details(self, condition):
+    def filter_details(self, condition: Condition) -> dict[str, object]:
         return FilterMixin.filter_details(self, condition)
 
     @property
-    def ai_value(self):
+    def ai_value(self) -> bool:
         return self.filter_value
 
     @property
-    def schema(self):
+    def schema(self) -> dict[str, object]:
         return {"type": "checkbox"}
 
     @property
-    def editable(self):
+    def editable(self) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride] -- Completion editability is computed from its owner.
         return not getattr(self.entity, "readonly", False)
 
     @property
-    def form_value(self):
+    def form_value(self) -> bool:
         return self.filter_value
 
 
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_completed_on_stores_timestamp
 # @pair task:completed-on
-class CompletedOn(DateMixin, AIMixin, ColumnMixin, DBProperty):
+class CompletedOn(DateMixin, AIMixin, ColumnMixin, DBProperty[datetime, TaskRecord]):
     """Task completion date. Stored as a UTC datetime, exposed as date.
 
     Set:
@@ -107,7 +116,7 @@ class CompletedOn(DateMixin, AIMixin, ColumnMixin, DBProperty):
 
     # Property Attributes
     _id = "completed_on"
-    _kind = "task"
+    _kind: str | None = "task"
     _label = "Completed On"
     _icon = "completed"
 
@@ -116,23 +125,23 @@ class CompletedOn(DateMixin, AIMixin, ColumnMixin, DBProperty):
     _editable = False
 
     @property
-    def value(self):
+    def value(self) -> datetime | None:
         return super().value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: object) -> None:
         if isinstance(value, (datetime, type(None))):
-            DateMixin.value.fset(self, value)
+            self._set_date_value(value)
 
     @property
-    def column_value(self):
+    def column_value(self) -> datetime | None:
         return dates.utc_datetime_to_user_datetime(self.value) if self.value else None
 
 
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_due_date
 # @matrix task : ai-value column filter-value
-class DueDate(DateMixin, AIMixin, ColumnMixin, FilterMixin, DBProperty):
+class DueDate(DateMixin, AIMixin, ColumnMixin, FilterMixin, DBProperty[datetime, TaskRecord]):
     """Task due date. Stored as UTC, displayed in user timezone.
 
     Set:
@@ -146,7 +155,7 @@ class DueDate(DateMixin, AIMixin, ColumnMixin, FilterMixin, DBProperty):
 
     # Property Attributes
     _id = "due_date"
-    _kind = "task"
+    _kind: str | None = "task"
     _label = "Due Date"
     _icon = "dueDate"
 
@@ -155,7 +164,7 @@ class DueDate(DateMixin, AIMixin, ColumnMixin, FilterMixin, DBProperty):
     _editable = True
 
     @property
-    def schema(self):
+    def schema(self) -> dict[str, object]:
         return {"type": "input", "input": "date"}
 
     # Filter Attributes
@@ -166,13 +175,13 @@ class DueDate(DateMixin, AIMixin, ColumnMixin, FilterMixin, DBProperty):
     # @tests tests_unit/test_013_task_properties.py::test_task_due_date
     # @matrix task : date due-date
     @property
-    def value(self):
+    def value(self) -> datetime | None:
         return super().value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: object) -> None:
         if value:
-            DateMixin.value.fset(self, value)
+            self._set_date_value(value)
         else:
             self.entity.db["due_date"] = None
             self._value = None
