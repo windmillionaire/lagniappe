@@ -10,10 +10,30 @@ import json
 import math
 from pathlib import Path, PurePosixPath
 import re
-from typing import Any
+from typing import Any, NotRequired, TYPE_CHECKING, TypedDict, TypeGuard
+from collections.abc import Mapping, Sequence
+
+
 from collections.abc import Callable, Iterable
 
 from .provider import DataLifecycleError
+
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+    from google.cloud.datastore.helpers import GeoPoint
+
+type PortableValue = str | int | float | bool | None | Sequence[PortableValue] | Mapping[str, PortableValue]
+
+type NativeValue = str | int | float | bool | None | date | bytes | GeoPoint | PortableReference | MissingReference | DecodedEntity | list[NativeValue] | dict[str, NativeValue]
+
+# @testable infrastructure
+class ShardDescriptor(TypedDict):
+    type: NotRequired[str]
+    path: str
+    count: int
+    bytes: int
+    sha256: str
 
 
 PORTABLE_FORMAT = "lagniappe-portable"
@@ -65,7 +85,7 @@ class PortableIdentity:
     type: str
     id: str
 
-    def as_dict(self):
+    def as_dict(self) -> dict[str, str]:
         return {"type": self.type, "id": self.id, "namespace": self.namespace}
 
 
@@ -76,10 +96,10 @@ class PortableReference:
     id: str
     namespace: str = ""
 
-    def identity(self):
+    def identity(self) -> PortableIdentity:
         return PortableIdentity(self.namespace, self.type, self.id)
 
-    def as_tag(self):
+    def as_tag(self) -> dict[str, dict[str, str]]:
         value = {"type": self.type, "id": self.id}
         if self.namespace:
             value["namespace"] = self.namespace
@@ -93,7 +113,7 @@ class MissingReference:
     digest: str
     warning_id: str
 
-    def as_tag(self):
+    def as_tag(self) -> dict[str, dict[str, str]]:
         return {
             "$missing_ref": {
                 "type": self.type,
@@ -106,7 +126,7 @@ class MissingReference:
 # @testable infrastructure
 @dataclass(frozen=True)
 class DecodedEntity:
-    properties: dict[str, Any]
+    properties: Mapping[str, object]
     exclude_from_indexes: tuple[str, ...]
 
 
@@ -225,13 +245,13 @@ class ValueCodec:
     def __init__(
         self,
         *,
-        reference_resolver: Callable[[Any], PortableReference | MissingReference] | None = None,
-        string_normalizer: Callable[[str, tuple[Any, ...]], str | PortableReference | MissingReference] | None = None,
+        reference_resolver: Callable[[Key], PortableReference | MissingReference] | None = None,
+        string_normalizer: Callable[[str, tuple[str | int, ...]], str | PortableReference | MissingReference] | None = None,
     ):
         self.reference_resolver = reference_resolver
         self.string_normalizer = string_normalizer
 
-    def encode(self, value: Any, path=()):
+    def encode(self, value: object, path: tuple[str | int, ...] = ()) -> PortableValue:
         if value is None or isinstance(value, bool):
             return value
         if isinstance(value, int):
@@ -316,7 +336,7 @@ class ValueCodec:
             f"Unsupported {type(value).__name__} value at {self._path(path)}"
         )
 
-    def decode(self, value: Any, path=()):
+    def decode(self, value: object, path: tuple[str | int, ...] = ()) -> NativeValue:
         if value is None or isinstance(value, (bool, int, float)):
             return value
         if isinstance(value, str):
@@ -364,8 +384,11 @@ class ValueCodec:
                 raise DataLifecycleError(f"Invalid missing reference at {self._path(path)}") from error
         if "$entity" in value and len(value) == 1:
             entity = value["$entity"]
+            properties = self.decode(entity.get("properties", {}), (*path, "$entity"))
+            if not isinstance(properties, dict):
+                raise DataLifecycleError(f"Invalid entity properties at {self._path(path)}")
             return DecodedEntity(
-                properties=self.decode(entity.get("properties", {}), (*path, "$entity")),
+                properties=properties,
                 exclude_from_indexes=tuple(sorted(entity.get("exclude_from_indexes") or ())),
             )
         return {
@@ -378,7 +401,7 @@ class ValueCodec:
         return ".".join(str(item) for item in path) or "<root>"
 
     @staticmethod
-    def _is_key(value):
+    def _is_key(value: object) -> TypeGuard[Key]:
         return (
             type(value).__name__ == "Key"
             and hasattr(value, "flat_path")
@@ -386,11 +409,11 @@ class ValueCodec:
         )
 
     @staticmethod
-    def _is_geopoint(value):
+    def _is_geopoint(value: object) -> TypeGuard[GeoPoint]:
         return type(value).__name__ == "GeoPoint" and hasattr(value, "latitude") and hasattr(value, "longitude")
 
     @staticmethod
-    def _is_entity(value):
+    def _is_entity(value: object) -> TypeGuard[dict[str, object]]:
         return (
             type(value).__name__ == "Entity"
             and hasattr(value, "exclude_from_indexes")
@@ -401,7 +424,7 @@ class ValueCodec:
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_value_codec_round_trips_every_supported_value
 # @pair portable-json:canonical-encoding
-def canonical_json(value: Any) -> bytes:
+def canonical_json(value: object) -> bytes:
     try:
         return json.dumps(
             value,
@@ -423,11 +446,13 @@ class ShardWriter:
     def __init__(self, root: str | Path):
         self.root = Path(root)
 
-    def write_type(self, semantic_type: str, records: Iterable[dict[str, Any]]):
+    def write_type(
+        self, semantic_type: str, records: Iterable[dict[str, Any]]
+    ) -> list[ShardDescriptor]:
         safe_type = portable_name(semantic_type)
         directory = self.root / "data" / "entities" / safe_type
         directory.mkdir(parents=True, exist_ok=True)
-        descriptors = []
+        descriptors: list[ShardDescriptor] = []
         shard = []
         shard_size = 2
 

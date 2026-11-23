@@ -9,7 +9,7 @@ import pickle
 import re
 from typing import Any
 
-from google.cloud.datastore import Key
+from google.cloud.datastore import Client, Key
 from config.datastore import encode_urlsafe_key
 
 from .portable import (
@@ -165,7 +165,7 @@ def _child_key(key) -> dict[str, Any]:
 def _normalize_conversation_ids(state: ArchiveState) -> None:
     """Derive conversation IDs from portable participant identities, not source keys."""
     rows = list(
-        state.connection.execute(
+        state.database.execute(
             "SELECT source_key, portable_id, raw FROM entities "
             "WHERE status='included' AND semantic_type='message_conversation'"
         )
@@ -174,7 +174,7 @@ def _normalize_conversation_ids(state: ArchiveState) -> None:
         entity = pickle.loads(row["raw"])
         participants = []
         for participant in entity.get("participants") or []:
-            mapped = state.connection.execute(
+            mapped = state.database.execute(
                 "SELECT namespace, semantic_type, portable_id, availability FROM key_map "
                 "WHERE encoding=?",
                 (_urlsafe(participant),),
@@ -190,11 +190,11 @@ def _normalize_conversation_ids(state: ArchiveState) -> None:
             raise DataLifecycleError("Conversation requires exactly two portable participants.")
         participants.sort(key=canonical_json)
         portable_id = f"conversation-{hashlib.sha256(canonical_json(participants)).hexdigest()}"
-        state.connection.execute(
+        state.database.execute(
             "UPDATE entities SET portable_id=? WHERE source_key=?",
             (portable_id, row["source_key"]),
         )
-        state.connection.execute(
+        state.database.execute(
             "UPDATE key_map SET portable_id=? "
             "WHERE semantic_type='message_conversation' AND portable_id=?",
             (portable_id, row["portable_id"]),
@@ -205,7 +205,7 @@ def _normalize_conversation_ids(state: ArchiveState) -> None:
 # @tests tests_tooling/test_008_data_lifecycle.py::test_staging_selects_durable_types_and_builds_typed_identity_map
 # @matrix portable-json : bounded-scan entity-selection portable-identity
 def stage_database(
-    client,
+    client: Client,
     state: ArchiveState,
     *,
     source_project: str,
@@ -324,11 +324,11 @@ def stage_database(
     for key, count in sorted(counts.items()):
         if key.startswith(("unknown-kind:", "excluded-type:", "missing-hash:", "invalid-hash:")):
             warning_id = hashlib.sha256(key.encode()).hexdigest()[:12]
-            state.connection.execute(
+            state.database.execute(
                 "INSERT OR REPLACE INTO warnings(id, code, details) VALUES(?, ?, ?)",
                 (warning_id, key.split(":", 1)[0], json.dumps({"category": key, "count": count}, sort_keys=True)),
             )
-    state.connection.commit()
+    state.database.commit()
     state.set_metadata("scan_counts", dict(sorted(counts.items())))
     return dict(counts)
 
@@ -340,12 +340,12 @@ class _Resolver:
     def __init__(self, state: ArchiveState):
         self.state = state
         self.known = {}
-        for row in state.connection.execute(
+        for row in state.database.execute(
             "SELECT encoding, namespace, semantic_type, portable_id, availability FROM key_map"
         ):
             self.known[row["encoding"]] = row
 
-    def key(self, key) -> PortableReference | MissingReference:
+    def key(self, key: Key) -> PortableReference | MissingReference:
         return self.encoding(_urlsafe(key))
 
     def encoding(self, value: str) -> PortableReference | MissingReference:
@@ -375,7 +375,7 @@ class _Resolver:
         return missing
 
     def _warn_missing(self, missing, availability):
-        self.state.connection.execute(
+        self.state.database.execute(
             "INSERT OR IGNORE INTO warnings(id, code, details) VALUES(?, ?, ?)",
             (
                 missing.warning_id,
@@ -391,7 +391,9 @@ class _Resolver:
             ),
         )
 
-    def string(self, value: str, _path):
+    def string(
+        self, value: str, _path: tuple[str | int, ...]
+    ) -> str | PortableReference | MissingReference:
         if value in self.known:
             return self.encoding(value)
         if value[:1] in {"{", "["}:
@@ -477,7 +479,7 @@ def _asset_tags(state, owner, raw_assets):
         role = str(definition.get("visibility") or "private")
         if role not in {"private", "public", "history"}:
             raise DataLifecycleError(f"Asset bucket role is invalid for {owner}:{name}")
-        state.connection.execute(
+        state.database.execute(
             "INSERT OR IGNORE INTO assets(logical_id, state, owner, "
             "logical_name, asset_type, required, source_role, source_path, generation, media_type, size) "
             "VALUES(?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -517,7 +519,7 @@ def portable_records(state: ArchiveState) -> list[dict[str, Any]]:
     codec = ValueCodec(reference_resolver=resolver.key, string_normalizer=resolver.string)
     records = []
     by_identity = {}
-    rows = list(state.connection.execute(
+    rows = list(state.database.execute(
         "SELECT * FROM entities WHERE status='included' "
         "ORDER BY semantic_type, namespace, portable_id"
     ))
@@ -602,7 +604,7 @@ def portable_records(state: ArchiveState) -> list[dict[str, Any]]:
     for record in records:
         for children in (record.get("children") or {}).values():
             children.sort(key=lambda child: canonical_json(child["key"]))
-    state.connection.commit()
+    state.database.commit()
     return sorted(
         records,
         key=lambda record: (

@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import NotRequired, TypedDict, cast
+from .provider import ProviderContext
+
+
+from google.cloud.datastore import Client
+
+
 from runner.presentation import read_input as input
 
 import hashlib
@@ -29,6 +37,36 @@ from .provider import (
 RESTORE_NORMALIZE_PAGE_SIZE = 250
 SERIALIZED_REFERENCE_PROPERTIES = frozenset({"submission", "default_submission"})
 DEFERRED_JOB_CONTROL_ID = "deferred-jobs-control"
+# @testable infrastructure
+class RestorePlan(TypedDict):
+    restore_id: str
+    backup_id: str
+    project_id: str
+    application_version: str
+    old_database: str
+    target_database: str
+    safety_database: str
+    backup_source_database: NotRequired[str]
+    database_location: NotRequired[str]
+    export_output_prefix: str
+    assets_uri: str
+    queue: str
+    queue_location: str
+    reconciler: str
+    maintenance_version: str
+    kind_prefix: str
+    owner_email: str
+    runtime_service_account: str
+    app_url: str
+    original_traffic: dict[str, float]
+    traffic_split_by: str
+    consistency: str
+    snapshot_time: NotRequired[str]
+    merge: dict[str, int | str]
+    provider_observations: dict[str, object]
+    sequence: list[str]
+
+
 QUEUE_SNAPSHOT_FORMAT = "lagniappe-purged-cloud-tasks"
 RESTORE_ARTIFACT_SCHEMA = 1
 RESTORE_JOURNAL_FORMAT = "lagniappe-restore-journal"
@@ -92,7 +130,7 @@ RESTORE_JOURNAL_BOOLEAN_KEYS = frozenset(
 # @testable false
 # @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
 # @reason resume-plan compatibility is enforced before any restore mutation
-def _validate_in_place_restore_plan(plan):
+def _validate_in_place_restore_plan(plan: object) -> RestorePlan:
     if not isinstance(plan, dict):
         raise DataLifecycleError("In-place restore checkpoint plan is invalid.")
     try:
@@ -134,7 +172,18 @@ def _validate_in_place_restore_plan(plan):
         "provider_observations",
         "sequence",
     }
-    if not required.issubset(plan):
+    structured_fields = {"merge", "provider_observations", "original_traffic", "sequence"}
+    if (not required.issubset(plan)
+        or any(not isinstance(plan[key], str) for key in required - structured_fields)
+        or any(key in plan and not isinstance(plan[key], str) for key in ("database_location", "backup_source_database", "snapshot_time"))
+        or not isinstance(plan["original_traffic"], dict)
+        or any(not isinstance(key, str) or not isinstance(value, (float, int)) for key, value in plan["original_traffic"].items())
+        or not isinstance(plan["merge"], dict)
+        or any(not isinstance(key, str) or not isinstance(value, (str, int)) for key, value in plan["merge"].items())
+        or not isinstance(plan["provider_observations"], dict)
+        or not isinstance(plan["sequence"], list)
+        or any(not isinstance(step, str) for step in plan["sequence"])
+    ):
         raise DataLifecycleError("In-place restore checkpoint plan is invalid.")
     try:
         validate_backup_id(plan["backup_id"])
@@ -143,7 +192,7 @@ def _validate_in_place_restore_plan(plan):
         raise DataLifecycleError(
             "In-place restore checkpoint plan is invalid."
         ) from error
-    return plan
+    return cast(RestorePlan, plan)
 
 
 # @testable false
@@ -223,10 +272,10 @@ class MirroredRestoreCheckpoint:
         self.filename = filename
 
     @property
-    def payload(self):
+    def payload(self) -> dict[str, object] | None:
         return self.local.payload
 
-    def load(self):
+    def load(self) -> dict[str, object] | None:
         return self.local.load()
 
     def _sync(self):
@@ -254,14 +303,14 @@ class MirroredRestoreCheckpoint:
             return
         self.context.upload_json_replace(object_name, desired)
 
-    def start(self, operation_id, **values):
+    def start(self, operation_id: str, **values: object) -> dict[str, object]:
         payload = self.local.start(
             operation_id, journal_revision=1, **values
         )
         self._sync()
         return payload
 
-    def update(self, checkpoint, **values):
+    def update(self, checkpoint: str, **values: object) -> dict[str, object]:
         revision = int((self.local.payload or {}).get("journal_revision") or 0) + 1
         payload = self.local.update(
             checkpoint, journal_revision=revision, **values
@@ -269,7 +318,7 @@ class MirroredRestoreCheckpoint:
         self._sync()
         return payload
 
-    def finish(self, **values):
+    def finish(self, **values: object) -> None:
         self.update("complete", status="complete", **values)
 
 
@@ -311,16 +360,16 @@ def _remote_restore_for_backup(context, backup_id):
 # @reason remote-to-local hydration is exercised through public restore resumption
 def _hydrate_local_checkpoint(local, remote):
     plan = _localize_remote_plan(remote["plan"])
-    local.start(
+    payload = local.start(
         plan["restore_id"],
         backup_id=plan["backup_id"],
         plan=plan,
         journal_revision=remote["state"]["journal_revision"],
     )
-    local.payload.update(remote["state"])
-    local.payload["plan"] = plan
+    payload.update(remote["state"])
+    payload["plan"] = plan
     local.save()
-    return local.payload
+    return payload
 
 
 # @testable false
@@ -391,13 +440,13 @@ def _queue_snapshot_descriptor(context, plan, payload, object_name):
 # @tests tests_tooling/test_008_data_lifecycle.py::test_queue_snapshot_preserves_full_task_definitions
 # @matrix data-lifecycle : immutable-restore-record queue-purge-audit
 def capture_queue_snapshot(
-    context,
-    plan,
+    context: ProviderContext,
+    plan: Mapping[str, object],
     *,
-    captured_at=None,
-    filename="purged-tasks.json",
-    observation="full-view tasks visible after queue pause and maintenance",
-):
+    captured_at: datetime | None = None,
+    filename: str = "purged-tasks.json",
+    observation: str = "full-view tasks visible after queue pause and maintenance",
+) -> dict[str, object]:
     """Persist the complete tasks observed immediately before a restore purge."""
     restore_id = str(plan["restore_id"])
     queue_name = str(plan["queue"])
@@ -583,15 +632,17 @@ def _normalize_reference_details(value, *, project_id, source_database_id, targe
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_discards_deferred_execution_state
 # @matrix data-lifecycle : deferred-state-retirement restore-key-normalization serialized-entity-details
 def normalize_restored_entity(
-    entity,
+    entity: Entity,
     *,
-    project_id,
-    source_database_id,
-    target_database_id,
-):
+    project_id: str,
+    source_database_id: str,
+    target_database_id: str,
+) -> dict[str, int]:
     """Rebind durable references and clear stale active-operation pointers."""
     source_database_id = validate_database_id(source_database_id)
     target_database_id = validate_database_id(target_database_id)
+    if entity.key is None:
+        raise DataLifecycleError("Restored entity has no Datastore key.")
     key_database = str(entity.key.database or DEFAULT_DATABASE_ID)
     if str(entity.key.project or "") != project_id or key_database != target_database_id:
         raise DataLifecycleError("Restored entity is not stored in the expected target database.")
@@ -723,14 +774,14 @@ def _bind_entities_to_client_database(client, entities):
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_default_database_writes_use_client_partition
 # @matrix data-lifecycle : bounded-restore-scan default-database-write-partition deferred-state-retirement restore-key-normalization
 def normalize_restored_database(
-    client,
+    client: Client,
     *,
-    project_id,
-    source_database_id,
-    target_database_id,
-    page_size=RESTORE_NORMALIZE_PAGE_SIZE,
-    kind_prefix=None,
-):
+    project_id: str,
+    source_database_id: str,
+    target_database_id: str,
+    page_size: int = RESTORE_NORMALIZE_PAGE_SIZE,
+    kind_prefix: str | None = None,
+) -> dict[str, int]:
     """Normalize durable references and discard restored execution state."""
     source_database_id = validate_database_id(source_database_id)
     target_database_id = validate_database_id(target_database_id)
@@ -842,11 +893,11 @@ def _compatible_locations(first, second):
 # @tests tests_tooling/test_008_data_lifecycle.py::test_target_validation_requires_owner_and_reserved_models
 # @matrix data-lifecycle : owner-invariant restore-validation
 def validate_restored_database(
-    client,
+    client: Client,
     *,
-    kind_prefix="",
-    owner_email,
-):
+    kind_prefix: str = "",
+    owner_email: str,
+) -> dict[str, int]:
     """Verify the minimum data invariants needed before a restored app can serve."""
     prefix = str(kind_prefix or "")
     owner_email = str(owner_email or "").strip().casefold()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import NotRequired, TypedDict
 from datetime import datetime, UTC
 import hashlib
 import mimetypes
@@ -14,6 +15,22 @@ from .portable import portable_name
 from .provider import DataLifecycleError
 from .staging import normalize_text
 from .state import ArchiveState, secure_directory
+
+
+# @testable infrastructure
+class ArchiveAsset(TypedDict):
+    logical_id: str
+    entity: dict[str, object]
+    name: str
+    type: str
+    status: str
+    generation: NotRequired[str]
+    media_type: NotRequired[str]
+    size: NotRequired[int]
+    sha256: NotRequired[str]
+    path: NotRequired[str]
+    canonical_document: NotRequired[str]
+    warning_id: NotRequired[str]
 
 
 DOWNLOAD_CHUNK_BYTES = 8 * 1024 * 1024
@@ -36,10 +53,10 @@ class AssetCollector:
         self.started_at = None
         self.completed_at = None
 
-    def collect(self):
+    def collect(self) -> tuple[list[ArchiveAsset], list[dict[str, object]]]:
         self.started_at = self._now()
         warnings = []
-        rows = list(self.state.connection.execute("SELECT * FROM assets ORDER BY logical_id"))
+        rows = list(self.state.database.execute("SELECT * FROM assets ORDER BY logical_id"))
         for row in rows:
             try:
                 self._collect_one(row)
@@ -55,15 +72,15 @@ class AssetCollector:
                     "message": str(error),
                 }
                 warnings.append(warning)
-                self.state.connection.execute(
+                self.state.database.execute(
                     "UPDATE assets SET state='unavailable' WHERE logical_id=?",
                     (row["logical_id"],),
                 )
-                self.state.connection.execute(
+                self.state.database.execute(
                     "INSERT OR REPLACE INTO warnings(id, code, details) VALUES(?, ?, ?)",
                     (warning["id"], warning["code"], self._json(warning)),
                 )
-                self.state.connection.commit()
+                self.state.database.commit()
         self._normalize_canonical_documents()
         self.completed_at = self._now()
         return self.descriptors(), warnings
@@ -92,11 +109,11 @@ class AssetCollector:
                 raise DataLifecycleError(
                     "Referenced asset generation is no longer available."
                 )
-            self.state.connection.execute(
+            self.state.database.execute(
                 "UPDATE assets SET generation=?, media_type=?, size=?, state='downloading' WHERE logical_id=?",
                 (generation, blob.content_type, size, row["logical_id"]),
             )
-            self.state.connection.commit()
+            self.state.database.commit()
             offset = part.stat().st_size if part.exists() else 0
             if offset > size:
                 part.unlink(missing_ok=True)
@@ -139,7 +156,7 @@ class AssetCollector:
             archive_size = part.stat().st_size
             payload_digest = self._sha256_file(part)
             safe_name = portable_name(row["logical_name"])
-            existing = self.state.connection.execute(
+            existing = self.state.database.execute(
                 "SELECT local_path FROM assets WHERE state='available' AND sha256=? LIMIT 1",
                 (payload_digest,),
             ).fetchone()
@@ -173,26 +190,26 @@ class AssetCollector:
                 if os.name != "nt":
                     os.chmod(canonical_target, 0o600)
                 canonical_path = canonical_relative.as_posix()
-            self.state.connection.execute(
+            self.state.database.execute(
                 "UPDATE assets SET state='available', generation=?, media_type=?, size=?, sha256=?, local_path=? "
                 "WHERE logical_id=?",
                 (generation, media_type, archive_size, payload_digest, relative.as_posix(), row["logical_id"]),
             )
-            self.state.connection.execute(
+            self.state.database.execute(
                 "DELETE FROM warnings WHERE id=?",
                 (f"asset-{row['logical_id'][:12]}",),
             )
             if canonical_path:
                 self.state.set_metadata(f"canonical:{row['logical_id']}", canonical_path)
             else:
-                self.state.connection.commit()
+                self.state.database.commit()
             return
         raise DataLifecycleError("Asset changed or failed throughout the bounded generation retry policy.")
 
-    def descriptors(self):
+    def descriptors(self) -> list[ArchiveAsset]:
         descriptors = []
-        for row in self.state.connection.execute("SELECT * FROM assets ORDER BY logical_id"):
-            descriptor = {
+        for row in self.state.database.execute("SELECT * FROM assets ORDER BY logical_id"):
+            descriptor: ArchiveAsset = {
                 "logical_id": row["logical_id"],
                 "entity": self._owner(row),
                 "name": row["logical_name"],
@@ -210,7 +227,7 @@ class AssetCollector:
                     }
                 )
                 canonical = self.state.get_metadata(f"canonical:{row['logical_id']}")
-                if canonical:
+                if isinstance(canonical, str) and canonical:
                     descriptor["canonical_document"] = canonical
             else:
                 descriptor["warning_id"] = f"asset-{row['logical_id'][:12]}"
@@ -228,7 +245,7 @@ class AssetCollector:
         from bs4 import BeautifulSoup
 
         documents = list(
-            self.state.connection.execute(
+            self.state.database.execute(
                 "SELECT * FROM assets WHERE state='available' AND asset_type='html' "
                 "AND logical_name='document' ORDER BY logical_id"
             )
@@ -237,12 +254,12 @@ class AssetCollector:
             canonical_path = self.state.get_metadata(
                 f"canonical:{document['logical_id']}"
             )
-            if not canonical_path:
+            if not isinstance(canonical_path, str) or not canonical_path:
                 raise DataLifecycleError("Available canonical document has no portable payload.")
             canonical = self.output_root / PurePosixPath(canonical_path)
             soup = BeautifulSoup(canonical.read_text(encoding="utf-8"), "html.parser")
             rows = list(
-                self.state.connection.execute(
+                self.state.database.execute(
                     "SELECT * FROM assets WHERE owner=?",
                     (document["owner"],),
                 )

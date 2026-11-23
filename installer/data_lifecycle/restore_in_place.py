@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
+
 from runner import presentation as ui
 from runner.presentation import output as print
 
@@ -26,6 +29,7 @@ from .provider import (
 from .recovery_set import _blob_sha256, inventory_database
 from .restore_support import (
     MirroredRestoreCheckpoint,
+    RestorePlan,
     _bind_entities_to_client_database,
     _compatible_locations,
     _confirm_mutation,
@@ -91,7 +95,7 @@ def _merge_counts(context, manifest):
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_dry_run_is_deterministic_and_read_only
 # @matrix data-lifecycle : dry-run in-place-merge restore-preflight safety-collision
-def restore_plan(backup_id, context=None):
+def restore_plan(backup_id: str, context: ProviderContext | None = None) -> RestorePlan:
     """Perform a read-only preflight for an in-place default-database merge."""
     context = context or ProviderContext.from_settings()
     backup_id = validate_backup_id(backup_id)
@@ -164,14 +168,14 @@ def restore_plan(backup_id, context=None):
     if service_account != runtime_service_account:
         raise DataLifecycleError("The internal caller must be the attached runtime service account.")
 
-    queue_payload = context.json_command(
+    queue_payload = ProviderContext.require_resource(context.json_command(
         ["tasks", "queues", "describe", queue, f"--location={region}"]
-    )
+    ))
     reconciler = constants.DEFAULT_DEFERRED_JOB_RECONCILER_NAME
-    reconciler_payload = context.json_command(
+    reconciler_payload = ProviderContext.require_resource(context.json_command(
         ["scheduler", "jobs", "describe", reconciler, f"--location={region}"]
-    )
-    service = context.json_command(["app", "services", "describe", "default"])
+    ))
+    service = ProviderContext.require_resource(context.json_command(["app", "services", "describe", "default"]))
     versions = context.json_command(["app", "versions", "list", "--service=default"])
     version_ids = {
         str(item.get("id") or item.get("version") or "")
@@ -304,7 +308,9 @@ def _publish_safety_assets(context, plan, snapshot_time):
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_assets_rebinds_owner_to_new_generation
 # @matrix data-lifecycle disaster-recovery : asset-generation restore-assets
-def restore_generation_bound_assets(context, plan):
+def restore_generation_bound_assets(
+    context: ProviderContext, plan: RestorePlan
+) -> dict[str, int]:
     """Restore recovery copies and rewrite descriptors to their new generations."""
     from config import SETTINGS
     from config.storage import storage_bucket_names
@@ -315,7 +321,10 @@ def restore_generation_bound_assets(context, plan):
         for role, name in storage_bucket_names(SETTINGS.APP).items()
     }
     generation_by_identity = {}
-    for asset in payload.get("assets") or []:
+    assets = payload.get("assets") or []
+    if not isinstance(assets, list) or any(not isinstance(asset, dict) for asset in assets):
+        raise DataLifecycleError("Recovery catalog has malformed assets.")
+    for asset in assets:
         recovery_name = str(asset.get("recovery_object") or "")
         try:
             source = context.bucket.blob(
@@ -368,13 +377,15 @@ def restore_generation_bound_assets(context, plan):
         client.put_multi(
             _bind_entities_to_client_database(client, owners.values())
         )
-    return {"assets": len(payload.get("assets") or []), "owners": len(owners)}
+    return {"assets": len(assets), "owners": len(owners)}
 
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_requeues_only_durable_scheduled_uncompletion
 # @matrix data-lifecycle disaster-recovery : queue-reconciliation scheduled-uncomplete
-def reconcile_scheduled_uncomplete_tasks(context, plan, *, now=None):
+def reconcile_scheduled_uncomplete_tasks(
+    context: ProviderContext, plan: RestorePlan, *, now: datetime | None = None
+) -> dict[str, int]:
     """Backfill durable markers and recreate only scheduled uncompletion wake-ups."""
     now = now or datetime.now(UTC)
     if now.tzinfo is None:
@@ -409,7 +420,7 @@ def reconcile_scheduled_uncomplete_tasks(context, plan, *, now=None):
                 schedule_at = now
                 entity["scheduled_uncomplete_token"] = token
                 entity["scheduled_uncomplete_at"] = schedule_at
-                excluded = set(getattr(entity, "exclude_from_indexes", ()) or ())
+                excluded: set[str] = set(getattr(entity, "exclude_from_indexes", ()) or ())
                 excluded.add("scheduled_uncomplete_token")
                 entity.exclude_from_indexes = tuple(sorted(excluded))
                 changed.append(entity)
@@ -469,13 +480,13 @@ def _completion_record(context, plan, checkpoint):
 # @tests tests_tooling/test_008_data_lifecycle.py::test_in_place_restore_rejects_legacy_named_database_checkpoint
 # @matrix data-lifecycle : cache-invalidation confirmation dry-run in-place-merge legacy-journal-rejection progress queue-purge-audit remote-journal restore resume
 def restore_backup(
-    backup_id,
+    backup_id: str,
     *,
-    dry_run=False,
-    context=None,
-    checkpoint=None,
-    confirmation=None,
-):
+    dry_run: bool = False,
+    context: ProviderContext | None = None,
+    checkpoint: LifecycleCheckpoint | None = None,
+    confirmation: Callable[[str], str] | None = None,
+) -> RestorePlan:
     """Merge one exact manual backup into `(default)` under maintenance."""
     context = context or ProviderContext.from_settings()
     backup_id = validate_backup_id(backup_id)
@@ -521,13 +532,16 @@ def restore_backup(
         )
     )
     _confirm_mutation("RESTORE", confirmation=confirmation)
-    checkpoint = MirroredRestoreCheckpoint(local, context)
+    journal = MirroredRestoreCheckpoint(local, context)
     if not state:
-        checkpoint.start(plan["restore_id"], backup_id=backup_id, plan=plan)
+        journal.start(plan["restore_id"], backup_id=backup_id, plan=plan)
     else:
-        checkpoint._sync()
+        journal._sync()
 
-    if not checkpoint.payload.get("maintenance_deployed"):
+    state = journal.payload
+    if state is None:
+        raise DataLifecycleError("The restore journal has no active state.")
+    if not state.get("maintenance_deployed"):
         record_step("deploy zero-traffic restore maintenance version")
         if not context.version_exists(plan["maintenance_version"]):
             with _progress(
@@ -539,20 +553,20 @@ def restore_backup(
                     plan["maintenance_version"],
                     plan["runtime_service_account"],
                 )
-        checkpoint.update("maintenance-deployed", maintenance_deployed=True)
-    if not checkpoint.payload.get("scheduler_paused"):
+        journal.update("maintenance-deployed", maintenance_deployed=True)
+    if not state.get("scheduler_paused"):
         context.pause_scheduler(plan["reconciler"], plan["queue_location"])
-        checkpoint.update("scheduler-paused", scheduler_paused=True)
-    if not checkpoint.payload.get("queue_paused"):
+        journal.update("scheduler-paused", scheduler_paused=True)
+    if not state.get("queue_paused"):
         context.pause_queue(plan["queue"], plan["queue_location"])
-        checkpoint.update("queue-paused", queue_paused=True)
-    if not checkpoint.payload.get("maintenance_active"):
+        journal.update("queue-paused", queue_paused=True)
+    if not state.get("maintenance_active"):
         context.set_traffic(
             {plan["maintenance_version"]: 1.0}, split_by=plan["traffic_split_by"]
         )
         context.wait_for_no_inflight_tasks(plan["queue"], plan["queue_location"])
-        checkpoint.update("maintenance-active", maintenance_active=True)
-    if not checkpoint.payload.get("request_drain_complete"):
+        journal.update("maintenance-active", maintenance_active=True)
+    if not state.get("request_drain_complete"):
         # App Engine standard requests may continue on their selected version
         # after the traffic switch. Drain one full request deadline before the
         # safety point so no pre-maintenance writer can race the clone/import.
@@ -562,20 +576,20 @@ def restore_backup(
             "(about 65 seconds)",
         ):
             context.sleep(65.0)
-        checkpoint.update("request-drain-complete", request_drain_complete=True)
-    if not checkpoint.payload.get("queue_snapshot"):
-        checkpoint.update(
+        journal.update("request-drain-complete", request_drain_complete=True)
+    if not state.get("queue_snapshot"):
+        journal.update(
             "queue-snapshotted",
             queue_snapshot=capture_queue_snapshot(context, plan),
         )
-    if not checkpoint.payload.get("queue_purged"):
+    if not state.get("queue_purged"):
         requested = datetime.now(UTC)
-        checkpoint.update(
+        journal.update(
             "queue-purge-started",
             purge_requested_at=requested.isoformat().replace("+00:00", "Z"),
         )
         context.purge_queue(plan["queue"], plan["queue_location"])
-        checkpoint.update("queue-purged", queue_purged=True)
+        journal.update("queue-purged", queue_purged=True)
         record_mutation(
             "purge configured task queue",
             action="purge",
@@ -584,65 +598,69 @@ def restore_backup(
         )
     context.wait_for_empty_queue(plan["queue"], plan["queue_location"])
 
-    if not checkpoint.payload.get("safety_snapshot_time"):
+    if not state.get("safety_snapshot_time"):
         with _progress(
             formatter,
             "Selecting a whole-minute safety point (up to about one minute)",
         ):
             safety_time = _safety_snapshot_time(context)
-        checkpoint.update(
+        journal.update(
             "safety-time-selected",
             safety_snapshot_time=safety_time.isoformat().replace("+00:00", "Z"),
         )
     safety_time = datetime.fromisoformat(
-        checkpoint.payload["safety_snapshot_time"].replace("Z", "+00:00")
+        str(state["safety_snapshot_time"]).replace("Z", "+00:00")
     )
-    if not checkpoint.payload.get("safety_clone_created"):
+    if not state.get("safety_clone_created"):
         with _progress(
             formatter,
             "Creating the temporary safety database "
             "(this may take several minutes)",
         ):
-            operation = checkpoint.payload.get("safety_clone_operation")
+            operation = state.get("safety_clone_operation")
             if not operation:
                 operation, _payload = context.start_clone(
                     plan["safety_database"], snapshot_time=safety_time
                 )
-                checkpoint.update(
+                journal.update(
                     "safety-clone-started", safety_clone_operation=operation
                 )
+            if not isinstance(operation, str):
+                raise DataLifecycleError("Restore journal has an invalid safety clone operation.")
             context.wait_for_operation(
                 operation, database_id=plan["safety_database"]
             )
-        checkpoint.update("safety-clone-created", safety_clone_created=True)
-    if not checkpoint.payload.get("safety_assets"):
-        checkpoint.update(
+        journal.update("safety-clone-created", safety_clone_created=True)
+    if not state.get("safety_assets"):
+        journal.update(
             "safety-assets-cataloged",
             safety_assets=_publish_safety_assets(context, plan, safety_time),
         )
 
-    if not checkpoint.payload.get("import_complete"):
+    if not state.get("import_complete"):
         with _progress(
             formatter,
             "Importing the manual backup (this may take several minutes)",
         ):
-            operation = checkpoint.payload.get("import_operation")
+            operation = state.get("import_operation")
             if not operation:
                 operation, _payload = context.start_import(
                     plan["export_output_prefix"], DEFAULT_DATABASE
                 )
-                checkpoint.update("import-started", import_operation=operation)
+                journal.update("import-started", import_operation=operation)
+            if not isinstance(operation, str):
+                raise DataLifecycleError("Restore journal has an invalid import operation.")
             context.wait_for_operation(operation, database_id=DEFAULT_DATABASE)
-        checkpoint.update("import-complete", import_complete=True)
-    if not checkpoint.payload.get("assets_restored"):
+        journal.update("import-complete", import_complete=True)
+    if not state.get("assets_restored"):
         record_step("restore exact referenced file versions")
         with _progress(
             formatter,
             "Restoring the backup's exact saved file versions",
         ):
             result = restore_generation_bound_assets(context, plan)
-        checkpoint.update("assets-restored", assets_restored=True, asset_result=result)
-    if not checkpoint.payload.get("normalized"):
+        journal.update("assets-restored", assets_restored=True, asset_result=result)
+    if not state.get("normalized"):
         record_step("normalize restored database state")
         with _progress(formatter, "Normalizing restored database state"):
             result = normalize_restored_database(
@@ -652,43 +670,43 @@ def restore_backup(
                 target_database_id=DEFAULT_DATABASE,
                 kind_prefix=plan["kind_prefix"],
             )
-        checkpoint.update("normalized", normalized=True, normalization=result)
-    if not checkpoint.payload.get("target_validated"):
+        journal.update("normalized", normalized=True, normalization=result)
+    if not state.get("target_validated"):
         result = validate_restored_database(
             context.datastore_client(DEFAULT_DATABASE),
             kind_prefix=plan["kind_prefix"],
             owner_email=plan["owner_email"],
         )
-        checkpoint.update("target-validated", target_validated=True, validation=result)
-    if not checkpoint.payload.get("cache_invalidated"):
+        journal.update("target-validated", target_validated=True, validation=result)
+    if not state.get("cache_invalidated"):
         context.invalidate_cache()
-        checkpoint.update("cache-invalidated", cache_invalidated=True)
-    if not checkpoint.payload.get("scheduled_tasks_reconciled"):
+        journal.update("cache-invalidated", cache_invalidated=True)
+    if not state.get("scheduled_tasks_reconciled"):
         result = reconcile_scheduled_uncomplete_tasks(context, plan)
-        checkpoint.update(
+        journal.update(
             "scheduled-tasks-reconciled",
             scheduled_tasks_reconciled=True,
             scheduled_task_result=result,
         )
-    if not checkpoint.payload.get("traffic_restored"):
+    if not state.get("traffic_restored"):
         context.set_traffic(plan["original_traffic"], split_by=plan["traffic_split_by"])
-        checkpoint.update("traffic-restored", traffic_restored=True)
-    if not checkpoint.payload.get("queue_resumed"):
+        journal.update("traffic-restored", traffic_restored=True)
+    if not state.get("queue_resumed"):
         if str(plan["provider_observations"].get("queue_state") or "").upper() == "RUNNING":
             context.resume_queue(plan["queue"], plan["queue_location"])
-        checkpoint.update("queue-state-restored", queue_resumed=True)
-    if not checkpoint.payload.get("scheduler_resumed"):
+        journal.update("queue-state-restored", queue_resumed=True)
+    if not state.get("scheduler_resumed"):
         if str(plan["provider_observations"].get("reconciler_state") or "").upper() == "ENABLED":
             context.resume_scheduler(plan["reconciler"], plan["queue_location"])
-        checkpoint.update("scheduler-state-restored", scheduler_resumed=True)
-    if not checkpoint.payload.get("safety_clone_cleaned"):
+        journal.update("scheduler-state-restored", scheduler_resumed=True)
+    if not state.get("safety_clone_cleaned"):
         context.disable_database_delete_protection(plan["safety_database"])
         context.delete_database(plan["safety_database"])
-        checkpoint.update("safety-clone-cleaned", safety_clone_cleaned=True)
-    if not checkpoint.payload.get("restore_record"):
-        record = _completion_record(context, plan, checkpoint)
-        checkpoint.update("restore-record-published", restore_record=record)
-    checkpoint.finish()
+        journal.update("safety-clone-cleaned", safety_clone_cleaned=True)
+    if not state.get("restore_record"):
+        record = _completion_record(context, plan, journal)
+        journal.update("restore-record-published", restore_record=record)
+    journal.finish()
     print(
         ui.success(f"Restore {plan['restore_id']} merged into (default): "
         f"{plan['merge']['overwritten']} keys reset and "

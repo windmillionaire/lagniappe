@@ -39,7 +39,11 @@ class ImportPlanner:
         self.target_namespace = str(target_namespace)
         self.reserved_keys = dict(reserved_keys or {})
 
-    def plan(self, records: Iterable[dict[str, Any]], assets=()):
+    def plan(
+        self,
+        records: Iterable[dict[str, Any]],
+        assets: Iterable[dict[str, object]] = (),
+    ) -> dict[str, object]:
         records = list(records)
         identities: dict[PortableIdentity, str] = {}
         ordinary = []
@@ -104,15 +108,15 @@ class ImportPlanner:
             "identity_count": len(planned),
         }
 
-    def plan_bundle(self, path):
+    def plan_bundle(self, path: str | Path) -> dict[str, object]:
         """Read one standalone-validated directory or ZIP and prove representability."""
         validate_archive(path)
         path = Path(path)
         if path.is_dir():
-            def read(relative):
+            def read(relative: str, /) -> bytes:
                 return (path / PurePosixPath(relative)).read_bytes()
 
-            def close():
+            def close() -> None:
                 return None
         else:
             import zipfile

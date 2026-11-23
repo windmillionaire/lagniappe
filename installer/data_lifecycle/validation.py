@@ -1,6 +1,7 @@
 """Standalone structural, relationship, security, checksum, and key audits."""
 
 from __future__ import annotations
+from typing import TypedDict
 
 import hashlib
 from html.parser import HTMLParser
@@ -40,6 +41,14 @@ OUTBOUND_PATTERN = re.compile(
 )
 
 
+# @testable infrastructure
+class FileDescriptor(TypedDict):
+    path: str
+    size: int
+    media_type: str
+    sha256: str
+
+
 # @testable false
 # @covered-by installer/data_lifecycle/validation.py::validate_archive
 # @reason parser callbacks are exercised by complete offline-link validation
@@ -48,7 +57,7 @@ class _ArchiveLinkParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.links = []
 
-    def handle_starttag(self, _tag, attrs):
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         for name, value in attrs:
             if name.casefold() in {"href", "src"} and value:
                 self.links.append(value)
@@ -82,7 +91,7 @@ def _validate_html_links(reader, paths):
 # @testable false
 # @covered-by installer/data_lifecycle/validation.py::validate_archive
 # @reason path containment is enforced throughout the public validator
-def _safe_path(value: str) -> str:
+def _safe_path(value: object) -> str:
     value = str(value or "")
     path = PurePosixPath(value)
     if (
@@ -103,7 +112,7 @@ class _DirectoryReader:
     def __init__(self, path):
         self.root = Path(path)
 
-    def paths(self):
+    def paths(self) -> list[str]:
         values = []
         for path in self.root.rglob("*"):
             if path.is_symlink():
@@ -115,7 +124,7 @@ class _DirectoryReader:
             values.append(path.relative_to(self.root).as_posix())
         return values
 
-    def read(self, path):
+    def read(self, path: str) -> bytes:
         target = self.root.joinpath(*PurePosixPath(_safe_path(path)).parts)
         if target.is_symlink() or not target.is_file():
             raise DataLifecycleError(f"Archive file is missing: {path}")
@@ -132,7 +141,7 @@ class _ZipReader:
         if not self.infos or self.infos[-1].filename != "manifest.json":
             raise DataLifecycleError("ZIP completion manifest must be its final entry.")
 
-    def paths(self):
+    def paths(self) -> list[str]:
         values = []
         seen = set()
         for info in self.infos:
@@ -150,13 +159,13 @@ class _ZipReader:
             values.append(path)
         return values
 
-    def read(self, path):
+    def read(self, path: str) -> bytes:
         try:
             return self.archive.read(_safe_path(path))
         except KeyError as error:
             raise DataLifecycleError(f"Archive file is missing: {path}") from error
 
-    def close(self):
+    def close(self) -> None:
         self.archive.close()
 
 
@@ -279,7 +288,7 @@ def _key_audit(path, payload):
 # @tests tests_tooling/test_008_data_lifecycle.py::test_archive_validation_accepts_canonical_directory_and_zip
 # @tests tests_tooling/test_008_data_lifecycle.py::test_archive_validation_counts_children_without_separate_identity_pages
 # @matrix portable-archive : key-audit owner-scoped-children path-safety validation
-def validate_archive(path) -> dict:
+def validate_archive(path: str | Path) -> dict:
     """Validate a complete directory/ZIP bundle without provider access."""
     reader = _reader(path)
     try:
@@ -576,7 +585,7 @@ def validate_archive(path) -> dict:
 # @testable false
 # @covered-by installer/data_lifecycle/validation.py::validate_archive
 # @reason descriptors are produced by archive publication and consumed by validation
-def file_descriptor(path: Path, root: Path):
+def file_descriptor(path: Path, root: Path) -> FileDescriptor:
     relative = path.relative_to(root).as_posix()
     payload = path.read_bytes()
     media_type = mimetypes.guess_type(relative)[0] or "application/octet-stream"
