@@ -49,12 +49,18 @@ def test_offline_indicator_toggles(get_admin, browser_failures):
     indicator = user.locate(OFFLINE_INDICATOR)
     expect(indicator).to_be_hidden()
 
-    with browser_failures.expect_offline(user):
-        user.offline = True
-        expect(indicator).to_be_visible()
+    # A dashboard poll already in flight can receive the service worker's
+    # synthetic offline response while Chromium switches network state.
+    with browser_failures.expect_http_error(
+        user, status=503, path="/l/poll", method="POST",
+        body='{"ok":false,"error":"You are offline"}', count=0, max_count=1,
+    ):
+        with browser_failures.expect_offline(user):
+            user.offline = True
+            expect(indicator).to_be_visible()
 
-    user.offline = False
-    expect(indicator).to_be_hidden()
+        user.offline = False
+        expect(indicator).to_be_hidden()
 
 
 # @matrix offline : indicator server-health
