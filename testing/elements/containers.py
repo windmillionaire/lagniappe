@@ -1,3 +1,4 @@
+import re
 from urllib.parse import parse_qsl, urlsplit
 
 from playwright.sync_api import expect
@@ -49,18 +50,21 @@ class List:
         control = first_page if first_page.count() else next_page
         visited = set()
         while not row.count():
-            assert control.count(), f"{entity.name!r} was missing from the Home list"
+            expect(control, f"Missing a page containing {entity.name!r}").to_have_attribute(
+                "data-route", re.compile(r"\S+")
+            )
             route = control.get_attribute("data-route")
-            assert route and route not in visited, "Home pagination did not advance"
-            visited.add(route)
             target = urlsplit(route)
             with expect_successful_response(
                 self.list.page,
                 method="GET",
                 path=target.path,
                 query=dict(parse_qsl(target.query)),
-            ):
+            ) as response:
                 control.click()
+            url = response.value.url
+            assert url not in visited, f"Home pagination returned {url} twice"
+            visited.add(url)
             # The response arrives before the widget replaces the outgoing controls.
             outgoing = self.list.locator(f'button[lp-control][data-route="{route}"]')
             expect(outgoing).not_to_be_attached()
