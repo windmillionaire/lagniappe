@@ -1,5 +1,11 @@
 """Queued notification-email delivery orchestration."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
 from ....definitions import Fetch
 from ....entities import Entities
 from ....properties import notification_email as delivery_values
@@ -57,13 +63,13 @@ def _deliver_immediate(row, now):
     sequence = row.get("message_sequence")
     try:
         valid = user is not None and _valid_for_user(row, user)
-        if row.get("record_type") == "message-candidate":
+        if user is not None and row.get("record_type") == "message-candidate":
             valid = valid and email_database.message_is_actionable(row, user)
         else:
             valid = valid and email_database.event_is_actionable(row)
-        if valid and presence.recently_active(user, now=now):
+        if valid and user is not None and presence.recently_active(user, now=now):
             valid = False
-        if not valid:
+        if not valid or user is None:
             email_database.finish_delivery(
                 row,
                 token,
@@ -100,7 +106,7 @@ def _deliver_digest(batch, now):
         row for row in rows if user is not None and _valid_for_user(row, user)
     ]
     try:
-        if not valid_rows:
+        if user is None or not valid_rows:
             email_database.compact_events(rows, "suppressed", now)
             email_database.finish_delivery(batch, token, "suppressed", now)
             return {"state": "suppressed"}
@@ -134,7 +140,7 @@ def _deliver_digest(batch, now):
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_uses_next_local_eight_and_batches
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_groups_messages_and_uses_named_completion_links
 # @matrix notification-email : clear-suppression digest document-mention hide-suppression html idempotency immediate item-cap message message-grouping opt-out-suppression presence-suppression read-suppression reply-suppression retry-release task-assignment
-def deliver(delivery_identifier, *, now=None):
+def deliver(delivery_identifier: str, *, now: datetime | None = None) -> Mapping[str, object]:
     """Deliver, suppress, or reschedule one opaque queued delivery."""
     now = policy.utc(now)
     row = email_database.get_delivery(delivery_identifier)

@@ -1,5 +1,11 @@
 """Participant-authorized direct-message reads and browser projections."""
 
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+    from google.cloud.datastore import Entity as DatastoreRow, Key
+
 from ...definitions import Fetch
 from ...entities import Entities
 from ...properties import message as message_values
@@ -48,13 +54,13 @@ def _peer_status(rows, user):
 # @covered-by lagniappe/core/tools/messaging/views.py::conversations
 # @reason browser projection is exercised through conversation listing
 def serialize_conversation(
-    conversation,
-    user,
+    conversation: DatastoreRow,
+    user: User,
     *,
-    peer_available=True,
-    peer_replyable=True,
-    peer_deleted=False,
-):
+    peer_available: bool = True,
+    peer_replyable: bool = True,
+    peer_deleted: bool = False,
+) -> dict[str, object]:
     user_id = conversation_values.participant_id(user)
     peer_key = conversation_values.peer_key(conversation, user)
     peer_id = conversation_values.encoded_identifier(peer_key) if peer_key else None
@@ -69,8 +75,8 @@ def serialize_conversation(
             "deleted": bool(peer_deleted),
         },
         "last_activity": (
-            conversation.get("last_activity").isoformat()
-            if conversation.get("last_activity")
+            last_activity.isoformat()
+            if (last_activity := conversation.get("last_activity"))
             else None
         ),
         "last_sender": conversation_values.encoded_identifier(
@@ -87,7 +93,7 @@ def serialize_conversation(
 # @testable false
 # @covered-by lagniappe/core/tools/messaging/views.py::conversation_history
 # @reason browser projection is exercised through chronological history
-def serialize_message(message, viewer):
+def serialize_message(message: DatastoreRow, viewer: User) -> dict[str, object]:
     return message_values.projection(message, viewer)
 
 
@@ -95,7 +101,7 @@ def serialize_message(message, viewer):
 # @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
 # @matrix messaging : compose-eligibility conversation-page
-def conversations(user, cursor=None, limit=CONVERSATION_PAGE_SIZE):
+def conversations(user: User, cursor: str | None = None, limit: int = CONVERSATION_PAGE_SIZE) -> dict[str, object]:
     if not collaboration.managed_user(user):
         raise PermissionError("Messaging is available to managed users only.")
     page = database_messaging.conversations_page(user, cursor, limit)
@@ -124,10 +130,10 @@ def conversations(user, cursor=None, limit=CONVERSATION_PAGE_SIZE):
 # @testable false
 # @covered-by lagniappe/core/tools/messaging/views.py::conversation_history
 # @reason authorized lookup is exercised through history
-def get_conversation(user, conversation_identifier):
+def get_conversation(user: User, conversation_identifier: str | Key) -> DatastoreRow:
     conversation = database_messaging.get_conversation(conversation_identifier)
     message_database.require_participant(conversation, user)
-    return conversation
+    return cast("DatastoreRow", conversation)
 
 
 # @testable true
@@ -135,11 +141,11 @@ def get_conversation(user, conversation_identifier):
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
 # @matrix messaging : chronological-display history-page participant-privacy
 def conversation_history(
-    user,
-    conversation_identifier,
-    cursor=None,
-    limit=HISTORY_PAGE_SIZE,
-):
+    user: User,
+    conversation_identifier: str | Key,
+    cursor: str | None = None,
+    limit: int = HISTORY_PAGE_SIZE,
+) -> dict[str, object]:
     conversation = get_conversation(user, conversation_identifier)
     peer_key = conversation_values.peer_key(conversation, user)
     peer_status = _peer_status([conversation], user).get(

@@ -1,5 +1,11 @@
 """Best-effort Redis presence used for email suppression."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+    from datetime import datetime
+
 from collections import OrderedDict
 from threading import Lock
 
@@ -66,7 +72,7 @@ def _timestamp(value):
 # @tests tests_unit/test_029a_notification_email_policy.py::test_activity_memo_is_safe_for_concurrent_workers_and_clock_changes
 # @matrix notification-email : coarse-request-activity presence
 # @matrix notification-email : bounded failure clock concurrency redis-loss
-def record_site_activity(user, *, now=None):
+def record_site_activity(user: User, *, now: datetime | None = None) -> bool:
     """Record coarse authenticated activity without creating browser traffic."""
     now = utc(now)
     timestamp = now.timestamp()
@@ -90,7 +96,7 @@ def record_site_activity(user, *, now=None):
 # @tests tests_unit/test_029a_notification_email_policy.py::test_site_activity_is_coarse_and_expires
 # @tests tests_unit/test_029b_notification_email_events.py::test_immediate_notification_is_delayed_escaped_and_delivered
 # @matrix notification-email : presence presence-suppression
-def recently_active(user, *, now=None):
+def recently_active(user: User, *, now: datetime | None = None) -> bool:
     """Return a best-effort recent-activity hint; cache failure fails open."""
     now = utc(now)
     try:

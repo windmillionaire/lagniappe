@@ -1,5 +1,7 @@
 """Strict wire contract for adaptive browser polling."""
 
+from typing import Literal, overload
+
 from dataclasses import dataclass
 
 from .projections import CHANNEL_REVISION_PATHS
@@ -26,7 +28,7 @@ POLL_CHANNELS = frozenset(CHANNEL_REVISION_PATHS)
 class PollContractError(ValueError):
     """A safe, field-addressed public polling contract failure."""
 
-    def __init__(self, path, reason):
+    def __init__(self, path: str, reason: str) -> None:
         self.path = path
         self.reason = reason
         super().__init__(f"{path}: {reason}")
@@ -39,9 +41,9 @@ class PollRequest:
 
     version: int
     client_id: str
-    subscriptions: tuple
-    closed_documents: tuple
-    notification_state: dict | None
+    subscriptions: tuple[dict[str, str | int | None], ...]
+    closed_documents: tuple[str, ...]
+    notification_state: dict[str, str | int | bool | None] | None
 
 
 # @testable false
@@ -76,7 +78,11 @@ def _fields(value, path, required, optional=()):
 # @testable false
 # @covered-by lagniappe/core/tools/polling/contract.py::parse_poll_request
 # @reason bounded string checks are exercised through the public parser
-def _string(value, path, *, maximum, nullable=False):
+@overload
+def _string(value: object, path: str, *, maximum: int, nullable: Literal[False] = False) -> str: ...
+@overload
+def _string(value: object, path: str, *, maximum: int, nullable: bool) -> str | None: ...
+def _string(value: object, path: str, *, maximum: int, nullable: bool = False) -> str | None:
     if nullable and value is None:
         return None
     if not isinstance(value, str):
@@ -228,7 +234,7 @@ def _notification_state(raw):
 # @tests tests_unit/test_026_polling_contract.py::test_poll_contract_rejects_invalid_notification_and_close_state
 # @matrix notifications : duplicates notification-state presence validation
 # @matrix polling : bounds cursor-types descriptors diagnostics duplicates notification-state presence protocol strict-fields validation
-def parse_poll_request(payload):
+def parse_poll_request(payload: object) -> PollRequest:
     """Parse one exact version-1 request or raise a safe contract error."""
     value = _object(payload, "request")
     _fields(

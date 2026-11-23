@@ -1,5 +1,10 @@
 """Root-depth collection discovery and cached-fingerprint refresh deltas."""
 
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.page import Page
+
 from dataclasses import dataclass
 
 from lagniappe.core import exceptions
@@ -378,7 +383,7 @@ def resolve_refresh_delta(collection, rows, user, *, reauthorize=False):
         if entity and entity.entity_kind != kind:
             entity = None
         permission_entity = (
-            entity.user if entity and collection.kind == "user-index" else entity
+            cast("Page", entity).user if entity and collection.kind == "user-index" else entity
         )
         if permission_entity and permission_entity.allowed(Action.VIEW, user=user):
             if key in changed_keys:

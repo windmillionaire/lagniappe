@@ -1,5 +1,10 @@
 """Recipient eligibility and delivery timing policy."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from datetime import datetime, time as datetime_time, timedelta, UTC
 
 from ....definitions import NotificationEmailMode
@@ -16,7 +21,7 @@ DELIVERY_LEASE_SECONDS = 5 * 60
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
 # @reason clock normalization is exercised through capture and delivery
-def utc(now=None):
+def utc(now: datetime | None = None) -> datetime:
     value = now or datetime.now(UTC)
     if value.tzinfo is None:
         value = value.replace(tzinfo=UTC)
@@ -26,7 +31,7 @@ def utc(now=None):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/policy.py::eligible_user
 # @reason preference normalization is owned by recipient eligibility
-def mode(user):
+def mode(user: User) -> NotificationEmailMode:
     try:
         return NotificationEmailMode[user.notification_email_mode]
     except (AttributeError, KeyError, TypeError):
@@ -36,14 +41,19 @@ def mode(user):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason opt-out generations are enforced through delivery
-def preference_epoch(user):
-    return int(user.db.get("notification_email_opt_out_epoch") or 0)
+def preference_epoch(user: User) -> int:
+    value = user.db.get("notification_email_opt_out_epoch")
+    if not value:
+        return 0
+    if not isinstance(value, (int, float, str, bytes, bytearray)):
+        raise TypeError("Invalid notification opt-out epoch")
+    return int(value)
 
 
 # @testable true
 # @tests tests_unit/test_029a_notification_email_policy.py::test_notification_email_preference_defaults_and_eligibility
 # @matrix notification-email : eligibility never-logged-in public-user
-def eligible_user(user):
+def eligible_user(user: object) -> bool:
     """Return whether a user may receive notification email."""
     return bool(
         isinstance(user, Entities.USER)
@@ -58,7 +68,7 @@ def eligible_user(user):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
 # @reason local digest timing is exercised through public event capture
-def next_digest(user, now):
+def next_digest(user: User, now: datetime) -> datetime:
     zone = user_timezone(user)
     local_now = now.astimezone(zone)
     due = datetime.combine(

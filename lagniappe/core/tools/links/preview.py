@@ -1,5 +1,13 @@
 """Text-only metadata previews for editor links."""
 
+from typing import TYPE_CHECKING, TypedDict, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.entities.user import User
+    from lagniappe.core.entities.project import Project
+    from urllib.parse import ParseResult
+
 from urllib.parse import parse_qs, urljoin, urlparse, urlunparse
 
 from lagniappe import CONFIG
@@ -7,6 +15,14 @@ from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from ..http import HTML_METADATA_POLICY, OutboundStatus, fetch_user_content
 from . import metadata as link_metadata
+
+class RoutePreview(TypedDict, total=False):
+    recognized: bool
+    entity: Entity | None
+    kind: str
+    title: str | None
+    description: str | None
+
 
 ALLOWED_EXTERNAL_SCHEMES = {"http", "https"}
 DIRECT_ENTITY_ROUTES = {
@@ -25,7 +41,7 @@ RESTRICTED_DESCRIPTION = "You do not have access to preview this link."
 # @covered-by lagniappe/core/tools/links/preview.py::preview_for_url
 # @reason exception carrier for preview validation failures
 class PreviewError(Exception):
-    def __init__(self, message, status=422):
+    def __init__(self, message: str, status: int = 422) -> None:
         super().__init__(message)
         self.status = status
 
@@ -135,11 +151,12 @@ def _restricted_preview(parsed, kind="internal"):
 # @testable false
 # @covered-by lagniappe/core/tools/links/preview.py::preview_for_url
 # @reason helper-owned-by-preview-url-resolution
-def _status_route_preview(parts, parsed):
+def _status_route_preview(parts: list[str], parsed: ParseResult) -> RoutePreview:
     project = Entities.fetch_one(parts[1], request=Fetch.direct())
     if not project or project.kind != "project":
         return {"recognized": True, "entity": None, "kind": "project"}
 
+    project = cast("Project", project)
     task_key = parts[3]
     model = next(
         (model for model in project.model_tasks if model.urlsafe_key == task_key),
@@ -161,7 +178,7 @@ def _status_route_preview(parts, parsed):
 # @testable false
 # @covered-by lagniappe/core/tools/links/preview.py::preview_for_url
 # @reason helper-owned-by-preview-url-resolution
-def _route_preview(parsed):
+def _route_preview(parsed: ParseResult) -> RoutePreview:
     parts = _route_parts(parsed.path or "")
     if len(parts) < 2:
         return {"recognized": False}
@@ -201,7 +218,7 @@ def _route_preview(parsed):
 # @testable false
 # @covered-by lagniappe/core/tools/links/preview.py::preview_for_url
 # @reason helper-owned-by-preview-url-resolution
-def _internal_preview(parsed, user=None, route_preview=None):
+def _internal_preview(parsed: ParseResult, user: User | None = None, route_preview: RoutePreview | None = None) -> dict[str, object]:
     route_preview = route_preview or _route_preview(parsed)
     if not route_preview.get("recognized"):
         raise PreviewError("Preview not found", status=404)
@@ -283,7 +300,7 @@ def _external_preview(parsed):
 # @matrix editor link-preview : external internal metadata permissions url-safety
 # @tests tests_unit/test_019_link_preview.py::test_task_preview_loads_page_form_before_permission_check
 # @pair link-preview:nested-relations
-def preview_for_url(url, user=None, base_url=None):
+def preview_for_url(url: str | None, user: User | None = None, base_url: str | None = None) -> dict[str, object]:
     value = str(url or "")
     if not value.strip():
         raise PreviewError("URL is required")

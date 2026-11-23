@@ -1,5 +1,15 @@
 """Capture committed notifications, mentions, and messages for email."""
 
+from typing import TYPE_CHECKING
+from ...database.utility import stored_key
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+    from google.cloud.datastore import Entity as DatastoreRow, Key
+    from datetime import datetime
+    from lagniappe.core.entities.notification import Notification
+    from lagniappe.core.entities.entity import Entity
+
 from datetime import timedelta
 from urllib.parse import quote
 
@@ -94,7 +104,7 @@ def _record_event(user, values, *, now=None):
         row["bucket"] = due_at.strftime("%Y%m%dT%H%M%SZ")
     row, created = email_database.put_if_absent(row)
     if created or row.get("state") == "pending":
-        stored_mode = NotificationEmailMode.__members__.get(row.get("mode"))
+        stored_mode = NotificationEmailMode.__members__.get(row.get("mode", ""))
         if stored_mode is NotificationEmailMode.DAILY:
             batch = email_database.digest_batch(
                 user,
@@ -113,7 +123,7 @@ def _record_event(user, values, *, now=None):
 # @tests tests_unit/test_029b_notification_email_events.py::test_task_assignment_email_uses_task_copy_without_headers
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_groups_messages_and_uses_named_completion_links
 # @matrix notification-email : notification pending-filter target-link target-title task-assignment
-def record_notification(notification, *, now=None):
+def record_notification(notification: Notification | None, *, now: datetime | None = None) -> DatastoreRow | None:
     """Capture one final ordinary notification for email delivery."""
     if (
         notification is None
@@ -174,7 +184,7 @@ def record_notification(notification, *, now=None):
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_uses_next_local_eight_and_batches
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_groups_messages_and_uses_named_completion_links
 # @matrix notification-email : digest full-roundup future-only-switch idempotency immediate timezone
-def record_notification_event(user, source_key, *, body, target=None, now=None):
+def record_notification_event(user: User, source_key: Key, *, body: str, target: Entity | None = None, now: datetime | None = None) -> DatastoreRow | None:
     """Capture a known final notification at a direct transaction boundary."""
     now = policy.utc(now)
     values = _event_values(
@@ -191,7 +201,7 @@ def record_notification_event(user, source_key, *, body, target=None, now=None):
 # @testable true
 # @tests tests_unit/test_029b_notification_email_events.py::test_document_mention_email_uses_concise_copy_and_document_tab
 # @pair notification-email:document-mention
-def record_document_mention(user, source_key, *, document, now=None):
+def record_document_mention(user: User, source_key: Key, *, document: Entity, now: datetime | None = None) -> DatastoreRow | None:
     """Capture a document mention with its dedicated email presentation."""
     now = policy.utc(now)
     document_name = str(getattr(document, "name", None) or "document").strip()
@@ -214,12 +224,12 @@ def record_document_mention(user, source_key, *, document, now=None):
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_groups_messages_and_uses_named_completion_links
 # @matrix notification-email : latest-only message quiet-window
 # @pair notification-email:message-grouping
-def record_message(message, conversation, recipient, *, now=None):
+def record_message(message: DatastoreRow, conversation: DatastoreRow, recipient: User, *, now: datetime | None = None) -> DatastoreRow | None:
     """Capture a newly-created inbound direct message."""
     now = policy.utc(now or message.get("created"))
     if not policy.eligible_user(recipient):
         return None
-    conversation_id = email_database.encoded_key(conversation.key)
+    conversation_id = email_database.encoded_key(stored_key(conversation))
     values = _event_values(
         source_type="message",
         source_key=message.key,

@@ -1,5 +1,7 @@
 """Authentication-email delivery through operator-provided SMTP."""
 
+from collections.abc import Mapping
+
 import re
 import smtplib
 import ssl
@@ -22,7 +24,7 @@ class AuthEmailError(RuntimeError):
 def _smtp_config(config):
     config = config or {}
     try:
-        port = int(config.get("port"))
+        port = int(config.get("port", ""))
     except (TypeError, ValueError):
         port = 0
     normalized = {
@@ -59,9 +61,9 @@ def _smtp_config(config):
 def _authenticated_smtp(
     smtp_config,
     *,
-    smtp_factory=smtplib.SMTP,
-    smtp_ssl_factory=smtplib.SMTP_SSL,
-    tls_context=None,
+    smtp_factory: type[smtplib.SMTP] = smtplib.SMTP,
+    smtp_ssl_factory: type[smtplib.SMTP_SSL] = smtplib.SMTP_SSL,
+    tls_context: ssl.SSLContext | None = None,
 ):
     """Open and authenticate one configured SMTP connection."""
     context = tls_context or ssl.create_default_context()
@@ -95,11 +97,11 @@ def _authenticated_smtp(
 # @matrix login : account-enumeration authentication-email availability smtp
 def check_auth_email_connection(
     *,
-    config=None,
-    smtp_factory=smtplib.SMTP,
-    smtp_ssl_factory=smtplib.SMTP_SSL,
-    tls_context=None,
-):
+    config: Mapping[str, object] | None = None,
+    smtp_factory: type[smtplib.SMTP] = smtplib.SMTP,
+    smtp_ssl_factory: type[smtplib.SMTP_SSL] = smtplib.SMTP_SSL,
+    tls_context: ssl.SSLContext | None = None,
+) -> bool:
     """Confirm sender availability without consulting or sending to a recipient."""
     if config is None:
         from lagniappe import CONFIG
@@ -120,16 +122,16 @@ def check_auth_email_connection(
 # @tests tests_unit/test_025_identity_platform.py::test_send_auth_email_supports_generic_smtp_transports
 # @matrix login : authentication-email smtp tls
 def send_auth_email(
-    recipient,
-    subject,
-    text_body,
-    html_body,
+    recipient: str,
+    subject: str,
+    text_body: str,
+    html_body: str,
     *,
-    config=None,
-    smtp_factory=smtplib.SMTP,
-    smtp_ssl_factory=smtplib.SMTP_SSL,
-    tls_context=None,
-):
+    config: Mapping[str, object] | None = None,
+    smtp_factory: type[smtplib.SMTP] = smtplib.SMTP,
+    smtp_ssl_factory: type[smtplib.SMTP_SSL] = smtplib.SMTP_SSL,
+    tls_context: ssl.SSLContext | None = None,
+) -> bool:
     """Send one authentication message through the configured SMTP service."""
     return send_email(
         recipient,
@@ -147,17 +149,17 @@ def send_auth_email(
 # @tests tests_unit/test_025_identity_platform.py::test_send_auth_email_supports_generic_smtp_transports
 # @matrix login : authentication-email smtp tls
 def send_email(
-    recipient,
-    subject,
-    text_body,
-    html_body,
+    recipient: str,
+    subject: str,
+    text_body: str,
+    html_body: str,
     *,
-    config=None,
-    smtp_factory=smtplib.SMTP,
-    smtp_ssl_factory=smtplib.SMTP_SSL,
-    tls_context=None,
-    message_id=None,
-):
+    config: Mapping[str, object] | None = None,
+    smtp_factory: type[smtplib.SMTP] = smtplib.SMTP,
+    smtp_ssl_factory: type[smtplib.SMTP_SSL] = smtplib.SMTP_SSL,
+    tls_context: ssl.SSLContext | None = None,
+    message_id: str | None = None,
+) -> bool:
     """Send one multipart application email through the configured SMTP service."""
     if config is None:
         from lagniappe import CONFIG
@@ -192,7 +194,7 @@ def send_email(
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_auth_action_message_escapes_content_and_links
 # @matrix login : action-link authentication-email templates
-def auth_action_message(action, app_name, action_url):
+def auth_action_message(action: str, app_name: str, action_url: str) -> tuple[str, str, str]:
     """Build the plain-text and HTML bodies for one authentication action."""
     app_name = str(app_name or "").strip() or "Lagniappe"
     action_url = str(action_url or "").strip()

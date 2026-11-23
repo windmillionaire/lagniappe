@@ -1,5 +1,13 @@
 """Notification-email copy, grouping, multipart rendering, and sending."""
 
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, TypedDict, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.tools.database.get import Identifier
+    from google.cloud.datastore import Entity as DatastoreRow
+    from lagniappe.core.entities.user import User
+
 from html import escape
 
 from lagniappe import CONFIG
@@ -10,10 +18,18 @@ from . import links
 from .capture import DOCUMENT_MENTION_EVENT, TASK_ASSIGNMENT_EVENT
 
 
+class NotificationCopy(TypedDict):
+    subject: str | None
+    title: str
+    text: str
+    html: str
+    standalone_headings: bool
+
+
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason generic copy selection is exercised through delivery
-def _generic(item, _app_name):
+def _generic(item: Mapping[str, object], _app_name: str) -> NotificationCopy:
     return {
         "subject": None,
         "title": str(item.get("title") or "Notification"),
@@ -26,7 +42,7 @@ def _generic(item, _app_name):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason mention-specific copy is exercised through delivery
-def _document_mention(item, app_name):
+def _document_mention(item: Mapping[str, object], app_name: str) -> NotificationCopy:
     document_name = str(item.get("document_name") or "document")
     return {
         "subject": f"{app_name} document mention",
@@ -40,7 +56,7 @@ def _document_mention(item, app_name):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason assignment-specific copy is exercised through delivery
-def _task_assignment(item, app_name):
+def _task_assignment(item: Mapping[str, object], app_name: str) -> NotificationCopy:
     sender_name = str(item.get("sender_name") or "A user")
     task_name = str(item.get("task_name") or "task")
     return {
@@ -64,15 +80,16 @@ EVENT_PRESENTATIONS = {
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason type dispatch is exercised through delivery
-def presentation(item, app_name):
-    renderer = EVENT_PRESENTATIONS.get(item.get("event_type"), _generic)
+def presentation(item: Mapping[str, object], app_name: str) -> NotificationCopy:
+    event_type = item.get("event_type")
+    renderer = EVENT_PRESENTATIONS.get(event_type, _generic) if isinstance(event_type, str) else _generic
     return renderer(item, app_name)
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason sender grouping is exercised through digest delivery
-def group_digest_messages(items):
+def group_digest_messages(items: Sequence[Mapping[str, object]]) -> list[Mapping[str, object]]:
     grouped = []
     by_sender = {}
     for item in items:
@@ -82,7 +99,7 @@ def group_digest_messages(items):
         sender = item.get("sender")
         sender_name = str(item.get("sender_name") or "a user")
         sender_id = (
-            email_database.encoded_key(sender)
+            email_database.encoded_key(cast("Identifier", sender))
             if sender is not None
             else sender_name.casefold()
         )
@@ -103,7 +120,7 @@ def group_digest_messages(items):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason multipart rendering is exercised through delivery
-def render_email(subject, items, *, digest=False, overflow=0):
+def render_email(subject: str, items: Sequence[Mapping[str, object]], *, digest: bool = False, overflow: int = 0) -> tuple[str, str]:
     app_name = str(getattr(CONFIG, "APP_NAME", "Lagniappe") or "Lagniappe")
     if digest:
         items = group_digest_messages(items)
@@ -116,7 +133,7 @@ def render_email(subject, items, *, digest=False, overflow=0):
     text_lines = [] if concise or digest else [subject, ""]
     html_items = []
     for item, item_presentation in zip(items, presentations, strict=True):
-        url = links.absolute_url(item.get("target_path"))
+        url = links.absolute_url(str(item.get("target_path") or "/"))
         if concise:
             text_lines.extend((item_presentation["text"], url, ""))
         else:
@@ -169,7 +186,7 @@ def render_email(subject, items, *, digest=False, overflow=0):
 # @testable false
 # @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason SMTP composition is exercised through delivery
-def send(user, row, items, *, digest=False, overflow=0):
+def send(user: User, row: DatastoreRow, items: Sequence[Mapping[str, object]], *, digest: bool = False, overflow: int = 0) -> bool:
     app_name = str(getattr(CONFIG, "APP_NAME", "Lagniappe") or "Lagniappe")
     row_presentation = presentation(row, app_name)
     if digest:
@@ -187,7 +204,7 @@ def send(user, row, items, *, digest=False, overflow=0):
         subject, items, digest=digest, overflow=overflow
     )
     return smtp.send_email(
-        user.email,
+        str(user.email or ""),
         subject,
         text_body,
         html_body,
