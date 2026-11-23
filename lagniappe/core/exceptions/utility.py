@@ -1,12 +1,15 @@
 """Formatting utilities for debug context display (pretty-printing, safe repr)."""
 
 import json
+from collections.abc import Mapping
 from pprint import pformat
 
 from .constants import JSON_DB_KEYS
 
 
-def pretty_print_dict(d, indent=0, decode_json_keys=False):
+def pretty_print_dict(
+    d: object, indent: int = 0, decode_json_keys: bool = False
+) -> str:
     """Pretty print a dictionary with nice formatting for HTML display.
 
     Args:
@@ -58,7 +61,9 @@ def pretty_print_dict(d, indent=0, decode_json_keys=False):
     return "\n".join(lines)
 
 
-def safe_repr(obj, max_length=2000, is_entity_context=False):
+def safe_repr(
+    obj: object, max_length: int = 2000, is_entity_context: bool = False
+) -> str:
     """Safely convert an object to a string representation.
 
     Args:
@@ -67,10 +72,11 @@ def safe_repr(obj, max_length=2000, is_entity_context=False):
         is_entity_context: If True, decode JSON keys in entity.db
     """
     try:
-        if hasattr(obj, "db") and isinstance(obj.db, dict):
+        db = getattr(obj, "db", None)
+        if isinstance(db, dict):
             # This is likely an entity - pretty print its db attribute with JSON decoding
             entity_type = type(obj).__name__
-            db_formatted = pretty_print_dict(obj.db, decode_json_keys=True)
+            db_formatted = pretty_print_dict(db, decode_json_keys=True)
             return f"<{entity_type}>\n{db_formatted}"
         elif isinstance(obj, dict):
             # Pretty print dictionaries (with JSON decoding if in entity context)
@@ -92,7 +98,9 @@ def safe_repr(obj, max_length=2000, is_entity_context=False):
         return f"<Unable to represent: {type(obj).__name__}>"
 
 
-def format_debug_context_for_template(context):
+def format_debug_context_for_template(
+    context: Mapping[str, object],
+) -> dict[str, object]:
     """Format debug context for display in a template."""
     formatted = {
         "timestamp": context.get("timestamp"),

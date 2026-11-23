@@ -1,7 +1,11 @@
+
+import traceback
+from collections.abc import Iterable
 from contextlib import suppress
 from pathlib import Path
-import traceback
+
 from flask import g, has_request_context, request
+
 from lagniappe import CONFIG
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -89,15 +93,15 @@ def _trace_caller():
 # @pair entities:load-tracing
 def record_entity_load_trace(
     *,
-    primary,
-    secondary,
-    related,
-    first_batch_key_count,
-    related_key_count,
-    fetch_depth=None,
-    fetch_reason=None,
-    fetch_stage=None,
-):
+    primary: Iterable[object] | None,
+    secondary: Iterable[object] | None,
+    related: Iterable[object] | None,
+    first_batch_key_count: int,
+    related_key_count: int,
+    fetch_depth: str | None = None,
+    fetch_reason: str | None = None,
+    fetch_stage: str | None = None,
+) -> None:
     """Record one request-local entity-fetch diagnostic entry."""
     if not _entity_load_tracing_enabled():
         return
@@ -135,7 +139,7 @@ def record_entity_load_trace(
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_print_entity_load_trace_outputs_request_summary
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_print_entity_load_trace_prints_once_per_request
 # @pair entities:load-tracing
-def print_entity_load_trace(response=None):
+def print_entity_load_trace(response: object | None = None) -> None:
     """Print request-local entity-fetch diagnostics."""
     if not _entity_load_tracing_enabled():
         return

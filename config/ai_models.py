@@ -1,8 +1,34 @@
 """Gemini model catalog, discovery, and retry defaults."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from google.auth.credentials import Credentials
+    from google.genai import Client
 import logging
 import re
 import time
+
+
+class ModelOption(TypedDict):
+    id: str
+    label: str
+    kind: str
+    tier: str
+    description: str
+    source: str
+    preview: bool
+    custom: bool
+
+
+class ModelOptions(TypedDict):
+    pricing_url: str
+    text: list[ModelOption]
+    image: list[ModelOption]
+
+
+
 
 AI_PRICING_URL = "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing"
 
@@ -23,7 +49,13 @@ MINIMUM_GEMINI_GENERATION_VERSION = (2, 5, 0)
 
 UNSUPPORTED_MODEL_FAMILIES = frozenset({"audio", "embedding", "live", "tts"})
 
-_DISCOVERY_CACHE = {}
+class _DiscoveryCacheEntry(TypedDict):
+    time: float
+    options: list[ModelOption]
+    ttl: float
+
+
+_DISCOVERY_CACHE: dict[tuple[str | None, str], _DiscoveryCacheEntry] = {}
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -272,7 +304,9 @@ def _add_current_model(options, model_id, kind):
 # @testable false
 # @covered-by config/ai_models.py::discover_model_options
 # @reason response shaping covered through public discovery behavior
-def _options_response(options, current_settings=None):
+def _options_response(
+    options: list[ModelOption], current_settings: Mapping[str, object] | None = None
+) -> ModelOptions:
     current_settings = current_settings or {}
     _add_current_model(options, current_settings.get("AI_MODEL"), "text")
     _add_current_model(options, current_settings.get("AI_UTILITY_MODEL"), "text")
@@ -317,13 +351,13 @@ def _options_response(options, current_settings=None):
 # @tests tests_unit/test_015_ai_tools.py::test_ai_model_discovery_limits_options_and_preserves_current_models
 # @matrix ai : api-version custom-current fallback model-discovery option-limit ordering provider-filtering
 def discover_model_options(
-    project=None,
-    location="global",
-    credentials=None,
-    client=None,
-    current_settings=None,
-    use_cache=True,
-):
+    project: str | None = None,
+    location: str = "global",
+    credentials: Credentials | None = None,
+    client: Client | None = None,
+    current_settings: Mapping[str, object] | None = None,
+    use_cache: bool = True,
+) -> ModelOptions:
     """Return Gemini model options, using live SDK discovery when available."""
     catalog = _catalog_options()
     cache_key = (project, location)
@@ -333,7 +367,7 @@ def discover_model_options(
         cached = _DISCOVERY_CACHE.get(cache_key)
         if cached and now - cached["time"] < cached["ttl"]:
             return _options_response(
-                [dict(option) for option in cached["options"]],
+                [option.copy() for option in cached["options"]],
                 current_settings=current_settings,
             )
 
@@ -383,7 +417,7 @@ def discover_model_options(
     if use_cache and client is None:
         _DISCOVERY_CACHE[cache_key] = {
             "time": now,
-            "options": [dict(option) for option in merged],
+            "options": [option.copy() for option in merged],
             "ttl": (
                 DISCOVERY_CACHE_SECONDS
                 if using_provider
@@ -397,7 +431,9 @@ def discover_model_options(
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_model_discovery_falls_back_to_catalog_and_preserves_custom
 # @matrix ai : model-discovery validation
-def known_model_ids(model_options=None, kind=None):
+def known_model_ids(
+    model_options: ModelOptions | None = None, kind: str | None = None
+) -> set[str]:
     """Return known model ids from a discovery response or the curated catalog."""
     model_options = model_options or discover_model_options(use_cache=False)
     buckets = []

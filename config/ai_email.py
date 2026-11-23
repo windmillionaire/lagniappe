@@ -1,8 +1,24 @@
 """Runtime-safe configuration contracts for inbound AI email."""
 
-from collections.abc import Mapping
 import re
 import unicodedata
+from collections.abc import Mapping
+from typing import TypedDict
+
+
+class AIEmailConfig(TypedDict):
+    provider: str
+    enabled: bool
+    domain: str
+    resend: dict[str, str]
+
+
+class PublicAIEmailConfig(TypedDict):
+    enabled: bool
+    addresses: dict[str, str]
+
+
+
 
 
 AI_EMAIL_PROVIDER = "resend"
@@ -88,7 +104,7 @@ def _required_text(value, name, *, maximum=1000):
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_rejects_security_weakening_values
 # @matrix ai-email : config domain email-address
-def normalize_email_address(value, name="email address"):
+def normalize_email_address(value: object, name: str = "email address") -> str:
     """Normalize one bare mailbox without provider-specific rewrites."""
     address = unicodedata.normalize("NFC", str(value or "").strip())
     if address.count("@") != 1 or any(character in address for character in "\r\n"):
@@ -104,7 +120,7 @@ def normalize_email_address(value, name="email address"):
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_rejects_security_weakening_values
 # @matrix ai-email : config domain idna
-def normalize_email_domain(value, name="AI email domain"):
+def normalize_email_domain(value: object, name: str = "AI email domain") -> str:
     """Return a lower-case IDNA ASCII domain without a trailing dot."""
     domain = str(value or "").strip().rstrip(".")
     if not domain or any(character in domain for character in "\r\n/@"):
@@ -135,7 +151,7 @@ def normalize_email_domain(value, name="AI email domain"):
 # @testable false
 # @covered-by config/ai_email.py::normalize_ai_email_config
 # @reason provider schema details are exercised through the public normalizer
-def _normalize_resend(value):
+def _normalize_resend(value: object) -> dict[str, str]:
     resend = _mapping(value, "AI_EMAIL_CONFIG.resend")
     _reject_unknown_keys(resend, _RESEND_KEYS, "AI_EMAIL_CONFIG.resend")
     normalized = {
@@ -183,7 +199,7 @@ def _normalize_resend(value):
 # @tests tests_tooling/test_003_config.py::test_recovery_accepts_and_redacts_optional_ai_email_config
 # @matrix ai-email : aliases config limits normalization secrets validation
 # @pair config:ai-email
-def normalize_ai_email_config(value):
+def normalize_ai_email_config(value: object) -> AIEmailConfig | None:
     """Validate installation choices without reading or rewriting code policy."""
     if value in (None, ""):
         return None
@@ -208,7 +224,7 @@ def normalize_ai_email_config(value):
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_policy_does_not_depend_on_or_rewrite_saved_settings
 # @matrix ai-email : aliases config public-projection secrets
-def ai_email_public_config(value):
+def ai_email_public_config(value: object) -> PublicAIEmailConfig:
     """Expose only enabled addresses; never return provider state or secrets."""
     config = normalize_ai_email_config(value)
     if not config or not config["enabled"]:

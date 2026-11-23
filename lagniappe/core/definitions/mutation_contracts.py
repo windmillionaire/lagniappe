@@ -1,5 +1,7 @@
 """Canonical entity and relationship mutation contract registry."""
 
+from typing import Literal
+
 from .mutations import (
     DeletePolicy,
     EntityMutationContract,
@@ -13,16 +15,16 @@ from .mutations import (
 # @covered-by lagniappe/core/definitions/mutation_contracts.py::validate_mutation_contracts
 # @reason contract construction is covered by registry completeness validation
 def relation(
-    name,
-    *targets,
-    cardinality="one",
-    authority=RelationAuthority.SOURCE,
-    gateway=None,
-    persisted=True,
-    on_source_delete=DeletePolicy.PRESERVE,
-    on_target_delete=DeletePolicy.PRESERVE,
-    mirrored=False,
-):
+    name: str,
+    *targets: str,
+    cardinality: Literal["one", "many"] = "one",
+    authority: RelationAuthority = RelationAuthority.SOURCE,
+    gateway: str | None = None,
+    persisted: bool = True,
+    on_source_delete: DeletePolicy = DeletePolicy.PRESERVE,
+    on_target_delete: DeletePolicy = DeletePolicy.PRESERVE,
+    mirrored: bool = False,
+) -> RelationMutationContract:
     effects = (
         (MutationEffectType.UPSERT, MutationEffectType.UNLINK)
         if mirrored
@@ -330,14 +332,14 @@ PERSISTED_ENTITY_KINDS = frozenset(ENTITY_MUTATION_CONTRACTS)
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
 # @matrix mutations : contract lookup
-def mutation_contract(kind):
+def mutation_contract(kind: str) -> EntityMutationContract | None:
     return ENTITY_MUTATION_CONTRACTS.get(kind)
 
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
 # @matrix mutations : completeness contract validation
-def validate_mutation_contracts():
+def validate_mutation_contracts() -> list[str]:
     """Return stable validation messages for registry drift."""
     errors = []
     known = set(ENTITY_MUTATION_CONTRACTS)

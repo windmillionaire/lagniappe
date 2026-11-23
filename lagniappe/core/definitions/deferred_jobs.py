@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-
 DEFERRED_JOB_VERSION = 2
 SUPPORTED_DEFERRED_JOB_VERSIONS = frozenset({1, DEFERRED_JOB_VERSION})
 DEFERRED_JOB_PAYLOAD_LIMIT_BYTES = 750 * 1024
@@ -109,7 +108,7 @@ class DeferredJobResult:
     # @testable true
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_checkpoints_before_apply_and_resumes_without_prepare
     # @pair deferred-jobs:delivery-result
-    def success(self):
+    def success(self) -> bool:
         return self.state in {
             DeferredJobRunState.COMPLETE,
             DeferredJobRunState.ACTIVE,

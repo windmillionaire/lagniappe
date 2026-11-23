@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any
 
-
 INGRESS_FORMAT_VERSION = 1
 INGRESS_BATCH_SIZE = 25
 
@@ -101,7 +100,7 @@ class IngressMutationPlan:
     entities: tuple[Any, ...] = field(default=(), repr=False, compare=False)
 
     # @testable infrastructure
-    def to_dict(self):
+    def to_dict(self) -> dict[str, object]:
         return {
             "row_index": self.row_index,
             "idempotency_key": self.idempotency_key,
@@ -145,7 +144,7 @@ class IngressProgress:
     poll_after_ms: int | None
 
     # @testable infrastructure
-    def to_dict(self):
+    def to_dict(self) -> dict[str, object]:
         return {
             "stage": self.stage,
             "run_status": self.run_status,

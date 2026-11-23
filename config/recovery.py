@@ -1,15 +1,15 @@
 """Canonical settings export and recovery-file validation."""
 
-from collections.abc import Mapping
 import json
 import os
-from pathlib import Path
 import re
 import tempfile
+from collections.abc import Mapping, MutableMapping
+from pathlib import Path
 from urllib.parse import urlparse
 
-from config.ai_settings import AI_PERSISTED_SETTING_KEYS
 from config.ai_email import AIEmailConfigurationError, normalize_ai_email_config
+from config.ai_settings import AI_PERSISTED_SETTING_KEYS
 from config.constants import (
     DEFAULT_DEPLOYMENT_SETTINGS,
     REDIS_CA_CERT_RELATIVE_PATH,
@@ -17,7 +17,6 @@ from config.constants import (
 )
 from config.public_pages import PUBLIC_PAGE_SETTING_KEYS
 from config.redis import redis_tls_enabled, validate_redis_ca_cert
-
 
 CONFIG_KIND = "lagniappe-settings"
 CONFIG_SCHEMA_VERSION = 3
@@ -69,13 +68,13 @@ def _mapping(value, name):
 # @matrix config : current-schema messaging-removal recovery-export
 # @pair public-pages:recovery-export
 def build_recovery_snapshot(
-    settings,
+    settings: Mapping[str, object],
     *,
-    deployment_settings=None,
-    ai_settings=None,
-    public_page_settings=None,
-    redis_ca_pem=None,
-):
+    deployment_settings: Mapping[str, object] | None = None,
+    ai_settings: Mapping[str, object] | None = None,
+    public_page_settings: Mapping[str, object] | None = None,
+    redis_ca_pem: str | None = None,
+) -> dict[str, object]:
     """Return a complete flat recovery snapshot without redacting persisted values."""
     snapshot = dict(settings)
     snapshot.pop("BUILD_ID", None)
@@ -158,7 +157,7 @@ def build_recovery_snapshot(
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_recovery_display_redacts_nested_and_flat_secrets_without_mutation
 # @matrix config : recovery-display secrets
-def redact_settings_for_display(settings):
+def redact_settings_for_display(settings: Mapping[str, object]) -> dict[str, object]:
     """Return a redacted browser-display copy without mutating the source mapping."""
 
     # @testable false
@@ -240,7 +239,7 @@ def _require_project_resource(value, name, project_id):
 # @tests tests_tooling/test_003_config.py::test_recovery_upgrades_schema_2_and_discards_legacy_messaging_config
 # @tests tests_tooling/test_003_config.py::test_recovery_accepts_and_redacts_optional_ai_email_config
 # @matrix config : site-policy ai-email authentication-email current-schema messaging-removal project-identity project-number recovery-validation required-settings schema-upgrade secrets
-def validate_recovery_document(settings):
+def validate_recovery_document(settings: Mapping[str, object]) -> dict[str, object]:
     """Validate and normalize a canonical recovery document before provider access."""
     from config.locations import (
         normalize_app_engine_location,
@@ -465,7 +464,9 @@ def validate_recovery_document(settings):
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_recovery_redis_ca_round_trips_through_one_file
 # @matrix config : recovery-export redis-tls
-def read_recovery_redis_ca(settings, *, app_dir=None):
+def read_recovery_redis_ca(
+    settings: Mapping[str, object], *, app_dir: str | Path | None = None
+) -> str | None:
     """Read the validated Redis CA PEM for inclusion in a recovery snapshot."""
     if not redis_tls_enabled(settings):
         return None
@@ -479,7 +480,9 @@ def read_recovery_redis_ca(settings, *, app_dir=None):
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_recovery_redis_ca_round_trips_through_one_file
 # @matrix config : certificate-validation recovery-restore redis-tls
-def materialize_recovery_redis_ca(settings, *, app_dir=None):
+def materialize_recovery_redis_ca(
+    settings: MutableMapping[str, object], *, app_dir: str | Path | None = None
+) -> Path | None:
     """Atomically restore the managed Redis CA file before endpoint validation."""
     recovered = settings
     if not redis_tls_enabled(recovered):

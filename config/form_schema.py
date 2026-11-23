@@ -2,7 +2,6 @@
 
 from copy import deepcopy
 
-
 SCHEMA_FORMAT_VERSION = 1
 _INPUT_TYPES = frozenset({"text", "date", "time", "number", "email", "tel"})
 _FIELD_TYPES = frozenset(
@@ -232,12 +231,12 @@ def _canonical_field(definition, *, table_column=False, discard_invalid=False):
 # @covered-by lagniappe/core/properties/schema.py::canonicalize_schema
 # @reason runtime-neutral implementation is exercised through the public schema canonicalizer
 def normalize_form_schema(
-    value,
+    value: object,
     *,
-    form_type=None,
-    snapshot=False,
-    discard_invalid=False,
-):
+    form_type: str | None = None,
+    snapshot: bool = False,
+    discard_invalid: bool = False,
+) -> list[dict[str, object]]:
     """Return the current durable schema projection without mutating input."""
     del snapshot
     if not isinstance(value, list):

@@ -1,8 +1,8 @@
 """MCP deployment settings and the supported public OAuth clients."""
 
 import re
+from collections.abc import Mapping
 from urllib.parse import urlsplit
-
 
 # Accepted only for credentials and clients issued before scope negotiation ended.
 LEGACY_SCOPE = "mcp:use"
@@ -25,7 +25,7 @@ REFRESH_SECONDS = 30 * 24 * 60 * 60
 # @testable true
 # @tests tests_tooling/test_012c_remote_mcp_config.py::test_mcp_connection_name_is_safe_for_copyable_commands
 # @matrix mcp-oauth : configuration validation
-def mcp_connection_name(value="lagniappe-remote"):
+def mcp_connection_name(value: object = "lagniappe-remote") -> str:
     """Validate the connection alias embedded in user-facing shell commands."""
     if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", value):
         raise ValueError(
@@ -37,7 +37,7 @@ def mcp_connection_name(value="lagniappe-remote"):
 
 # @testable false
 # @covered-by config/remote_mcp.py::normalize_mcp_config
-def https_url(value, *, origin=False):
+def https_url(value: object, *, origin: bool = False) -> str:
     """Require an exact, canonical HTTPS URL rather than normalizing identity."""
     if not isinstance(value, str) or not value or len(value) > 2048:
         raise ValueError("Remote MCP requires an absolute HTTPS URL")
@@ -66,7 +66,7 @@ def https_url(value, *, origin=False):
 # @testable true
 # @tests tests_tooling/test_012c_remote_mcp_config.py::test_remote_mcp_configuration_is_opt_in_and_exact
 # @matrix mcp-oauth : configuration validation
-def normalize_mcp_config(settings):
+def normalize_mcp_config(settings: Mapping[str, object]) -> dict[str, str | None]:
     """Validate the installed endpoint and identity, including while AI is off."""
     name = mcp_connection_name(settings.get("MCP_NAME", "lagniappe-remote"))
     resource = settings.get("MCP_RESOURCE")
@@ -88,7 +88,7 @@ def normalize_mcp_config(settings):
 # @testable true
 # @tests tests_tooling/test_012c_remote_mcp_config.py::test_remote_mcp_configuration_is_opt_in_and_exact
 # @matrix mcp-oauth : configuration validation
-def mcp_issuer(settings):
+def mcp_issuer(settings: Mapping[str, object]) -> str:
     """Use the application's canonical origin for OAuth and workload identity."""
     domain = settings.get("CUSTOM_DOMAIN")
     issuer = f"https://{domain}" if domain else settings.get("APP_URL")

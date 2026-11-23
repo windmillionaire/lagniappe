@@ -1,8 +1,9 @@
 """Shared Redis connection configuration for setup and application runtime."""
 
-from collections.abc import Mapping
-from pathlib import Path
 import ssl
+from collections.abc import Mapping
+from os import PathLike
+from pathlib import Path
 
 
 # @testable false
@@ -26,7 +27,7 @@ def _setting(settings, name, default=None):
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_redis_client_kwargs_support_verified_tls
 # @matrix config : redis-tls settings
-def redis_tls_enabled(settings):
+def redis_tls_enabled(settings: object) -> bool:
     """Return the normalized Redis TLS flag from a mapping or config object."""
     value = _setting(settings, "REDIS_TLS", False)
     if isinstance(value, bool):
@@ -48,13 +49,15 @@ def redis_tls_enabled(settings):
 # @tests tests_tooling/test_003_config.py::test_redis_client_kwargs_support_verified_tls
 # @tests tests_tooling/test_003_config.py::test_redis_tls_requires_a_valid_ca_bundle
 # @matrix config : certificate-validation failure redis-tls
-def validate_redis_ca_cert(path, *, app_dir=None):
+def validate_redis_ca_cert(path: object, *, app_dir: str | Path | None = None) -> Path:
     """Resolve and validate a PEM CA bundle, returning its absolute path."""
     if not path:
         raise RedisTLSConfigurationError(
             "REDIS_TLS is enabled but REDIS_CA_CERT is not configured."
         )
 
+    if not isinstance(path, (str, PathLike)):
+        raise RedisTLSConfigurationError("Redis CA certificate must be a filesystem path.")
     cert_path = Path(path).expanduser()
     if not cert_path.is_absolute():
         if app_dir is None:
@@ -83,7 +86,9 @@ def validate_redis_ca_cert(path, *, app_dir=None):
 # @tests tests_tooling/test_003_config.py::test_redis_client_kwargs_support_verified_tls
 # @tests tests_tooling/test_003_config.py::test_redis_tls_requires_a_valid_ca_bundle
 # @matrix config : redis-connection redis-tls
-def redis_client_kwargs(settings, *, app_dir=None, **connection_options):
+def redis_client_kwargs(
+    settings: object, *, app_dir: str | Path | None = None, **connection_options: object
+) -> dict[str, object]:
     """Build redis-py client options shared by setup and runtime clients."""
     options = {
         "host": _setting(settings, "REDIS_HOST"),

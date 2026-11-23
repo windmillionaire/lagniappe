@@ -380,7 +380,8 @@ def test_main_install_ai_email_offer_requires_custom_domain_and_resend(
             }
         }
     )
-    monkeypatch.setattr(config, "SETTINGS", settings)
+    monkeypatch.setitem(vars(config), "SETTINGS", settings)
+    monkeypatch.setattr(ai_email.FORMATTER, "_initialized", True)
 
     assert ai_email.setup_ai_email() is None
     output = capsys.readouterr().out
@@ -445,7 +446,8 @@ def test_ai_email_setup_saves_deploys_then_enables_webhook(
         },
         save=lambda: events.append("save"),
     )
-    monkeypatch.setattr(config, "SETTINGS", settings)
+    monkeypatch.setitem(vars(config), "SETTINGS", settings)
+    monkeypatch.setattr(ai_email.FORMATTER, "_initialized", True)
     monkeypatch.setattr(
         verify,
         "prepare_existing_installation",
@@ -565,7 +567,8 @@ def test_ai_email_rerun_reuses_saved_inbound_api_key_without_prompt(
         },
         save=lambda: None,
     )
-    monkeypatch.setattr(config, "SETTINGS", settings)
+    monkeypatch.setitem(vars(config), "SETTINGS", settings)
+    monkeypatch.setattr(ai_email.FORMATTER, "_initialized", True)
 
     class Client:
         def __init__(self, api_key):
@@ -637,7 +640,8 @@ def test_ai_email_disable_turns_off_provider_before_saving_and_deploying(
         },
         save=lambda: events.append("save"),
     )
-    monkeypatch.setattr(config, "SETTINGS", settings)
+    monkeypatch.setitem(vars(config), "SETTINGS", settings)
+    monkeypatch.setattr(ai_email.FORMATTER, "_initialized", True)
 
     class Client:
         def __init__(self, key):

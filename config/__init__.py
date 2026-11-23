@@ -1,14 +1,14 @@
-from collections.abc import Mapping
-from dataclasses import dataclass, field
-from enum import Enum
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -47,17 +47,17 @@ class Directory(Enum):
     TEST_REPORTS = REPORTS / "test_reports"
     SITE_IMAGES = APP_DIR / "lagniappe/web/static/images"
 
-    def clean(self):
+    def clean(self) -> None:
         if self.value.exists():
             shutil.rmtree(self.value)
 
-    def get_or_create(self):
+    def get_or_create(self) -> Path:
         if not self.value.exists():
             self.value.mkdir(parents=True, exist_ok=True)
 
         return self.value
 
-    def create(self):
+    def create(self) -> Path:
         return self.get_or_create()
 
 
@@ -71,7 +71,7 @@ class Environment(Enum):
 # @covered-by config/__init__.py::File.load
 # @covered-by installer/doctor.py::run_doctor
 # @reason shared saved-settings decoding is exercised by normal loading and read-only diagnostics
-def decode_app_settings(data):
+def decode_app_settings(data: Mapping[str, object]) -> dict[str, object]:
     """Decode saved scalar/JSON strings while preserving native YAML values."""
     decoded = dict(data)
     decoded.pop("BUILD_ID", None)
@@ -104,16 +104,16 @@ class File(Enum):
     TEST_SESSION_LOCK = Directory.REPORTS.value / "test-session.lock"
 
     @property
-    def convert(self):
+    def convert(self) -> bool:
         return self.name == "APP_SETTINGS_YAML"
 
-    def exists(self):
+    def exists(self) -> bool:
         return self.value.exists()
 
     # @testable true
     # @tests tests_tooling/test_003_config.py::test_atomic_config_write_preserves_valid_file_and_restricts_secrets
     # @matrix config : permissions transactional-state utf8
-    def save(self, data):
+    def save(self, data: Mapping[str, object]) -> bool:
         if self.name.endswith("_YAML"):
             content = self._serialize_yaml(data)
         elif self.name.endswith("_JSON"):
@@ -129,7 +129,7 @@ class File(Enum):
     # @testable true
     # @tests tests_tooling/test_003_config.py::test_python_config_package_resolves_expected_repo_files
     # @matrix config : config-files parsing
-    def load(self):
+    def load(self) -> dict[str, object]:
         if not self.exists():
             return {}
 
@@ -143,10 +143,12 @@ class File(Enum):
     # @testable false
     # @covered-by config/__init__.py::File.load
     # @reason YAML parsing adapter is owned by the public file loader
-    def _load_from_yaml(self):
+    def _load_from_yaml(self) -> dict[str, object]:
         with open(self.value, encoding="utf-8", newline="") as f:
             data = yaml.safe_load(f) or {}
 
+        if not isinstance(data, dict):
+            raise ValueError(f"{self.value.name} must contain a mapping")
         if not self.convert:
             return data
 
@@ -159,7 +161,7 @@ class File(Enum):
         if not data:
             raise ValueError("Nothing to save")
 
-        yaml_data = data.copy()
+        yaml_data = dict(data)
         if self.convert:
             yaml_data.pop("BUILD_ID", None)
             for key, value in yaml_data.items():
@@ -180,9 +182,12 @@ class File(Enum):
     # @testable false
     # @covered-by config/__init__.py::File.load
     # @reason JSON parsing adapter is owned by the public file loader
-    def _load_from_json(self):
+    def _load_from_json(self) -> dict[str, object]:
         with open(self.value, encoding="utf-8", newline="") as f:
-            return json.load(f)
+            data = json.load(f)
+        if not isinstance(data, dict):
+            raise ValueError(f"{self.value.name} must contain a mapping")
+        return data
 
     # @testable false
     # @covered-by config/__init__.py::File.save
@@ -360,7 +365,7 @@ def _generation_source_checksum():
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_generation_manifest_tracks_constants_and_required_outputs
 # @matrix config setup : completeness generation source-marker
-def write_generation_manifest():
+def write_generation_manifest() -> bool:
     """Record the constants generation after every output has been persisted."""
     _require_generation_files()
     source_path = GENERATION_SOURCE_FILE.relative_to(APP_DIR).as_posix()
@@ -380,7 +385,7 @@ def write_generation_manifest():
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_generation_manifest_tracks_constants_and_required_outputs
 # @matrix config deploy : completeness generation source-marker
-def verify_generation_manifest():
+def verify_generation_manifest() -> bool:
     """Fail when required outputs or their constants generation are stale."""
     try:
         manifest = File.GENERATION_JSON.load()
@@ -512,14 +517,14 @@ def load_runtime_settings(environment: Environment | str) -> RuntimeSettings:
             if environment == Environment.DEVELOPMENT
             else "test_settings"
         )
-        overrides = development.get(key, {})
+        overrides = _dev_section(development, key)
     return _project_runtime_settings(app_settings, overrides, environment)
 
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_saved_settings_reader_preserves_raw_values_without_loading_a_draft
 # @matrix config : config-files parsing
-def read_saved_app_settings():
+def read_saved_app_settings() -> dict[str, object]:
     """Read canonical persisted values for configuration display and recovery."""
     with open(
         File.APP_SETTINGS_YAML.value, encoding="utf-8", newline=""
@@ -529,13 +534,23 @@ def read_saved_app_settings():
     return data
 
 
+def _dev_section(document: Mapping[str, object], name: str) -> dict[str, object]:
+    section = document.get(name, {})
+    if not isinstance(section, dict):
+        raise ValueError(f"Development settings section {name!r} must contain a mapping")
+    return section
+
+
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_settings_drafts_own_documents_and_preserve_internal_aliases
 # @matrix config : configuration transactional-state
 class SettingsDraft:
     """Mutable generated documents owned by one installer or runner session."""
 
-    def __init__(self):
+    RECOVERY_MODE: bool
+    _SETUP_ENABLED_GOOGLE_CLOUD_APIS: set[str]
+
+    def __init__(self) -> None:
         self.DEPLOY = File.APP_YAML.load()
         self.APP = File.APP_SETTINGS_YAML.load()
         self.DEV = File.DEV_YAML.load()
@@ -543,14 +558,14 @@ class SettingsDraft:
         self.INDEX = File.INDEX_YAML.load()
         self.MANIFEST = File.MANIFEST_JSON.load()
         self.BROWSER_PROTOCOL = File.BROWSER_PROTOCOL_JSON.load()
-        self.GCLOUD_CONFIG = self.DEV.get("gcloud_config", {})
-        self.DEV_CONFIG = self.DEV.get("dev_settings", {})
-        self.TEST_CONFIG = self.DEV.get("test_settings", {})
+        self.GCLOUD_CONFIG = _dev_section(self.DEV, "gcloud_config")
+        self.DEV_CONFIG = _dev_section(self.DEV, "dev_settings")
+        self.TEST_CONFIG = _dev_section(self.DEV, "test_settings")
 
     # @testable true
     # @tests tests_tooling/test_003_config.py::test_draft_save_preserves_identity_and_publishes_only_selected_files
     # @matrix config : config-files transactional-state
-    def save(self, *file_refs):
+    def save(self, *file_refs: File) -> tuple[str, ...]:
         """Persist only changed selected files, then commit one generation manifest."""
         selected = tuple(file_refs) or GENERATION_FILES
         invalid = [
@@ -583,14 +598,14 @@ class SettingsDraft:
     # @testable false
     # @covered-by config/__init__.py::read_saved_app_settings
     # @reason compatibility adapter for persisted configuration exports
-    def app_settings(self):
+    def app_settings(self) -> dict[str, object]:
         return read_saved_app_settings()
 
     # @testable true
     # @tests tests_tooling/test_003_config.py::test_runtime_and_draft_projections_preserve_environment_precedence
     # @tests tests_tooling/test_003_config.py::test_draft_projections_observe_edits_without_saving_or_aliasing
     # @matrix config : configuration transactional-state
-    def snapshot(self, environment):
+    def snapshot(self, environment: str | Environment) -> RuntimeSettings:
         """Project current draft values without reading or writing saved settings."""
         environment = Environment(environment)
         overrides = {
@@ -604,21 +619,21 @@ class SettingsDraft:
     # @testable false
     # @covered-by config/__init__.py::SettingsDraft.snapshot
     # @reason compatibility adapter for an independent production draft projection
-    def app_config(self):
+    def app_config(self) -> dict[str, object]:
         return self.snapshot(Environment.PRODUCTION).as_dict()
 
     @property
     # @testable false
     # @covered-by config/__init__.py::SettingsDraft.snapshot
     # @reason compatibility adapter for an independent development draft projection
-    def dev_config(self):
+    def dev_config(self) -> dict[str, object]:
         return self.snapshot(Environment.DEVELOPMENT).as_dict()
 
     @property
     # @testable false
     # @covered-by config/__init__.py::SettingsDraft.snapshot
     # @reason compatibility adapter for an independent testing draft projection
-    def test_config(self):
+    def test_config(self) -> dict[str, object]:
         return self.snapshot(Environment.TESTING).as_dict()
 
 

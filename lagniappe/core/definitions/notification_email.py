@@ -14,7 +14,7 @@ class NotificationEmailMode(Enum):
     # @tests tests_unit/test_029a_notification_email_policy.py::test_notification_email_preference_defaults_and_eligibility
     # @pair notification-email:preference
     @classmethod
-    def name_for(cls, value):
+    def name_for(cls, value: object) -> str:
         """Normalize an enum or exact stored/form name."""
         if isinstance(value, cls):
             return value.name

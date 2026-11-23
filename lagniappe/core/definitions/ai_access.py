@@ -17,7 +17,7 @@ class AI(Enum, metaclass=DefaultEnum):
 
     DEFAULT = NONE
 
-    def implies(self, required):
+    def implies(self, required: object) -> bool:
         """Return whether this tier includes a concrete required AI capability."""
         return bool(
             isinstance(required, AI)
@@ -27,7 +27,7 @@ class AI(Enum, metaclass=DefaultEnum):
         )
 
     @classmethod
-    def name_for(cls, value):
+    def name_for(cls, value: object) -> str:
         """Normalize an enum or exact stored/form name, rejecting unknown values."""
         if isinstance(value, cls):
             return value.name

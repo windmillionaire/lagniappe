@@ -1,12 +1,23 @@
-from collections.abc import Mapping
-from contextlib import suppress
+
 import traceback
+from collections.abc import Iterable, Mapping
+from contextlib import suppress
 from pathlib import Path
+from typing import Protocol
 
 from flask import has_request_context, request
 
 from lagniappe import CONFIG
+
 from . import UnloadedRelationError, capture
+
+
+class _RelationProperty(Protocol):
+    _reported_unloaded_keys: tuple[str, tuple[str, ...]] | None
+
+
+
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -116,7 +127,9 @@ def _property_context(prop):
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_related_single_value_reports_unloaded_relation_without_loading
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_related_value_strict_mode_raises_after_reporting
 # @matrix relations : diagnostics strict-mode unloaded-fallback
-def capture_unloaded_relation(prop, *, relation_type, keys):
+def capture_unloaded_relation(
+    prop: _RelationProperty, *, relation_type: str, keys: Iterable[object]
+) -> None:
     """Capture a diagnostic when relation access would have lazy-loaded."""
     if not _unloaded_relations_tracing_enabled():
         return

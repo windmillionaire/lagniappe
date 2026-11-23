@@ -1,11 +1,10 @@
 """Shared Cloud Storage naming and metadata contract."""
 
-from collections.abc import Mapping
-from typing import SupportsIndex, SupportsInt, TypedDict, TYPE_CHECKING
-
 import hashlib
 import logging
 import time
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, SupportsIndex, SupportsInt, TypedDict
 from urllib.parse import urlparse
 
 if TYPE_CHECKING:
@@ -166,7 +165,7 @@ def expected_storage_cors(config: object) -> list[_CorsRule]:
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_cors_preserves_standing_and_exact_origin_lifecycles
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_storage_provisioning_is_bucket_scoped_and_idempotent
 # @matrix storage hosted-e2e : cors provisioning
-def has_browser_cors_origin(rules, origin):
+def has_browser_cors_origin(rules: list[_CorsRule] | None, origin: str | None) -> bool:
     """Check for the explicit origin with all methods and headers used by the app."""
     if not origin:
         return False
@@ -288,7 +287,9 @@ def _patch_bucket_metadata(bucket):
 # @tests tests_unit/test_018_database_assets.py::test_configure_bucket_enables_versioning_and_reconciles_noncurrent_lifecycle
 # @tests tests_unit/test_018_database_assets.py::test_configure_bucket_retries_transient_patch_failure
 # @matrix storage : bucket-metadata cors idempotent lifecycle-preservation object-versioning storage-class transient-retry
-def configure_storage_bucket(bucket: Bucket, config: object, *, preserve_cors_origin: str | None = None) -> bool:
+def configure_storage_bucket(
+    bucket: Bucket, config: object, *, preserve_cors_origin: str | None = None
+) -> bool:
     """Reconcile runtime metadata and the setup-owned version-retention rule."""
     changed = False
 

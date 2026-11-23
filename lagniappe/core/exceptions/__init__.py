@@ -1,12 +1,11 @@
 """Custom exceptions and error capture (Sentry in prod, console in dev)."""
 
+import sys
+import traceback
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
-
 from datetime import datetime
 from pprint import pformat
-import traceback
-import sys
+from typing import TYPE_CHECKING
 
 from config.deployment import DeploymentSettingsError as DeploymentSettingsError
 from lagniappe import CONFIG
@@ -14,12 +13,12 @@ from lagniappe import CONFIG
 if TYPE_CHECKING:
     from sentry_sdk._types import LogLevelStr
 
+from .frames import extract_entity_from_frames, extract_local_variables
 from .request import (
     extract_request_info,
     sanitize_error_context,
     sanitize_sentry_event,
 )
-from .frames import extract_local_variables, extract_entity_from_frames
 from .utility import format_debug_context_for_template
 
 
@@ -29,6 +28,8 @@ class AISettingsError(ValueError):
 
 class ValidationError(Exception):
     """Raised when entity data fails validation (import, form submission)."""
+
+    context: dict[str, object]
 
 
 # @testable infrastructure
@@ -42,7 +43,7 @@ class MutationConflict(ValidationError):
 class AIException(Exception):
     """Raised when AI generation fails or returns invalid output."""
 
-    def __init__(self, message, context=None):
+    def __init__(self, message: str, context: dict[str, object] | None = None) -> None:
         super().__init__(message)
         self.context = context or {}
 
@@ -71,7 +72,7 @@ class PropertyError(Exception):
     for debugging. The original exception is chained (__cause__).
     """
 
-    def __init__(self, message, entity=None):
+    def __init__(self, message: str, entity: object | None = None) -> None:
         super().__init__(message)
         self.entity = entity
 
@@ -120,8 +121,11 @@ def get_debug_context(error: BaseException) -> dict[str, object]:
 # @matrix deferred-jobs : sentry terminal-delivery
 # @matrix error-handling : privacy redaction request-context sentry terminal-delivery
 def capture(
-    error: object, context: Mapping[str, object] | None = None,
-    level: LogLevelStr = "error", *, wait_for_delivery: bool = False,
+    error: object,
+    context: Mapping[str, object] | None = None,
+    level: LogLevelStr = "error",
+    *,
+    wait_for_delivery: bool = False,
 ) -> None:
     """Capture an error, sending to Sentry in production or printing in dev."""
     if CONFIG.capture_errors:

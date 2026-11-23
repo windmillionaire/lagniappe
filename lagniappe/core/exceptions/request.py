@@ -1,12 +1,14 @@
 """Bound and sanitize request context used in error reports."""
 
 from collections.abc import Mapping
-from typing import overload
+from typing import TYPE_CHECKING, cast, overload
+
+if TYPE_CHECKING:
+    from sentry_sdk._types import Event, Hint
 import re
 from urllib.parse import urlsplit
 
 from flask import has_request_context, request
-
 
 REDACTED = "[REDACTED]"
 MAX_CONTEXT_DEPTH = 8
@@ -306,7 +308,7 @@ def _bounded_content_length(content_length):
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_request_info_uses_bounded_structural_allowlist
 # @matrix error-reporting : payload-bounds privacy request-context
-def extract_request_info():
+def extract_request_info() -> dict[str, object] | None:
     """Extract bounded request structure without payload or identifier values."""
     if not has_request_context():
         return None
@@ -349,7 +351,7 @@ def extract_request_info():
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_sentry_event_sanitizer_removes_sdk_request_payloads
 # @matrix error-reporting : payload-bounds privacy redaction request-context sentry-event
-def sanitize_sentry_event(event, _hint=None):
+def sanitize_sentry_event(event: Event, _hint: Hint | None = None) -> Event:
     """Apply the privacy boundary to SDK-generated Sentry event fields."""
     if not isinstance(event, Mapping):
         return event
@@ -393,7 +395,7 @@ def sanitize_sentry_event(event, _hint=None):
         if key in sanitized:
             sanitized[key] = sanitize_error_context(sanitized[key])
 
-    return sanitized
+    return cast("Event", sanitized)
 
 
 # @testable false
@@ -416,7 +418,7 @@ def _is_expected_ai_document_limit(event):
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_sentry_filter_drops_only_expected_ai_document_page_limit
 # @matrix ai error-reporting files : expected-provider-failure pdf-page-limit privacy
-def filter_sentry_event(event, hint=None):
+def filter_sentry_event(event: Event, hint: Hint | None = None) -> Event | None:
     """Drop known user-input limits, then sanitize every reported error."""
     if _is_expected_ai_document_limit(event):
         return None
