@@ -463,6 +463,8 @@ def test_task_reuses_pinned_version(monkeypatch):
 def test_startup_checks_identity_and_optional_redis(monkeypatch):
     app = {
         "EXPERIMENTS_ENABLED": True,
+        "REDIS_HOST": "redis.example.test",
+        "REDIS_PORT": "6379",
         "EXPERIMENTS_PROJECT": PROJECT,
         "GOOGLE_CLOUD_PROJECT": PROJECT,
         "ADMIN_EMAIL": "owner@example.com",

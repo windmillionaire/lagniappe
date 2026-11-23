@@ -1,12 +1,17 @@
-from runner import presentation as ui
-from runner.presentation import output as print
-
 import json
 import os
+from typing import TypedDict
 
-from runner.context import GCLOUD_CLI, format_command
+from runner import presentation as ui
 from runner.console import wrap_text
+from runner.context import GCLOUD_CLI, format_command
+from runner.presentation import output as print
 from runner.process import run_command
+
+
+class GcloudConfiguration(TypedDict):
+    name: str
+    properties: dict[str, dict[str, str]]
 
 
 # @testable true
@@ -16,13 +21,13 @@ from runner.process import run_command
 # @matrix auth development setup testing : activation gcloud-config gcloud-token unconfigured validation
 def activate_repository_gcloud(
     *,
-    ensure_adc=False,
-    ensure_cli_token=False,
-    allow_cli_login=False,
-    allow_runtime_adc=False,
-    allow_adc_login=None,
-    select_adc_target=False,
-):
+    ensure_adc: bool = False,
+    ensure_cli_token: bool = False,
+    allow_cli_login: bool = False,
+    allow_runtime_adc: bool = False,
+    allow_adc_login: bool | None = None,
+    select_adc_target: bool = False,
+) -> bool:
     """Activate the complete gcloud/ADC target saved for this repository."""
     from config import SETTINGS
 
@@ -94,10 +99,10 @@ def activate_repository_gcloud(
 # @testable false
 # @covered-by runner/gcloud.py::config_gcloud
 # @reason gcloud CLI query wrapper exercised through configuration switching
-def list_configurations():
+def list_configurations() -> list[GcloudConfiguration]:
     """List all available gcloud configurations."""
     result = run_command(
-        [GCLOUD_CLI, "config", "configurations", "list", "--format=json"]
+        [GCLOUD_CLI or "gcloud", "config", "configurations", "list", "--format=json"]
     )
     configs = json.loads(result.stdout)
     return configs
@@ -106,11 +111,11 @@ def list_configurations():
 # @testable false
 # @covered-by runner/gcloud.py::config_gcloud
 # @reason gcloud CLI query wrapper exercised through configuration switching
-def get_active_configuration():
+def get_active_configuration() -> str:
     """Get the currently active configuration name."""
     result = run_command(
         [
-            GCLOUD_CLI,
+            GCLOUD_CLI or "gcloud",
             "config",
             "configurations",
             "list",
@@ -124,9 +129,9 @@ def get_active_configuration():
 # @testable false
 # @covered-by runner/gcloud.py::config_gcloud
 # @reason gcloud CLI query wrapper exercised through configuration switching
-def get_authenticated_accounts():
+def get_authenticated_accounts() -> list[str]:
     """Get list of authenticated accounts."""
-    result = run_command([GCLOUD_CLI, "auth", "list", "--format=value(account)"])
+    result = run_command([GCLOUD_CLI or "gcloud", "auth", "list", "--format=value(account)"])
     accounts = [acc.strip() for acc in result.stdout.split("\n") if acc.strip()]
     return accounts
 
@@ -134,7 +139,7 @@ def get_authenticated_accounts():
 # @testable false
 # @covered-by runner/gcloud.py::config_gcloud
 # @reason small authentication helper used by gcloud configuration switching
-def is_account_authenticated(account):
+def is_account_authenticated(account: str) -> bool:
     """Check if a specific account is authenticated."""
     authenticated_accounts = get_authenticated_accounts()
     return account in authenticated_accounts
@@ -143,13 +148,13 @@ def is_account_authenticated(account):
 # @testable false
 # @covered-by runner/gcloud.py::config_gcloud
 # @reason console guidance around authentication failures
-def check_account_authentication(account):
+def check_account_authentication(account: str) -> None:
     """Check if account is authenticated, exit with instructions if not."""
     if not is_account_authenticated(account):
         print(ui.error("The saved account is not authenticated with gcloud"))
         print(ui.value("Account", account, verbatim=True))
         print(wrap_text("\nTo authenticate this account, run:"))
-        print(f"\n  {ui.literal(format_command([GCLOUD_CLI, 'auth', 'login', account]))}")
+        print(f"\n  {ui.literal(format_command([GCLOUD_CLI or 'gcloud', 'auth', 'login', account]))}")
         print(wrap_text("\nThis will open a browser window where you can sign in."))
         print(wrap_text("\nAuthenticated accounts:"))
         authenticated = get_authenticated_accounts()
@@ -164,17 +169,17 @@ def check_account_authentication(account):
 # @testable false
 # @covered-by runner/gcloud.py::config_gcloud
 # @reason gcloud CLI mutation wrapper exercised through configuration switching
-def create_configuration(name, account, project):
+def create_configuration(name: str, account: str, project: str) -> None:
     """Create a new gcloud configuration."""
     print(wrap_text(f"\nCreating configuration '{name}'..."))
     run_command(
-        [GCLOUD_CLI, "config", "configurations", "create", name, "--no-activate"]
+        [GCLOUD_CLI or "gcloud", "config", "configurations", "create", name, "--no-activate"]
     )
     run_command(
-        [GCLOUD_CLI, "config", "set", "account", account, "--configuration", name]
+        [GCLOUD_CLI or "gcloud", "config", "set", "account", account, "--configuration", name]
     )
     run_command(
-        [GCLOUD_CLI, "config", "set", "project", project, "--configuration", name]
+        [GCLOUD_CLI or "gcloud", "config", "set", "project", project, "--configuration", name]
     )
     print(ui.success(f"Configuration '{name}' created"))
 
@@ -182,17 +187,17 @@ def create_configuration(name, account, project):
 # @testable false
 # @covered-by runner/gcloud.py::config_gcloud
 # @reason gcloud CLI mutation wrapper exercised through configuration switching
-def activate_configuration(name):
+def activate_configuration(name: str) -> None:
     """Activate a specific gcloud configuration."""
     print(wrap_text(f"\nActivating configuration '{name}'..."))
-    run_command([GCLOUD_CLI, "config", "configurations", "activate", name])
+    run_command([GCLOUD_CLI or "gcloud", "config", "configurations", "activate", name])
 
 
 # @testable false
 # @covered-by runner/gcloud.py::config_gcloud
 # @reason gcloud CLI query wrapper exercised through configuration switching
-def get_configuration_value(key, configuration=None):
-    command = [GCLOUD_CLI, "config", "get-value", key]
+def get_configuration_value(key: str, configuration: str | None = None) -> str:
+    command = [GCLOUD_CLI or "gcloud", "config", "get-value", key]
     if configuration:
         command.extend(["--configuration", configuration])
     result = run_command(command)
@@ -202,7 +207,7 @@ def get_configuration_value(key, configuration=None):
 # @testable false
 # @covered-by runner/gcloud.py::config_gcloud
 # @reason property reconciliation branch inside gcloud configuration switching
-def ensure_configuration_properties(name, account, project):
+def ensure_configuration_properties(name: str, account: str, project: str) -> None:
     """Ensure an existing gcloud configuration points at the expected account/project."""
     current_account = get_configuration_value("account", configuration=name)
     current_project = get_configuration_value("project", configuration=name)
@@ -214,7 +219,7 @@ def ensure_configuration_properties(name, account, project):
             )
         )
         run_command(
-            [GCLOUD_CLI, "config", "set", "account", account, "--configuration", name]
+            [GCLOUD_CLI or "gcloud", "config", "set", "account", account, "--configuration", name]
         )
 
     if current_project != project:
@@ -224,14 +229,16 @@ def ensure_configuration_properties(name, account, project):
             )
         )
         run_command(
-            [GCLOUD_CLI, "config", "set", "project", project, "--configuration", name]
+            [GCLOUD_CLI or "gcloud", "config", "set", "project", project, "--configuration", name]
         )
 
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_gcloud_switcher_exports_project_for_child_processes
 # @matrix setup : env-export gcloud-config
-def verify_active_configuration(name, account, project, *, announce=True):
+def verify_active_configuration(
+    name: str, account: str, project: str, *, announce: bool = True
+) -> None:
     active = get_active_configuration()
     active_account = get_configuration_value("account")
     active_project = get_configuration_value("project")
@@ -273,7 +280,7 @@ def verify_active_configuration(name, account, project, *, announce=True):
 # @testable false
 # @covered-by runner/gcloud.py::config_gcloud
 # @reason console-only inspection helper
-def display_configurations():
+def display_configurations() -> None:
     """Display all configurations in a readable format."""
     configs = list_configurations()
     active = get_active_configuration()
@@ -302,7 +309,7 @@ def display_configurations():
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_gcloud_switcher_exports_project_for_child_processes
 # @matrix setup : env-export gcloud-config
-def config_gcloud(*, announce=True):
+def config_gcloud(*, announce: bool = True) -> None:
     from config import SETTINGS
 
     config = SETTINGS.GCLOUD_CONFIG

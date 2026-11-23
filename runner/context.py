@@ -1,12 +1,13 @@
 """Repository-local paths and external tools shared by setup and runners."""
 
-from pathlib import Path
-from types import MappingProxyType
 import os
 import shlex
 import shutil
 import subprocess
 import sys
+from collections.abc import Sequence
+from pathlib import Path
+from types import MappingProxyType
 
 from runner.uv_bootstrap import managed_uv_path
 
@@ -34,7 +35,9 @@ UV_CLI = managed_uv_path()
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_portable_runtime_paths_commands_and_virtualenv_instructions
 # @matrix setup : portability repository-root virtualenv
-def project_virtualenv_active(*, prefix=None, base_prefix=None):
+def project_virtualenv_active(
+    *, prefix: str | Path | None = None, base_prefix: str | Path | None = None
+) -> bool:
     """Return whether Python is running from this checkout's ``venv``."""
     prefix = Path(prefix or sys.prefix)
     base_prefix = Path(
@@ -54,7 +57,9 @@ def project_virtualenv_active(*, prefix=None, base_prefix=None):
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_portable_runtime_paths_commands_and_virtualenv_instructions
 # @matrix setup : generated-command portability
-def format_command(command, *, windows=None):
+def format_command(
+    command: Sequence[str | Path], *, windows: bool | None = None
+) -> str:
     """Render an argument-list command for the operator's supported shell."""
     command = [str(part) for part in command]
     windows = os.name == "nt" if windows is None else windows
@@ -64,7 +69,9 @@ def format_command(command, *, windows=None):
 # @testable false
 # @covered-by runner/context.py::setup_command
 # @reason generic adapter is exercised through generated setup commands
-def python_command(script, *arguments, windows=None):
+def python_command(
+    script: str | Path, *arguments: str | Path, windows: bool | None = None
+) -> str:
     """Return an exact current-Python repository command."""
     return format_command(
         [sys.executable, REPOSITORY_ROOT / script, *arguments],
@@ -75,7 +82,7 @@ def python_command(script, *arguments, windows=None):
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_portable_runtime_paths_commands_and_virtualenv_instructions
 # @matrix setup : generated-command portability
-def setup_command(*arguments, windows=None):
+def setup_command(*arguments: str | Path, windows: bool | None = None) -> str:
     """Return the supported setup launcher invocation for the user's platform."""
     windows = os.name == "nt" if windows is None else windows
     launcher = r".\setup.cmd" if windows else "./setup.sh"
@@ -85,7 +92,7 @@ def setup_command(*arguments, windows=None):
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_portable_runtime_paths_commands_and_virtualenv_instructions
 # @matrix setup : instructions portability virtualenv
-def virtualenv_instructions():
+def virtualenv_instructions() -> str:
     """Return both supported environment-bootstrap/setup command forms."""
     return (
         "macOS/Linux terminal:\n"

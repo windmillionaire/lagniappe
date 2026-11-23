@@ -4,12 +4,8 @@ from __future__ import annotations
 
 import argparse
 import copy
-from contextlib import contextmanager
-from dataclasses import asdict, dataclass
-from datetime import datetime, UTC
 import hashlib
 import json
-from pathlib import Path
 import re
 import secrets
 import shutil
@@ -17,10 +13,16 @@ import sys
 import tempfile
 import time
 import xml.etree.ElementTree as ElementTree
+from collections.abc import Callable, Sequence
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import TypedDict
 
 import yaml
 
-from config import APP_DIR, File, SETTINGS, _atomic_write_text
+from config import APP_DIR, SETTINGS, File, _atomic_write_text
 from config.constants import (
     APP_HANDLERS,
     DEFAULT_TEST_PREFIX,
@@ -35,8 +37,8 @@ from config.storage import (
     has_browser_cors_origin,
     storage_bucket_names,
 )
-from runner.context import GCLOUD_CLI, GIT_CLI, NPM_CLI
 from runner import cloud_checkpoints
+from runner.context import GCLOUD_CLI, GIT_CLI, NPM_CLI
 from runner.frontend_build import GitFrontendBuildReader, inspect_frontend_build
 from runner.gcloud import activate_repository_gcloud
 from runner.process import run_command
@@ -92,6 +94,14 @@ class HostedE2EError(RuntimeError):
     """Raised when a hosted-E2E lifecycle invariant is not satisfied."""
 
 
+class ReleaseEvidence(TypedDict):
+    base: str
+    candidate: str
+    evidence: str
+    mode: str
+    source_snapshot: str
+
+
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_environment_rejects_retired_lifecycle
 # @matrix hosted-e2e : environment-selection deletion-safety image-boundary fail-closed
@@ -109,7 +119,7 @@ class HostedE2EEnvironment:
     # @testable true
     # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_environment_rejects_retired_lifecycle
     # @matrix hosted-e2e : environment-selection image-boundary
-    def image_base(self, infrastructure) -> str:
+    def image_base(self, infrastructure: HostedE2EInfrastructure) -> str:
         registry = infrastructure.image_base.rsplit("/", 1)[0]
         return f"{registry}/{self.image_repository}"
 
@@ -195,7 +205,7 @@ def _gcloud(*arguments, check=True, timeout=600, capture_output=True):
     if not GCLOUD_CLI:
         raise HostedE2EError("The gcloud CLI is required for hosted E2E commands.")
     return run_command(
-        [GCLOUD_CLI, *map(str, arguments)],
+        [GCLOUD_CLI or "gcloud", *map(str, arguments)],
         check=check,
         timeout=timeout,
         capture_output=capture_output,
@@ -205,7 +215,7 @@ def _gcloud(*arguments, check=True, timeout=600, capture_output=True):
 # @testable infrastructure
 def _git(*arguments, check=True, repo_root=None):
     result = run_command(
-        [GIT_CLI, *map(str, arguments)],
+        [GIT_CLI or "git", *map(str, arguments)],
         check=False,
         timeout=60,
         cwd=repo_root or APP_DIR,
@@ -365,11 +375,11 @@ def _load_json(path: Path):
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_e2e_requires_a_clean_committed_source
 # @matrix hosted-e2e : generated-assets lifecycle source-integrity
-def require_clean_source(repo_root=APP_DIR):
+def require_clean_source(repo_root: Path = APP_DIR) -> str:
     """Return HEAD when authored and runtime source exactly match the commit."""
     status = run_command(
         [
-            GIT_CLI,
+            GIT_CLI or "git",
             "status",
             "--porcelain",
             "--untracked-files=all",
@@ -389,7 +399,7 @@ def require_clean_source(repo_root=APP_DIR):
             "runner image, and evidence all identify one committed source."
         )
     head = run_command(
-        [GIT_CLI, "rev-parse", "HEAD"],
+        [GIT_CLI or "git", "rev-parse", "HEAD"],
         cwd=Path(repo_root),
         check=False,
         timeout=60,
@@ -425,7 +435,7 @@ def _require_committed_production_build(
         expected_mode="production",
         expected_version=expected_version,
     )
-    if issues:
+    if issues or validation is None:
         detail = "; ".join(issues)
         raise HostedE2EError(
             "Hosted E2E create requires a coherent committed production frontend "
@@ -465,7 +475,7 @@ def _run_create_preflight(source, *, base_ref=None):
     python = sys.executable
     run_py = APP_DIR / "run.py"
     gates = (
-        ("authored frontend source", [NPM_CLI, "run", "check"]),
+        ("authored frontend source", [NPM_CLI or "npm", "run", "check"]),
         ("Python source", [python, "-m", "ruff", "check", "."]),
         ("Python type checking", [python, "-m", "basedpyright", "--warnings"]),
         (
@@ -536,7 +546,7 @@ def _committed_source_tree(source, *, repo_root=APP_DIR):
         source_root.mkdir()
         result = run_command(
             [
-                GIT_CLI,
+                GIT_CLI or "git",
                 "archive",
                 "--format=tar",
                 f"--output={archive_path}",
@@ -897,7 +907,7 @@ def _grant_runtime_identity_roles(infrastructure, runtime_member, deployer_membe
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_setup_provisions_only_supported_runtime_identities
 # @matrix hosted-e2e : identity setup-contract
-def setup(github_repository=None):
+def setup(github_repository: str | None = None) -> dict[str, object]:
     """Provision stable least-privilege resources and the inert service anchor."""
     _activate(adc=False)
     STATE_ROOT.mkdir(parents=True, exist_ok=True)
@@ -1665,7 +1675,12 @@ def _require_current_setup(infrastructure):
 
 
 # @testable infrastructure
-def create(*, base_ref=None, environment="standard", experiments_workers=DEFAULT_BROWSER_WORKERS):
+def create(
+    *,
+    base_ref: str | None = None,
+    environment: str = "standard",
+    experiments_workers: int = DEFAULT_BROWSER_WORKERS,
+) -> dict[str, object]:
     """Deploy one committed production build as a test app and runner."""
     selected = _environment(environment)
     if type(experiments_workers) is not int or not 1 <= experiments_workers <= 6:
@@ -1882,14 +1897,14 @@ def _execution_name(payload, *output, environment="standard"):
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execution_wait_recognizes_success
 # @matrix hosted-e2e : execution-status failure-reporting progress success
 def _wait_for_execution(
-    infrastructure,
-    execution,
+    infrastructure: HostedE2EInfrastructure,
+    execution: str,
     *,
-    timeout=9000,
+    timeout: float = 9000,
     poll_interval=5,
     report_interval=300,
-    report=True,
-    monotonic=time.monotonic,
+    report: bool = True,
+    monotonic: Callable[[], float] = time.monotonic,
     sleep=time.sleep,
 ):
     """Wait for one Cloud Run execution and report useful periodic status."""
@@ -2012,7 +2027,7 @@ def _wait_for_execution(
 # @matrix hosted-e2e : artifact-location duration junit result-summary
 # @pair hosted-e2e:suite-scope
 def format_execute_summary(
-    payload,
+    payload: dict[str, object],
     *,
     imported: bool = True,
     state_root: Path = STATE_ROOT,
@@ -2169,12 +2184,12 @@ def format_execute_summary(
 # @matrix hosted-e2e : argument-injection cloud-run execution-name failure-recovery focused-execution local-dispatch override target-validation
 def execute(
     *,
-    targets=(),
-    import_results=True,
-    progress=True,
-    environment="standard",
-    experiments=False,
-):
+    targets: Sequence[str] = (),
+    import_results: bool = True,
+    progress: bool = True,
+    environment: str = "standard",
+    experiments: bool | str = False,
+) -> dict[str, object]:
     """Execute the shared Cloud Run job and normally import its evidence."""
     from testing.utility.hosted_e2e_job import validate_focused_targets
 
@@ -2290,7 +2305,7 @@ def _evidence_exit_status(document: object) -> int:
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_remote_evidence_merges_tests_and_snapshot_provenance
 # @matrix hosted-e2e traceability : evidence merge provenance
-def merge_remote_evidence(local, remote):
+def merge_remote_evidence(local: object, remote: object) -> dict[str, object]:
     """Merge a hosted pytest manifest into the normal latest evidence file."""
     from testing.utility.test_evidence import (
         TEST_RUN_SCHEMA_VERSION,
@@ -2349,7 +2364,9 @@ def merge_remote_evidence(local, remote):
 # @tests tests_tooling/test_009_hosted_e2e.py::test_test_evidence_import_does_not_require_playwright
 # @matrix hosted-e2e traceability : ci-import evidence merge provenance source-integrity
 # @matrix hosted-e2e : suite-scope failure-retention
-def import_result_directory(directory, *, expected_execution=None):
+def import_result_directory(
+    directory: Path, *, expected_execution: str | None = None
+) -> dict[str, object]:
     """Validate and merge an already-downloaded hosted result directory."""
     from testing.utility.test_evidence import (
         LATEST_TEST_RUN,
@@ -2425,12 +2442,12 @@ def import_result_directory(directory, *, expected_execution=None):
 # @matrix hosted-e2e : branch-movement failure-retention source-integrity suite-scope target-validation
 # @pairs release:continuation traceability:evidence
 def validate_release_evidence(
-    candidate,
-    evidence,
+    candidate: str,
+    evidence: str,
     *,
-    base,
-    repo_root=APP_DIR,
-):
+    base: str,
+    repo_root: Path = APP_DIR,
+) -> ReleaseEvidence:
     """Validate passing hosted evidence for an exact release commit chain."""
     from testing.utility.test_evidence import (
         LATEST_TEST_RUN,
@@ -2540,12 +2557,12 @@ def validate_release_evidence(
 # @matrix hosted-e2e traceability : artifact-download progress selective-download
 def results(
     *,
-    execution=None,
-    latest=False,
-    merge=True,
-    include_report_archive=True,
-    environment="standard",
-):
+    execution: str | None = None,
+    latest: bool = False,
+    merge: bool = True,
+    include_report_archive: bool = True,
+    environment: str = "standard",
+) -> dict[str, object]:
     """Download one result bundle and merge its outcomes into evidence.json."""
     selected = _environment(environment)
     _activate(adc=True)
@@ -2553,14 +2570,15 @@ def results(
     state = _load_json(selected.state_path) or {}
     if latest:
         execution = _latest_execution(infrastructure, environment=selected.name)
-    execution = execution or state.get("last_execution")
+    selected_execution = execution or state.get("last_execution")
     if (
-        not isinstance(execution, str)
-        or not execution.startswith(f"{selected.job}-")
-        or not EXECUTION_RE.fullmatch(execution)
+        not isinstance(selected_execution, str)
+        or not selected_execution.startswith(f"{selected.job}-")
+        or not EXECUTION_RE.fullmatch(selected_execution)
     ):
         raise HostedE2EError("A valid Cloud Run execution name is required.")
 
+    execution = selected_execution
     from google.cloud import storage
 
     destination = selected.result_root / execution
@@ -2669,7 +2687,9 @@ def _clear_local_result_artifacts(*, environment="standard"):
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_teardown_removes_resources_and_results_without_redis
 # @matrix hosted-e2e : deletion-safety evidence-retention local-artifacts teardown
-def teardown(*, force=False, environment="standard"):
+def teardown(
+    *, force: bool = False, environment: str = "standard"
+) -> dict[str, object]:
     """Remove the hosted resources. Each E2E runner owns its test-data cleanup."""
     selected = _environment(environment)
     (APP_DIR / ".hosted-e2e-app.yaml").unlink(missing_ok=True)
@@ -2769,7 +2789,7 @@ def teardown(*, force=False, environment="standard"):
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_status_reads_only_the_supported_job
 # @matrix hosted-e2e : provider-status
-def status(*, environment="standard"):
+def status(*, environment: str = "standard") -> dict[str, object]:
     """Return local lifecycle state plus live App Engine/job presence."""
     selected = _environment(environment)
     _activate(adc=False)

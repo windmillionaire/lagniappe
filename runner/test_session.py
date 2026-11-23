@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from dataclasses import dataclass
-from datetime import datetime, UTC
 import fcntl
 import hashlib
 import json
@@ -14,15 +11,18 @@ import signal
 import subprocess
 import sys
 import threading
+from collections.abc import Callable, Collection, Iterator, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from time import monotonic, sleep
-from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, TypedDict, Unpack, cast, overload
 
-from config import APP_DIR, Directory, File, SETTINGS, _atomic_write_text
+from config import APP_DIR, SETTINGS, Directory, File, _atomic_write_text
 from runner.context import format_command
 
 if TYPE_CHECKING:
-    from lagniappe.core.tools.hosted_e2e.lease import E2ELease
+    from lagniappe.core.tools.hosted_e2e.lease import E2ELease, E2ELeaseHeartbeat
 
 
 SESSION_SCHEMA_VERSION = 1
@@ -64,6 +64,47 @@ SESSION_STATE_FIELDS = frozenset(
 )
 
 
+class ProcessIdentity(TypedDict):
+    pid: int
+    pgid: int
+    boot_id: str
+    started: str
+    command_sha256: str
+
+
+class BrowserAttachment(TypedDict):
+    id: str
+    command: str
+    created_at: str
+    process: ProcessIdentity
+
+
+class SessionState(TypedDict):
+    schema_version: int
+    nonce: str
+    mode: str
+    phase: str
+    created_at: str
+    heartbeat_at: str
+    repository: str
+    base_url: str
+    port: int
+    data_namespace: dict[str, str]
+    artifact_namespaces: list[str]
+    command: str
+    recovery_hint: str
+    owner: ProcessIdentity
+    keeper: ProcessIdentity | None
+    server: ProcessIdentity | None
+    attachment: BrowserAttachment | None
+
+
+class SessionChanges(TypedDict, total=False):
+    phase: str
+    keeper: ProcessIdentity | None
+    server: ProcessIdentity | None
+
+
 class TestSessionError(RuntimeError):
     """Base error for local test-session ownership."""
 
@@ -85,7 +126,7 @@ def _state_paths():
 
 
 @contextmanager
-def session_transition_lock():
+def session_transition_lock() -> Iterator[None]:
     """Serialize one short state transition; never hold this for a session."""
     _state_path, lock_path = _state_paths()
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -121,7 +162,7 @@ def _validate_process_identity(value, name):
 # @testable true
 # @tests tests_tooling/test_005_test_session.py::test_corrupt_session_state_fails_closed
 # @matrix test-session : corrupt-state fail-closed schema
-def validate_session_state(value):
+def validate_session_state(value: object) -> SessionState:
     """Return a strict local state record or fail closed."""
     if not isinstance(value, dict):
         raise TestSessionStateError("Test-session state must be a JSON object.")
@@ -175,10 +216,18 @@ def validate_session_state(value):
                 _validate_process_identity(process["process"], "attachment.process")
             else:
                 _validate_process_identity(process, field)
-    return value
+    return cast(SessionState, value)
 
 
-def load_session_state(*, strict=True):
+@overload
+def load_session_state(*, strict: Literal[True] = True) -> SessionState | None: ...
+
+
+@overload
+def load_session_state(*, strict: bool) -> object: ...
+
+
+def load_session_state(*, strict: bool = True) -> object:
     state_path, _lock_path = _state_paths()
     try:
         value = json.loads(state_path.read_text(encoding="utf-8"))
@@ -193,7 +242,7 @@ def load_session_state(*, strict=True):
     return validate_session_state(value) if strict else value
 
 
-def write_session_state(state):
+def write_session_state(state: object) -> None:
     validate_session_state(state)
     state_path, _lock_path = _state_paths()
     _atomic_write_text(
@@ -203,7 +252,7 @@ def write_session_state(state):
     )
 
 
-def remove_session_state(nonce):
+def remove_session_state(nonce: str) -> bool:
     state_path, _lock_path = _state_paths()
     with session_transition_lock():
         state = load_session_state()
@@ -248,7 +297,7 @@ def _boot_identity() -> str:
 # @tests tests_tooling/test_005_test_session.py::test_process_identity_rejects_reused_pid
 # @tests tests_tooling/test_005_test_session.py::test_capture_process_identity_uses_portable_ps_fingerprint
 # @matrix test-session : command-fingerprint pid-reuse portability process-start
-def capture_process_identity(pid: int) -> dict | None:
+def capture_process_identity(pid: int) -> ProcessIdentity | None:
     """Capture portable identity fields that distinguish PID reuse."""
     pid_value = _ps_value(int(pid), "pid")
     if pid_value is None:
@@ -271,7 +320,7 @@ def capture_process_identity(pid: int) -> dict | None:
     }
 
 
-def inspect_process_identity(expected: dict) -> str:
+def inspect_process_identity(expected: ProcessIdentity) -> str:
     """Return match, missing, mismatch, or unknown for a recorded process."""
     _validate_process_identity(expected, "process")
     try:
@@ -335,14 +384,16 @@ class TestSessionAuthority:
 
     nonce: str
     mode: str
-    owner: dict
+    owner: ProcessIdentity
     data_lease: E2ELease
     _heartbeat_stop: threading.Event
     _heartbeat_lost: threading.Event
     _heartbeat_thread: threading.Thread | None
     _handed_off: bool = False
 
-    def assert_local_active(self, *, phases=None):
+    def assert_local_active(
+        self, *, phases: Collection[str] | None = None
+    ) -> SessionState:
         if self._heartbeat_lost.is_set():
             raise TestSessionStateError("The local test-session heartbeat was lost.")
         with session_transition_lock():
@@ -359,30 +410,30 @@ class TestSessionAuthority:
                 )
         return state
 
-    def assert_active(self, *, phases=None):
+    def assert_active(self, *, phases: Collection[str] | None = None) -> SessionState:
         state = self.assert_local_active(phases=phases)
         self.data_lease.assert_active()
         return state
 
-    def update(self, **changes):
+    def update(self, **changes: Unpack[SessionChanges]) -> SessionState:
         with session_transition_lock():
             state = load_session_state()
             if state is None or state["nonce"] != self.nonce:
                 raise TestSessionStateError("Local test-session ownership was lost.")
             if state["owner"] != self.owner:
                 raise TestSessionStateError("Local test-session owner changed.")
-            state.update(changes)
+            state.update(**changes)
             state["heartbeat_at"] = utc_now()
             write_session_state(state)
             return state
 
-    def mark_recovery_required(self):
+    def mark_recovery_required(self) -> SessionState | None:
         try:
             return self.update(phase="recovery-required")
         except TestSessionError:
             return None
 
-    def handoff(self, owner):
+    def handoff(self, owner: ProcessIdentity) -> SessionState:
         _validate_process_identity(owner, "handoff owner")
         self.assert_active()
         with session_transition_lock():
@@ -400,13 +451,13 @@ class TestSessionAuthority:
         self._handed_off = True
         return state
 
-    def complete(self):
+    def complete(self) -> None:
         self.assert_active()
         self._stop_local_heartbeat()
         self.data_lease.__exit__(None, None, None)
         remove_session_state(self.nonce)
 
-    def rollback_without_cleanup(self):
+    def rollback_without_cleanup(self) -> None:
         """Release a session that has not crossed a destructive boundary."""
         self._stop_local_heartbeat()
         self.data_lease.__exit__(None, None, None)
@@ -435,7 +486,7 @@ def _heartbeat_owned_state(authority):
 # @matrix test-session : concurrency durable-state mutation-order ownership preflight subprocess
 def acquire_test_session(
     mode: str,
-    command,
+    command: str | Sequence[str],
     *,
     data_lease_factory: Callable[[str], E2ELease] = _new_owned_data_lease,
 ) -> TestSessionAuthority:
@@ -514,7 +565,9 @@ def acquire_test_session(
         raise
 
 
-def authority_from_environment(*, expected_mode="local-e2e"):
+def authority_from_environment(
+    *, expected_mode: str = "local-e2e"
+) -> tuple[SessionState, E2ELeaseHeartbeat]:
     nonce = str(os.environ.get(SESSION_NONCE_ENV) or "").strip()
     mode = str(os.environ.get(SESSION_MODE_ENV) or "").strip()
     if not nonce or mode != expected_mode:
@@ -526,7 +579,7 @@ def authority_from_environment(*, expected_mode="local-e2e"):
         state = load_session_state()
         if state is None or state["nonce"] != nonce or state["mode"] != mode:
             raise TestSessionStateError("Inherited test-session authority is stale.")
-        if state["phase"] != "ready" or state.get("server") is None:
+        if state["phase"] != "ready" or state["server"] is None:
             raise TestSessionStateError("Inherited test-session is not ready.")
         if inspect_process_identity(state["owner"]) != "match":
             raise TestSessionStateError("Inherited test-session owner is not live.")
@@ -537,12 +590,14 @@ def authority_from_environment(*, expected_mode="local-e2e"):
     return state, adopter
 
 
-def update_state_for_nonce(nonce, **changes):
+def update_state_for_nonce(
+    nonce: str, **changes: Unpack[SessionChanges]
+) -> SessionState:
     with session_transition_lock():
         state = load_session_state()
         if state is None or state["nonce"] != nonce:
             raise TestSessionStateError("Test-session state no longer matches keeper.")
-        state.update(changes)
+        state.update(**changes)
         state["heartbeat_at"] = utc_now()
         write_session_state(state)
         return state
@@ -577,7 +632,7 @@ def run_managed_keeper() -> int:
         if (
             state
             and state["nonce"] == nonce
-            and state.get("keeper")
+            and state["keeper"]
             and state["keeper"]["pid"] == os.getpid()
         ):
             identity = state["keeper"]
@@ -622,7 +677,7 @@ def run_managed_keeper() -> int:
             raise TestSessionStateError("Managed Flask process exited during launch.")
         update_state_for_nonce(nonce, server=server)
         if not wait_for_session_server(
-            SETTINGS.test_config["BASE_URL"],
+            str(SETTINGS.test_config["BASE_URL"]),
             nonce,
             expected_pid=process.pid,
             expected_mode=mode,
@@ -674,7 +729,7 @@ def run_managed_keeper() -> int:
             adopter.__exit__(None, None, None)
 
 
-def main(arguments=None) -> int:
+def main(arguments: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if arguments is None else arguments)
     if arguments == ["keeper"]:
         return run_managed_keeper()

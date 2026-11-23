@@ -5,11 +5,12 @@ import base64
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import ssl
 import subprocess
 import sys
+from pathlib import Path
+from typing import TypedDict, Unpack
 
 import google_crc32c
 import requests
@@ -18,6 +19,7 @@ import yaml
 from config import (
     APP_DIR,
     File,
+    SettingsDraft,
     _atomic_write_text,
     decode_app_settings,
     write_generation_manifest,
@@ -32,6 +34,22 @@ from installer.config_builders import (
 )
 from installer.state import SetupProcessLock
 from runner.context import GCLOUD_CLI, GIT_CLI
+
+class DeveloperSettings(TypedDict):
+    gcloud_config: dict[str, str]
+
+
+class RequestOptions(TypedDict, total=False):
+    json: dict[str, str | dict[str, str]]
+    params: dict[str, str]
+
+
+class SecretResponse(TypedDict, total=False):
+    name: str
+    etag: str
+    versionAliases: dict[str, str]
+    payload: dict[str, str]
+
 
 SECRET = "lagniappe-cloud-settings"
 FILES = Path("config/files")
@@ -74,7 +92,7 @@ def _receipt(root):
 
 
 # @testable infrastructure
-def _source(root):
+def _source(root: Path) -> str:
     result = subprocess.run(
         [GIT_CLI or "git", "-C", str(root), "rev-parse", "HEAD"],
         capture_output=True,
@@ -92,7 +110,9 @@ def _source(root):
 # @testable true
 # @tests tests_tooling/test_016_cloud_operator.py::test_bundle_round_trip
 # @matrix config setup : secrets project-identity redis-tls
-def validate_bundle(bundle, project):
+def validate_bundle(
+    bundle: object, project: str
+) -> tuple[dict[str, object], DeveloperSettings]:
     """Validate all documents together before staging any changes."""
     if (
         not PROJECT.fullmatch(project)
@@ -191,15 +211,17 @@ def _same_settings(left, right):
 
 
 # @testable infrastructure
-def _snapshot(root):
+def _snapshot(root: Path) -> str:
     return hashlib.sha256(
         _json([_read(root, path) for path in (APP, DEV, CA)]).encode()
     ).hexdigest()
 
 
 # @testable infrastructure
-def _record(root, project, version, source, **extra):
-    receipt = dict(
+def _record(
+    root: Path, project: str, version: str, source: str, **extra: object
+) -> dict[str, object]:
+    receipt: dict[str, object] = dict(
         project=project,
         secret=SECRET,
         version=version,
@@ -212,7 +234,9 @@ def _record(root, project, version, source, **extra):
 
 
 # @testable infrastructure
-def cli_token(project, configuration, account, *, env=None):
+def cli_token(
+    project: str, configuration: str, account: str, *, env: dict[str, str] | None = None
+) -> str:
     """Get a short-lived token for the project's explicitly selected CLI identity."""
     if (
         not GCLOUD_CLI
@@ -267,14 +291,16 @@ def cli_token(project, configuration, account, *, env=None):
 class SecretManager:
     """Use only the explicitly selected CLI identity. Never log provider bodies."""
 
-    def __init__(self, project, configuration, account):
+    def __init__(self, project: str, configuration: str, account: str) -> None:
         self.url = f"https://secretmanager.googleapis.com/v1/projects/{project}/secrets/{SECRET}"
         self.session = requests.Session()
         self.session.headers["Authorization"] = "Bearer " + cli_token(
             project, configuration, account
         )
 
-    def request(self, method, suffix="", **kwargs):
+    def request(
+        self, method: str, suffix: str = "", **kwargs: Unpack[RequestOptions]
+    ) -> SecretResponse:
         response = self.session.request(
             method, self.url + suffix, timeout=30, allow_redirects=False, **kwargs
         )
@@ -284,10 +310,12 @@ class SecretManager:
             )
         return response.json()
 
-    def access(self, version):
+    def access(self, version: str) -> tuple[str, dict[str, object]]:
         if not (VERSION.fullmatch(version) or version == "current"):
             raise CloudSettingsError("Use a numeric secret version or current.")
         data = self.request("GET", f"/versions/{version}:access")
+        if "name" not in data or "payload" not in data:
+            raise CloudSettingsError("Secret Manager returned an incomplete version.")
         number = data["name"].rsplit("/", 1)[-1]
         raw = base64.b64decode(data["payload"]["data"], validate=True)
         if (
@@ -305,7 +333,13 @@ class SecretManager:
 # @testable true
 # @tests tests_tooling/test_016_cloud_operator.py::test_publish_rejects_stale_writers
 # @matrix config setup : secrets transactional-state
-def publish(root, project, store, receipt, source):
+def publish(
+    root: Path,
+    project: str,
+    store: SecretManager,
+    receipt: dict[str, object],
+    source: str,
+) -> dict[str, object]:
     bundle = _local_bundle(root, project, receipt)
     metadata = store.request("GET")
     aliases = metadata.get("versionAliases", {})
@@ -325,6 +359,8 @@ def publish(root, project, store, receipt, source):
             "dataCrc32c": str(google_crc32c.value(raw)),
         }
         response = store.request("POST", ":addVersion", json={"payload": payload})
+        if "name" not in response or "etag" not in metadata:
+            raise CloudSettingsError("Secret Manager returned incomplete version metadata.")
         version = response["name"].rsplit("/", 1)[-1]
         if not VERSION.fullmatch(version) or store.access(version)[1] != bundle:
             raise CloudSettingsError(
@@ -349,7 +385,7 @@ def publish(root, project, store, receipt, source):
 # @testable true
 # @tests tests_tooling/test_016_cloud_operator.py::test_deploy_requires_pinned_experiments_target
 # @matrix deploy setup : project-identity
-def verify_operator_target(root, project, draft):
+def verify_operator_target(root: Path, project: str, draft: SettingsDraft) -> None:
     from config.experiments import normalize_experiments_config
 
     receipt = _receipt(root)
@@ -413,7 +449,16 @@ def _recover(root):
 # @testable true
 # @tests tests_tooling/test_016_cloud_operator.py::test_restore_preserves_previous_installation
 # @matrix config deploy : config-files transactional-state recovery
-def restore(root, project, version, bundle, receipt, source, operator, replace=False):
+def restore(
+    root: Path,
+    project: str,
+    version: str,
+    bundle: dict[str, object],
+    receipt: dict[str, object],
+    source: str,
+    operator: dict[str, str] | None,
+    replace: bool = False,
+) -> dict[str, object]:
     app, dev = validate_bundle(bundle, project)
     local_app = _read(root, APP)
     local_dev = _read(root, DEV)
@@ -440,6 +485,9 @@ def restore(root, project, version, bundle, receipt, source, operator, replace=F
         )
     extra = {}
     app_text = bundle["app"]
+    ca_text = bundle["ca"]
+    if not isinstance(app_text, str) or (ca_text is not None and not isinstance(ca_text, str)):
+        raise CloudSettingsError("The settings documents must contain text.")
     if operator:
         if not operator["ACCOUNT"].endswith(f"@{project}.iam.gserviceaccount.com"):
             raise CloudSettingsError(
@@ -477,7 +525,7 @@ def restore(root, project, version, bundle, receipt, source, operator, replace=F
     backup = {path.as_posix(): _read(root, path) for path in _restore_paths()}
     _atomic_write_text(root / JOURNAL, _json(backup), owner_only=True)
     try:
-        for path, value in ((APP, app_text), (DEV, dev_text), (CA, bundle["ca"])):
+        for path, value in ((APP, app_text), (DEV, dev_text), (CA, ca_text)):
             if value is None:
                 (root / path).unlink(missing_ok=True)
             else:
@@ -497,7 +545,7 @@ def restore(root, project, version, bundle, receipt, source, operator, replace=F
 # @testable true
 # @tests tests_tooling/test_016_cloud_operator.py::test_cloud_settings_cli
 # @matrix config setup : cli-routing project-identity
-def main(arguments):
+def main(arguments: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="run.py cloud-settings")
     commands = parser.add_subparsers(dest="action", required=True)
     for action in ("publish", "restore", "check"):
@@ -553,6 +601,8 @@ def main(arguments):
             target = yaml.safe_load(local)["gcloud_config"] if local else {}
             account = args.account or target.get("ACCOUNT")
             name = args.configuration or target.get("NAME")
+            if not name or not account:
+                raise CloudSettingsError("Select a valid project, gcloud configuration, and account.")
             store = SecretManager(args.project, name, account)
             source = _source(root)
             if args.action == "publish":

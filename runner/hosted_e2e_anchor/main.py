@@ -1,10 +1,17 @@
 """Inert traffic-owning version for the App Engine E2E service."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from _typeshed.wsgi import StartResponse
+
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_anchor_marks_every_rejection
 # @matrix hosted-e2e : anchor deletion-safety soft-routing
-def app(environ, start_response):
+def app(environ: dict[str, object], start_response: StartResponse) -> list[bytes]:
     body = b"Not Found\n"
     start_response(
         "404 Not Found",

@@ -1,20 +1,29 @@
 """Coordinated protocol checks and automatically grouped browser stories."""
 
-from contextlib import contextmanager, ExitStack
+from __future__ import annotations
+
 import argparse
 import json
 import os
-from pathlib import Path
 import signal
 import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Iterator, Sequence
+from contextlib import ExitStack, contextmanager
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal
 from uuid import uuid4
 
 from runner.context import REPOSITORY_ROOT
-from runner.e2e_parallel import Batch, merge_results, schedule
 from runner.e2e_inventory import duration_estimates, story_batches
+from runner.e2e_parallel import Batch, merge_results, schedule
+
+if TYPE_CHECKING:
+    from lagniappe.core.tools.hosted_e2e.lease import E2ELease
+    from runner.e2e_inventory import CollectedTest
+    from runner.test_session import TestSessionAuthority
 
 
 PILOT_FILE = "testing/tests_e2e/001_site/test_001h_parallel_pilot.py"
@@ -73,7 +82,9 @@ TARGETS = (*PROTOCOL_TARGETS, *STORY_TARGETS)
 # @testable true
 # @tests tests_tooling/test_015_e2e_parallel.py::test_pilot_arguments_are_bounded_and_keep_normal_runs_unchanged
 # @matrix testing : parallel-e2e
-def pilot_arguments(arguments):
+def pilot_arguments(
+    arguments: list[str],
+) -> tuple[str | Literal[False], int, list[str]]:
     parser = argparse.ArgumentParser(add_help=False, exit_on_error=False, allow_abbrev=False)
     parser.add_argument("--workers", "--experiments-workers", dest="experiments_workers", type=int)
     try:
@@ -102,7 +113,9 @@ def pilot_arguments(arguments):
 
 # @testable infrastructure
 @contextmanager
-def pilot_authority(local_authority):
+def pilot_authority(
+    local_authority: TestSessionAuthority | None,
+) -> Iterator[TestSessionAuthority | E2ELease]:
     if local_authority is not None:
         yield local_authority
         return
@@ -125,7 +138,9 @@ def pilot_authority(local_authority):
 # @testable true
 # @tests tests_tooling/test_015_e2e_parallel.py::test_pilot_targets_resolve_collected_browser_parameters
 # @matrix testing : parallel-e2e collection browser-parameters
-def resolve_pilot_targets(records, targets):
+def resolve_pilot_targets(
+    records: Sequence[CollectedTest], targets: Sequence[str]
+) -> list[CollectedTest]:
     """Resolve bounded selectors to actual pytest IDs, failing on missing cases."""
     selected = {}
     for target in targets:
@@ -150,7 +165,14 @@ def resolve_pilot_targets(records, targets):
 # @testable true
 # @tests tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task
 # @matrix testing : parallel-e2e
-def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
+def run_pilot(
+    authority: TestSessionAuthority | E2ELease,
+    command: list[str],
+    pytest_args: Sequence[str],
+    *,
+    scope: str = "pilot",
+    workers: int = 3,
+) -> int:
     from lagniappe import CONFIG
     from lagniappe.core.entities import Entities
     from runner.test_session import capture_process_identity, load_session_state
@@ -170,7 +192,9 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
     owner = capture_process_identity(os.getpid())
     if owner is None:
         raise RuntimeError("Cannot identify E2E pilot coordinator")
-    run_id = getattr(authority, "run_id", None) or authority.nonce
+    run_id = getattr(authority, "run_id", None) or getattr(authority, "nonce", None)
+    if not isinstance(run_id, str) or not run_id:
+        raise RuntimeError("A coordinated E2E run requires an owner identity.")
     cookies = ()
     if CONFIG.hosted_e2e_runner:
         from testing.utility.e2e_runtime import hosted_e2e_browser_cookie
@@ -178,6 +202,11 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
         # callers. Exchange once for the run, then share only its scoped cookie.
         cookies = (hosted_e2e_browser_cookie(run_id),)
     local = load_session_state() if not CONFIG.hosted_e2e_runner else None
+    server_pid = None
+    if local:
+        if local["server"] is None:
+            raise RuntimeError("The local E2E session has no registered server.")
+        server_pid = local["server"]["pid"]
     collection = root / "collection.json"
     story_targets = tuple(dict.fromkeys(target.split("::", 1)[0] for target in TARGETS)) if scope == "pilot" else ("testing/tests_e2e", "-m", "not unfinished")
     collected = subprocess.run(
@@ -245,7 +274,7 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
                       "base_url": CONFIG.BASE_URL, "fixtures": fixtures,
                       "browser_cookies": cookies,
                       "resource_registry": str(contexts),
-                      "server_pid": local["server"]["pid"] if local else None,
+                      "server_pid": server_pid,
                       "artifacts": str(artifacts)}
             if batch.name.startswith("stories-"):
                 record["test_resources"] = {

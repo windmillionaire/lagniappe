@@ -30,7 +30,7 @@ FONT_URL_RE = re.compile(r"src:\s*url\((https://fonts\.gstatic\.com/[^)]+)\)")
 # @testable true
 # @tests tests_tooling/test_icons.py::test_material_symbol_subset_request_uses_unique_sorted_registry_glyphs
 # @pair icons:subset-request
-def subset_request(icons_path=ICONS_PATH):
+def subset_request(icons_path: Path = ICONS_PATH) -> tuple[str, list[str]]:
     registry = yaml.safe_load(Path(icons_path).read_text(encoding="utf-8")) or {}
     definitions = flatten_icon_definitions(
         registry, schema=load_icons_schema(REPOSITORY_ROOT)
@@ -147,11 +147,11 @@ def _write_subset(font, css_url, font_url, icon_names, font_path, metadata_path)
 # @pair icons:subset-update
 def update_icons(
     *,
-    rebuild=True,
-    icons_path=ICONS_PATH,
-    font_path=FONT_PATH,
-    metadata_path=METADATA_PATH,
-):
+    rebuild: bool = True,
+    icons_path: Path = ICONS_PATH,
+    font_path: Path = FONT_PATH,
+    metadata_path: Path = METADATA_PATH,
+) -> None:
     css_url, icon_names = subset_request(icons_path)
     css = _download(css_url).decode("utf-8")
     font_url = _font_url(css)
@@ -170,7 +170,7 @@ def update_icons(
     )
     if rebuild:
         try:
-            run_command([NPM_CLI, "run", "dev"], check=True)
+            run_command([NPM_CLI or "npm", "run", "dev"], check=True)
         except (Exception, KeyboardInterrupt):
             print(
                 "Frontend rebuild did not complete; refreshed icon sources are "

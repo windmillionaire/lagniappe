@@ -301,7 +301,7 @@ def run_tests(test_args: list[str]) -> int:
 
             from config import SETTINGS
 
-            require_server_port_available(SETTINGS.test_config["BASE_URL"])
+            require_server_port_available(str(SETTINGS.test_config["BASE_URL"]))
             ensure_test_frontend_bundle(authority)
             prepare_test_artifacts(authority)
             # Treat cleanup as crossed before invoking it: partial provider

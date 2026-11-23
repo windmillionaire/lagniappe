@@ -8,7 +8,7 @@ from pathlib import Path
 # @testable true
 # @tests tests_tooling/test_001l_setup_experiments.py::test_source_identity_includes_dirty_code_and_excludes_credentials
 # @matrix experiments : source-identity
-def source_identity(root):
+def source_identity(root: Path) -> str:
     """Hash authored runtime/build inputs, including uncommitted new files."""
     root = Path(root)
     paths = set()

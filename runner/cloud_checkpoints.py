@@ -1,13 +1,37 @@
 """Project-private, generation-checked hosted-E2E state for disposable tasks."""
 
+from __future__ import annotations
+
+import json
+import os
+import uuid
+from argparse import Namespace
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
-from datetime import datetime, UTC
-import json
-import os
+from datetime import UTC, datetime
 from pathlib import Path
-import uuid
+from types import ModuleType
+from typing import TYPE_CHECKING, Literal, TypedDict, cast
+
+if TYPE_CHECKING:
+    from google.cloud.storage import Bucket
+
+class Operation(TypedDict, total=False):
+    action: str
+    id: str
+    settings_version: str
+    started: str
+
+
+class CheckpointDocument(TypedDict):
+    schema: int
+    project: str
+    setup: dict[str, object] | None
+    state: dict[str, object] | None
+    operation: Operation | None
+
 
 OBJECT = "hosted-e2e/checkpoint.json"
 DOCUMENTS = {"setup.json": "setup", "state.json": "state"}
@@ -36,26 +60,28 @@ def _bucket(project, number, *, credentials=None):
 # @tests tests_tooling/test_016_cloud_operator.py::test_checkpoint_resumes_and_excludes_competing_writers
 # @matrix hosted-e2e : lifecycle recovery transactional-state
 class Checkpoint:
-    def __init__(self, bucket, project):
+    def __init__(self, bucket: Bucket, project: str) -> None:
         self.bucket = bucket
         self.project = project
         self.generation = 0
-        self.doc = {
+        self.doc: CheckpointDocument = {
             "schema": 1,
             "project": project,
             "setup": None,
             "state": None,
             "operation": None,
         }
-        self.paths = {}
+        self.paths: dict[Path, Literal["state", "setup"]] = {}
 
-    def load(self):
+    def load(self) -> None:
         blob = self.bucket.get_blob(OBJECT)
         if blob is None:
             raise RuntimeError(
                 "Initialize the operator checkpoint from the installation first."
             )
-        self.generation = int(blob.generation)
+        if blob.generation is None:
+            raise RuntimeError("Cloud Storage returned a checkpoint without a generation.")
+        self.generation = blob.generation
         doc = json.loads(blob.download_as_bytes(if_generation_match=self.generation))
         if (
             not isinstance(doc, dict)
@@ -69,14 +95,24 @@ class Checkpoint:
         for name in ("state", "setup"):
             item = doc[name]
             if item is not None and (
-                item.get("schema_version") != 1 or item.get("project") != self.project
+                not isinstance(item, dict) or item.get("schema_version") != 1 or item.get("project") != self.project
             ):
                 raise RuntimeError(
                     "The lifecycle document belongs to another schema or project."
                 )
-        self.doc = doc
+        operation = doc["operation"]
+        if operation is not None and (
+            not isinstance(operation, dict)
+            or any(
+                not isinstance(value, str)
+                for key, value in operation.items()
+                if key in Operation.__optional_keys__
+            )
+        ):
+            raise RuntimeError("The stored checkpoint contains an invalid operation.")
+        self.doc = cast(CheckpointDocument, doc)
 
-    def save(self):
+    def save(self) -> None:
         from google.api_core.exceptions import PreconditionFailed
 
         blob = self.bucket.blob(OBJECT)
@@ -90,21 +126,31 @@ class Checkpoint:
             raise RuntimeError(
                 "Another task changed the operator checkpoint. Read status before retrying."
             ) from None
-        self.generation = int(blob.generation)
+        if blob.generation is None:
+            raise RuntimeError("Cloud Storage returned a checkpoint without a generation.")
+        self.generation = blob.generation
 
-    def write(self, path, payload):
-        if not self.doc["operation"] or payload.get("project") != self.project:
+    def write(self, path: Path, payload: dict[str, object]) -> None:
+        operation = self.doc["operation"]
+        if not operation or payload.get("project") != self.project:
             raise RuntimeError(
                 "A project-bound operation is required to save lifecycle progress."
             )
         item = deepcopy(payload)
         if self.paths[path] == "state":
-            item["cloud_settings_version"] = self.doc["operation"]["settings_version"]
+            if "settings_version" not in operation:
+                raise RuntimeError("Saving lifecycle state requires the operation's settings version.")
+            item["cloud_settings_version"] = operation["settings_version"]
         self.doc[self.paths[path]] = item
         self.save()
 
     @contextmanager
-    def operation(self, action, receipt, recover_generation=None):
+    def operation(
+        self,
+        action: str,
+        receipt: Mapping[str, str],
+        recover_generation: int | None = None,
+    ) -> Iterator[None]:
         self.load()
         operation = self.doc["operation"]
         if action == "status":
@@ -149,7 +195,7 @@ ACTIVE: ContextVar[Checkpoint | None] = ContextVar("hosted_checkpoint", default=
 # @testable true
 # @tests tests_tooling/test_016_cloud_operator.py::test_checkpoint_seed_is_create_only
 # @matrix hosted-e2e setup : project-identity transactional-state
-def seed(root, project):
+def seed(root: Path, project: str) -> None:
     """Import the existing verified installation's last completed setup and teardown once."""
     from google.oauth2.credentials import Credentials
 
@@ -189,7 +235,8 @@ def seed(root, project):
         project, docs["setup"]["project_number"], credentials=Credentials(token)
     )
     checkpoint = Checkpoint(bucket, project)
-    checkpoint.doc.update(docs)
+    checkpoint.doc["state"] = docs["state"]
+    checkpoint.doc["setup"] = docs["setup"]
     checkpoint.save()
     print(
         f"Initialized the private checkpoint for {project} at generation {checkpoint.generation}."
@@ -200,7 +247,7 @@ def seed(root, project):
 # @tests tests_tooling/test_016_cloud_operator.py::test_checkpoint_is_opt_in
 # @matrix hosted-e2e : isolation project-identity
 @contextmanager
-def lifecycle(hosted, args):
+def lifecycle(hosted: ModuleType, args: Namespace) -> Iterator[None]:
     project = os.environ.get("LAGNIAPPE_CLOUD_CHECKPOINT_PROJECT")
     if not project or args.action in {"import-results", "validate-release-evidence"}:
         if getattr(args, "recover_generation", None) is not None:

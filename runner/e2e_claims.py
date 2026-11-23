@@ -1,12 +1,13 @@
 """Per-test resource reservations for workers sharing one coordinator host."""
 
-from contextlib import contextmanager, ExitStack
 import fcntl
-from hashlib import sha256
 import json
 import os
-from pathlib import Path
 import time
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import ExitStack, contextmanager
+from hashlib import sha256
+from pathlib import Path
 
 import pytest
 
@@ -16,7 +17,13 @@ import pytest
 # @tests tests_tooling/test_015_e2e_parallel.py::test_case_claims_stop_waiting_on_timeout_or_lost_authority
 # @matrix testing : parallel-e2e
 @contextmanager
-def reserve_resources(directory, resources, assert_active, *, timeout=600):
+def reserve_resources(
+    directory: Path,
+    resources: Sequence[str],
+    assert_active: Callable[[], object],
+    *,
+    timeout: float = 600,
+) -> Iterator[float]:
     """Acquire all direct claims together; release on teardown, error or exit."""
     directory = Path(directory)
     directory.mkdir(exist_ok=True)
@@ -49,7 +56,9 @@ def reserve_resources(directory, resources, assert_active, *, timeout=600):
 # @tests tests_tooling/test_015_e2e_parallel.py::test_case_claim_hook_covers_fixture_teardown_and_continues_after_failure
 # @matrix testing : parallel-e2e
 @pytest.hookimpl(hookwrapper=True, tryfirst=True)
-def pytest_runtest_protocol(item, nextitem):
+def pytest_runtest_protocol(
+    item: pytest.Item, nextitem: pytest.Item | None
+) -> Iterator[None]:
     """Hold claims across all setup/call/teardown, including failed fixtures."""
     if not os.environ.get("LAGNIAPPE_E2E_WORKER_CONTEXT"):
         yield

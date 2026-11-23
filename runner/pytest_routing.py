@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from contextlib import suppress
-from dataclasses import dataclass
 import importlib
 import os
-from pathlib import Path
 import re
 import sys
+from contextlib import suppress
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pytest
 
 
 PYTEST_CONFIG = "testing/pytest.ini"
@@ -98,7 +102,7 @@ class PytestPartitions:
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_pytest_invocation_routes_registered_option_values
 # @pair testing:pytest-options
-def pytest_addoption(parser) -> None:
+def pytest_addoption(parser: pytest.Parser) -> None:
     """Register options that must be known before suite conftests are imported."""
     group = parser.getgroup("lagniappe")
     group.addoption(
@@ -119,7 +123,7 @@ def normalize_marker_expression(expression: str) -> str:
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_pytest_routing_plugin_normalizes_provider_marker_tokens
 # @matrix setup testing : pytest-markers
-def pytest_configure(config) -> None:
+def pytest_configure(config: pytest.Config) -> None:
     """Apply runner-owned marker aliases before pytest evaluates collection."""
     expression = str(getattr(config.option, "markexpr", "") or "")
     config.option.markexpr = normalize_marker_expression(expression)

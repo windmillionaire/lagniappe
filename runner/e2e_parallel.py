@@ -1,15 +1,26 @@
 """Bounded E2E batches under one owner, with private results and conflict lanes."""
 
-from contextlib import suppress
-from dataclasses import dataclass
+from __future__ import annotations
+
 import json
 import math
 import os
-from pathlib import Path
 import signal
 import subprocess
 import time
+from collections.abc import Callable, Mapping, Sequence
+from contextlib import suppress
+from dataclasses import dataclass
+from pathlib import Path
+from typing import NotRequired, TypedDict
 from xml.etree import ElementTree as ET
+
+
+class WorkerEvent(TypedDict):
+    batch: str
+    event: str
+    at: float
+    status: NotRequired[int]
 
 
 @dataclass(frozen=True)
@@ -21,7 +32,7 @@ class Batch:
     additional_nodeids: tuple[str, ...] = ()
 
     @property
-    def nodeids(self):
+    def nodeids(self) -> tuple[str, ...]:
         return (self.nodeid, *self.additional_nodeids)
 
 
@@ -29,7 +40,7 @@ class Batch:
 # @tests tests_tooling/test_015_e2e_parallel.py::test_worker_messages_allow_publication_during_completion
 # @tests tests_tooling/test_015_e2e_parallel.py::test_worker_messages_reject_missing_completed_messages
 # @matrix testing : parallel-e2e
-def await_worker_file(path):
+def await_worker_file(path: Path) -> dict[str, object]:
     """Wait for an atomic harness message, never for browser/app state."""
     deadline = time.monotonic() + 90
     while not path.is_file():
@@ -47,7 +58,16 @@ def await_worker_file(path):
 # @tests tests_tooling/test_015_e2e_parallel.py::test_scheduler_stops_children_before_returning_on_lost_authority
 # @tests tests_tooling/test_015_e2e_parallel.py::test_scheduler_reaps_a_crashed_workers_remaining_children
 # @matrix testing : parallel-e2e
-def schedule(batches, launch, assert_active, *, workers=2, timeout=180, finished=None, events=None):
+def schedule(
+    batches: Sequence[Batch],
+    launch: Callable[[Batch], subprocess.Popen],
+    assert_active: Callable[[], object],
+    *,
+    workers: int = 2,
+    timeout: float = 180,
+    finished: dict[str, int] | None = None,
+    events: list[WorkerEvent] | None = None,
+) -> tuple[dict[str, int], list[WorkerEvent]]:
     """Run nonconflicting batches; an exclusive entry is a draining barrier."""
     pending = list(batches)
     running = {}
@@ -119,7 +139,15 @@ def schedule(batches, launch, assert_active, *, workers=2, timeout=180, finished
 # @tests tests_tooling/test_015_e2e_parallel.py::test_merge_preserves_each_parameter_and_reports_missing_batch_cases
 # @tests tests_tooling/test_015_e2e_parallel.py::test_merge_checks_each_case_identity_and_outcome
 # @matrix testing : parallel-e2e
-def merge_results(batches, directory, statuses, *, attempt, snapshot, destination):
+def merge_results(
+    batches: Sequence[Batch],
+    directory: Path,
+    statuses: Mapping[str, int],
+    *,
+    attempt: str,
+    snapshot: str,
+    destination: str | Path,
+) -> tuple[dict[str, dict[str, object]], list[str]]:
     """Account for every selected nodeid without consulting earlier evidence."""
     outcomes = {}
     errors = []

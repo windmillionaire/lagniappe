@@ -42,9 +42,15 @@ CUSTOM = {
 # @tests tests_tooling/test_016_cloud_operator.py::test_operator_grants_stay_in_experiments
 # @matrix hosted-e2e setup : iam project-identity
 def bindings(
-    project, app, setup, build_account, *, app_engine_account=None,
-    hosted_job_exists=False, project_job_policy=False,
-):
+    project: str,
+    app: dict[str, object],
+    setup: dict[str, str],
+    build_account: str,
+    *,
+    app_engine_account: str | None = None,
+    hosted_job_exists: bool = False,
+    project_job_policy: bool = False,
+) -> list[tuple[list[str], str]]:
     from runner.hosted_e2e import JOB
 
     policy = normalize_experiments_config(app)
@@ -219,7 +225,7 @@ def _build_accounts(base, project, *, apply):
 
 
 # @testable infrastructure
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", required=True)
     parser.add_argument("--from-checkout", type=Path, required=True)

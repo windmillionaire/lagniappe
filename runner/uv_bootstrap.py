@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from contextlib import suppress
 import argparse
-from dataclasses import dataclass
 import hashlib
 import http.client
 import json
 import os
-from pathlib import Path, PurePosixPath
 import platform
 import re
 import shutil
@@ -17,14 +14,21 @@ import stat
 import subprocess
 import sys
 import tarfile
-from tarfile import open as open_tar_archive
 import tempfile
+from collections.abc import Callable, Sequence
+from contextlib import suppress
+from dataclasses import dataclass
+from http.client import HTTPMessage
+from pathlib import Path, PurePosixPath
+from tarfile import open as open_tar_archive
 from types import MappingProxyType
+from typing import IO
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import (
     HTTPRedirectHandler,
     HTTPSHandler,
+    OpenerDirector,
     Request,
     build_opener,
 )
@@ -164,7 +168,7 @@ def _validate_member_name(name, *, directory=False):
 # @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_manifest_and_managed_context_path
 # @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_rejects_malformed_manifest
 # @matrix mcp-package setup : bootstrap manifest platform-pin url-policy validation
-def load_manifest(path=BOOTSTRAP_MANIFEST):
+def load_manifest(path: Path = BOOTSTRAP_MANIFEST) -> UvBootstrapManifest:
     """Load and strictly validate the committed uv bootstrap manifest."""
     path = Path(path)
     try:
@@ -319,7 +323,13 @@ def _host_platform_key(*, system=None, architecture=None, libc=None):
 # @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_rejects_unsupported_host
 # @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_manifest_preserves_supported_macos_development_hosts
 # @matrix mcp-package setup : bootstrap macos platform-pin platform-selection portability wsl
-def select_artifact(manifest, *, system=None, architecture=None, libc=None):
+def select_artifact(
+    manifest: UvBootstrapManifest,
+    *,
+    system: str | None = None,
+    architecture: str | None = None,
+    libc: str | None = None,
+) -> UvArtifact:
     """Select the one declared artifact matching the current host tuple."""
     platform_key = _host_platform_key(
         system=system,
@@ -337,7 +347,9 @@ def select_artifact(manifest, *, system=None, architecture=None, libc=None):
 # @testable true
 # @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_manifest_and_managed_context_path
 # @matrix mcp-package setup : bootstrap managed-path version-pin
-def managed_uv_path(*, manifest_path=BOOTSTRAP_MANIFEST, virtualenv=PROJECT_VIRTUALENV):
+def managed_uv_path(
+    *, manifest_path: Path = BOOTSTRAP_MANIFEST, virtualenv: Path = PROJECT_VIRTUALENV
+) -> Path:
     """Return the manifest-versioned managed uv path without consulting PATH."""
     manifest = load_manifest(manifest_path)
     executable = "uv.exe" if os.name == "nt" else "uv"
@@ -410,7 +422,13 @@ def _prepare_destination(virtualenv, version):
 # @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_installs_idempotently_and_repairs_corrupt_copy
 # @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_check_rejects_wrong_version_and_permissions
 # @matrix mcp-package setup : bootstrap executable-permissions version-verification
-def verify_uv(executable, version, expected_sha256, *, run=subprocess.run):
+def verify_uv(
+    executable: Path,
+    version: str,
+    expected_sha256: str,
+    *,
+    run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+) -> Path:
     """Verify ownership, mode, exact bytes, and version of managed uv."""
     executable = Path(executable)
     try:
@@ -477,11 +495,19 @@ def verify_uv(executable, version, expected_sha256, *, run=subprocess.run):
 # @covered-by runner/uv_bootstrap.py::install_uv
 # @reason redirect enforcement is exercised through guarded-download install cases
 class _AllowedRedirectHandler(HTTPRedirectHandler):
-    def __init__(self, allowed_hosts):
+    def __init__(self, allowed_hosts: Sequence[str]) -> None:
         super().__init__()
         self._allowed_hosts = allowed_hosts
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
+    def redirect_request(
+        self,
+        req: Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: HTTPMessage,
+        newurl: str,
+    ) -> Request | None:
         _validate_https_url(newurl, self._allowed_hosts)
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
@@ -640,15 +666,15 @@ def _extract_executable(archive_path, artifact, destination):
 # @matrix mcp-package setup : atomic-install bootstrap digest download-bounds fail-closed idempotence managed-path repair tar-safety url-policy
 def install_uv(
     *,
-    manifest_path=BOOTSTRAP_MANIFEST,
-    virtualenv=PROJECT_VIRTUALENV,
-    system=None,
-    architecture=None,
-    libc=None,
-    opener=None,
-    run=subprocess.run,
-    replace=None,
-):
+    manifest_path: Path = BOOTSTRAP_MANIFEST,
+    virtualenv: Path = PROJECT_VIRTUALENV,
+    system: str | None = None,
+    architecture: str | None = None,
+    libc: str | None = None,
+    opener: OpenerDirector | None = None,
+    run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+    replace: Callable[[Path, Path], None] | None = None,
+) -> Path:
     """Install or repair the declared uv executable without replacing a valid copy."""
     manifest = load_manifest(manifest_path)
     artifact = select_artifact(
@@ -727,13 +753,13 @@ def install_uv(
 # @matrix mcp-package setup : bootstrap diagnostics executable-digest executable-permissions version-verification
 def check_uv(
     *,
-    manifest_path=BOOTSTRAP_MANIFEST,
-    virtualenv=PROJECT_VIRTUALENV,
-    system=None,
-    architecture=None,
-    libc=None,
-    run=subprocess.run,
-):
+    manifest_path: Path = BOOTSTRAP_MANIFEST,
+    virtualenv: Path = PROJECT_VIRTUALENV,
+    system: str | None = None,
+    architecture: str | None = None,
+    libc: str | None = None,
+    run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+) -> Path:
     """Verify the manifest-selected managed uv executable without downloading."""
     manifest = load_manifest(manifest_path)
     artifact = select_artifact(
@@ -757,7 +783,7 @@ def check_uv(
 # @testable true
 # @tests tests_tooling/test_012_mcp_environment.py::test_uv_bootstrap_cli_is_noninteractive_and_actionable
 # @matrix mcp-package setup : bootstrap cli diagnostics non-interactive
-def main(arguments=None):
+def main(arguments: list[str] | None = None) -> int:
     """Run the explicit managed-uv install or read-only verification command."""
     parser = argparse.ArgumentParser(
         prog="python -m runner.uv_bootstrap",

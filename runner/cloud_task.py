@@ -17,7 +17,7 @@ from runner.context import GCLOUD_CLI
 # @tests tests_tooling/test_016_cloud_operator.py::test_cloud_connection_requires_target_identity
 # @tests tests_tooling/test_016_cloud_operator.py::test_cloud_connection_accepts_only_the_configured_relay
 # @matrix auth setup : adc project-identity
-def connection_file(account):
+def connection_file(account: str) -> str:
     path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     manifest = os.environ.get("OIC_MANIFEST_PATH")
     if manifest:
@@ -80,7 +80,7 @@ def _gcloud(*arguments: str, env: dict[str, str]) -> None:
 # @testable true
 # @tests tests_tooling/test_016_cloud_operator.py::test_startup_checks_identity_and_optional_redis
 # @matrix auth setup : adc project-identity
-def probe(project, *, check_redis=False):
+def probe(project: str, *, check_redis: bool = False) -> None:
     from config import SETTINGS
     from config.experiments import normalize_experiments_config
     from runner.gcloud import activate_repository_gcloud
@@ -97,11 +97,11 @@ def probe(project, *, check_redis=False):
     if not check_redis:
         return
 
-    from config.redis import redis_client_kwargs
+    from config.redis import redis_connection_kwargs
     from redis import Redis
 
     client = Redis(
-        **redis_client_kwargs(SETTINGS.APP, socket_timeout=5, socket_connect_timeout=5)
+        **redis_connection_kwargs(SETTINGS.APP, socket_timeout=5, socket_connect_timeout=5)
     )
     try:
         if not client.ping():
@@ -116,7 +116,7 @@ def probe(project, *, check_redis=False):
 # @tests tests_tooling/test_016_cloud_operator.py::test_check_connection_uses_task_identity_before_restore
 # @tests tests_tooling/test_016_cloud_operator.py::test_default_startup_reads_hosted_status
 # @matrix setup : cli-routing project-identity
-def main(arguments=None):
+def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--project",

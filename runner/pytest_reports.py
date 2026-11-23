@@ -1,9 +1,10 @@
 """Preserve JUnit results when one runner invocation uses two environments."""
 
-from contextlib import contextmanager
-from pathlib import Path
 import os
 import tempfile
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
+from pathlib import Path
 from xml.etree import ElementTree
 
 from .pytest_routing import PytestPartitions
@@ -30,7 +31,7 @@ def _without_junit(arguments):
 # @tests tests_tooling/test_007_run_py_test_command.py::test_partition_junit_reports_preserves_single_run_and_rejects_missing_results
 # @matrix testing mcp-package : junit result-aggregation environment-isolation
 @contextmanager
-def partition_junit_reports(partitions):
+def partition_junit_reports(partitions: PytestPartitions) -> Iterator[PytestPartitions]:
     """Give each process a fresh XML path, then atomically publish their union."""
     if partitions.root_args is None or partitions.mcp_args is None:
         yield partitions
@@ -59,7 +60,7 @@ def partition_junit_reports(partitions):
 # @tests tests_tooling/test_007_run_py_test_command.py::test_partition_junit_reports_preserves_single_run_and_rejects_missing_results
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_complete_run_merges_all_phases_without_hiding_failure
 # @matrix testing mcp-package hosted-e2e : junit result-aggregation environment-isolation
-def merge_junit_reports(paths, destination):
+def merge_junit_reports(paths: Iterable[Path], destination: Path) -> None:
     """Publish every phase's results, rejecting missing or malformed reports."""
     combined = ElementTree.Element("testsuites")
     for path in paths:
