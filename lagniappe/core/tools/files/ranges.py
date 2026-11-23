@@ -21,11 +21,11 @@ class ByteRange:
     size: int
 
     @property
-    def length(self):
+    def length(self) -> int:
         return self.end - self.start + 1
 
     @property
-    def content_range(self):
+    def content_range(self) -> str:
         return f"bytes {self.start}-{self.end}/{self.size}"
 
 
@@ -34,7 +34,7 @@ class ByteRange:
 # @tests tests_unit/test_006d_file_ranges.py::test_parse_byte_range_rejects_invalid_headers
 # @tests tests_unit/test_006d_file_ranges.py::test_parse_byte_range_raises_for_unsatisfiable_ranges
 # @matrix file preview : byte-range invalid-header unsatisfiable
-def parse_byte_range(header, size):
+def parse_byte_range(header: str | None, size: int) -> ByteRange | None:
     """Parse a single HTTP byte range against a known resource size."""
     if not header or not isinstance(header, str):
         return None

@@ -4,6 +4,7 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
+from typing import Protocol
 import os
 import posixpath
 import re
@@ -14,6 +15,10 @@ import zipfile
 from xml.parsers import expat
 
 from ...definitions.file_consumers import LARGE_ASSET_BYTES
+
+
+class BinaryReader(Protocol):
+    def read(self, size: int = -1, /) -> bytes: ...
 
 
 DOCX_MIMETYPE = (
@@ -100,7 +105,7 @@ class OOXMLExtractionResult:
     # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_output_budget_returns_typed_partial_result
     # @pair files:partial-result
     @property
-    def truncated(self):
+    def truncated(self) -> bool:
         return self.truncation_reason is not None
 
 
@@ -255,7 +260,7 @@ class _CappedText:
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_summary_generation_uses_docx_text_fallback
 # @tests tests_unit/test_015_ai_tools.py::test_ooxml_xlsx_extraction_preserves_rows_tabs_and_shared_strings
 # @matrix ai files : ooxml summary-fallback
-def is_supported_ooxml(filename=None, mimetype=None):
+def is_supported_ooxml(filename: str | None = None, mimetype: str | None = None) -> bool:
     """Return whether filename or MIME type identifies a supported OOXML file."""
     return _ooxml_kind(filename=filename, mimetype=mimetype) is not None
 
@@ -266,7 +271,10 @@ def is_supported_ooxml(filename=None, mimetype=None):
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_unsafe_archive_members_before_parsing
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_forbidden_or_malformed_xml
 # @matrix files : bounded-resources docx ooxml partial-result xlsx
-def extract_ooxml(content, filename=None, mimetype=None, *, max_characters=None):
+def extract_ooxml(
+    content: bytes | bytearray | memoryview | BinaryReader,
+    filename: str | None = None, mimetype: str | None = None, *, max_characters: int | None = None,
+) -> OOXMLExtractionResult | None:
     """Extract bounded rough text and partial-result metadata from DOCX/XLSX."""
     kind = _ooxml_kind(filename=filename, mimetype=mimetype)
     if kind is None:
@@ -327,7 +335,10 @@ def extract_ooxml(content, filename=None, mimetype=None, *, max_characters=None)
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_happy_paths_preserve_docx_and_xlsx_order
 # @matrix ai files : compatibility docx ooxml rows shared-strings summary-fallback tabs xlsx
 # @pair ai:ooxml
-def extract_ooxml_text(content, filename=None, mimetype=None):
+def extract_ooxml_text(
+    content: bytes | bytearray | memoryview | BinaryReader,
+    filename: str | None = None, mimetype: str | None = None,
+) -> str | None:
     """Compatibility wrapper returning only bounded extracted text."""
     result = extract_ooxml(content, filename=filename, mimetype=mimetype)
     return result.text if result is not None else None
@@ -993,6 +1004,7 @@ class _WorksheetHandler:
     # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def _finish_cell(self):
         cell = self.cell
+        assert cell is not None and self.row_values is not None
         index = _column_index(cell.reference)
         if index is None:
             index = self.row_length
@@ -1011,6 +1023,7 @@ class _WorksheetHandler:
     def _finish_row(self):
         line = _CappedText(self.budget.max_characters + 1)
         previous_index = None
+        assert self.row_values is not None
         for index, value in sorted(self.row_values.items()):
             if value == "":
                 continue

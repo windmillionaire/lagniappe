@@ -1,11 +1,17 @@
 """Named HTML safety policies, Markdown rendering, and text conversion."""
 
+from collections.abc import Iterable
 import html as html_module
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.form import Form
 import re
 import textwrap
 from urllib.parse import urlsplit
 
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import BeautifulSoup
+from bs4.element import NavigableString
 import markdown
 import nh3
 
@@ -124,7 +130,7 @@ _RICH_CLEANER = nh3.Cleaner(
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_strip_tags
 # @pair utility:html-stripping
-def strip_tags(html_content, *, preserve_whitespace=False):
+def strip_tags[T](html_content: T, *, preserve_whitespace: bool = False) -> str | T:
     """Strip HTML tags, optionally retaining multiline text's whitespace."""
     if not isinstance(html_content, str):
         return html_content
@@ -524,7 +530,7 @@ def _retain_original_images(content, original_html):
 # @tests tests_unit/test_014_security.py::test_render_markdown_normalizes_indented_html_source
 # @tests tests_e2e/004_projects/test_004d_document.py::test_pasting_plain_html_inserts_safe_formatted_content
 # @matrix files security : active-content comments html-sanitization links malformed-markup relative-url table task-list unknown-wrapper url-scheme
-def sanitize_html(content) -> SafeHTML:
+def sanitize_html(content: object) -> SafeHTML:
     """Apply the narrow semantic HTML policy used by Markdown and files."""
     if not isinstance(content, str) or not content:
         return _stamp_safe_html("")
@@ -536,7 +542,7 @@ def sanitize_html(content) -> SafeHTML:
 # @tests tests_unit/test_014_security.py::test_form_content_policy_keeps_only_owned_images
 # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
 # @matrix form-html security : html-sanitization inner-html owned-image
-def sanitize_form_content_html(content, form, field_id) -> SafeHTML:
+def sanitize_form_content_html(content: object, form: Form, field_id: str) -> SafeHTML:
     """Apply the form-content policy and retain only this field's owned images."""
     if not isinstance(content, str) or not content:
         return _stamp_safe_html("")
@@ -556,7 +562,7 @@ def sanitize_form_content_html(content, form, field_id) -> SafeHTML:
 # @testable true
 # @tests tests_unit/test_014_security.py::test_public_document_policy_keeps_only_rewritten_owned_images
 # @matrix public-pages security : html-sanitization owned-image
-def sanitize_public_document_html(content, image_sources) -> SafeHTML:
+def sanitize_public_document_html(content: object, image_sources: Iterable[tuple[str, str]]) -> SafeHTML:
     """Apply the anonymous public-document policy to transformed editor HTML."""
     if not isinstance(content, str) or not content:
         return _stamp_safe_html("")
@@ -574,7 +580,7 @@ def sanitize_public_document_html(content, image_sources) -> SafeHTML:
 # @tests tests_unit/test_014_security.py::test_render_markdown_normalizes_indented_html_source
 # @matrix editor files markdown : code-block hard-break html-source list-kind mixed-list soft-wrap task-list
 # @matrix form-html security : html-sanitization owned-image
-def render_markdown(text, *, image_sources=None, original_html=None) -> SafeHTML:
+def render_markdown(text: object, *, image_sources: Iterable[tuple[str, str]] | None = None, original_html: str | None = None) -> SafeHTML:
     """Render Markdown safely, optionally retaining images from existing content."""
     if not isinstance(text, str):
         return _stamp_safe_html("")
@@ -626,7 +632,7 @@ def render_markdown(text, *, image_sources=None, original_html=None) -> SafeHTML
 # @tests tests_unit/test_014_security.py::test_htmlize_preserves_markdown_tables_and_sanitizes_cells
 # @tests tests_unit/test_014_security.py::test_htmlize_escapes_code_plain_text_and_mimetype_attributes
 # @matrix files security : code html html-sanitization markdown mimetype plain-text table
-def htmlize(text, mimetype) -> SafeHTML:
+def htmlize(text: object, mimetype: str | None) -> SafeHTML:
     """Convert text content to sanitized HTML for its MIME type."""
     if mimetype == "text/html":
         return sanitize_html(text)

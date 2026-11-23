@@ -1,6 +1,15 @@
 """Text extraction from files via Document AI OCR and direct reading."""
 
 from google.cloud import documentai
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.deferred_job import DeferredJob
+    from lagniappe.core.entities.notification import Notification
+    from lagniappe.core.entities.file import File
+    from lagniappe.core.entities.user import User
+    from lagniappe.core.properties.file_options import Extract
+    from lagniappe.core.properties.file_assets import FileAsset
 
 from lagniappe import CONFIG
 
@@ -15,7 +24,7 @@ from .constants import DOCUMENT_AI_MIMETYPES
 # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatch_uses_explicit_actor
 # @tests tests_unit/test_006_file_properties.py::test_file_dispatch_rejects_missing_actor_before_changing_status
 # @matrix file deferred-jobs : explicit-actor validation
-def get_file_text(file, *, actor=None, dispatch=True):
+def get_file_text(file: File, *, actor: User | None = None, dispatch: bool = True) -> Extract:
     """Initiate text extraction for a file, dispatching to OCR or a background task.
 
     Args:
@@ -50,12 +59,12 @@ def get_file_text(file, *, actor=None, dispatch=True):
 # @tests tests_unit/test_006_file_properties.py::test_file_dispatch_rejects_missing_actor_before_changing_status
 # @matrix file deferred-jobs : explicit-actor validation
 def start_file_extraction(
-    file,
+    file: File,
     *,
-    actor,
-    idempotency_key=None,
-    delay_seconds=5,
-):
+    actor: User | None,
+    idempotency_key: str | None = None,
+    delay_seconds: int = 5,
+) -> tuple[DeferredJob, Notification | None]:
     """Dispatch extraction for a persisted file with an optional stable identity."""
     from ...definitions import DeferredJobSpec, DeferredJobType
     from ..deferred_jobs.service import DeferredJobs
@@ -79,7 +88,7 @@ def start_file_extraction(
 # @testable false
 # @covered-by lagniappe/core/tools/files/extract.py::get_file_text
 # @reason Document AI OCR is external-service behavior owned by process/E2E workflows
-def ocr_file(file, raise_errors=False):
+def ocr_file(file: File, raise_errors: bool = False) -> Extract:
     """Run Document AI OCR on a GCS file and return the extracted text.
 
     Args:
@@ -88,7 +97,7 @@ def ocr_file(file, raise_errors=False):
     Returns:
         Extract process property.
     """
-    file_uri = file.get_asset("file").uri
+    file_uri = cast("FileAsset", file.get_asset("file")).uri
     mime_type = file.mimetype
     extract = file.properties.extract
 

@@ -1,18 +1,37 @@
 """CSV parsing, column type inference, and schema generation for file imports."""
 
+from collections.abc import Mapping, Sequence
 import csv
 import io
 import re
+from typing import NotRequired, TypedDict
 
 from ... import exceptions
 from ...definitions.identifiers import short_hash, short_uuid
+
+
+class CSVColumn(TypedDict):
+    id: str
+    label: str
+    index: int
+    kind: NotRequired[str]
+    icon: NotRequired[str]
+    type: NotRequired[str]
+
+
+class ParsedCSV(TypedDict):
+    delimiter: str
+    rows: list[dict[str, str]]
+    columns: dict[str, CSVColumn]
+    row_count: int
+    column_count: int
 
 
 # @testable true
 # @tests tests_unit/test_006a_ingress_csv.py::test_categorical_detection
 # @tests tests_unit/test_006a_ingress_csv.py::test_string_fallback
 # @matrix ingress-csv : categorical fallback type-inference
-def infer_column_types(rows, columns):
+def infer_column_types(rows: Sequence[Mapping[str, str]], columns: Sequence[CSVColumn]) -> None:
     """Infer column types (string, number, date, etc.) by sampling row values.
 
     Args:
@@ -159,7 +178,7 @@ def infer_column_types(rows, columns):
 # @testable false
 # @covered-by lagniappe/core/tools/files/validate.py::create_schema
 # @reason categorical option extraction is part of schema generation
-def extract_options(rows, column):
+def extract_options(rows: Sequence[Mapping[str, str]], column: CSVColumn) -> tuple[list[str], str | None]:
     """Extract unique option values for a categorical or multi-categorical column.
 
     Args:
@@ -171,7 +190,7 @@ def extract_options(rows, column):
     """
     values = [row.get(column["id"], "").strip() for row in rows]
 
-    if column["type"] == "multi_categorical":
+    if column.get("type") == "multi_categorical":
         joined_values = "".join(values)
         if not re.search(r"[;|]", joined_values):
             separator = None
@@ -196,7 +215,7 @@ def extract_options(rows, column):
 # @tests tests_unit/test_006a_ingress_csv.py::test_no_header_raises
 # @tests tests_unit/test_006a_ingress_csv.py::test_rows_keyed_by_column_id
 # @matrix ingress-csv : column-ids delimiter empty-rows validation
-def process_csv(text):
+def process_csv(text: str) -> ParsedCSV:
     """Parse CSV text into structured rows, columns, and inferred types.
 
     Args:
@@ -221,7 +240,7 @@ def process_csv(text):
         if not col_label or not str(col_label).strip():
             continue
 
-        column = {
+        column: CSVColumn = {
             "id": f"col-{short_hash(f'{col_label}-{idx}')}",
             "label": col_label.replace("\n", " ").replace("\r", " ").strip(),
             "index": idx,
@@ -258,7 +277,7 @@ def process_csv(text):
 # @testable false
 # @covered-by lagniappe/core/tools/files/validate.py::create_schema
 # @reason select/radio option shaping is part of schema generation
-def create_options(values, column_schema):
+def create_options(values: Sequence[str], column_schema: dict[str, object]) -> list[dict[str, str]]:
     """Build option objects for a select column, switching to radio for small sets."""
     if len(values) < 6:
         column_schema["type"] = "radio"
@@ -271,7 +290,7 @@ def create_options(values, column_schema):
 # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_builds_or_selects_the_submission_form
 # @tests tests_unit/test_006b_ingress_entity.py::test_generated_import_schema_preserves_reserved_page_fields
 # @matrix form ingress : choose-form default-form schema-generation
-def create_schema(columns, rows, *, form_type):
+def create_schema(columns: Mapping[str, CSVColumn], rows: Sequence[Mapping[str, str]], *, form_type: str) -> tuple[list[dict[str, object]], str | None]:
     """Generate a form schema from inferred column types and row data.
 
     Args:
@@ -301,7 +320,7 @@ def create_schema(columns, rows, *, form_type):
     # @reason per-column schema assembly is part of create_schema
     def build_schema(column, separators):
         label = column["label"].strip()
-        column_schema = {"title": label}
+        column_schema: dict[str, object] = {"title": label}
 
         settings = type_to_schema[column["type"]]
         if form_type == "page" and label.lower() == "name":

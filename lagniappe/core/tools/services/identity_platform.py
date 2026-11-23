@@ -1,5 +1,6 @@
 """Google Identity Platform token and account operations."""
 
+from collections.abc import Mapping
 import re
 
 from urllib.parse import quote, urlencode
@@ -22,7 +23,7 @@ IDENTITY_REQUEST_TIMEOUT = 10
 class IdentityPlatformError(RuntimeError):
     """Raised when Identity Platform rejects or cannot complete an operation."""
 
-    def __init__(self, message, *, provider_code=None):
+    def __init__(self, message: str, *, provider_code: str | None = None) -> None:
         super().__init__(message)
         self.provider_code = str(provider_code or "").strip() or None
 
@@ -78,7 +79,7 @@ def _client_config(config):
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_verify_identity_token_enforces_project_issuer_and_subject
 # @matrix login : audience identity-platform issuer token-verification
-def verify_identity_token(token, project_id, request_adapter=None):
+def verify_identity_token(token: str, project_id: str, request_adapter: google_requests.Request | None = None) -> Mapping[str, object]:
     """Verify a Secure Token ID token for exactly one Identity Platform project."""
     project_id = str(project_id or "").strip()
     if not token or not project_id:
@@ -101,7 +102,7 @@ def verify_identity_token(token, project_id, request_adapter=None):
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_verify_google_credential_enforces_client_and_verified_email
 # @matrix login : audience email-verification google-oauth token-verification
-def verify_google_credential(credential, client_id, request_adapter=None):
+def verify_google_credential(credential: str, client_id: str, request_adapter: google_requests.Request | None = None) -> Mapping[str, object]:
     """Verify a Google Identity Services credential before account exchange."""
     client_id = str(client_id or "").strip()
     if not credential or not client_id:
@@ -124,11 +125,11 @@ def verify_google_credential(credential, client_id, request_adapter=None):
 # @tests tests_unit/test_025_identity_platform.py::test_exchange_google_credential_uses_identity_platform_idp_endpoint
 # @matrix login : google-oauth identity-platform provider-error-code token-exchange
 def exchange_google_credential(
-    credential,
-    client_config,
-    request_uri,
-    session=None,
-):
+    credential: str,
+    client_config: Mapping[str, object],
+    request_uri: str,
+    session: http_requests.Session | None = None,
+) -> dict[str, object]:
     """Exchange a popup-free GIS credential for an Identity Platform ID token."""
     api_key, _ = _client_config(client_config)
     if not credential:
@@ -179,22 +180,23 @@ def exchange_google_credential(
 # @matrix login : google-oauth identity-platform provider-state
 def google_provider_enabled(
     *,
-    project_id=None,
-    access_token=None,
-    session=None,
-):
+    project_id: str | None = None,
+    access_token: str | None = None,
+    session: http_requests.Session | None = None,
+) -> bool:
     """Return whether the project's live Google sign-in provider is enabled."""
     config = None
     if not project_id or not access_token:
         from lagniappe import CONFIG
 
         config = CONFIG
-    project_id = str(project_id or config.GOOGLE_CLOUD_PROJECT or "").strip()
+    project_id = str(project_id or (config.GOOGLE_CLOUD_PROJECT if config is not None else "") or "").strip()
     if not project_id:
         raise IdentityPlatformError(
             "Google provider status requires an Identity Platform project ID."
         )
-    access_token = access_token or config.google_access_token()
+    if not access_token and config is not None:
+        access_token = config.google_access_token()
     session = session or http_requests.Session()
     try:
         response = session.get(
@@ -237,14 +239,14 @@ def _admin_headers(access_token):
 # @tests tests_unit/test_025_identity_platform.py::test_generate_email_action_code_returns_provider_code_without_sending
 # @matrix login : action-codes authentication-email identity-platform
 def generate_email_action_code(
-    request_type,
-    email,
+    request_type: str,
+    email: str,
     *,
-    user_ip=None,
-    project_id=None,
-    access_token=None,
-    session=None,
-):
+    user_ip: str | None = None,
+    project_id: str | None = None,
+    access_token: str | None = None,
+    session: http_requests.Session | None = None,
+) -> str:
     """Generate an Identity Platform OOB code without provider email delivery."""
     request_type = str(request_type or "").strip()
     if request_type not in {"PASSWORD_RESET", "VERIFY_EMAIL"}:
@@ -258,12 +260,13 @@ def generate_email_action_code(
         from lagniappe import CONFIG
 
         config = CONFIG
-    project_id = str(project_id or config.GOOGLE_CLOUD_PROJECT or "").strip()
+    project_id = str(project_id or (config.GOOGLE_CLOUD_PROJECT if config is not None else "") or "").strip()
     if not project_id:
         raise IdentityPlatformError(
             "Identity Platform email action requires a project ID."
         )
-    access_token = access_token or config.google_access_token()
+    if not access_token and config is not None:
+        access_token = config.google_access_token()
     payload = {
         "requestType": request_type,
         "email": email,
@@ -302,12 +305,12 @@ def generate_email_action_code(
 # @tests tests_unit/test_025_identity_platform.py::test_delete_account_by_email_looks_up_and_deletes_identity_user
 # @matrix users : account-delete identity-platform
 def delete_account_by_email(
-    email,
+    email: str,
     *,
-    project_id=None,
-    access_token=None,
-    session=None,
-):
+    project_id: str | None = None,
+    access_token: str | None = None,
+    session: http_requests.Session | None = None,
+) -> bool:
     """Delete the Identity Platform account for an email, if one exists."""
     email = str(email or "").strip().lower()
     if not email:
@@ -317,12 +320,13 @@ def delete_account_by_email(
         from lagniappe import CONFIG
 
         config = CONFIG
-    project_id = str(project_id or config.GOOGLE_CLOUD_PROJECT or "").strip()
+    project_id = str(project_id or (config.GOOGLE_CLOUD_PROJECT if config is not None else "") or "").strip()
     if not project_id:
         raise IdentityPlatformError(
             "Identity Platform account deletion requires a project ID."
         )
-    access_token = access_token or config.google_access_token()
+    if not access_token and config is not None:
+        access_token = config.google_access_token()
     headers = _admin_headers(access_token)
     session = session or http_requests.Session()
     lookup_url = f"{IDENTITY_TOOLKIT_API}/projects/{project_id}/accounts:lookup"

@@ -1,9 +1,14 @@
 """File encoding and MIME detection."""
 
 from contextlib import suppress
+from typing import BinaryIO, Protocol
 import filetype
 
 from .constants import ENCODINGS, TEXT_MIMETYPES
+
+
+class SampleReader(Protocol):
+    def read_sample(self, size: int, /) -> bytes: ...
 
 
 MIME_SAMPLE_BYTES = 8192
@@ -31,7 +36,7 @@ def _upload_sample(upload, size=MIME_SAMPLE_BYTES):
 # @covered-by lagniappe/core/properties/file_assets.py::FileAsset
 # @covered-by lagniappe/core/tools/files/utility.py::determine_mimetype
 # @reason upload metadata decisions are owned by the file asset upload contract
-def determine_encoding(upload):
+def determine_encoding(upload: BinaryIO | SampleReader) -> str | None:
     """Detect the character encoding of an uploaded file by trial decoding."""
     sample = _upload_sample(upload, 1024)
     for encoding in ENCODINGS:
@@ -46,7 +51,7 @@ def determine_encoding(upload):
 # @testable false
 # @covered-by lagniappe/core/properties/file_assets.py::FileAsset
 # @reason upload metadata decisions are owned by the file asset upload contract
-def determine_mimetype(upload, filename, mimetype, encoding):
+def determine_mimetype(upload: BinaryIO | SampleReader, filename: str, mimetype: str | None, encoding: str | None) -> str:
     """Resolve an upload MIME type from magic bytes and its extension."""
     mimetype = str(mimetype or "").partition(";")[0].strip().casefold()
     if mimetype in GENERIC_MIMETYPES:

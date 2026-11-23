@@ -1,5 +1,6 @@
 """Google Places API integration (autocomplete and place details)."""
 
+from typing import TypedDict
 import json
 import math
 import re
@@ -19,7 +20,12 @@ from ..http import (
     request_trusted_content,
 )
 
-_token_cache = {"token": None, "expires_at": 0}
+class TokenCache(TypedDict):
+    token: str | None
+    expires_at: float
+
+
+_token_cache: TokenCache = {"token": None, "expires_at": 0}
 
 # Trailing secondary unit (suite, apt, etc.) without a preceding comma.
 _TRAILING_UNIT = re.compile(
@@ -39,7 +45,7 @@ _UNIT_LABEL = re.compile(
 # @testable true
 # @tests tests_unit/test_003d_submission_location.py::test_normalize_location_coordinates_rejects_malformed_values
 # @matrix location : coordinates session-bias validation
-def normalize_location_coordinates(value):
+def normalize_location_coordinates(value: object) -> dict[str, float] | None:
     """Return normalized finite latitude/longitude coordinates, or ``None``."""
     if isinstance(value, str):
         try:
@@ -133,7 +139,7 @@ def _capture_contract_failure(operation, method):
 # @tests tests_unit/test_003d_submission_location.py::test_simplify_address_for_search_trailing_suite
 # @tests tests_unit/test_003d_submission_location.py::test_simplify_address_for_search_no_change
 # @pair location:suite-stripping
-def simplify_address_for_search(query):
+def simplify_address_for_search(query: str | None) -> str | None:
     """Strip one secondary-address clause for a follow-up Places search.
 
     Returns a shorter string or None if nothing was removed or the result is too short.
@@ -163,7 +169,7 @@ def simplify_address_for_search(query):
 # @tests tests_unit/test_003d_submission_location.py::test_resolve_location_query_retries_after_simplify
 # @tests tests_unit/test_003d_submission_location.py::test_resolve_location_query_first_hit_wins
 # @matrix location : first-hit retry suite-stripping
-def resolve_location_query(query):
+def resolve_location_query(query: str | None) -> dict[str, str] | None:
     """Autocomplete a query; if empty, retry once with simplified address text.
 
     Returns the first ``{id, name}`` suggestion or None if no match.
@@ -257,7 +263,7 @@ def _formatted_address_without_unit(formatted_address, address2):
 # @testable true
 # @tests tests_unit/test_003d_submission_location.py::test_get_places_access_token_reuses_cached_token_until_refresh_window
 # @matrix location : api-cache oauth
-def get_places_access_token():
+def get_places_access_token() -> str:
     """Get a cached OAuth2 access token for the Places API."""
     now = time.time()
 
@@ -290,7 +296,7 @@ def get_places_access_token():
 # @tests tests_unit/test_003d_submission_location.py::test_get_place_details_omits_street_address_display_name
 # @tests tests_unit/test_003d_submission_location.py::test_places_provider_failures_capture_once_and_degrade
 # @matrix location : address2 api-request deadline degradation diagnostics name-normalization provider-failure
-def get_place_details(place_id):
+def get_place_details(place_id: str | None) -> dict[str, str] | None:
     """Fetch place details (name, address) from Google Places API."""
     if not place_id:
         return None
@@ -363,12 +369,12 @@ def get_place_details(place_id):
 # @tests tests_unit/test_003d_submission_location.py::test_places_provider_failures_capture_once_and_degrade
 # @tests tests_unit/test_003d_submission_location.py::test_places_malformed_provider_payload_captures_once
 # @matrix location : api-request deadline degradation diagnostics provider-contract provider-failure response-mapping session-bias
-def search_places(query):
+def search_places(query: str | None) -> list[dict[str, str]]:
     """Autocomplete a place query, biased to the user's session location."""
     if not query or len(query) < 3:
         return []
 
-    data = {"input": query}
+    data: dict[str, object] = {"input": query}
     location = normalize_location_coordinates(session.get("location"))
     if location:
         data["locationBias"] = {

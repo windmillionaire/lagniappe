@@ -1,11 +1,18 @@
 """Page lookup helpers for CSV import workflows."""
 
 import re
+from typing import TypedDict
 
 from thefuzz import process
 
 from ...definitions import Restriction
 from .. import cache
+
+
+class PageMatch(TypedDict):
+    id: str | None
+    warnings: list[str]
+    errors: list[str]
 
 
 FUZZY_MATCH_THRESHOLD = 80
@@ -18,9 +25,9 @@ WEAK_MATCH_THRESHOLD = 90
 # @tests tests_unit/test_006c_files_find_page.py::test_find_page_fuzzy_weak_match_returns_warning
 # @tests tests_unit/test_006c_files_find_page.py::test_find_page_fuzzy_low_confidence_returns_error
 # @matrix ingress link : fuzzy-match no-match page-match weak-match
-def find_page(value, match_field_label="Name", fuzzy=False, error_label=None):
+def find_page(value: object, match_field_label: str = "Name", fuzzy: bool = False, error_label: str | None = None) -> PageMatch:
     """Find a page by name or cached form-field snippet for CSV imports."""
-    result = {"id": None, "warnings": [], "errors": []}
+    result: PageMatch = {"id": None, "warnings": [], "errors": []}
     lookup_value = _lookup_value(value)
     label = error_label or match_field_label
 

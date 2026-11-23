@@ -6,6 +6,10 @@ from io import BytesIO
 from ipaddress import ip_address
 import re
 import socket
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from requests._types import JsonType, ParamsType
 import time
 import unicodedata
 from urllib.parse import urljoin, urlsplit, urlunsplit
@@ -185,7 +189,7 @@ def _resolve_public_addresses(target: _ValidatedURL) -> tuple[str, ...]:
     for record in records:
         try:
             raw_address = record[4][0]
-            if "%" in raw_address:
+            if not isinstance(raw_address, str) or "%" in raw_address:
                 raise ValueError("scoped resolved address")
             address = ip_address(raw_address)
         except (IndexError, ValueError) as error:
@@ -566,8 +570,8 @@ def request_trusted_content(
     policy: TrustedProviderPolicy,
     *,
     headers: dict[str, str] | None = None,
-    params: dict[str, object] | None = None,
-    json_body: object = None,
+    params: ParamsType = None,
+    json_body: JsonType = None,
 ) -> OutboundResult:
     """Request bounded content from a policy-owned fixed provider origin."""
     method = str(method or "").upper()
