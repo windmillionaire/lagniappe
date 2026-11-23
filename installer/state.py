@@ -132,7 +132,7 @@ def _pid_running(pid):
 class SetupProcessLock:
     """Cross-platform single-process lock based on atomic file creation."""
 
-    def __init__(self, path=None):
+    def __init__(self, path: str | Path | None = None) -> None:
         self.path = Path(path or (_state_dir() / ".lagniappe_setup.lock"))
         self.acquired = False
 
@@ -199,7 +199,9 @@ class SetupProcessLock:
 class OperationJournal:
     """Persist the last safe setup boundary without settings or credentials."""
 
-    def __init__(self, mode, argv, path=None):
+    def __init__(
+        self, mode: str, argv: Sequence[str], path: str | Path | None = None
+    ) -> None:
         self.path = Path(
             path or (_state_dir() / "lagniappe_setup_operation.json")
         )

@@ -150,7 +150,15 @@ def _rewrite_reference_url(value, page_path, identities):
 class OfflineHTMLBuilder:
     """Render presentation pages using only already-portable records and assets."""
 
-    def __init__(self, root, *, backup_id, created_at, consistency, warnings=()):
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        backup_id: str,
+        created_at: str,
+        consistency: str,
+        warnings: Iterable[Mapping[str, object]] = (),
+    ) -> None:
         self.root = Path(root)
         self.backup_id = backup_id
         self.created_at = created_at

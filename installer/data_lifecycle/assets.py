@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import NotRequired, TypedDict
+from typing import TYPE_CHECKING, NotRequired, Protocol, TypedDict, cast
+from collections.abc import Mapping
 from datetime import datetime, UTC
 import hashlib
 import mimetypes
@@ -15,6 +16,18 @@ from .portable import portable_name
 from .provider import DataLifecycleError
 from .staging import normalize_text
 from .state import ArchiveState, secure_directory
+
+
+if TYPE_CHECKING:
+    from google.cloud.storage import Bucket
+    from .archive import _RecoveryAssetBucket
+
+
+# @testable infrastructure
+class _RangeDownload(Protocol):
+    def __call__(
+        self, *, start: int, end: int, if_generation_match: int, checksum: None
+    ) -> bytes: ...
 
 
 # @testable infrastructure
@@ -43,7 +56,14 @@ GENERATION_RETRY_LIMIT = 3
 class AssetCollector:
     """Download only staged references and publish verified content-addressed bytes."""
 
-    def __init__(self, state: ArchiveState, output_root, buckets, *, chunk_size=DOWNLOAD_CHUNK_BYTES):
+    def __init__(
+        self,
+        state: ArchiveState,
+        output_root: str | Path,
+        buckets: Mapping[str, Bucket | _RecoveryAssetBucket],
+        *,
+        chunk_size: int = DOWNLOAD_CHUNK_BYTES,
+    ) -> None:
         if state.connection is None:
             raise DataLifecycleError("Archive staging database is not open.")
         self.state = state
@@ -122,9 +142,12 @@ class AssetCollector:
                 with part.open("ab") as output:
                     if os.name != "nt":
                         os.chmod(part, 0o600)
+                    # Cloud Storage accepts checksum=None for ranges, while its
+                    # generated annotation only describes named checksum methods.
+                    download_range = cast(_RangeDownload, blob.download_as_bytes)
                     while offset < size:
                         end = min(offset + self.chunk_size, size) - 1
-                        payload = blob.download_as_bytes(
+                        payload = download_range(
                             start=offset,
                             end=end,
                             if_generation_match=int(generation),

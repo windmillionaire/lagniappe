@@ -245,9 +245,13 @@ class ValueCodec:
     def __init__(
         self,
         *,
-        reference_resolver: Callable[[Key], PortableReference | MissingReference] | None = None,
-        string_normalizer: Callable[[str, tuple[str | int, ...]], str | PortableReference | MissingReference] | None = None,
-    ):
+        reference_resolver: Callable[[Key], PortableReference | MissingReference]
+        | None = None,
+        string_normalizer: Callable[
+            [str, tuple[str | int, ...]], str | PortableReference | MissingReference
+        ]
+        | None = None,
+    ) -> None:
         self.reference_resolver = reference_resolver
         self.string_normalizer = string_normalizer
 
@@ -443,7 +447,7 @@ def canonical_json(value: object) -> bytes:
 class ShardWriter:
     """Stream sorted per-type JSON-array shards within both v1 limits."""
 
-    def __init__(self, root: str | Path):
+    def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
 
     def write_type(

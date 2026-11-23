@@ -6,7 +6,7 @@ import hashlib
 import json
 from pathlib import Path, PurePosixPath
 from typing import Any
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from .portable import (
     TEXT_REFERENCE_PREFIX,
@@ -34,7 +34,13 @@ class ImportPlanner:
 
     RECIPE = "lagniappe-target-key/v1"
 
-    def __init__(self, *, target_prefix="", target_namespace="", reserved_keys=None):
+    def __init__(
+        self,
+        *,
+        target_prefix: str = "",
+        target_namespace: str = "",
+        reserved_keys: Mapping[str, str] | None = None,
+    ) -> None:
         self.target_prefix = str(target_prefix)
         self.target_namespace = str(target_namespace)
         self.reserved_keys = dict(reserved_keys or {})

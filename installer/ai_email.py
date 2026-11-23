@@ -1,5 +1,9 @@
 """Provision the Resend transport used by production AI email submissions."""
 
+from collections.abc import Callable
+from typing import Protocol
+
+
 from contextlib import suppress
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
@@ -37,13 +41,27 @@ WEBHOOK_PATH = "/webhooks/resend/ai-email"
 WEBHOOK_EVENTS = ["email.received"]
 
 
+# @testable infrastructure
+class _ResendRequest(Protocol):
+    def __call__(
+        self, method: str, url: str, *, headers: dict[str, str],
+        json: dict[str, str | dict[str, str] | list[str]] | None, timeout: float,
+    ) -> requests.Response: ...
+
+
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_resend_setup_client_uses_full_key_for_provider_administration
 # @matrix ai-email setup : authorization resend-api setup
 class ResendSetupClient:
     """Bounded Resend administration adapter for the focused installer."""
 
-    def __init__(self, api_key, *, request=None, retry_sleep=None):
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        request: _ResendRequest | None = None,
+        retry_sleep: Callable[[float], None] | None = None,
+    ) -> None:
         self.api_key = str(api_key or "").strip()
         self.request = request or requests.request
         self.retry_sleep = retry_sleep

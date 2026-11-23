@@ -337,7 +337,7 @@ def stage_database(
 # @covered-by installer/data_lifecycle/staging.py::portable_records
 # @reason staged key-map lookup is exercised through portable record conversion
 class _Resolver:
-    def __init__(self, state: ArchiveState):
+    def __init__(self, state: ArchiveState) -> None:
         self.state = state
         self.known = {}
         for row in state.database.execute(

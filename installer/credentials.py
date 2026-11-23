@@ -56,7 +56,7 @@ def _adc_credentials_path():
 class _AdcCredentialTransaction:
     """Restore or remove ADC when setup cannot confirm the selected operator."""
 
-    def __init__(self, path=None):
+    def __init__(self, path: str | Path | None = None) -> None:
         self.path = Path(path or _adc_credentials_path())
         self.captured = False
         self.previous = None

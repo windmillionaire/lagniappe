@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import NotRequired, TypedDict, cast
 from .provider import ProviderContext
+from .state import LifecycleCheckpoint
 
 
 from google.cloud.datastore import Client
@@ -264,7 +265,13 @@ def _validate_remote_journal(context, payload, *, restore_id=None, filename=None
 class MirroredRestoreCheckpoint:
     """Mirror a private local checkpoint into a secret-free recovery object."""
 
-    def __init__(self, local, context, *, filename="journal.json"):
+    def __init__(
+        self,
+        local: LifecycleCheckpoint,
+        context: ProviderContext,
+        *,
+        filename: str = "journal.json",
+    ) -> None:
         if filename != "journal.json":
             raise DataLifecycleError("Remote restore journal filename is invalid.")
         self.local = local
@@ -295,8 +302,11 @@ class MirroredRestoreCheckpoint:
         remote_revision = existing["state"]["journal_revision"]
         local_revision = desired["state"]["journal_revision"]
         if remote_revision > local_revision:
-            self.local.payload.update(existing["state"])
-            self.local.payload["plan"] = _localize_remote_plan(existing["plan"])
+            state = self.local.payload
+            if state is None:
+                raise DataLifecycleError("Restore journal has no active state.")
+            state.update(existing["state"])
+            state["plan"] = _localize_remote_plan(existing["plan"])
             self.local.save()
             return
         if remote_revision == local_revision:
