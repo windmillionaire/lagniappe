@@ -117,6 +117,21 @@ def test_project_document_state_uses_markup_when_no_ydoc():
     assert state["markup"] == "<p>Readonly project document content marker</p>"
 
 
+@pytest.mark.unit
+def test_document_html_assignment_reads_back_text_and_clears():
+    project = Project(testing=True)
+    document = project.properties.document
+    markup = "<p>Revised</p>"
+    with patch.object(project, "save_asset", side_effect=[object(), None]) as save:
+        document.html = markup
+        assert document.html == markup
+        save.assert_called_with(markup, "document", "html")
+
+        document.html = None
+        assert document.html is None
+        save.assert_called_with(None, "document", "html")
+
+
 # @matrix project : filter-value public
 @pytest.mark.unit
 def test_project_is_public(get_test_entities):

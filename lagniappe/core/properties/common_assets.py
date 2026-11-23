@@ -73,7 +73,8 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property):
 
     @html.setter
     def html(self, value):
-        self._html = self.entity.save_asset(value, self.id, "html")
+        saved = self.entity.save_asset(value, self.id, "html")
+        self._html = value if saved else None
 
     @property
     def ydoc(self):
