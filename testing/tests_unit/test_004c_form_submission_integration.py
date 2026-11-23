@@ -44,7 +44,7 @@ def test_submission_links_internal_top_level_and_table_row(
         fetch_requests = []
         key_requests = []
 
-        def _fake_entities_get(identifier, *, request):
+        def _fake_entities_get(identifier, *, request, fetch_requests=fetch_requests):
             fetch_requests.append((identifier, request))
             return SimpleNamespace(
                 details={
@@ -55,7 +55,7 @@ def test_submission_links_internal_top_level_and_table_row(
                 }
             )
 
-        def _fake_datastore_key(identifier):
+        def _fake_datastore_key(identifier, *, key_requests=key_requests):
             key_requests.append(identifier)
             return f"key:{identifier}"
 

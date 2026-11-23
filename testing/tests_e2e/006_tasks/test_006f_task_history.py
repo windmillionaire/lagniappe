@@ -206,7 +206,7 @@ def test_completion_views_follow_generation_and_archive_original_answers(get_adm
             completion_path = f"/tasks/{live.key}/completion-details"
             completion_requests = []
 
-            def track_completion_request(request):
+            def track_completion_request(request, *, completion_path=completion_path, completion_requests=completion_requests):
                 if request.method == "GET" and request.url.split("?", 1)[0].endswith(completion_path):
                     completion_requests.append(request)
 

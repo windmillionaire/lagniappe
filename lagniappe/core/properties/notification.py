@@ -17,7 +17,7 @@ class Pending(DBProperty):
     """Whether a notification represents work still in progress."""
 
     _id = "pending"
-    _truthy = {True, "true", "True", "1", 1, "on", "yes"}
+    _truthy = {True, "true", "True", "1", "on", "yes"}
 
     # @testable false
     # @covered-by lagniappe/core/entities/notification.py::Notification.create

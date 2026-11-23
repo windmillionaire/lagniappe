@@ -269,7 +269,7 @@ def test_runtime_datastore_and_all_storage_bucket_operations(monkeypatch):
                     controlled_clock.setattr(
                         storage_signing,
                         "get_v4_now_dtstamps",
-                        lambda: (request_timestamp, datestamp),
+                        lambda *, request_timestamp=request_timestamp, datestamp=datestamp: (request_timestamp, datestamp),
                     )
                     expired_url = assets.get_signed_url(blob.name, expires_in=1)
                 expired_query = parse_qs(urlparse(expired_url).query)

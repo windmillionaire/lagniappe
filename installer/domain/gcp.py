@@ -319,7 +319,7 @@ def wait_for_managed_certificate(
             return True
         elif pending_id:
             certificate = retry_provider_call(
-                lambda: _get_ssl_certificate(project_id, pending_id, account),
+                lambda *, pending_id=pending_id: _get_ssl_certificate(project_id, pending_id, account),
                 description=f"Check App Engine managed certificate {pending_id}",
             )
             last_status = _managed_certificate_status(certificate)

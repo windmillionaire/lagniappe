@@ -19,7 +19,7 @@ def _deployment_int(settings, defaults, key, label, min_value=1):
     except (TypeError, ValueError):
         raise DeploymentSettingsError(
             f"{label} must be an integer greater than or equal to {min_value}."
-        )
+        ) from None
 
     if parsed < min_value:
         raise DeploymentSettingsError(

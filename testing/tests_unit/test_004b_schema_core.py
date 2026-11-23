@@ -39,7 +39,7 @@ def test_schema_validate_ai_html_calls_set_html_field(get_test_entities):
         payload = copy.deepcopy(entity.test_spec["ai_payload"])
         before = copy.deepcopy(payload)
         entity.form_type = "task"
-        entity.set_html_field = lambda fid, html: calls.append([fid, html])
+        entity.set_html_field = lambda fid, html, *, calls=calls: calls.append([fid, html])
         schema = entity.properties.schema
         schema.validate_ai(payload)
         assert calls == entity.test_spec["expected_set_html_calls"]

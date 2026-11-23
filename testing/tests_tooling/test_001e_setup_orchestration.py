@@ -412,9 +412,10 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
     spec.loader.exec_module(setup_cli)
     verify_runtime = setup_package.verify_setup_runtime
 
+    events = []
     for parameters in CLI_MODES:
         arguments = list(parameters.values[0])
-        events = []
+        events.clear()
         monkeypatch.setattr(
             setup_package,
             "verify_setup_runtime",

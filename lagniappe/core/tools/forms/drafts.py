@@ -417,13 +417,13 @@ def save_form_draft(form, draft, baseline, save_id, actor, *, images=None, _retr
         })
         commit_started = True
         outcome = execute_mutation(plan)
-    except exceptions.MutationConflict:
+    except exceptions.MutationConflict as error:
         cleanup_rejected_attempt(current)
         if _retry:
             # Re-read permissions and metadata; the browser baseline still
             # prevents overwriting another editor's accepted draft.
             return save_form_draft(form, draft, baseline, save_id, actor, images=images, _retry=False)
-        raise FormDraftConflict("The Form changed while saving. Your draft is preserved; reload to reconcile it.")
+        raise FormDraftConflict("The Form changed while saving. Your draft is preserved; reload to reconcile it.") from error
     except Exception:
         if not commit_started:
             cleanup_rejected_attempt(current)
@@ -483,12 +483,12 @@ def copy_form_draft(source, draft, baseline, save_id, actor, *, images=None):
         })
         commit_started = True
         outcome = execute_mutation(plan)
-    except exceptions.MutationConflict:
+    except exceptions.MutationConflict as error:
         cleanup_rejected_attempt(copied)
         existing = Entities.fetch_one(key, request=Fetch.direct())
         if existing is not None:
             return copy_form_draft(source, draft, baseline, save_id, actor, images=images)
-        raise FormDraftConflict("The source Form changed while copying. Your draft is preserved.")
+        raise FormDraftConflict("The source Form changed while copying. Your draft is preserved.") from error
     except Exception:
         if not commit_started:
             cleanup_rejected_attempt(copied)

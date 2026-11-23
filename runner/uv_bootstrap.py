@@ -350,9 +350,9 @@ def _require_safe_directory(path, *, create=False):
     path = Path(path)
     try:
         metadata = path.lstat()
-    except FileNotFoundError:
+    except FileNotFoundError as error:
         if not create:
-            raise UvBootstrapError(f"Managed uv directory is missing: {path}")
+            raise UvBootstrapError(f"Managed uv directory is missing: {path}") from error
         try:
             path.mkdir(mode=0o700)
             metadata = path.lstat()

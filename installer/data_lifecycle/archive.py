@@ -117,11 +117,11 @@ def _wait_for_scratch_database(context, database_id, *, timeout=600):
     while True:
         try:
             return context.database(database_id)
-        except ProviderNotFound:
+        except ProviderNotFound as error:
             if context.monotonic() >= deadline:
                 raise DataLifecycleError(
                     "The reserved archive scratch database did not become available."
-                )
+                ) from error
             delays = (1, 2, 4, 8, 15, 30)
             context.sleep(delays[min(attempt, len(delays) - 1)])
             attempt += 1

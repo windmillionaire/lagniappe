@@ -182,7 +182,7 @@ def test_cimd_is_exact_bounded_cached_and_accepts_public_method_intersection(
         ),
         SimpleNamespace(ok=True, http_status=200, redirect_count=0, body=b"not json"),
     ):
-        monkeypatch.setattr(auth, "fetch_user_content", lambda *args: response)
+        monkeypatch.setattr(auth, "fetch_user_content", lambda *args, response=response: response)
         with pytest.raises(auth.OAuthError):
             auth.client_metadata(oauth.config["client_id"])
 

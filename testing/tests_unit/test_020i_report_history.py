@@ -44,7 +44,7 @@ def test_report_delete_preserves_referenced_files_and_fences_cleanup(monkeypatch
     for outcome in ("busy", "stale", "missing", "committed"):
         effects.clear()
 
-        def commit(current, snapshot, *entities):
+        def commit(current, snapshot, *entities, outcome=outcome):
             assert snapshot == {"status": "complete"}
             assert entities == (report, orphan)
             effects.append("fence")

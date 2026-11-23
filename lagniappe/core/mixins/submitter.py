@@ -354,7 +354,7 @@ class SubmitterMixin:
             except Exception as e:
                 raise ValidationError(
                     f"{field_id}:{imported_submission.get(field_id, None)} - {str(e)}"
-                )
+                ) from e
 
         self.save_submission()
 

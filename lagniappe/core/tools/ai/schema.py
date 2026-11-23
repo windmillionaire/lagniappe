@@ -53,7 +53,7 @@ def generate_schema(prompt, *, validator=validate_schema):
     try:
         return ai_model.generate_content(prompt, validator=validator)
     except Exception as e:
-        raise exceptions.AIException(f"{GENERIC_MESSAGE} {str(e)}")
+        raise exceptions.AIException(f"{GENERIC_MESSAGE} {str(e)}") from e
 
 
 # @testable true

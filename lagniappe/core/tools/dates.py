@@ -107,7 +107,7 @@ def user_date_string_to_utc_datetime(date_string, *, user=None):
         )
         return value.astimezone(timezone.utc)
     except (ValueError, TypeError):
-        raise ValueError(f"Invalid date format: {date_string}")
+        raise ValueError(f"Invalid date format: {date_string}") from None
 
 
 # @testable false

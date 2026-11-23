@@ -689,7 +689,7 @@ def test_completion_during_migration_returns_inline_error_without_saving(
         path = f"/tasks/{task.key}/update"
         with browser_failures.expect_http_error(user, status=422, path=path):
             with user.page.expect_response(
-                lambda response: response.request.method == "PUT"
+                lambda response, *, path=path: response.request.method == "PUT"
                 and response.url.endswith(path)
             ) as rejected:
                 row.locator("[data-role='complete-toggle']").click()

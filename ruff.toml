@@ -18,13 +18,7 @@ select = ["E4", "E7", "E9", "F", "B", "UP", "SIM"]
 # avoid introducing these and clear them as files are touched.
 ignore = [
     "B007",
-    "B009",
-    "B010",
     "B018",
-    "B023",
-    "B033",
-    "B039",
-    "B904",
     "B905",
     "SIM102",
     "SIM103",
@@ -33,7 +27,6 @@ ignore = [
     "SIM109",
     "SIM112",
     "SIM114",
-    "SIM115",
     "SIM117",
     "SIM118",
     "SIM201",

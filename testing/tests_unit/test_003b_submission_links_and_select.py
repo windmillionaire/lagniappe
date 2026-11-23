@@ -96,7 +96,7 @@ def test_submission_bookmark_replace_flags_update_entity_fields(
         for entity in get_test_entities():
             saved_assets = []
 
-            def save_asset(content, name, asset_type, visibility="private"):
+            def save_asset(content, name, asset_type, visibility="private", *, saved_assets=saved_assets):
                 saved_assets.append((content, name, asset_type, visibility))
                 return True
 

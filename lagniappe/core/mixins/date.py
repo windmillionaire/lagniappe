@@ -41,7 +41,7 @@ class DateMixin:
         try:
             utc_value = self.set_utc_datetime(value)
         except Exception as e:
-            raise ValueError(f"Invalid date value '{value}': {e}")
+            raise ValueError(f"Invalid date value '{value}': {e}") from e
 
         super(DateMixin, type(self)).value.fset(self, utc_value)
 

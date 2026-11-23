@@ -1107,14 +1107,14 @@ def test_cleanup_test_data_ignores_redis_missing_search_index_errors(monkeypatch
         class FakeCache:
             INDEX = "search-idx"
 
-            def keys(self, pattern):
+            def keys(self, pattern, *, calls=calls):
                 calls.append(("keys", pattern))
                 return ["test-one"]
 
-            def delete(self, *keys):
+            def delete(self, *keys, calls=calls):
                 calls.append(("delete", keys))
 
-            def drop_index(self, index):
+            def drop_index(self, index, *, calls=calls, missing_index_message=missing_index_message):
                 calls.append(("drop", index))
                 raise ResponseError(missing_index_message)
 

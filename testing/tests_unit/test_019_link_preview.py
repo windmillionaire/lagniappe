@@ -190,7 +190,7 @@ def test_external_preview_maps_metadata_and_falls_back(monkeypatch):
         OutboundResult(OutboundStatus.OK, body=b"<html></html>"),
         OutboundResult(OutboundStatus.TIMEOUT),
     ):
-        monkeypatch.setattr(link_preview, "fetch_user_content", lambda *a, **kw: response)
+        monkeypatch.setattr(link_preview, "fetch_user_content", lambda *a, response=response, **kw: response)
         fallback = link_preview.preview_for_url(
             "https://www.example.org/",
             user=object(),

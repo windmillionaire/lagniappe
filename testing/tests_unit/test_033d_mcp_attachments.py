@@ -106,7 +106,7 @@ def test_attachment_download_counts_actual_bytes_and_cleans_partial_files(
             destination = tmp_path / str(size)
             destination.mkdir()
 
-            def factory(**kwargs):
+            def factory(*, size=size, **kwargs):
                 return httpx.AsyncClient(
                     transport=httpx.MockTransport(
                         lambda request: httpx.Response(200, stream=Chunks(size))
@@ -138,7 +138,7 @@ def test_attachment_download_counts_actual_bytes_and_cleans_partial_files(
             destination = tmp_path / ("declared-" + declared)
             destination.mkdir()
 
-            def factory(**kwargs):
+            def factory(*, declared=declared, **kwargs):
                 return httpx.AsyncClient(
                     transport=httpx.MockTransport(
                         lambda request: httpx.Response(
@@ -215,7 +215,7 @@ def test_partial_downloads_clean_the_entire_spool_when_transfer_fails(monkeypatc
 
         for cancellation in (False, True):
 
-            def factory(**kwargs):
+            def factory(*, cancellation=cancellation, **kwargs):
                 stream = CancelledTransfer() if cancellation else Chunks(5)
                 return httpx.AsyncClient(
                     transport=httpx.MockTransport(

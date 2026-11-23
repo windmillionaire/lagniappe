@@ -331,7 +331,7 @@ def test_settings_singleton_is_lazy_and_reloads_saved_documents(
     config = saved_projection_settings
     assert config._settings_draft is None
     with pytest.raises(AttributeError):
-        getattr(config, "unknown_setting_attribute")
+        _ = config.unknown_setting_attribute
     first = config.SETTINGS
     assert first is config.SETTINGS
     assert first.APP["APP_NAME"] == "Saved app"

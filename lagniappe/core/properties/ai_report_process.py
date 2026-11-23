@@ -166,7 +166,7 @@ class Pending(ReportProcessValue):
     """Whether an AI report still represents work in progress."""
 
     _id = "pending"
-    _truthy = {True, "true", "True", "1", 1, "on", "yes"}
+    _truthy = {True, "true", "True", "1", "on", "yes"}
 
     @property
     def value(self):

@@ -92,7 +92,7 @@ def create_site_image(image, remove_bg=True, bg_tolerance=30):
             },
         }
         exceptions.capture(e, context)
-        raise exceptions.SiteImageError(f"Invalid image file: {str(e)}")
+        raise exceptions.SiteImageError(f"Invalid image file: {str(e)}") from e
 
     if source_image.mode != "RGBA":
         try:
@@ -106,7 +106,7 @@ def create_site_image(image, remove_bg=True, bg_tolerance=30):
                 },
             }
             exceptions.capture(e, context)
-            raise exceptions.SiteImageError(f"Failed to convert image: {str(e)}")
+            raise exceptions.SiteImageError(f"Failed to convert image: {str(e)}") from e
 
     pixels = list(source_image.getdata())
     transparent_count = sum(1 for p in pixels if len(p) == 4 and p[3] < 255)
@@ -154,7 +154,7 @@ def create_site_image(image, remove_bg=True, bg_tolerance=30):
             },
         }
         exceptions.capture(e, context)
-        raise exceptions.SiteImageError(f"Error during image generation: {str(e)}")
+        raise exceptions.SiteImageError(f"Error during image generation: {str(e)}") from e
 
     return image_paths
 

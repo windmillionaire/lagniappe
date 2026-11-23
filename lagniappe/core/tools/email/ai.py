@@ -1,5 +1,6 @@
 """Signed inbound-email boundary and handoff to saved AI report workflows."""
 
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from email import policy
@@ -395,56 +396,57 @@ class ResendAIEmailClient:
             )
         ):
             raise AIEmailProviderError("Resend returned an invalid attachment URL.")
-        spool = tempfile.SpooledTemporaryFile(max_size=SPOOL_MEMORY_BYTES, mode="w+b")
-        actual = 0
-        response = None
-        try:
+        with ExitStack() as cleanup:
+            spool = cleanup.enter_context(
+                tempfile.SpooledTemporaryFile(max_size=SPOOL_MEMORY_BYTES, mode="w+b")
+            )
+            actual = 0
+            response = None
             try:
-                response = self.download_request(
-                    download_url,
-                    stream=True,
-                    timeout=RESEND_TIMEOUT,
-                )
-            except (requests.ConnectionError, requests.Timeout) as error:
-                raise AIEmailProviderError(
-                    "Resend attachment download was unavailable."
-                ) from error
-            if not response.ok:
-                raise AIEmailProviderError(
-                    f"Resend attachment download returned HTTP {response.status_code}."
-                )
-            for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_BYTES):
-                if not chunk:
-                    continue
-                actual += len(chunk)
-                if actual > max_file_bytes or total_bytes + actual > max_total_bytes:
+                try:
+                    response = self.download_request(
+                        download_url,
+                        stream=True,
+                        timeout=RESEND_TIMEOUT,
+                    )
+                except (requests.ConnectionError, requests.Timeout) as error:
+                    raise AIEmailProviderError(
+                        "Resend attachment download was unavailable."
+                    ) from error
+                if not response.ok:
+                    raise AIEmailProviderError(
+                        f"Resend attachment download returned HTTP {response.status_code}."
+                    )
+                for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_BYTES):
+                    if not chunk:
+                        continue
+                    actual += len(chunk)
+                    if actual > max_file_bytes or total_bytes + actual > max_total_bytes:
+                        raise AIEmailRejection(
+                            "attachment_contract",
+                            "One or more attachments exceeded the AI email size limit.",
+                        )
+                    spool.write(chunk)
+                if actual <= 0:
                     raise AIEmailRejection(
                         "attachment_contract",
-                        "One or more attachments exceeded the AI email size limit.",
+                        "Empty attachments cannot be submitted by email.",
                     )
-                spool.write(chunk)
-            if actual <= 0:
-                raise AIEmailRejection(
-                    "attachment_contract",
-                    "Empty attachments cannot be submitted by email.",
+                spool.seek(0)
+                filename = secure_filename(attachment.get("filename") or "") or "attachment.bin"
+                upload = FileStorage(
+                    stream=spool,
+                    filename=filename,
+                    content_type=(
+                        attachment.get("content_type") or "application/octet-stream"
+                    ),
+                    content_length=actual,
                 )
-            spool.seek(0)
-            filename = secure_filename(attachment.get("filename") or "") or "attachment.bin"
-            upload = FileStorage(
-                stream=spool,
-                filename=filename,
-                content_type=(
-                    attachment.get("content_type") or "application/octet-stream"
-                ),
-                content_length=actual,
-            )
+            finally:
+                if response is not None and hasattr(response, "close"):
+                    response.close()
+            cleanup.pop_all()  # FileStorage owns the open stream on success.
             return upload, actual
-        except Exception:
-            spool.close()
-            raise
-        finally:
-            if response is not None and hasattr(response, "close"):
-                response.close()
 
     def send_email(self, payload, *, idempotency_key):
         return self._request(

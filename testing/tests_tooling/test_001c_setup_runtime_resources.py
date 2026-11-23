@@ -335,7 +335,7 @@ def test_security_cli_configures_and_optionally_deploys_redis_tls(monkeypatch):
 def _install_cloud_module(monkeypatch, name, module):
     google = sys.modules.get("google") or types.ModuleType("google")
     cloud = sys.modules.get("google.cloud") or types.ModuleType("google.cloud")
-    setattr(google, "cloud", cloud)
+    google.cloud = cloud
     setattr(cloud, name, module)
     monkeypatch.setitem(sys.modules, "google", google)
     monkeypatch.setitem(sys.modules, "google.cloud", cloud)
@@ -2373,7 +2373,7 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
     for answer in ("n", "N", ""):
         events.clear()
         capsys.readouterr()
-        monkeypatch.setattr("builtins.input", lambda prompt: answer)
+        monkeypatch.setattr("builtins.input", lambda prompt, *, answer=answer: answer)
         assert upgrade.update() == 0
         output = capsys.readouterr().out
         assert output.rstrip().endswith("Deploy when ready:\n  ./setup.sh update")
@@ -3274,7 +3274,7 @@ def test_setup_third_party_imports_are_bootstrapped_or_jit_guarded():
             for child in ast.iter_child_nodes(parent)
         }
 
-        def scope(node):
+        def scope(node, *, parents=parents):
             current = node
             while current is not None and not isinstance(
                 current, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef)

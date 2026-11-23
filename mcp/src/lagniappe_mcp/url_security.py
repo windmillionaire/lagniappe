@@ -76,7 +76,7 @@ def _canonical_host(host: str) -> str:
         ):
             raise ConfigurationError(
                 "invalid_url", "Lagniappe URL has an invalid host."
-            )
+            ) from None
         return value
     normalized = address.compressed
     return f"[{normalized}]" if address.version == 6 else normalized

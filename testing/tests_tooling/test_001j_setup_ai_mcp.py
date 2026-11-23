@@ -276,7 +276,7 @@ def test_mcp_policy_preserves_legacy_api_without_implicitly_installing_service()
 def test_mcp_discovery_distinguishes_absence_from_unavailable_state(monkeypatch):
     target = mcp._deployment(settings())
     for error in ("PERMISSION_DENIED", "PERMISSION_DENIED: resource NOT_FOUND or inaccessible", "network timeout", "service API disabled"):
-        monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=error))
+        monkeypatch.setattr(mcp, "_run", lambda *a, error=error, **k: SimpleNamespace(returncode=1, stderr=error))
         with pytest.raises(SetupError, match="discovery failed"):
             mcp.describe(target, ["run", "services", "describe"], optional=True)
     monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr="NOT_FOUND"))
@@ -295,7 +295,7 @@ def test_mcp_discovery_distinguishes_absence_from_unavailable_state(monkeypatch)
         "network timeout contacting gs://demo-project-mcp-builds",
         "HTTP 404: service API disabled",
     ):
-        monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=error))
+        monkeypatch.setattr(mcp, "_run", lambda *a, error=error, **k: SimpleNamespace(returncode=1, stderr=error))
         with pytest.raises(SetupError, match="discovery failed"):
             mcp.describe(target, arguments, optional=True)
     arguments = ["artifacts", "docker", "images", "describe", target.image]
@@ -310,7 +310,7 @@ def test_mcp_discovery_distinguishes_absence_from_unavailable_state(monkeypatch)
         "ERROR: (gcloud.artifacts.docker.images.describe) Invalid Docker image.",
         "ERROR: (gcloud.artifacts.docker.images.describe) network timeout",
     ):
-        monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=error))
+        monkeypatch.setattr(mcp, "_run", lambda *a, error=error, **k: SimpleNamespace(returncode=1, stderr=error))
         with pytest.raises(SetupError, match="discovery failed"):
             mcp.describe(target, arguments, optional=True)
     monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="[]"))

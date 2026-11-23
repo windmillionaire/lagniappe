@@ -401,7 +401,7 @@ def install_if_missing(import_name, explanation=None, package_name=None):
                     print(ui.status(wrap_text("Aborting installer.")))
                     raise SetupCancelled(
                         f"Installation of {package_name} was cancelled."
-                    )
+                    ) from None
 
             print(ui.activity(f"Installing {package_name}"), file=sys.stderr)
             try:

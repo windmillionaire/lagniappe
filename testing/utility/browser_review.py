@@ -122,18 +122,18 @@ def capture_review(args: argparse.Namespace) -> int:
                 http_errors: list[dict[str, Any]] = []
                 page.on(
                     "console",
-                    lambda msg: console_messages.append(f"{msg.type}: {msg.text}"),
+                    lambda msg, *, console_messages=console_messages: console_messages.append(f"{msg.type}: {msg.text}"),
                 )
-                page.on("pageerror", lambda exc: page_errors.append(str(exc)))
+                page.on("pageerror", lambda exc, *, page_errors=page_errors: page_errors.append(str(exc)))
                 page.on(
                     "requestfailed",
-                    lambda request: failed_requests.append(
+                    lambda request, *, failed_requests=failed_requests: failed_requests.append(
                         f"{request.method} {request.url}: {request.failure}"
                     ),
                 )
                 page.on(
                     "response",
-                    lambda response: (
+                    lambda response, *, http_errors=http_errors: (
                         http_errors.append(
                             {"status": response.status, "url": response.url}
                         )

@@ -267,7 +267,7 @@ class IsAdmin(DBProperty):
 class OwnerInboundToggle(DBProperty):
     """Fail-closed owner opt-in for a collaboration channel."""
 
-    _truthy = {True, "true", "True", "1", 1, "on", "yes"}
+    _truthy = {True, "true", "True", "1", "on", "yes"}
 
     # @testable true
     # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed

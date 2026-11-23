@@ -84,7 +84,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
         if self.categories:
             required.append("models")
 
-        user = getattr(self, "user")
+        user = self.user
         if user:
             required.extend(user.requires)
 

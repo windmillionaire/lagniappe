@@ -57,7 +57,7 @@ def generate_project(prompt):
     try:
         return ai_model.generate_content(prompt, validator=validate_project)
     except (AIException, Exception) as e:
-        raise AIException(f"{GENERIC_MESSAGE} {str(e)}")
+        raise AIException(f"{GENERIC_MESSAGE} {str(e)}") from e
 
 
 # @testable true

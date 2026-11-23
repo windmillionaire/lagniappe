@@ -65,9 +65,9 @@ def generate_category(prompt):
     try:
         return ai_model.generate_content(prompt, validator=validate_generated)
     except exceptions.AIException as e:
-        raise exceptions.AIException(f"{GENERIC_MESSAGE} {str(e)}")
+        raise exceptions.AIException(f"{GENERIC_MESSAGE} {str(e)}") from e
     except Exception as e:
-        raise exceptions.AIException(f"{GENERIC_MESSAGE} {str(e)}")
+        raise exceptions.AIException(f"{GENERIC_MESSAGE} {str(e)}") from e
 
 
 # @testable true

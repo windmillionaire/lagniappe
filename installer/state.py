@@ -150,7 +150,7 @@ class SetupProcessLock:
                     raise SetupError(
                         "Another Lagniappe setup process is already running "
                         f"(pid {payload['pid']})."
-                    )
+                    ) from None
                 self.path.unlink(missing_ok=True)
                 continue
             with os.fdopen(

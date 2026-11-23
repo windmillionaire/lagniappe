@@ -138,7 +138,7 @@ def _validate_user_url(value: object, policy: UserFetchPolicy) -> _ValidatedURL:
         address = ip_address(host)
     except ValueError:
         if any(not _HOST_LABEL.fullmatch(label) for label in host.split(".")):
-            raise ValueError("invalid URL")
+            raise ValueError("invalid URL") from None
     else:
         host = address.compressed
 

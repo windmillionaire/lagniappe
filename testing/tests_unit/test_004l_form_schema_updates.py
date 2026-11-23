@@ -402,7 +402,7 @@ def test_utility_table_conversion_omits_blanks_and_repairs_invalid_numbers(scope
     for row in [{"item": "a", "qty": "unknown"}, {"item": "a", "extra": None}, {"qty": None}]:
         calls.clear()
 
-        def invalid(prompt):
+        def invalid(prompt, *, row=row):
             calls.append(prompt)
             return {"conversions": [{"id": "notes", "value": {"rows": [row]}}]}
 

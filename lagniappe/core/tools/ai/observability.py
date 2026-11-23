@@ -110,7 +110,8 @@ class AIExecutionContext:
     execution_control: object | None = field(default=None, repr=False, compare=False)
 
 
-_EXECUTION_CONTEXT = ContextVar("ai_execution_context", default=AIExecutionContext())
+_EMPTY_CONTEXT = AIExecutionContext()
+_EXECUTION_CONTEXT = ContextVar("ai_execution_context", default=_EMPTY_CONTEXT)
 _CURRENT_OBSERVER = ContextVar("ai_generation_observer", default=None)
 
 

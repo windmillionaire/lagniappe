@@ -595,7 +595,7 @@ def substitute_macro_args(
         )
         body = re.sub(
             r"{{-?\s*" + escaped + r"\s+or\s+(['\"])(.*?)\1\s*-?}}",
-            lambda match: value.text or match.group(2),
+            lambda match, *, value=value: value.text or match.group(2),
             body,
         )
         body = re.sub(

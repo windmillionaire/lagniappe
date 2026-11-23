@@ -21,10 +21,10 @@ def generate_ai_text(prompt):
         return ai_model.generate_content(prompt)
     except exceptions.AIException as e:
         exceptions.capture(e)
-        raise exceptions.AIException(f"{GENERIC_MESSAGE} {str(e)}")
+        raise exceptions.AIException(f"{GENERIC_MESSAGE} {str(e)}") from e
     except Exception as e:
         exceptions.capture(e)
-        raise exceptions.AIException(f"{GENERIC_MESSAGE} {str(e)}")
+        raise exceptions.AIException(f"{GENERIC_MESSAGE} {str(e)}") from e
 
 
 # @testable true

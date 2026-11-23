@@ -107,7 +107,7 @@ def generate_schedule(prompt):
         return schedule_data
     except Exception as e:
         capture(e, context={"prompt": prompt.build(), "schedule_data": schedule_data})
-        raise AIException(f"Unable to generate schedule: {str(e)}")
+        raise AIException(f"Unable to generate schedule: {str(e)}") from e
 
 
 # @testable true

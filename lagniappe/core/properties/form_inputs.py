@@ -400,10 +400,10 @@ class TelInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
             return phonenumbers.format_number(
                 parsed_number, phonenumbers.PhoneNumberFormat.E164
             )
-        except phonenumbers.NumberParseException:
+        except phonenumbers.NumberParseException as error:
             raise ValidationError(
                 f"Invalid phone number value '{value}' in column '({self.label})'"
-            )
+            ) from error
         except (ValueError, TypeError):
             return None
 

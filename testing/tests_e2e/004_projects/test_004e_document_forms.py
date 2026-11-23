@@ -73,7 +73,7 @@ def test_editor_preview_rejects_private_targets_without_disrupting_popover(
             path="/l/preview",
         ):
             with user.page.expect_response(
-                lambda response: (
+                lambda response, *, target=target: (
                     urlsplit(response.url).path == "/l/preview"
                     and parse_qs(urlsplit(response.url).query).get("url") == [target]
                 )
