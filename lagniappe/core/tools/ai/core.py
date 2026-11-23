@@ -4,9 +4,10 @@ from collections.abc import Callable
 from io import BytesIO
 import json
 import re
-from typing import TYPE_CHECKING, Never, Unpack, overload
+from typing import TYPE_CHECKING, Never, Unpack, cast, overload
 
 if TYPE_CHECKING:
+    from ...entities.user import User
     from .prompt import Prompt
 
 from google import genai
@@ -391,7 +392,7 @@ class GenAI:
     def generate_content(self, prompt: Prompt, *, validator: None = None, validation_retries: int = 0) -> ModelValue: ...
 
 
-    def generate_content(self, prompt: Prompt, *, validator=None, validation_retries: int = 0):
+    def generate_content[T](self, prompt: Prompt, *, validator: Callable[[object], T] | None = None, validation_retries: int = 0) -> T | ModelValue:
         """Generate and optionally validate text under one observable call boundary."""
         if not CONFIG.AI_ENABLED:
             raise exceptions.AIException("AI is disabled for this installation.")
@@ -684,7 +685,7 @@ class GenAI:
                     observer = current_observer()
                     tool_responses, file_parts = execute_function_calls(
                         response.function_calls,
-                        prompt.user,
+                        cast("User", prompt.user),
                         cache=tool_cache,
                         debug=debug_enabled(),
                         trace=iteration_trace["calls"],

@@ -19,6 +19,14 @@ Provides tools that let the AI query the app's data at generation time:
 - get_guidelines: retrieve detailed prompt guidelines on demand
 """
 
+from collections.abc import Callable, Iterable, Mapping
+from typing import TYPE_CHECKING, Literal, Protocol, TypedDict, cast, overload
+
+if TYPE_CHECKING:
+    from ...entities.user import User
+    from ...properties.file_assets import FilePart
+    from ..deferred_jobs.control import DeferredExecutionControl
+
 import json
 
 from google.genai import types
@@ -47,6 +55,29 @@ from .references import normalize_hash_references
 from .function_definitions.output_schemas import OUTPUT_SCHEMAS, RESULT_PATHS
 
 # Default for direct tool-enabled prompts without a workflow-specific limit.
+type ToolResult = Mapping[str, object] | list[dict[str, object]]
+type ToolResponse = tuple[ToolResult, list[FilePart]]
+
+
+class _CompletedCall(Protocol):
+    """A non-streaming provider call, after its argument fragments are assembled."""
+
+    name: str
+    args: dict[str, object]
+
+
+class _SearchHandler(Protocol):
+    def __call__(self, args: Mapping[str, object], user: User, *, candidate_search: bool) -> ToolResult: ...
+
+
+class ToolDefinition(TypedDict):
+    name: str
+    description: str
+    input_schema: dict[str, object]
+    output_schema: dict[str, object]
+    result_paths: dict[str, object]
+
+
 MAX_TOOL_ITERATIONS = 12
 TRACE_STRING_LIMIT = 500
 TRACE_LIST_LIMIT = 5
@@ -85,7 +116,7 @@ FUNCTION_TOOL = types.Tool(function_declarations=list(DECLARATIONS.values()))
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_config_combines_search_tools_json_and_thinking_settings
 # @matrix ai : config tools
-def build_function_tool(*names):
+def build_function_tool(*names: str) -> types.Tool | None:
     """Build a types.Tool with only the requested function declarations."""
     declarations = [DECLARATIONS[n] for n in names if n in DECLARATIONS]
     if not declarations:
@@ -93,7 +124,7 @@ def build_function_tool(*names):
     return types.Tool(function_declarations=declarations)
 
 
-HANDLERS = {
+HANDLERS: dict[str, Callable[[Mapping[str, object], User], ToolResult | ToolResponse]] = {
     "get_help": get_help.execute_get_help,
     "search_entities": search.execute_search,
     "get_entity": get_entity.execute_get_entity,
@@ -136,11 +167,11 @@ def _provider_schema_to_json(value):
     return value
 
 
-TOOL_DEFINITIONS = {
+TOOL_DEFINITIONS: dict[str, ToolDefinition] = {
     name: {
         "name": name,
         "description": declaration.description or "",
-        "input_schema": _provider_schema_to_json(declaration.parameters),
+        "input_schema": cast(dict[str, object], _provider_schema_to_json(declaration.parameters)),
         "output_schema": OUTPUT_SCHEMAS[name],
         "result_paths": RESULT_PATHS[name],
     }
@@ -151,7 +182,13 @@ TOOL_DEFINITIONS = {
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_tool_catalog_and_dispatch_share_registered_tools
 # @matrix agent-api ai : provider-neutral-schema tool-catalog
-def tool_catalog(*, names=None, names_only=False, transport=None):
+@overload
+def tool_catalog(*, names: Iterable[str] | None = None, names_only: Literal[False] = False, transport: str | None = None) -> list[ToolDefinition]: ...
+@overload
+def tool_catalog(*, names: Iterable[str] | None = None, names_only: Literal[True], transport: str | None = None) -> list[str]: ...
+@overload
+def tool_catalog(*, names: Iterable[str] | None = None, names_only: bool, transport: str | None = None) -> list[ToolDefinition] | list[str]: ...
+def tool_catalog(*, names: Iterable[str] | None = None, names_only: bool = False, transport: str | None = None) -> list[ToolDefinition] | list[str]:
     """Return the provider-neutral catalog used by external tool clients."""
     selected = list(DECLARATIONS) if names is None else list(dict.fromkeys(names))
     unknown = [name for name in selected if name not in DECLARATIONS]
@@ -182,7 +219,7 @@ def tool_catalog(*, names=None, names_only=False, transport=None):
 # @tests tests_unit/test_032d_external_guidance.py::test_organize_guidance_is_shared_across_provider_and_external_dispatch
 # @tests tests_unit/test_032d_external_guidance.py::test_search_dispatch_and_catalog_match_across_ai_entry_points
 # @matrix ai agent-api : guidelines tool-dispatch
-def execute_registered_tool(name, args, user, *, external=False):
+def execute_registered_tool(name: str, args: object, user: User, *, external: bool = False) -> ToolResponse:
     """Execute one registered read tool without constructing provider parts."""
     if name not in HANDLERS:
         return {"error": f"Unknown function: {name}"}, []
@@ -193,7 +230,8 @@ def execute_registered_tool(name, args, user, *, external=False):
     if external and name == "get_guidelines":
         result = get_guidelines.execute_external_get_guidelines(normalized_args, user)
     elif name == "search_entities":
-        result = HANDLERS[name](normalized_args, user, candidate_search=True)
+        search_handler = cast(_SearchHandler, HANDLERS[name])
+        result = search_handler(normalized_args, user, candidate_search=True)
     else:
         result = HANDLERS[name](normalized_args, user)
     if isinstance(result, tuple):
@@ -265,11 +303,11 @@ def _result_summary(result):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/core.py::GenAI._tool_loop
 # @reason requested-call summaries are emitted through tool-loop exception context
-def summarize_function_calls(function_calls):
+def summarize_function_calls(function_calls: Iterable[types.FunctionCall]) -> list[dict[str, object]]:
     """Compact function-call summary for exception context."""
     return [
         {"name": fc.name, "args": _trace_value(dict(fc.args))}
-        for fc in function_calls
+        for fc in cast(Iterable[_CompletedCall], function_calls)
     ]
 
 
@@ -298,14 +336,14 @@ def _mark_file_parts_omitted(result):
 # @tests tests_unit/test_015_ai_tools.py::test_ai_function_call_dispatch_caps_file_parts_per_turn
 # @matrix ai : caching file-parts limit tool-dispatch trace unknown-tool
 def execute_function_calls(
-    function_calls,
-    user,
-    cache=None,
-    debug=False,
-    trace=None,
-    max_file_parts=None,
-    execution_control=None,
-):
+    function_calls: Iterable[types.FunctionCall],
+    user: User,
+    cache: dict[tuple[str, str], ToolResponse] | None = None,
+    debug: bool = False,
+    trace: list[dict[str, object]] | None = None,
+    max_file_parts: int | None = None,
+    execution_control: DeferredExecutionControl | None = None,
+) -> tuple[list[types.Part], list[FilePart]]:
     """Execute a list of function calls and return response parts.
 
     Handlers may return a tuple of (result, file_parts) when they need
@@ -316,8 +354,8 @@ def execute_function_calls(
         cache = {}
     responses = []
     file_parts = []
-    function_calls = list(function_calls)
-    raw_args = [dict(fc.args) for fc in function_calls]
+    calls = cast("list[_CompletedCall]", list(function_calls))
+    raw_args = [dict(fc.args) for fc in calls]
     normalized_args = normalize_hash_references(raw_args)
     if debug:
         ai_debug(
@@ -330,7 +368,7 @@ def execute_function_calls(
                     "normalized": raw != normalized,
                 }
                 for fc, raw, normalized in zip(
-                    function_calls,
+                    calls,
                     raw_args,
                     normalized_args,
                     strict=True,
@@ -338,11 +376,11 @@ def execute_function_calls(
             ],
         )
 
-    for fc, raw_args_item, args in zip(function_calls, raw_args, normalized_args, strict=True):
+    for fc, raw_args_item, args in zip(calls, raw_args, normalized_args, strict=True):
         if execution_control is not None:
             execution_control.before_tool(fc.name)
         cache_key = (fc.name, json.dumps(args, sort_keys=True))
-        trace_record = {
+        trace_record: dict[str, object] = {
             "name": fc.name,
             "args": _trace_value(args),
             "cached": cache_key in cache,
