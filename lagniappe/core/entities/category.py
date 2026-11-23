@@ -1,10 +1,10 @@
-from typing import TYPE_CHECKING, Self, TypedDict, cast
+from typing import TYPE_CHECKING, Self, TypedDict, Unpack, cast
 
 from flask import url_for
 from ..properties import category, common_entity, common_related
 from lagniappe.core.tools.database import get as database_get
 from .entity import Entity, EntityProperties
-from .index import PageIndex
+from .index import CollectionOptions, PageIndex
 
 
 if TYPE_CHECKING:
@@ -67,7 +67,7 @@ class Category(Entity):
         )
         return properties
 
-    def index(self, *args: object, **kwargs: object) -> PageIndex:
+    def index(self, *args: object, **kwargs: Unpack[CollectionOptions]) -> PageIndex:
         return PageIndex(*args, entity=self, **kwargs)
 
     @property

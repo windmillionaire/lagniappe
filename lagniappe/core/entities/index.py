@@ -1,4 +1,18 @@
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, TypedDict, Unpack, cast
+
 from flask import url_for
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+
+    from .category import Category
+    from .entity import Entity
+    from .form import Form
+    from .group import PublicGroup, UserGroup
+    from .page import Page
+    from .task import Task
+    from .user import User
 
 from ..definitions import Action, Restriction, Fetch, FetchReason
 from ..entities import Entities
@@ -10,6 +24,16 @@ from ..tools.tasks.ordering import sort_tasks
 from .site import Site
 
 
+class CollectionOptions(TypedDict, total=False):
+    cursor: str | None
+    limit: int | None
+    user: User | None
+
+
+class IndexOptions(CollectionOptions, total=False):
+    entity: Entity | None
+
+
 # @testable true
 # @tests tests_unit/test_010_task_index.py::test_index_base_cursor_limit_user_and_append_state
 # @matrix index : pagination state user-scope
@@ -19,44 +43,53 @@ class Index(Site):
     """
 
     _route = None
-    _append = False
+    _append: str | bool | None = False
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._cursor = kwargs.get("cursor")
-        self._limit = kwargs.get("limit", 25)
-        self._user = current_context_user(kwargs.get("user"))
+    def __init__(
+        self, *args: object, cursor: str | None = None, limit: int | None = 25,
+        user: User | None = None, entity: Entity | None = None, **kwargs: object,
+    ) -> None:
+        super().__init__(*args, entity=entity, **kwargs)
+        self._cursor = cursor
+        self._limit = limit
+        self._user = current_context_user(user)
 
     @property
-    def append(self):
+    def append(self) -> str | bool | None:
         return self._append
 
     @append.setter
-    def append(self, value):
+    def append(self, value: str | bool | None) -> None:
         self._append = value
 
     @property
-    def user(self):
+    def user(self) -> User | None:
         return self._user
 
     @user.setter
-    def user(self, value):
+    def user(self, value: User | None) -> None:
         self._user = value
 
     @property
-    def cursor(self):
+    def _viewer(self) -> User:
+        if self.user is None:
+            raise AttributeError("This index requires a viewer")
+        return self.user
+
+    @property
+    def cursor(self) -> str | None:
         return self._cursor
 
     @cursor.setter
-    def cursor(self, value):
+    def cursor(self, value: str | None) -> None:
         self._cursor = value
 
     @property
-    def limit(self):
+    def limit(self) -> int | None:
         return self._limit
 
     @limit.setter
-    def limit(self, value):
+    def limit(self, value: int | None) -> None:
         self._limit = value
 
 
@@ -72,29 +105,31 @@ class TaskIndex(Index):
     URLs include ``undated=1`` when switching.
     """
 
+    if TYPE_CHECKING:
+        table: index.TaskTable
+
     _kind = "task"
-    _tasks = None
+    _tasks: list[Task] | None = None
 
     # @testable true
     # @tests tests_unit/test_010_task_index.py::test_task_index_paginates_dated_then_undated_tasks_with_restrictions
     # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
     # @matrix task-index : assignee-visibility undated
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, undated: bool = False, **kwargs: Unpack[IndexOptions]) -> None:
         super().__init__(*args, **kwargs)
-        self._undated = bool(kwargs.get("undated"))
-        self._project = (
-            self.entity if isinstance(self.entity, Entities.PROJECT) else None
-        )
-        self._restrictions = self.user.properties.restrictions.task
-        self._assigned_to = self.user.page if self._project is None else None
+        self._undated = bool(undated)
+        owner = self.entity
+        self._project = owner if isinstance(owner, Entities.PROJECT) else None
+        self._restrictions = self._viewer.properties.restrictions.task
+        self._assigned_to = self._viewer.page if self._project is None else None
 
-    def _get_properties(self):
+    def _get_properties(self) -> dict[str, type[index.TaskTable]]:
         return {
             "table": index.TaskTable,
         }
 
     @property
-    def route(self):
+    def route(self) -> str:
         return url_for("tasks.rows")
 
     # @testable true
@@ -104,7 +139,7 @@ class TaskIndex(Index):
     # @pair task-index:assignee-visibility
     # @tests tests_unit/test_010b_index_user_scope.py::test_task_index_visibility_uses_explicit_viewer
     # @matrix task-index : explicit-user permissions
-    def undated_tasks(self):
+    def undated_tasks(self) -> list[Task]:
         db = database_get.tasks_without_due_dates(
             start_cursor=self.cursor,
             limit=self.limit,
@@ -120,7 +155,7 @@ class TaskIndex(Index):
         )
 
         return [
-            task
+            cast("Task", task)
             for task in Entities.fetch(
                 *db.results,
                 request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
@@ -135,7 +170,7 @@ class TaskIndex(Index):
     # @pair task-index:assignee-visibility
     # @tests tests_unit/test_010b_index_user_scope.py::test_task_index_visibility_uses_explicit_viewer
     # @matrix task-index : explicit-user permissions
-    def dated_tasks(self):
+    def dated_tasks(self) -> list[Task]:
         db = database_get.tasks_with_due_dates(
             start_cursor=self.cursor,
             limit=self.limit,
@@ -152,7 +187,7 @@ class TaskIndex(Index):
         else:
             self.append = url_for("tasks.rows", undated=1)
         return [
-            task
+            cast("Task", task)
             for task in Entities.fetch(
                 *db.results,
                 request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
@@ -164,7 +199,7 @@ class TaskIndex(Index):
     # @tests tests_unit/test_010_task_index.py::test_task_index_paginates_dated_then_undated_tasks_with_restrictions
     # @pair task-index:pagination
     @property
-    def tasks(self):
+    def tasks(self) -> list[Task]:
         if self._tasks is not None:
             return self._tasks
 
@@ -178,7 +213,7 @@ class TaskIndex(Index):
     # @testable true
     # @tests tests_unit/test_021_refresh.py::test_task_index_refresh_roots_uses_both_ordered_query_streams
     # @matrix reconnect-refresh task-index : ordering root-depth
-    def refresh_roots(self):
+    def refresh_roots(self) -> list[Task]:
         """Return the complete task-index membership without relationships.
 
         Refresh intentionally reruns the normal dated and undated query recipes.
@@ -212,9 +247,12 @@ class TaskIndex(Index):
 class TaskHistoryIndex(Index):
     """Task history list view for a task."""
 
+    if TYPE_CHECKING:
+        table: index.TaskHistoryTable
+
     _kind = "task"
 
-    def _get_properties(self):
+    def _get_properties(self) -> dict[str, type[index.TaskHistoryTable]]:
         return {
             "table": index.TaskHistoryTable,
         }
@@ -226,17 +264,25 @@ class TaskHistoryIndex(Index):
 class PageIndex(Index):
     """Page list view for a category."""
 
-    _kind = "page"
-    _pages = None
+    if TYPE_CHECKING:
+        table: category.CategoryTable
 
-    def _get_properties(self):
+    _kind = "page"
+    _pages: list[Page] | None = None
+
+    @property
+    def _category(self) -> Category:
+        # Category.index registers this index with its category as owner.
+        return cast("Category", self.entity)
+
+    def _get_properties(self) -> dict[str, type[category.CategoryTable]]:
         return {
             "table": category.CategoryTable,
         }
 
     @property
-    def route(self):
-        return url_for("categories.rows", key=self.entity.urlsafe_key)
+    def route(self) -> str:
+        return url_for("categories.rows", key=self._category.urlsafe_key)
 
     # @testable true
     # @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_restricted_page_is_not_listed_for_outsider_on_category_index
@@ -245,15 +291,16 @@ class PageIndex(Index):
     # @tests tests_unit/test_010b_index_user_scope.py::test_page_index_visibility_uses_explicit_viewer
     # @matrix pages : explicit-user permissions
     @property
-    def pages(self):
+    def pages(self) -> list[Page]:
         if self._pages is not None:
             return self._pages
 
-        restrictions = self.user.properties.restrictions.unrestricted_pages(self.entity)
+        restrictions = self._viewer.properties.restrictions.unrestricted_pages(self._category)
         limit = self.limit if not self.cursor else None
 
+        # Saved category indexes always use the paginated database result.
         db = database_get.pages(
-            self.entity.key,
+            cast("Key", self._category.key),
             start_cursor=self.cursor,
             limit=limit,
             hashes=restrictions,
@@ -261,13 +308,13 @@ class PageIndex(Index):
         self.cursor = db.next_cursor
 
         self._pages = [
-            page
+            cast("Page", page)
             for page in Entities.fetch(*db.results, request=Fetch.direct())
             if page.allowed(Action.VIEW, user=self.user)
         ]
 
         self.append = (
-            url_for("categories.rows", key=self.entity.urlsafe_key, cursor=self.cursor)
+            url_for("categories.rows", key=self._category.urlsafe_key, cursor=self.cursor)
             if self.cursor
             else None
         )
@@ -277,11 +324,12 @@ class PageIndex(Index):
     # @testable true
     # @tests tests_unit/test_021_refresh.py::test_page_index_refresh_roots_reuses_restricted_collection_query
     # @matrix category-index reconnect-refresh : membership root-depth
-    def refresh_roots(self):
+    def refresh_roots(self) -> list[Page]:
         """Return every page in this category at root depth."""
-        restrictions = self.user.properties.restrictions.unrestricted_pages(self.entity)
+        restrictions = self._viewer.properties.restrictions.unrestricted_pages(self._category)
+        # Saved category indexes always use the paginated database result.
         db = database_get.pages(
-            self.entity.key,
+            cast("Key", self._category.key),
             limit=None,
             hashes=restrictions,
         )
@@ -298,16 +346,19 @@ class PageIndex(Index):
 class FormIndex(Index):
     """Form list view with related category/project resolution."""
 
-    _kind = "form"
-    _forms = None
+    if TYPE_CHECKING:
+        table: index.FormTable
 
-    def _get_properties(self):
+    _kind = "form"
+    _forms: list[Form] | None = None
+
+    def _get_properties(self) -> dict[str, type[index.FormTable]]:
         return {
             "table": index.FormTable,
         }
 
     @property
-    def route(self):
+    def route(self) -> str:
         return url_for("forms.rows")
 
     # @testable true
@@ -319,11 +370,11 @@ class FormIndex(Index):
     # @tests tests_unit/test_010b_index_user_scope.py::test_form_index_related_models_use_explicit_viewer
     # @pair forms:related-entities
     @property
-    def forms(self):
+    def forms(self) -> list[Form]:
         if self._forms is not None:
             return self._forms
 
-        hashes = self.user.properties.restrictions.form
+        hashes = self._viewer.properties.restrictions.form
 
         if not Restriction.is_unrestricted(hashes):
             self._forms = []
@@ -374,26 +425,30 @@ class FormIndex(Index):
 class UserIndex(Index):
     """User list view with group management."""
 
+    if TYPE_CHECKING:
+        table: index.UserTable
+
     _kind = "user"
-    _users = None
+    _users: list[User] | None = None
+    _public_users_enabled: bool
     _regular_mode = "regular"
     _public_mode = "public"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, mode: str | None = None, **kwargs: Unpack[IndexOptions]) -> None:
         super().__init__(*args, **kwargs)
         self._mode = (
             self._public_mode
-            if kwargs.get("mode") == self._public_mode
+            if mode == self._public_mode
             else self._regular_mode
         )
 
-    def _get_properties(self):
+    def _get_properties(self) -> dict[str, type[index.UserTable]]:
         return {
             "table": index.UserTable,
         }
 
     @property
-    def route(self):
+    def route(self) -> str:
         if self.mode == self._public_mode:
             return url_for("users.rows", mode=self._public_mode)
         return url_for("users.rows")
@@ -406,7 +461,7 @@ class UserIndex(Index):
     # @matrix public-users : disabled enabled mode pagination public-mode public-users
     # @matrix user-index : disabled mode pagination public-mode public-users regular-mode restrictions
     @property
-    def users(self):
+    def users(self) -> list[User]:
         if self._users is not None:
             return self._users
 
@@ -418,19 +473,19 @@ class UserIndex(Index):
     # @testable false
     # @covered-by lagniappe/core/entities/index.py::UserIndex.users
     # @reason helper keeps mode-specific query paths readable
-    def _load_regular_users(self):
-        restrictions = self.user.properties.restrictions.users
+    def _load_regular_users(self) -> list[User]:
+        restrictions = self._viewer.properties.restrictions.users
 
         db = database_get.users(
             start_cursor=self.cursor, hashes=restrictions, limit=self.limit
         )
         self._users = [
-            u
-            for u in Entities.fetch(
+            user
+            for row in Entities.fetch(
                 *db.results,
                 request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
             )
-            if not u.is_public and u.allowed(Action.VIEW, self.user)
+            if not (user := cast("User", row)).is_public and user.allowed(Action.VIEW, self.user)
         ]
         self.cursor = db.next_cursor
 
@@ -441,7 +496,7 @@ class UserIndex(Index):
     # @testable false
     # @covered-by lagniappe/core/entities/index.py::UserIndex.users
     # @reason helper keeps mode-specific query paths readable
-    def _load_public_users(self):
+    def _load_public_users(self) -> list[User]:
         if not self.public_users_enabled:
             self._users = []
             return self._users
@@ -452,12 +507,12 @@ class UserIndex(Index):
             limit=self.limit,
         )
         self._users = [
-            u
-            for u in Entities.fetch(
+            user
+            for row in Entities.fetch(
                 *db.results,
                 request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
             )
-            if u.is_public and u.allowed(Action.VIEW, self.user)
+            if (user := cast("User", row)).is_public and user.allowed(Action.VIEW, self.user)
         ]
         self.cursor = db.next_cursor
 
@@ -472,7 +527,7 @@ class UserIndex(Index):
     # @testable true
     # @tests tests_unit/test_021_refresh.py::test_user_index_refresh_roots_preserves_regular_and_public_modes
     # @matrix reconnect-refresh user-index : mode root-depth page-canonical
-    def refresh_roots(self):
+    def refresh_roots(self) -> list[Page]:
         """Return the Pages represented by authorized User rows at root depth."""
         if self.mode == self._public_mode:
             if not self.public_users_enabled:
@@ -484,7 +539,7 @@ class UserIndex(Index):
             expected_public = True
         else:
             db = database_get.users(
-                hashes=self.user.properties.restrictions.users,
+                hashes=self._viewer.properties.restrictions.users,
                 limit=None,
             )
             expected_public = False
@@ -505,14 +560,14 @@ class UserIndex(Index):
         return [pages[key] for key in page_keys if key in pages]
 
     @property
-    def mode(self):
+    def mode(self) -> str:
         return self._mode
 
     # @testable true
     # @tests tests_unit/test_009_user_index.py::test_user_index_public_mode_returns_empty_when_public_users_disabled
     # @matrix user-index : enabled public-users
     @property
-    def public_users_enabled(self):
+    def public_users_enabled(self) -> bool:
         if getattr(self, "_public_users_enabled", None) is not None:
             return self._public_users_enabled
 
@@ -526,17 +581,18 @@ class UserIndex(Index):
     # @tests tests_unit/test_010b_index_user_scope.py::test_user_index_groups_use_explicit_viewer
     # @matrix user-index : explicit-user permissions
     @property
-    def groups(self):
-        if getattr(self, "_groups", None):
-            return self._groups
+    def groups(self) -> list[UserGroup]:
+        if cached := getattr(self, "_groups", None):
+            return cached
 
-        restrictions = self.user.properties.restrictions.users
+        restrictions = self._viewer.properties.restrictions.users
         if Restriction.is_unrestricted(restrictions):
             groups = database_get.groups(hashes=restrictions)
         else:
             restricted = cache.get_details_by_hash(restrictions)
             allowed_groups = {
-                g["id"] for g in restricted.values() if g["kind"] == "group"
+                detail["id"] for detail in cast("Mapping[str, Mapping[str, str]]", restricted).values()
+                if detail["kind"] == "group"
             }
             groups = database_get.groups(hashes=sorted(allowed_groups))
 
@@ -552,7 +608,7 @@ class UserIndex(Index):
     # @tests tests_unit/test_009_user_index.py::test_user_index_loads_users_groups_public_group_and_append_cursor
     # @pair user-index:public-group
     @property
-    def public_group(self):
+    def public_group(self) -> PublicGroup:
         if getattr(self, "_public_group", None) is not None:
             return self._public_group
 

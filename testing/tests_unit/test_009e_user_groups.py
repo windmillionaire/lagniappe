@@ -332,6 +332,9 @@ def test_group_permissions_require_admin_and_handle_anonymous():
 # @matrix public-groups : create enabled get permissions
 @pytest.mark.unit
 def test_public_group_get_create_and_enabled_state():
+    with pytest.raises(TypeError):
+        PublicGroup.create("another group")
+
     existing = _public_group_entity()
     with patch.object(group_module.database_get, "public_group", return_value=existing):
         group = PublicGroup.get()

@@ -1,3 +1,11 @@
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
+    from ..entities.site import Site
+    from ..entities.history import TaskHistory
+    from ..entities.task import Task
+
 from .base_property import build_field
 from .base_columns import Columns
 from .common_entity import Description, Modified, Name
@@ -13,11 +21,11 @@ from ..mixins import ColumnMixin
 # @testable true
 # @tests tests_unit/test_010_task_index.py::test_task_index
 # @matrix task-index : columns table
-class TaskTable(Columns):
+class TaskTable(Columns["Entity | Site"]):
     _id = "table"
     _kind = "task"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, entity: Entity | Site | None = None, **kwargs: object) -> None:
         self.column_fields = [
             Completed,
             Name,
@@ -28,7 +36,7 @@ class TaskTable(Columns):
             Modified,
         ]
         self.default_selected = (Name, DueDate, Modified)
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, entity=entity, **kwargs)
 
         for field in self.fields.values():
             if isinstance(field, self.default_selected):
@@ -41,13 +49,13 @@ class TaskTable(Columns):
 # @tests tests_unit/test_010_task_index.py::test_task_history_index_includes_attachments_column
 # @tests tests_unit/test_010_task_index.py::test_task_history_index_includes_snapshot_columns
 # @matrix tasks : attachments columns completion-cycle description history name reload table
-class TaskHistoryTable(Columns):
+class TaskHistoryTable(Columns["Task | TaskHistory"]):
     _id = "table"
     _kind = "task"
     _embedded = True
     default_selected = (CompletedOn, Name, Description)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, entity: Task | TaskHistory | None = None, **kwargs: object) -> None:
         self.column_fields = [
             CompletedOn,
             Name,
@@ -55,14 +63,14 @@ class TaskHistoryTable(Columns):
             CompletedBy,
             TaskFiles,
         ]
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, entity=entity, **kwargs)
 
     @property
-    def fields(self):
-        if getattr(self, "_fields", None):
-            return self._fields
+    def fields(self) -> dict[str, ColumnMixin]:
+        if cached := getattr(self, "_fields", None):
+            return cached
 
-        fields = {}
+        fields: dict[str, ColumnMixin] = {}
         for f in self.column_fields:
             field = build_field(f, self.entity)
             fields[field.id] = field
@@ -78,11 +86,11 @@ class TaskHistoryTable(Columns):
                 }
             )
 
-        for f in fields.values():
-            f.selected = isinstance(f, self.default_selected)
-            if isinstance(f, Name):
-                f.link = False
-                f.parent = False
+        for field in fields.values():
+            field.selected = isinstance(field, self.default_selected)
+            if isinstance(field, Name):
+                field.link = False
+                field.parent = False
 
         self._fields = fields
         return self._fields
@@ -91,13 +99,13 @@ class TaskHistoryTable(Columns):
 # @testable true
 # @tests tests_unit/test_004a_form_index.py::test_form_index_table
 # @matrix form-index : columns table
-class FormTable(Columns):
+class FormTable(Columns["Entity | Site"]):
     _id = "table"
     _kind = "form"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, entity: Entity | Site | None = None, **kwargs: object) -> None:
         self.column_fields = [Name, FormType, Categories, Projects, Modified]
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, entity=entity, **kwargs)
 
         for field in self.fields.values():
             field.selected = True
@@ -106,13 +114,13 @@ class FormTable(Columns):
 # @testable true
 # @tests tests_unit/test_009_user_index.py::test_user_index
 # @matrix user-index : columns table
-class UserTable(Columns):
+class UserTable(Columns["Entity | Site"]):
     _id = "table"
     _kind = "user"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, entity: Entity | Site | None = None, **kwargs: object) -> None:
         self.column_fields = [Name, Email, Groups, LastLogin, Modified]
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, entity=entity, **kwargs)
 
         for field in self.fields.values():
             field.selected = True

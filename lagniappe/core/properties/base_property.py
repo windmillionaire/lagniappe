@@ -98,7 +98,7 @@ class Property[Value = object, Owner: Entity | Site = "Entity", Write = Value | 
     @property
     def kind(self) -> str:
         if not self._kind:
-            self._kind = self._entity.entity_kind
+            self._kind = cast("str | None", self._entity.entity_kind)
 
         if not self._kind:
             raise NotImplementedError(f"{self.__class__.__name__} requires kind")

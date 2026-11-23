@@ -1,3 +1,9 @@
+from typing import TYPE_CHECKING, Self
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
+    from ..entities.user import User
+
 from ..definitions import Action, Fetch
 from ..entities import Entities
 from lagniappe.core.tools.database import get as database_get
@@ -5,7 +11,7 @@ from .base_property import UNSET
 
 
 # @testable infrastructure
-class HomeProperty:
+class HomeProperty[Cursor: str | int = str]:
     """Base class for home page list sections.
 
     Each section (projects, categories, tasks, starred) is a paginated
@@ -14,44 +20,46 @@ class HomeProperty:
     """
 
     _id = "home"
+    _label: str
+    _list: list[Entity]
 
     # @testable true
     # @tests tests_unit/test_002i_home_properties.py::test_home_requires_explicit_user
     # @tests tests_unit/test_002i_home_properties.py::test_home_sections_keep_their_viewer_across_lazy_and_paginated_reads
     # @matrix home : explicit-user validation
-    def __init__(self, *args, user, **kwargs):
+    def __init__(self, *args: object, user: User, cursor: Cursor | None = None, **kwargs: object) -> None:
         if user is None:
             raise ValueError("Home section requires a user")
         self._user = user
-        self._cursor = kwargs.get("cursor")
+        self._cursor = cursor
         self._back = bool(self._cursor)
 
     @property
-    def id(self):
+    def id(self) -> str:
         return self._id
 
     @property
-    def value(self):
+    def value(self) -> Self:
         return self
 
     @property
-    def label(self):
+    def label(self) -> str:
         return self._label
 
     @property
-    def back(self):
+    def back(self) -> bool:
         return self._back
 
     @property
-    def cursor(self):
+    def cursor(self) -> Cursor | None:
         return self._cursor
 
     @cursor.setter
-    def cursor(self, value):
+    def cursor(self, value: Cursor | None) -> None:
         self._cursor = value
 
     @property
-    def list(self):
+    def list(self) -> object:
         return getattr(self, "_list", UNSET)
 
 
@@ -64,9 +72,9 @@ class ProjectList(HomeProperty):
     entity_kind = "project"
 
     @property
-    def list(self):
+    def list(self) -> list[Entity]:
         if super().list is not UNSET:
-            return super().list
+            return self._list
 
         hashes = self._user.properties.restrictions.project
         db = database_get.models(
@@ -89,9 +97,9 @@ class CategoryList(HomeProperty):
     entity_kind = "category"
 
     @property
-    def list(self):
+    def list(self) -> list[Entity]:
         if super().list is not UNSET:
-            return super().list
+            return self._list
 
         hashes = self._user.properties.restrictions.category
         db = database_get.models(
@@ -112,9 +120,9 @@ class PageList(HomeProperty):
     _label = "Pages"
 
     @property
-    def list(self):
+    def list(self) -> list[Entity]:
         if super().list is not UNSET:
-            return super().list
+            return self._list
 
         hashes = self._user.properties.restrictions.page
         db = database_get.recent_pages(start_cursor=self.cursor, hashes=hashes)
@@ -140,9 +148,9 @@ class TaskList(HomeProperty):
     _label = "Tasks"
 
     @property
-    def list(self):
+    def list(self) -> list[Entity]:
         if super().list is not UNSET:
-            return super().list
+            return self._list
 
         hashes = self._user.properties.restrictions.task
         tasks = database_get.due_tasks(
@@ -167,7 +175,7 @@ class TaskList(HomeProperty):
         return self._list
 
     @property
-    def count(self):
+    def count(self) -> int:
         return database_get.user_task_count(self._user.page)
 
 
@@ -176,14 +184,14 @@ class TaskList(HomeProperty):
 # @tests tests_unit/test_002i_home_properties.py::test_home_starred_list_hides_but_retains_inaccessible_keys
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_route_rejects_inaccessible_and_missing_targets
 # @matrix starred : inaccessible-placeholder missing-placeholder pagination retained-inaccessible view-authorization
-class StarredList(HomeProperty):
+class StarredList(HomeProperty[str | int]):
     _id = "starred"
     _label = "Starred"
 
     @property
-    def list(self):
+    def list(self) -> list[Entity]:
         if super().list is not UNSET:
-            return super().list
+            return self._list
 
         starred_keys = self._user.properties.starred.keys
         cursor = int(self.cursor) if self.cursor else 0
@@ -202,12 +210,12 @@ class StarredList(HomeProperty):
 
         loaded_by_key = {entity.key: entity for entity in loaded}
         self._list = []
-        self._items = []
+        self._items: list[dict[str, object]] = []
         for key in starred:
             entity = loaded_by_key.get(key)
             urlsafe_key = database_get.urlsafe_key(key)
             if entity is None:
-                item = {
+                item: dict[str, object] = {
                     "key": urlsafe_key,
                     "state": "missing",
                     "message": "This starred item no longer exists.",
@@ -230,13 +238,13 @@ class StarredList(HomeProperty):
         return self._list
 
     @property
-    def items(self):
+    def items(self) -> list[dict[str, object]]:
         if super().list is UNSET:
             _ = self.list
         return self._items
 
     @property
-    def count(self):
+    def count(self) -> int:
         return len(self._user.properties.starred.keys)
 
 
@@ -248,9 +256,9 @@ class NoteList(HomeProperty):
     _label = "Notes"
 
     @property
-    def list(self):
+    def list(self) -> list[Entity]:
         if super().list is not UNSET:
-            return super().list
+            return self._list
 
         notes = database_get.notes(self._user)
         self._list = Entities.fetch(*notes, request=Fetch.direct())
@@ -265,9 +273,9 @@ class IngressList(HomeProperty):
     _label = "Import Data"
 
     @property
-    def list(self):
+    def list(self) -> list[Entity]:
         if super().list is not UNSET:
-            return super().list
+            return self._list
 
         files = database_get.ingress_files()
         self._list = Entities.fetch(*files, request=Fetch.direct())
@@ -285,9 +293,9 @@ class ToolsList(HomeProperty):
     _label = "Plans & Reports"
 
     @property
-    def list(self):
+    def list(self) -> list[Entity]:
         if super().list is not UNSET:
-            return super().list
+            return self._list
 
         db = database_get.ai_reports(self._user, start_cursor=self.cursor)
         self._list = Entities.fetch(*db.results, request=Fetch.direct())

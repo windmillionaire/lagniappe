@@ -18,6 +18,8 @@ from lagniappe.core.tools.database import get as database_get
 
 if TYPE_CHECKING:
     from . import property_types
+    from .category import Category
+    from .project import Project
 
 
 # @testable false
@@ -30,6 +32,8 @@ class Form(Entity, AssetMixin):
         @property
         def restricted_to(self) -> dict[str, list[str]]: ...
 
+        categories: list[Category]
+        projects: list[Project]
         generation: int
         form_type: str | None
         schema: list[dict[str, object]]

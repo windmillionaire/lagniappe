@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Required, Self, TypedDict
+from typing import TYPE_CHECKING, Required, Self, TypedDict, Unpack
 
 from flask import url_for
 
@@ -6,7 +6,7 @@ from ..definitions import Action
 from ..mixins import AssetMixin
 from ..properties import common_assets, common_entity, project
 from .entity import Entity, EntityProperties
-from .index import TaskIndex
+from .index import CollectionOptions, TaskIndex
 
 
 if TYPE_CHECKING:
@@ -92,8 +92,8 @@ class Project(Entity, AssetMixin):
 
         return state
 
-    def index(self, *args: object, **kwargs: object) -> TaskIndex:
-        return TaskIndex(*args, entity=self, **kwargs)
+    def index(self, *args: object, undated: bool = False, **kwargs: Unpack[CollectionOptions]) -> TaskIndex:
+        return TaskIndex(*args, entity=self, undated=undated, **kwargs)
 
     # @testable true
     # @tests tests_unit/test_032h_report_batches.py::test_dependent_creations_share_one_commit

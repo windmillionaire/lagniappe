@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from flask import url_for
 
@@ -60,10 +60,10 @@ class File(AssetMixin, Entity):
         return list(dict.fromkeys(h for h in [self.hash, "models", *requirements] if h))
 
     @property
-    def owner(self) -> Entity | None:
+    def owner(self) -> Page | Task | None:
         if self.properties.task.key:
-            return permission_relation(self, "task", required=True)
-        return permission_relation(self, "page")
+            return cast("Task", permission_relation(self, "task", required=True))
+        return cast("Page | None", permission_relation(self, "page"))
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_file_save_normalizes_task_page_and_restriction_fingerprint
