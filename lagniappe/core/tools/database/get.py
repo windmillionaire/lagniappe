@@ -39,6 +39,14 @@ def _empty_results() -> Results[Entity]:
 
 
 # @testable infrastructure
+@overload
+def urlsafe_key(identifier: Key) -> str: ...
+
+
+@overload
+def urlsafe_key(identifier: object) -> str | None: ...
+
+
 def urlsafe_key(identifier: object) -> str | None:
     """Convert an identifier to its URL-safe base64 key string."""
     key = datastore_key(identifier)
