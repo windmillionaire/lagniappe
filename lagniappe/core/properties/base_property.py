@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from ..exceptions import PropertyError
 from ..tools.auth.context import current_context_user
@@ -8,6 +8,15 @@ if TYPE_CHECKING:
     from ..entities.entity import Entity
     from ..entities.site import Site
     from ..mixins.field_host import FieldUser
+
+
+class _FieldFactory[Field](Protocol):
+    def __call__(self, *, entity: Entity | Site) -> Field: ...
+
+
+def build_field[Field](field_type: type[Field], owner: Entity | Site) -> Field:
+    """Instantiate a registered field with the owner for which it was selected."""
+    return cast("_FieldFactory[Field]", field_type)(entity=owner)
 
 
 UNSET = object()

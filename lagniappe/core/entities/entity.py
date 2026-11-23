@@ -12,6 +12,7 @@ from ..definitions.fingerprints import base_fingerprint
 from ..entities import Entities
 from ..exceptions import PropertyError
 from ..properties import common_entity
+from ..properties.base_property import build_field
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
 from ..tools.auth.context import current_context_user
@@ -19,7 +20,6 @@ from ..tools.auth.restrictions import restriction_fields
 
 
 if TYPE_CHECKING:
-    from ..properties.base_process import ProcessProperty
     from ..properties.form_submission import FormSubmission
     from ..properties.user_related import UserPage
 
@@ -37,11 +37,15 @@ class _ReadableProperty(Protocol):
     def value(self) -> object: ...
 
 
-type RegisteredProperty = _ReadableProperty | ProcessProperty
+class _ProcessSection(Protocol):
+    @property
+    def id(self) -> str: ...
+
+    @property
+    def section(self) -> dict[str, object]: ...
 
 
-class _FieldFactory(Protocol):
-    def __call__(self, *, entity: Entity) -> RegisteredProperty: ...
+type RegisteredProperty = _ReadableProperty | _ProcessSection
 
 
 # @testable infrastructure
@@ -75,10 +79,7 @@ class EntityProperties:
         if name in self._registry:
             base_class = self._registry[name]
             try:
-                # Each owner registers its own concrete field classes. Their
-                # accepted owner types can be narrower than the base Entity.
-                factory = cast(_FieldFactory, base_class)
-                property_instance = factory(entity=self._entity)
+                property_instance = build_field(base_class, self._entity)
             except PropertyError:
                 raise
             except Exception as e:
@@ -247,7 +248,8 @@ class Entity:
         prop = self.properties.get(name)
         if prop is None:
             raise AttributeError(f"Property {name} not found")
-        return prop.value
+        # Process sections intentionally raise their own PropertyError for an unknown value.
+        return getattr(prop, "value")  # noqa: B009
 
     def __setattr__(self, name: str, value: object) -> None:
         prop = self.properties.get(name)
