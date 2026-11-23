@@ -94,13 +94,13 @@ def _run_cli(arguments, *, behavior="return", status=0):
     )
 
 
-def _module(monkeypatch, setup_package, name, **members):
-    module_name = f"installer.{name}"
+def _module(monkeypatch, package, name, **members):
+    module_name = f"{package.__name__}.{name}"
     module = types.ModuleType(module_name)
     for member_name, value in members.items():
         setattr(module, member_name, value)
     monkeypatch.setitem(sys.modules, module_name, module)
-    monkeypatch.setattr(setup_package, name, module, raising=False)
+    monkeypatch.setattr(package, name, module, raising=False)
     return module
 
 
@@ -114,7 +114,6 @@ def _install_harness(
     import config
     import installer as setup_package
     from installer import install as install_module
-    from installer import mcp as mcp_module
 
     events = []
     settings = types.SimpleNamespace(
@@ -124,7 +123,8 @@ def _install_harness(
         GCLOUD_CONFIG={},
         save=lambda: events.append("settings.save"),
     )
-    monkeypatch.setattr(config, "SETTINGS", settings)
+    # SETTINGS is lazy. Looking up the previous attribute would load saved files.
+    monkeypatch.setitem(vars(config), "SETTINGS", settings)
     monkeypatch.setattr(config, "File", types.SimpleNamespace(
         INDEX_YAML=types.SimpleNamespace(value="index.yaml"),
         APP_YAML=types.SimpleNamespace(value="lagniappe.yaml"),
@@ -172,7 +172,7 @@ def _install_harness(
         "deploy",
         deploy_to_app_engine=deploy_to_app_engine,
     )
-    _module(monkeypatch, setup_package, "mcp", requested=mcp_module.requested)
+    _module(monkeypatch, setup_package, "mcp", requested=lambda app: False)
     gcloud_module = _module(
         monkeypatch,
         setup_package,
@@ -491,11 +491,13 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
 # @source installer/verify.py::validate_installation
 def test_ai_command_checks_credentials_once_before_local_validation(monkeypatch):
     import config
+    import runner
     from installer import __main__ as setup_cli
     from installer import commands, optional, package_install
-    from runner import deploy, gcloud
+    from runner import gcloud
 
     events = []
+    monkeypatch.setitem(vars(config), "SETTINGS", types.SimpleNamespace(APP={}))
     monkeypatch.setattr(package_install, "ensure_pip_is_available", lambda: None)
     monkeypatch.setattr(package_install, "ensure_setup_dependencies", lambda: None)
     monkeypatch.setattr(
@@ -508,7 +510,12 @@ def test_ai_command_checks_credentials_once_before_local_validation(monkeypatch)
     )
     monkeypatch.setattr(commands, "check_gcloud_cli", lambda: None)
     monkeypatch.setattr(config, "verify_generation_manifest", lambda: events.append("generation"))
-    monkeypatch.setattr(deploy, "verify_runtime_deploy_surface", lambda: events.append("deploy-surface"))
+    _module(
+        monkeypatch,
+        runner,
+        "deploy",
+        verify_runtime_deploy_surface=lambda: events.append("deploy-surface"),
+    )
     monkeypatch.setattr(optional, "configure_ai_features", lambda: events.append("AI prompt") or False)
     monkeypatch.setattr("builtins.input", lambda prompt: "n")
 
