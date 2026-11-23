@@ -1,5 +1,11 @@
 """External API presentation."""
 
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from ....entities.ai_report import AIReport
+    from ....entities.user import User
+
 from copy import deepcopy
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason
@@ -14,7 +20,7 @@ from .validation import _walk_strings
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_entity_links_use_the_site_origin_without_rewriting_evidence
 # @pair agent-api:origin-validation
-def absolute_entity_links(value, *, origin):
+def absolute_entity_links(value: object, *, origin: str) -> object:
     """Qualify structured record links for clients outside the website."""
     if isinstance(value, dict):
         result = {
@@ -67,7 +73,7 @@ def _replace_internal_references(value, replacements):
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_public_execution_receipt_rechecks_entity_visibility
 # @pair agent-api:execution-receipt
-def public_execution_receipt(report, user) -> dict[str, object] | None:
+def public_execution_receipt(report: AIReport, user: User) -> dict[str, object] | None:
     """Expose bounded outcomes, never the recovery ledger or stale entity data."""
     result = getattr(report, "result", None)
     if not isinstance(result, dict):
@@ -146,7 +152,7 @@ def public_execution_receipt(report, user) -> dict[str, object] | None:
 # @tests tests_unit/test_032_agent_api.py::test_public_plan_proposal_round_trips_hash_references_and_markdown
 # @tests tests_unit/test_032_agent_api.py::test_public_plan_omits_preview_references_before_loading_entities
 # @matrix agent-api ai-report : markdown public-reference round-trip stored-execution
-def public_plan_proposal(report, user=None):
+def public_plan_proposal(report: AIReport, user: User | None = None) -> dict[str, object] | None:
     """Project stored execution state back into the public submission contract."""
     proposal = getattr(report, "proposal", None)
     if not isinstance(proposal, dict):
@@ -204,4 +210,5 @@ def public_plan_proposal(report, user=None):
     )
     public = _replace_internal_references(public, replacements)
 
-    return public
+    # Reference replacement preserves the outer proposal object and its string keys.
+    return cast(dict[str, object], public)

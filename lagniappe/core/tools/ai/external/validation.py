@@ -1,5 +1,11 @@
 """External API validation."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ....entities.ai_report import AIReport
+    from ....entities.user import User
+
 import json
 from copy import deepcopy
 
@@ -31,7 +37,7 @@ from .definitions import (
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_submission_validation_collects_independent_field_errors
 # @matrix agent-api : envelope schema field-path bounded-validation
-def submission_validation_errors(data, report, user):
+def submission_validation_errors(data: object, report: AIReport, user: User) -> list[dict[str, object]]:
     """Collect safe independent envelope/schema errors before semantic validation."""
     errors = []
     if not isinstance(data, dict):
@@ -602,10 +608,11 @@ def _answer_visible_text(field, value):
 # @matrix agent-api ai-report : file-placement file-summary permissions proposal-validation references
 # @pairs agent-api:ask ai-report:answer-only
 def validate_external_proposal(
-    proposal, report, user, *, file_usage, instructions=None, resolved_references=None
-):
+    proposal: object, report: AIReport, user: User, *, file_usage: object, instructions: object = None, resolved_references: dict[str, str] | None = None
+) -> dict[str, object]:
     """Validate an external final proposal without provider repair."""
     _validate_top_level(proposal)
+    assert isinstance(proposal, dict)
     proposal = deepcopy(proposal)
     if not report.available:
         raise exceptions.AIException("this plan is no longer available")

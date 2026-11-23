@@ -1,5 +1,17 @@
 """External API uploads."""
 
+from collections.abc import Callable, Iterable
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+    from ....entities.ai_report import AIReport
+    from ....entities.user import User
+    from ....entities.file import File
+    from ..external_operations import PlanWriter
+
+
 import re
 import uuid
 from copy import deepcopy
@@ -31,10 +43,17 @@ from .plans import load_plan, require_draft, require_plan_access
 _UPLOAD_BATCH_PATTERN = re.compile(definitions.UPLOAD_BATCH_ID_PATTERN)
 
 
+def _saved_report_key(report: AIReport) -> Key:
+    key = report.key
+    if key is None:
+        raise exceptions.ValidationError("The upload manifest identity is invalid.")
+    return key
+
+
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_upload_batch_identity_is_preserved_in_every_record
 # @matrix agent-api ai-report : upload-batch-identity upload-manifest
-def prepare_upload_manifest(records, *, upload_batch_id):
+def prepare_upload_manifest(records: Iterable[object] | None, *, upload_batch_id: str) -> list[dict[str, object]]:
     """Normalize an external upload batch with one server-issued identity."""
     return prepare_report_upload_manifest(
         records,
@@ -46,7 +65,7 @@ def prepare_upload_manifest(records, *, upload_batch_id):
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_upload_file_identity_is_deterministic_per_batch_record
 # @matrix agent-api ai-report mcp-upload : deterministic-file-identity upload-manifest
-def bind_upload_file_identities(report, manifest, *, upload_batch_id):
+def bind_upload_file_identities(report: AIReport, manifest: object, *, upload_batch_id: str) -> list[dict[str, object]]:
     """Bind each external upload record to one deterministic future File key."""
     if not isinstance(manifest, list) or len(manifest) > MAX_PLAN_FILES:
         raise exceptions.ValidationError("The upload manifest is invalid.")
@@ -59,7 +78,7 @@ def bind_upload_file_identities(report, manifest, *, upload_batch_id):
             raise exceptions.ValidationError("The upload manifest is invalid.")
         try:
             key = agent_api_store.upload_file_key(
-                report.key,
+                _saved_report_key(report),
                 upload_batch_id,
                 index,
             )
@@ -85,22 +104,27 @@ def bind_upload_file_identities(report, manifest, *, upload_batch_id):
 # @tests tests_unit/test_032_agent_api.py::test_external_upload_finalization_binds_report_user
 # @matrix agent-api ai-report mcp-upload : deterministic-file-identity lease-renewal temporary-view-ownership upload-finalization
 def finalize_uploads(
-    report,
-    user,
+    report: AIReport,
+    user: User,
     *,
-    asset_nonce=None,
-    ensure_active=None,
-    save=None,
-):
+    asset_nonce: str | None = None,
+    ensure_active: Callable[[], None] | None = None,
+    save: PlanWriter | None = None,
+) -> list[File]:
     """Finalize external uploads and make draft files visible to their submitter."""
 
-    manifest = list(report.upload_manifest or [])
+    pending = report.upload_manifest or []
+    if not isinstance(pending, list):
+        raise exceptions.ValidationError("The upload manifest identity is invalid.")
+    manifest = list(pending)
     batch_ids = {
         record.get("upload_batch_id") for record in manifest if isinstance(record, dict)
     }
     if len(batch_ids) != 1:
         raise exceptions.ValidationError("The upload manifest identity is invalid.")
     upload_batch_id = next(iter(batch_ids))
+    if not isinstance(upload_batch_id, str):
+        raise exceptions.ValidationError("The upload manifest identity is invalid.")
     report.upload_manifest = bind_upload_file_identities(
         report,
         manifest,
@@ -120,7 +144,7 @@ def finalize_uploads(
             raise exceptions.ValidationError("The upload manifest identity is invalid.")
         file_key = database_get.datastore_key(record.get("file_key"))
         expected_key = agent_api_store.upload_file_key(
-            report.key,
+            _saved_report_key(report),
             batch_id,
             file_index,
         )
@@ -186,11 +210,11 @@ def finalize_uploads(
 # @testable false
 # @covered-by lagniappe/core/tools/ai/external/uploads.py::finalize_upload_batch
 # @reason persisted batch-record consistency is asserted through the bound finalize route
-def current_upload_batch_id(report):
+def current_upload_batch_id(report: AIReport) -> str | None:
     """Return the persisted batch identity, rejecting inconsistent state."""
     manifest = (
-        report.agent_manifest
-        if isinstance(getattr(report, "agent_manifest", None), dict)
+        stored
+        if isinstance(stored := getattr(report, "agent_manifest", None), dict)
         else {}
     )
     batch_id = manifest.get("upload_batch_id")
@@ -244,7 +268,7 @@ def _upload_sizes(report, requested):
 # @matrix agent-api mcp-upload : last-writer upload-batch-identity uploads
 # @pairs agent-api:authoritative-reload agent-api:concurrency agent-api:stale-snapshot
 # @pairs mcp-upload:authoritative-reload mcp-upload:concurrency mcp-upload:stale-snapshot
-def create_upload_sessions(report, user, data, *, request_id):
+def create_upload_sessions(report: AIReport, user: User, data: dict[str, object], *, request_id: str | None) -> dict[str, object]:
     require_plan_access(report, user)
     plan_id = report.urlsafe_key
     require_uploads_available(report)
@@ -339,7 +363,7 @@ def create_upload_sessions(report, user, data, *, request_id):
     upload_batch_id = uuid.uuid4().hex
     claim_token = uuid.uuid4().hex
     claim_outcome = agent_api_store.claim_plan_operation(
-        report.key,
+        _saved_report_key(report),
         phase="create",
         operation_id=upload_batch_id,
         claim_token=claim_token,
@@ -364,7 +388,7 @@ def create_upload_sessions(report, user, data, *, request_id):
         records = []
         for index, item in enumerate(normalized):
             if not agent_api_store.renew_plan_operation(
-                report.key,
+                _saved_report_key(report),
                 phase="create",
                 operation_id=upload_batch_id,
                 claim_token=claim_token,
@@ -405,8 +429,8 @@ def create_upload_sessions(report, user, data, *, request_id):
             upload_batch_id=upload_batch_id,
         )
         agent_manifest = (
-            dict(report.agent_manifest)
-            if isinstance(getattr(report, "agent_manifest", None), dict)
+            dict(stored)
+            if isinstance(stored := getattr(report, "agent_manifest", None), dict)
             else {}
         )
         agent_manifest["upload_batch_id"] = upload_batch_id
@@ -432,7 +456,7 @@ def create_upload_sessions(report, user, data, *, request_id):
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_claimed_upload_routes_reload_before_storage_side_effects
 # @matrix agent-api mcp-upload : last-writer upload-batch-identity uploads
 # @matrix agent-api mcp-upload : authoritative-reload concurrency checkpoint resume stale-snapshot
-def finalize_upload_batch(report, user, data, *, request_id):
+def finalize_upload_batch(report: AIReport, user: User, data: dict[str, object], *, request_id: str | None) -> AIReport:
     require_plan_access(report, user)
     plan_id = report.urlsafe_key
     require_draft(report)
@@ -471,7 +495,7 @@ def finalize_upload_batch(report, user, data, *, request_id):
 
     claim_token = uuid.uuid4().hex
     claim_outcome = agent_api_store.claim_plan_operation(
-        report.key,
+        _saved_report_key(report),
         phase="finalize",
         operation_id=upload_batch_id,
         claim_token=claim_token,
@@ -501,7 +525,7 @@ def finalize_upload_batch(report, user, data, *, request_id):
         # @reason the service-owned callback only maps lease renewal loss to its API conflict
         def ensure_active():
             if not agent_api_store.renew_plan_operation(
-                report.key,
+                _saved_report_key(report),
                 phase="finalize",
                 operation_id=upload_batch_id,
                 claim_token=claim_token,
@@ -539,7 +563,7 @@ def finalize_upload_batch(report, user, data, *, request_id):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/external/uploads.py::create_upload_sessions
 # @reason preserve draft/pending checks before HTTP body parsing and after acquiring a claim
-def require_uploads_available(report):
+def require_uploads_available(report: AIReport) -> None:
     require_draft(report)
     if report.upload_manifest:
         raise ExternalPlanError(

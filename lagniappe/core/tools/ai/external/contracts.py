@@ -1,5 +1,13 @@
 """External API contracts."""
 
+from collections.abc import Iterable
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ....entities.ai_report import AIReport
+    from ....entities.user import User
+
 import hashlib
 import json
 
@@ -31,7 +39,7 @@ from .definitions import (
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_client_skill_markdown_is_minimal_and_discovery_first
 # @matrix agent-api : bootstrap discovery secret-handling tool-envelope
-def client_skill_markdown(base_url):
+def client_skill_markdown(base_url: str) -> str:
     """Return the canonical minimal client skill for this API deployment."""
     base_url = str(base_url or "").rstrip("/")
     return f"""---
@@ -94,7 +102,7 @@ than narrating every API call.
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_answer_context_is_plan_free
 # @pair agent-api:answer-context
-def answer_context(user):
+def answer_context(user: User) -> dict[str, object]:
     """Describe client-owned answering without creating a report or session."""
     return {
         "current_date": dates.user_today(user).date().isoformat(),
@@ -116,7 +124,7 @@ def answer_context(user):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/external/contracts.py::plan_contract
 # @reason reference projection is asserted through the public plan contract
-def report_file_references(report):
+def report_file_references(report: AIReport) -> list[str]:
     return [
         reference for file in report.input_files if (reference := hash_reference(file))
     ]
@@ -125,7 +133,7 @@ def report_file_references(report):
 # @testable true
 # @tests tests_unit/test_032_agent_api.py::test_external_plan_contract_inventories_all_seven_finalized_files
 # @matrix agent-api files : complete-inventory deterministic-fingerprint seven-file-regression
-def report_file_inventory(report):
+def report_file_inventory(report: AIReport) -> dict[str, object]:
     """Describe the finalized file set that a proposal must cover completely."""
     files = [
         {
@@ -260,7 +268,7 @@ def _json_bytes(value):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/external/contracts.py::plan_contract
 # @reason persisted timezone projection is asserted through the public contract
-def user_timezone_name(user):
+def user_timezone_name(user: User) -> str:
     data = getattr(user, "db", None)
     return str(data.get("timezone") or "UTC") if isinstance(data, dict) else "UTC"
 
@@ -277,7 +285,7 @@ def _external_allowed_report_actions(user):
 # @tests tests_unit/test_032_agent_api.py::test_external_plan_contract_is_permission_and_file_scoped
 # @tests tests_unit/test_020b_ai_planner.py::test_native_and_external_plans_share_personal_page_guidance
 # @matrix agent-api ai-report : file-placement file-summary permissions proposal-contract
-def plan_contract(report, user, *, submit_url, actions=None, view=DEFAULT_CONTRACT_VIEW, execution_allowed=False):
+def plan_contract(report: AIReport, user: User, *, submit_url: str, actions: Iterable[str] | None = None, view: str = DEFAULT_CONTRACT_VIEW, execution_allowed: bool = False) -> dict[str, object]:
     if not report.available:
         raise exceptions.ValidationError("this plan is no longer available")
     if not str(submit_url or "").strip():

@@ -10,7 +10,7 @@ from ..planner import file_usage_schema
 # @tests tests_unit/test_032i_external_contracts.py::test_openapi_publishes_runtime_defaults_limits_and_independent_documents
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @matrix agent-api : contract
-def build_openapi_document(*, app_name, server_url):
+def build_openapi_document(*, app_name: str, server_url: str) -> dict[str, object]:
     """Return the machine-readable workflow and contract for external agents."""
     plan_parameter = {
         "name": "plan_id",
