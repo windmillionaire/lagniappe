@@ -13,6 +13,7 @@ from testing.definitions import Groups, Projects, SitePages, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.elements.combobox import Dropdown
 from testing.resources import Project
+from testing.resources.core import VIEW_INITIALIZATION_TIMEOUT
 from testing.utility.network import expect_successful_response
 from testing.utility.polling import expect_poll_result
 
@@ -37,6 +38,14 @@ def _restricted_definition(label):
     )
 
 
+def _initialized_messages_view(user):
+    view = user.locate("[lp-view][data-kind='messages']")
+    # Startup loads the conversation list, then opens the selected thread and
+    # acknowledges its unread messages before publishing the initialized marker.
+    expect(view).to_have_attribute("initialized", "", timeout=2 * VIEW_INITIALIZATION_TIMEOUT)
+    return view
+
+
 def _go_messages(user, conversation_id=None):
     query = f"?with={conversation_id}" if conversation_id else ""
     response = user.page.goto(
@@ -44,9 +53,7 @@ def _go_messages(user, conversation_id=None):
         wait_until="load",
     )
     assert response and response.status == 200
-    view = user.locate("[lp-view][data-kind='messages']")
-    expect(view).to_have_attribute("initialized", "")
-    return view
+    return _initialized_messages_view(user)
 
 
 def _send_from_modal(user, recipient, body):
@@ -304,8 +311,7 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     with recipient.page.expect_navigation():
         aggregate.get_by_role("link", name="1 new message", exact=True).click()
 
-    recipient_view = recipient.locate("[lp-view][data-kind='messages']")
-    expect(recipient_view).to_have_attribute("initialized", "")
+    _initialized_messages_view(recipient)
     history = recipient.locate("[data-role='message-history']")
     expect(history).to_contain_text(first_body)
     expect(recipient.locate("[data-role='notifications']")).to_have_attribute(
@@ -337,13 +343,7 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
         first_body
     )
 
-    recipient.page.goto(
-        f"{SETTINGS.test_config['BASE_URL']}/messages?with={conversation_id}",
-        wait_until="load",
-    )
-    expect(recipient.locate("[lp-view][data-kind='messages']")).to_have_attribute(
-        "initialized", ""
-    )
+    _go_messages(recipient, conversation_id)
     conversation_row = recipient.locate(
         f"[data-role='conversation-list'] [data-conversation-row='{conversation_id}']"
     )
@@ -499,8 +499,7 @@ def test_inbound_message_allows_reply_without_compose_permission(get_admin, get_
     with recipient.page.expect_navigation():
         aggregate.get_by_role("link", name="1 new message", exact=True).click()
 
-    view = recipient.locate("[lp-view][data-kind='messages']")
-    expect(view).to_have_attribute("initialized", "")
+    view = _initialized_messages_view(recipient)
     expect(view.locator("[data-action='compose-message']")).to_have_count(0)
     expect(view).not_to_contain_text("Messaging unavailable")
     reply = view.locator("[data-role='message-reply']")
