@@ -8,7 +8,7 @@ from ...definitions import Action, Fetch
 from ...entities import Entities
 from ...properties.schema import SchemaFields
 from ..ai import autofill
-from ..database.utility import ExactEntityState
+from ..database.utility import ExactEntityState, PageSubmissionState
 from .contracts import check_size, json_value
 
 if TYPE_CHECKING:
@@ -136,7 +136,8 @@ def stage_submission_guard(
     guards: list[tuple[Key, ExactEntityState]] = list(getattr(target, "_form_additional_guards", ()))
     if target.key is None:
         return False
-    guards.append((target.key, ExactEntityState(deepcopy(dict(target.db)))))
+    expectation = PageSubmissionState if getattr(target, "entity_kind", None) == "page" else ExactEntityState
+    guards.append((target.key, expectation(deepcopy(dict(target.db)))))
     target._form_additional_guards = guards
     return True
 
