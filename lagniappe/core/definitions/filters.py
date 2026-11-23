@@ -243,7 +243,7 @@ class FilterDefinition:
         """Create from a serialized description (JSON string or list)."""
         attrs = json.loads(definition) if isinstance(definition, str) else definition
         return cls(
-            *attrs[0:4],
+            attrs[0], attrs[1], attrs[2], attrs[3],
             attrs[4] if len(attrs) > 4 else None,
             attrs[5] if len(attrs) > 5 else False,
         )

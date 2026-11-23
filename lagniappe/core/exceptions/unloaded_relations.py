@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from contextlib import suppress
 import traceback
 from pathlib import Path
@@ -82,7 +83,9 @@ def _entity_context(entity):
     if not entity:
         return None
 
-    db = _safe_attr(entity, "db", {}) or {}
+    db = _safe_attr(entity, "db", {})
+    if not isinstance(db, Mapping):
+        db = {}
     kind = _safe_attr(entity, "kind") or _safe_attr(entity, "entity_kind")
     return {
         "class": f"{type(entity).__module__}.{type(entity).__name__}",

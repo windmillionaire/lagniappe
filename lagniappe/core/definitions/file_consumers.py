@@ -128,7 +128,10 @@ def _megabyte_label(size):
 # @tests tests_unit/test_018_database_assets.py::test_file_consumer_limits_use_metadata_before_reading
 # @tests tests_unit/test_018_database_assets.py::test_direct_upload_full_read_requires_named_bounded_consumer
 # @matrix files : bounded-consumer size-limit
-def enforce_file_consumer(source, consumer, *, filename=None, size=None):
+def enforce_file_consumer(
+    source: object, consumer: FileConsumer | str, *, filename: str | None = None,
+    size: int | None = None,
+) -> int | None:
     """Authorize a named consumer after checking size without reading bytes."""
     if not isinstance(consumer, FileConsumer):
         consumer = FileConsumer(consumer)
@@ -142,7 +145,7 @@ def enforce_file_consumer(source, consumer, *, filename=None, size=None):
             max_bytes=capability.max_bytes,
         )
 
-    if capability.max_bytes is not None and size > capability.max_bytes:
+    if capability.max_bytes is not None and size is not None and size > capability.max_bytes:
         name = f"{filename} is" if filename else "File is"
         raise FileConsumerLimitError(
             f"{name} too large for {capability.label} "

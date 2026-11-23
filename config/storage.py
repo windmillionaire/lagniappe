@@ -1,9 +1,23 @@
 """Shared Cloud Storage naming and metadata contract."""
 
+from collections.abc import Mapping
+from typing import SupportsIndex, SupportsInt, TypedDict, TYPE_CHECKING
+
 import hashlib
 import logging
 import time
 from urllib.parse import urlparse
+
+if TYPE_CHECKING:
+    from google.cloud.storage import Bucket
+
+
+class _CorsRule(TypedDict):
+    origin: list[str]
+    method: list[str]
+    responseHeader: list[str]
+    maxAgeSeconds: int
+
 
 LOGGER = logging.getLogger(__name__)
 BUCKET_KINDS = ("history", "private", "public")
@@ -27,7 +41,7 @@ RUNTIME_TEMP_UPLOAD_RETENTION_DAYS = 30
 # @testable false
 # @covered-by config/storage.py::_patch_bucket_metadata
 # @reason provider-neutral classifier is owned by bucket metadata retry behavior
-def _is_storage_transient_error(error):
+def _is_storage_transient_error(error: Exception) -> bool:
     """Return whether a provider error is safe to retry."""
     if type(error).__name__ in {
         "BadGateway",
@@ -47,6 +61,8 @@ def _is_storage_transient_error(error):
         response = getattr(error, "response", None)
         status = getattr(response, "status_code", None)
 
+    if not isinstance(status, (str, bytes, bytearray, SupportsInt, SupportsIndex)):
+        return False
     try:
         status = int(status)
     except (TypeError, ValueError):
@@ -59,7 +75,7 @@ def _is_storage_transient_error(error):
 # @covered-by config/storage.py::storage_bucket_names
 # @covered-by config/storage.py::recovery_bucket_name
 # @reason shared deterministic name construction is exercised through public naming contracts
-def _bucket_name(settings, kind):
+def _bucket_name(settings: Mapping[str, object], kind: str) -> str:
     """Return one deterministic full bucket name for an app-settings mapping."""
     digest = hashlib.sha256(str(settings["GIBBERISH"]).encode()).hexdigest()
     prefix = str(settings.get("PREFIX") or "")
@@ -69,7 +85,7 @@ def _bucket_name(settings, kind):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_storage_bucket_names_match_runtime_contract
 # @matrix setup storage : naming
-def storage_bucket_names(settings):
+def storage_bucket_names(settings: Mapping[str, object]) -> dict[str, str]:
     """Return Lagniappe's three runtime bucket names for app settings."""
     return {kind: _bucket_name(settings, kind) for kind in BUCKET_KINDS}
 
@@ -78,7 +94,7 @@ def storage_bucket_names(settings):
 # @tests tests_unit/test_018_database_assets.py::test_storage_bucket_names_match_runtime_contract
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_storage_provisioning_is_bucket_scoped_and_idempotent
 # @pairs disaster-recovery:naming storage:provisioning
-def recovery_bucket_name(settings):
+def recovery_bucket_name(settings: Mapping[str, object]) -> str:
     """Return the operator-only disaster-recovery bucket name."""
     return _bucket_name(settings, RECOVERY_BUCKET_KIND)
 
@@ -86,7 +102,7 @@ def recovery_bucket_name(settings):
 # @testable false
 # @covered-by config/storage.py::expected_storage_cors_origins
 # @reason URL parsing helper owned by the public CORS contract
-def _origin(value):
+def _origin(value: object) -> str | None:
     """Return a scheme://host[:port] origin for a configured URL."""
     if not value:
         return None
@@ -101,7 +117,7 @@ def _origin(value):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_storage_cors_origins_include_configured_urls
 # @matrix storage : cors origins
-def expected_storage_cors_origins(config):
+def expected_storage_cors_origins(config: object) -> list[str]:
     """Return the browser origins allowed to upload/download bucket objects."""
     origins = []
 
@@ -110,8 +126,8 @@ def expected_storage_cors_origins(config):
         origins.append(app_origin)
 
     custom_domain = getattr(config, "CUSTOM_DOMAIN", None)
-    if custom_domain:
-        origins.append(_origin(f"https://{custom_domain}"))
+    if custom_domain and (custom_origin := _origin(f"https://{custom_domain}")):
+        origins.append(custom_origin)
 
     if getattr(config, "local", False):
         base_url = getattr(config, "BASE_URL", None)
@@ -130,7 +146,7 @@ def expected_storage_cors_origins(config):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_expected_storage_cors_shape
 # @pair storage:cors
-def expected_storage_cors(config):
+def expected_storage_cors(config: object) -> list[_CorsRule]:
     """Return the expected Cloud Storage CORS rule for Lagniappe buckets."""
     origins = expected_storage_cors_origins(config)
     if not origins:
@@ -272,7 +288,7 @@ def _patch_bucket_metadata(bucket):
 # @tests tests_unit/test_018_database_assets.py::test_configure_bucket_enables_versioning_and_reconciles_noncurrent_lifecycle
 # @tests tests_unit/test_018_database_assets.py::test_configure_bucket_retries_transient_patch_failure
 # @matrix storage : bucket-metadata cors idempotent lifecycle-preservation object-versioning storage-class transient-retry
-def configure_storage_bucket(bucket, config, *, preserve_cors_origin=None):
+def configure_storage_bucket(bucket: Bucket, config: object, *, preserve_cors_origin: str | None = None) -> bool:
     """Reconcile runtime metadata and the setup-owned version-retention rule."""
     changed = False
 
@@ -286,7 +302,7 @@ def configure_storage_bucket(bucket, config, *, preserve_cors_origin=None):
 
     expected_cors = expected_storage_cors(config)
     existing_cors = getattr(bucket, "cors", None)
-    if expected_cors and has_browser_cors_origin(existing_cors, preserve_cors_origin):
+    if expected_cors and preserve_cors_origin and has_browser_cors_origin(existing_cors, preserve_cors_origin):
         expected_cors[0]["origin"] = sorted(
             {*expected_cors[0]["origin"], preserve_cors_origin}
         )
@@ -320,7 +336,7 @@ def configure_storage_bucket(bucket, config, *, preserve_cors_origin=None):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_configure_recovery_bucket_removes_cors_and_is_idempotent
 # @matrix disaster-recovery : bucket-metadata lifecycle-preservation
-def configure_recovery_bucket(bucket):
+def configure_recovery_bucket(bucket: Bucket) -> bool:
     """Reconcile recovery-bucket metadata without browser-facing CORS."""
     changed = False
 

@@ -1,7 +1,14 @@
-from enum import EnumMeta
+from enum import Enum, EnumMeta
 
 
 # @testable infrastructure
+def _get_default_member[Member: Enum](self: type[Member], name: str) -> Member:
+    try:
+        return EnumMeta.__getitem__(self, name)
+    except KeyError:
+        return EnumMeta.__getitem__(self, "DEFAULT")
+
+
 class DefaultEnum(EnumMeta):
     """
     Enum metaclass that returns a DEFAULT value instead of raising KeyError.
@@ -9,8 +16,4 @@ class DefaultEnum(EnumMeta):
     Used by enums like IngressStage and Action where a safe default is needed.
     """
 
-    def __getitem__(cls, name):
-        try:
-            return super().__getitem__(name)
-        except KeyError:
-            return cls.DEFAULT
+    __getitem__ = _get_default_member

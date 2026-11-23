@@ -337,8 +337,7 @@ class General(Enum):
                 Levels.DELETE,
                 Levels.CREATE,
             ]
-        elif self in [General.MODELS, General.FORMS]:
-            return [Levels.NONE, Levels.VIEW, Levels.EDIT, Levels.DELETE, Levels.CREATE]
+        return [Levels.NONE, Levels.VIEW, Levels.EDIT, Levels.DELETE, Levels.CREATE]
 
     @property
     def default(self):

@@ -1,6 +1,7 @@
 """Bound and sanitize request context used in error reports."""
 
 from collections.abc import Mapping
+from typing import overload
 import re
 from urllib.parse import urlsplit
 
@@ -180,8 +181,8 @@ def _sanitize_text(value, *, limit=MAX_CONTEXT_STRING_LENGTH):
 # @testable false
 # @covered-by lagniappe/core/exceptions/request.py::sanitize_error_context
 # @reason URL parsing is exercised through the public context sanitizer
-def _sanitize_url(value):
-    metadata = {
+def _sanitize_url(value: object) -> dict[str, str | int | bool]:
+    metadata: dict[str, str | int | bool] = {
         "parseable": False,
         "has_path": False,
         "has_query": False,
@@ -260,7 +261,15 @@ def _sanitize_value(value, *, key=None, depth=0):
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_error_context_sanitizer_redacts_nested_secrets_and_bounds_payloads
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_error_context_sanitizer_replaces_urls_with_bounded_metadata
 # @matrix error-reporting : payload-bounds privacy redaction url-metadata
-def sanitize_error_context(value):
+@overload
+def sanitize_error_context(value: Mapping[str, object]) -> dict[str, object]: ...
+
+
+@overload
+def sanitize_error_context(value: object) -> object: ...
+
+
+def sanitize_error_context(value: object) -> object:
     """Return a bounded, serialization-safe copy with sensitive values removed."""
     return _sanitize_value(value)
 

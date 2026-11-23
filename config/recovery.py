@@ -358,7 +358,8 @@ def validate_recovery_document(settings):
         )
     auth_email = _mapping(auth_email_value, "AUTH_EMAIL_CONFIG")
     try:
-        auth_email_port = int(auth_email.get("port"))
+        port = auth_email.get("port")
+        auth_email_port = int(port) if port is not None else 0
     except (TypeError, ValueError):
         auth_email_port = 0
     normalized_auth_email = {

@@ -92,7 +92,7 @@ class RelationMutationContract:
     # @testable false
     # @covered-by lagniappe/core/definitions/mutations.py::RelationMutationContract
     # @reason relation serialization is exercised through the public contract
-    def to_dict(self):
+    def to_dict(self) -> dict[str, object]:
         return {
             "name": self.name,
             "targets": list(self.targets),
@@ -126,7 +126,7 @@ class EntityMutationContract:
     # @testable false
     # @covered-by lagniappe/core/definitions/mutations.py::EntityMutationContract
     # @reason entity serialization is exercised through the public contract
-    def to_dict(self):
+    def to_dict(self) -> dict[str, object]:
         return {
             "kind": self.kind,
             "delete_effects": [effect.value for effect in self.delete_effects],
@@ -177,8 +177,8 @@ class MutationEffect:
     # @testable false
     # @covered-by lagniappe/core/definitions/mutations.py::MutationEffect
     # @reason effect serialization is exercised through plan serialization
-    def to_dict(self):
-        data = {
+    def to_dict(self) -> dict[str, object]:
+        data: dict[str, object] = {
             "effect": self.effect.value,
             "phase": self.phase.value,
         }
@@ -364,7 +364,7 @@ class MutationPlan:
     # @testable false
     # @covered-by lagniappe/core/definitions/mutations.py::MutationPlan
     # @reason plan serialization is exercised through the public plan contract
-    def to_dict(self):
+    def to_dict(self) -> dict[str, object]:
         return {
             "operation": self.operation.value,
             "effects": [effect.to_dict() for effect in self.effects],
@@ -394,7 +394,7 @@ class MutationOutcome:
     # @testable false
     # @covered-by lagniappe/core/definitions/mutations.py::MutationOutcome
     # @reason outcome serialization is exercised through the public contract
-    def to_dict(self):
+    def to_dict(self) -> dict[str, object]:
         return {
             "operation": self.operation.value,
             "durable_committed": self.durable_committed,

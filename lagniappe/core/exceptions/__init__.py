@@ -1,5 +1,8 @@
 """Custom exceptions and error capture (Sentry in prod, console in dev)."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
 from datetime import datetime
 from pprint import pformat
 import traceback
@@ -7,6 +10,9 @@ import sys
 
 from config.deployment import DeploymentSettingsError as DeploymentSettingsError
 from lagniappe import CONFIG
+
+if TYPE_CHECKING:
+    from sentry_sdk._types import LogLevelStr
 
 from .request import (
     extract_request_info,
@@ -77,12 +83,12 @@ class UnloadedRelationError(Exception):
 # @testable false
 # @covered-by lagniappe/web/start/errors.py::_handle_error_with_context
 # @reason debug context is rendered and captured through the Flask error handler
-def get_debug_context(error):
+def get_debug_context(error: BaseException) -> dict[str, object]:
     """
     Extract comprehensive debug context from an exception.
     Returns a dict with all available debug information.
     """
-    context = {
+    context: dict[str, object] = {
         "timestamp": datetime.now().isoformat(),
         "error_type": type(error).__name__,
         "error_message": str(error),
@@ -113,7 +119,10 @@ def get_debug_context(error):
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_error_capture_sanitizes_context_without_duplicate_request
 # @matrix deferred-jobs : sentry terminal-delivery
 # @matrix error-handling : privacy redaction request-context sentry terminal-delivery
-def capture(error, context=None, level="error", *, wait_for_delivery=False):
+def capture(
+    error: object, context: Mapping[str, object] | None = None,
+    level: LogLevelStr = "error", *, wait_for_delivery: bool = False,
+) -> None:
     """Capture an error, sending to Sentry in production or printing in dev."""
     if CONFIG.capture_errors:
         import sentry_sdk
