@@ -572,7 +572,7 @@ def create_deferred_job_if_absent(
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_autofill_lock_cleanup_is_compare_and_delete
 # @matrix deferred-jobs : compare-and-set form-lock
 @retry_aborted
-def release_deferred_job_lock(identifier: Identifier, operation: str) -> bool:
+def release_deferred_job_lock(identifier: Identifier, operation: str | None) -> bool:
     """Delete a lock only when it still belongs to ``operation``."""
     key = _deferred_job_key(identifier)
     if key is None:

@@ -36,6 +36,11 @@ GENERIC_CONTENT_TYPES = {"", None, "application/octet-stream"}
 DIRECT_UPLOAD_ASSET_NONCE = re.compile(r"^[a-f0-9]{32}$")
 
 
+class _TextUpload(Protocol):
+    # The SDK forwards an explicit None to upload_from_file for MIME inference.
+    def __call__(self, data: str, *, content_type: str | None) -> None: ...
+
+
 class UploadSession(TypedDict):
     token: str
     session_url: str
@@ -503,7 +508,7 @@ def _is_direct_upload(file: object) -> TypeGuard[DirectUploadFile]:
 def save_file(
     file: BinaryIO | FileStorage | DirectUploadFile,
     path: str,
-    content_type: str,
+    content_type: str | None,
     visibility: str,
 ) -> Blob:
     """Upload a file object to the specified bucket.
@@ -588,7 +593,7 @@ def get_text(
 
 # @testable false
 # @reason cloud storage behavior is owned by E2E coverage against configured services
-def save_text(text: str, path: str, content_type: str, visibility: str) -> Blob:
+def save_text(text: str, path: str, content_type: str | None, visibility: str) -> Blob:
     """Upload a text string as a blob to the specified bucket.
 
     Args:
@@ -599,7 +604,8 @@ def save_text(text: str, path: str, content_type: str, visibility: str) -> Blob:
     """
     bucket = DATA.bucket(visibility)
     blob = bucket.blob(path)
-    blob.upload_from_string(text, content_type=content_type)
+    upload = cast(_TextUpload, blob.upload_from_string)
+    upload(text, content_type=content_type)
     blob.reload()
     return blob
 
