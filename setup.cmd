@@ -7,10 +7,17 @@ set "LAGNIAPPE_VENV_PYTHON=%~dp0venv\Scripts\python.exe"
 
 if not exist "%LAGNIAPPE_VENV_PYTHON%" goto prepare_environment
 
-"%LAGNIAPPE_VENV_PYTHON%" -E -c "import pathlib, sys; base=str(pathlib.Path(sys.base_prefix)).lower(); unsafe='google-cloud-sdk' in base and 'bundledpython' in base; raise SystemExit(42 if unsafe else 0)" >nul 2>nul
+"%LAGNIAPPE_VENV_PYTHON%" -E -c "import pathlib, sys; base=str(pathlib.Path(sys.base_prefix)).lower(); unsafe='google-cloud-sdk' in base and 'bundledpython' in base; raise SystemExit(42 if unsafe else 43 if sys.version_info[:2] != (3, 14) else 0)" >nul 2>nul
+if "%errorlevel%"=="43" goto wrong_environment_version
 if "%errorlevel%"=="42" goto replace_cloud_sdk_environment
 if errorlevel 1 goto environment_failed
 goto run_setup
+
+
+:wrong_environment_version
+echo This checkout's venv must use Python 3.14.
+echo Rename the existing venv directory, then rerun .\setup.cmd to create it with Python 3.14.
+exit /b 1
 
 :replace_cloud_sdk_environment
 echo Replacing Lagniappe's generated Python environment...
@@ -20,29 +27,30 @@ if exist "%LAGNIAPPE_VENV_DIR%" goto environment_failed
 :prepare_environment
 echo Preparing Lagniappe's isolated Python environment...
 set "LAGNIAPPE_BOOTSTRAP_PYTHON="
+set "LAGNIAPPE_PY_LAUNCHER=-3.14"
 
 :try_python_launcher
 where py >nul 2>nul
 if errorlevel 1 goto try_local_python
-py -3 -E -c "import pathlib, sys; base=str(pathlib.Path(sys.base_prefix)).lower(); unsafe='google-cloud-sdk' in base and 'bundledpython' in base; raise SystemExit(sys.version_info < (3, 12) or unsafe)" >nul 2>nul
+py %LAGNIAPPE_PY_LAUNCHER% -E -c "import pathlib, sys; base=str(pathlib.Path(sys.base_prefix)).lower(); unsafe='google-cloud-sdk' in base and 'bundledpython' in base; raise SystemExit(sys.version_info[:2] != (3, 14) or unsafe)" >nul 2>nul
 if not errorlevel 1 goto create_with_launcher
 
 :try_local_python
-for %%V in (314 313 312) do if exist "%LOCALAPPDATA%\Programs\Python\Python%%V\python.exe" (
-    set "LAGNIAPPE_BOOTSTRAP_PYTHON=%LOCALAPPDATA%\Programs\Python\Python%%V\python.exe"
+if exist "%LOCALAPPDATA%\Programs\Python\Python314\python.exe" (
+    set "LAGNIAPPE_BOOTSTRAP_PYTHON=%LOCALAPPDATA%\Programs\Python\Python314\python.exe"
     goto create_with_path
 )
 
 :try_python
 where python >nul 2>nul
 if errorlevel 1 goto try_python3
-python -E -c "import pathlib, sys; base=str(pathlib.Path(sys.base_prefix)).lower(); unsafe='google-cloud-sdk' in base and 'bundledpython' in base; raise SystemExit(sys.version_info < (3, 12) or unsafe)" >nul 2>nul
+python -E -c "import pathlib, sys; base=str(pathlib.Path(sys.base_prefix)).lower(); unsafe='google-cloud-sdk' in base and 'bundledpython' in base; raise SystemExit(sys.version_info[:2] != (3, 14) or unsafe)" >nul 2>nul
 if not errorlevel 1 goto create_with_python
 
 :try_python3
 where python3 >nul 2>nul
 if errorlevel 1 goto install_python
-python3 -E -c "import pathlib, sys; base=str(pathlib.Path(sys.base_prefix)).lower(); unsafe='google-cloud-sdk' in base and 'bundledpython' in base; raise SystemExit(sys.version_info < (3, 12) or unsafe)" >nul 2>nul
+python3 -E -c "import pathlib, sys; base=str(pathlib.Path(sys.base_prefix)).lower(); unsafe='google-cloud-sdk' in base and 'bundledpython' in base; raise SystemExit(sys.version_info[:2] != (3, 14) or unsafe)" >nul 2>nul
 if not errorlevel 1 goto create_with_python3
 
 :install_python
@@ -62,7 +70,7 @@ goto python_install_failed
 
 :missing_python
 echo.
-echo [X] Lagniappe requires standalone Python 3.12 or newer
+echo [X] Lagniappe requires standalone Python 3.14
 echo Install Python from https://www.python.org/downloads/windows/ and run
 echo .\setup.cmd again.
 exit /b 1
@@ -80,7 +88,7 @@ if errorlevel 1 goto environment_failed
 goto check_environment
 
 :create_with_launcher
-py -3 -E -m venv "%~dp0venv"
+py %LAGNIAPPE_PY_LAUNCHER% -E -m venv "%~dp0venv"
 if errorlevel 1 goto environment_failed
 goto check_environment
 
@@ -94,6 +102,8 @@ python3 -E -m venv "%~dp0venv"
 if errorlevel 1 goto environment_failed
 
 :check_environment
+"%LAGNIAPPE_VENV_PYTHON%" -E -c "import sys; raise SystemExit(sys.version_info[:2] != (3, 14))" >nul 2>nul
+if errorlevel 1 goto wrong_environment_version
 if not exist "%LAGNIAPPE_VENV_PYTHON%" goto environment_failed
 "%LAGNIAPPE_VENV_PYTHON%" -E -c "import sys; paths=[str(path).lower() for path in sys.path]; raise SystemExit(any('google-cloud-sdk' in path and 'bundledpython' in path for path in paths))" >nul 2>nul
 if errorlevel 1 goto contaminated_environment

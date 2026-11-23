@@ -4,6 +4,7 @@ import ipaddress
 import math
 import os
 import re
+import sys
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
@@ -139,6 +140,8 @@ class Config:
     VERSION: str
 
     def __init__(self, settings: RuntimeSettings | None = None) -> None:
+        if sys.version_info[:2] != (3, 14):
+            raise RuntimeError("Lagniappe 2.5 requires Python 3.14.")
         if settings is None:
             settings = load_runtime_settings(
                 Environment(os.environ.get("FLASK_ENV", "production"))

@@ -163,12 +163,9 @@
             class="text-base-medium text-sm space-y-3 list-decimal ml-5 mt-3">
           <li>Check whether the installed Python version is ready for Lagniappe:</li>
         </ol>
-        {{ code("python3") }}
+        {{ code("python3.14 --version") }}
         <p class="text-base-medium text-sm mt-2">
-          Python displays its version and then a <code>&gt;&gt;&gt;</code> prompt.
-          Type <code>exit()</code> and press Enter to return to the normal
-          Terminal prompt. If the displayed version is 3.12 or newer,
-          continue. If it is 3.11 or older, or the command is not found,
+          If the command displays Python 3.14.x, continue. If it is unavailable,
           download and run
           {{ link("https://www.python.org/downloads/macos/", "Python.org's current macOS installer") }},
           then close and reopen Terminal and run the check again.
@@ -203,7 +200,7 @@
       Google Cloud CLI remain normal system tools.
     {% endcall %}
     {% call callout("note", False) %}
-      Lagniappe needs Python 3.12 or newer. The macOS steps above check Python
+      Lagniappe requires Python 3.14. The macOS steps above check Python
       before installing Google Cloud CLI. On Windows, setup can offer to
       install a supported standalone Python with WinGet if one is not already
       available.

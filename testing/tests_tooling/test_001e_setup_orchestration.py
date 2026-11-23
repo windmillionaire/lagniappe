@@ -473,11 +473,11 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
         assert events == expected
 
     monkeypatch.setattr(setup_package, "verify_setup_runtime", verify_runtime)
-    monkeypatch.setattr(setup_package.sys, "version_info", (3, 11))
+    monkeypatch.setattr(setup_package.sys, "version_info", (3, 13))
     with pytest.raises(SetupError):
         setup_package.verify_setup_runtime()
 
-    monkeypatch.setattr(setup_package.sys, "version_info", (3, 12))
+    monkeypatch.setattr(setup_package.sys, "version_info", (3, 14))
     monkeypatch.setattr(setup_package, "project_virtualenv_active", lambda: False)
     with pytest.raises(SetupError):
         setup_package.verify_setup_runtime()
@@ -622,7 +622,10 @@ def test_portable_runtime_paths_commands_and_virtualenv_instructions():
     assert '"$LAGNIAPPE_VENV_PYTHON" -E -m installer "$@"' in posix_launcher
     assert '"$@"' in posix_launcher
     assert "gcloud info" not in windows_launcher
+    assert "python3.14 python3 python" in posix_launcher
     assert "Python.Python.3.14" in windows_launcher
+    assert "-3.14" in windows_launcher
+    assert "314 313 312" not in windows_launcher
     assert "winget install" in windows_launcher
     assert "bundledpython" in windows_launcher
     assert 'rmdir /s /q "%LAGNIAPPE_VENV_DIR%"' in windows_launcher

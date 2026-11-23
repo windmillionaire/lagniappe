@@ -30,7 +30,7 @@ artifact fails closed without selecting an ambient `uv`; rerun
 
 ## Project virtualenv
 
-`setup.sh` and `setup.cmd` locate a supported Python, create this checkout's
+`setup.sh` and `setup.cmd` locate Python 3.14, create this checkout's
 `venv`, and invoke it directly. They do not activate or reuse another virtual
 environment. Every installer mode verifies that `sys.executable` belongs to
 this checkout.

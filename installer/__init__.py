@@ -29,12 +29,12 @@ def verify_setup_runtime() -> None:
     """Require supported Python from this checkout's project virtualenv."""
     from installer.errors import SetupError
 
-    if sys.version_info < (3, 12):  # noqa: UP036 -- the installer bootstraps on Python 3.12+.
+    if sys.version_info[:2] != (3, 14):
         print(
-            f"Python 3.12 or higher is required (you are running {sys.version})."
+            f"Python 3.14 is required (you are running {sys.version})."
         )
         print(virtualenv_instructions())
-        raise SetupError("Python 3.12 or higher is required.")
+        raise SetupError("Python 3.14 is required.")
 
     if not project_virtualenv_active():
         print("Setup must run from this checkout's project virtualenv.")
