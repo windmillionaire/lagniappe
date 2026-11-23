@@ -1,5 +1,13 @@
 """Project-related properties for model tasks and filtering."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+    from ..entities.model_task import ModelTask
+    from ..entities.project import Project
+
 from ..definitions import Fetch
 from ..entities import Entities
 from ..mixins import (
@@ -22,7 +30,7 @@ from .task_related import AssignedTo, HasSignature, HasStatus, TaskCategories
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_model_tasks_load_attach_and_order_from_database
 # @matrix project : db-load model-tasks ordering relation-attach
-class ModelTasks(RelatedEntityListMixin, Property):
+class ModelTasks(RelatedEntityListMixin["ModelTask"], Property[list["ModelTask"], "Project"]):
     """Model tasks (workflow stages) belonging to a project.
 
     Lazy-loaded from the database on first access. Each model task
@@ -33,13 +41,14 @@ class ModelTasks(RelatedEntityListMixin, Property):
     """
 
     # Property Attributes
+    _value: object
     _id = "model_tasks"
     _label = "Models"
 
     @property
-    def value(self):
+    def value(self) -> list[ModelTask]:  # pyright: ignore[reportIncompatibleMethodOverride] -- Membership is changed through add or attach.
         if self.is_set:
-            return self._value
+            return cast("list[ModelTask]", self._value)
 
         model_tasks = Entities.fetch(
             *database_get.model_tasks(self.entity),
@@ -52,7 +61,7 @@ class ModelTasks(RelatedEntityListMixin, Property):
         return self._value
 
     # Entity Attributes
-    def add(self, model):
+    def add(self, model: ModelTask) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] -- This override retains its public model keyword.
         models = self.value
         if model and model.key not in [m.key for m in models]:
             model.order = max([len(models), *(m.order or 0 for m in models)]) + 1
@@ -60,9 +69,10 @@ class ModelTasks(RelatedEntityListMixin, Property):
             self._cache_attached_entities()
             self._invalidate_projections()
 
-    def attach(self, key_map):
+    def attach(self, key_map: Mapping[Key, ModelTask]) -> None:
         if self.is_set:
-            self._value = [key_map.get(model.key, model) for model in self._value]
+            models = cast("list[ModelTask]", self._value)
+            self._value = [key_map.get(cast("Key", model.key), model) for model in models]
             self._cache_attached_entities()
             self._invalidate_projections()
 
@@ -71,8 +81,8 @@ class ModelTasks(RelatedEntityListMixin, Property):
 # @tests tests_unit/test_005_project_properties.py::test_project_filters
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_conditions_include_task_fields
 # @matrix filters project : completed conditions entity-fields filter-value
-class ProjectFilters(Filters):
-    def __init__(self, *args, entity=None, **kwargs):
+class ProjectFilters(Filters["Project"]):
+    def __init__(self, *args: object, entity: Project | None = None, **kwargs: object) -> None:
         super().__init__(*args, entity=entity, **kwargs)
         self.filter_kind = "task"
         self.filter_fields = [
@@ -86,17 +96,19 @@ class ProjectFilters(Filters):
         ]
 
     @property
-    def entity_fields(self):
+    def entity_fields(self) -> dict[str, FilterMixin]:
         if self._entity_fields is not None:
             return self._entity_fields
 
         self._entity_fields = {}
         for model in self.entity.model_tasks:
-            self._entity_fields[model.hash] = AttachedModelTask(entity=self.entity)
-            self._entity_fields[model.hash].value = model
+            model_field = AttachedModelTask(entity=self.entity)
+            model_field.value = model
+            self._entity_fields[model.hash] = model_field
             if model.form:
-                self._entity_fields[model.form.hash] = AttachedForm(entity=model)
-                self._entity_fields[model.form.hash].value = model.form
+                form_field = AttachedForm(entity=model)
+                form_field.value = model.form
+                self._entity_fields[model.form.hash] = form_field
 
         return self._entity_fields
 
@@ -105,7 +117,7 @@ class ProjectFilters(Filters):
 # @tests tests_unit/test_005_project_properties.py::test_model_task_project_parent_details_and_attach
 # @matrix project : attach details model-task-parent
 class ModelTaskProject(
-    RelatedEntityMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty
+    RelatedEntityMixin["Project"], DetailsMixin, FilterMixin, AIMixin, DBProperty["Project"]
 ):
     """Parent project for a ModelTask entity.
 
@@ -128,7 +140,7 @@ class ModelTaskProject(
 
     # Details Attributes
     @property
-    def details_key(self):
+    def details_key(self) -> str:
         return "parent"
 
 

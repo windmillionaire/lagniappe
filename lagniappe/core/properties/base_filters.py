@@ -1,13 +1,21 @@
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Self, cast
+
+from ..mixins.filter import FilterMixin
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
+
 from ..definitions import Action
 from ..tools.auth.context import current_context_user
-from .base_property import Property
+from .base_property import Property, build_field
 
 
 # @testable infrastructure
 # @covered-by lagniappe/core/properties/category.py::CategoryFilters
 # @covered-by lagniappe/core/properties/project.py::ProjectFilters
 # @covered-by lagniappe/core/properties/form.py::FormFilters.conditions
-class Filters(Property):
+class Filters[Owner: Entity = "Entity"](Property["Filters", Owner, "Filters | None"]):
     """Filter configuration for an entity's list view.
 
     Builds filter fields from ``filter_fields`` and optionally adds
@@ -21,8 +29,18 @@ class Filters(Property):
     """
 
     _id = "filters"
+    filter_fields: list[type[FilterMixin] | FilterMixin]
+    filter_kind: str
+    _fields: dict[str, FilterMixin] | None
+    _conditions: list[dict[str, object]] | None
+    _entity_fields: dict[str, FilterMixin] | None
 
-    def __init__(self, *args, entity=None, **kwargs):
+    if TYPE_CHECKING:
+        @property
+        def entity_fields(self) -> Mapping[str, FilterMixin]: ...
+
+
+    def __init__(self, *args: object, entity: Owner | None = None, **kwargs: object) -> None:
         super().__init__(*args, entity=entity, **kwargs)
         self._entity_fields = None
         self._fields = None
@@ -30,24 +48,24 @@ class Filters(Property):
         self._conditions_user_key = None
 
     @property
-    def value(self):
+    def value(self) -> Self:  # pyright: ignore[reportIncompatibleMethodOverride] -- The filter configuration is a read-only computed field.
         return self
 
     @property
-    def fields(self):
+    def fields(self) -> dict[str, FilterMixin]:
         if self._fields is not None:
             return self._fields
 
         self._fields = {}
         for f in self.filter_fields:
-            field = f(entity=self.entity) if isinstance(f, type) else f
+            field = build_field(f, self.entity) if isinstance(f, type) else f
             field.filter_kind = self.filter_kind
             self._fields[field.filter_key] = field
 
         return self._fields
 
     @property
-    def conditions(self):
+    def conditions(self) -> list[dict[str, object]]:
         user = current_context_user()
         user_key = getattr(user, "key", None) or id(user)
         if self._conditions is not None and self._conditions_user_key == user_key:
@@ -69,14 +87,15 @@ class Filters(Property):
             return self._conditions
 
         for entity_field in visible_entity_fields.values():
+            entity = cast("Entity", entity_field.value)
             self._conditions.append(
                 {
                     "field": entity_field.filter_key,
                     "label": entity_field.filter_label,
                     "kind": entity_field.filter_kind,
                     "icon": entity_field.icon,
-                    "hash": entity_field.value.hash,
-                    "key": entity_field.value.urlsafe_key,
+                    "hash": entity.hash,
+                    "key": entity.urlsafe_key,
                 }
             )
 
@@ -84,7 +103,7 @@ class Filters(Property):
         return self._conditions
 
     @property
-    def preload(self):
+    def preload(self) -> list[dict[str, object]]:
         return self.conditions
 
     # @testable true
@@ -92,15 +111,15 @@ class Filters(Property):
     # @tests tests_unit/test_007_category_properties.py::test_category_filter_conditions_include_only_viewable_forms
     # @matrix category filters permissions project : conditions entity-fields view-access
     @property
-    def visible_entity_fields(self):
+    def visible_entity_fields(self) -> dict[str, FilterMixin]:
         user = current_context_user()
         return {
             key: field
             for key, field in self.entity_fields.items()
-            if field.value and field.value.allowed(Action.VIEW, user=user)
+            if (entity := cast("Entity | None", field.value)) and entity.allowed(Action.VIEW, user=user)
         }
 
-    def reset(self):
+    def reset(self) -> None:
         self._conditions = None
         self._conditions_user_key = None
         self._fields = None

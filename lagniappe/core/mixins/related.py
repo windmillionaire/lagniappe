@@ -31,6 +31,7 @@ else:
 # @covered-by lagniappe/core/properties/page_related.py::PageCategories
 # @covered-by lagniappe/core/properties/user_related.py::Groups
 class RelatedEntityListMixin[Related: Entity = "Entity"](_RelationHost):
+    _value: object
     _touch_members = True
     """Adds storage for a list of related entities.
 
@@ -260,6 +261,7 @@ class RelatedEntityMixin[Related: Entity = "Entity"](_RelationHost):
         attach(key_map): Populate from a pre-loaded key map.
     """
 
+    _value: object
     _column_value: dict[str, object] | None
     _attached: dict[Key, Related] | None
 

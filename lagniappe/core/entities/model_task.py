@@ -1,14 +1,22 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Self, TypedDict, cast
 
 from ..properties import project
 from ..exceptions import PropertyError
 from ..tools.database.get import urlsafe_key
-from .entity import Entity
+from .entity import Entity, EntityProperties
 
 
 if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+
     from . import property_types
+    from .form import Form
     from .project import Project
+
+
+class ModelTaskData(TypedDict, total=False):
+    name: str | None
+    form: Form | None
 
 
 # @testable true
@@ -18,6 +26,7 @@ if TYPE_CHECKING:
 class ModelTask(Entity):
     if TYPE_CHECKING:
         project: Project | None
+        form: Form | None
 
         @property
         def properties(self) -> property_types.ModelTaskProperties: ...
@@ -28,7 +37,7 @@ class ModelTask(Entity):
     # @tests tests_unit/test_005_project_properties.py::test_model_task_reference_retains_project_without_loading_relations
     # @pair model-task:reference-links
     @property
-    def reference_details(self):
+    def reference_details(self) -> dict[str, object]:
         details = super().reference_details
         project = self.properties.project
         if project.key:
@@ -43,7 +52,7 @@ class ModelTask(Entity):
     # @tests tests_unit/test_006b_ingress_entity.py::test_model_task_required_reports_unloaded_project_relation
     # @matrix requires : unloaded-relation validation
     @property
-    def required(self):
+    def required(self) -> list[str]:
         project = self.project
         if not project:
             raise PropertyError(
@@ -52,7 +61,7 @@ class ModelTask(Entity):
             )
         return ["models", self.hash, project.hash]
 
-    def _get_properties(self):
+    def _get_properties(self) -> EntityProperties:
         properties = super()._get_properties()
         properties.update(
             {
@@ -74,7 +83,7 @@ class ModelTask(Entity):
     # @tests tests_unit/test_032h_report_batches.py::test_create_key_batches_are_bounded_and_keep_parent_groups_separate
     # @matrix ai-report : id-allocation parent
     @classmethod
-    def create(cls, project, data, *, key=None):
+    def create(cls, project: Project, data: ModelTaskData, *, key: Key | None = None) -> Self:
         new_task = cls(key, parent=project)
         new_task.project = project
         new_task.kind = cls.entity_kind
@@ -84,6 +93,6 @@ class ModelTask(Entity):
         new_task.update(data)
         return new_task
 
-    def update(self, data):
+    def update(self, data: ModelTaskData) -> None:
         self.name = data.get("name")
         self.form = data.get("form")

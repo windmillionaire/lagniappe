@@ -18,7 +18,6 @@ from .base_filters import Filters
 from .form_table import Table
 
 if TYPE_CHECKING:
-    from ..entities.entity import Entity
     from ..entities.form import Form
     from .base_schema import FieldDefinition
 
@@ -95,8 +94,8 @@ class FormFilters(Filters):
     # @matrix filters form : conditions exclude-table-fields schema-fields
     @property
     def conditions(self) -> list[dict[str, object]]:
-        if getattr(self, "_conditions", None):
-            return self._conditions
+        if cached := getattr(self, "_conditions", None):
+            return cached
 
         self._conditions = [self._condition(field) for field in self.fields.values()]
         return self._conditions

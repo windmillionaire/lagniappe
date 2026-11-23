@@ -1,3 +1,4 @@
+from .base_property import build_field
 from .base_columns import Columns
 from .common_entity import Description, Modified, Name
 from .common_related import Categories, Projects
@@ -63,7 +64,7 @@ class TaskHistoryTable(Columns):
 
         fields = {}
         for f in self.column_fields:
-            field = f(entity=self.entity)
+            field = build_field(f, self.entity)
             fields[field.id] = field
 
         definition = getattr(self.entity, "submission_definition", None)
