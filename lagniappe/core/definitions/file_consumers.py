@@ -84,7 +84,7 @@ class FileConsumerLimitError(ValueError):
         self,
         message: str,
         *,
-        consumer: FileConsumer,
+        consumer: FileConsumer | None,
         size: int | None = None,
         max_bytes: int | None = None,
     ) -> None:
