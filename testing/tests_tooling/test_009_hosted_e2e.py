@@ -519,6 +519,7 @@ def _release_evidence_repository(
     suite="all",
     targets=None,
     extra_change=False,
+    hosted_overrides=None,
 ):
     _git(repo, "init")
     _git(repo, "config", "user.name", "Hosted Release Test")
@@ -550,6 +551,7 @@ def _release_evidence_repository(
         "build_id": "b1234567",
         "version": "e2e-abcdef1234567890",
         "suite": suite,
+        **(hosted_overrides or {}),
     }
     if targets is not None:
         payload["provenance"]["hosted_e2e"]["targets"] = targets
@@ -671,6 +673,24 @@ def test_release_evidence_validation_rejects_failed_or_focused_results(tmp_path)
             base=base,
             repo_root=focused_repo,
         )
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"source": "a" * 40}, "exact candidate source"),
+        ({"source_snapshot": "b" * 64}, "current semantic source tree"),
+        ({"targets": []}, "complete hosted all suite"),
+    ],
+)
+def test_release_rejects_passing_evidence_for_another_source_or_selection(
+    tmp_path, overrides, message
+):
+    base, candidate, evidence = _release_evidence_repository(
+        tmp_path, hosted_overrides=overrides
+    )
+    with pytest.raises(HostedE2EError, match=message):
+        hosted_e2e.validate_release_evidence(candidate, evidence, base=base, repo_root=tmp_path)
 
 
 def test_hosted_result_stamps_remote_provenance(tmp_path, monkeypatch):

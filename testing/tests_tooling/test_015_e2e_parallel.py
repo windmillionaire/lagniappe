@@ -509,7 +509,7 @@ def test_scheduler_reaps_a_crashed_workers_remaining_children(tmp_path):
 
 # @matrix testing : parallel-e2e
 @pytest.mark.parametrize("variant", ["pass", "setup", "teardown", "missing", "corrupt", "duplicate",
-                                      "wrong-source", "wrong-selection", "crash", "missing-junit"])
+                                      "wrong-source", "wrong-selection", "incomplete", "crash", "missing-junit"])
 def test_merge_preserves_failures_and_rejects_missing_corrupt_or_duplicate_evidence(tmp_path, variant):
     batches = [Batch("a", "testing/tests_e2e/test_example.py::test_a"),
                Batch("b", "testing/tests_e2e/test_example.py::test_b")]
@@ -536,6 +536,10 @@ def test_merge_preserves_failures_and_rejects_missing_corrupt_or_duplicate_evide
         statuses["b"] = -9 if variant == "crash" else 0
     elif variant == "corrupt":
         path.write_text("{")
+    elif variant == "incomplete":
+        payload = json.loads(path.read_text())
+        payload["outcomes"] = {}
+        path.write_text(json.dumps(payload))
     elif variant == "missing-junit":
         (tmp_path / "b" / "junit.xml").unlink()
     elif variant == "duplicate":
