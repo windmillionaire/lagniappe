@@ -6,6 +6,7 @@ from flask import url_for
 if TYPE_CHECKING:
     from google.cloud.datastore import Key
 
+    from ..restrictions import QueryHashes
     from .category import Category
     from .entity import Entity
     from .form import Form
@@ -120,7 +121,7 @@ class TaskIndex(Index):
         self._undated = bool(undated)
         owner = self.entity
         self._project = owner if isinstance(owner, Entities.PROJECT) else None
-        self._restrictions = self._viewer.properties.restrictions.task
+        self._restrictions: QueryHashes = self._viewer.properties.restrictions.task
         self._assigned_to = self._viewer.page if self._project is None else None
 
     def _get_properties(self) -> dict[str, type[index.TaskTable]]:
