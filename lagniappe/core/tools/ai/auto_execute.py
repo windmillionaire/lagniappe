@@ -2,7 +2,6 @@
 
 from collections.abc import Mapping
 import re
-from typing import Any
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions import AI
@@ -14,7 +13,7 @@ OPERATION_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 PROPOSAL_FINGERPRINT_PATTERN = re.compile(r"^[a-f0-9]{64}$")
 
 
-def site_auto_execute_enabled(config: Any = CONFIG) -> bool:
+def site_auto_execute_enabled(config: object = CONFIG) -> bool:
     """Return True only when AI is enabled and the live site setting allows auto-execution."""
     if not getattr(config, "AI_ENABLED", False):
         return False
@@ -22,10 +21,10 @@ def site_auto_execute_enabled(config: Any = CONFIG) -> bool:
 
 
 def experiments_execution_allowed(
-    user: Any,
+    user: object,
     *,
     remote_mcp: bool = False,
-    config: Any = CONFIG,
+    config: object = CONFIG,
 ) -> bool:
     """Designated Administrator agent execution preset for experiments installations."""
     return bool(
@@ -46,7 +45,7 @@ def experiments_execution_allowed(
     )
 
 
-def user_auto_execute_enabled(user: Any, *, config: Any = CONFIG) -> bool:
+def user_auto_execute_enabled(user: object, *, config: object = CONFIG) -> bool:
     """Return True when both site policy and this non-public user allow auto-execution."""
     return bool(
         site_auto_execute_enabled(config=config)
@@ -59,10 +58,10 @@ def user_auto_execute_enabled(user: Any, *, config: Any = CONFIG) -> bool:
 
 
 def can_execute_external_plan(
-    user: Any,
+    user: object,
     *,
     remote_mcp: bool = False,
-    config: Any = CONFIG,
+    config: object = CONFIG,
 ) -> bool:
     """Return True when an authenticated API or remote-MCP caller may trigger plan execution."""
     if not getattr(config, "AI_ENABLED", False) or not getattr(
@@ -74,7 +73,7 @@ def can_execute_external_plan(
     return user_auto_execute_enabled(user, config=config)
 
 
-def can_auto_execute_onsite_plan(user: Any, *, config: Any = CONFIG) -> bool:
+def can_auto_execute_onsite_plan(user: object, *, config: object = CONFIG) -> bool:
     """Return True when an on-site Create a Plan request may auto-run safe proposals.
 
     The user's saved ``allow_auto_execute`` sets the checkbox default on Home and
@@ -93,7 +92,7 @@ def can_auto_execute_onsite_plan(user: Any, *, config: Any = CONFIG) -> bool:
     return bool(callable(access) and access(AI.CREATE))
 
 
-def review_required_reason(proposal: Mapping[str, Any] | None) -> str | None:
+def review_required_reason(proposal: Mapping[str, object] | None) -> str | None:
     """Return a human-readable pause reason if the proposal must stop for browser review."""
     if not isinstance(proposal, Mapping):
         return None
@@ -122,7 +121,7 @@ def review_required_reason(proposal: Mapping[str, Any] | None) -> str | None:
     return None
 
 
-def plan_requires_review(report: Any, *, enforce_safety_pause: bool = True) -> str | None:
+def plan_requires_review(report: object, *, enforce_safety_pause: bool = True) -> str | None:
     """Return why a Plan cannot execute automatically, or None if eligible."""
     manifest = getattr(report, "agent_manifest", None)
     if isinstance(manifest, Mapping) and manifest.get("require_review") is True:

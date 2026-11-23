@@ -1,7 +1,11 @@
 """Shared browser, auto-execute, and external-API/MCP request to execute a saved proposal."""
 
 import hashlib
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.ai_report import AIReport
+    from lagniappe.core.entities.user import User
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, DeferredJobSpec, DeferredJobType, Fetch
@@ -19,8 +23,8 @@ from . import ledger
 
 
 def request_execution(
-    report: Any,
-    actor: Any,
+    report: AIReport,
+    actor: User,
     *,
     operation_id: str | None = None,
     expected_fingerprint: str | None = None,
@@ -39,7 +43,7 @@ def request_execution(
         )
     is_external = bool(external_execution or remote_mcp)
     is_experiments = False
-    parameters: dict[str, Any] = {}
+    parameters: dict[str, bool] = {}
     if is_external:
         if not can_execute_external_plan(actor, remote_mcp=remote_mcp):
             raise exceptions.ValidationError(
