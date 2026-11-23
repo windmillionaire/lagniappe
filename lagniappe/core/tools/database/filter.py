@@ -47,19 +47,20 @@ Example usage:
 
 from __future__ import annotations
 
-from typing import Any
+from enum import Enum, auto
+from typing import SupportsIndex, overload
 from collections.abc import Iterator
 
-from google.cloud.datastore import Key, query as datastore_query
+from google.cloud.datastore import Entity, Key, query as datastore_query
 
-from ...restrictions import Restriction
+from ...restrictions import QueryHashes, Restriction
 from .core import DATA, KINDS
 
 
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_results_use_normal_list_indexing_and_keep_cursor_metadata
 # @matrix database : indexing pagination query-results slicing
-class Results:
+class Results[Row]:
     """
     Container for query results with optional pagination cursor.
 
@@ -81,32 +82,42 @@ class Results:
 
     __slots__ = ("results", "next_cursor")
 
-    def __init__(self, results: list, next_cursor: str | None = None):
+    def __init__(self, results: list[Row], next_cursor: str | None = None) -> None:
         self.results = results
         self.next_cursor = next_cursor
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Row]:
         """Iterate over results."""
         return iter(self.results)
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Return the number of results."""
         return len(self.results)
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """Return True if there are any results."""
         return bool(self.results)
 
-    def __getitem__(self, index):
+    @overload
+    def __getitem__(self, index: SupportsIndex) -> Row: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> list[Row]: ...
+
+    def __getitem__(self, index: SupportsIndex | slice) -> Row | list[Row]:
         """Allow indexing into results."""
         return self.results[index]
 
-    def first(self) -> Any | None:
+    def first(self) -> Row | None:
         """Return the first result or None."""
         return self.results[0] if self.results else None
 
 
-_DENY_ALL_FILTER = object()
+class _FilterState(Enum):
+    DENY_ALL = auto()
+
+
+_DENY_ALL_FILTER = _FilterState.DENY_ALL
 
 
 # @testable true
@@ -128,7 +139,7 @@ class Filter:
 
     # --- Comparison Operators ---
 
-    def eq(self, prop: str, value: Any) -> Filter:
+    def eq(self, prop: str, value: object) -> Filter:
         """Equal to (=)"""
         if value is not None:
             self._conditions.append(
@@ -141,7 +152,7 @@ class Filter:
         self._conditions.append(datastore_query.PropertyFilter(prop, "=", None))
         return self
 
-    def ne(self, prop: str, value: Any) -> Filter:
+    def ne(self, prop: str, value: object) -> Filter:
         """Not equal to (!=)"""
         if value is not None:
             self._conditions.append(
@@ -149,7 +160,7 @@ class Filter:
             )
         return self
 
-    def lt(self, prop: str, value: Any) -> Filter:
+    def lt(self, prop: str, value: object) -> Filter:
         """Less than (<)"""
         if value is not None:
             self._conditions.append(
@@ -157,7 +168,7 @@ class Filter:
             )
         return self
 
-    def le(self, prop: str, value: Any) -> Filter:
+    def le(self, prop: str, value: object) -> Filter:
         """Less than or equal to (<=)"""
         if value is not None:
             self._conditions.append(
@@ -165,7 +176,7 @@ class Filter:
             )
         return self
 
-    def gt(self, prop: str, value: Any) -> Filter:
+    def gt(self, prop: str, value: object) -> Filter:
         """Greater than (>)"""
         if value is not None:
             self._conditions.append(
@@ -173,7 +184,7 @@ class Filter:
             )
         return self
 
-    def ge(self, prop: str, value: Any) -> Filter:
+    def ge(self, prop: str, value: object) -> Filter:
         """Greater than or equal to (>=)"""
         if value is not None:
             self._conditions.append(
@@ -213,7 +224,7 @@ class Filter:
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_database_filter_requires_rejects_invalid_hashes_type
     # @matrix database : filter validation
-    def requires(self, hashes: list | None) -> Filter:
+    def requires(self, hashes: QueryHashes | None) -> Filter:
         """
         Add a requires filter for permission-based access.
 
@@ -244,7 +255,7 @@ class Filter:
 
     # --- Build ---
 
-    def build(self) -> datastore_query.PropertyFilter | None:
+    def build(self) -> datastore_query.BaseFilter | _FilterState | None:
         """
         Build and return the final Datastore filter.
 
@@ -375,7 +386,7 @@ class Query:
         self._order.extend(properties)
         return self
 
-    def limit(self, n: int) -> Query:
+    def limit(self, n: int | None) -> Query:
         """Set the maximum number of results to return."""
         self._limit = n
         return self
@@ -415,7 +426,7 @@ class Query:
         self._distinct_on.extend(properties)
         return self
 
-    def ancestor(self, key: Key) -> Query:
+    def ancestor(self, key: Key | None) -> Query:
         """Set the ancestor for an ancestor query."""
         self._ancestor = key
         return self
@@ -445,7 +456,7 @@ class Query:
 
         return q
 
-    def fetch(self) -> Results:
+    def fetch(self) -> Results[Entity]:
         """
         Execute the query and return Results with optional pagination cursor.
 
@@ -467,14 +478,14 @@ class Query:
         else:
             return Results(list(q.fetch()))
 
-    def fetch_all(self) -> list:
+    def fetch_all(self) -> list[Entity]:
         """Execute the query and return all results (no pagination)."""
         q = self._build_query()
         if q is None:
             return []
         return list(q.fetch())
 
-    def fetch_one(self) -> Any | None:
+    def fetch_one(self) -> Entity | None:
         """Execute the query and return the first result or None."""
         q = self._build_query()
         if q is None:
@@ -482,7 +493,7 @@ class Query:
         results = list(q.fetch(limit=1))
         return results[0] if results else None
 
-    def fetch_iter(self) -> Iterator:
+    def fetch_iter(self) -> Iterator[Entity]:
         """Execute the query and return an iterator over results."""
         q = self._build_query()
         if q is None:
