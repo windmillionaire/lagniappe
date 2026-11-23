@@ -2,9 +2,7 @@ import json
 from typing import TYPE_CHECKING, Self, cast
 
 if TYPE_CHECKING:
-    from werkzeug.datastructures import FileStorage
-
-    from ..definitions.asset import HTMLAsset, YDocAsset
+    from ..definitions.asset import AssetUpload, HTMLAsset, YDocAsset
     from ..entities.page import Page
     from ..entities.project import Project
 
@@ -98,7 +96,7 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property["Document", DocumentOw
     # @testable true
     # @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image
     # @pair editor:image-upload
-    def add_image(self, image: FileStorage, visibility: str = "private") -> str | None:
+    def add_image(self, image: AssetUpload, visibility: str = "private") -> str | None:
         name = f"image_{short_uuid()}"
         asset = self.entity.save_asset(image, name, "image", visibility=visibility)
         if asset is None:

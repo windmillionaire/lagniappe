@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 from enum import Enum
-from typing import TYPE_CHECKING, Protocol, TypedDict, cast
+from typing import TYPE_CHECKING, BinaryIO, Protocol, TypedDict, cast
 
 if TYPE_CHECKING:
     from google.cloud.datastore import Key
@@ -86,12 +86,7 @@ class _EncodedOwner(AssetOwner, Protocol):
     def encoding(self) -> str: ...
 
 
-class _UploadStream(Protocol):
-    def seek(self, offset: int, /) -> object: ...
-    def read(self) -> bytes: ...
-
-
-type AssetUpload = _UploadStream | FileStorage
+type AssetUpload = BinaryIO | FileStorage | database_assets.DirectUploadFile
 
 
 type JSONValue = str | int | float | bool | None | list[JSONValue] | dict[str, JSONValue]
@@ -281,8 +276,9 @@ class Asset[ReadResult = str, WriteContent = str]:
         if not content:
             return False
 
+        # Binary assets override save, and JSONAsset encodes before using this text writer.
         blob = database_assets.save_text(
-            content, self.path, self.content_type, self.visibility.value
+            cast(str, content), self.path, self.content_type, self.visibility.value
         )
         self._record_saved_blob(blob)
         return True

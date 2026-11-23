@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 # @matrix file : asset-lifecycle attached-pages attached-tasks badges permissions references reverse-links task-history upload
 class File(AssetMixin, Entity):
     if TYPE_CHECKING:
+        encoding: str | None
         filename: str | None
         mimetype: str
         page: Page | None
