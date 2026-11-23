@@ -1075,17 +1075,15 @@ def test_task_entity_lifecycle_readonly_and_save_relations():
     with patch(
         "lagniappe.core.entities.entity.database_utility.create_key",
         return_value="tsk015created",
+    ), patch(
+        "lagniappe.core.entities.entity.database_get.entity", return_value=None
+    ), patch(
+        "lagniappe.core.entities.entity.database_utility.create_entity",
+        return_value=created_db,
     ):
-        with patch(
-            "lagniappe.core.entities.entity.database_get.entity", return_value=None
-        ):
-            with patch(
-                "lagniappe.core.entities.entity.database_utility.create_entity",
-                return_value=created_db,
-            ):
-                created = Task.create(
-                    {"page": page, "form": form, "project": project, "name": "Created"}
-                )
+        created = Task.create(
+            {"page": page, "form": form, "project": project, "name": "Created"}
+        )
 
     assert created.kind == "task"
     assert created.page is page

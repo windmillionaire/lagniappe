@@ -81,14 +81,13 @@ def test_file_summary_completion_stages_authoritative_info_until_reset(
     with expect_poll_result(
         user.page,
         subscription_id=f"view:entity:{file.key}",
+    ), expect_successful_response(
+        user.page,
+        method="GET",
+        path=f"/files/{file.key}/info/replace",
+        entity_key=file.key,
     ):
-        with expect_successful_response(
-            user.page,
-            method="GET",
-            path=f"/files/{file.key}/info/replace",
-            entity_key=file.key,
-        ):
-            user.offline = False
+        user.offline = False
 
     info_form = file.info_form
     marker = info_form.locator("[lp-edited-marker]")

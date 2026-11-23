@@ -203,9 +203,8 @@ def test_user_admin_role_is_separate_from_owner_and_invalidates_cache():
     with patch(
         "lagniappe.core.entities.user.CONFIG",
         SimpleNamespace(ADMIN_EMAIL="owner@example.test"),
-    ):
-        with pytest.raises(ValueError, match="configured primary Owner"):
-            other.is_owner = True
+    ), pytest.raises(ValueError, match="configured primary Owner"):
+        other.is_owner = True
 
 
 # @matrix user : asset-lifecycle default-image google-download profile-photo
@@ -922,12 +921,11 @@ def test_user_entity_create_save_load_owner_page_and_groups():
     with patch(
         "lagniappe.core.entities.user.database_get.user",
         return_value=raw,
-    ) as get_user:
-        with patch(
-            "lagniappe.core.entities.user.Entities.fetch_one",
-            return_value=loaded,
-        ) as get_entity:
-            result = User.load("loaded@example.com")
+    ) as get_user, patch(
+        "lagniappe.core.entities.user.Entities.fetch_one",
+        return_value=loaded,
+    ) as get_entity:
+        result = User.load("loaded@example.com")
 
     get_user.assert_called_once_with("loaded@example.com")
     get_entity.assert_called_once_with(raw, request=Fetch.direct())
@@ -954,34 +952,29 @@ def test_user_create_does_not_leave_initial_cache_invalidation():
     with patch(
         "lagniappe.core.entities.user.CONFIG",
         SimpleNamespace(ADMIN_EMAIL="initial-cache@example.test"),
+    ), patch(
+        "lagniappe.core.entities.user.database_get.user",
+        return_value=None,
+    ), patch(
+        "lagniappe.core.entities.entity.database_utility.create_key",
+        return_value=new_key,
+    ), patch(
+        "lagniappe.core.entities.entity.database_get.entity",
+        return_value=None,
+    ), patch(
+        "lagniappe.core.entities.entity.database_utility.create_entity",
+        return_value=new_entity,
+    ), patch(
+        "lagniappe.core.properties.user_related.Entities.USERS.get",
+        return_value=users_model,
     ):
-        with patch(
-            "lagniappe.core.entities.user.database_get.user",
-            return_value=None,
-        ):
-            with patch(
-                "lagniappe.core.entities.entity.database_utility.create_key",
-                return_value=new_key,
-            ):
-                with patch(
-                    "lagniappe.core.entities.entity.database_get.entity",
-                    return_value=None,
-                ):
-                    with patch(
-                        "lagniappe.core.entities.entity.database_utility.create_entity",
-                        return_value=new_entity,
-                    ):
-                        with patch(
-                            "lagniappe.core.properties.user_related.Entities.USERS.get",
-                            return_value=users_model,
-                        ):
-                            user = User.create(
-                                {
-                                    "name": "Initial Cache User",
-                                    "email": "initial-cache@example.test",
-                                    "page": page,
-                                }
-                            )
+        user = User.create(
+            {
+                "name": "Initial Cache User",
+                "email": "initial-cache@example.test",
+                "page": page,
+            }
+        )
 
     assert user.is_owner is True
     assert user.ai_access == "CREATE"

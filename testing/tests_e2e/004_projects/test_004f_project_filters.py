@@ -911,10 +911,9 @@ def test_saved_in_progress_filter_refreshes_after_reconnect(
     with expect_poll_result(
         user.page,
         subscription_id=f"view:entity:{filter_key}",
-    ):
-        with expect_reconnect_refresh(user, browser_failures):
-            task.mark_completed()
-            user.offline = False
+    ), expect_reconnect_refresh(user, browser_failures):
+        task.mark_completed()
+        user.offline = False
 
     expect(filtered_row).not_to_be_attached()
     expect(user.locate("#table tbody")).to_have_attribute("loaded", "")

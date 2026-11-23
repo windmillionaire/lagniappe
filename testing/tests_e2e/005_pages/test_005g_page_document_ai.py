@@ -219,30 +219,29 @@ def test_generate_text_provider_error_surfaces_in_form(
         user.page,
         page.key,
         error=error,
-    ) as path:
-        with browser_failures.expect(
-            user,
-            kind="console",
-            console_type="error",
-            text_contains=(
-                "Failed to load resource: the server responded with a status of 422"
-            ),
-            source_path=path,
-        ):
-            with user.page.expect_response(
-                lambda response: (
-                    response.request.method == "POST"
-                    and response.url.endswith(path)
-                )
-            ) as response_info:
-                form.submit()
-
-            response = response_info.value
-            assert response.status == 422
-            assert response.text() == error
-            expect(form.form.locator("[data-role='error']")).to_contain_text(
-                re.compile(error)
+    ) as path, browser_failures.expect(
+        user,
+        kind="console",
+        console_type="error",
+        text_contains=(
+            "Failed to load resource: the server responded with a status of 422"
+        ),
+        source_path=path,
+    ):
+        with user.page.expect_response(
+            lambda response: (
+                response.request.method == "POST"
+                and response.url.endswith(path)
             )
+        ) as response_info:
+            form.submit()
+
+        response = response_info.value
+        assert response.status == 422
+        assert response.text() == error
+        expect(form.form.locator("[data-role='error']")).to_contain_text(
+            re.compile(error)
+        )
 
 # @matrix ai : document-context generate-text live-provider page-context
 @pytest.mark.ai

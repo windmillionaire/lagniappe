@@ -411,16 +411,15 @@ def test_model_task_entity_create_update_order_and_save_relations():
     with patch(
         "lagniappe.core.entities.entity.database_utility.create_key",
         return_value=datastore.Key("models", "model005b", parent=project.key),
-    ):
-        with patch("lagniappe.core.entities.entity.database_get.entity", return_value=None):
-            with patch(
-                "lagniappe.core.entities.entity.database_utility.create_entity",
-                return_value=created_db,
-            ):
-                model = ModelTask.create(
-                    project,
-                    {"name": "Inspection", "form": form},
-                )
+    ), patch("lagniappe.core.entities.entity.database_get.entity", return_value=None):
+        with patch(
+            "lagniappe.core.entities.entity.database_utility.create_entity",
+            return_value=created_db,
+        ):
+            model = ModelTask.create(
+                project,
+                {"name": "Inspection", "form": form},
+            )
 
     assert model.kind == "model"
     assert model.project is project

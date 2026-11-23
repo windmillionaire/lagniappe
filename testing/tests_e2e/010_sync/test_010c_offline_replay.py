@@ -179,23 +179,22 @@ def _offline_document_edit(user, browser_failures, editor, *parts, sync_id):
         path="/l/poll",
         count=0,
         max_count=1,
-    ):
-        with browser_failures.expect_offline(user):
-            _go_offline(user)
-            editor.focus()
-            for index, part in enumerate(parts):
-                if index:
-                    editor.enter()
-                editor.type_text(part)
-            editor.wait_for_render()
-            for part in parts:
-                expect(editor.text_entry).to_contain_text(part)
-            editor.text_entry.blur()
-            wait_for_offline_sync_records(
-                user,
-                sync_id=sync_id,
-                saved_html_contains=parts,
-            )
+    ), browser_failures.expect_offline(user):
+        _go_offline(user)
+        editor.focus()
+        for index, part in enumerate(parts):
+            if index:
+                editor.enter()
+            editor.type_text(part)
+        editor.wait_for_render()
+        for part in parts:
+            expect(editor.text_entry).to_contain_text(part)
+        editor.text_entry.blur()
+        wait_for_offline_sync_records(
+            user,
+            sync_id=sync_id,
+            saved_html_contains=parts,
+        )
 
 
 def _offline_form_edit(user, form, value):
@@ -275,21 +274,20 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_admin, get_user, brow
             status=503,
             path="/l/sync",
             max_count=2,
+        ), browser_failures.expect_http_error(
+            user,
+            status=503,
+            path="/l/poll",
+            count=0,
+            max_count=1,
         ):
-            with browser_failures.expect_http_error(
-                user,
-                status=503,
-                path="/l/poll",
-                count=0,
-                max_count=1,
+            with user.page.expect_request(
+                lambda request: request.method == "POST"
+                and request.url.endswith("/l/sync")
+                and document_sync_id in (request.post_data or "")
             ):
-                with user.page.expect_request(
-                    lambda request: request.method == "POST"
-                    and request.url.endswith("/l/sync")
-                    and document_sync_id in (request.post_data or "")
-                ):
-                    user.offline = False
-                wait_for_connectivity_replay(user)
+                user.offline = False
+            wait_for_connectivity_replay(user)
     finally:
         user.page.context.unroute("**/l/sync", fail_sync)
 

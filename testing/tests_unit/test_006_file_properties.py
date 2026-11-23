@@ -555,9 +555,8 @@ def test_file_processing_preserves_pending_request_when_dispatch_fails(monkeypat
     file.update({"extract": "on"})
     with patch.object(
         DeferredJobs, "start", side_effect=RuntimeError("Queue unavailable")
-    ):
-        with pytest.raises(RuntimeError, match="Queue unavailable"):
-            file.dispatch_pending_processing(actor=actor)
+    ), pytest.raises(RuntimeError, match="Queue unavailable"):
+        file.dispatch_pending_processing(actor=actor)
 
     started = []
     monkeypatch.setattr(DeferredJobs, "start", lambda spec: started.append(spec))

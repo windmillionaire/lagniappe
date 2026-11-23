@@ -190,9 +190,8 @@ class BrowserFailureCollector:
             if ping_count > 0
             else nullcontext()
         )
-        with expectation:
-            with native_failure:
-                yield
+        with expectation, native_failure:
+            yield
 
     def assert_clean(self) -> None:
         """Raise one teardown-friendly failure for unaccounted browser events."""

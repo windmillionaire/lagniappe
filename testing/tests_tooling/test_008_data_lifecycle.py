@@ -564,10 +564,9 @@ def test_archive_state_is_private_transactional_and_resumable(tmp_path):
     path = tmp_path / "private" / "archive.sqlite3"
     with ArchiveState(path) as state:
         state.set_metadata("cursor", {"page": 2})
-        with pytest.raises(RuntimeError):
-            with state.transaction() as connection:
-                connection.execute("INSERT INTO warnings VALUES('x', 'test', '{}')")
-                raise RuntimeError("rollback")
+        with pytest.raises(RuntimeError), state.transaction() as connection:
+            connection.execute("INSERT INTO warnings VALUES('x', 'test', '{}')")
+            raise RuntimeError("rollback")
         assert state.connection.execute("SELECT COUNT(*) FROM warnings").fetchone()[0] == 0
     with ArchiveState(path) as resumed:
         assert resumed.get_metadata("cursor") == {"page": 2}

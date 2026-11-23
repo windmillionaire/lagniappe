@@ -350,12 +350,11 @@ def test_restrictions_builds_group_membership_from_stored_requires(monkeypatch):
         property(lambda _self: pytest.fail("group relation must not be read")),
     )
 
-    with _app().test_request_context("/"):
-        with MockRestrictions().patch_cache():
-            restrictions = user.properties.restrictions
-            assert restrictions.belongs_to == ["group-one", "group-two"]
-            assert session["restrictions"]["belongs_to"] == ["group-one", "group-two"]
-            assert restrictions.user_message_restrictions == ["group-one", "group-two"]
+    with _app().test_request_context("/"), MockRestrictions().patch_cache():
+        restrictions = user.properties.restrictions
+        assert restrictions.belongs_to == ["group-one", "group-two"]
+        assert session["restrictions"]["belongs_to"] == ["group-one", "group-two"]
+        assert restrictions.user_message_restrictions == ["group-one", "group-two"]
 
 
 # @matrix permissions restrictions : empty-access loaded-state

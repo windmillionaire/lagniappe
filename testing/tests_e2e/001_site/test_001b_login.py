@@ -1777,16 +1777,15 @@ def test_login_identity_returns_rate_limit_response(get_user, browser_failures):
             user,
             status=429,
             path="/users/login-identity",
+        ), browser_failures.expect_http_error(
+            user,
+            status=401,
+            path="/users/login-identity",
+            count=20,
         ):
-            with browser_failures.expect_http_error(
-                user,
-                status=401,
-                path="/users/login-identity",
-                count=20,
-            ):
-                for _ in range(25):
-                    response = user.page.evaluate(
-                        """async ({ csrfToken, authResult }) => {
+            for _ in range(25):
+                response = user.page.evaluate(
+                    """async ({ csrfToken, authResult }) => {
                             const response = await fetch("/users/login-identity", {
                                 method: "POST",
                                 headers: {
@@ -1801,15 +1800,15 @@ def test_login_identity_returns_rate_limit_response(get_user, browser_failures):
                                 json: await response.json(),
                             };
                         }""",
-                        {
-                            "csrfToken": csrf_token,
-                            "authResult": f"invalid-token-{uuid4().hex}",
-                        },
-                    )
-                    if response["status"] == 429:
-                        limited = response
-                        break
-                    assert response["status"] == 401
+                    {
+                        "csrfToken": csrf_token,
+                        "authResult": f"invalid-token-{uuid4().hex}",
+                    },
+                )
+                if response["status"] == 429:
+                    limited = response
+                    break
+                assert response["status"] == 401
 
         assert limited is not None
         assert limited["retryAfter"] is not None
@@ -2092,22 +2091,21 @@ def test_verification_delivery_failure_recovers_safely(
         user,
         status=503,
         path="/users/send-verification-email",
+    ), browser_failures.expect_http_error(
+        user,
+        status=403,
+        path="/users/login-identity",
     ):
-        with browser_failures.expect_http_error(
-            user,
-            status=403,
-            path="/users/login-identity",
-        ):
-            first_time_form.locator(Buttons.SIGNIN).click()
-            sign_in_form = user.locate(login_page.SIGN_IN_FORM)
-            expect(sign_in_form).to_be_visible()
-            error = sign_in_form.locator(Roles.ERROR)
-            expect(error).to_have_text(
-                "We couldn't send the verification email. "
-                "Sign in again to retry delivery."
-            )
-            expect(error).not_to_contain_text("private provider detail")
-            expect(sign_in_form.locator("input[name='email']")).to_have_value(email)
+        first_time_form.locator(Buttons.SIGNIN).click()
+        sign_in_form = user.locate(login_page.SIGN_IN_FORM)
+        expect(sign_in_form).to_be_visible()
+        error = sign_in_form.locator(Roles.ERROR)
+        expect(error).to_have_text(
+            "We couldn't send the verification email. "
+            "Sign in again to retry delivery."
+        )
+        expect(error).not_to_contain_text("private provider detail")
+        expect(sign_in_form.locator("input[name='email']")).to_have_value(email)
 
     sign_in_form.locator(PASSWORD).fill(password)
     with browser_failures.expect_http_error(

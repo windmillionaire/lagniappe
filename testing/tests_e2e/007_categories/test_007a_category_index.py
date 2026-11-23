@@ -91,27 +91,26 @@ def test_category_index_renders_first_batch_before_cursor_continuation(
             user,
             status=503,
             path=continuation_path,
+        ), scoped_browser_route(
+            user.page.context,
+            continuation_route,
+            reject_continuation,
         ):
-            with scoped_browser_route(
-                user.page.context,
-                continuation_route,
-                reject_continuation,
+            with user.page.expect_response(
+                lambda response: is_continuation_request(response.request)
+                and response.status == 503
             ):
-                with user.page.expect_response(
-                    lambda response: is_continuation_request(response.request)
-                    and response.status == 503
-                ):
-                    response = user.navigate(category.url)
-                assert response.ok
-                expect(user.locate("[lp-view]")).to_have_attribute(
-                    "initialized", ""
-                )
-                body = user.locate(category.TABLE_BODY)
-                rows = body.locator("tr[lp-entity]")
+                response = user.navigate(category.url)
+            assert response.ok
+            expect(user.locate("[lp-view]")).to_have_attribute(
+                "initialized", ""
+            )
+            body = user.locate(category.TABLE_BODY)
+            rows = body.locator("tr[lp-entity]")
 
-                expect(rows).to_have_count(25)
-                expect(rows.first).to_be_visible()
-                expect(body).not_to_have_attribute("loaded", "")
+            expect(rows).to_have_count(25)
+            expect(rows.first).to_be_visible()
+            expect(body).not_to_have_attribute("loaded", "")
 
         response = user.navigate(category.url)
         assert response.ok

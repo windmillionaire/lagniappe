@@ -66,16 +66,14 @@ def test_filter_cache_query_filters_loaded_entities_by_view_permission():
 
     with patch(
         "lagniappe.core.tools.filters.cache.FilterExpression", _FilterExpression
-    ):
-        with patch(
-            "lagniappe.core.tools.filters.cache.filter_cache.query",
-            return_value=["visible-key", "hidden-key"],
-        ) as query:
-            with patch(
-                "lagniappe.core.tools.filters.cache.Entities.fetch",
-                return_value=[visible, hidden],
-            ) as load:
-                results = FilterCache(parent, user=viewer).query(entity_filter)
+    ), patch(
+        "lagniappe.core.tools.filters.cache.filter_cache.query",
+        return_value=["visible-key", "hidden-key"],
+    ) as query, patch(
+        "lagniappe.core.tools.filters.cache.Entities.fetch",
+        return_value=[visible, hidden],
+    ) as load:
+        results = FilterCache(parent, user=viewer).query(entity_filter)
 
     query.assert_called_once_with(
         FilterCache(parent, user=viewer).cache_key,
@@ -147,13 +145,12 @@ def test_filter_cache_loads_category_pages_without_restrictions():
             SimpleNamespace(results=["page-key-1"], next_cursor="cursor-2"),
             SimpleNamespace(results=["page-key-2"], next_cursor=None),
         ],
-    ) as pages:
-        with patch(
-            "lagniappe.core.tools.filters.cache.Entities.fetch",
-            side_effect=lambda *keys, **_kwargs: [pages_by_key[key] for key in keys],
-        ):
-            cache = FilterCache(parent, user=_user(models=["restricted"]))
-            cache._load()
+    ) as pages, patch(
+        "lagniappe.core.tools.filters.cache.Entities.fetch",
+        side_effect=lambda *keys, **_kwargs: [pages_by_key[key] for key in keys],
+    ):
+        cache = FilterCache(parent, user=_user(models=["restricted"]))
+        cache._load()
 
     assert pages.call_args_list == [
         call(

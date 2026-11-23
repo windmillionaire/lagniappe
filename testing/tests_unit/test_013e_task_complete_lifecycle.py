@@ -770,13 +770,10 @@ def test_task_complete_with_schedule_queues_uncomplete():
     with patch(
         "lagniappe.core.tools.tasks.scheduling.user_today",
         return_value=mock_today,
-    ):
-        with patch(_USER_TZ, return_value=ZoneInfo("UTC")):
-            with patch(
-                "lagniappe.core.entities.task.scheduling.add_uncomplete_task_to_queue"
-            ) as queue_mock:
-                with patch("lagniappe.core.entities.task.current_user", completer):
-                    task.complete()
+    ), patch(_USER_TZ, return_value=ZoneInfo("UTC")), patch(
+        "lagniappe.core.entities.task.scheduling.add_uncomplete_task_to_queue"
+    ) as queue_mock, patch("lagniappe.core.entities.task.current_user", completer):
+        task.complete()
 
     queue_mock.assert_called_once_with(task)
     assert task.completed is True

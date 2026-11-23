@@ -399,9 +399,8 @@ def test_category_saved_filter_save_and_run(get_admin, browser_failures):
     with expect_poll_result(
         user.page,
         subscription_id=f"view:entity:{filter_key}",
-    ):
-        with expect_reconnect_refresh(user, browser_failures):
-            refreshed_page.create()
-            user.offline = False
+    ), expect_reconnect_refresh(user, browser_failures):
+        refreshed_page.create()
+        user.offline = False
 
     expect(refreshed_row).to_be_visible()

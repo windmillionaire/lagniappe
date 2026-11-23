@@ -98,28 +98,27 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
         method="HEAD",
         path="/l/ping",
         failure="net::ERR_CONNECTION_FAILED",
+    ), browser_failures.expect(
+        user,
+        kind="console",
+        count=1,
+        max_count=3,
+        console_type="error",
+        text="Failed to load resource: net::ERR_CONNECTION_FAILED",
+        source_path="/l/ping",
     ):
-        with browser_failures.expect(
-            user,
-            kind="console",
-            count=1,
-            max_count=3,
-            console_type="error",
-            text="Failed to load resource: net::ERR_CONNECTION_FAILED",
-            source_path="/l/ping",
+        with scoped_browser_route(user.page.context, "**/l/ping", fail_ping):
+            user.reload()
+            expect(indicator).to_be_visible()
+
+        assert 1 <= len(failed_pings) <= 3
+
+        with expect_successful_response(
+            user.page,
+            method="HEAD",
+            path="/l/ping",
         ):
-            with scoped_browser_route(user.page.context, "**/l/ping", fail_ping):
-                user.reload()
-                expect(indicator).to_be_visible()
-
-            assert 1 <= len(failed_pings) <= 3
-
-            with expect_successful_response(
-                user.page,
-                method="HEAD",
-                path="/l/ping",
-            ):
-                user.reload()
+            user.reload()
     expect(indicator).to_be_hidden()
 
 
@@ -159,30 +158,29 @@ def test_offline_poll_recovers_without_online_event(get_admin, browser_failures)
         method="HEAD",
         path="/l/ping",
         timeout=8000,
-    ):
-        with scoped_browser_route(user.page.context, "**/l/ping", fail_ping):
+    ), scoped_browser_route(user.page.context, "**/l/ping", fail_ping):
+        with browser_failures.expect(
+            user,
+            kind="requestfailed",
+            method="HEAD",
+            path="/l/ping",
+            failure="net::ERR_CONNECTION_FAILED",
+        ):
             with browser_failures.expect(
                 user,
-                kind="requestfailed",
-                method="HEAD",
-                path="/l/ping",
-                failure="net::ERR_CONNECTION_FAILED",
+                kind="console",
+                console_type="error",
+                text="Failed to load resource: net::ERR_CONNECTION_FAILED",
+                source_path="/l/ping",
             ):
-                with browser_failures.expect(
-                    user,
-                    kind="console",
-                    console_type="error",
-                    text="Failed to load resource: net::ERR_CONNECTION_FAILED",
-                    source_path="/l/ping",
+                with user.page.expect_event(
+                    "requestfailed",
+                    predicate=lambda request: request.method == "HEAD"
+                    and request.url.endswith("/l/ping"),
                 ):
-                    with user.page.expect_event(
-                        "requestfailed",
-                        predicate=lambda request: request.method == "HEAD"
-                        and request.url.endswith("/l/ping"),
-                    ):
-                        user.offline = False
-                    expect(indicator).to_be_visible()
-                    assert user.page.evaluate("navigator.onLine") is True
+                    user.offline = False
+                expect(indicator).to_be_visible()
+                assert user.page.evaluate("navigator.onLine") is True
 
     assert len(failed_pings) == 1
     expect(indicator).to_be_hidden()

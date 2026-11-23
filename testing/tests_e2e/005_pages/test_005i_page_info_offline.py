@@ -124,33 +124,32 @@ def test_page_info_replay_reconciles_after_reload(get_admin, browser_failures):
         owner,
         status=503,
         path="/analytics/track",
+    ), browser_failures.expect_offline(
+        owner,
+        ping_count=2,
+        max_ping_count=3,
     ):
-        with browser_failures.expect_offline(
-            owner,
-            ping_count=2,
-            max_ping_count=3,
-        ):
-            owner.offline = True
-            info_submit = _main_submit(info_form)
-            info_submit.click()
-            expect(info_submit).to_contain_text("Queued Sync")
-            wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
+        owner.offline = True
+        info_submit = _main_submit(info_form)
+        info_submit.click()
+        expect(info_submit).to_contain_text("Queued Sync")
+        wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
 
-            page = page.reload()
-            expect(owner.locate(OFFLINE_INDICATOR)).to_be_visible()
+        page = page.reload()
+        expect(owner.locate(OFFLINE_INDICATOR)).to_be_visible()
 
-            current_form = page.info_form
-            current_submission = current_form.locator("[id^='sync-text-renderer-']")
-            expect(current_submission.locator("input")).to_have_value(
-                original_submission
-            )
-            current_submit = _main_submit(current_form)
-            expect(current_submit).to_contain_text("Update Page")
-            expect(current_submit.locator("[data-icon='offline']")).to_have_count(0)
+        current_form = page.info_form
+        current_submission = current_form.locator("[id^='sync-text-renderer-']")
+        expect(current_submission.locator("input")).to_have_value(
+            original_submission
+        )
+        current_submit = _main_submit(current_form)
+        expect(current_submit).to_contain_text("Update Page")
+        expect(current_submit.locator("[data-icon='offline']")).to_have_count(0)
 
-            with owner.page.expect_response("**/pages/*/update", timeout=15000):
-                owner.offline = False
-            wait_for_offline_mutations(owner, record_id=mutation_id, exact=0)
+        with owner.page.expect_response("**/pages/*/update", timeout=15000):
+            owner.offline = False
+        wait_for_offline_mutations(owner, record_id=mutation_id, exact=0)
 
     marker = current_form.locator("[lp-edited-marker]")
     expect(marker).to_be_visible()

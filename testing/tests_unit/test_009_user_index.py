@@ -357,12 +357,11 @@ def test_user_index_public_mode_returns_empty_when_public_users_disabled():
     with patch(
         "lagniappe.core.entities.index.Entities.PUBLIC_GROUP.enabled",
         return_value=False,
-    ) as enabled:
-        with patch(
-            "lagniappe.core.entities.index.database_get.users",
-        ) as user_query:
-            index = UserIndex(mode="public", user=index_user)
-            users = index.users
+    ) as enabled, patch(
+        "lagniappe.core.entities.index.database_get.users",
+    ) as user_query:
+        index = UserIndex(mode="public", user=index_user)
+        users = index.users
 
     enabled.assert_called_once_with()
     user_query.assert_not_called()

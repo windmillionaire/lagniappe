@@ -245,13 +245,12 @@ def test_browser_submission_references_validate_table_links_before_mutation(get_
         patch(
             "lagniappe.core.tools.auth.references.database_get.datastore_key",
             return_value=denied.key,
-        ),
+        ),pytest.raises(ValidationError, match=UNAVAILABLE_REFERENCE_ERROR)
     ):
-        with pytest.raises(ValidationError, match=UNAVAILABLE_REFERENCE_ERROR):
-            page.form_submission(
-                WebFormSubmission({"with_rows": rows}),
-                actor=actor,
-            )
+        page.form_submission(
+            WebFormSubmission({"with_rows": rows}),
+            actor=actor,
+        )
 
     assert "with_rows" not in page.properties.submission.db_value
 

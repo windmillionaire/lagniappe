@@ -288,20 +288,19 @@ def test_wait_matches_exact_method_path_query_and_request_payload():
 def test_wait_reports_matching_http_failure_without_timing_out():
     page = FakePage()
 
-    with pytest.raises(AssertionError) as error:
-        with expect_successful_response(
-            page,
-            method="PUT",
-            path="/tasks/task/update",
-        ):
-            page.respond(
-                FakeResponse(
-                    method="PUT",
-                    url="http://test.local/tasks/task/update",
-                    status=422,
-                    body="Task name is required",
-                )
+    with pytest.raises(AssertionError) as error, expect_successful_response(
+        page,
+        method="PUT",
+        path="/tasks/task/update",
+    ):
+        page.respond(
+            FakeResponse(
+                method="PUT",
+                url="http://test.local/tasks/task/update",
+                status=422,
+                body="Task name is required",
             )
+        )
 
     message = str(error.value)
     assert "PUT /tasks/task/update" in message
@@ -412,20 +411,19 @@ def test_poll_wait_matches_subscription_and_validates_result():
 def test_poll_wait_reports_missing_or_unexpected_result(payload, message):
     page = FakePage()
 
-    with pytest.raises(AssertionError, match=message):
-        with polling.expect_poll_result(
-            page,
-            subscription_id="view:entity:file-key",
-        ):
-            page.respond(
-                FakeResponse(
-                    url="http://test.local/l/poll",
-                    post_data=(
-                        '{"subscriptions":[{"id":"view:entity:file-key"}]}'
-                    ),
-                    payload=payload,
-                )
+    with pytest.raises(AssertionError, match=message), polling.expect_poll_result(
+        page,
+        subscription_id="view:entity:file-key",
+    ):
+        page.respond(
+            FakeResponse(
+                url="http://test.local/l/poll",
+                post_data=(
+                    '{"subscriptions":[{"id":"view:entity:file-key"}]}'
+                ),
+                payload=payload,
             )
+        )
 
 
 class FakeJavaScriptHandle:

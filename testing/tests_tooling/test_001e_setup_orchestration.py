@@ -1507,21 +1507,20 @@ def test_setup_process_lock_and_operation_journal(tmp_path, capsys):
             SetupProcessLock(lock_path).acquire()
     assert not lock_path.exists()
 
-    with pytest.raises(SetupError, match="interrupted"):
-        with setup_operation(
-            "install",
-            ["jobs"],
-            lock_path=lock_path,
-            journal_path=journal_path,
-        ):
-            record_step("enable API")
-            record_mutation(
-                "enable API",
-                action="enabled",
-                resource="provider-api",
-                identifier="tasks.googleapis.com",
-            )
-            raise KeyboardInterrupt
+    with pytest.raises(SetupError, match="interrupted"), setup_operation(
+        "install",
+        ["jobs"],
+        lock_path=lock_path,
+        journal_path=journal_path,
+    ):
+        record_step("enable API")
+        record_mutation(
+            "enable API",
+            action="enabled",
+            resource="provider-api",
+            identifier="tasks.googleapis.com",
+        )
+        raise KeyboardInterrupt
 
     journal = json.loads(journal_path.read_text(encoding="utf-8"))
     assert not lock_path.exists()

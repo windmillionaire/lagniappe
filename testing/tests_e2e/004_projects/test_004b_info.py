@@ -121,10 +121,9 @@ def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revisio
         path="/l/poll",
         count=0,
         max_count=1,
-    ):
-        with browser_failures.expect_offline(owner):
-            owner.offline = True
-            expect(owner.locate("[data-role='offline']")).to_be_visible()
+    ), browser_failures.expect_offline(owner):
+        owner.offline = True
+        expect(owner.locate("[data-role='offline']")).to_be_visible()
 
     timestamp_only = Entities.fetch_one(project.key, request=Fetch.direct())
     timestamp_only.properties.modified.update()
@@ -134,14 +133,13 @@ def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revisio
     with expect_poll_result(
         owner.page,
         subscription_id=f"view:entity:{project.key}",
+    ), expect_successful_response(
+        owner.page,
+        method="GET",
+        path=f"/projects/{project.key}/info/replace",
+        entity_key=project.key,
     ):
-        with expect_successful_response(
-            owner.page,
-            method="GET",
-            path=f"/projects/{project.key}/info/replace",
-            entity_key=project.key,
-        ):
-            owner.offline = False
+        owner.offline = False
 
     expect(owner.locate("[data-role='offline']")).to_be_hidden()
     refreshed_form = project.info_form
@@ -189,10 +187,9 @@ def test_project_revision_notice_only_resets_changed_form(
         path="/l/poll",
         count=0,
         max_count=1,
-    ):
-        with browser_failures.expect_offline(owner):
-            owner.offline = True
-            expect(owner.locate("[data-role='offline']")).to_be_visible()
+    ), browser_failures.expect_offline(owner):
+        owner.offline = True
+        expect(owner.locate("[data-role='offline']")).to_be_visible()
 
     remote_name = f"Remote revision {uuid4().hex[:8]}"
     collaborator.go(project)
@@ -215,14 +212,13 @@ def test_project_revision_notice_only_resets_changed_form(
     with expect_poll_result(
         owner.page,
         subscription_id=f"view:entity:{project.key}",
+    ), expect_successful_response(
+        owner.page,
+        method="GET",
+        path=f"/projects/{project.key}/info/replace",
+        entity_key=project.key,
     ):
-        with expect_successful_response(
-            owner.page,
-            method="GET",
-            path=f"/projects/{project.key}/info/replace",
-            entity_key=project.key,
-        ):
-            owner.offline = False
+        owner.offline = False
 
     expect(owner.locate("[data-role='offline']")).to_be_hidden()
 

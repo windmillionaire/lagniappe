@@ -212,14 +212,13 @@ def test_completed_button(get_admin, get_user, browser_failures):
         with expect_poll_result(
             user.page,
             subscription_id="view:channel:tasks",
+        ), expect_successful_response(
+            user.page,
+            method="GET",
+            path=status_path,
+            query={"completed": "true"},
         ):
-            with expect_successful_response(
-                user.page,
-                method="GET",
-                path=status_path,
-                query={"completed": "true"},
-            ):
-                user.offline = False
+            user.offline = False
     finally:
         if user.offline:
             user.offline = False
