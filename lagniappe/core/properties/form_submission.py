@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from lagniappe.core.tools.forms.definitions import require_mutable_submission
 

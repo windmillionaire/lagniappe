@@ -160,7 +160,7 @@ class RowSubmission(SubmissionProperty):
         row = cls(table)
         for field_id, field in row.fields.items():
             field.reset()
-            field.validate_ai(values.get(field_id, None))
+            field.validate_ai(values.get(field_id))
         return row
 
     # @testable true

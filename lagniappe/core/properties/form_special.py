@@ -10,7 +10,8 @@ from .base_schema import SchemaProperty
 
 if TYPE_CHECKING:
     from ..definitions.asset import AssetUpload
-    from ..entities.entity import Entity
+    # Specialized generic bases below defer the circular owner import.
+    from ..entities.entity import Entity as Entity
     from ..mixins.assets import AssetMixin
     from .base_schema import FieldDefinition
     from .form_submission import FormSubmission
