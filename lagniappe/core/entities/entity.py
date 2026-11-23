@@ -470,11 +470,8 @@ class Entity:
         if cached:
             return cached
 
-        encoded = database_get.urlsafe_key(self.key)
-        if encoded is None:
-            raise RuntimeError("no key assigned")
-        self._urlsafe_key = encoded
-        return encoded
+        self._urlsafe_key = database_get.urlsafe_key(self.key)
+        return self._urlsafe_key
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_key_access_without_key_raises_runtime_error
