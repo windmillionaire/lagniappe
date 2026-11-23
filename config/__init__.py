@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 import yaml
 
@@ -454,9 +455,9 @@ class RuntimeSettings:
         object.__setattr__(self, "environment", Environment(self.environment))
         object.__setattr__(self, "values", _freeze_settings(self.values))
 
-    def as_dict(self):
+    def as_dict(self) -> dict[str, object]:
         """Return plain containers owned by the caller for runtime normalization."""
-        return _copy_settings(self.values)
+        return {key: _copy_settings(item) for key, item in self.values.items()}
 
 
 # @testable false
@@ -502,7 +503,7 @@ def _project_runtime_settings(app_settings, overrides, environment):
 # @tests tests_tooling/test_003_config.py::test_runtime_and_draft_projections_preserve_environment_precedence
 # @tests tests_tooling/test_003_config.py::test_hosted_runtime_projection_preserves_validated_overrides
 # @matrix config : config-files configuration parsing
-def load_runtime_settings(environment):
+def load_runtime_settings(environment: Environment | str) -> RuntimeSettings:
     """Read saved settings for one process without constructing an installer draft."""
     environment = Environment(environment)
     app_settings = File.APP_SETTINGS_YAML.load()
@@ -625,16 +626,19 @@ class SettingsDraft:
 
 
 Settings = SettingsDraft
+if TYPE_CHECKING:
+    SETTINGS: SettingsDraft
+
 # reload(config) is the source-upgrade boundary. Discard both the lazy instance
 # and any eagerly bound SETTINGS left by an older source generation.
 globals().pop("SETTINGS", None)
-_settings_draft = None
+_settings_draft: SettingsDraft | None = None
 
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_settings_singleton_is_lazy_and_reloads_saved_documents
 # @matrix config setup : config-files git-upgrade
-def __getattr__(name):
+def __getattr__(name: str) -> SettingsDraft:
     if name != "SETTINGS":
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     global _settings_draft

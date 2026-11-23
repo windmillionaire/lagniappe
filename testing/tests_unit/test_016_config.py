@@ -755,3 +755,13 @@ def test_installer_database_id_validation():
     assert validate_database_id("current-db") == "current-db"
     with pytest.raises(ValueError):
         validate_database_id("UPPERCASE")
+
+
+def test_required_installer_settings_have_runtime_type_declarations():
+    from typing import get_type_hints
+
+    from config.constants import REQUIRED_APPLICATION_SETTINGS
+    from lagniappe import Config
+
+    declared = get_type_hints(Config)
+    assert REQUIRED_APPLICATION_SETTINGS.keys() <= declared.keys()

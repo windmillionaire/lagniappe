@@ -1,6 +1,7 @@
 """Unit tests for general infrastructure and core utility functions."""
 
 from types import SimpleNamespace
+from typing import get_args, get_type_hints
 from uuid import UUID
 
 from flask import Flask, g
@@ -377,6 +378,16 @@ def test_entities_initialized():
     assert hasattr(Entities, "_load")
     assert not hasattr(Entities, "load")
     assert not hasattr(Entities, "get")
+
+
+def test_registry_types_match_runtime_classes_including_aliases():
+    from lagniappe.core.entities import EntityRegistry, types as registered
+
+    annotations = get_type_hints(EntityRegistry, localns={"registered": registered})
+    declared = {name: get_args(value)[0] for name, value in annotations.items()}
+    members = {name: member.value for name, member in registered.EntityType.__members__.items()}
+    assert declared == members
+    assert {name: getattr(Entities, name) for name in members} == declared
 
 
 # @matrix mutations : batch dedupe delete

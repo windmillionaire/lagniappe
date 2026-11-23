@@ -1,4 +1,9 @@
-from ..definitions import Fetch, FetchDepth, MutationOperation
+from __future__ import annotations
+
+from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING, Self, TypeGuard, cast, overload
+
+from ..definitions import Fetch, FetchDepth, MutationOperation, MutationOutcome
 from ..exceptions import capture, record_entity_load_trace
 from ..mutations import (
     execute_mutation,
@@ -12,11 +17,56 @@ from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.measurements import timed
 
 
+if TYPE_CHECKING:
+    from google.cloud.datastore import Entity as DatastoreEntity, Key
+
+    from . import types as registered
+    from .entity import Entity
+
+    type Identifier = Entity | DatastoreEntity | Key | str | None
+
+
+def _is_keyed_entity(identifier: Identifier) -> TypeGuard[Entity | DatastoreEntity]:
+    return hasattr(identifier, "key")
+
+
 # @testable infrastructure
 class EntityRegistry:
     """Global type registry and public entity persistence facade."""
 
-    def initialize(self):
+    # initialize() publishes these classes lazily to avoid import cycles.
+    DEFERRED_JOB: type[registered.DeferredJob]
+    JOB: type[registered.DeferredJob]
+    DEFERRED_JOB_LOCK: type[registered.DeferredJobLock]
+    JOB_LOCK: type[registered.DeferredJobLock]
+    USER: type[registered.User]
+    PROJECT: type[registered.Project]
+    MODEL_TASK: type[registered.ModelTask]
+    MODEL: type[registered.ModelTask]
+    FILE: type[registered.File]
+    INGRESS: type[registered.Ingress]
+    FORM: type[registered.Form]
+    CATEGORY: type[registered.Category]
+    USERS: type[registered.UserCategory]
+    PAGE: type[registered.Page]
+    TASK: type[registered.Task]
+    USER_GROUP: type[registered.UserGroup]
+    GROUP: type[registered.UserGroup]
+    PUBLIC_GROUP: type[registered.PublicGroup]
+    HOME: type[registered.Home]
+    FILTER: type[registered.Filter]
+    CONDITION: type[registered.Condition]
+    TASK_HISTORY: type[registered.TaskHistory]
+    NOTIFICATION: type[registered.Notification]
+    NOTE: type[registered.Note]
+    FORM_HISTORY: type[registered.FormHistory]
+    DOCUMENT_HISTORY: type[registered.DocumentHistory]
+    REPORT: type[registered.AIReport]
+    MESSAGE_CONVERSATION: type[registered.MessageConversation]
+    MESSAGE: type[registered.Message]
+    MENTION_MARKER: type[registered.MentionMarker]
+
+    def initialize(self) -> Self:
         from .types import EntityType
 
         for name, entity_type in EntityType.__members__.items():
@@ -24,12 +74,12 @@ class EntityRegistry:
         self._types = EntityType
         return self
 
-    def _typed_entity(self, entity):
+    def _typed_entity(self, entity: Entity | DatastoreEntity | None) -> Entity | None:
         """Convert a raw database entity dict to a typed Entity instance."""
         if not entity:
             return None
         if hasattr(entity, "db"):
-            return entity
+            return cast("Entity", entity)
 
         entity_type = entity.get("type", None)
         if not entity_type:
@@ -38,75 +88,82 @@ class EntityRegistry:
                 context={"entity": entity},
             )
             return None
-        return self._types[entity_type.upper()].value(entity)
+        # Only persisted kinds occur in Datastore rows. The registry also
+        # exposes UI-only helpers such as HOME and CONDITION to its callers.
+        factory = cast("type[Entity]", self._types[entity_type.upper()].value)
+        return factory(entity)
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_preserves_explicit_root_over_shallow_attached_copy
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_reuses_cached_attached_relations
     # @matrix entities relations : attached-cache load no-extra-read
     # @pairs entities:explicit-fetch-depth relations:root-precedence
-    def _load(self, *identifiers, related=True, _fetch=None, _fetch_stage=None):
+    def _load(
+        self, *identifiers: Identifier, related: bool = True,
+        _fetch: Fetch | None = None, _fetch_stage: str | None = None,
+    ) -> list[Entity]:
         """Batch-load typed entities and attach resolved relationships."""
         if not identifiers:
             return []
 
-        entities = {
+        pending: dict[Key | None, Entity | None] = {
             entity.key: entity
             for entity in [
                 self._typed_entity(identifier)
                 for identifier in identifiers
-                if hasattr(identifier, "key")
+                if _is_keyed_entity(identifier)
             ]
             if entity
         }
-        entities.update(
+        pending.update(
             {
                 key: None
                 for key in [
                     database_get.datastore_key(identifier)
                     for identifier in identifiers
-                    if not hasattr(identifier, "key")
+                    if not _is_keyed_entity(identifier)
                 ]
                 if key
             }
         )
-        primary_keys = list(entities)
+        primary_keys = list(pending)
 
-        for entity in [value for value in entities.values() if value]:
+        for entity in [value for value in pending.values() if value]:
             for key, related_entity in entity.related_entities.items():
-                entities.setdefault(key, related_entity)
+                pending.setdefault(key, related_entity)
             for key in entity.related_keys:
-                entities.setdefault(key, None)
+                pending.setdefault(key, None)
 
-        secondary_keys = [key for key, value in entities.items() if value is None]
+        secondary_keys = [key for key, value in pending.items() if value is None]
         secondary_entities = {
             entity.key: self._typed_entity(entity)
             for entity in database_get.entities(secondary_keys)
             if entity
         }
-        entities.update(secondary_entities)
-        entities = {key: value for key, value in entities.items() if value}
+        pending.update(secondary_entities)
 
         related_keys, related_entities = [], {}
         if related:
-            related_sources = list(entities.values())
+            pending = {key: value for key, value in pending.items() if value}
+            related_sources = [entity for entity in pending.values() if entity is not None]
             for entity in related_sources:
                 for key, related_entity in entity.related_entities.items():
-                    entities.setdefault(key, related_entity)
+                    pending.setdefault(key, related_entity)
 
             related_keys = [
                 key
                 for entity in related_sources
                 for key in entity.related_keys
-                if key not in entities
+                if key not in pending
             ]
             related_entities = {
                 entity.key: self._typed_entity(entity)
                 for entity in database_get.entities(related_keys)
                 if entity
             }
-            entities.update(related_entities)
-            entities = {key: value for key, value in entities.items() if value}
+            pending.update(related_entities)
+
+        entities = {key: value for key, value in pending.items() if value}
 
         resolved_keys = {*secondary_keys, *related_keys}
         for entity in entities.values():
@@ -143,7 +200,7 @@ class EntityRegistry:
     # @matrix relations : direct nested root
     # @pairs entities:fetch entities:no-extra-read entities:typed-entity relations:stale-key
     @timed("entity", "fetch")
-    def fetch(self, *identifiers, request):
+    def fetch(self, *identifiers: Identifier, request: Fetch) -> list[Entity]:
         """Load unique roots in caller order, then expand to the requested depth.
 
         Explicit entities take precedence over keys for the same root. Missing
@@ -154,7 +211,7 @@ class EntityRegistry:
 
         roots = {}
         for identifier in identifiers:
-            if hasattr(identifier, "key"):
+            if _is_keyed_entity(identifier):
                 entity = self._typed_entity(identifier)
                 if entity is not None:
                     roots[entity.key] = entity
@@ -180,10 +237,18 @@ class EntityRegistry:
             _fetch_stage="relations",
         )
 
+    @overload
+    def fetch_one[T: Entity](self, identifier: T, *, request: Fetch) -> T | None: ...
+
+    @overload
+    def fetch_one(
+        self, identifier: DatastoreEntity | Key | str | None, *, request: Fetch
+    ) -> Entity | None: ...
+
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_one_returns_entity_or_none
     # @pairs entities:explicit-fetch-depth relations:root
-    def fetch_one(self, identifier, *, request):
+    def fetch_one(self, identifier: Identifier, *, request: Fetch) -> Entity | None:
         fetched = self.fetch(identifier, request=request)
         return fetched[0] if fetched else None
 
@@ -191,7 +256,7 @@ class EntityRegistry:
     # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
     # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_project_cascades_models_forms_filters_and_cache
     # @matrix entities : assets cache cascade database delete forms
-    def delete(self, *entities, preserve_user_pages=False):
+    def delete(self, *entities: Entity, preserve_user_pages: bool = False) -> MutationOutcome:
         return execute_mutation(
             plan_delete(
                 *entities,
@@ -203,7 +268,7 @@ class EntityRegistry:
     # @testable true
     # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_save_persists_relations_process_payloads_and_cache
     # @matrix entities : cache database dependent-owner process-state save
-    def save(self, *entities):
+    def save(self, *entities: Entity) -> MutationOutcome:
         outcome = execute_mutation(
             plan_mutation(MutationOperation.SAVE, *entities, registry=self)
         )
@@ -220,14 +285,16 @@ class EntityRegistry:
     # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_masked_timezone_save_preserves_newer_user_state
     # @matrix mutations : cache-isolation direct-save exclusions intent-isolation lifecycle-isolation root-save
     # @matrix cache session timezone : concurrent-permissions property-mask
-    def save_root(self, entity, *, property_mask=None):
+    def save_root(
+        self, entity: Entity, *, property_mask: Iterable[str] | None = None
+    ) -> MutationOutcome:
         """Persist one root, optionally updating only selected properties."""
         return execute_mutation(plan_root(entity, property_mask=property_mask))
 
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_touch_uses_masked_root_save_and_only_updates_modified
     # @matrix mutations : exclusions modified property-mask root-save touch
-    def touch(self, *entities):
+    def touch(self, *entities: Entity) -> MutationOutcome:
         entities = tuple(entity for entity in entities if hasattr(entity, "db"))
         return execute_mutation(
             plan_root(
@@ -240,7 +307,10 @@ class EntityRegistry:
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_document_checkpoint_masks_parent_state_and_optionally_advances_lists
     # @matrix mutations sync : checkpoint document history parent-fingerprint property-mask
-    def save_document_checkpoint(self, entity, *, advance_parent=False, expected_state=None):
+    def save_document_checkpoint(
+        self, entity: Entity, *, advance_parent: bool = False,
+        expected_state: Mapping[str, object] | None = None,
+    ) -> MutationOutcome:
         """Persist a document checkpoint without rewriting sibling state."""
         return execute_mutation(
             plan_document_checkpoint(
@@ -254,7 +324,7 @@ class EntityRegistry:
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_document_parent_touch_only_advances_parent_and_list_fingerprints
     # @matrix mutations sync : document list-owner parent-fingerprint property-mask
-    def advance_document_parent(self, entity):
+    def advance_document_parent(self, entity: Entity) -> MutationOutcome:
         """Advance document ownership metadata through masked writes."""
         return execute_mutation(
             plan_document_parent_touch(entity, registry=self)
@@ -266,5 +336,5 @@ Entities = EntityRegistry()
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_initialized
 # @pair entities:initialization
-def initialize():
+def initialize() -> None:
     Entities.initialize()

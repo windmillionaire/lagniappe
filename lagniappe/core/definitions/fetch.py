@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from enum import Enum, IntEnum
+from typing import Self
 
 
 # @testable infrastructure
@@ -47,7 +48,7 @@ class Fetch:
     depth: FetchDepth
     reason: FetchReason | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not isinstance(self.depth, FetchDepth):
             raise TypeError("Fetch depth must be a FetchDepth")
         if self.depth is FetchDepth.NESTED and not isinstance(
@@ -58,13 +59,13 @@ class Fetch:
             raise ValueError("Only nested fetches may declare a reason")
 
     @classmethod
-    def root(cls):
+    def root(cls) -> Self:
         return cls(FetchDepth.ROOT)
 
     @classmethod
-    def direct(cls):
+    def direct(cls) -> Self:
         return cls(FetchDepth.DIRECT)
 
     @classmethod
-    def nested(cls, *, because):
+    def nested(cls, *, because: FetchReason) -> Self:
         return cls(FetchDepth.NESTED, reason=because)
