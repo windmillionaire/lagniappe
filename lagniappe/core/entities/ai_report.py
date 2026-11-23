@@ -188,7 +188,9 @@ class AIReport(Entity):
     @property
     def required(self) -> list[str]:
         parent = self.parent
-        return [parent.hash] if parent is not None else []
+        if parent is None:
+            raise AttributeError(f"{type(self).__name__} requires an attached parent")
+        return [parent.hash]
 
     # @testable true
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_permissions_follow_creator_ownership
