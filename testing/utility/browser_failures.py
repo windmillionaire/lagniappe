@@ -110,6 +110,8 @@ class BrowserFailureCollector:
         text_contains: str | None = None,
         failure: str | None = None,
         source_path: str | None = None,
+        http_method: str | None = None,
+        http_body: str | None = None,
     ) -> ExpectedBrowserFailure:
         """Return a scope that consumes an intentional failure pattern."""
         if count is not None and count < 0:
@@ -135,6 +137,8 @@ class BrowserFailureCollector:
                 "text_contains": text_contains,
                 "failure": failure,
                 "source_path": source_path,
+                "http_method": http_method,
+                "http_body": http_body,
             },
         )
 
@@ -144,10 +148,12 @@ class BrowserFailureCollector:
         *,
         status: int,
         path: str,
+        method: str | None = None,
+        body: str | None = None,
         count: int | None = None,
         max_count: int | None = None,
     ) -> ExpectedBrowserFailure:
-        """Allow Chromium's optional diagnostic; callers assert the HTTP/UI result."""
+        """Allow an expected Chromium diagnostic, optionally matching its captured 5xx response."""
         source_path = urlsplit(path).path
         return self.expect(
             user,
@@ -157,6 +163,8 @@ class BrowserFailureCollector:
             console_type="error",
             text_contains=f"status of {status} ",
             source_path=source_path,
+            http_method=method,
+            http_body=body,
         )
 
     @contextmanager
