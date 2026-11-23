@@ -1,5 +1,8 @@
 """Build JSONPath filter expressions from compiled filter definitions."""
 
+from collections.abc import Sequence
+from ...definitions import FilterDefinition
+
 import json
 from math import isfinite
 import re
@@ -39,7 +42,7 @@ def _regex(value, *, exact=False):
 class FilterExpression:
     """Converts a list of filter definitions into a composite JSONPath query string."""
 
-    def __init__(self, definitions):
+    def __init__(self, definitions: Sequence[FilterDefinition]) -> None:
         self.definitions = definitions
 
     # @testable true
@@ -63,7 +66,7 @@ class FilterExpression:
     # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_checkbox_condition
     # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_select_condition
     # @matrix filters : attached-form boolean-condition compound description document entity-condition escaping field-name jsonpath number-condition public punctuation regex-literal run-results scalar-list select-condition string-condition
-    def build(self, *, ids_only=True):
+    def build(self, *, ids_only: bool = True) -> str:
         """Convert filter definitions into a single JSONPath query."""
         if not self.definitions:
             raise ValueError("Filter expression requires at least one condition")

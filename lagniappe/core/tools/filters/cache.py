@@ -9,9 +9,11 @@ from lagniappe.core.tools.database import get as database_get
 from ...tools.database.core import KINDS
 from ...tools.database.filter import Filter, Query
 from ...tools.auth.context import current_context_user
-from typing import TYPE_CHECKING, TypeGuard
+from typing import TYPE_CHECKING, TypeGuard, cast
 
 if TYPE_CHECKING:
+    from redis.commands.json._util import JsonType
+    from lagniappe.core.entities.entity import Entity
     from lagniappe.core.entities.category import Category
     from lagniappe.core.entities.project import Project
     from lagniappe.core.entities.user import User
@@ -59,7 +61,7 @@ def _matches_literal(row, definition):
 # @testable false
 # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
 # @reason filter-index value escaping is part of cache materialization
-def escape_for_filter(to_filter):
+def escape_for_filter[T](to_filter: T) -> T:
     """Preserve semantic cache values; query literals provide the escaping."""
     return to_filter
 
@@ -109,7 +111,7 @@ class FilterCache:
     # @testable true
     # @tests tests_unit/test_021_refresh.py::test_filter_cache_query_roots_uses_root_fetch_without_permission_expansion
     # @matrix filters reconnect-refresh : membership root-depth
-    def query_roots(self, filter):
+    def query_roots(self, filter: CompiledFilter) -> list[Entity]:
         """Return matching roots for modified-time comparison without expansion."""
         return Entities.fetch(*self._query_keys(filter), request=Fetch.root())
 
@@ -122,7 +124,7 @@ class FilterCache:
     # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_results_respect_page_permissions
     # @matrix filters : compound entity-condition run-results string-condition view-access
     # @pair filters:query
-    def query(self, filter):
+    def query(self, filter: CompiledFilter) -> list[Entity]:
         """Query the cache with a filter and return matching entities."""
         return [
             entity
@@ -137,7 +139,7 @@ class FilterCache:
     # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
     # @covered-by lagniappe/web/routes/process/main.py::update_cache
     # @reason refresh scheduling is owned by route/process workflows
-    def update(self, queue=True):
+    def update(self, queue: bool = True) -> None:
         """Refresh the cache immediately or via a background task."""
         now = CONFIG.local or not queue
 
@@ -146,7 +148,7 @@ class FilterCache:
         else:
             assert self.user is not None
             task_endpoint = url_for("process.update_cache", _external=True)
-            payload = {
+            payload: dict[str, object] = {
                 "cache_key": self.cache_key,
                 "entity_key": self.entity.urlsafe_key,
                 "user_key": self.user.urlsafe_key,
@@ -157,7 +159,7 @@ class FilterCache:
     # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
     # @reason index-map shaping is part of cache materialization
     def _entity_map(self, entities):
-        return {e.hash: escape_for_filter(e.to_filter_index()) for e in entities}
+        return {e.hash: cast("JsonType", escape_for_filter(e.to_filter_index())) for e in entities}
 
     # @testable true
     # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_loads_category_pages_without_restrictions
@@ -215,7 +217,7 @@ class FilterCache:
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_category
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_model_task
     # @matrix filters : entity-condition model-task run-results string-condition
-    def cache(self):
+    def cache(self) -> None:
         """Build or incrementally refresh the filter cache."""
         # filter_cache.delete(self.cache_key)
         if self.entity.kind == "project" and CONFIG.local:

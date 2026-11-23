@@ -1,10 +1,11 @@
 """AI declarations and handlers for shared-cache workspace filter queries."""
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from lagniappe.core.entities.user import User
+    from lagniappe.core.tools.filters.contract import FilterParent
 
 from google.genai import types
 
@@ -144,6 +145,7 @@ def execute_get_filter_schema(args: Mapping[str, object], user: User) -> Mapping
     if error:
         return error
     try:
+        assert parent is not None
         return describe_filter_fields(parent, user)
     except exceptions.ValidationError as error:
         return {"error": str(error)}
@@ -158,6 +160,7 @@ def execute_query_workspace_filter(args: Mapping[str, object], user: User) -> Ma
     if error:
         return error
     try:
+        assert parent is not None
         return query_workspace_filter(
             parent,
             args.get("conditions"),
@@ -184,4 +187,4 @@ def _filter_parent(args, user):
         return None, {"error": "Project or category not found"}
     if not parent.allowed(Action.VIEW, user=user):
         return None, {"error": "Access denied"}
-    return parent, None
+    return cast("FilterParent", parent), None

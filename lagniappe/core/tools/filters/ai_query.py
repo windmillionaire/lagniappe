@@ -1,5 +1,12 @@
 """Validated, read-only filter queries for AI workspace tools."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ...definitions import FilterDefinition
+    from ...entities.user import User
+    from .contract import FilterParent
+
 from contextlib import suppress
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason
@@ -35,7 +42,7 @@ SORTS = frozenset(
 # @tests tests_unit/test_015c_ai_filter_query.py::test_describe_filter_fields_exposes_parent_relations_and_form_fields
 # @tests tests_unit/test_015c_ai_filter_query.py::test_describe_filter_fields_uses_real_project_and_form_filter_surfaces
 # @matrix ai-filter : integration permissions schema
-def describe_filter_fields(parent, user):
+def describe_filter_fields(parent: FilterParent, user: User) -> dict[str, object]:
     """Describe filterable fields visible to ``user`` under a project/category."""
     return describe_filter_contract(parent, user)
 
@@ -44,7 +51,7 @@ def describe_filter_fields(parent, user):
 # @tests tests_unit/test_015c_ai_filter_query.py::test_compile_filter_definitions_normalizes_dates_numbers_and_booleans
 # @tests tests_unit/test_015c_ai_filter_query.py::test_compile_filter_definitions_rejects_unknown_fields_comparators_and_values
 # @matrix ai-filter : compilation permissions validation
-def compile_filter_definitions(parent, conditions, user):
+def compile_filter_definitions(parent: FilterParent, conditions: object, user: User) -> list[FilterDefinition]:
     """Compile AI condition DTOs through the shared filter contract."""
     compiled = compile_filter_contract(
         parent,
@@ -59,14 +66,14 @@ def compile_filter_definitions(parent, conditions, user):
 # @tests tests_unit/test_015c_ai_filter_query.py::test_query_workspace_filter_uses_shared_cache_and_permission_filters_results
 # @matrix ai-filter : cache-query output permissions
 def query_workspace_filter(
-    parent,
-    conditions,
-    user,
+    parent: FilterParent,
+    conditions: object,
+    user: User,
     *,
     limit: object = DEFAULT_LIMIT,
     sort: object = "modified_desc",
     include_inactive: bool = False,
-):
+) -> dict[str, object]:
     """Warm a shared parent cache and return permission-filtered AI records."""
     compiled = compile_filter_contract(
         parent,
