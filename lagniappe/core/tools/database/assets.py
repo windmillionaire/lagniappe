@@ -84,6 +84,7 @@ class DirectUploadFile:
     """File-like wrapper around a verified direct-to-GCS upload."""
 
     lagniappe_direct_upload = True
+    lagniappe_preserve_source: bool
 
     def __init__(self, record, payload, blob):
         self.record = record
