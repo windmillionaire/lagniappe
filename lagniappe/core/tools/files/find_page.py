@@ -25,7 +25,7 @@ WEAK_MATCH_THRESHOLD = 90
 # @tests tests_unit/test_006c_files_find_page.py::test_find_page_fuzzy_weak_match_returns_warning
 # @tests tests_unit/test_006c_files_find_page.py::test_find_page_fuzzy_low_confidence_returns_error
 # @matrix ingress link : fuzzy-match no-match page-match weak-match
-def find_page(value: object, match_field_label: str = "Name", fuzzy: bool = False, error_label: str | None = None) -> PageMatch:
+def find_page(value: object, match_field_label: str = "Name", fuzzy: bool | None = False, error_label: str | None = None) -> PageMatch:
     """Find a page by name or cached form-field snippet for CSV imports."""
     result: PageMatch = {"id": None, "warnings": [], "errors": []}
     lookup_value = _lookup_value(value)
