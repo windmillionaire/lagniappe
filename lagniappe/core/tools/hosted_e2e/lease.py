@@ -6,6 +6,10 @@ import hashlib
 import re
 import secrets
 import threading
+from typing import TYPE_CHECKING, Self
+
+if TYPE_CHECKING:
+    from redis import Redis
 
 from lagniappe import CONFIG
 
@@ -33,7 +37,7 @@ return 0
 # @testable false
 # @covered-by lagniappe/core/tools/hosted_e2e/lease.py::acquire_e2e_lease
 # @reason lazy Redis adapter owned by the public lease operations
-def _redis_client(client=None):
+def _redis_client(client: Redis | None = None):
     if client is not None:
         return client
     from lagniappe.core.tools.cache.core import cache
@@ -54,7 +58,7 @@ def _validate_run_id(run_id: str) -> str:
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_key_is_outside_test_cleanup_prefix
 # @matrix hosted-e2e : lease prefix-isolation
-def e2e_lease_key(*, project_id=None, prefix=None) -> str:
+def e2e_lease_key(*, project_id: str | None = None, prefix: str | None = None) -> str:
     """Return a reserved key that cannot match ordinary test-data cleanup."""
     project_id = str(project_id or CONFIG.GOOGLE_CLOUD_PROJECT or "").strip()
     prefix = str(prefix if prefix is not None else CONFIG.PREFIX)
@@ -67,7 +71,7 @@ def e2e_lease_key(*, project_id=None, prefix=None) -> str:
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
 # @matrix hosted-e2e : concurrency expiry lease ownership
-def acquire_e2e_lease(run_id: str, *, ttl=DEFAULT_LEASE_SECONDS, client=None) -> bool:
+def acquire_e2e_lease(run_id: str, *, ttl: int = DEFAULT_LEASE_SECONDS, client: Redis | None = None) -> bool:
     run_id = _validate_run_id(run_id)
     return bool(
         _redis_client(client).set(
@@ -82,7 +86,7 @@ def acquire_e2e_lease(run_id: str, *, ttl=DEFAULT_LEASE_SECONDS, client=None) ->
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
 # @matrix hosted-e2e : lease ownership
-def current_e2e_lease(*, client=None) -> str | None:
+def current_e2e_lease(*, client: Redis | None = None) -> str | None:
     value = _redis_client(client).get(e2e_lease_key())
     if isinstance(value, bytes):
         value = value.decode("utf-8")
@@ -92,7 +96,7 @@ def current_e2e_lease(*, client=None) -> str | None:
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
 # @matrix hosted-e2e : lease ownership
-def e2e_lease_active(run_id: str, *, client=None) -> bool:
+def e2e_lease_active(run_id: str, *, client: Redis | None = None) -> bool:
     return current_e2e_lease(client=client) == _validate_run_id(run_id)
 
 
@@ -118,8 +122,8 @@ def bind_e2e_deployment(
     version: str,
     source: str,
     *,
-    ttl=DEFAULT_DEPLOYMENT_BINDING_SECONDS,
-    client=None,
+    ttl: int = DEFAULT_DEPLOYMENT_BINDING_SECONDS,
+    client: Redis | None = None,
 ) -> bool:
     """Bind one deployed server to the run that currently owns the lease."""
     run_id = _validate_run_id(run_id)
@@ -143,7 +147,7 @@ def e2e_deployment_lease_active(
     source: str,
     *,
     run_id: str | None = None,
-    client=None,
+    client: Redis | None = None,
 ) -> bool:
     """Return whether this deployment is bound to the current lease owner."""
     redis_client = _redis_client(client)
@@ -163,8 +167,8 @@ def e2e_deployment_lease_active(
 def heartbeat_e2e_lease(
     run_id: str,
     *,
-    ttl=DEFAULT_LEASE_SECONDS,
-    client=None,
+    ttl: int = DEFAULT_LEASE_SECONDS,
+    client: Redis | None = None,
 ) -> bool:
     run_id = _validate_run_id(run_id)
     result = _redis_client(client).eval(
@@ -180,7 +184,7 @@ def heartbeat_e2e_lease(
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
 # @matrix hosted-e2e : lease ownership
-def release_e2e_lease(run_id: str, *, client=None) -> bool:
+def release_e2e_lease(run_id: str, *, client: Redis | None = None) -> bool:
     run_id = _validate_run_id(run_id)
     result = _redis_client(client).eval(
         _COMPARE_DELETE,
@@ -198,8 +202,8 @@ def consume_e2e_bootstrap_token(
     token_digest: str,
     run_id: str,
     *,
-    ttl=10 * 60,
-    client=None,
+    ttl: int = 10 * 60,
+    client: Redis | None = None,
 ) -> bool:
     """Consume one verified ID token once for the lease-owning run."""
     run_id = _validate_run_id(run_id)
@@ -229,10 +233,10 @@ class E2ELease:
         self,
         run_id: str | None = None,
         *,
-        ttl=DEFAULT_LEASE_SECONDS,
-        heartbeat_seconds=DEFAULT_HEARTBEAT_SECONDS,
-        client=None,
-    ):
+        ttl: int = DEFAULT_LEASE_SECONDS,
+        heartbeat_seconds: int = DEFAULT_HEARTBEAT_SECONDS,
+        client: Redis | None = None,
+    ) -> None:
         self.run_id = _validate_run_id(run_id or secrets.token_urlsafe(32))
         self.ttl = int(ttl)
         self.heartbeat_seconds = int(heartbeat_seconds)
@@ -245,7 +249,7 @@ class E2ELease:
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
     # @matrix hosted-e2e : concurrency heartbeat lease ownership
-    def __enter__(self):
+    def __enter__(self) -> Self:
         if not acquire_e2e_lease(
             self.run_id,
             ttl=self.ttl,
@@ -284,7 +288,7 @@ class E2ELease:
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
     # @matrix hosted-e2e : lease ownership
-    def assert_active(self):
+    def assert_active(self) -> None:
         if self._lost.is_set() or not e2e_lease_active(
             self.run_id,
             client=self.client,
@@ -294,7 +298,7 @@ class E2ELease:
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_handoff_keeps_owner_for_heartbeat_adoption
     # @matrix hosted-e2e : heartbeat lease-ownership transfer
-    def handoff(self):
+    def handoff(self) -> str:
         """Stop this heartbeat without releasing the owner token."""
         self.assert_active()
         self._stop.set()
@@ -328,10 +332,10 @@ class E2ELeaseHeartbeat:
         self,
         run_id: str,
         *,
-        ttl=DEFAULT_LEASE_SECONDS,
-        heartbeat_seconds=DEFAULT_HEARTBEAT_SECONDS,
-        client=None,
-    ):
+        ttl: int = DEFAULT_LEASE_SECONDS,
+        heartbeat_seconds: int = DEFAULT_HEARTBEAT_SECONDS,
+        client: Redis | None = None,
+    ) -> None:
         self.run_id = _validate_run_id(run_id)
         self.ttl = int(ttl)
         self.heartbeat_seconds = int(heartbeat_seconds)
@@ -340,7 +344,7 @@ class E2ELeaseHeartbeat:
         self._lost = threading.Event()
         self._thread = None
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         if not e2e_lease_active(self.run_id, client=self.client):
             raise RuntimeError("Cannot adopt an inactive shared E2E data lease.")
         self._thread = threading.Thread(
@@ -365,7 +369,7 @@ class E2ELeaseHeartbeat:
                 self._lost.set()
                 return
 
-    def assert_active(self):
+    def assert_active(self) -> None:
         if self._lost.is_set() or not e2e_lease_active(
             self.run_id,
             client=self.client,

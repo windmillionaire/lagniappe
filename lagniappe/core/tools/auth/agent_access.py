@@ -1,3 +1,8 @@
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from datetime import datetime, UTC
 import hmac
 
@@ -21,7 +26,7 @@ def _enabled_flag(value):
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_agent_access_config_and_user_helpers
 # @matrix login : agent-access config
-def enabled():
+def enabled() -> bool:
     code = str(getattr(CONFIG, "AGENT_ACCESS_CODE", "") or "").strip()
     email = str(getattr(CONFIG, "AGENT_ACCESS_EMAIL", "") or "").strip()
     return bool(
@@ -32,7 +37,7 @@ def enabled():
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_agent_access_config_and_user_helpers
 # @matrix login : agent-access code-validation
-def code_matches(code):
+def code_matches(code: str | None) -> bool:
     expected = str(getattr(CONFIG, "AGENT_ACCESS_CODE", ""))
     submitted = str(code or "").strip()
     return bool(submitted and expected and hmac.compare_digest(submitted, expected))
@@ -54,7 +59,7 @@ def _ensure_own_page_access(user):
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_agent_access_user_helper_creates_or_loads_user_with_groups
 # @matrix login : agent-access groups user user-page
-def get_or_create_user():
+def get_or_create_user() -> User:
     email = str(getattr(CONFIG, "AGENT_ACCESS_EMAIL", "")).strip().lower()
     name = str(getattr(CONFIG, "AGENT_ACCESS_NAME", "") or "Agent").strip() or "Agent"
 
@@ -71,4 +76,4 @@ def get_or_create_user():
     _ensure_own_page_access(user)
     user.last_login = datetime.now(UTC)
     user.save()
-    return user
+    return cast("User", user)

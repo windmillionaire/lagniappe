@@ -146,7 +146,7 @@ def credential_status(user: User, *, now: datetime | None = None) -> dict[str, o
 # @tests tests_unit/test_032_agent_api.py::test_issue_authenticate_expire_and_revoke_credential
 # @tests tests_unit/test_032_agent_api.py::test_authenticate_rejects_tampered_and_mismatched_credentials
 # @matrix agent-api : authentication expiry revoke tamper user-binding
-def authenticate_credential(token: str, *, now: datetime | None = None):
+def authenticate_credential(token: str, *, now: datetime | None = None) -> tuple[User, dict[str, object]]:
     """Return the current User for a valid external-agent bearer token."""
     if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED:
         raise AgentAPICredentialError("External AI access is disabled.")

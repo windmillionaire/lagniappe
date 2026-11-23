@@ -20,7 +20,7 @@ class HostedE2EAuthenticationError(ValueError):
 # @testable true
 # @tests tests_unit/test_030_hosted_e2e.py::test_validate_google_claims_requires_exact_verified_identity
 # @matrix hosted-e2e : audience authentication identity issuer
-def validate_google_claims(claims, *, audience: str, caller_email: str) -> dict:
+def validate_google_claims(claims: object, *, audience: str, caller_email: str) -> dict[str, object]:
     """Validate the identity-bound claims returned by Google's token verifier."""
     if not isinstance(claims, dict):
         raise HostedE2EAuthenticationError("Google ID-token claims are invalid.")

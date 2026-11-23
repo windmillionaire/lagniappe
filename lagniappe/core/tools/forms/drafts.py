@@ -162,7 +162,7 @@ def archive_form_generation(source, *, attempt_owner=None):
             )
             if not blob:
                 raise exceptions.ValidationError("Could not preserve the Form's previous content.")
-            copied = dict(definition)
+            copied = definition.copy()
             copied["path"] = destination
             copied.pop("visibility", None)
             if getattr(blob, "generation", None) is not None:

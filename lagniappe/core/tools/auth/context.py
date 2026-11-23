@@ -1,5 +1,10 @@
 """Resolve the active user for request and unit-test code paths."""
 
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from flask import g, has_request_context
 from flask_login import current_user
 
@@ -12,7 +17,7 @@ from lagniappe import CONFIG
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_current_user_prefers_flask_user_over_config
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_current_user_prefers_agent_api_user_over_flask_user
 # @matrix agent-api testing users : bearer-user config-mutable current-user flask-request resolver
-def current_context_user(user=None):
+def current_context_user(user: User | None = None) -> User | None:
     """Return the explicit, bearer, browser-session, or configured test user."""
     if user is not None:
         return user
@@ -21,6 +26,6 @@ def current_context_user(user=None):
         agent_api_user = getattr(g, "agent_api_user", None)
         if agent_api_user is not None:
             return agent_api_user
-        return current_user
+        return cast("User", current_user)
 
     return getattr(CONFIG, "TEST_CURRENT_USER", None)

@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from google.cloud.firestore_admin_v1 import FirestoreAdminClient
+
+
 from collections.abc import Iterable
 from datetime import datetime, UTC
 import json
@@ -95,7 +101,7 @@ def _backup(payload, project_id):
 # @testable true
 # @tests tests_unit/test_024_data_protection_status.py::test_data_protection_status_is_sanitized_and_read_only
 # @matrix admin disaster-recovery : human-readable-timestamps native-backups recovery-catalog sanitization schedules
-def data_protection_status(admin_client=None):
+def data_protection_status(admin_client: FirestoreAdminClient | None = None) -> dict[str, object]:
     """Return provider metadata and a sanitized manual-backup catalog."""
     project_id = CONFIG.GOOGLE_CLOUD_PROJECT
     if admin_client is None:

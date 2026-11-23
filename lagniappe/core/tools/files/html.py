@@ -553,8 +553,8 @@ def sanitize_form_content_html(content: object, form: Form | FormHistory, field_
         if not name.startswith(prefix) or definition.get("type") != "image":
             continue
         asset = form.get_asset(name)
-        if asset and getattr(asset, "url", None):
-            image_sources.append((asset.url, asset.url))
+        if asset and (url := getattr(asset, "url", None)):
+            image_sources.append((url, url))
     prepared = _prepare_owned_images(content, image_sources)
     reduced = _prepare_canonical_task_lists(prepared)
     return _stamp_safe_html(_finalize_clean_html(_RICH_CLEANER.clean(reduced)))

@@ -55,7 +55,7 @@ def _compatible(source, candidate, page):
 # @testable true
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_combine_selects_completed_then_modified_main
 # @matrix task-combine : completed-on deterministic-tie modified winner
-def select_main_task(tasks):
+def select_main_task(tasks: Iterable[Task]) -> Task:
     """Choose the task whose current state remains after a combination."""
     tasks = tuple(task for task in tasks if isinstance(task, Entities.TASK))
     if not tasks:
@@ -85,7 +85,7 @@ def select_main_task(tasks):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
 # @matrix task-combine : compatible linked-page no-model same-model same-page view-page
-def compatible_tasks(task, page, user):
+def compatible_tasks(task: Task, page: Page, user: User) -> tuple[Task, ...]:
     """Return delete-permitted peers owned by the page displaying ``task``."""
     if not isinstance(task, Entities.TASK) or not isinstance(page, Entities.PAGE):
         return ()

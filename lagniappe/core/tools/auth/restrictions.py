@@ -1,6 +1,21 @@
 """Explicit permission dependencies and canonical source restrictions."""
 
+from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING, Protocol, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity
+
 from ...exceptions import UnloadedRelationError
+
+
+class PermissionRelation(Protocol):
+    @property
+    def key(self) -> object: ...
+    @property
+    def is_set(self) -> bool: ...
+    @property
+    def value(self) -> Entity | None: ...
 
 
 RESTRICTION_SOURCES = ("page", "page_form", "task_form")
@@ -9,7 +24,7 @@ RESTRICTION_SOURCES = ("page", "page_form", "task_form")
 # @testable true
 # @tests tests_unit/test_009g_restriction_reconciliation.py::test_restrictions_normalize_source_clauses
 # @matrix permissions : source-clauses stable-order admin-only
-def normalize_restrictions(mapping):
+def normalize_restrictions(mapping: Mapping[str, Iterable[str]] | None) -> dict[str, list[str]]:
     """Copy nonempty source clauses, preserving their independent requirements."""
     normalized = {}
     for source in RESTRICTION_SOURCES:
@@ -22,7 +37,7 @@ def normalize_restrictions(mapping):
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_restriction_fields_keep_source_boundaries
 # @matrix permissions cache : source-clauses stable-order
-def restriction_fields(mapping):
+def restriction_fields(mapping: Mapping[str, Iterable[str]] | None) -> dict[str, str]:
     """Encode each source independently as a Redis TAG field."""
     return {
         f"restricted_to_{source}": ",".join(groups)
@@ -36,8 +51,8 @@ def restriction_fields(mapping):
 # @tests tests_unit/test_013_task_properties.py::test_deleted_task_form_recalculates_remaining_restrictions
 # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_recalculates_restrictions_after_form_deletion
 # @matrix permissions relations : deleted-form recalculation
-def permission_relation(entity, name, *, required=False):
-    prop = entity.properties.get(name)
+def permission_relation(entity: Entity, name: str, *, required: bool = False) -> Entity | None:
+    prop = cast("PermissionRelation | None", entity.properties.get(name))
     if prop is None or not prop.key:
         if required:
             raise UnloadedRelationError(f"{entity.entity_kind}.{name} is required")

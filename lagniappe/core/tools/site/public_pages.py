@@ -1,10 +1,13 @@
 """Public-page discovery, document-image, and social metadata services."""
 
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 import re
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from lagniappe import Config
+    from ..files.html import SafeHTML
     from lagniappe.core.entities.page import Page
 from urllib.parse import urlsplit
 from xml.etree import ElementTree
@@ -52,7 +55,7 @@ class DocumentImage:
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_public_page_runtime_settings_prefer_live_datastore_and_fail_closed
 # @matrix public-pages : config-fallback live-settings
-def runtime_settings(config=CONFIG):
+def runtime_settings(config: Config = CONFIG) -> dict[str, bool]:
     """Read live site discovery settings, falling back to deployed config."""
     fallback = {
         "PUBLIC_PAGE_INDEXING": getattr(config, "PUBLIC_PAGE_INDEXING", False)
@@ -89,7 +92,7 @@ def _bounded_image_alt(value):
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_public_document_images_only_include_embedded_page_assets
 # @matrix public-pages : document-image privacy preview
-def document_images(page):
+def document_images(page: Page) -> list[DocumentImage]:
     """Return unique page-owned document images in their document order."""
     soup = BeautifulSoup(page.properties.document.html or "", "html.parser")
     assets = {}
@@ -167,7 +170,7 @@ def _validated_public_image_url(page, candidate, image_url, public_origin):
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_public_document_rewrites_only_embedded_page_images
 # @matrix public-pages : document-image public-rendering
-def public_document_html(page, image_url, *, public_origin=None):
+def public_document_html(page: Page, image_url: Callable[[DocumentImage], str], *, public_origin: str | None = None) -> tuple[SafeHTML, list[DocumentImage]]:
     """Render anonymous-safe HTML with mentions and owned images transformed."""
     content = sanitize_mentions(page.properties.document.html or "")
     candidates = document_images(page)
@@ -187,7 +190,7 @@ def public_document_html(page, image_url, *, public_origin=None):
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_public_metadata_uses_safe_fallbacks_and_selected_document_image
 # @matrix public-pages : metadata privacy social-preview
-def metadata(page, *, canonical_url, site_image_url, public_image_url, indexing):
+def metadata(page: Page, *, canonical_url: str, site_image_url: str, public_image_url: Callable[[DocumentImage], str], indexing: bool) -> dict[str, object]:
     """Build privacy-safe canonical, robots, Open Graph, and Twitter metadata."""
     settings = normalize_public_settings(page.public_settings)
     document, candidates = public_document_html(
@@ -242,7 +245,7 @@ def _manual_path(section):
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_public_manual_metadata_and_urls_are_canonical
 # @matrix manual : canonical-url metadata search-discovery
-def manual_metadata(section, *, indexing, app_name=CONFIG.APP_NAME):
+def manual_metadata(section: Mapping[str, str], *, indexing: bool, app_name: str = CONFIG.APP_NAME) -> dict[str, object]:
     """Build public-safe search metadata for one full manual section."""
     path = _manual_path(section)
     name = section["name"]
@@ -258,7 +261,7 @@ def manual_metadata(section, *, indexing, app_name=CONFIG.APP_NAME):
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_public_manual_metadata_and_urls_are_canonical
 # @matrix manual sitemap : canonical-url public-url
-def discoverable_manual_urls():
+def discoverable_manual_urls() -> list[str]:
     """Return every canonical URL in the static public-manual catalog."""
     return [absolute_url(_manual_path(section)) for section in MANUAL_SECTIONS]
 
@@ -286,7 +289,7 @@ def manual_directory_group() -> DirectoryGroup:
 # @tests tests_unit/test_026_site_admin.py::test_robots_text_allows_public_surface_and_advertises_enabled_sitemap
 # @matrix public-pages robots : disabled enabled public-assets
 # @matrix manual robots : disabled enabled fragment
-def robots_text(indexing, *, sitemap_url, public_manual=False):
+def robots_text(indexing: bool, *, sitemap_url: str, public_manual: bool = False) -> str:
     """Return crawler rules that block the app while allowing public surfaces."""
     lines = [
         "User-agent: *",
@@ -310,7 +313,7 @@ def robots_text(indexing, *, sitemap_url, public_manual=False):
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_sitemap_xml_is_sorted_deduped_and_fails_closed_at_limit
 # @matrix public-pages sitemap : dedupe limit sorted xml
-def sitemap_xml(urls):
+def sitemap_xml(urls: Iterable[str]) -> str:
     """Build one deterministic URL-only sitemap, failing rather than truncating."""
     urls = sorted(set(urls))
     if len(urls) > SITEMAP_URL_LIMIT:

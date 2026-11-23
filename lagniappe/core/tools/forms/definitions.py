@@ -507,11 +507,11 @@ def rendered_html_fields(entity, *, original=False, definition=None, only_field_
             for name, asset_definition in source.assets.items():
                 if name.startswith(f"image_{field_id}_") and asset_definition.get("type") == "image":
                     asset = source.get_asset(name)
-                    if asset and asset.url:
+                    if asset and (url := getattr(asset, "url", None)):
                         extension = getattr(asset, "extension", None)
                         identifier = f"{name}.{extension}" if extension else name
                         html = html.replace(
-                            asset.url,
+                            url,
                             f"/assets/{entity.urlsafe_key}/form-generation/{definition.generation}/{identifier}",
                         )
         result[field_id] = html
