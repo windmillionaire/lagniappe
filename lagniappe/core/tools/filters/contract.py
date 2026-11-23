@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime, time, UTC
 import json
+from typing import Never
 from math import isfinite
 
 from lagniappe.core import exceptions
@@ -78,7 +79,7 @@ class CompiledFilter:
 # @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
 # @covered-by lagniappe/core/tools/filters/contract.py::parse_filter_request
 # @reason shared error construction is exercised through public validation failures
-def _error(message, *, path="filter", code="invalid", status=422):
+def _error(message: str, *, path: str = "filter", code: str = "invalid", status: int = 422) -> Never:
     raise FilterContractError(message, path=path, code=code, status=status)
 
 
@@ -270,6 +271,7 @@ def _add_catalog_field(catalog, source, field, allowed_value=None):
         )
         catalog[key] = entry
     if allowed_value:
+        assert entry.allowed_values is not None
         entry.allowed_values[allowed_value.hash] = allowed_value
 
 

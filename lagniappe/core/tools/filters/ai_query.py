@@ -102,7 +102,7 @@ def query_workspace_filter(
         # row projections, but this AI boundary serializes that two-hop graph.
         # Serialization below isolates affected rows and returns a bounded
         # corrective result instead of promoting legacy data to an API 500.
-        with suppress(RECOVERABLE_RESULT_ERRORS):
+        with suppress(*RECOVERABLE_RESULT_ERRORS):
             Entities.fetch(
                 *selected,
                 *task_pages,

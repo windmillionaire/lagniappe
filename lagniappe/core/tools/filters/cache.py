@@ -9,6 +9,8 @@ from lagniappe.core.tools.database import get as database_get
 from ...tools.database.core import KINDS
 from ...tools.database.filter import Filter, Query
 from ...tools.auth.context import current_context_user
+from typing import TypeGuard
+
 from ..cache import Keys, filter_cache
 from ..services.task_queue import create_task
 from .build import FilterExpression
@@ -16,6 +18,10 @@ from .contract import CompiledFilter
 
 
 FILTER_CACHE_SCOPE = "all-v2"
+
+
+def _entity_ids(value: object) -> TypeGuard[list[str]]:
+    return isinstance(value, list) and all(isinstance(key, str) for key in value)
 
 
 # @testable false
@@ -74,19 +80,24 @@ class FilterCache:
     # @matrix cache filters : allowed query query-boundary related-load validation
     # @matrix permissions : allowed query related-load
     # @matrix filters : escaping punctuation regex-literal run-results string-condition
-    def _query_keys(self, filter):
+    def _query_keys(self, filter: CompiledFilter) -> list[str]:
         if not isinstance(filter, CompiledFilter):
             raise TypeError("FilterCache queries require a CompiledFilter")
         literals = [definition for definition in filter.definitions if _needs_literal_match(definition)]
         if not literals:
             expression = FilterExpression(filter.definitions).build()
-            return filter_cache.query(self.cache_key, expression)
+            identifiers = filter_cache.query(self.cache_key, expression)
+            if not _entity_ids(identifiers):
+                raise TypeError("Expected an array of entity IDs from the filter index")
+            return identifiers
         remaining = [definition for definition in filter.definitions if definition not in literals]
         expression = FilterExpression(remaining).build(ids_only=False) if remaining else "$.*"
         rows = filter_cache.query(self.cache_key, expression)
+        if not isinstance(rows, list):
+            raise TypeError("Expected an array of records from the filter index")
         return [
-            row["id"] for row in rows
-            if isinstance(row, dict) and row.get("id")
+            identifier for row in rows
+            if isinstance(row, dict) and isinstance(identifier := row.get("id"), str) and identifier
             and all(_matches_literal(row, definition) for definition in literals)
         ]
 
@@ -128,6 +139,7 @@ class FilterCache:
         if now:
             self.cache()
         else:
+            assert self.user is not None
             task_endpoint = url_for("process.update_cache", _external=True)
             payload = {
                 "cache_key": self.cache_key,
@@ -212,6 +224,8 @@ class FilterCache:
             if not to_refresh:
                 return
 
+            if not _entity_ids(to_refresh):
+                raise TypeError("Expected an array of entity IDs requiring a refresh")
             request = (
                 Fetch.nested(because=FetchReason.TASK_FILTER_INDEX_MATERIALIZATION)
                 if self.entity.kind == "project"
