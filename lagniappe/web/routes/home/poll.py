@@ -1,5 +1,12 @@
 """Versioned adaptive polling for mounted browser state."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import g, request
 from flask_login import current_user
 
@@ -173,7 +180,7 @@ def _document_result(descriptor, entity, client_id):
 # @pairs notifications:deferred sync:presence web-headers:notification-state
 @internal.route("/poll", methods=["POST"])
 @logged_in(context=_poll_context)
-def poll():
+def poll() -> ResponseReturnValue:
     """Resolve every due browser subscription through one typed contract."""
     try:
         parsed = g.get("poll_request") or parse_poll_request(request.get_json(silent=True))

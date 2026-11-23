@@ -7,6 +7,14 @@ the X-Lagniappe-Invalidate-Cache header that triggers service worker
 cache clearing.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask import Response
+    from lagniappe import Config
+
 from datetime import timedelta
 import json
 import re
@@ -45,7 +53,7 @@ if CONFIG.capture_errors:
 # @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_flask_security_configuration_and_session_cookie_attributes
 # @matrix login session : cookie-hardening lifetime
 # @pair web-headers:security
-def configure_flask_security(flask_app, runtime_config=CONFIG):
+def configure_flask_security(flask_app: Flask, runtime_config: Config = CONFIG) -> None:
     """Apply the stable Flask session, cookie, and runtime-mode contract."""
     flask_app.config.update(
         USE_SESSION_FOR_NEXT=True,
@@ -125,7 +133,7 @@ def _client_cache_invalidation_requested():
 
 # @testable infrastructure
 @app.before_request
-def clear_request_notification_state():
+def clear_request_notification_state() -> None:
     """Start every request without a stale post-commit projection result."""
     cache.clear_recorded_notification_states()
     cache.clear_request_owner_projection()
@@ -135,7 +143,7 @@ def clear_request_notification_state():
 # @covered-by lagniappe/core/tools/email/notifications/presence.py::record_site_activity
 # @reason Flask response-hook wiring delegates to the tested coarse activity service
 @app.after_request
-def record_authenticated_site_activity(response):
+def record_authenticated_site_activity(response: Response) -> Response:
     """Keep a coarse Redis activity hint without adding browser requests."""
     user_key = session.get(CONFIG.LOGIN_USER_KEY) if session.get("_user_id") else None
     if user_key and request.endpoint != "static":
@@ -158,7 +166,7 @@ def record_authenticated_site_activity(response):
 # @pair login:logout
 # @matrix mcp-oauth : loopback browser-callback
 @app.after_request
-def add_lagniappe_headers(response):
+def add_lagniappe_headers(response: Response) -> Response:
     """Add security headers, ETag fingerprinting, and cache invalidation flag."""
     headers = {
         "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
@@ -217,7 +225,7 @@ def add_lagniappe_headers(response):
         # Cache Storage deletion cannot clear the browser's separate HTTP cache.
         # This transient command must never become reusable response metadata.
         headers["Cache-Control"] = "no-store"
-        headers["X-Lagniappe-Invalidate-Cache"] = True
+        headers["X-Lagniappe-Invalidate-Cache"] = "True"
         headers["X-Lagniappe-Cache-Revision"] = str(cache_revision)
 
     if getattr(CONFIG, "DEBUG_TRACING", False):

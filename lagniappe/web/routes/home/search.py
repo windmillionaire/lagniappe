@@ -1,3 +1,10 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 import math
 
 from flask import abort, g, request
@@ -7,7 +14,7 @@ from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache, collaboration
 from lagniappe.core.tools.services import places as location
-from lagniappe.web.auth import logged_in
+from lagniappe.web.auth import authenticated_user, logged_in
 from lagniappe.web import responses
 
 from . import internal
@@ -130,6 +137,7 @@ def _administrator_results(results):
         result
         for result in results
         if (page := pages.get(result.get("id")))
+        and page.user is not None
         and not page.user.is_public
         and not page.user.is_admin
     ]
@@ -178,7 +186,7 @@ def _quick_create_entity(kind, form):
 # @pairs admin:managed-user-search categories:index-filter facets:command-row search:search-results
 @internal.route("/search-index/<kind>")
 @logged_in
-def index(kind):
+def index(kind: str) -> ResponseReturnValue:
     g.NO_CACHE = True
     preloaded_hashes = set(request.values.getlist("preload"))
     query = request.values.get("q", "")
@@ -206,8 +214,8 @@ def index(kind):
     search_results = collaboration.collaboration_user_results(
         search_results,
         query,
-        request.values.get("permission"),
-        current_user,
+        request.values.get("permission", ""),
+        authenticated_user(),
         document_identifier=request.values.get("document"),
     )
     if kind == "administrator":
@@ -217,6 +225,7 @@ def index(kind):
         results = [
             {"id": r["id"], "name": r["name"], "kind": r["kind"], "details": r}
             for r in cache.get_details_by_hash(preloaded_hashes).values()
+            if "id" in r and "kind" in r and "name" in r
         ]
     else:
         results = []
@@ -243,7 +252,7 @@ def index(kind):
 # @matrix quick-create : create-route created-option
 @internal.route("/search-index/<kind>/create", methods=["POST"])
 @logged_in
-def create_index(kind):
+def create_index(kind: str) -> ResponseReturnValue:
     if not _can_quick_create(kind):
         abort(403)
 
@@ -262,7 +271,7 @@ def create_index(kind):
 # @pair projects:search
 @internal.route("/search-bar")
 @logged_in
-def search_bar():
+def search_bar() -> ResponseReturnValue:
     g.NO_CACHE = True
     q = request.values.get("q", "")
     if len(q) < 2:
@@ -285,7 +294,7 @@ def search_bar():
 # @matrix search : no-results query-display result-title
 @internal.route("/search-page")
 @logged_in
-def search_page():
+def search_page() -> ResponseReturnValue:
     g.NO_CACHE = True
     q = request.values.get("q", "")
 
@@ -339,7 +348,7 @@ def _search_page_pagination(page, results, total, per_page=10):
 # @matrix location : first-hit suite-stripping
 @internal.route("/search-location")
 @logged_in
-def location_search():
+def location_search() -> ResponseReturnValue:
     g.NO_CACHE = True
     query = request.values.get("q")
 

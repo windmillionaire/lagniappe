@@ -1,5 +1,12 @@
 """Browser-session shortcuts for user-facing AI reports."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 import re
 
 from flask import abort, redirect, url_for
@@ -21,7 +28,7 @@ REPORT_HASH_PATTERN = re.compile(r"^[A-Za-z0-9_-]{12}$")
 # @matrix agent-api ai-report : browser-review creator-bound short-link
 @tools.route("/api-plan/<plan_hash>", methods=["GET"])
 @logged_in
-def api_plan_preview(plan_hash):
+def api_plan_preview(plan_hash: str) -> ResponseReturnValue:
     """Resolve an API report's short hash only within its creator's session."""
     abort_public_user_action()
     if not REPORT_HASH_PATTERN.fullmatch(str(plan_hash or "")):

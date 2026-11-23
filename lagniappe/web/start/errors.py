@@ -1,5 +1,13 @@
 """Error handlers for HTTP, Datastore, and uncaught exceptions."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask import Flask
+    from flask.typing import ResponseReturnValue
+
 from flask import g, make_response, redirect, render_template, request, session, url_for
 from flask_wtf.csrf import CSRFError
 from lagniappe import CONFIG
@@ -12,7 +20,7 @@ from lagniappe.core import exceptions
 
 # @testable false
 # @reason Flask error handler registration is exercised through E2E app boot and error-page behavior
-def initialize(app):
+def initialize(app: Flask) -> None:
     app.register_error_handler(GoogleAPIError, handle_datastore_error)
     app.register_error_handler(TemplateError, handle_template_error)
     app.register_error_handler(HTTPException, handle_http_error)
@@ -28,9 +36,9 @@ def initialize(app):
 # @matrix error-handling : csrf http-404
 # @matrix agent-api : error-envelope routing
 # @pair login:redirect-target
-def handle_http_error(error):
+def handle_http_error(error: HTTPException) -> ResponseReturnValue:
     """Handle HTTP exceptions (4xx and 5xx errors)."""
-    code = error.code if hasattr(error, "code") else 500
+    code = error.code or 500 if hasattr(error, "code") else 500
 
     if request.path == "/api" or request.path.startswith("/api/"):
         from lagniappe.web.routes.api.main import handle_api_http_error
@@ -67,7 +75,7 @@ def handle_http_error(error):
 
 # @testable false
 # @reason Datastore errors require live Google exceptions and rendered app context
-def handle_datastore_error(error):
+def handle_datastore_error(error: GoogleAPIError) -> ResponseReturnValue:
     """Handle Google Datastore/API errors."""
     if "index for this query is not ready to serve" in str(error).casefold():
         response, code = _handle_error_with_context(
@@ -90,14 +98,14 @@ def handle_datastore_error(error):
 
 # @testable false
 # @reason Flask error handler wrappers are exercised through E2E error-page behavior
-def handle_template_error(error):
+def handle_template_error(error: TemplateError) -> ResponseReturnValue:
     """Handle Jinja2 template errors."""
     return _handle_error_with_context(error, code=500, header_msg="Template Error")
 
 
 # @testable false
 # @reason Flask error handler wrappers are exercised through E2E error-page behavior
-def handle_exception(error):
+def handle_exception(error: Exception) -> ResponseReturnValue:
     """Handle uncaught exceptions."""
     return _handle_error_with_context(error, code=500, header_msg="Exception")
 

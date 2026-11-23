@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 from flask import request
 from flask_login import current_user
 
@@ -16,7 +26,9 @@ from . import pages
 # @matrix notes pages permissions : load owner private shared viewer
 @pages.route("<key>/notes", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
-def get_notes(key, **kwargs):
+def get_notes(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
 
     rows = database_get.page_notes(page)
@@ -41,7 +53,9 @@ def get_notes(key, **kwargs):
 # @matrix notes pages : body create photo scope validation visibility
 @pages.route("<key>/notes", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
-def create_note(key, **kwargs):
+def create_note(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
 
     body = (request.form.get("body") or "").strip()

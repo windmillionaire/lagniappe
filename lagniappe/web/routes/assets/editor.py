@@ -1,7 +1,19 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 from flask import request, abort, get_template_attribute
 from flask_login import current_user
 
+from lagniappe.core.definitions.asset import ImageAsset
 from lagniappe.core.definitions import AI, Action, Fetch
+from lagniappe.core.properties.form_special import HTML
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.tools.ai import images as ai_images
@@ -16,6 +28,8 @@ from lagniappe.core.tools.forms.definitions import (
     rendered_html_fields,
 )
 from lagniappe.web.auth import (
+    authenticated_user,
+    load_route_entity,
     abort_public_user_action,
     permission,
     require_ai_access,
@@ -33,7 +47,13 @@ from .main import _asset_metadata_response, _asset_redirect, _large_asset
 # @matrix html-field : authoritative-content form-asset render-fetch retry submitter-key
 @assets.route("<key>/html/<field_id>", methods=["GET"])
 @permission(requested=Action.VIEW)
-def html_field(key, field_id, **kwargs):
+def html_field(
+    key: str,
+    field_id: str,
+    **kwargs: Unpack[
+        EntityContext[models.Form | models.Page | models.Task | models.TaskHistory]
+    ],
+) -> ResponseReturnValue:
     entity = Entities.fetch_one(
         kwargs["entity"],
         request=Fetch.direct(),
@@ -42,10 +62,14 @@ def html_field(key, field_id, **kwargs):
         return responses.document_html(
             rendered_html_fields(entity, only_field_id=field_id).get(field_id, "")
         )
+    if entity is None:
+        abort(404)
     form = entity if isinstance(entity, Entities.FORM) else entity.form
-    html = form.get_html_field(field_id) if form else None
+    if not isinstance(form, Entities.FORM):
+        return responses.document_html("")
+    html = form.get_html_field(field_id)
     return responses.document_html(
-        sanitize_form_content_html(html, form, field_id) if form else ""
+        sanitize_form_content_html(html, form, field_id)
     )
 
 
@@ -54,7 +78,12 @@ def html_field(key, field_id, **kwargs):
 # @matrix task-completion html-field permissions : schema-version owned-image record-scope
 @assets.route("<key>/form-generation/<int:generation>/<asset_name>", methods=["GET", "HEAD"])
 @permission(requested=Action.VIEW, no_store=True)
-def historical_form_image(key, generation, asset_name, **kwargs):
+def historical_form_image(
+    key: str,
+    generation: int,
+    asset_name: str,
+    **kwargs: Unpack[EntityContext[models.Task | models.TaskHistory]],
+) -> ResponseReturnValue:
     """Serve retained images through the authorized completion, never a free snapshot key."""
     entity = Entities.fetch_one(kwargs["entity"], request=Fetch.direct())
     if not isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)):
@@ -70,7 +99,7 @@ def historical_form_image(key, generation, asset_name, **kwargs):
     else:
         definition = entity.submission_definition
     if (
-        not definition.immutable or definition.error or not definition.content_available
+        definition.source is None or not definition.immutable or definition.error or not definition.content_available
         or generation != definition.generation
     ):
         abort(404)
@@ -82,7 +111,7 @@ def historical_form_image(key, generation, asset_name, **kwargs):
     ):
         abort(404)
     asset = definition.source.get_asset(name)
-    if not asset:
+    if not isinstance(asset, ImageAsset):
         abort(404)
     if request.method == "HEAD":
         return _asset_metadata_response(asset, asset.content_type)
@@ -101,8 +130,10 @@ def historical_form_image(key, generation, asset_name, **kwargs):
 # @pair html-field:html-fields
 @assets.route("<key>/form-html/<field_id>", methods=["PUT"])
 @permission(requested=Action.EDIT)
-def form_html(key, field_id, **kwargs):
-    entity = Entities.fetch_one(
+def form_html(
+    key: str, field_id: str, **kwargs: Unpack[EntityContext[models.Form]]
+) -> ResponseReturnValue:
+    entity = load_route_entity(
         kwargs["entity"],
         request=Fetch.direct(),
     )
@@ -118,12 +149,16 @@ def form_html(key, field_id, **kwargs):
 # @pair sync:document
 @assets.route("<key>/document/state", methods=["GET"])
 @permission(requested=Action.VIEW)
-def get_document_state(key, **kwargs):
-    entity = Entities.fetch_one(
+def get_document_state(
+    key: str, **kwargs: Unpack[EntityContext[models.Page | models.Project]]
+) -> ResponseReturnValue:
+    entity = load_route_entity(
         kwargs["entity"],
         request=Fetch.direct(),
     )
     state = entity.properties.document.state
+    if not isinstance(state, dict):
+        abort(404)
     return responses.shared_document(**state)
 
 
@@ -133,8 +168,13 @@ def get_document_state(key, **kwargs):
 # @matrix editor : image-generate-toggle image-upload
 @assets.route("<key>/document/image", methods=["POST"])
 @permission(requested=Action.EDIT)
-def add_document_image(key, **kwargs):
-    entity = Entities.fetch_one(
+def add_document_image(
+    key: str,
+    **kwargs: Unpack[
+        EntityContext[models.Form | models.Page | models.Project | models.Task]
+    ],
+) -> ResponseReturnValue:
+    entity = load_route_entity(
         kwargs["entity"],
         request=Fetch.direct(),
     )
@@ -177,9 +217,16 @@ def add_document_image(key, **kwargs):
     if field and isinstance(entity, Entities.FORM):
         url = entity.add_html_field_image(field, file, visibility)
     elif field:
-        url = entity.fields[field].add_image(file, visibility)
-    else:
+        if not isinstance(entity, (Entities.PAGE, Entities.TASK)):
+            return responses.error("field is unavailable")
+        image_field = entity.properties.submission.fields.get(field)
+        if not isinstance(image_field, HTML):
+            return responses.error("field is unavailable")
+        url = image_field.add_image(file, visibility)
+    elif isinstance(entity, (Entities.PAGE, Entities.PROJECT)):
         url = entity.properties.document.add_image(file, visibility)
+    else:
+        return responses.error("field is required")
 
     Entities.save(entity)
 
@@ -191,7 +238,7 @@ def add_document_image(key, **kwargs):
 # @reason route permission mirrors the final document image upload endpoint
 @assets.route("<key>/document/image/direct-upload", methods=["POST"])
 @permission(requested=Action.EDIT)
-def add_document_image_direct(key, **kwargs):
+def add_document_image_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     abort_public_user_action()
 
     return direct_uploads.direct_upload_response()
@@ -203,13 +250,16 @@ def add_document_image_direct(key, **kwargs):
 # @matrix ai : document-context generate-text live-provider page-context selected-text
 @assets.route("<key>/document/generate", methods=["POST"])
 @permission(requested=Action.EDIT)
-def generate_text(key, **kwargs):
+def generate_text(
+    key: str,
+    **kwargs: Unpack[EntityContext[models.Form | models.Page | models.Project]],
+) -> ResponseReturnValue:
     require_ai_access(AI.CREATE)
 
     if request.form.get("role") == "explain" or request.form.get("explain"):
         return responses.error("Initial Prompt is no longer available.")
 
-    entity = Entities.fetch_one(
+    entity = load_route_entity(
         kwargs["entity"],
         request=Fetch.direct(),
     )
@@ -218,16 +268,16 @@ def generate_text(key, **kwargs):
     field = request.values.get("field")
 
     try:
-        context_data = ai_text.document_generation_context(
+        context_data: dict[str, object] = dict(ai_text.document_generation_context(
             entity,
             user=current_user,
             field=field,
-        )
+        ))
     except exceptions.ValidationError as e:
         return responses.error(str(e))
 
-    if request.form.get("selected_text"):
-        context_data["selected_text"] = request.form.get("selected_text").strip()
+    if selected_text := request.form.get("selected_text"):
+        context_data["selected_text"] = selected_text.strip()
 
     prompt = ai_text.text_generation_prompt(user_prompt, context_data)
     try:
@@ -245,8 +295,10 @@ def generate_text(key, **kwargs):
 # @matrix editor : history-list history-pin history-restore
 @assets.route("<key>/document/history", methods=["GET"])
 @permission(requested=Action.VIEW)
-def list_document_history(key, **kwargs):
-    entity = Entities.fetch_one(
+def list_document_history(
+    key: str, **kwargs: Unpack[EntityContext[models.Page | models.Project]]
+) -> ResponseReturnValue:
+    entity = load_route_entity(
         kwargs["entity"],
         request=Fetch.direct(),
     )
@@ -266,23 +318,32 @@ def list_document_history(key, **kwargs):
 # @matrix editor : current-content history-pin validation
 @assets.route("<key>/document/history/pin", methods=["POST"])
 @permission(requested=Action.EDIT)
-def pin_document_history(key, **kwargs):
-    entity = Entities.fetch_one(
+def pin_document_history(
+    key: str, **kwargs: Unpack[EntityContext[models.Page | models.Project]]
+) -> ResponseReturnValue:
+    entity = load_route_entity(
         kwargs["entity"],
         request=Fetch.direct(),
     )
     payload = request.get_json(silent=True) or {}
     try:
         if payload.get("recovery_id"):
+            html = payload.get("html")
+            if not isinstance(html, str):
+                raise exceptions.ValidationError("Document content must be text")
             history = document_history.recovery_pin(
-                entity, current_user, name=payload.get("name"), html=payload.get("html"),
+                entity, authenticated_user(), name=payload.get("name") or "", html=html,
                 operation_id=payload["recovery_id"],
             )
         else:
             history = Entities.DOCUMENT_HISTORY.create(
                 entity, name=payload.get("name"), html=payload.get("html"),
             )
+            if history is None:
+                abort(404)
             Entities.save(history)
+        if history is None:
+            abort(404)
     except exceptions.ValidationError as error:
         return responses.error(str(error))
 
@@ -294,7 +355,9 @@ def pin_document_history(key, **kwargs):
 # @matrix editor document-history : backups permissions preview
 @assets.route("<key>/document/history/backups", methods=["GET"])
 @permission(requested=Action.VIEW, no_store=True)
-def list_document_backups(key, **kwargs):
+def list_document_backups(
+    key: str, **kwargs: Unpack[EntityContext[models.Page | models.Project]]
+) -> ResponseReturnValue:
     entity = Entities.fetch_one(kwargs["entity"], request=Fetch.direct())
     if not isinstance(entity, (Entities.PAGE, Entities.PROJECT)):
         abort(404)
@@ -309,7 +372,9 @@ def list_document_backups(key, **kwargs):
 # @matrix editor document-history : backups permissions preview
 @assets.route("<key>/document/history/backups/<token>", methods=["GET"])
 @permission(requested=Action.VIEW, no_store=True)
-def get_document_backup(key, token, **kwargs):
+def get_document_backup(
+    key: str, token: str, **kwargs: Unpack[EntityContext[models.Page | models.Project]]
+) -> ResponseReturnValue:
     from google.api_core.exceptions import NotFound
 
     entity = Entities.fetch_one(kwargs["entity"], request=Fetch.direct())
@@ -328,8 +393,10 @@ def get_document_backup(key, token, **kwargs):
 # @matrix editor : confirmation history-clear
 @assets.route("<key>/document/history/unpinned", methods=["GET", "DELETE"])
 @permission(requested=Action.EDIT)
-def unpinned_document_history(key, **kwargs):
-    entity = Entities.fetch_one(
+def unpinned_document_history(
+    key: str, **kwargs: Unpack[EntityContext[models.Page | models.Project]]
+) -> ResponseReturnValue:
+    entity = load_route_entity(
         kwargs["entity"],
         request=Fetch.direct(),
     )
@@ -353,15 +420,19 @@ def unpinned_document_history(key, **kwargs):
 # @matrix editor : history-restore parent-scope
 @assets.route("<key>/document/history/<history_key>", methods=["GET"])
 @permission(requested=Action.VIEW)
-def get_document_history(key, history_key, **kwargs):
-    entity = Entities.fetch_one(
+def get_document_history(
+    key: str,
+    history_key: str,
+    **kwargs: Unpack[EntityContext[models.Page | models.Project]],
+) -> ResponseReturnValue:
+    entity = load_route_entity(
         kwargs["entity"],
         request=Fetch.direct(),
     )
     history = Entities.fetch_one(history_key, request=Fetch.direct())
     if (
         not isinstance(history, Entities.DOCUMENT_HISTORY)
-        or history.key.parent != entity.key
+        or history.key is None or history.key.parent != entity.key
     ):
         abort(404)
 

@@ -1,3 +1,11 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask import Request
+    from flask.typing import ResponseReturnValue
+
 from flask import jsonify, make_response, request, session
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
@@ -25,7 +33,7 @@ from . import process
 # @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
 # @matrix deferred-jobs : cloud-tasks hosted-e2e oidc provider-delivery
-def authenticate_task(request):
+def authenticate_task(request: Request) -> dict[str, object] | None:
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         return None
@@ -69,7 +77,7 @@ def authenticate_task(request):
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
 # @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
 @process.route("/jobs", methods=["POST"])
-def deferred_job_process():
+def deferred_job_process() -> ResponseReturnValue:
     """Run one durable job; Cloud Tasks carries only its Datastore key."""
     payload = authenticate_task(request)
     if payload is None:
@@ -96,7 +104,7 @@ def deferred_job_process():
 # @reason requires Cloud Tasks OIDC authentication and delayed delivery
 # @matrix deferred-jobs notifications : feedback long-running
 @process.route("/jobs/feedback", methods=["POST"])
-def deferred_job_feedback():
+def deferred_job_feedback() -> ResponseReturnValue:
     """Publish a user-facing update if a deferred job is still active."""
     payload = authenticate_task(request)
     if payload is None:
@@ -116,7 +124,7 @@ def deferred_job_feedback():
 # @reason requires Cloud Scheduler OIDC authentication and production queue state
 # @matrix deferred-jobs : reconciliation recovery scheduler
 @process.route("/jobs/reconcile", methods=["POST"])
-def deferred_job_reconcile():
+def deferred_job_reconcile() -> ResponseReturnValue:
     """Recover stranded deferred work from durable dispatch metadata."""
     payload = authenticate_task(request)
     if payload is None:
@@ -131,7 +139,7 @@ def deferred_job_reconcile():
 # @reason requires Cloud Tasks OIDC authentication and SMTP provider delivery
 # @matrix notification-email : delayed-delivery process-route
 @process.route("/notification-email", methods=["POST"])
-def notification_email_delivery():
+def notification_email_delivery() -> ResponseReturnValue:
     """Deliver one opaque event-driven notification email task."""
     payload = authenticate_task(request)
     if payload is None:
@@ -159,22 +167,23 @@ def notification_email_delivery():
 # @pair task-scheduling:delivery-auth
 # @pairs task-completion:uncomplete task-scheduling:schedule-queue
 @process.route("/uncomplete-task", methods=["POST"])
-def uncomplete_task():
+def uncomplete_task() -> ResponseReturnValue:
     payload = authenticate_task(request)
     if payload is None:
         return make_response("Unauthorized", 401)
     allowed = {"key", "token"} if payload.get("token") else {"key", "next_due_date"}
-    if not payload.get("key") or not set(payload).issubset(allowed):
+    task_key = payload.get("key")
+    if not isinstance(task_key, str) or not task_key or not set(payload).issubset(allowed):
         return jsonify({"success": False, "error": "Invalid task payload."}), 400
 
     task = None
 
     try:
         task = Entities.fetch_one(
-            payload["key"],
+            task_key,
             request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
         )
-        if not task:
+        if not isinstance(task, Entities.TASK):
             return make_response("", 200)
         token = str(payload.get("token") or "")
         active_schedule = task.properties.schedule.active
@@ -223,7 +232,7 @@ def uncomplete_task():
 # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_save_persists_relations_process_payloads_and_cache
 # @pairs cache:redis-connection entities:save
 @process.route("/update-cache", methods=["POST"])
-def update_cache():
+def update_cache() -> ResponseReturnValue:
     payload = authenticate_task(request)
     if payload is None:
         return make_response("Unauthorized", 401)
@@ -232,15 +241,20 @@ def update_cache():
     ):
         return jsonify({"success": False, "error": "Invalid cache payload."}), 400
 
+    entity_key = payload.get("entity_key")
+    if not isinstance(entity_key, str):
+        return jsonify({"success": False, "error": "Invalid cache payload."}), 400
     user = None
     entity = None
 
     try:
         user = Entities.USER(payload.get("user_key"))
         entity = Entities.fetch_one(
-            payload.get("entity_key"),
+            entity_key,
             request=Fetch.direct(),
         )
+        if not isinstance(entity, (Entities.CATEGORY, Entities.PROJECT)):
+            raise ValueError("Invalid filter cache target.")
         filters.FilterCache(entity, user=user).update(queue=False)
     except Exception as e:
         exceptions.capture(
@@ -262,7 +276,7 @@ def update_cache():
 # @tests tests_unit/test_006b_ingress_entity.py::test_completed_ingress_shows_results
 # @pair ingress:row-results
 @process.route("/ingress", methods=["POST"])
-def ingress():
+def ingress() -> ResponseReturnValue:
     payload = authenticate_task(request)
     if payload is None:
         return make_response("Unauthorized", 401)
@@ -273,14 +287,19 @@ def ingress():
 
     session["timezone"] = payload.get("timezone", "UTC")
 
+    file_key = payload.get("key")
+    if not isinstance(file_key, str):
+        return jsonify({"success": False, "error": "Invalid ingress payload."}), 400
     file = None
     service = None
 
     try:
         file = Entities.fetch_one(
-            payload["key"],
+            file_key,
             request=Fetch.direct(),
         )
+        if not isinstance(file, Entities.INGRESS):
+            raise ValueError("Invalid import target.")
         service = IngressService(file)
         outcome = service.run_batch()
 
@@ -290,7 +309,7 @@ def ingress():
         if outcome.state == "completed":
             create_process_notification(
                 payload,
-                f"Data import complete for {service.entity.name}",
+                f"Data import complete for {file.name}",
             )
         elif outcome.dispatch_next:
             try:
@@ -307,7 +326,7 @@ def ingress():
                     context={
                         "operation": "ingress_followup_dispatch",
                         "payload": payload,
-                        "file": service.entity.db,
+                        "file": file.db,
                     },
                 )
                 return jsonify({"success": False, "retry": True}), 503
@@ -330,12 +349,21 @@ def ingress():
 # @tests tests_e2e/009_search/test_009e_form_restrictions.py::test_restriction_worker_retries_and_continues
 # @matrix permissions search : reconciliation queue retry continuation authentication
 @process.route("/reconcile-restrictions", methods=["POST"])
-def reconcile_restrictions():
+def reconcile_restrictions() -> ResponseReturnValue:
     from lagniappe.core.tools.cache.restrictions import reconcile_batch, enqueue
     payload = authenticate_task(request)
     if payload is None:
         return make_response("Unauthorized", 401)
-    if (not payload.get("source_key")
+    source_key = payload.get("source_key")
+    cursor = payload.get("cursor")
+    offset = payload.get("offset", 0)
+    revision = payload.get("revision")
+    owners = payload.get("owner_keys")
+    if (not isinstance(source_key, str) or not source_key
+            or (cursor is not None and not isinstance(cursor, str))
+            or not isinstance(offset, int)
+            or (revision is not None and not isinstance(revision, str))
+            or (owners is not None and not isinstance(owners, list))
             or not set(payload) <= {"source_key", "cursor", "offset", "revision", "owner_keys"}
             or ("revision" in payload and not isinstance(payload["revision"], str))
             or ("owner_keys" in payload and (
@@ -344,7 +372,7 @@ def reconcile_restrictions():
             ))):
         return jsonify({"success": False}), 400
     try:
-        remaining = reconcile_batch(**payload)
+        remaining = reconcile_batch(source_key, cursor, offset, revision, owners)
         if remaining:
             enqueue(remaining)
     except Exception as error:

@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 from types import SimpleNamespace
 
 from flask import request
@@ -9,6 +19,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.tools.ai.reporting.completion import files as report_files
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.web.auth import (
+    authenticated_user,
     abort_public_user_action,
     permission,
     require_ai_access,
@@ -31,7 +42,7 @@ from . import files
 # @matrix file : badges file-mobile file-upload linked-entities load page-upload pdf-preview pdf-toolbar preview reverse-links tabs text-asset text-tab
 @files.route("/<key>", methods=["GET"])
 @permission(Resource.FILE, Action.VIEW)
-def view(key, **kwargs):
+def view(key: str, **kwargs: Unpack[EntityContext[models.File]]) -> ResponseReturnValue:
     file = kwargs["entity"]
 
     return responses.file_page(file)
@@ -41,7 +52,7 @@ def view(key, **kwargs):
 # @covered-by lagniappe/web/responses.py::file_info
 @files.route("/<key>/info/replace", methods=["GET"])
 @permission(Resource.FILE, Action.VIEW)
-def info(key, **kwargs):
+def info(key: str, **kwargs: Unpack[EntityContext[models.File]]) -> ResponseReturnValue:
     return responses.file_info(kwargs["entity"])
 
 
@@ -52,7 +63,9 @@ def info(key, **kwargs):
 # @pair file:attached-pages
 @files.route("/<key>/download", methods=["GET"])
 @permission(Resource.FILE, Action.VIEW, no_store=True)
-def download(key, **kwargs):
+def download(
+    key: str, **kwargs: Unpack[EntityContext[models.File]]
+) -> ResponseReturnValue:
     entity = kwargs["entity"]
     if not isinstance(entity, Entities.FILE):
         return responses.not_found("File not found")
@@ -67,7 +80,9 @@ def download(key, **kwargs):
 # @matrix ingress pages : delete
 @files.route("/<key>/delete", methods=["DELETE"])
 @permission(Resource.FILE, Action.DELETE)
-def delete(key, **kwargs):
+def delete(
+    key: str, **kwargs: Unpack[EntityContext[models.File]]
+) -> ResponseReturnValue:
     abort_public_user_action()
 
     file = kwargs["entity"]
@@ -83,7 +98,9 @@ def delete(key, **kwargs):
 # @matrix file : add display-name extract info-update linked-pages reload remove summarize summary
 @files.route("/<key>/update", methods=["PUT"])
 @permission(Resource.FILE, Action.EDIT)
-def update(key, **kwargs):
+def update(
+    key: str, **kwargs: Unpack[EntityContext[models.File]]
+) -> ResponseReturnValue:
     abort_public_user_action()
 
     if (
@@ -98,7 +115,7 @@ def update(key, **kwargs):
     changed = False
     if request.form.get("owner-control"):
         try:
-            owner = SubmittedReferenceResolver(current_user, request.form.get("owner-key")).one(
+            owner = SubmittedReferenceResolver(authenticated_user(), request.form.get("owner-key")).one(
                 request.form.get("owner-key"), expected=(Entities.PAGE, Entities.TASK),
                 action=Action.EDIT, required=True,
             )
@@ -165,10 +182,13 @@ def _summarize_page_uploads(files):
 # @matrix file : html-preview text-asset
 @files.route("/<key>/html", methods=["GET"])
 @permission(Resource.FILE, Action.VIEW)
-def get_html(key, **kwargs):
+def get_html(
+    key: str, **kwargs: Unpack[EntityContext[models.File]]
+) -> ResponseReturnValue:
     file = kwargs["entity"]
 
-    return responses.document_html(file.properties.text.markup)
+    markup = file.properties.text.markup
+    return responses.document_html(markup if isinstance(markup, str) else None)
 
 
 # @testable true
@@ -182,7 +202,9 @@ def get_html(key, **kwargs):
 # @matrix file pages : file-upload multi-file page-upload submitted-reference
 @files.route("/<key>/upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
-def upload(key, **kwargs):
+def upload(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     abort_public_user_action()
 
     summarize_requested = request.form.get("summarize") is not None
@@ -200,22 +222,21 @@ def upload(key, **kwargs):
     if not uploads:
         return responses.error("No file uploaded")
 
-    if uploads:
-        multiple_uploads = len(uploads) > 1
-        batch_summarize = multiple_uploads and summarize_requested
-        uploaded_files = [
-            Entities.FILE().create(
-                page=page,
-                upload=upload,
-                data=_page_upload_data(
-                    upload,
-                    multiple_uploads=multiple_uploads,
-                    batch_summarize=batch_summarize,
-                ),
-            )
-            for upload in uploads
-        ]
-        _summarize_page_uploads(uploaded_files)
+    multiple_uploads = len(uploads) > 1
+    batch_summarize = multiple_uploads and summarize_requested
+    uploaded_files = [
+        Entities.FILE().create(
+            page=page,
+            upload=upload,
+            data=_page_upload_data(
+                upload,
+                multiple_uploads=multiple_uploads,
+                batch_summarize=batch_summarize,
+            ),
+        )
+        for upload in uploads
+    ]
+    _summarize_page_uploads(uploaded_files)
     Entities.save(*uploaded_files, page)
     for uploaded_file in uploaded_files:
         uploaded_file.dispatch_pending_processing(actor=current_user._get_current_object())
@@ -228,7 +249,7 @@ def upload(key, **kwargs):
 # @reason route permission mirrors the final upload endpoint
 @files.route("/<key>/upload/direct-upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
-def upload_direct(key, **kwargs):
+def upload_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     abort_public_user_action()
 
     return direct_uploads.direct_upload_response()

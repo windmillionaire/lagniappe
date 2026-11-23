@@ -1,5 +1,12 @@
 """Browser-session controls for the user's external-agent API credential."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import abort, g, request
 from flask_login import current_user
 
@@ -8,7 +15,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.tools.auth import agent_api
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
 from lagniappe.web import responses
-from lagniappe.web.auth import logged_in
+from lagniappe.web.auth import authenticated_user, logged_in
 
 from . import users
 
@@ -24,7 +31,7 @@ def _enabled_actor():
     ):
         abort(403)
     g.NO_CACHE = True
-    return current_user._get_current_object()
+    return authenticated_user()
 
 
 # @testable false
@@ -63,7 +70,7 @@ def _rotation_limit(actor):
 # @matrix agent-api user-settings : entitlement-independent expiry revoke rotate shown-once
 @users.route("/me/api-key", methods=["GET", "POST", "DELETE"])
 @logged_in
-def api_key():
+def api_key() -> ResponseReturnValue:
     """Inspect, rotate, or revoke the current user's single API credential."""
     actor = _enabled_actor()
     if request.method == "GET":

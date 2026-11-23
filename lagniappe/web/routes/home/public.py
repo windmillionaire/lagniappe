@@ -1,5 +1,12 @@
 """Anonymous directory and crawler discovery endpoints."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import Response, abort, make_response, redirect, render_template, url_for
 from flask_login import current_user
 
@@ -17,7 +24,7 @@ from . import home
 # @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_directory_lists_manual_in_collapsed_group
 # @matrix public-directory : anonymous-access collapsible empty-state login manual metadata page-cards redis-cache
 @home.route("/public/", methods=["GET"])
-def public_directory():
+def public_directory() -> ResponseReturnValue:
     snapshot = cache.cached_public_directory(
         public_pages.public_directory_snapshot
     )
@@ -62,7 +69,7 @@ def public_directory():
 # @matrix public-pages robots : disabled enabled
 # @matrix manual robots : disabled enabled fragment
 @home.route("/robots.txt", methods=["GET"])
-def robots():
+def robots() -> ResponseReturnValue:
     indexing = public_pages.runtime_settings()["PUBLIC_PAGE_INDEXING"]
     content = public_pages.robots_text(
         indexing,
@@ -78,7 +85,7 @@ def robots():
 # @matrix public-pages sitemap : disabled enabled redis-cache
 # @matrix manual sitemap : disabled enabled public-url
 @home.route("/sitemap.xml", methods=["GET"])
-def sitemap():
+def sitemap() -> ResponseReturnValue:
     snapshot = cache.cached_public_directory(
         public_pages.public_directory_snapshot
     )

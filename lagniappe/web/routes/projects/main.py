@@ -1,3 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+    from werkzeug.datastructures import MultiDict
+
 from flask import abort, request
 
 from lagniappe.core.entities import Entities
@@ -26,7 +37,9 @@ from . import projects
 # @matrix projects : document-tab load navigate permission-gates readonly
 @projects.route("/<key>", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
-def view(key, **kwargs):
+def view(
+    key: str, **kwargs: Unpack[EntityContext[models.Project]]
+) -> ResponseReturnValue:
     project = kwargs["entity"]
     if not isinstance(project, Entities.PROJECT):
         abort(404)
@@ -41,14 +54,16 @@ def view(key, **kwargs):
 # @matrix edited-entity-notice projects : dirty-state info-form no-reload replacement side-effect-free staged-reset timestamp-only
 @projects.route("/<key>/info/replace", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
-def info(key, **kwargs):
+def info(
+    key: str, **kwargs: Unpack[EntityContext[models.Project]]
+) -> ResponseReturnValue:
     return responses.project_info(kwargs["entity"])
 
 
 # @testable true
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
 # @matrix projects : create-manual
-def create_update_data(form):
+def create_update_data(form: MultiDict[str, str]) -> dict[str, str | None]:
     return {
         "name": form.get("name"),
         "description": form.get("description"),
@@ -60,7 +75,9 @@ def create_update_data(form):
 # @matrix projects : info-form update
 @projects.route("<key>/update", methods=["PUT"])
 @permission(Resource.PROJECT, Action.EDIT)
-def update(key, **kwargs):
+def update(
+    key: str, **kwargs: Unpack[EntityContext[models.Project]]
+) -> ResponseReturnValue:
     project = kwargs["entity"]
 
     update_data = create_update_data(request.form)
@@ -103,7 +120,7 @@ def _create_project(generated_data):
 # @matrix projects : ai-create create-manual
 @projects.route("/create", methods=["POST"])
 @permission(Resource.PROJECTS, Action.CREATE)
-def create():
+def create() -> ResponseReturnValue:
     generate = request.form.get("generate")
     if request.form.get("role") == "explain" or request.form.get("explain"):
         return responses.error("Initial Prompt is no longer available.")
@@ -120,7 +137,7 @@ def create():
         new_project = Entities.PROJECT.create(project_data)
         new_project.ai_generated = True
 
-        for model_task in project_data.get("model_tasks"):
+        for model_task in project_data.get("model_tasks") or []:
             new_model_task = Entities.MODEL_TASK.create(new_project, model_task)
             new_project.add_mutation_intents(
                 MutationIntent.standard(
@@ -158,7 +175,9 @@ def create():
 # @pair projects:delete
 @projects.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.PROJECT, Action.DELETE)
-def delete(key, **kwargs):
+def delete(
+    key: str, **kwargs: Unpack[EntityContext[models.Project]]
+) -> ResponseReturnValue:
     project = kwargs["entity"]
     if not project:
         return responses.not_found("project not found")

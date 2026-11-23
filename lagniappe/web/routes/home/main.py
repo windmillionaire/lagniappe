@@ -1,3 +1,10 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import abort, request, g, make_response
 
 from flask_login import current_user
@@ -14,7 +21,7 @@ from lagniappe.core.tools.polling.projections import (
     render_operation_statuses,
 )
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
-from lagniappe.web.auth import home_permission, logged_in
+from lagniappe.web.auth import authenticated_user, home_permission, logged_in
 from lagniappe.web import responses
 
 from . import home, internal
@@ -25,7 +32,7 @@ from . import home, internal
 # @matrix home : layout load mobile
 @home.route("/")
 @home_permission(anonymous_endpoint="home.public_directory")
-def home_page():
+def home_page() -> ResponseReturnValue:
     home = Entities.HOME(user=current_user._get_current_object())
     return responses.home_page(home)
 
@@ -39,7 +46,7 @@ def home_page():
 # @pair ai-report:provider-independent-history
 @internal.route("/get/<kind>")
 @home_permission()
-def get(kind):
+def get(kind: str) -> ResponseReturnValue:
     if kind == "tools" and getattr(current_user, "is_public", False):
         abort(403)
     home = Entities.HOME(user=current_user._get_current_object())
@@ -64,7 +71,7 @@ def get(kind):
 # @matrix notes : cached-response load notes-only
 @internal.route("/activity")
 @home_permission()
-def activity():
+def activity() -> ResponseReturnValue:
     home = Entities.HOME(user=current_user._get_current_object())
     return responses.activity(home.section("notes"))
 
@@ -78,20 +85,20 @@ def activity():
 # @pair notifications:assignee-target
 @internal.route("/notifications")
 @logged_in
-def notifications():
+def notifications() -> ResponseReturnValue:
     page = database_notifications.notifications_page(
-        current_user,
+        authenticated_user(),
         start_cursor=request.args.get("cursor"),
         limit=25,
     )
     notification_keys = [row.key for row in page]
     aggregate = database_notifications.repair_notification_aggregate(
-        current_user,
+        authenticated_user(),
     )
 
     try:
         state = cache.seed_notification_state(
-            current_user,
+            authenticated_user(),
             notification_keys=notification_keys,
             aggregate_loader=lambda _user: aggregate,
             repair=True,
@@ -113,7 +120,7 @@ def notifications():
         notifications,
         aggregate=aggregate_counts(aggregate),
         cursor=page.next_cursor,
-        can_message=collaboration.can_initiate_messages(current_user),
+        can_message=collaboration.can_initiate_messages(authenticated_user()),
     )
 
 
@@ -122,10 +129,10 @@ def notifications():
 # @matrix notifications : clear-all ownership
 @internal.route("/notifications", methods=["DELETE"])
 @logged_in
-def clear_notifications():
-    notification_keys = database_notifications.notification_keys(current_user)
+def clear_notifications() -> ResponseReturnValue:
+    notification_keys = database_notifications.notification_keys(authenticated_user())
     notification_service.clear_ordinary_notifications(current_user, notification_keys)
-    aggregate = database_notifications.get_notification_aggregate(current_user)
+    aggregate = database_notifications.get_notification_aggregate(authenticated_user())
     notification_service.publish_notification_aggregate(current_user, aggregate)
 
     return responses.ok()
@@ -139,7 +146,7 @@ def clear_notifications():
 # @pair permissions:owner-only-shared
 @internal.route("/activity/notes", methods=["POST"])
 @logged_in
-def create_note():
+def create_note() -> ResponseReturnValue:
     body = (request.form.get("body") or "").strip()
     photo = request.files.get("note-file")
     has_photo = bool(photo and getattr(photo, "filename", None))
@@ -172,9 +179,9 @@ def create_note():
 # @matrix activity notes notifications : delete ownership
 @internal.route("/activity/<key>", methods=["DELETE"])
 @logged_in
-def delete_activity(key):
+def delete_activity(key: str) -> ResponseReturnValue:
     activity = Entities.fetch_one(key, request=Fetch.direct())
-    if not activity or activity.kind not in ("note", "notification"):
+    if not isinstance(activity, (Entities.NOTE, Entities.NOTIFICATION)):
         return responses.not_found("Activity item not found")
 
     if activity.kind == "note" and not activity.allowed(
@@ -189,7 +196,7 @@ def delete_activity(key):
         if activity.notification_type != "ordinary":
             abort(403)
         notification_service.delete_ordinary_notification(current_user, activity.key)
-        aggregate = database_notifications.get_notification_aggregate(current_user)
+        aggregate = database_notifications.get_notification_aggregate(authenticated_user())
         notification_service.publish_notification_aggregate(current_user, aggregate)
     else:
         Entities.delete(activity)
@@ -206,7 +213,7 @@ def delete_activity(key):
 # @matrix starred : add-authorization category file missing-target no-mutation page project unavailable-removal
 @internal.route("/toggle-star/<key>", methods=["PATCH"])
 @logged_in
-def toggle_star(key):
+def toggle_star(key: str) -> ResponseReturnValue:
     """Toggle starred status for an entity.
 
     Removing a stored key mutates only the authenticated user's own starred

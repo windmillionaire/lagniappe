@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 import json
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -31,6 +41,7 @@ from lagniappe.core.tools.site.cache_rebuild import rebuild_application_cache
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
 from lagniappe.web.auth import (
+    authenticated_user,
     clear_client_cache_invalidation,
     logged_in,
     owner_only,
@@ -82,7 +93,7 @@ def _administrator_payload():
     # @reason private roster row formatting is exercised through the payload owner
     def role_entry(user, *, primary_owner=False):
         last_login = user.last_login if user else None
-        if hasattr(last_login, "isoformat"):
+        if last_login is not None and hasattr(last_login, "isoformat"):
             last_login = last_login.isoformat()
         return {
             "key": user.urlsafe_key if user else None,
@@ -206,7 +217,7 @@ def _role_target(identifier):
 # @pair entities:delete
 @internal.route("/delete/<key>", methods=["GET"])
 @permission(requested=Action.DELETE)
-def delete(key, **kwargs):
+def delete(key: str, **kwargs: Unpack[EntityContext[Entity]]) -> ResponseReturnValue:
     entity = Entities.fetch_one(
         kwargs["entity"],
         request=Fetch.direct(),
@@ -221,7 +232,7 @@ def delete(key, **kwargs):
 # @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
 # @pair offline:indicator
 @home.route("/offline", methods=["GET"])
-def offline():
+def offline() -> ResponseReturnValue:
     g.NO_CACHE = True
     return responses.offline()
 
@@ -232,7 +243,7 @@ def offline():
 # @matrix cache : current redis-connection
 @internal.route("/rebuild-cache", methods=["POST"])
 @permission(Resource.SITE)
-def rebuild_cache():
+def rebuild_cache() -> ResponseReturnValue:
     result = rebuild_application_cache()
     if not result.rebuilt:
         return responses.json_response(
@@ -247,7 +258,7 @@ def rebuild_cache():
 # @matrix admin : site-update success
 @internal.route("/site-update", methods=["POST"])
 @permission(Resource.SITE)
-def site_update():
+def site_update() -> ResponseReturnValue:
     migration_status = run_site_updates()
     status = 200 if migration_status["status"] == "current" else 409
     return responses.json_response(
@@ -264,7 +275,7 @@ def site_update():
 # @matrix admin owner : admin-only identity-metadata public-preview site-settings
 @internal.route("/site-settings", methods=["GET"])
 @permission(Resource.SITE, no_store=True)
-def site_settings():
+def site_settings() -> ResponseReturnValue:
     project_id = CONFIG.GOOGLE_CLOUD_PROJECT
     google_console_url = "https://console.cloud.google.com"
 
@@ -385,7 +396,7 @@ def site_settings():
 # @pairs admin:promotion cache:cache-invalidation cache:invalidation-acknowledgement owner:owner-only
 @internal.route("/site-administrators", methods=["POST"])
 @owner_only
-def promote_site_administrator():
+def promote_site_administrator() -> ResponseReturnValue:
     data = request.form if request.form else request.get_json(silent=True) or {}
     identifier = str(data.get("user_key") or data.get("key") or "").strip()
     if not identifier:
@@ -411,7 +422,7 @@ def promote_site_administrator():
 # @pairs cache:cache-invalidation cache:invalidation-acknowledgement owner:owner-only
 @internal.route("/site-administrators/<key>", methods=["GET", "DELETE"])
 @owner_only
-def demote_site_administrator(key):
+def demote_site_administrator(key: str) -> ResponseReturnValue:
     target = _role_target(key)
     if request.method == "GET":
         return render_template(
@@ -437,7 +448,7 @@ def demote_site_administrator(key):
 # @matrix admin : deployment-settings metadata validation
 @internal.route("/set-deployment-settings", methods=["POST"])
 @permission(Resource.SITE)
-def set_deployment_settings():
+def set_deployment_settings() -> ResponseReturnValue:
     data = request.form if request.form else request.get_json(silent=True) or {}
 
     try:
@@ -454,7 +465,7 @@ def set_deployment_settings():
 # @matrix admin : ai-settings validation
 @internal.route("/set-ai-settings", methods=["POST"])
 @permission(Resource.SITE)
-def set_ai_settings():
+def set_ai_settings() -> ResponseReturnValue:
     if not CONFIG.AI_ENABLED:
         abort(403)
     data = request.form if request.form else request.get_json(silent=True) or {}
@@ -488,7 +499,7 @@ def set_ai_settings():
 # @matrix admin public-pages : live-settings sitemap-invalidation validation
 @internal.route("/site-settings/public-pages", methods=["GET", "POST"])
 @permission(Resource.SITE, no_store=True)
-def set_public_page_settings():
+def set_public_page_settings() -> ResponseReturnValue:
     current = public_page_service.runtime_settings(config=CONFIG)
     if request.method == "GET":
         return responses.json_response({"public_pages": current})
@@ -514,7 +525,7 @@ def set_public_page_settings():
 # @pair admin:site-settings
 @internal.route("/site-configuration", methods=["GET"])
 @owner_only
-def site_configuration():
+def site_configuration() -> ResponseReturnValue:
     g.NO_CACHE = True
     return responses.site_configuration(read_saved_app_settings())
 
@@ -524,7 +535,7 @@ def site_configuration():
 # @matrix admin : generated-images metadata public-preview site-image-upload
 @internal.route("/set-site-image", methods=["POST"])
 @permission(Resource.SITE)
-def set_site_image():
+def set_site_image() -> ResponseReturnValue:
     uploaded_file = (
         [f for f in request.files.values() if f.filename][0] if request.files else None
     )
@@ -547,7 +558,7 @@ def set_site_image():
 # @reason route permission mirrors the final site image upload endpoint
 @internal.route("/set-site-image/direct-upload", methods=["POST"])
 @permission(Resource.SITE)
-def set_site_image_direct():
+def set_site_image_direct() -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
@@ -559,7 +570,7 @@ def set_site_image_direct():
 # @matrix notifications : ping redis-projection
 # @pairs offline:server-health server:initialization web-headers:notification-state
 @internal.route("/ping")
-def ping():
+def ping() -> ResponseReturnValue:
     g.NO_CACHE = True
     user_key = session.get(CONFIG.LOGIN_USER_KEY) if session.get("_user_id") else None
     if user_key:
@@ -576,7 +587,7 @@ def ping():
 # @tests tests_e2e/001_site/test_001a_environment.py::test_privacy_policy_is_public
 # @matrix privacy public-pages : anonymous-access document-load
 @home.route("/privacy-policy", methods=["GET"])
-def privacy_policy():
+def privacy_policy() -> ResponseReturnValue:
     return responses.privacy_policy()
 
 
@@ -584,7 +595,7 @@ def privacy_policy():
 # @tests tests_e2e/001_site/test_001a_environment.py::test_reporting_privacy_notice_is_public
 # @matrix error-reporting privacy public-pages : anonymous-access document-load maintainer-destination
 @home.route("/reporting_privacy", methods=["GET"])
-def reporting_privacy():
+def reporting_privacy() -> ResponseReturnValue:
     return responses.reporting_privacy()
 
 
@@ -592,7 +603,7 @@ def reporting_privacy():
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
 # @pair login:remember-cookie
 @internal.route("/token")
-def refresh_token():
+def refresh_token() -> ResponseReturnValue:
     g.NO_CACHE = True
     return generate_csrf()
 
@@ -601,7 +612,7 @@ def refresh_token():
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_page_loads
 # @matrix login : form-state page-load
 @internal.route("/identity-config")
-def identity_config():
+def identity_config() -> ResponseReturnValue:
     g.NO_CACHE = True
     return responses.json_response(getattr(CONFIG, "IDENTITY_PLATFORM_CONFIG", {}))
 
@@ -615,7 +626,7 @@ def identity_config():
 # @pair login:remember-cookie
 @internal.route("/update-session", methods=["POST"])
 @logged_in
-def update_session():
+def update_session() -> ResponseReturnValue:
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return responses.error("Invalid session update.")
@@ -648,7 +659,7 @@ def update_session():
 
     if save_user:
         # Startup requests may hold a snapshot from before a permission edit.
-        Entities.save_root(current_user, property_mask=("timezone",))
+        Entities.save_root(authenticated_user(), property_mask=("timezone",))
 
     return responses.json_response({"userHash": current_user.hash})
 
@@ -667,7 +678,7 @@ def update_session():
 # @pair cache:invalidation-acknowledgement
 @internal.route("/validate-user", methods=["POST"])
 @logged_in
-def validate_user():
+def validate_user() -> ResponseReturnValue:
     data = request.get_json(silent=True) or {}
     cache_cleared = (
         data.get("cacheCleared") is True and data.get("responseCacheCleared") is True

@@ -1,5 +1,12 @@
 """Authenticated Markdown rendering endpoint."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import request
 
 from lagniappe.core.tools.files.html import render_markdown
@@ -16,7 +23,7 @@ from . import internal
 # @matrix editor markdown : conversion paste
 @internal.route("/markdown", methods=["POST"])
 @logged_in
-def markdown():
+def markdown() -> ResponseReturnValue:
     """Render a plain Markdown string into sanitized editor-compatible HTML."""
     payload = request.get_json(silent=True) or {}
     source = payload.get("markdown")

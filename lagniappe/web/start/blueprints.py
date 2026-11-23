@@ -1,6 +1,18 @@
 """Register route blueprints and apply the explicit CSRF exemption policy."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Mapping
+    from flask import Flask
+    from flask.typing import ResponseReturnValue
+    from flask_wtf.csrf import CSRFProtect
+    from lagniappe import Config
+
 from dataclasses import dataclass
+from flask import Blueprint
 
 
 # @testable infrastructure
@@ -210,14 +222,14 @@ def _validate_policy(registrations, exemptions):
 # @matrix csrf web-startup : blueprint-registration exemption-policy validation
 # @pair csrf:route-gate
 def apply_blueprint_policy(
-    app,
-    csrf,
-    bindings,
-    runtime_config,
+    app: Flask,
+    csrf: CSRFProtect,
+    bindings: Mapping[str, Blueprint | Callable[..., ResponseReturnValue]],
+    runtime_config: Config,
     *,
-    registrations=BLUEPRINT_REGISTRATIONS,
-    exemptions=CSRF_EXEMPTIONS,
-):
+    registrations: Iterable[BlueprintRegistration] = BLUEPRINT_REGISTRATIONS,
+    exemptions: Iterable[CSRFExemption] = CSRF_EXEMPTIONS,
+) -> None:
     """Register enabled blueprints and apply only declared CSRF exemptions."""
     registrations = tuple(registrations)
     exemptions = tuple(exemptions)
@@ -240,7 +252,10 @@ def apply_blueprint_policy(
         options = {}
         if registration.url_prefix is not None:
             options["url_prefix"] = registration.url_prefix
-        app.register_blueprint(bindings[registration.binding], **options)
+        registered = bindings[registration.binding]
+        if callable(registered):
+            raise RuntimeError(f"Invalid blueprint binding: {registration.binding}")
+        app.register_blueprint(registered, **options)
 
     resolved_exemptions = []
     for exemption in exemptions:
@@ -265,7 +280,15 @@ def apply_blueprint_policy(
 # @testable true
 # @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_blueprint_registration_and_csrf_exemption_policy
 # @matrix web-startup : blueprint-registration
-def initialize(app, csrf, *, binding_factory=_resolve_bindings, runtime_config=None):
+def initialize(
+    app: Flask,
+    csrf: CSRFProtect,
+    *,
+    binding_factory: Callable[
+        [Config], Mapping[str, Blueprint | Callable[..., ResponseReturnValue]]
+    ] = _resolve_bindings,
+    runtime_config: Config | None = None,
+) -> None:
     """Resolve production bindings and apply registration/security policy."""
     if runtime_config is None:
         from lagniappe import CONFIG

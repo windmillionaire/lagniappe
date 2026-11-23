@@ -1,9 +1,16 @@
 """Initialize services on the process-global Flask application."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask import Flask
+    from flask_wtf.csrf import CSRFProtect
 
 # @testable false
 # @reason Flask app startup is exercised through E2E app boot; unit coverage would require broad Flask/import scaffolding
-def initialize_app(app, csrf):
+def initialize_app(app: Flask, csrf: CSRFProtect) -> None:
     """Initialize persistence, AI, entities, templates, errors, routes, and login."""
     from lagniappe.core.tools import ai, cache
     from lagniappe.core.tools.database import utility as database_utility

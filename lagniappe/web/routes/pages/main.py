@@ -1,9 +1,21 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 from flask import Response, abort, g, request
 from flask_login import current_user
 
 from lagniappe.core import exceptions
 from lagniappe.core.exceptions import ValidationError
+from lagniappe.core.properties.base_property import Property
 from lagniappe.core.entities import Entities
+from lagniappe.core.definitions.asset import ImageAsset
 from lagniappe.core.definitions import (
     AI,
     FileConsumerLimitError,
@@ -19,6 +31,7 @@ from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_con
 from lagniappe.core.tools.forms import review as form_review
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.web.auth import (
+    authenticated_user,
     abort_public_user_action,
     logged_in,
     permission,
@@ -87,7 +100,7 @@ def _user_settings_fingerprint(page, user):
 # @matrix pages : access-restrictions source-summary
 @pages.route("<key>", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW, fingerprint=_page_view_fingerprint)
-def view(key, **kwargs):
+def view(key: str, **kwargs: Unpack[EntityContext[models.Page]]) -> ResponseReturnValue:
     page = _load_page_settings_relations(
         kwargs["entity"],
         restrictions=Resource.USER.allowed(Action.PERMISSIONS),
@@ -101,7 +114,7 @@ def view(key, **kwargs):
 # @matrix ai : autofill completion-refresh deferred
 @pages.route("<key>/info/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
-def info(key, **kwargs):
+def info(key: str, **kwargs: Unpack[EntityContext[models.Page]]) -> ResponseReturnValue:
     page = kwargs["entity"]
     return responses.page_info(page)
 
@@ -110,7 +123,9 @@ def info(key, **kwargs):
 # @covered-by lagniappe/web/responses.py::user_settings
 @pages.route("<key>/user-settings/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW, fingerprint=_user_settings_fingerprint)
-def user_settings(key, **kwargs):
+def user_settings(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
     is_own_page = getattr(getattr(current_user, "page", None), "key", None) == page.key
     if not page.user or not (is_own_page or Resource.USER.allowed(Action.PERMISSIONS)):
@@ -125,7 +140,9 @@ def user_settings(key, **kwargs):
 # @covered-by lagniappe/web/responses.py::page_permissions
 @pages.route("<key>/permissions/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.PERMISSIONS)
-def permissions(key, **kwargs):
+def permissions(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = _load_page_settings_relations(kwargs["entity"], restrictions=True)
     return responses.page_permissions(page)
 
@@ -134,7 +151,9 @@ def permissions(key, **kwargs):
 # @covered-by lagniappe/web/responses.py::page_document_settings
 @pages.route("<key>/document-settings/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.PUBLISH)
-def document_settings(key, **kwargs):
+def document_settings(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     return responses.page_document_settings(kwargs["entity"])
 
 
@@ -149,11 +168,13 @@ def document_settings(key, **kwargs):
     fingerprint=deferred_autofill.page_tasks_fingerprint,
     context_keys=experiments.task_list_context_keys,
 )
-def tasks(key, **kwargs):
+def tasks(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
     if not g.get("task_list_prepared"):
         # Range/login invalidation may require a body after a matching ETag.
-        deferred_autofill.prepare_form_states(page.tasks, current_user)
+        deferred_autofill.prepare_form_states(page.tasks, authenticated_user())
     response = responses.page_tasks(page)
     deferred_autofill.finish_task_list_validation(page)
     return response
@@ -164,7 +185,9 @@ def tasks(key, **kwargs):
 # @matrix files : async-load empty-state permission-gates readonly
 @pages.route("<key>/files", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
-def files(key, **kwargs):
+def files(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
     if _is_public_users_own_page(page):
         abort_public_user_action()
@@ -194,7 +217,7 @@ def _page_data(form, page=None, category=None):
     category_keys = form.getlist("category")
     form_key = form.get("form")
     resolver = SubmittedReferenceResolver(
-        current_user,
+        authenticated_user(),
         *category_keys,
         form_key,
     )
@@ -318,14 +341,16 @@ def _is_offline_replay(form):
 # @matrix user-settings : restrictions submit-boundary
 @pages.route("<key>/update", methods=["PUT", "GET"])
 @permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
-def update(key, **kwargs):
+def update(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
 
     if request.method == "GET":
         if request.values.get("form"):
             try:
                 page.form = SubmittedReferenceResolver(
-                    current_user,
+                    authenticated_user(),
                     request.values.get("form"),
                 ).one(
                     request.values.get("form"),
@@ -356,7 +381,8 @@ def update(key, **kwargs):
             "The autofill attachment was not uploaded. Try attaching it again."
         )
 
-    old_image = page.image.path if page.image else None
+    image = page.get_asset("image")
+    old_image = image.path if image else None
 
     try:
         page_data = _page_data(request.form, page=page)
@@ -403,7 +429,7 @@ def update(key, **kwargs):
         return responses.entity_response(
             deferred_autofill.start_deferred_autofill(
                 page,
-                current_user,
+                authenticated_user(),
                 request.form,
                 multipart_file=bool(request.files.get("autofill-file")),
                 submission=draft["values"] if draft else None,
@@ -422,9 +448,9 @@ def update(key, **kwargs):
     staged_file = None
     try:
         staged_file, staged_cleanup = deferred_autofill.staged_upload_for_update(
-            page, current_user, request.form,
+            page, authenticated_user(), request.form,
         )
-        form_review.acknowledge_reviews(page, current_user, request.form.getlist("reviewed-operation"))
+        form_review.acknowledge_reviews(page, authenticated_user(), request.form.getlist("reviewed-operation"))
         if staged_file:
             Entities.save(staged_file, page)
         else:
@@ -445,7 +471,8 @@ def update(key, **kwargs):
             page,
         )
 
-    new_image = page.image.path if page.image else None
+    image = page.get_asset("image")
+    new_image = image.path if image else None
 
     if old_image != new_image:
         return responses.json_response({"reload": True})
@@ -458,7 +485,9 @@ def update(key, **kwargs):
 # @reason route permission mirrors page update for autofill uploads
 @pages.route("<key>/update/direct-upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
-def update_direct(key, **kwargs):
+def update_direct(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     upload_data = request.get_json(silent=True) or request.form
     if upload_data.get("input_name") == "autofill-file":
         require_ai_access(AI.CREATE)
@@ -473,7 +502,9 @@ def update_direct(key, **kwargs):
 # @matrix category-index : editable-cell quick-edit
 @pages.route("<key>/patch", methods=["PATCH"])
 @permission(Resource.PAGE, Action.EDIT)
-def patch(key, **kwargs):
+def patch(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
 
     patch_data = request.json
@@ -490,7 +521,7 @@ def patch(key, **kwargs):
 
     if schema_id in page.properties:
         field = page.properties[schema_id]
-        if not field.editable:
+        if not isinstance(field, Property) or not field.editable:
             return responses.error("Field cannot be edited")
         field.value = value
     else:
@@ -526,7 +557,9 @@ def patch(key, **kwargs):
 # @pair deferred-jobs:hosted-e2e
 @pages.route("<key>/create", methods=["POST"])
 @permission(Resource.CATEGORY, Action.EDIT)
-def create(key, **kwargs):
+def create(
+    key: str, **kwargs: Unpack[EntityContext[models.Category]]
+) -> ResponseReturnValue:
     """Create a page within a category. Key is the category key, not a page key."""
     category = kwargs["entity"]
 
@@ -558,7 +591,7 @@ def create(key, **kwargs):
         page.save()
         deferred_response = deferred_autofill.start_deferred_autofill(
             page,
-            current_user,
+            authenticated_user(),
             request.form,
             multipart_file=bool(request.files.get("autofill-file")),
             key=category.urlsafe_key,
@@ -591,7 +624,7 @@ def create(key, **kwargs):
 # @reason route permission mirrors page create for upload-backed form data
 @pages.route("<key>/create/direct-upload", methods=["POST"])
 @permission(Resource.CATEGORY, Action.EDIT)
-def create_direct(key, **kwargs):
+def create_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     upload_data = request.get_json(silent=True) or request.form
     if upload_data.get("input_name") == "autofill-file":
         require_ai_access(AI.CREATE)
@@ -603,7 +636,7 @@ def create_direct(key, **kwargs):
 # @matrix home pages : category-select create default-category
 @pages.route("create", methods=["POST"])
 @logged_in
-def create_from_home():
+def create_from_home() -> ResponseReturnValue:
     """Create a page from the homepage, using a selected or default category."""
     if not current_user.properties.restrictions.category_edit_restrictions:
         abort(403)
@@ -652,7 +685,9 @@ def create_from_home():
 # @pair entities:delete
 @pages.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.PAGE, Action.DELETE)
-def delete(key, **kwargs):
+def delete(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
     if not page:
         return responses.error("page not found")
@@ -684,7 +719,9 @@ def delete(key, **kwargs):
 # @pair public-directory:category
 @pages.route("<key>/visibility", methods=["PUT"])
 @permission(Resource.PAGE, Action.PUBLISH)
-def visibility(key, **kwargs):
+def visibility(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
 
     page.is_public = request.form.get("visibility") == "public"
@@ -725,11 +762,11 @@ def visibility(key, **kwargs):
 # @matrix page : public public-user
 # @pair pages:public-document
 @pages.route("public/<public_id>", methods=["GET"])
-def public(public_id):
+def public(public_id: str) -> ResponseReturnValue:
     public_pages = Entities.fetch(
         *database_get.public_pages(public_id), request=Fetch.root()
     )
-    page = next((page for page in public_pages if page.is_public), None)
+    page = next((page for page in public_pages if isinstance(page, Entities.PAGE) and page.is_public), None)
 
     if not page:
         abort(404)
@@ -741,12 +778,12 @@ def public(public_id):
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
 # @matrix public-pages : document-image public-route revocation
 @pages.route("public/<public_id>/images/<asset_name>", methods=["GET", "HEAD"])
-def public_image(public_id, asset_name):
+def public_image(public_id: str, asset_name: str) -> ResponseReturnValue:
     candidates = Entities.fetch(
         *database_get.public_pages(public_id),
         request=Fetch.root(),
     )
-    page = next((candidate for candidate in candidates if candidate.is_public), None)
+    page = next((candidate for candidate in candidates if isinstance(candidate, Entities.PAGE) and candidate.is_public), None)
     if not page:
         abort(404)
 
@@ -757,7 +794,7 @@ def public_image(public_id, asset_name):
     if asset_key not in referenced:
         abort(404)
     asset = page.get_asset(asset_key)
-    if not asset:
+    if not isinstance(asset, ImageAsset):
         abort(404)
 
     g.NO_CACHE = True
@@ -779,7 +816,7 @@ def public_image(public_id, asset_name):
 def _apply_page_access_restrictions(page, form):
     admin_only = form.get("admin") in {"on", "true"}
     keys = [] if admin_only else form.getlist("group-key")
-    groups = SubmittedReferenceResolver(current_user, *keys).many(
+    groups = SubmittedReferenceResolver(authenticated_user(), *keys).many(
         keys, expected=Entities.USER_GROUP, action=Action.VIEW
     )
     page.groups = groups
@@ -792,7 +829,9 @@ def _apply_page_access_restrictions(page, form):
 # @reason endpoint coordinates page access requests while focused helpers own response and mutation behavior
 @pages.route("<key>/view-access", methods=["GET", "PUT"])
 @permission(Resource.PAGE, Action.PERMISSIONS)
-def view_access(key, **kwargs):
+def view_access(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
 
     if request.method == "PUT":

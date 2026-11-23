@@ -1,12 +1,19 @@
 """Jinja template filters for text, date, time, phone, and number formatting."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from datetime import date, datetime, time
+
 from lagniappe.core.tools.files.html import render_markdown, strip_tags
 
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_snippets_are_plain_text_and_at_most_five_lines
 # @pair ai-report:list-snippets
-def format_markdown_text(value):
+def format_markdown_text(value: str) -> str:
     """Flatten Markdown into escaped-by-Jinja text for compact previews."""
     return strip_tags(render_markdown(value))
 
@@ -14,7 +21,7 @@ def format_markdown_text(value):
 # @testable true
 # @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_basic_input_submission
 # @matrix template-formatting : date time
-def format_datetime(value):
+def format_datetime(value: datetime | str | None) -> str:
     if not value:
         return ""
     elif isinstance(value, str):
@@ -26,7 +33,7 @@ def format_datetime(value):
 # @testable true
 # @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_basic_input_submission
 # @pair template-formatting:date
-def format_date(value):
+def format_date(value: date | str | None) -> str:
     if not value:
         return ""
     elif isinstance(value, str):
@@ -38,7 +45,7 @@ def format_date(value):
 # @testable true
 # @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_basic_input_submission
 # @pair template-formatting:time
-def format_time(value):
+def format_time(value: datetime | time | str | None) -> str:
     if not value:
         return ""
     elif isinstance(value, str):
@@ -50,7 +57,7 @@ def format_time(value):
 # @testable true
 # @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_basic_input_submission
 # @pair template-formatting:phone
-def format_phone(value):
+def format_phone(value: str | None) -> str:
     if not value:
         return ""
 
@@ -67,7 +74,7 @@ def format_phone(value):
 # @testable true
 # @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_basic_input_submission
 # @pair template-formatting:number
-def format_number(value):
+def format_number(value: object) -> str:
     if value is None or value == "":
         return ""
 

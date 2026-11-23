@@ -1,3 +1,11 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+
 from collections import Counter, defaultdict
 from datetime import datetime, time, timedelta, UTC
 
@@ -103,14 +111,14 @@ def _no_cache():
 # @testable false
 # @covered-by lagniappe/web/routes/analytics/main.py::track
 # @reason analytics is intentionally route-local and covered through the owner dashboard workflow
-def enabled():
+def enabled() -> bool:
     return bool(getattr(CONFIG, "ANALYTICS", False))
 
 
 # @testable false
 # @covered-by lagniappe/web/routes/analytics/main.py::index
 # @reason AI observability enablement is exercised through independent dashboard gates
-def ai_enabled():
+def ai_enabled() -> bool:
     return bool(getattr(CONFIG, "AI_OBSERVABILITY", False))
 
 
@@ -266,7 +274,7 @@ def _save_event(data):
 # @testable false
 # @covered-by lagniappe/web/routes/analytics/main.py::_save_event
 # @reason login events are a dashboard analytics signal and intentionally share route-local persistence
-def record_login(user, provider=None):
+def record_login(user: models.User, provider: str | None = None) -> None:
     if not enabled() or not user:
         return
 
@@ -444,7 +452,7 @@ def _dashboard(events):
 # @pair deferred-jobs:diagnostics
 @analytics.route("/", methods=["GET"])
 @permission(Resource.SITE, Action.EDIT)
-def index():
+def index() -> ResponseReturnValue:
     analytics_enabled = enabled()
     ai_observability_enabled = ai_enabled()
     if not analytics_enabled and not ai_observability_enabled:
@@ -520,7 +528,7 @@ def index():
 # @pairs ai-observability:job-correlation deferred-jobs:diagnostics
 @analytics.route("/ai/operations/<job_id>.json", methods=["GET"])
 @permission(Resource.SITE, Action.EDIT)
-def operation_diagnostic(job_id):
+def operation_diagnostic(job_id: str) -> ResponseReturnValue:
     """Return one transferable, privacy-bounded job/provider snapshot."""
     if not ai_enabled():
         abort(404)
@@ -537,7 +545,7 @@ def operation_diagnostic(job_id):
 # @matrix analytics : accordion dashboard
 @analytics.route("/events/<prefix>", methods=["GET"])
 @permission(Resource.SITE, Action.EDIT)
-def events(prefix):
+def events(prefix: str) -> ResponseReturnValue:
     if not enabled():
         abort(404)
 
@@ -556,7 +564,7 @@ def events(prefix):
 # @matrix analytics : owner-filter retention-clear
 @analytics.route("/clear/<retention>", methods=["DELETE"])
 @permission(Resource.SITE, Action.EDIT)
-def clear_records(retention):
+def clear_records(retention: str) -> ResponseReturnValue:
     if not enabled():
         abort(404)
 
@@ -575,7 +583,7 @@ def clear_records(retention):
 # @pair ai-observability:independent-clear
 @analytics.route("/ai/clear/<retention>", methods=["DELETE"])
 @permission(Resource.SITE, Action.EDIT)
-def clear_ai_records(retention):
+def clear_ai_records(retention: str) -> ResponseReturnValue:
     if not ai_enabled():
         abort(404)
 
@@ -596,7 +604,7 @@ def clear_ai_records(retention):
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
 # @matrix analytics : owner-filter page-load
 @analytics.route("/track", methods=["POST"])
-def track():
+def track() -> ResponseReturnValue:
     if not enabled():
         abort(404)
 

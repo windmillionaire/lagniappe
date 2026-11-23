@@ -1,3 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask import Request
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 import json
 
 from flask import abort, request, get_template_attribute
@@ -12,6 +24,8 @@ from lagniappe.core.definitions import (
     FileConsumerLimitError,
     Resource,
 )
+from lagniappe.core.properties.task_scheduling import ScheduleType
+from lagniappe.core.properties.base_property import Property
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.tools import dates
 from lagniappe.core.properties.schema import SchemaFields
@@ -31,6 +45,8 @@ from lagniappe.core.tools.tasks import combine as task_combine
 from lagniappe.core.tools.tasks import scheduling
 from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
 from lagniappe.web.auth import (
+    authenticated_user,
+    load_route_entity,
     abort_public_user_action,
     logged_in,
     permission,
@@ -64,7 +80,7 @@ def _ai_schedule_requested(form):
 # @pair permissions:own-page-only
 @tasks.route("/index", methods=["GET"])
 @logged_in
-def task_index():
+def task_index() -> ResponseReturnValue:
     task_index = index.TaskIndex()
 
     return responses.index("tasks", task_index)
@@ -76,7 +92,7 @@ def task_index():
 # @pairs permissions:own-page-only table-controls:sort-asc task-index:authenticated-access
 @tasks.route("/rows", methods=["GET"])
 @logged_in
-def rows():
+def rows() -> ResponseReturnValue:
     task_index = index.TaskIndex(**request.values)
     tasks = task_index.tasks
 
@@ -92,8 +108,8 @@ def rows():
 # @pair ai:completion-refresh
 @tasks.route("/<key>/replace", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
-def get(key, **kwargs):
-    task = Entities.fetch_one(
+def get(key: str, **kwargs: Unpack[EntityContext[models.Task]]) -> ResponseReturnValue:
+    task = load_route_entity(
         kwargs["entity"],
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
@@ -105,8 +121,10 @@ def get(key, **kwargs):
 # @covered-by lagniappe/web/responses.py::task_settings
 @tasks.route("/<key>/settings/replace", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW)
-def settings(key, **kwargs):
-    task = Entities.fetch_one(
+def settings(
+    key: str, **kwargs: Unpack[EntityContext[models.Task]]
+) -> ResponseReturnValue:
+    task = load_route_entity(
         kwargs["entity"],
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
@@ -123,7 +141,7 @@ def settings(key, **kwargs):
 # @pair permissions:resource-gates
 @tasks.route("<key>", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
-def view(key, **kwargs):
+def view(key: str, **kwargs: Unpack[EntityContext[models.Task]]) -> ResponseReturnValue:
     task = kwargs["entity"]
     page = Entities.fetch_one(task.page, request=Fetch.direct())
     if not page.allowed(Action.VIEW) and task.is_assigned_to(current_user):
@@ -140,8 +158,10 @@ def view(key, **kwargs):
 # @pair entities:delete
 @tasks.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.TASK, Action.DELETE)
-def delete(key, **kwargs):
-    task = Entities.fetch_one(
+def delete(
+    key: str, **kwargs: Unpack[EntityContext[models.Task]]
+) -> ResponseReturnValue:
+    task = load_route_entity(
         kwargs["entity"],
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
@@ -160,8 +180,8 @@ def delete(key, **kwargs):
 # @matrix tasks : completed move title-menu
 @tasks.route("<key>/move", methods=["PUT"])
 @permission(Resource.TASK, Action.EDIT)
-def move(key, **kwargs):
-    task = Entities.fetch_one(
+def move(key: str, **kwargs: Unpack[EntityContext[models.Task]]) -> ResponseReturnValue:
+    task = load_route_entity(
         kwargs["entity"],
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
@@ -189,7 +209,9 @@ def move(key, **kwargs):
 # @pair web-headers:no-store
 @tasks.route("<key>/combine", methods=["GET", "PUT"])
 @permission(Resource.TASK, Action.DELETE, no_store=True)
-def combine(key, **kwargs):
+def combine(
+    key: str, **kwargs: Unpack[EntityContext[models.Task]]
+) -> ResponseReturnValue:
     task = kwargs["entity"]
     page_key = request.args.get("page")
     page = Entities.fetch_one(page_key, request=Fetch.direct()) if page_key else None
@@ -205,7 +227,7 @@ def combine(key, **kwargs):
             task,
             request.form.getlist("task"),
             page,
-            current_user,
+            authenticated_user(),
         )
     except exceptions.ValidationError as error:
         return responses.error(str(error))
@@ -311,7 +333,7 @@ def _create_task_file():
     file = Entities.FILE().create(
         upload=uploaded_file,
         data=data,
-        report_user=current_user._get_current_object(),
+        report_user=authenticated_user(),
     )
     file.save()
     return file
@@ -388,7 +410,9 @@ def _task_create_due_date_data(request):
 # @covered-by lagniappe/web/routes/tasks/main.py::update
 # @covered-by lagniappe/web/routes/tasks/main.py::personal
 # @reason aggregate task form-data assembly is exercised through task mutation endpoints
-def task_data(request, page, task=None):
+def task_data(
+    request: Request, page: models.Page, task: models.Task | None = None
+) -> dict[str, object]:
     """Resolve form data into a dict suitable for Task.create() or Task.update()."""
     assets = _upload_assets_payload(request)
     asset_file_keys = _asset_file_keys(assets)
@@ -401,7 +425,7 @@ def task_data(request, page, task=None):
     model_key = request.form.get("model")
     public_tracking = _public_task_tracking(task, project_key, model_key)
     resolver = SubmittedReferenceResolver(
-        current_user,
+        authenticated_user(),
         form_key,
         assignee_key,
         project_key,
@@ -466,7 +490,7 @@ def task_data(request, page, task=None):
         not model.project or model.project.key != project.key
     ):
         raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
-    if not model_key and not project_key and current_tracking and not current_tracking.allowed(
+    if not model_key and not project_key and task is not None and current_tracking and not current_tracking.allowed(
         Action.VIEW, user=current_user
     ):
         model = task.model
@@ -483,7 +507,7 @@ def task_data(request, page, task=None):
         return bool(
             selected.user
             and collaboration.recipient_allowed(
-                current_user,
+                authenticated_user(),
                 selected.user,
                 channel="assign",
             )
@@ -556,7 +580,9 @@ def task_data(request, page, task=None):
 # @matrix tasks : async-upload file-upload signed-claim
 @tasks.route("<key>/upload-file", methods=["POST"])
 @permission(requested=Action.EDIT)
-def upload_file(key, **kwargs):
+def upload_file(
+    key: str, **kwargs: Unpack[EntityContext[Entity]]
+) -> ResponseReturnValue:
     abort_public_user_action()
 
     try:
@@ -590,7 +616,7 @@ def upload_file(key, **kwargs):
 # @reason route permission mirrors the final task upload endpoint
 @tasks.route("<key>/upload-file/direct-upload", methods=["POST"])
 @permission(requested=Action.EDIT)
-def upload_file_direct(key, **kwargs):
+def upload_file_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     abort_public_user_action()
 
     return direct_uploads.direct_upload_response()
@@ -623,8 +649,10 @@ def _should_submit_task_form(active, role, task):
 # @matrix form-migration : stale-generation direct-write
 @tasks.route("<key>/update", methods=["PUT", "GET"])
 @permission(Resource.TASK, Action.EDIT)
-def update(key, **kwargs):
-    task = Entities.fetch_one(
+def update(
+    key: str, **kwargs: Unpack[EntityContext[models.Task]]
+) -> ResponseReturnValue:
+    task = load_route_entity(
         kwargs["entity"],
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
@@ -686,10 +714,10 @@ def update(key, **kwargs):
             require_ai_access(AI.CREATE)
 
         schedule = task.properties.schedule.update(request.form)
-        if schedule and schedule.generate:
+        if isinstance(schedule, ScheduleType) and schedule.generate:
             schedule.create()
 
-        if schedule and schedule.error:
+        if isinstance(schedule, ScheduleType) and schedule.error:
             return responses.error(schedule.error)
 
     if role == "complete-toggle":
@@ -703,12 +731,12 @@ def update(key, **kwargs):
         except (exceptions.TaskCompletionError, exceptions.ValidationError) as e:
             return responses.error(str(e))
 
-    if role == "autofill-submit":
+    if autofill_requested and draft is not None:
         require_ai_access(AI.CREATE)
         return responses.entity_response(
             deferred_autofill.start_deferred_autofill(
                 task,
-                current_user,
+                authenticated_user(),
                 request.form,
                 multipart_file=bool(request.files.get("autofill-file")),
                 submission=draft["values"],
@@ -721,9 +749,9 @@ def update(key, **kwargs):
     staged_file = None
     try:
         staged_file, staged_cleanup = deferred_autofill.staged_upload_for_update(
-            task, current_user, request.form,
+            task, authenticated_user(), request.form,
         )
-        form_review.acknowledge_reviews(task, current_user, request.form.getlist("reviewed-operation"))
+        form_review.acknowledge_reviews(task, authenticated_user(), request.form.getlist("reviewed-operation"))
         if staged_file:
             Entities.save(staged_file, task)
         else:
@@ -747,7 +775,9 @@ def update(key, **kwargs):
 # @reason route permission mirrors task update for autofill uploads
 @tasks.route("<key>/update/direct-upload", methods=["POST"])
 @permission(Resource.TASK, Action.EDIT)
-def update_direct(key, **kwargs):
+def update_direct(
+    key: str, **kwargs: Unpack[EntityContext[models.Task]]
+) -> ResponseReturnValue:
     upload_data = request.get_json(silent=True) or request.form
     if upload_data.get("input_name") == "autofill-file":
         require_ai_access(AI.CREATE)
@@ -763,7 +793,9 @@ def update_direct(key, **kwargs):
 # @matrix tasks : basic create
 @tasks.route("<key>/create", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
-def create(key, **kwargs):
+def create(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     """Create a task on a page. Key is the page key, not a task key."""
     page = kwargs["entity"]
     try:
@@ -778,10 +810,10 @@ def create(key, **kwargs):
         require_ai_access(AI.CREATE)
 
     schedule = task.properties.schedule.update(request.form)
-    if schedule and schedule.generate:
+    if isinstance(schedule, ScheduleType) and schedule.generate:
         schedule.create()
 
-    if schedule and schedule.error:
+    if isinstance(schedule, ScheduleType) and schedule.error:
         return responses.error(schedule.error)
 
     task.save()
@@ -795,7 +827,7 @@ def create(key, **kwargs):
 # @reason route permission mirrors task create for upload-backed form data
 @tasks.route("<key>/create/direct-upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
-def create_direct(key, **kwargs):
+def create_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     upload_data = request.get_json(silent=True) or request.form
     if upload_data.get("input_name") == "autofill-file":
         require_ai_access(AI.CREATE)
@@ -808,7 +840,9 @@ def create_direct(key, **kwargs):
 # @matrix tasks : create-personal due-date
 @tasks.route("<key>/personal", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
-def personal(key, **kwargs):
+def personal(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     """Create a quick task on the current user's own page (from home)."""
     page = kwargs["entity"]
     try:
@@ -827,7 +861,9 @@ def personal(key, **kwargs):
 # @matrix task-completion : deleted-form generation raw-values
 @tasks.route("<key>/archived-submission", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW, no_store=True)
-def archived_submission(key, **kwargs):
+def archived_submission(
+    key: str, **kwargs: Unpack[EntityContext[models.Task]]
+) -> ResponseReturnValue:
     task = kwargs["entity"]
     if not task.completed or task.form is not None or task.properties.form.key is None:
         abort(404)
@@ -839,7 +875,7 @@ def archived_submission(key, **kwargs):
 # @reason route permission mirrors personal task create for upload-backed form data
 @tasks.route("<key>/personal/direct-upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
-def personal_direct(key, **kwargs):
+def personal_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
@@ -850,7 +886,9 @@ def personal_direct(key, **kwargs):
 # @matrix tasks : completion-cycle history reload
 @tasks.route("<key>/history", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW, no_store=True)
-def history(key, **kwargs):
+def history(
+    key: str, **kwargs: Unpack[EntityContext[models.Task]]
+) -> ResponseReturnValue:
     task = kwargs["entity"]
     groups = history_groups(task.history)
     for group in groups:
@@ -866,7 +904,9 @@ def history(key, **kwargs):
 # @matrix task-completion : original-view permission-gates
 @tasks.route("<key>/completion-details", methods=["GET"])
 @permission(requested=Action.VIEW, no_store=True)
-def completion_details(key, **kwargs):
+def completion_details(
+    key: str, **kwargs: Unpack[EntityContext[models.Task | models.TaskHistory]]
+) -> ResponseReturnValue:
     entity = Entities.fetch_one(kwargs["entity"], request=Fetch.direct())
     if not isinstance(entity, (Entities.TASK, Entities.TASK_HISTORY)) or (
         isinstance(entity, Entities.TASK) and not entity.completed
@@ -898,7 +938,9 @@ def _home_task_response(task):
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_history_fill_converts_selected_fields_and_reports_invalid_values
 @tasks.route("<key>/history/latest-submission", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW, no_store=True)
-def latest_history_submission(key, **kwargs):
+def latest_history_submission(
+    key: str, **kwargs: Unpack[EntityContext[models.Task]]
+) -> ResponseReturnValue:
     task = kwargs["entity"]
     histories = task.load_history(database_get.latest_task_history(task))
     history = histories[0] if histories else None
@@ -936,8 +978,10 @@ def _delete_file_if_unreferenced(file):
 # @matrix tasks : attachment file-upload remove
 @tasks.route("<key>/files/<file_key>", methods=["DELETE"])
 @permission(Resource.TASK, Action.EDIT)
-def delete_file(key, file_key, **kwargs):
-    task = Entities.fetch_one(
+def delete_file(
+    key: str, file_key: str, **kwargs: Unpack[EntityContext[models.Task]]
+) -> ResponseReturnValue:
+    task = load_route_entity(
         kwargs["entity"],
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
@@ -977,8 +1021,10 @@ def delete_file(key, file_key, **kwargs):
 # @pair task-index:quick-edit
 @tasks.route("<key>/patch", methods=["PATCH"])
 @permission(Resource.TASK, Action.EDIT)
-def patch(key, **kwargs):
-    task = Entities.fetch_one(
+def patch(
+    key: str, **kwargs: Unpack[EntityContext[models.Task]]
+) -> ResponseReturnValue:
+    task = load_route_entity(
         kwargs["entity"],
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
@@ -998,7 +1044,7 @@ def patch(key, **kwargs):
 
     if schema_id in task.properties:
         field = task.properties[schema_id]
-        if not field.editable:
+        if not isinstance(field, Property) or not field.editable:
             return responses.error("Field cannot be edited")
 
         if schema_id == "completed":
@@ -1045,8 +1091,10 @@ def patch(key, **kwargs):
 # @matrix tasks : complete recurring
 @tasks.route("/<key>/complete", methods=["PUT"])
 @permission(Resource.TASK, Action.EDIT)
-def complete(key, **kwargs):
-    task = Entities.fetch_one(
+def complete(
+    key: str, **kwargs: Unpack[EntityContext[models.Task]]
+) -> ResponseReturnValue:
+    task = load_route_entity(
         kwargs["entity"],
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
@@ -1080,8 +1128,10 @@ def complete(key, **kwargs):
 # @matrix tasks : due-date postpone
 @tasks.route("/<key>/change-due-date", methods=["PUT"])
 @permission(Resource.TASK, Action.EDIT)
-def change_due_date(key, **kwargs):
-    task = Entities.fetch_one(
+def change_due_date(
+    key: str, **kwargs: Unpack[EntityContext[models.Task]]
+) -> ResponseReturnValue:
+    task = load_route_entity(
         kwargs["entity"],
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )

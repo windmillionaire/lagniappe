@@ -1,3 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 from flask import request
 from flask_login import current_user
 
@@ -12,7 +23,7 @@ from lagniappe.core.definitions import (
     MutationIntent,
     Resource,
 )
-from lagniappe.web.auth import permission, require_ai_access
+from lagniappe.web.auth import authenticated_user, permission, require_ai_access
 from lagniappe.web import responses
 from lagniappe.core.tools.diagnostics import timed
 
@@ -27,7 +38,9 @@ from . import categories
 @categories.route("/<key>", methods=["GET"])
 @timed(profile=True)
 @permission(Resource.CATEGORY, Action.RESTRICTED)
-def index(key, **kwargs):
+def index(
+    key: str, **kwargs: Unpack[EntityContext[models.Category]]
+) -> ResponseReturnValue:
     category = kwargs["entity"]
 
     filters.FilterCache(category).update()
@@ -43,7 +56,9 @@ def index(key, **kwargs):
 # @matrix categories : index-filter permission-gates
 @categories.route("/<key>/rows", methods=["GET"])
 @permission(Resource.CATEGORY, Action.RESTRICTED)
-def rows(key, **kwargs):
+def rows(
+    key: str, **kwargs: Unpack[EntityContext[models.Category]]
+) -> ResponseReturnValue:
     category = kwargs["entity"]
 
     category_index = category.index(**request.values)
@@ -56,7 +71,9 @@ def rows(key, **kwargs):
 # @covered-by lagniappe/web/responses.py::category_info
 @categories.route("/<key>/info/replace", methods=["GET"])
 @permission(Resource.CATEGORY, Action.VIEW)
-def info(key, **kwargs):
+def info(
+    key: str, **kwargs: Unpack[EntityContext[models.Category]]
+) -> ResponseReturnValue:
     return responses.category_info(kwargs["entity"])
 
 
@@ -67,7 +84,7 @@ def info(key, **kwargs):
 def _category_data(form, category=None):
     form_key = form.get("form")
     current_form = category.form if category else None
-    selected_form = SubmittedReferenceResolver(current_user, form_key).one(
+    selected_form = SubmittedReferenceResolver(authenticated_user(), form_key).one(
         form_key,
         expected=Entities.FORM,
         action=Action.VIEW,
@@ -92,7 +109,9 @@ def _category_data(form, category=None):
 # @matrix categories : permission-gates update
 @categories.route("<key>/update", methods=["PUT"])
 @permission(Resource.CATEGORY, Action.EDIT)
-def update(key, **kwargs):
+def update(
+    key: str, **kwargs: Unpack[EntityContext[models.Category]]
+) -> ResponseReturnValue:
     category = kwargs["entity"]
 
     try:
@@ -135,7 +154,7 @@ def _generate_category(generated_data):
 # @matrix categories : ai-create attach-form create-manual retired-preview no-create
 @categories.route("create", methods=["POST"])
 @permission(Resource.MODELS, Action.CREATE)
-def create():
+def create() -> ResponseReturnValue:
     generate = request.form.get("generate")
     if request.form.get("role") == "explain" or request.form.get("explain"):
         return responses.error("Initial Prompt is no longer available.")
@@ -173,7 +192,7 @@ def create():
 # @pair categories:delete
 @categories.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.MODELS, Action.DELETE)
-def delete(key, **kwargs):
+def delete(key: str, **kwargs: Unpack[EntityContext[Entity]]) -> ResponseReturnValue:
     category = kwargs["entity"]
     if not category:
         return responses.error("category not found")

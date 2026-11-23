@@ -1,5 +1,13 @@
 """REST transport for provider-free external agent plans."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask import Response
+    from flask.typing import ResponseReturnValue
+
 from functools import wraps
 import json
 import logging
@@ -14,6 +22,7 @@ from config.remote_mcp import mcp_issuer
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason
+from lagniappe.core.definitions.asset import FileAsset
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import summarize_actions
 from lagniappe.core.tools.ai import external_api
@@ -85,7 +94,15 @@ def _api_absolute_url(path):
 class APIProblem(Exception):
     """Expected client-facing API failure."""
 
-    def __init__(self, code, message, status, *, details=None, retry_after=None):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        status: int,
+        *,
+        details: object = None,
+        retry_after: int | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
@@ -167,7 +184,7 @@ def _rate_limit(scope, identifier, limit, window_seconds):
 # @matrix agent-api : site-policy bearer-only body-limit entitlement-independent error-envelope public-user request-correlation request-recheck session-independent streaming
 # @pairs agent-api:rate-limit
 @api.before_request
-def authenticate_request():
+def authenticate_request() -> ResponseReturnValue | None:
     """Authenticate only a bearer token; browser sessions are never a fallback."""
     g.NO_CACHE = True
     g.agent_api_request_id = _request_id()
@@ -194,7 +211,7 @@ def authenticate_request():
                     "remote-mcp-envelope", client_ip(request), *GENERAL_RATE_LIMIT
                 )
                 actor, credential = remote_auth.authenticate_envelope(
-                    token.strip(), request.headers.get(USER_TOKEN_HEADER)
+                    token.strip(), request.headers[USER_TOKEN_HEADER]
                 )
                 g.remote_mcp_authenticated = True
             except remote_auth.OAuthError:
@@ -215,6 +232,8 @@ def authenticate_request():
     except agent_auth.AgentAPICredentialError:
         return _error("unauthorized", "The API key is invalid or expired.", 401)
 
+    if actor is None:
+        return _error("invalid_token", "Invalid bearer credential.", 401)
     if getattr(actor, "is_public", False):
         return _error(
             "forbidden",
@@ -246,7 +265,7 @@ api_family.before_request(authenticate_request)
 # @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_external_api_authentication_and_header_contract
 # @matrix agent-api : build-marker error-envelope no-store request-correlation
 @api.after_request
-def annotate_response(response):
+def annotate_response(response: Response) -> Response:
     response.headers["X-Request-ID"] = getattr(
         g,
         "agent_api_request_id",
@@ -264,7 +283,7 @@ api_family.after_request(annotate_response)
 # @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_csrf_exempt_surfaces_reach_replacement_authentication_gates
 # @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
 # @matrix agent-api : error-envelope routing
-def handle_api_http_error(error):
+def handle_api_http_error(error: HTTPException) -> Response:
     """Render routing-level API failures with the normal JSON envelope."""
     g.NO_CACHE = True
     if not getattr(g, "agent_api_request_id", None):
@@ -272,7 +291,7 @@ def handle_api_http_error(error):
     if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED:
         return _error("external_ai_disabled", "External AI access is disabled.", 403)
 
-    status = error.code if isinstance(error, HTTPException) else 500
+    status = (error.code or 500) if isinstance(error, HTTPException) else 500
     code, message = {
         404: ("not_found", "API resource not found."),
         405: ("method_not_allowed", "Method not allowed for this API resource."),
@@ -289,7 +308,7 @@ def handle_api_http_error(error):
 # @covered-by lagniappe/web/routes/api/main.py::authenticate_request
 # @reason expected problem rendering uses the same tested error envelope
 @api.errorhandler(APIProblem)
-def handle_api_problem(problem):
+def handle_api_problem(problem: APIProblem) -> ResponseReturnValue:
     return _error(
         problem.code,
         problem.message,
@@ -301,7 +320,7 @@ def handle_api_problem(problem):
 
 # @testable infrastructure
 @api.errorhandler(Exception)
-def handle_unexpected_error(error):
+def handle_unexpected_error(error: Exception) -> Response:
     if isinstance(error, HTTPException):
         return _error(
             "request_failed",
@@ -537,7 +556,7 @@ def _discovery_payload():
 # @matrix agent-api : discovery bearer-only
 @api_family.get("/", strict_slashes=False)
 @_route
-def api_family_index():
+def api_family_index() -> ResponseReturnValue:
     """Identify the current version without duplicating its contract."""
     current = _discovery_payload()
     return {
@@ -552,7 +571,7 @@ def api_family_index():
 # @matrix agent-api : discovery bearer-only
 @api.get("/", strict_slashes=False)
 @_route
-def api_index():
+def api_index() -> ResponseReturnValue:
     """Point an authenticated client directly to API discovery resources."""
     return _discovery_payload()
 
@@ -562,7 +581,7 @@ def api_index():
 # @matrix agent-api : bootstrap bearer-only discovery
 @api.get("/client-skill.md")
 @_route
-def client_skill():
+def client_skill() -> ResponseReturnValue:
     """Return a copyable, discovery-first client skill without API schemas."""
     response = make_response(
         external_api.client_skill_markdown(
@@ -579,7 +598,7 @@ def client_skill():
 # @matrix agent-api : contract
 @api.get("/openapi.json")
 @_route
-def openapi_document():
+def openapi_document() -> ResponseReturnValue:
     """Return the authenticated external-agent contract."""
     return build_openapi_document(
         app_name=CONFIG.APP_NAME, server_url=_api_absolute_url("/"),
@@ -592,7 +611,7 @@ def openapi_document():
 # @matrix agent-api : bearer-only entitlement-independent plan-capability
 @api.get("/me")
 @_route
-def me():
+def me() -> ResponseReturnValue:
     actor = g.agent_api_user
     return {
         "user": {
@@ -619,7 +638,7 @@ def me():
 # @matrix agent-api : tool-catalog
 @api.get("/tools")
 @_route
-def tools():
+def tools() -> ResponseReturnValue:
     selected = []
     for value in request.args.getlist("names"):
         selected.extend(name.strip() for name in value.split(",") if name.strip())
@@ -664,7 +683,7 @@ def tools():
 # @pair agent-api:answer-context
 @api.get("/answer-context")
 @_route
-def answer_context():
+def answer_context() -> ResponseReturnValue:
     return external_api.answer_context(g.agent_api_user)
 
 
@@ -675,7 +694,7 @@ def answer_context():
 # @pairs agent-api:rate-limit
 @api.post("/plans")
 @_route
-def create_plan():
+def create_plan() -> ResponseReturnValue:
     actor = g.agent_api_user
     _rate_limit(
         "agent-api-plan-start",
@@ -734,7 +753,7 @@ def create_plan():
 
 @api.get("/plans/<plan_id>")
 @_route
-def get_plan(plan_id):
+def get_plan(plan_id: str) -> ResponseReturnValue:
     raw_include = request.args.get("include_proposal")
     if raw_include is None:
         include_proposal = True
@@ -768,7 +787,7 @@ def _experiments_execution_allowed():
 
 @api.post("/plans/<plan_id>/execute")
 @_route
-def execute_plan(plan_id):
+def execute_plan(plan_id: str) -> ResponseReturnValue:
     if not _execution_allowed():
         raise APIProblem(
             "execution_forbidden",
@@ -800,6 +819,8 @@ def execute_plan(plan_id):
         remote_mcp=remote_mcp,
         external_execution=True,
     )
+    if job is None:
+        raise APIProblem("execution_unavailable", "Execution was not started.", 409)
     return {
         "plan": _plan_payload(_load_plan(plan_id), include_proposal=False),
         "operation": {"id": job.idempotency_key, "status": job.status},
@@ -811,7 +832,7 @@ def execute_plan(plan_id):
 # @matrix agent-api : proposal-contract
 @api.get("/plans/<plan_id>/contract")
 @_route
-def get_plan_contract(plan_id):
+def get_plan_contract(plan_id: str) -> ResponseReturnValue:
     report = _load_plan(plan_id)
     actions = [
         name.strip()
@@ -854,7 +875,7 @@ def get_plan_contract(plan_id):
 # @pairs mcp-upload:authoritative-reload mcp-upload:concurrency mcp-upload:stale-snapshot
 @api.post("/plans/<plan_id>/uploads")
 @_route
-def create_uploads(plan_id):
+def create_uploads(plan_id: str) -> ResponseReturnValue:
     report = _load_plan(plan_id)
     external_api.require_uploads_available(report)
     data = _json_body()
@@ -871,7 +892,7 @@ def create_uploads(plan_id):
 # @matrix agent-api mcp-upload : authoritative-reload concurrency checkpoint resume stale-snapshot
 @api.post("/plans/<plan_id>/uploads/finalize")
 @_route
-def finalize_uploads(plan_id):
+def finalize_uploads(plan_id: str) -> ResponseReturnValue:
     report = _load_plan(plan_id)
     external_api.require_draft(report)
     data = _json_body()
@@ -906,7 +927,7 @@ def _original_file_download(tool_name, arguments, result):
     ):
         return result
     asset = entity.properties.file.value
-    if not asset or not asset.path:
+    if not isinstance(asset, FileAsset) or not asset.path:
         return result
 
     if not isinstance(result, dict):
@@ -944,7 +965,7 @@ def _original_file_download(tool_name, arguments, result):
 @api.post("/tools/<tool_name>", defaults={"plan_id": None})
 @api.post("/plans/<plan_id>/tools/<tool_name>")
 @_route
-def execute_tool(plan_id, tool_name):
+def execute_tool(plan_id: str, tool_name: str) -> ResponseReturnValue:
     report = _load_plan(plan_id) if plan_id is not None else None
     if report is not None:
         _require_tools_available(report)
@@ -1039,7 +1060,7 @@ def execute_tool(plan_id, tool_name):
 # @pairs mcp-upload:concurrency mcp-upload:plan-operation
 @api.post("/plans/<plan_id>/submit")
 @_route
-def submit_plan(plan_id):
+def submit_plan(plan_id: str) -> ResponseReturnValue:
     report = _load_plan(plan_id)
     external_api.require_submission_available(report)
     data = _json_body()
@@ -1080,6 +1101,8 @@ def submit_plan(plan_id):
                     remote_mcp=remote_mcp,
                     external_execution=True,
                 )
+                if job is None:
+                    raise APIProblem("execution_unavailable", "Execution was not started.", 409)
                 refreshed = _load_plan(plan_id)
                 receipt["status"] = refreshed.status
                 receipt["operation"] = {

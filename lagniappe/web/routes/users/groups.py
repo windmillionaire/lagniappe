@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 from flask import request
 
 from lagniappe.core.definitions import Action, Fetch, Resource
@@ -15,7 +25,7 @@ from . import users
 # @matrix user-groups : group-create nav
 @users.route("/create-group", methods=["POST"])
 @permission(Resource.USER_GROUPS, Action.CREATE)
-def create_group():
+def create_group() -> ResponseReturnValue:
     group = Entities.USER_GROUP.create(request.form.get("name"))
     Entities.save(group)
 
@@ -28,7 +38,7 @@ def create_group():
 # @matrix public-groups : permissions public
 @users.route("/public-permissions", methods=["GET", "PUT"])
 @permission(Resource.SITE)
-def public_permissions():
+def public_permissions() -> ResponseReturnValue:
     public_group = Entities.PUBLIC_GROUP.get()
 
     if request.method == "PUT":
@@ -44,7 +54,9 @@ def public_permissions():
 # @matrix user-groups : entity-permissions general-permissions permission-update rename
 @users.route("/group-permissions/<key>", methods=["PUT", "GET"])
 @permission(Resource.USER_GROUPS, Action.EDIT)
-def group_permissions(key, **kwargs):
+def group_permissions(
+    key: str, **kwargs: Unpack[EntityContext[models.UserGroup]]
+) -> ResponseReturnValue:
     group = kwargs["entity"]
 
     if request.method == "PUT":
@@ -66,11 +78,13 @@ def group_permissions(key, **kwargs):
 # @pair user-groups:membership-change
 @users.route("/delete-group/<key>", methods=["DELETE"])
 @permission(Resource.USER_GROUPS, Action.DELETE)
-def delete_group(key, **kwargs):
+def delete_group(
+    key: str, **kwargs: Unpack[EntityContext[models.UserGroup]]
+) -> ResponseReturnValue:
     group = kwargs["entity"]
 
     users_in_group = database_get.users(group=group.key, limit=None)
-    users = Entities.fetch(*users_in_group.results, request=Fetch.direct())
+    users = [user for user in Entities.fetch(*users_in_group.results, request=Fetch.direct()) if isinstance(user, Entities.USER)]
     for user in users:
         user.properties.groups.remove(group)
         user.properties.permissions.create()

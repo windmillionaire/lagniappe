@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 import json
 import re
 
@@ -6,13 +16,14 @@ from flask_login import current_user
 
 from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core import exceptions
+from lagniappe.core.properties.form_table import Table
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.mixins.submitter import normalize_submission_values
 from lagniappe.core.tools.ai import schema as ai_schema
 from lagniappe.core.tools.forms import drafts as form_drafts
 from lagniappe.core.tools.ai.form_draft import prepare_generated_changes
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
-from lagniappe.web.auth import permission, require_ai_access
+from lagniappe.web.auth import authenticated_user, load_route_entity, permission, require_ai_access
 
 from . import forms
 from lagniappe.web import responses, direct_uploads
@@ -100,7 +111,7 @@ def _draft_image_sources(form, html_fields):
 # @matrix forms : create-control index index-view permission-gates tools
 @forms.route("/index", methods=["GET"])
 @permission(Resource.FORMS, Action.VIEW)
-def form_index():
+def form_index() -> ResponseReturnValue:
     form_index = index.FormIndex()
 
     return responses.index("forms", form_index)
@@ -111,7 +122,7 @@ def form_index():
 # @pair forms:index-view
 @forms.route("/rows", methods=["GET"])
 @permission(Resource.FORMS, Action.VIEW)
-def rows():
+def rows() -> ResponseReturnValue:
     form_index = index.FormIndex(**request.values)
     forms = form_index.forms
 
@@ -123,7 +134,7 @@ def rows():
 # @matrix forms : builder-edit permission-gates restriction-control
 @forms.route("/<key>", methods=["GET"])
 @permission(Resource.FORM, Action.VIEW, no_store=True)
-def view(key, **kwargs):
+def view(key: str, **kwargs: Unpack[EntityContext[models.Form]]) -> ResponseReturnValue:
     form = kwargs["entity"]
 
     from lagniappe.core.tools.forms import changes as form_changes, conversions as form_conversions
@@ -140,7 +151,9 @@ def view(key, **kwargs):
 # @matrix form-migration : status recovery
 @forms.route("/<key>/change", methods=["GET", "POST"])
 @permission(Resource.FORM, Action.EDIT, no_store=True)
-def form_change(key, **kwargs):
+def form_change(
+    key: str, **kwargs: Unpack[EntityContext[models.Form]]
+) -> ResponseReturnValue:
     from lagniappe.core.tools.forms import changes as form_changes
     try:
         result = (form_changes.change_response(kwargs["entity"], current_user) if request.method == "GET"
@@ -160,7 +173,9 @@ def form_change(key, **kwargs):
 # @matrix forms : migration-required save-receipt stale-acknowledgement persistent-error concurrent-edit
 @forms.route("<key>/update", methods=["PUT"])
 @permission(Resource.FORM, Action.EDIT)
-def update(key, **kwargs):
+def update(
+    key: str, **kwargs: Unpack[EntityContext[models.Form]]
+) -> ResponseReturnValue:
     form = kwargs["entity"]
     data = request.get_json(silent=True) or request.form
     try:
@@ -182,7 +197,7 @@ def update(key, **kwargs):
 # @reason signed upload creation has the same permission as final draft publication
 @forms.route("<key>/update/direct-upload", methods=["POST"])
 @permission(Resource.FORM, Action.EDIT)
-def update_direct(key, **kwargs):
+def update_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
@@ -192,7 +207,7 @@ def update_direct(key, **kwargs):
 # @matrix forms : create page-form task-form
 @forms.route("/create", methods=["POST"])
 @permission(Resource.FORM, Action.CREATE)
-def create():
+def create() -> ResponseReturnValue:
     new_form = Entities.FORM.create(request.form)
     new_form.save()
 
@@ -204,7 +219,9 @@ def create():
 # @matrix forms : builder-copy form-type navigation schema
 @forms.route("<key>/copy", methods=["POST"])
 @permission(Resource.FORM, Action.CREATE)
-def copy_form(key, **kwargs):
+def copy_form(
+    key: str, **kwargs: Unpack[EntityContext[models.Form]]
+) -> ResponseReturnValue:
     source = kwargs["entity"]
     data = request.get_json(silent=True) or request.form
     try:
@@ -227,7 +244,7 @@ def copy_form(key, **kwargs):
 # @reason signed upload creation has the same permission as final draft copy
 @forms.route("<key>/copy/direct-upload", methods=["POST"])
 @permission(Resource.FORM, Action.CREATE)
-def copy_direct(key, **kwargs):
+def copy_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
@@ -237,7 +254,9 @@ def copy_direct(key, **kwargs):
 # @matrix forms : page-form task-form
 @forms.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.FORM, Action.DELETE)
-def delete(key, **kwargs):
+def delete(
+    key: str, **kwargs: Unpack[EntityContext[models.Form]]
+) -> ResponseReturnValue:
     form = kwargs["entity"]
     Entities.delete(form)
 
@@ -250,12 +269,16 @@ def delete(key, **kwargs):
 # @matrix form-table : mixed-columns row-submission
 @forms.route("<key>/validate-row/<table_id>", methods=["GET"])
 @permission(requested=Action.EDIT)
-def validate_row(key, table_id, **kwargs):
-    entity = Entities.fetch_one(
+def validate_row(
+    key: str, table_id: str, **kwargs: Unpack[EntityContext[models.Page | models.Task]]
+) -> ResponseReturnValue:
+    entity = load_route_entity(
         kwargs["entity"],
         request=Fetch.direct(),
     )
     field = entity.properties.submission.fields.get(table_id)
+    if not isinstance(field, Table):
+        return responses.error("The original table definition is unavailable.")
     field.user = current_user
 
     values = normalize_submission_values(request.values, field.fields)
@@ -279,16 +302,21 @@ def validate_row(key, table_id, **kwargs):
 # @matrix form-table : form-submission row-submission
 @forms.route("<key>/expand-table-cell/<table_id>", methods=["GET"])
 @permission(requested=Action.VIEW)
-def expand_table_cell(key, table_id, **kwargs):
-    entity = Entities.fetch_one(
+def expand_table_cell(
+    key: str,
+    table_id: str,
+    **kwargs: Unpack[EntityContext[models.Page | models.Task | models.TaskHistory]],
+) -> ResponseReturnValue:
+    entity = load_route_entity(
         kwargs["entity"],
         request=Fetch.direct(),
     )
 
     field = entity.properties.submission.fields.get(table_id)
-    if field is None:
+    if not isinstance(field, Table):
         return responses.error("The original table definition is unavailable.")
-    field.value = entity.submission.get(table_id)
+    submission = entity.properties.submission.value
+    field.value = submission.get(table_id) if isinstance(submission, dict) else None
     field.kind = (
         entity.kind if not isinstance(entity, Entities.TASK_HISTORY) else "form"
     )
@@ -302,13 +330,15 @@ def expand_table_cell(key, table_id, **kwargs):
 # @matrix forms : access-restrictions group-restricted owner-restricted
 @forms.route("<key>/restrictions", methods=["PUT"])
 @permission(Resource.FORM, Action.EDIT)
-def restrictions(key, **kwargs):
+def restrictions(
+    key: str, **kwargs: Unpack[EntityContext[models.Form]]
+) -> ResponseReturnValue:
     form = kwargs["entity"]
 
     admin_only = request.form.get("admin") in {"on", "true"}
     keys = [] if admin_only else request.form.getlist("group-key")
     try:
-        resolver = SubmittedReferenceResolver(current_user, *keys)
+        resolver = SubmittedReferenceResolver(authenticated_user(), *keys)
         groups = [resolver.one(key, expected=Entities.USER_GROUP, action=Action.VIEW, required=True)
                   for key in keys]
         form.groups = groups
@@ -325,11 +355,11 @@ def restrictions(key, **kwargs):
 # @matrix ai forms : generate-schema live-ai reload saved-state submitted-reference
 @forms.route("/create-schema", methods=["POST"])
 @permission(Resource.FORMS, Action.EDIT)
-def create_schema():
+def create_schema() -> ResponseReturnValue:
     description = request.form.get("description", "")
     form_key = request.form.get("form-key")
     try:
-        form = SubmittedReferenceResolver(current_user, form_key).one(
+        form = SubmittedReferenceResolver(authenticated_user(), form_key).one(
             form_key,
             expected=Entities.FORM,
             action=Action.EDIT,
@@ -385,6 +415,8 @@ def create_schema():
 # @pair form-schema:property
 @forms.route("<key>/schema", methods=["GET"])
 @permission(Resource.FORM, Action.VIEW)
-def schema(key, **kwargs):
+def schema(
+    key: str, **kwargs: Unpack[EntityContext[models.Form]]
+) -> ResponseReturnValue:
     form = kwargs["entity"]
     return responses.json_response({"schema": form.schema})

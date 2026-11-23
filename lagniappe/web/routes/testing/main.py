@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 import hashlib
 import os
 
@@ -93,7 +98,7 @@ def _valid_internal_process_request() -> bool:
 # @testable infrastructure
 # @matrix hosted-e2e : authentication deployment-binding lease request-gate
 @testing.before_app_request
-def require_hosted_e2e_session():
+def require_hosted_e2e_session() -> ResponseReturnValue | None:
     """Hide every dynamic/static Flask request without an active run cookie."""
     if not CONFIG.hosted_e2e_server:
         hostname = request.host.partition(":")[0]
@@ -129,7 +134,7 @@ def require_hosted_e2e_session():
 # @matrix hosted-e2e : readiness server-identity
 # @matrix test-session : health-nonce readiness server-identity
 @testing.route("/health", methods=["GET"])
-def health():
+def health() -> ResponseReturnValue:
     """Expose only non-secret identity needed to validate a fresh version."""
     if not CONFIG.hosted_e2e_server:
         if not CONFIG.testing:
@@ -166,7 +171,7 @@ def health():
 # @tests tests_e2e/001_site/test_001d_offline.py::test_upstream_unavailable_preserves_current_form_state
 # @matrix e2e request-errors : server-failure upstream-unavailable
 @testing.route("/upstream-unavailable", methods=["GET"])
-def upstream_unavailable():
+def upstream_unavailable() -> ResponseReturnValue:
     """Return provider-shaped unmarked HTML for the browser failure story."""
     if not CONFIG.testing:
         return _hidden()
@@ -182,7 +187,7 @@ def upstream_unavailable():
 # @testable infrastructure
 # @matrix hosted-e2e : authentication bootstrap cookie replay
 @testing.route("/session", methods=["POST"])
-def create_session():
+def create_session() -> ResponseReturnValue:
     """Exchange one Google ID token for a run- and version-bound cookie."""
     if not CONFIG.hosted_e2e_server:
         return _hidden()

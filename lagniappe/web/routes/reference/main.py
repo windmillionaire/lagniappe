@@ -1,3 +1,10 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import abort, g
 
 from config import read_saved_app_settings
@@ -17,7 +24,7 @@ from . import reference
 # @pair projects:create-help
 @reference.route("/section/<section>")
 @logged_in
-def section(section):
+def section(section: str) -> ResponseReturnValue:
     """Document settings help page."""
     return responses.reference_topic(section)
 
@@ -28,7 +35,7 @@ def section(section):
 # @matrix admin : environment-variables site-settings
 @reference.route("/environment-variables")
 @permission(Resource.SITE)
-def environment_variables():
+def environment_variables() -> ResponseReturnValue:
     """Return environment variables as YAML formatted HTML."""
     env_data = read_saved_app_settings()
 
@@ -41,7 +48,7 @@ def environment_variables():
 # @matrix admin owner : recovery-export
 @reference.route("/download-settings")
 @owner_only
-def download_settings():
+def download_settings() -> ResponseReturnValue:
     """Download the complete canonical recovery snapshot."""
     g.NO_CACHE = True
     try:

@@ -1,5 +1,12 @@
 """Signed Resend webhook boundary for AI email submissions."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import Response, request
 
 from lagniappe import CONFIG
@@ -18,7 +25,7 @@ from . import webhooks
 # @covered-by lagniappe/core/tools/email/ai.py::verify_svix_signature
 # @covered-by lagniappe/core/tools/email/ai.py::process_resend_email
 @webhooks.post("/resend/ai-email")
-def resend_ai_email():
+def resend_ai_email() -> ResponseReturnValue:
     """Verify and hand one Resend event to the durable report workflow."""
     config = getattr(CONFIG, "AI_EMAIL_CONFIG", None)
     if not CONFIG.AI_ENABLED or not config or not config.get("enabled"):

@@ -1,5 +1,15 @@
 """Experiments-only request headers and structured measurements."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from flask import Flask, Response
+    from google.cloud.datastore import Key
+    from lagniappe import Config
+
 import os
 import time
 
@@ -13,7 +23,7 @@ from lagniappe.core.tools.polling import task_lists
 # @testable true
 # @tests tests_e2e/006_tasks/test_006j_task_list_validation.py::test_experiments_compare_task_list_paths_without_changing_content_or_access
 # @matrix experiments : task-list-comparison
-def task_list_context_keys():
+def task_list_context_keys() -> Sequence[Key]:
     """Select equivalent read schedules for an opt-in, same-instance trial."""
     variant = request.headers.get("X-Lagniappe-Experiments-Task-List")
     if CONFIG.EXPERIMENTS_ENABLED and variant in ("batched", "unbatched"):
@@ -27,7 +37,7 @@ def task_list_context_keys():
 # @tests tests_e2e/013_agent_api/test_013g_experiments.py::test_experiments_request_headers_and_private_log_summary
 # @tests tests_e2e/013_agent_api/test_013g_experiments.py::test_experiments_comparison_metadata_survives_304
 # @matrix experiments : request-measurements
-def initialize_measurements(app, config):
+def initialize_measurements(app: Flask, config: Config) -> None:
     """Register first so the timing response hook runs after all other hooks."""
     if not config.EXPERIMENTS_ENABLED or config.EXPERIMENTS_DIAGNOSTICS == "off":
         return
@@ -36,7 +46,7 @@ def initialize_measurements(app, config):
     # @covered-by lagniappe/web/experiments.py::initialize_measurements
     # @reason begin request-local collection before authentication and CSRF checks
     @app.before_request
-    def begin():
+    def begin() -> None:
         g.experiments_measurement = measurements.Measurement(
             config.EXPERIMENTS_DIAGNOSTICS
         )
@@ -46,7 +56,7 @@ def initialize_measurements(app, config):
     # @covered-by lagniappe/web/experiments.py::initialize_measurements
     # @reason response metadata deliberately excludes request paths and contents
     @app.after_request
-    def finish(response):
+    def finish(response: Response) -> Response:
         measurement = getattr(g, "experiments_measurement", None)
         if measurement is None:
             return response
@@ -77,7 +87,7 @@ def initialize_measurements(app, config):
     # @covered-by lagniappe/web/experiments.py::initialize_measurements
     # @reason restore the context even when Flask does not produce a response
     @app.teardown_request
-    def cleanup(error):
+    def cleanup(error: BaseException | None) -> None:
         token = g.pop("experiments_token", None)
         if token is not None:
             if not g.pop("experiments_logged", False):
@@ -93,13 +103,13 @@ def initialize_measurements(app, config):
     # @testable false
     # @covered-by lagniappe/web/experiments.py::initialize_measurements
     # @reason pair Flask template signals without storing template context values
-    def template_start(sender, **kwargs):
+    def template_start(sender: Flask, **kwargs: object) -> None:
         g.setdefault("experiments_template_stack", []).append(time.perf_counter())
 
     # @testable false
     # @covered-by lagniappe/web/experiments.py::initialize_measurements
     # @reason template durations can overlap other measured provider operations
-    def template_end(sender, **kwargs):
+    def template_end(sender: Flask, **kwargs: object) -> None:
         stack = g.get("experiments_template_stack", [])
         measurement = measurements.CURRENT.get()
         if stack and measurement:

@@ -1,5 +1,12 @@
 """Routes for AI tool reports."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import abort, redirect, request, url_for
 from flask_login import current_user
 
@@ -27,7 +34,7 @@ from lagniappe.core.tools.forms import review as form_review
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
 from lagniappe.web import deferred_autofill
-from lagniappe.web.auth import ai_access, logged_in, require_ai_access
+from lagniappe.web.auth import authenticated_user, ai_access, logged_in, require_ai_access
 
 from . import tools
 
@@ -38,7 +45,7 @@ from . import tools
 # @matrix ai tasks : cancellation
 @tools.route("/operations/<job_key>/cancel", methods=["POST"])
 @logged_in
-def cancel_generation(job_key):
+def cancel_generation(job_key: str) -> ResponseReturnValue:
     job = Entities.fetch_one(job_key, request=Fetch.direct())
     if not isinstance(job, Entities.DEFERRED_JOB) or job.job_type not in {"autofill", DeferredJobType.REPORT_AI.value}:
         abort(404)
@@ -46,7 +53,7 @@ def cancel_generation(job_key):
         target = Entities.fetch_one(((job.inputs or {}).get("target") or {}).get("id"), request=Fetch.direct())
         if not isinstance(target, (Entities.PAGE, Entities.TASK)) or not target.allowed(Action.EDIT, user=current_user):
             abort(403)
-        if (job.parameters or {}).get("mode") == "revise" and job.actor.key != current_user.key:
+        if (job.parameters or {}).get("mode") == "revise" and (job.actor is None or job.actor.key != current_user.key):
             abort(403)
         if request.form.get("operation-id") != job.idempotency_key:
             abort(409, description="This autofill control is stale. Refresh before trying again.")
@@ -55,7 +62,7 @@ def cancel_generation(job_key):
         was_cancelled = bool(statuses and statuses[0]["status"] in {"cancelled", "superseded"})
         return responses.json_response({"status": statuses[0] if statuses else None,
             "message": "Autofill cancelled. Saved answers and files were kept." if was_cancelled else "Autofill has already finished or applied its results."})
-    if job.actor.key != current_user.key and not current_user.has_permission(Resource.SITE, Action.EDIT):
+    if (job.actor is None or job.actor.key != current_user.key) and not current_user.has_permission(Resource.SITE, Action.EDIT):
         abort(403)
     if request.form.get("operation-id") != job.idempotency_key:
         abort(409, description="This generation control is stale. Refresh before trying again.")
@@ -68,7 +75,7 @@ def cancel_generation(job_key):
     if (report.deferred_job or {}).get("key") != job.urlsafe_key:
         abort(409, description="This report operation has changed.")
     DeferredJobs.cancel(job)
-    if job.actor.key != current_user.key:
+    if job.actor is None or job.actor.key != current_user.key:
         return redirect(url_for("analytics.index"))
     return redirect(url_for("tools.report", key=report.urlsafe_key))
 
@@ -77,7 +84,7 @@ def cancel_generation(job_key):
 # @pair ai:autofill
 @tools.route("/autofill/<key>/revise", methods=["POST"])
 @ai_access(AI.CREATE)
-def refine_autofill(key):
+def refine_autofill(key: str) -> ResponseReturnValue:
     """Prompt-only, actor-private proposals; never save the modal's draft answers."""
     target = Entities.fetch_one(key, request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS))
     if not isinstance(target, (Entities.PAGE, Entities.TASK)) or not target.allowed(Action.EDIT, user=current_user):
@@ -103,7 +110,7 @@ def refine_autofill(key):
             "previous_suggestions": form_review.review_projection(target, current_user),
         }
         return deferred_autofill.start_deferred_autofill(
-            target, current_user, request.form, mode="revise", submission=submission,
+            target, authenticated_user(), request.form, mode="revise", submission=submission,
             review_context=context,
         )
     except (ValueError, exceptions.ValidationError, exceptions.AIException) as error:
@@ -116,7 +123,7 @@ def refine_autofill(key):
 # @pair ai-access:provider-boundary
 @tools.route("/reports/<key>/retry-generation", methods=["POST"])
 @ai_access(AI.ASK)
-def retry_generation(key):
+def retry_generation(key: str) -> ResponseReturnValue:
     report = _get_report(key)
     if report is None:
         abort(404)
@@ -132,7 +139,7 @@ def retry_generation(key):
     try:
         DeferredJobs.start(DeferredJobSpec(
             job_type=DeferredJobType.REPORT_AI,
-            actor=current_user._get_current_object(),
+            actor=authenticated_user(),
             idempotency_key=request.form.get("operation-id"),
             inputs={"report": report},
             notification_body="Creating AI report...",
@@ -141,7 +148,7 @@ def retry_generation(key):
         ))
     except Exception:
         report.properties.process.fail("Generation could not be started. Retry to start again.")
-        Entities.save(report, current_user)
+        Entities.save(report, authenticated_user())
         raise
     return redirect(url_for("tools.report", key=report.urlsafe_key))
 
@@ -166,7 +173,7 @@ def _uploaded_report_files():
                 "filename": upload.filename,
                 "mimetype": upload.content_type,
             },
-            report_user=current_user._get_current_object(),
+            report_user=authenticated_user(),
         )
         files.append(file)
     return files
@@ -192,7 +199,7 @@ def _report_upload_manifest():
 # @reason route permission mirrors the final organize upload endpoint
 @tools.route("/ai/direct-upload", methods=["POST"])
 @ai_access(AI.ASK)
-def create_ai_report_direct():
+def create_ai_report_direct() -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
@@ -233,13 +240,13 @@ def _start_tool_report(
     )
     if auto_execute:
         report.db["auto_execute"] = True
-    Entities.save(*input_files, report, current_user)
+    Entities.save(*input_files, report, authenticated_user())
 
     try:
         job, notification = DeferredJobs.start(
             DeferredJobSpec(
                 job_type=DeferredJobType.REPORT_AI,
-                actor=current_user._get_current_object(),
+                actor=authenticated_user(),
                 idempotency_key=request.form.get("operation-id"),
                 inputs={"report": report},
                 parameters={"auto_execute": True} if auto_execute else {},
@@ -255,7 +262,7 @@ def _start_tool_report(
         report.properties.process.fail(
             "AI report could not be started. Please try again."
         )
-        Entities.save(report, current_user)
+        Entities.save(report, authenticated_user())
         exceptions.capture(
             e,
             context={
@@ -268,7 +275,7 @@ def _start_tool_report(
 
     # Starting the adapter may replace its report instance while recording the
     # operation. Render that saved state for an already-open homepage list too.
-    report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct()) or report
+    report = Entities.fetch_one(report, request=Fetch.direct()) or report
     return responses.deferred_tool_report(report, notification, job=job)
 
 
@@ -282,7 +289,7 @@ def _start_tool_report(
 # @matrix ai-report : list
 @tools.route("/ai", methods=["POST"])
 @ai_access(AI.ASK)
-def create_ai_report():
+def create_ai_report() -> ResponseReturnValue:
     if request.form.get("role") == "explain":
         return responses.error("Initial Prompt is no longer available.")
 
@@ -302,7 +309,7 @@ def create_ai_report():
 
     auto_execute = (
         request.form.get("auto_execute") == "true"
-        and can_auto_execute_onsite_plan(current_user._get_current_object())
+        and can_auto_execute_onsite_plan(authenticated_user())
     )
     return _start_tool_report(
         instructions,
@@ -368,7 +375,7 @@ def _external_plan_mutation_error(outcome):
 # @pair ai-access:provider-boundary
 @tools.route("/reports/<key>", methods=["GET"])
 @logged_in
-def report(key):
+def report(key: str) -> ResponseReturnValue:
     report = _get_report(key, require_available=False)
     if not report:
         return responses.not_found("Report not found")
@@ -387,7 +394,7 @@ def report(key):
 # @matrix ai-report : failed-prefix failure reload
 @tools.route("/reports/<key>/run", methods=["POST"])
 @logged_in
-def run_report(key):
+def run_report(key: str) -> ResponseReturnValue:
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
@@ -395,7 +402,7 @@ def run_report(key):
     try:
         job, notification = request_execution(
             report,
-            current_user._get_current_object(),
+            authenticated_user(),
             operation_id=(request.form.get("operation-id") or "").strip() or None,
         )
     except exceptions.ValidationError as error:
@@ -408,7 +415,7 @@ def run_report(key):
                 current.status = "ready"
                 current.pending = False
             current.error = message
-            Entities.save(current, current_user)
+            Entities.save(current, authenticated_user())
         exceptions.capture(
             error,
             context={
@@ -437,7 +444,7 @@ def run_report(key):
 # @pair ai-access:provider-boundary
 @tools.route("/reports/<key>/revise", methods=["POST"])
 @ai_access(AI.ASK)
-def revise_report(key):
+def revise_report(key: str) -> ResponseReturnValue:
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
@@ -457,7 +464,7 @@ def revise_report(key):
     if correcting:
         from lagniappe.core.tools.ai.reporting.corrections import link_correction, save_correction
         source = report
-        report = Entities.REPORT.create({"user": current_user._get_current_object(), "name": "Correction: " + source.name, "instructions": feedback, "origin": "web"})
+        report = Entities.REPORT.create({"user": authenticated_user(), "name": "Correction: " + source.name, "instructions": feedback, "origin": "web"})
         try:
             link_correction(report, source, current_user)
             save_correction(report, source)
@@ -465,13 +472,13 @@ def revise_report(key):
             return responses.error(str(error))
     else:
         report.properties.process.revise()
-        Entities.save(report, current_user)
+        Entities.save(report, authenticated_user())
 
     try:
         job, notification = DeferredJobs.start(
             DeferredJobSpec(
                 job_type=DeferredJobType.REPORT_AI,
-                actor=current_user._get_current_object(),
+                actor=authenticated_user(),
                 idempotency_key=request.form.get("operation-id"),
                 inputs={"report": report},
                 parameters={"mode": "generate" if correcting else "revise", "feedback": feedback},
@@ -490,7 +497,7 @@ def revise_report(key):
             report.properties.process.revision_failed(
                 "AI report revision could not be started. Please try again."
             )
-        Entities.save(report, current_user)
+        Entities.save(report, authenticated_user())
         exceptions.capture(
             e,
             context={
@@ -512,7 +519,7 @@ def revise_report(key):
 # @matrix agent-api ai-report : browser-review cas skip-action
 @tools.route("/reports/<key>/actions/<int:action_index>/skip", methods=["POST"])
 @logged_in
-def skip_report_action(key, action_index):
+def skip_report_action(key: str, action_index: int) -> ResponseReturnValue:
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
@@ -548,7 +555,7 @@ def skip_report_action(key, action_index):
         if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
             return _external_plan_mutation_error(outcome)
     else:
-        Entities.save(report, current_user)
+        Entities.save(report, authenticated_user())
     return responses.json_response(result)
 
 
@@ -561,14 +568,14 @@ def skip_report_action(key, action_index):
 # @matrix agent-api ai-report : browser-review cas delete report-execution
 @tools.route("/reports/<key>", methods=["DELETE"])
 @logged_in
-def delete_report(key):
+def delete_report(key: str) -> ResponseReturnValue:
     report = _get_report(key, require_available=False)
     if not report:
         return responses.not_found("Report not found")
     outcome = report_history.delete_report_record(report)
     if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
         return _external_plan_mutation_error(outcome)
-    Entities.touch(current_user)
+    Entities.touch(authenticated_user())
     return responses.ok()
 
 
@@ -578,7 +585,7 @@ def delete_report(key):
 # @matrix ai-report : bulk-delete ownership validation
 @tools.route("/reports/executed", methods=["DELETE"])
 @logged_in
-def delete_executed_reports():
+def delete_executed_reports() -> ResponseReturnValue:
     if getattr(current_user, "is_public", False):
         abort(403)
     data = request.get_json(silent=True)

@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 from flask import request
 
 from flask_login import current_user
@@ -22,7 +32,9 @@ from . import assets
 # @pairs page:asset-lifecycle pages:image-add
 @assets.route("<key>/add-page-image", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
-def add_page_image(key, **kwargs):
+def add_page_image(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     abort_public_user_action()
 
     page = kwargs["entity"]
@@ -49,7 +61,7 @@ def add_page_image(key, **kwargs):
 # @reason route permission mirrors the final page image upload endpoint
 @assets.route("<key>/add-page-image/direct-upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
-def add_page_image_direct(key, **kwargs):
+def add_page_image_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     abort_public_user_action()
 
     return direct_uploads.direct_upload_response()
@@ -61,7 +73,9 @@ def add_page_image_direct(key, **kwargs):
 # @pairs page:asset-lifecycle pages:image-remove
 @assets.route("<key>/remove-page-image", methods=["DELETE"])
 @permission(Resource.PAGE, Action.EDIT)
-def remove_page_image(key, **kwargs):
+def remove_page_image(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     abort_public_user_action()
 
     page = kwargs["entity"]
@@ -78,12 +92,14 @@ def remove_page_image(key, **kwargs):
 # @pairs page:asset-lifecycle pages:image-generate
 @assets.route("<key>/generate-page-image", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
-def generate_page_image(key, **kwargs):
+def generate_page_image(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     require_ai_access(AI.CREATE)
 
     page = kwargs["entity"]
 
-    generate_data = {
+    generate_data: dict[str, object] = {
         "user_prompt": request.form.get("prompt"),
     }
 

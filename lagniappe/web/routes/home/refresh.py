@@ -1,5 +1,12 @@
 """Batched collection refresh with cached-fingerprint comparisons."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import get_template_attribute, request
 from flask_login import current_user
 
@@ -102,7 +109,7 @@ def _refresh_target(view, target, refresh_view):
 # @pairs category-index:refresh permissions:authorization
 @internal.route("/refresh", methods=["POST"])
 @logged_in
-def refresh():
+def refresh() -> ResponseReturnValue:
     """Return permission-checked row deltas for supported mounted collections."""
     payload = request.get_json(silent=True) or {}
     view = payload.get("view")

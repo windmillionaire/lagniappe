@@ -1,11 +1,22 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 from flask import redirect, request
 
-from lagniappe.core.definitions import Action, AssetTypes, Fetch
+from lagniappe.core.definitions.asset import FileAsset, ImageAsset
+from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.definitions.asset import LARGE_ASSET_BYTES
-from lagniappe.core.entities import Entities
+from lagniappe.core.mixins.assets import AssetMixin
 from lagniappe.core.tools.files import ranges as file_ranges
 from lagniappe.core.tools.database import assets as database_assets
-from lagniappe.web.auth import permission
+from lagniappe.web.auth import load_route_entity, permission
 from lagniappe.web import responses
 
 from . import assets
@@ -77,9 +88,9 @@ def _file_response(asset, mimetype):
     if range_header:
         size = _asset_size(asset)
         try:
-            byte_range = file_ranges.parse_byte_range(range_header, size)
+            byte_range = file_ranges.parse_byte_range(range_header, size or 0)
         except file_ranges.UnsatisfiableByteRange:
-            return responses.file_range_not_satisfiable(size, mimetype)
+            return responses.file_range_not_satisfiable(size or 0, mimetype)
 
     if byte_range:
         content = database_assets.download_file(
@@ -115,17 +126,21 @@ def _file_response(asset, mimetype):
 # @pairs editor:image-upload file:preview page:asset-lifecycle
 @assets.route("<key>/<name>", methods=["GET", "HEAD"])
 @permission(requested=Action.VIEW)
-def get_image(key, name, **kwargs):
-    entity = Entities.fetch_one(
+def get_image(
+    key: str, name: str, **kwargs: Unpack[EntityContext[Entity]]
+) -> ResponseReturnValue:
+    entity = load_route_entity(
         kwargs["entity"],
         request=Fetch.direct(),
     )
 
+    if not isinstance(entity, AssetMixin):
+        return responses.not_found("Content not found")
     asset = entity.get_asset(name)
     if not asset:
         return responses.not_found("Content not found")
 
-    if isinstance(asset, AssetTypes.IMAGE.value):
+    if isinstance(asset, ImageAsset):
         if request.method == "HEAD":
             return _asset_metadata_response(asset, asset.content_type)
         if _large_asset(asset):
@@ -134,7 +149,7 @@ def get_image(key, name, **kwargs):
         if not content:
             return responses.not_found("Content not found")
         return responses.image_response(content, asset.content_type)
-    elif isinstance(asset, AssetTypes.FILE.value):
+    elif isinstance(asset, FileAsset):
         if request.method == "HEAD":
             return _asset_metadata_response(asset, entity.mimetype)
         return _file_response(asset, entity.mimetype)

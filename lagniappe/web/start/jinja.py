@@ -1,5 +1,13 @@
 """Jinja environment setup: custom tests, filters, and template globals."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask import Flask
+    from lagniappe.core.entities.entity import Entity
+
 from datetime import date, datetime
 
 from flask.json.provider import DefaultJSONProvider
@@ -21,31 +29,32 @@ class SafeJSONProvider(DefaultJSONProvider):
     """JSON provider that gracefully handles non-serializable types
     so ``|tojson`` in templates never raises TypeError."""
 
-    def default(self, o):
+    def default(self, o: object) -> object:
         if isinstance(o, (datetime, date)):
             return o.isoformat()
-        if hasattr(o, "__json__"):
-            return o.__json__()
+        serializer = getattr(o, "__json__", None)
+        if callable(serializer):
+            return serializer()
         return str(o)
 
 
 # @testable false
 # @reason current-user template helper is exercised through rendered E2E pages
-def starred(entity):
+def starred(entity: Entity) -> bool:
     return entity.key in current_user.properties.starred.keys
 
 
 # @testable true
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_owner_assignment_opt_in_enables_managed_user_combobox
 # @pair task-assignment:owner-opt-in
-def owner_allows_assignments():
+def owner_allows_assignments() -> bool:
     owner = cache.get_owner_projection()
     return bool(owner and owner.get("allow_task_assignments"))
 
 
 # @testable false
 # @reason Flask/Jinja date tests are exercised through rendered E2E pages
-def is_datetime(value):
+def is_datetime(value: object) -> bool:
     return isinstance(value, datetime)
 
 
@@ -64,14 +73,14 @@ def _date(value):
 
 # @testable false
 # @reason Flask/Jinja filters are exercised through rendered E2E pages
-def yesno(value):
+def yesno(value: object) -> str:
     return "true" if value else "false"
 
 
 # @testable true
 # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_safe_html_filter_rejects_untyped_values
 # @matrix templates security : safe-html strict-filter
-def render_safe_html(value):
+def render_safe_html(value: SafeHTML) -> Markup:
     """Expose only policy-stamped HTML at an explicit Jinja raw sink."""
     if not isinstance(value, SafeHTML):
         raise TypeError(f"safe_html requires SafeHTML, got {type(value).__name__}")
@@ -94,7 +103,7 @@ def _icon_definition(key):
 # @testable true
 # @tests tests_e2e/002_home/test_002a_home.py::test_home_material_symbols_use_semantic_span_markup
 # @matrix home icons : material-symbol-markup
-def render_icon(key, classes="", kind=None):
+def render_icon(key: str, classes: str | None = "", kind: str | None = None) -> Markup:
     """Render one decorative Material Symbol from its semantic registry ID."""
     definition = _icon_definition(key)
     if not definition:
@@ -127,7 +136,7 @@ def render_icon(key, classes="", kind=None):
 
 # @testable false
 # @reason Flask/Jinja date tests are exercised through rendered E2E pages
-def is_after_today(value):
+def is_after_today(value: date | datetime | None) -> bool:
     date = _date(value)
     if not date:
         return False
@@ -137,7 +146,7 @@ def is_after_today(value):
 
 # @testable false
 # @reason Flask/Jinja date tests are exercised through rendered E2E pages
-def is_before_today(value):
+def is_before_today(value: date | datetime | None) -> bool:
     date = _date(value)
     if not date:
         return False
@@ -152,7 +161,7 @@ def is_before_today(value):
 # @matrix template-formatting : safe-json tojson
 # @pair frontend-build:font-delivery
 # @pair ai-report:list-snippets
-def initialize(app):
+def initialize(app: Flask) -> None:
     app.json_provider_class = SafeJSONProvider
     app.json = SafeJSONProvider(app)
 

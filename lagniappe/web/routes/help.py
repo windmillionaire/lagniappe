@@ -1,5 +1,12 @@
 """Signed-in, source-backed application reference pages."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import Blueprint, abort, render_template
 
 from lagniappe.reference import get_topic
@@ -14,7 +21,7 @@ help_pages = Blueprint("help", __name__)
 # @matrix help : navigation context-permissions
 @help_pages.route("/<topic_id>")
 @logged_in
-def article(topic_id):
+def article(topic_id: str) -> ResponseReturnValue:
     try:
         topic = get_topic(topic_id)
     except KeyError:

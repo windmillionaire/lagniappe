@@ -1,11 +1,24 @@
 """Shared deferred orchestration for page and task form autofill."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from flask import Response
+    from google.cloud.datastore import Key
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.entities.entity import Entity
+    from werkzeug.datastructures import MultiDict
+
 import hashlib
 import json
 from uuid import uuid4
 
-from flask import g, request, url_for
-from flask_login import current_user
+from flask import abort, g, request, url_for
+from collections.abc import Mapping
+from lagniappe.web.auth import authenticated_user
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
@@ -32,7 +45,7 @@ from lagniappe.web import direct_uploads, responses
 # @testable false
 # @covered-by lagniappe/web/deferred_autofill.py::locked_response
 # @reason browser projection wrapper delegates to the durable lock resolver
-def active_lock(entity):
+def active_lock(entity: Entity) -> dict[str, object] | None:
     """Return the browser-safe active autofill descriptor for ``entity``."""
     return deferred_job_lock_descriptor(entity)
 
@@ -40,7 +53,9 @@ def active_lock(entity):
 # @testable true
 # @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
 # @matrix deferred-jobs : conflict form-lock
-def locked_response(entity, form=None):
+def locked_response(
+    entity: Entity, form: Mapping[str, object] | None = None
+) -> tuple[Response, int] | None:
     """Schema writers fence saves; an autofill reservation fences only AI starts."""
     form = form or {}
     descriptor = active_lock(entity)
@@ -64,7 +79,9 @@ def locked_response(entity, form=None):
 
 
 # @testable infrastructure
-def prepare_form_states(entities, user):
+def prepare_form_states(
+    entities: Iterable[models.Task | models.Page], user: models.User
+) -> None:
     """Batch operation lookups for a rendered task list, including initial HTML."""
     targets = [entity for entity in entities if not getattr(entity, "completed", False)
                and entity.allowed(Action.EDIT, user=user)]
@@ -75,10 +92,13 @@ def prepare_form_states(entities, user):
     for target in targets:
         descriptor = active.get(target.urlsafe_key)
         descriptors[target.urlsafe_key] = Operation.descriptor(*descriptor) if descriptor else None
-    keys = list(dict.fromkeys(filter(None, (
-        (descriptors[target.urlsafe_key] or {}).get("operation") or (target.deferred_job or {}).get("key")
-        for target in targets
-    ))))
+    keys = []
+    for target in targets:
+        descriptor = descriptors[target.urlsafe_key] or {}
+        job = target.deferred_job
+        key = descriptor.get("operation") or (job.get("key") if isinstance(job, dict) else None)
+        if isinstance(key, str) and key not in keys:
+            keys.append(key)
     statuses = g.setdefault("autofill_bootstrap_statuses", {})
     for index in range(0, len(keys), 50):
         statuses.update({status["key"]: status for status in DeferredJobs.statuses(keys[index:index + 50], user)})
@@ -87,9 +107,11 @@ def prepare_form_states(entities, user):
 # @testable true
 # @pair ai:autofill
 # @matrix ai tasks : autofill reload
-def form_state(entity, user=None):
+def form_state(
+    entity: models.Page | models.Task, user: models.User | None = None
+) -> dict[str, object]:
     """Bootstrap the same editor state used by subsequent operation polling."""
-    user = user or current_user
+    user = user or authenticated_user()
     if not entity.allowed(Action.EDIT, user=user) or (
         isinstance(entity, Entities.TASK) and entity.completed
     ):
@@ -101,7 +123,10 @@ def form_state(entity, user=None):
         return cache[cache_key]
     descriptors = g.get("autofill_bootstrap_locks", {})
     descriptor = descriptors[entity.urlsafe_key] if entity.urlsafe_key in descriptors else active_lock(entity)
-    key = descriptor.get("operation") if descriptor else (entity.deferred_job or {}).get("key")
+    last_job = entity.deferred_job
+    key = descriptor.get("operation") if descriptor else last_job.get("key") if isinstance(last_job, dict) else None
+    if not isinstance(key, str):
+        key = None
     cached_status = g.get("autofill_bootstrap_statuses", {}).get(key)
     statuses = [dict(cached_status)] if cached_status else DeferredJobs.statuses([key], user) if key else []
     status = statuses[0] if statuses else None
@@ -114,7 +139,7 @@ def form_state(entity, user=None):
     if (status and status["type"] == "autofill" and status["status"] == "succeeded"
             and not any(candidate["operation"] == key for candidate in reviews)):
         job = Entities.fetch_one(key, request=Fetch.direct())
-        if job and ((job.parameters or {}).get("mode") != "revise" or job.actor.key == user.key):
+        if isinstance(job, Entities.DEFERRED_JOB) and ((job.parameters or {}).get("mode") != "revise" or (job.actor is not None and job.actor.key == user.key)):
             snapshot = (job.parameters or {}).get("snapshot")
             stale_autofill = bool(snapshot) and not review.snapshot_matches_form(snapshot, entity)
         status = None
@@ -129,7 +154,7 @@ def form_state(entity, user=None):
         result["cancel_url"] = url_for("tools.cancel_generation", job_key=key)
         if status["status"] in {"failed", "cancelled"}:
             job = Entities.fetch_one(key, request=Fetch.direct())
-            if job and job.actor.key == user.key and (job.parameters or {}).get("mode") != "revise":
+            if isinstance(job, Entities.DEFERRED_JOB) and job.actor is not None and job.actor.key == user.key and (job.parameters or {}).get("mode") != "revise":
                 result["retry_operation"] = key
     cache[cache_key] = result
     return result
@@ -137,10 +162,12 @@ def form_state(entity, user=None):
 
 # @testable true
 # @pair ai:autofill
-def form_fingerprint(entity, user):
+def form_fingerprint(entity: models.Page | models.Task, user: models.User) -> str:
     """Operation revisions invalidate initial-form HTTP caches, not answer revisions."""
     state = form_state(entity, user)
-    operation = state.get("operation") or {}
+    operation = state.get("operation")
+    if not isinstance(operation, Mapping):
+        operation = {}
     return hashlib.sha256(json.dumps([
         entity.fingerprint, operation.get("key"), operation.get("revision"),
         entity.db.get(review.REVIEWS),
@@ -153,13 +180,14 @@ def form_fingerprint(entity, user):
 # @tests tests_e2e/006_tasks/test_006j_task_list_validation.py::test_task_list_rechecks_restrictions_for_cached_viewer
 # @matrix tasks cache : conditional-response durable-revision job-lifecycle viewer-scope
 # @matrix tasks cache permissions : conditional-response immediate-revocation inherited-restrictions
-def page_tasks_fingerprint(page, user):
+def page_tasks_fingerprint(page: models.Page, user: models.User) -> str:
     """Validate proven quiet fragments before loading their Task graph."""
     from lagniappe.web.auth import _etag_fingerprint
     from lagniappe.core.tools.polling.projections import page_tasks_revision
     if not page.allowed(Action.VIEW, user=user):
         return page.fingerprint
     snapshot = task_lists.quiet_snapshot(g.get("request_context_records"))
+    fingerprint = None
     if snapshot is not None:
         fingerprint = task_lists.quiet_fingerprint(snapshot, page, user)
         if request.if_none_match.contains_weak(_etag_fingerprint(fingerprint, user)):
@@ -169,7 +197,7 @@ def page_tasks_fingerprint(page, user):
             return fingerprint
     prepare_form_states(page.tasks, user)
     g.task_list_prepared = True
-    if snapshot is not None and not (
+    if fingerprint is not None and snapshot is not None and not (
         task_lists.has_operation_dependencies([*page.tasks, *page.completed_tasks])
         or any(g.get("autofill_bootstrap_locks", {}).values())
         or g.get("autofill_bootstrap_statuses")
@@ -183,7 +211,7 @@ def page_tasks_fingerprint(page, user):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006j_task_list_validation.py::test_task_list_job_boundaries_and_render_race
 # @matrix tasks cache : conditional-response concurrent-render
-def finish_task_list_validation(page):
+def finish_task_list_validation(page: models.Page) -> None:
     """Do not label a raced render as reusable quiet HTML."""
     snapshot = g.get("task_list_snapshot")
     if snapshot is None:
@@ -199,10 +227,15 @@ def finish_task_list_validation(page):
 
 
 # @testable infrastructure
-def conflict_response(entity):
+def conflict_response(entity: models.Page | models.Task) -> tuple[Response, int]:
     """Return fresh typed values for the shared online/offline review flow."""
-    entity = Entities.fetch_one(entity.key, request=Fetch.direct())
-    response = responses.page_task(entity, conflict=True) if isinstance(entity, Entities.TASK) else responses.page_info(entity, conflict=True)
+    loaded = Entities.fetch_one(entity.key, request=Fetch.direct())
+    if isinstance(loaded, Entities.TASK):
+        response = responses.page_task(loaded, conflict=True)
+    elif isinstance(loaded, Entities.PAGE):
+        response = responses.page_info(loaded, conflict=True)
+    else:
+        abort(404)
     if isinstance(response, tuple):
         return response[0], 409
     response.status_code = 409
@@ -214,7 +247,9 @@ def conflict_response(entity):
 # @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_autofill_start_snapshots_draft_and_stages_file_without_saving_them
 # @pair ai:autofill
 # @matrix ai files tasks : autofill rejected-suggestion staged-upload-cleanup
-def staged_upload_for_update(entity, actor, form):
+def staged_upload_for_update(
+    entity: models.Page | models.Task, actor: models.User, form: MultiDict[str, str]
+) -> tuple[models.File | None, list[dict[str, object]]]:
     """Prepare an accepted AI upload; defer deletion until the form save commits."""
     reviewed = set(form.getlist("reviewed-operation"))
     used = set(form.getlist("used-autofill-operation"))
@@ -227,14 +262,15 @@ def staged_upload_for_update(entity, actor, form):
         available = {candidate["operation"] for candidate in review.review_projection(entity, actor)}
         if not used.issubset(available):
             raise exceptions.ValidationError("The form changed. Run autofill again before using its suggestions.")
-        if entity.form:
-            guards = list(getattr(entity, "_form_additional_guards", ()))
+        if entity.form and entity.form.key is not None:
+            guards: list[tuple[Key, database_utility.ExactEntityState]] = list(getattr(entity, "_form_additional_guards", ()))
             guards.append((entity.form.key, database_utility.ExactEntityState(dict(entity.form.db))))
             entity._form_additional_guards = guards
 
     candidates = set(reviewed & references)
-    current_key = (entity.deferred_job or {}).get("key")
-    if current_key:
+    last_job = entity.deferred_job
+    current_key = last_job.get("key") if isinstance(last_job, dict) else None
+    if isinstance(current_key, str) and current_key:
         candidates.add(current_key)
     jobs = Entities.fetch(*candidates, request=Fetch.direct()) if candidates else ()
     file = None
@@ -247,14 +283,14 @@ def staged_upload_for_update(entity, actor, form):
         snapshot = (job.parameters or {}).get("snapshot")
         stale = bool(snapshot) and not review.snapshot_matches_form(snapshot, entity)
         record = (job.parameters or {}).get("upload_record")
-        if not record:
+        if not isinstance(record, dict) or not record:
             continue
         # Private prompt-only refinements build on the shared suggestion. A
         # selected refinement still uses the original evidence from that review.
         accepted = job.urlsafe_key in reviewed and bool(used) and job.status == "succeeded" and not stale
         discarded = job.urlsafe_key in reviewed and not accepted
         abandoned = (job.urlsafe_key == current_key and (job.status in {"failed", "cancelled"} or (job.status == "succeeded" and stale))
-                     and job.actor.key == actor.key)
+                     and job.actor is not None and job.actor.key == actor.key)
         if not (accepted or discarded or abandoned):
             continue
         if accepted:
@@ -278,18 +314,20 @@ def staged_upload_for_update(entity, actor, form):
                           "mimetype": upload.content_type},
                     key=file_key,
                 )
-                storage_assets.record_attempt_asset(file, file.assets["file"])
+                storage_assets.record_attempt_asset(file, dict(file.assets["file"]))
                 file.move_to(entity)
             elif not isinstance(file, Entities.FILE) or getattr(file.owner, "key", None) != entity.key:
                 raise exceptions.ValidationError("This autofill attachment belongs to another form.")
         cleanup.append(record)
-    if current_key:
+    if isinstance(current_key, str) and current_key:
         current = next((job for job in jobs if job.urlsafe_key == current_key), None)
+        parameters = current.parameters if isinstance(current, Entities.DEFERRED_JOB) else None
+        snapshot = (parameters or {}).get("snapshot")
         if current_key in reviewed or (
-            current and (current.status in {"failed", "cancelled"}
-                         or (current.status == "succeeded" and (current.parameters or {}).get("snapshot")
-                             and not review.snapshot_matches_form(current.parameters["snapshot"], entity)))
-            and current.actor.key == actor.key
+            isinstance(current, Entities.DEFERRED_JOB) and (current.status in {"failed", "cancelled"}
+                         or (current.status == "succeeded" and snapshot
+                             and not review.snapshot_matches_form(snapshot, entity)))
+            and current.actor is not None and current.actor.key == actor.key
         ):
             entity.deferred_job = None
             review.acknowledge_reviews(entity, actor, [current_key])
@@ -297,7 +335,7 @@ def staged_upload_for_update(entity, actor, form):
 
 
 # @testable infrastructure
-def cleanup_staged_uploads(records):
+def cleanup_staged_uploads(records: Iterable[Mapping[str, object]]) -> None:
     for record in records:
         if not storage_assets.delete_direct_upload(record):
             exceptions.capture(
@@ -314,17 +352,17 @@ def cleanup_staged_uploads(records):
 # @matrix ai tasks : retry original-prompt staged-upload
 # @pair deferred-jobs:hosted-e2e
 def start_deferred_autofill(
-    entity,
-    user,
-    form,
+    entity: models.Page | models.Task,
+    user: models.User,
+    form: Mapping[str, object],
     *,
-    multipart_file=False,
-    key=None,
-    source_widget=None,
-    destination=None,
-    lock_target=True,
-    **options,
-):
+    multipart_file: bool = False,
+    key: str | None = None,
+    source_widget: str | None = None,
+    destination: str | None = None,
+    lock_target: bool = True,
+    **options: object,
+) -> Response | tuple[Response, int]:
     """Create the pending notification and enqueue one persisted autofill job."""
     if multipart_file:
         return responses.error(
@@ -338,9 +376,9 @@ def start_deferred_autofill(
     trusted_retry_upload = False
     try:
         retry = form.get("autofill-retry")
-        if retry:
+        if isinstance(retry, str) and retry:
             previous = Entities.fetch_one(retry, request=Fetch.direct())
-            if (not isinstance(previous, Entities.DEFERRED_JOB) or previous.job_type != "autofill"
+            if (not isinstance(previous, Entities.DEFERRED_JOB) or previous.job_type != "autofill" or previous.actor is None
                     or previous.actor.key != user.key or previous.status not in {"failed", "cancelled"}
                     or ((previous.inputs or {}).get("target") or {}).get("id") != entity.urlsafe_key):
                 return responses.error("This autofill retry is no longer available.")

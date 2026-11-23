@@ -1,3 +1,10 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import g, request
 from flask_login import current_user
 
@@ -13,7 +20,7 @@ from . import internal
 # @reason route wrapper delegates preview resolution and safety checks to core helper
 @internal.route("/preview")
 @logged_in
-def preview():
+def preview() -> ResponseReturnValue:
     g.NO_CACHE = True
 
     try:
