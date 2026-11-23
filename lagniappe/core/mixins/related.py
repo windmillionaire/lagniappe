@@ -66,8 +66,8 @@ class RelatedEntityListMixin[Related: Entity = Entity](_RelationHost):
             self.entity._to_cache = None
 
     @property
-    def sort_value(self) -> dict[str, str]:
-        return {cast(str, e["hash"]): cast(str, e["name"]) for e in self.column_value}
+    def sort_value(self) -> dict[str, str | None]:
+        return {cast(str, e["hash"]): cast("str | None", e["name"]) for e in self.column_value}
 
     @property
     def column_value(self) -> list[dict[str, object]]:
@@ -391,7 +391,7 @@ class RelatedEntityMixin[Related: Entity = Entity](_RelationHost):
     _ordering = Ordering.CATEGORICAL
 
     @property
-    def sort_value(self) -> dict[str, str] | None:
+    def sort_value(self) -> dict[str, str | None] | None:
         return {self.value.hash: self.value.name} if self.value else None
 
     @property

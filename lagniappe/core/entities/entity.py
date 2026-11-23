@@ -150,7 +150,12 @@ class Entity:
 
     if TYPE_CHECKING:
         # Values exposed by the common entity property registry.
-        name: str
+        @property
+        def name(self) -> str | None: ...
+
+        @name.setter
+        def name[Part](self, value: str | list[Part] | None) -> None: ...
+
         @property
         def hash(self) -> str: ...
 

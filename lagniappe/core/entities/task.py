@@ -48,6 +48,9 @@ if TYPE_CHECKING:
 # @matrix task-completion mutations : hydration no-extra-read
 class Task(AssetMixin, SubmitterMixin, Entity):
     if TYPE_CHECKING:
+        @property
+        def restricted_to(self) -> dict[str, list[str]]: ...
+
         form: Form | None
         @property
         def due_date(self) -> datetime | None: ...

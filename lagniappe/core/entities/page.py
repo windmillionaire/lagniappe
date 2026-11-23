@@ -35,6 +35,9 @@ if TYPE_CHECKING:
 # @matrix cache page : public-user
 class Page(AssetMixin, SubmitterMixin, Entity):
     if TYPE_CHECKING:
+        @property
+        def restricted_to(self) -> dict[str, list[str]]: ...
+
         categories: list[Category]
         form: Form | None
 

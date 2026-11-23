@@ -27,6 +27,9 @@ if TYPE_CHECKING:
 # @reason focused methods/properties own the durable Form behavior
 class Form(Entity, AssetMixin):
     if TYPE_CHECKING:
+        @property
+        def restricted_to(self) -> dict[str, list[str]]: ...
+
         generation: int
         form_type: str | None
         schema: list[dict[str, object]]
