@@ -1,6 +1,17 @@
 """Internal one-to-one messaging entities."""
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from . import property_types
+    from datetime import datetime
+    from google.cloud.datastore import Entity as DatastoreEntity
+    from google.cloud.datastore import Key
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.entities.entity import EntityProperties
+    from typing import Self
 
 
 from .entity import Entity
@@ -9,19 +20,25 @@ from ..properties import message_conversation
 from lagniappe.core.tools.database import utility as database_utility
 
 
-if TYPE_CHECKING:
-    from . import property_types
-
-
 # @testable true
 # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
 # @matrix messaging : entity-contract polling-revision
 class MessageConversation(Entity):
     """Durable participant state and cursors for a direct-message thread."""
     if TYPE_CHECKING:
+        participants: list[Key] | None
+        visible_to: list[Key] | None
+        participant_names: dict[str, str] | None
+        last_activity: datetime | None
+        last_sender: Key | None
+        sequence: int | None
+        revision: int | None
+        unread_counts: dict[str, int] | None
+        read_through: dict[str, int] | None
+        cleared_through: dict[str, int] | None
+
         @property
         def properties(self) -> property_types.MessageConversationProperties: ...
-
 
     entity_kind = "message_conversation"
 
@@ -29,7 +46,7 @@ class MessageConversation(Entity):
     # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
     # @pair messaging:index-exclusion
     @property
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         return frozenset(
             {
                 "participant_names",
@@ -42,7 +59,7 @@ class MessageConversation(Entity):
     # @testable false
     # @covered-by lagniappe/core/entities/message.py::MessageConversation
     # @reason property registry composition is exercised through the entity contract
-    def _get_properties(self):
+    def _get_properties(self) -> EntityProperties:
         properties = super()._get_properties()
         properties.update(
             {
@@ -61,9 +78,10 @@ class MessageConversation(Entity):
         return properties
 
     @classmethod
-    def create(cls, actor, recipient, *, key, now):
-        conversation = cls(database_utility.create_entity(key))
-        conversation.db.exclude_from_indexes = conversation.exclude_from_index
+    def create(cls, actor: models.User, recipient: models.User, *, key: Key, now: datetime) -> Self:
+        row = database_utility.create_entity(key)
+        conversation = cls(row)
+        row.exclude_from_indexes = set(conversation.exclude_from_index)
         conversation.db.update(message_conversation.initial_values(actor, recipient, now))
         return conversation
 
@@ -74,9 +92,18 @@ class MessageConversation(Entity):
 class Message(Entity):
     """One immutable plain-text message in a conversation ancestor group."""
     if TYPE_CHECKING:
+        conversation: Key | None
+        sequence: int | None
+        sender: Key | None
+        recipient: Key | None
+        sender_name: str | None
+        recipient_name: str | None
+        body: str | None
+        hidden_for: list[Key] | None
+        operation_id: str | None
+
         @property
         def properties(self) -> property_types.MessageProperties: ...
-
 
     entity_kind = "message"
 
@@ -84,7 +111,7 @@ class Message(Entity):
     # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
     # @pair messaging:index-exclusion
     @property
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         return frozenset(
             {
                 "body",
@@ -98,7 +125,7 @@ class Message(Entity):
     # @testable false
     # @covered-by lagniappe/core/entities/message.py::Message
     # @reason property registry composition is exercised through the entity contract
-    def _get_properties(self):
+    def _get_properties(self) -> EntityProperties:
         properties = super()._get_properties()
         properties.update(
             {
@@ -118,18 +145,19 @@ class Message(Entity):
     @classmethod
     def create(
         cls,
-        conversation,
-        actor,
-        recipient,
+        conversation: models.MessageConversation | DatastoreEntity,
+        actor: models.User,
+        recipient: models.User,
         *,
-        key,
-        body,
-        operation_id,
-        sequence,
-        now,
-    ):
-        message = cls(database_utility.create_entity(key))
-        message.db.exclude_from_indexes = message.exclude_from_index
+        key: Key,
+        body: str,
+        operation_id: str,
+        sequence: int,
+        now: datetime,
+    ) -> Self:
+        row = database_utility.create_entity(key)
+        message = cls(row)
+        row.exclude_from_indexes = set(message.exclude_from_index)
         message.db.update(
             message_properties.initial_values(
                 conversation,

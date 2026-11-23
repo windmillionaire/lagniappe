@@ -1,6 +1,15 @@
 """Read-only grouped projection for AI report execution results."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.tools.ai.reporting.execution.ledger import ReportLedger
+
+
 from .ai_report_process import ReportProcessValue
+
+
+type _Ledger = ReportLedger
 
 
 # @testable true
@@ -8,13 +17,13 @@ from .ai_report_process import ReportProcessValue
 # @tests tests_unit/test_020h_ai_report_execution.py::test_grouped_result_actions_groups_completed_task_history_under_created_task
 # @tests tests_unit/test_020h_ai_report_execution.py::test_grouped_result_actions_groups_page_files_tasks_and_summaries
 # @matrix ai-report : attachments completed-task-history grouping result
-class Result(ReportProcessValue):
+class Result(ReportProcessValue[_Ledger]):
     """Structured deterministic run result for an AI report."""
 
     _id = "result"
 
     @property
-    def grouped_actions(self):
+    def grouped_actions(self) -> list[dict[str, object]]:
         if not isinstance(self.value, dict):
             return []
 
@@ -25,8 +34,10 @@ class Result(ReportProcessValue):
         file_targets = {}
         for action in self.value.get("actions") or []:
             item = dict(action)
-            target = item.get("target") or {}
-            entity = item.get("entity") or {}
+            saved_target = item.get("target")
+            saved_entity = item.get("entity")
+            target = saved_target if isinstance(saved_target, dict) else {}
+            entity = saved_entity if isinstance(saved_entity, dict) else {}
             action_type = item.get("type")
 
 

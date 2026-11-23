@@ -1,5 +1,17 @@
 """Persisted direct-message values, identity, validation, and projection."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from datetime import datetime
+    from google.cloud.datastore import Entity as DatastoreEntity
+    from google.cloud.datastore import Key
+    from lagniappe.core.entities import types as models
+
+
 import hashlib
 
 from ..exceptions import ValidationError
@@ -14,7 +26,7 @@ OPERATION_ID_LIMIT = 128
 # @testable true
 # @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
 # @pair messaging:body-validation
-def normalize_body(value):
+def normalize_body(value: object) -> str:
     if not isinstance(value, str):
         raise ValidationError("Message body is required.")
     body = value.strip()
@@ -30,7 +42,7 @@ def normalize_body(value):
 # @testable true
 # @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
 # @pair messaging:idempotency
-def normalize_operation_id(value):
+def normalize_operation_id(value: object) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValidationError("Message operation ID is required.")
     operation_id = value.strip()
@@ -42,7 +54,7 @@ def normalize_operation_id(value):
 # @testable true
 # @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
 # @pair messaging:deterministic-key
-def message_identity(sender, operation_id):
+def message_identity(sender: models.User | Key, operation_id: str) -> str:
     identity = f"{participant_id(sender)}\0{operation_id}"
     return hashlib.sha256(identity.encode()).hexdigest()
 
@@ -50,7 +62,7 @@ def message_identity(sender, operation_id):
 # @testable false
 # @covered-by lagniappe/core/tools/database/messaging.py::send_message_record
 # @reason exact raw message construction is exercised through the transaction boundary
-def initial_values(conversation, actor, recipient, body, operation_id, sequence, now):
+def initial_values(conversation: models.MessageConversation | DatastoreEntity, actor: models.User, recipient: models.User, body: str, operation_id: str, sequence: int, now: datetime) -> dict[str, object]:
     return {
         "type": "message",
         "kind": "message",
@@ -72,7 +84,7 @@ def initial_values(conversation, actor, recipient, body, operation_id, sequence,
 # @testable false
 # @covered-by lagniappe/core/tools/database/messaging.py::send_message_record
 # @reason replay comparison is exercised through idempotent send behavior
-def payload_matches(row, actor, recipient, body, operation_id):
+def payload_matches(row: Mapping[str, object], actor: models.User, recipient: models.User, body: str, operation_id: str) -> bool:
     return bool(
         row.get("sender") == actor.key
         and row.get("recipient") == recipient.key
@@ -84,7 +96,8 @@ def payload_matches(row, actor, recipient, body, operation_id):
 # @testable true
 # @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
 # @pair messaging:chronological-display
-def projection(row, viewer):
+def projection(row: DatastoreEntity, viewer: models.User) -> dict[str, object]:
+    created = row.get("created")
     sender_id = encoded_identifier(row.get("sender"))
     recipient_id = encoded_identifier(row.get("recipient"))
     return {
@@ -99,42 +112,42 @@ def projection(row, viewer):
             "name": row.get("recipient_name") or "Deleted user",
         },
         "body": row.get("body") or "",
-        "created": row.get("created").isoformat() if row.get("created") else None,
+        "created": created.isoformat() if created else None,
         "mine": row.get("sender") == viewer.key,
     }
 
 
-class Conversation(DBProperty):
+class Conversation(DBProperty["Key"]):
     _id = "conversation"
 
 
-class Sequence(DBProperty):
+class Sequence(DBProperty[int]):
     _id = "sequence"
 
 
-class Sender(DBProperty):
+class Sender(DBProperty["Key"]):
     _id = "sender"
 
 
-class Recipient(DBProperty):
+class Recipient(DBProperty["Key"]):
     _id = "recipient"
 
 
-class SenderName(DBProperty):
+class SenderName(DBProperty[str]):
     _id = "sender_name"
 
 
-class RecipientName(DBProperty):
+class RecipientName(DBProperty[str]):
     _id = "recipient_name"
 
 
-class Body(DBProperty):
+class Body(DBProperty[str]):
     _id = "body"
 
 
-class HiddenFor(DBProperty):
+class HiddenFor(DBProperty["list[Key]"]):
     _id = "hidden_for"
 
 
-class OperationID(DBProperty):
+class OperationID(DBProperty[str]):
     _id = "operation_id"

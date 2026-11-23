@@ -1,5 +1,13 @@
 """Deferred-job lifecycle state and privacy-bounded projections."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities import types as models
+
+
 from datetime import datetime, UTC
 
 from lagniappe.core.definitions import (
@@ -47,11 +55,11 @@ PHASE_LABELS = {
 }
 
 
-class Status(DBProperty):
+class Status(DBProperty[str]):
     _id = "status"
 
 
-class StatusRevision(DBProperty):
+class StatusRevision(DBProperty[int]):
     _id = "status_revision"
 
 
@@ -78,7 +86,7 @@ class Delivery(JSONValue):
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lifecycle_normalizes_timestamps_and_elapsed_time
 # @pair deferred-jobs:timestamp-normalization
-def datetime_value(value):
+def datetime_value(value: object) -> datetime | None:
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=UTC)
     if isinstance(value, str):
@@ -93,7 +101,7 @@ def datetime_value(value):
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lifecycle_normalizes_timestamps_and_elapsed_time
 # @pair deferred-jobs:elapsed-time
-def elapsed_seconds(start, now):
+def elapsed_seconds(start: object, now: datetime) -> int:
     start = datetime_value(start)
     return max(int((now - start).total_seconds()), 0) if start else 0
 
@@ -105,7 +113,7 @@ def elapsed_seconds(start, now):
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_active_job_elapsed_time_advances_with_the_clock
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_terminal_job_elapsed_time_uses_stored_fallbacks
 # @matrix deferred-jobs : privacy progress stale-state status timing dependency-wait recovery
-def status_projection(job, *, now):
+def status_projection(job: models.DeferredJob, *, now: datetime) -> dict[str, object]:
     progress = dict(getattr(job, "progress", None) or {})
     client = dict(getattr(job, "client", None) or {})
     phase = progress.get("phase") or getattr(job, "status", None) or "queued"
@@ -193,7 +201,7 @@ def status_projection(job, *, now):
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_admin_projection_exposes_diagnostics_without_payload_content
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_terminal_job_elapsed_time_stays_fixed_after_completion
 # @matrix deferred-jobs : diagnostics privacy timing
-def admin_projection(job, *, now):
+def admin_projection(job: models.DeferredJob, *, now: datetime) -> dict[str, object]:
     """Extend owner-visible status with bounded operational diagnostics."""
     projection = status_projection(job, now=now)
     actor = getattr(job, "actor", None)

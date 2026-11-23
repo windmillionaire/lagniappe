@@ -1,5 +1,12 @@
 """DB and related-entity properties for activity entities."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.entities import types as models
+
+
 from ..mixins import RelatedEntityListMixin, RelatedEntityMixin
 from ..tools.files.html import strip_tags
 from .base_asset import AssetProperty
@@ -10,61 +17,66 @@ NOTE_VISIBILITIES = frozenset({"private", "everyone"})
 NOTE_SCOPES = frozenset({"home", "page"})
 
 
+type _NoteParent = Entity
+type _Author = models.User
+type _InputFile = models.File
+
+
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_note_visibility_and_scope_validate_values
 # @matrix notes : persistence validation visibility
-class Visibility(DBProperty):
+class Visibility(DBProperty[str]):
     """Who may see a note within its owning surface."""
 
     _id = "visibility"
 
     @property
-    def value(self):
+    def value(self) -> str:
         return super().value or "private"
 
     @value.setter
-    def value(self, value):
+    def value(self, value: str | None) -> None:
         value = value or "private"
         if value not in NOTE_VISIBILITIES:
             raise ValueError("visibility must be 'private' or 'everyone'")
-        DBProperty._write_db_value(self, value)
+        self._write_db_value(value)
 
 
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_note_visibility_and_scope_validate_values
 # @matrix notes : persistence scope validation
-class Scope(DBProperty):
+class Scope(DBProperty[str]):
     """Surface that owns and displays a note."""
 
     _id = "scope"
 
     @property
-    def value(self):
+    def value(self) -> str:
         return super().value or "home"
 
     @value.setter
-    def value(self, value):
+    def value(self, value: str | None) -> None:
         value = value or "home"
         if value not in NOTE_SCOPES:
             raise ValueError("scope must be 'home' or 'page'")
-        DBProperty._write_db_value(self, value)
+        self._write_db_value(value)
 
 
-class AttachedParent(RelatedEntityMixin, DBProperty):
+class AttachedParent(RelatedEntityMixin[_NoteParent], DBProperty[_NoteParent]):
     """The parent attached to a note or notification."""
 
     # Property Attributes
     _id = "parent"
 
 
-class AttachedUser(RelatedEntityMixin, DBProperty):
+class AttachedUser(RelatedEntityMixin[_Author], DBProperty[_Author]):
     """The user who created a note."""
 
     # Property Attributes
     _id = "user"
 
 
-class InputFiles(RelatedEntityListMixin, DBProperty):
+class InputFiles(RelatedEntityListMixin[_InputFile], DBProperty[list[_InputFile]]):
     """Files uploaded as input for an AI report."""
 
     _id = "input_files"
@@ -73,13 +85,13 @@ class InputFiles(RelatedEntityListMixin, DBProperty):
     _icon = "file"
 
 
-class Tool(DBProperty):
+class Tool(DBProperty[str]):
     """Tool identifier used to generate an AI report."""
 
     _id = "tool"
 
 
-class Instructions(DBProperty):
+class Instructions(DBProperty[str]):
     """Optional user guidance supplied when creating an AI report."""
 
     _id = "instructions"
@@ -88,20 +100,20 @@ class Instructions(DBProperty):
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
 # @matrix activity notes : body html-stripping
-class Body(DBProperty):
+class Body(DBProperty[str]):
     """Plain-text body for notes and notifications."""
 
     # Property Attributes
     _id = "body"
 
     @property
-    def value(self):
+    def value(self) -> str | None:
         return super().value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: str | None) -> None:
         body = strip_tags(value).strip() if value else None
-        DBProperty._write_db_value(self, body)
+        self._write_db_value(body)
 
 
 # @testable true

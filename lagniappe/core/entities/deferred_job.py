@@ -1,6 +1,17 @@
 """Durable envelope for user-facing background work."""
 
-from typing import TYPE_CHECKING
+from __future__ import annotations
+
+from typing import Required, TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from . import property_types
+    from .user import User
+    from datetime import datetime
+    from google.cloud.datastore import Key
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.entities.entity import EntityProperties
+    from typing import Self
 
 
 from .entity import Entity
@@ -12,9 +23,33 @@ from ..properties import (
 )
 
 
-if TYPE_CHECKING:
-    from . import property_types
-    from .user import User
+class JobCreation(TypedDict, total=False):
+    actor: Required[models.User]
+    job_type: Required[str]
+    idempotency_key: Required[str]
+    key: Key | None
+    name: str
+    notification: models.Notification | None
+    job_version: int
+    start_completed: bool
+    attempt: int | str
+    status_revision: int | str
+    inputs: dict[str, dict[str, str] | None]
+    status: str | None
+    request_fingerprint: str | None
+    dispatch_state: str | None
+    task_identity: str | None
+    telemetry_id: str | None
+    dispatched_at: datetime | None
+    deadline_at: datetime | None
+    authorization: dict[str, object]
+    parameters: dict[str, object]
+    client: dict[str, object]
+    progress: dict[str, object]
+    checkpoint: dict[str, object]
+    result: dict[str, object]
+    error: dict[str, object]
+    delivery: dict[str, object]
 
 
 # @testable true
@@ -23,6 +58,19 @@ if TYPE_CHECKING:
 class DeferredJob(Entity):
     """Internal versioned job record; domain entities remain the UI contract."""
     if TYPE_CHECKING:
+        job_version: int | None
+        notification: models.Notification | None
+        idempotency_key: str
+        request_fingerprint: str | None
+        dispatch_state: str | None
+        task_identity: str | None
+        start_completed: bool
+        telemetry_id: str | None
+        dispatched_at: datetime | None
+        deadline_at: datetime | None
+        lease_token: str | None
+        lease_expires: datetime | None
+        next_attempt_at: datetime | None
         attempt: int | None
         status_revision: int | None
         actor: User | None
@@ -42,12 +90,11 @@ class DeferredJob(Entity):
         @property
         def properties(self) -> property_types.DeferredJobProperties: ...
 
-
     entity_kind = "job"
 
     @property
     # @testable infrastructure
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         return frozenset(
             {
                 "authorization",
@@ -71,16 +118,16 @@ class DeferredJob(Entity):
 
     @property
     # @testable infrastructure
-    def to_cache(self):
+    def to_cache(self) -> dict[str, object]:
         return {}
 
     @property
     # @testable infrastructure
-    def required(self):
+    def required(self) -> list[str]:
         return [self.actor.hash] if self.actor else []
 
     # @testable infrastructure
-    def _get_properties(self):
+    def _get_properties(self) -> EntityProperties:
         properties = super()._get_properties()
         properties.update(
             {
@@ -117,7 +164,7 @@ class DeferredJob(Entity):
 
     @classmethod
     # @testable infrastructure
-    def create(cls, data):
+    def create(cls, data: JobCreation) -> Self:
         actor = data["actor"]
         job = cls(data.get("key")) if data.get("key") else cls(parent=actor)
         job.kind = cls.entity_kind
