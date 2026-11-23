@@ -1,5 +1,11 @@
 """Function declaration and handler for loading a single form schema."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core import exceptions
@@ -45,11 +51,11 @@ GET_SCHEMA = types.FunctionDeclaration(
 # @tests tests_unit/test_015_ai_tools.py::test_get_schema_preserves_collection_rows_and_typed_cells
 # @matrix ai form-schema : form model-task page task tool-context
 # @matrix ai form-schema : permissions schema
-def execute_get_schema(args, user):
+def execute_get_schema(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     """Return the schema for a form, page, task, or model task."""
     identifier = args.get("id")
     ai_debug("tool.get_schema.request", identifier=identifier)
-    if not identifier:
+    if not isinstance(identifier, str) or not identifier:
         ai_debug("tool.get_schema.result", error="id is required")
         return {"error": "id is required"}
 

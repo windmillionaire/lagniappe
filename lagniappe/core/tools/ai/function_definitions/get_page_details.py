@@ -1,5 +1,11 @@
 """Function declaration and handler for loading a page and its related context."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch
@@ -64,9 +70,9 @@ GET_PAGE_DETAILS = types.FunctionDeclaration(
 # @matrix ai files pages tasks : exclusions page-details projection summary
 # @matrix ai tasks : compact pagination permissions
 # @tests tests_unit/test_015f_ai_task_lists.py::test_compact_page_details_*
-def execute_get_page_details(args, user):
+def execute_get_page_details(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
-    if not identifier:
+    if not isinstance(identifier, str) or not identifier:
         return {"error": "id is required"}
 
     page = Entities.fetch_one(identifier, request=Fetch.direct())

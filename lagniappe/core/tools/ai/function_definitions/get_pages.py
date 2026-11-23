@@ -1,5 +1,11 @@
 """Function declaration and handler for loading sample pages from a category."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch
@@ -75,13 +81,13 @@ GET_CATEGORY_PAGES = types.FunctionDeclaration(
 # @tests tests_unit/test_015_ai_tools.py::test_get_category_pages_compact_returns_lightweight_page_refs
 # @tests tests_unit/test_015_ai_tools.py::test_get_category_pages_reports_effective_limit_and_pagination
 # @matrix ai category-pages : compact pagination tool-context
-def execute_get_category_pages(args, user):
+def execute_get_category_pages(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
     form_identifier = args.get("form_id")
     compact = _bool_arg(args.get("compact"))
     names_only = _bool_arg(args.get("names_only"))
     maximum = NAMES_LIMIT if names_only else SEARCH_LIMIT
-    if not identifier:
+    if not isinstance(identifier, str) or not identifier:
         return {"error": "id is required"}
 
     category = Entities.fetch_one(identifier, request=Fetch.direct())
@@ -91,6 +97,8 @@ def execute_get_category_pages(args, user):
         return {"error": "Access denied"}
     form = None
     if form_identifier:
+        if not isinstance(form_identifier, str):
+            return {"error": "Form not found"}
         form = Entities.fetch_one(form_identifier, request=Fetch.direct())
         if not form or not isinstance(form, Entities.FORM):
             return {"error": "Form not found"}

@@ -1,5 +1,11 @@
 """Function declaration and handler for workspace entity search."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason, SearchFacets
@@ -155,8 +161,10 @@ SEARCH_ENTITIES = types.FunctionDeclaration(
 # @tests tests_unit/test_015e_ai_candidate_search.py::test_external_candidates_use_cached_context_without_entity_loading
 # @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_scope_preserves_full_text_and_exact_modes
 # @matrix ai search : candidate-routing cached-details parent-scope
-def execute_search(args, user, *, candidate_search=False):
+def execute_search(args: Mapping[str, object], user: User, *, candidate_search: bool = False) -> Mapping[str, object] | list[dict[str, object]]:
     query = args.get("query", "")
+    if not isinstance(query, str):
+        return {"error": "query must be a string"}
     restrictions = user.properties.restrictions.search
     belongs_to = user.properties.restrictions.belongs_to
     kinds, invalid_kinds = _search_kinds(args.get("kinds"))
@@ -176,7 +184,7 @@ def execute_search(args, user, *, candidate_search=False):
             "allowed_match_modes": list(SEARCH_MATCH_MODES),
         }
     parent_hash = None
-    if args.get("parent_id"):
+    if parent_id := args.get("parent_id"):
         if (match_mode != "exact_name" and not candidate_search) or kinds != ["page"]:
             return {
                 "error": (
@@ -186,7 +194,9 @@ def execute_search(args, user, *, candidate_search=False):
                     "kinds=[\"page\"]."
                 )
             }
-        parent = Entities.fetch_one(args["parent_id"], request=Fetch.direct())
+        if not isinstance(parent_id, str):
+            return {"error": "Parent Category not found."}
+        parent = Entities.fetch_one(parent_id, request=Fetch.direct())
         if not isinstance(parent, Entities.CATEGORY):
             return {"error": "Parent Category not found."}
         if not parent.allowed(Action.VIEW, user=user):

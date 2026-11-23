@@ -63,9 +63,9 @@ def query_workspace_filter(
     conditions,
     user,
     *,
-    limit=DEFAULT_LIMIT,
-    sort="modified_desc",
-    include_inactive=False,
+    limit: object = DEFAULT_LIMIT,
+    sort: object = "modified_desc",
+    include_inactive: bool = False,
 ):
     """Warm a shared parent cache and return permission-filtered AI records."""
     compiled = compile_filter_contract(

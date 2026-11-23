@@ -1,5 +1,11 @@
 """Function declaration and handler for loading entity details by ID."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason
@@ -42,9 +48,9 @@ GET_ENTITY = types.FunctionDeclaration(
 # @matrix form-schema : attached-form autofill model-task schema stored-key
 # @matrix ai : edit-view exact-answers shared-schema
 # @matrix entity-patch : preservation validation preparation permissions
-def execute_get_entity(args, user):
+def execute_get_entity(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
-    if not identifier:
+    if not isinstance(identifier, str) or not identifier:
         return {"error": "id is required"}
 
     entity = _load_entity(identifier)

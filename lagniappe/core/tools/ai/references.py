@@ -91,7 +91,7 @@ def normalize_hash_references(value: object, *, resolved_details=None) -> object
             {
                 f"hash:{entity_hash}": item["id"]
                 for entity_hash, item in details.items()
-                if isinstance(item, dict) and item.get("id")
+                if isinstance(item, dict) and "id" in item and item["id"]
             }
         )
     if not replacements:

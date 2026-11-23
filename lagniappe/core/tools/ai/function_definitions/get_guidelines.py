@@ -1,5 +1,11 @@
 """Function declaration and handler for on-demand AI guideline bundles."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.tools.ai.debug import ai_debug
@@ -254,7 +260,7 @@ GET_GUIDELINES = types.FunctionDeclaration(
 # @tests tests_unit/test_032d_external_guidance.py::test_submission_patch_guidance_is_shared_and_omits_autofill_workflow
 # @matrix ai : guidelines tool-dispatch
 # @matrix ai guidelines : action-selection field-type-selection payload-size
-def execute_get_guidelines(args, _user):
+def execute_get_guidelines(args: Mapping[str, object], _user: User) -> Mapping[str, object]:
     """Return guidelines for the built-in provider's current workflow stage."""
     return _guidelines_result(args, external=False)
 
@@ -265,7 +271,7 @@ def execute_get_guidelines(args, _user):
 # @matrix ai agent-api : guidelines tool-dispatch
 # @matrix ai guidelines : action-selection field-type-selection payload-size
 # @matrix ai-report submission : preservation validation
-def execute_external_get_guidelines(args, _user):
+def execute_external_get_guidelines(args: Mapping[str, object], _user: User) -> Mapping[str, object]:
     """Compose external authoring guidance from trusted API dispatch context."""
     return _guidelines_result(args, external=True)
 

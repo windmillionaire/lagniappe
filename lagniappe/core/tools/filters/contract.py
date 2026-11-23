@@ -423,8 +423,8 @@ def _entity_filter_value(entry, value, user, index):
     if not entity:
         normalized = identifier.removeprefix("hash:")
         details = cache.get_details_by_hash([normalized]).get(normalized)
-        if details and details.get("id"):
-            entity = Entities.fetch_one(details["id"], request=Fetch.direct())
+        if details and (entity_id := details.get("id")):
+            entity = Entities.fetch_one(entity_id, request=Fetch.direct())
     if not entity or not entity.allowed(Action.VIEW, user=user):
         _error(
             f"Filter condition {index + 1} references an unavailable entity.",

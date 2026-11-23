@@ -1,5 +1,11 @@
 """Function declaration and handler for listing workspace model resources."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 import json
 from collections import defaultdict
 from datetime import timedelta
@@ -52,7 +58,7 @@ LIST_WORKSPACE_RESOURCES = types.FunctionDeclaration(
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_list_workspace_resources_caches_inventory
 # @matrix ai : redis-cache resource-inventory
-def execute_list_workspace_resources(args, user):
+def execute_list_workspace_resources(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     """Return a cached, permission-filtered inventory of model resources."""
     cache_key = _resource_cache_key(user)
     cached = redis_cache.get(cache_key)
@@ -77,6 +83,8 @@ def execute_list_workspace_resources(args, user):
             ("project_id", Entities.PROJECT, "projects"),
         ):
             if identifier := args.get(argument):
+                if not isinstance(identifier, str):
+                    return {"error": "Requested workspace scope is unavailable"}
                 entity = Entities.fetch_one(identifier, request=Fetch.direct())
                 if not isinstance(entity, kind) or not _can_list(entity, user):
                     return {"error": "Requested workspace scope is unavailable"}

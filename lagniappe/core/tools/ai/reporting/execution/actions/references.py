@@ -1,6 +1,6 @@
 """Entity, page, and file reference resolution for report actions."""
 
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Literal, cast, overload
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason, Restriction
@@ -9,6 +9,7 @@ from ....references import stored_file_identifiers
 from lagniappe.core.tools import cache
 
 if TYPE_CHECKING:
+    from lagniappe.core.tools.cache.query import GroupScope
     from lagniappe.core.entities.entity import Entity
 
 
@@ -293,7 +294,7 @@ def _resolve_page_by_exact_name(page_name, user):
 
     restrictions = getattr(getattr(user, "properties", None), "restrictions", None)
     required = getattr(restrictions, "search", [])
-    belongs_to = getattr(restrictions, "belongs_to", Restriction.BELONGS_TO_NONE)
+    belongs_to = cast("GroupScope", getattr(restrictions, "belongs_to", Restriction.BELONGS_TO_NONE))
     results, _total = cache.search(
         page_name,
         required,

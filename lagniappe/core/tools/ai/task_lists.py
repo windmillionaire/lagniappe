@@ -5,6 +5,11 @@ import binascii
 from datetime import datetime, UTC
 import hashlib
 import json
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.page import Page
+    from lagniappe.core.entities.user import User
 
 from lagniappe.core.definitions import Action
 from lagniappe.core.tools.dates import user_timezone
@@ -28,8 +33,9 @@ TASK_LIMIT_SCHEMA = {
 # @covered-by lagniappe/core/tools/ai/function_definitions/get_page_details.py::execute_get_page_details
 # @reason shared compact projection and continuation are exercised through both read tools
 def compact_task_list(
-    page, user, *, include_completed, limit=DEFAULT_TASK_LIMIT, cursor=None, view=None
-):
+    page: Page, user: User, *, include_completed: object, limit: object = DEFAULT_TASK_LIMIT,
+    cursor: object = None, view: object = None,
+) -> dict[str, object]:
     """Page an authorized list without serializing task forms or submissions.
 
     Page loads and filters its task relations once. Pagination bounds projection

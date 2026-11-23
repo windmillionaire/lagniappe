@@ -1,5 +1,11 @@
 """Function declaration and handler for retrieving file content."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason
@@ -51,9 +57,9 @@ def _truthy(value):
 # @tests tests_unit/test_015_ai_tools.py::test_ai_get_file_skips_large_original_unless_requested
 # @tests tests_unit/test_015_ai_tools.py::test_ai_get_file_reports_unsupported_original_file
 # @matrix ai files : attachments content get-file large-file summary unsupported
-def execute_get_file(args, user):
+def execute_get_file(args: Mapping[str, object], user: User) -> Mapping[str, object] | tuple[Mapping[str, object], list[dict[str, str]]]:
     file_id = args.get("id")
-    if not file_id:
+    if not isinstance(file_id, str) or not file_id:
         return {"error": "id is required"}
 
     entity = Entities.fetch_one(file_id, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))

@@ -1,5 +1,11 @@
 """Function declaration and handler for listing forms available in a category."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch
@@ -35,9 +41,9 @@ GET_CATEGORY_FORMS = types.FunctionDeclaration(
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_category_forms_returns_full_form_schema
 # @matrix ai form-schema : autofill category-forms schema
-def execute_get_category_forms(args, user):
+def execute_get_category_forms(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
-    if not identifier:
+    if not isinstance(identifier, str) or not identifier:
         return {"error": "id is required"}
 
     category = Entities.fetch_one(identifier, request=Fetch.direct())
