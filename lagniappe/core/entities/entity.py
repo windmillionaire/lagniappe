@@ -28,13 +28,15 @@ if TYPE_CHECKING:
 class RegisteredProperty(Protocol):
     """Common portion of fields with different owner and value types."""
 
-    def __init__(self, *, entity: Entity) -> None: ...
-
     @property
     def id(self) -> str: ...
 
     @property
     def value(self) -> object: ...
+
+
+class _FieldFactory(Protocol):
+    def __call__(self, *, entity: Entity) -> RegisteredProperty: ...
 
 
 # @testable infrastructure
@@ -68,7 +70,10 @@ class EntityProperties:
         if name in self._registry:
             base_class = self._registry[name]
             try:
-                property_instance = base_class(entity=self._entity)
+                # Each owner registers its own concrete field classes. Their
+                # accepted owner types can be narrower than the base Entity.
+                factory = cast(_FieldFactory, base_class)
+                property_instance = factory(entity=self._entity)
             except PropertyError:
                 raise
             except Exception as e:
