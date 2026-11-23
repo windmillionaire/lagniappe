@@ -478,3 +478,22 @@ def test_form_filters(get_test_entities, get_schema):
             [condition[key] for key in ("field", "label", "kind", "icon")]
             for condition in form.filters.conditions
         ] == form.test_spec["expected_conditions"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("updated", [True, False])
+def test_html_descriptor_preserves_the_asset_change_flag(updated):
+    from types import SimpleNamespace
+
+    from lagniappe.core.properties.form_special import HTML
+
+    saved = []
+
+    def save_asset(content, field_id, asset_type):
+        saved.append((content, field_id, asset_type))
+        return SimpleNamespace(updated=updated)
+
+    field = HTML({"id": "notice"}, entity=SimpleNamespace(save_asset=save_asset))
+    assert HTML.value.fset(field, "<p>Hello</p>") is updated
+    assert HTML.value.fset(field, "") is None
+    assert saved == [("<p>Hello</p>", "notice", "html")]

@@ -22,6 +22,8 @@ def test_submission_value(get_test_entities, get_schema):
 
         assert entity.submission == test_submission
         assert entity.properties.submission.db_value == test_submission
+        with pytest.raises(AttributeError):
+            entity.properties.submission.db_value = {}
 
 
 # @pair submission:fields
