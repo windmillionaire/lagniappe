@@ -1,5 +1,7 @@
 """Custom exceptions and error capture (Sentry in prod, console in dev)."""
 
+from __future__ import annotations
+
 import sys
 import traceback
 from collections.abc import Mapping
