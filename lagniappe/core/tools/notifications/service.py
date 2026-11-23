@@ -20,7 +20,7 @@ from lagniappe.core.tools.database import notifications as database_notification
 # @testable false
 # @covered-by lagniappe/core/properties/notification_aggregate.py::counts
 # @reason thin service spelling preserves an explicit value/service boundary
-def aggregate_counts(row: Mapping[str, object] | None) -> dict[str, object]:
+def aggregate_counts(row: DatastoreRow | None) -> notification_aggregate.NotificationCounts:
     return notification_aggregate.counts(row)
 
 

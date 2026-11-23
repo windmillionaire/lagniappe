@@ -247,7 +247,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
         report = context.input("report")
         return report if isinstance(report, Entities.REPORT) else None
 
-    def external_delivery(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> object:
+    def external_delivery(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> dict[str, object] | None:
         from lagniappe.core.tools.email.ai import send_report_feedback
 
         return send_report_feedback(

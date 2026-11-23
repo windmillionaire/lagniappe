@@ -83,7 +83,7 @@ def execute_get_page_details(args: Mapping[str, object], user: User) -> Mapping[
         return {"error": "Access denied"}
 
     from .get_entity import edit_entity
-    result = {"page": edit_entity(page, user) if args.get("view") == "edit" else page.to_ai(user)}
+    result: dict[str, object] = {"page": edit_entity(page, user) if args.get("view") == "edit" else page.to_ai(user)}
 
     if page.model:
         result["category"] = page.model.to_ai(user)

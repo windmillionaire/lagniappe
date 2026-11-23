@@ -77,7 +77,7 @@ def send_message(
 # @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
 # @pair messaging:read-race
-def mark_read(user: User, conversation_identifier: str | Key, expected_revision: int | None = None) -> dict[str, object]:
+def mark_read(user: User, conversation_identifier: str | Key, expected_revision: int | None = None) -> views.ConversationProjection:
     key = database_get.datastore_key(conversation_identifier)
     if not key:
         raise ValueError("Conversation key is invalid.")
@@ -122,7 +122,7 @@ def hide_message(user: User, message_identifier: str | Key) -> bool:
 # @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
 # @pair messaging:clear-horizon
-def clear_conversation(user: User, conversation_identifier: str | Key) -> dict[str, object]:
+def clear_conversation(user: User, conversation_identifier: str | Key) -> views.ConversationProjection:
     key = database_get.datastore_key(conversation_identifier)
     if not key:
         raise ValueError("Conversation key is invalid.")

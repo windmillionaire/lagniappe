@@ -183,5 +183,5 @@ class DeferredJobAdapter:
         return False
 
     # @testable infrastructure
-    def external_delivery(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> object:
+    def external_delivery(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> dict[str, object] | None:
         return None

@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 if TYPE_CHECKING:
+    from .reporting.contracts.actions import ReportProposal
     from ...entities.ai_report import AIReport
     from ...entities.user import User
 
@@ -43,7 +44,7 @@ class FileUsage(TypedDict):
 
 
 class GeneratedReport(TypedDict):
-    proposal: dict[str, object]
+    proposal: ReportProposal
     file_usage: list[FileUsage]
     status: NotRequired[str]
 

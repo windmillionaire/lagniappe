@@ -2,7 +2,11 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
+    from ..entities.user import User
 
 DEFERRED_JOB_VERSION = 2
 SUPPORTED_DEFERRED_JOB_VERSIONS = frozenset({1, DEFERRED_JOB_VERSION})
@@ -85,11 +89,11 @@ class DeferredJobSpec:
     """Immutable input contract used to create one durable job."""
 
     job_type: DeferredJobType
-    actor: Any
+    actor: User
     inputs: dict[str, Any]
     parameters: dict[str, Any] = field(default_factory=dict)
     notification_body: str | None = "Working..."
-    notification_target: Any = None
+    notification_target: Entity | None = None
     client: dict[str, Any] = field(default_factory=dict)
     idempotency_key: str | None = None
     delay_seconds: int = 0

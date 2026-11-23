@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from ..reporting.contracts.actions import ReportProposal
     from ....entities.ai_report import AIReport
     from ....entities.user import User
 
@@ -609,7 +610,7 @@ def _answer_visible_text(field, value):
 # @pairs agent-api:ask ai-report:answer-only
 def validate_external_proposal(
     proposal: object, report: AIReport, user: User, *, file_usage: object, instructions: object = None, resolved_references: dict[str, str] | None = None
-) -> dict[str, object]:
+) -> ReportProposal:
     """Validate an external final proposal without provider repair."""
     _validate_top_level(proposal)
     assert isinstance(proposal, dict)

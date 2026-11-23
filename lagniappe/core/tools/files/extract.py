@@ -69,7 +69,7 @@ def start_file_extraction(
     from ...definitions import DeferredJobSpec, DeferredJobType
     from ..deferred_jobs.service import DeferredJobs
 
-    if not getattr(actor, "is_authenticated", False):
+    if actor is None or not getattr(actor, "is_authenticated", False):
         raise exceptions.ValidationError("File processing requires an authenticated actor.")
     return DeferredJobs.start(
         DeferredJobSpec(

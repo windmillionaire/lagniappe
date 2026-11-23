@@ -203,6 +203,8 @@ def submit_plan(
             "Provide instructions or finalized files before submission."
         )
 
+    # validate_external_proposal has validated every submitted usage row.
+    assert isinstance(file_usage, list)
     report.file_usage = deepcopy(file_usage)
     report.properties.process.set_proposal(normalized)
     manifest = dict(report.agent_manifest or {})
