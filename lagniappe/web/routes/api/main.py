@@ -1048,7 +1048,10 @@ def submit_plan(plan_id):
     )
     receipt = _submission_receipt(submitted)
     if data.get("execute") is True and submitted.output_kind == "proposal":
-        from lagniappe.core.tools.ai.auto_execute import plan_requires_review
+        from lagniappe.core.tools.ai.auto_execute import (
+            experiments_execution_allowed,
+            plan_requires_review,
+        )
         from lagniappe.core.tools.ai.reporting.execution.request import (
             request_execution,
         )
@@ -1059,11 +1062,16 @@ def submit_plan(plan_id):
                 "reason": "Automatic plan execution is not enabled for this connection.",
             }
         else:
-            pause_reason = plan_requires_review(submitted)
+            remote_mcp = bool(getattr(g, "remote_mcp_authenticated", False))
+            is_experiments = experiments_execution_allowed(
+                g.agent_api_user, remote_mcp=remote_mcp
+            )
+            pause_reason = plan_requires_review(
+                submitted, enforce_safety_pause=not is_experiments
+            )
             if pause_reason:
                 receipt["execution"] = {"started": False, "reason": pause_reason}
             else:
-                remote_mcp = bool(getattr(g, "remote_mcp_authenticated", False))
                 job, _notification = request_execution(
                     submitted,
                     g.agent_api_user,

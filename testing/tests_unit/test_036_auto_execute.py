@@ -389,3 +389,87 @@ def test_submission_validation_checks_execute_operation_id_and_require_review():
         actor,
     )
     assert any(err["code"] == "invalid_operation_id" for err in bad_op)
+
+
+def test_experiments_agent_bypasses_safety_pause_but_honors_require_review(monkeypatch):
+    agent = _make_user(
+        allow_auto_execute=False,
+        is_admin=True,
+        email="agent@localhost",
+    )
+    for name, value in {
+        "AI_ENABLED": True,
+        "EXTERNAL_AI_ENABLED": True,
+        "EXPERIMENTS_ENABLED": True,
+        "EXPERIMENTS_EXECUTION_ENABLED": True,
+        "EXPERIMENTS_PROJECT": "proj-exp",
+        "GOOGLE_CLOUD_PROJECT": "proj-exp",
+        "AGENT_ACCESS_ENABLED": True,
+        "AGENT_ACCESS_EMAIL": "agent@localhost",
+    }.items():
+        monkeypatch.setattr(CONFIG, name, value)
+    monkeypatch.setattr(
+        auto_execute,
+        "runtime_ai_settings",
+        lambda config=CONFIG: {"AI_AUTO_EXECUTE": False},
+    )
+    started = []
+    monkeypatch.setattr(
+        execution.database_utility,
+        "create_named_key",
+        lambda *args, **kwargs: "job-key",
+    )
+    monkeypatch.setattr(
+        execution.Entities,
+        "fetch_one",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "lagniappe.core.tools.ai.reporting.schema_updates.prepare_schema_updates",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "lagniappe.core.tools.ai.reporting.corrections.approve_correction",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        execution.DeferredJobs,
+        "start",
+        lambda spec: (started.append(spec) or SimpleNamespace(idempotency_key=spec.idempotency_key, status="queued"), None),
+    )
+
+    schema_report = _make_report(
+        agent,
+        proposal={
+            "summary": "Update form schema",
+            "actions": [{"id": "a1", "type": "update_form_schema", "data": {}}],
+            "issues": ["Breaking type change"],
+        },
+    )
+    fp = schema_report.agent_manifest["proposal_fingerprint"]
+    job, _ = execution.request_execution(
+        schema_report,
+        agent,
+        operation_id="exp-schema-op",
+        expected_fingerprint=fp,
+        remote_mcp=True,
+        external_execution=True,
+    )
+    assert job.idempotency_key == "exp-schema-op"
+    assert started[-1].parameters == {"experiments_execution": True}
+
+    # Explicit require_review=True still pauses even the designated experiments agent.
+    review_report = _make_report(
+        agent,
+        proposal=schema_report.proposal,
+        require_review=True,
+    )
+    with pytest.raises(exceptions.ValidationError, match="marked for browser review"):
+        execution.request_execution(
+            review_report,
+            agent,
+            operation_id="exp-review-op",
+            expected_fingerprint=fp,
+            remote_mcp=True,
+            external_execution=True,
+        )

@@ -38,6 +38,7 @@ def request_execution(
             "This execution was superseded by an approved correction."
         )
     is_external = bool(external_execution or remote_mcp)
+    is_experiments = False
     parameters: dict[str, Any] = {}
     if is_external:
         if not can_execute_external_plan(actor, remote_mcp=remote_mcp):
@@ -57,7 +58,8 @@ def request_execution(
             raise exceptions.ValidationError(
                 "The submitted proposal changed. Read and submit the current plan before execution."
             )
-        if experiments_execution_allowed(actor, remote_mcp=remote_mcp):
+        is_experiments = experiments_execution_allowed(actor, remote_mcp=remote_mcp)
+        if is_experiments:
             parameters = {"experiments_execution": True}
         else:
             parameters = {
@@ -100,7 +102,9 @@ def request_execution(
             "The submitted proposal changed. Read and submit the current plan before execution."
         )
     if is_external or auto_execute:
-        pause_reason = plan_requires_review(report)
+        pause_reason = plan_requires_review(
+            report, enforce_safety_pause=not is_experiments
+        )
         if pause_reason:
             raise exceptions.ValidationError(pause_reason)
 
