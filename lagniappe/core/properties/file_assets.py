@@ -68,7 +68,7 @@ class FileAsset(AssetProperty[_FileOwner, "StoredFile", "FileStorage | DirectUpl
     @value.setter
     def value(self, value: FileStorage | DirectUploadFile) -> None:
         upload = value
-        mimetype = cast(str | None, upload.content_type) or self.entity.mimetype
+        mimetype = upload.content_type or self.entity.mimetype
         self.entity.mimetype = file_utility.determine_mimetype(
             upload, self.entity.filename, mimetype, self.entity.encoding
         )
