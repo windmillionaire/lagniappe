@@ -3,32 +3,61 @@
 import json
 import hashlib
 from uuid import uuid4
+from typing import TYPE_CHECKING, Literal, Protocol, cast, overload
 
 from ..definitions import AssetTypes
+from ..definitions.asset import (
+    Asset, AssetContent, AssetDefinition, AssetOwner, AssetUpload, FileAsset, HTMLAsset,
+    ImageAsset, JSONAsset, JSONValue, StoredAsset, TextAsset, YDocAsset,
+)
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Entity as DatastoreEntity, Key
 from lagniappe.core.tools.database import assets as database_assets
+
+
+class _AssetEntity(AssetOwner, Protocol):
+    @property
+    def assets(self) -> dict[str, AssetDefinition]: ...
+
+
+if TYPE_CHECKING:
+    class _AssetHost:
+        hash: str
+
+        @property
+        def key(self) -> Key | None: ...
+
+        @property
+        def db(self) -> DatastoreEntity | dict[str, object]: ...
+else:
+    _AssetHost = object
 
 
 # @testable infrastructure
 # @covered-by lagniappe/core/mixins/assets.py::AssetMixin.get_asset
 # @covered-by lagniappe/core/mixins/assets.py::AssetMixin.save_asset
 class AssetRegistry:
-    def __init__(self):
+    def __init__(self) -> None:
         self._types = AssetTypes
 
-    def get(self, name, entity):
+    def get(self, name: str, entity: _AssetEntity) -> StoredAsset | None:
         definition = entity.assets.get(name)
         if not definition:
             return None
-        asset_type = self._types[definition.get("type", "").upper()]
+        tag = definition.get("type", "")
+        if tag is None:
+            raise AttributeError("Asset type is missing")
+        asset_type = self._types[tag.upper()]
         if not asset_type.value:
             return None
 
         return asset_type.value(definition, name=name, entity=entity)
 
-    def create(self, type, name, entity):
+    def create(self, type: str, name: str, entity: _AssetEntity) -> StoredAsset:
         asset_type = self._types[type.upper()]
-        if not asset_type:
-            return None
+        if not asset_type.value:
+            raise TypeError(f"Unknown asset type: {type!r}")
         return asset_type.value(name=name, entity=entity)
 
 
@@ -38,7 +67,7 @@ Assets = AssetRegistry()
 # @testable infrastructure
 # @covered-by lagniappe/core/properties/common_assets.py::Document.add_image
 # @covered-by lagniappe/core/properties/common_assets.py::Document.save
-class AssetMixin:
+class AssetMixin(_AssetHost):
     """Adds cloud-stored asset management to an entity.
 
     Assets are tracked in entity.db["assets"] as a JSON dict mapping
@@ -54,12 +83,13 @@ class AssetMixin:
         delete_asset(name): Remove an asset from storage and the assets dict.
     """
 
-    _assets = None
+    _assets: dict[str, AssetDefinition] | None = None
 
     @property
-    def assets(self):
+    def assets(self) -> dict[str, AssetDefinition]:
         if self._assets is None:
-            self._assets = json.loads(self.db.get("assets", "{}"))
+            raw = cast(str, self.db.get("assets", "{}"))
+            self._assets = cast("dict[str, AssetDefinition]", json.loads(raw))
 
         return self._assets
 
@@ -67,7 +97,7 @@ class AssetMixin:
     # @covered-by lagniappe/core/properties/common_assets.py::Document.add_image
     # @covered-by lagniappe/core/properties/common_assets.py::Document.save
     # @reason production asset lookup mechanics are exercised through E2E asset-backed property flows
-    def get_asset(self, name):
+    def get_asset(self, name: str) -> StoredAsset | None:
         name = name.split(".")[0] if isinstance(name, str) else name
         asset = Assets.get(name, self)
         if not asset:
@@ -77,26 +107,57 @@ class AssetMixin:
     # @testable false
     # @covered-by lagniappe/core/properties/common_assets.py::Document.save
     # @reason asset deletion is owned by property save/delete contracts
-    def delete_asset(self, name):
+    def delete_asset(self, name: str) -> None:
         asset = self.get_asset(name)
         if not asset:
             return
 
         asset.delete()
 
-        self._assets.pop(name)
+        self.assets.pop(name)
         self.db["assets"] = json.dumps(self._assets)
 
     # @testable false
     # @covered-by lagniappe/core/properties/common_assets.py::Document.add_image
     # @covered-by lagniappe/core/properties/common_assets.py::Document.save
     # @reason asset persistence plumbing is owned by the asset-backed property contracts
-    def save_asset(self, content, name, type, visibility="private", *, isolated=False):
+    @overload
+    def save_asset(self, content: str | None, name: str, type: Literal["html"],
+                   visibility: str = "private", *, isolated: bool = False) -> HTMLAsset | None: ...
+
+    @overload
+    def save_asset(self, content: str | None, name: str, type: Literal["ydoc"],
+                   visibility: str = "private", *, isolated: bool = False) -> YDocAsset | None: ...
+
+    @overload
+    def save_asset(self, content: str | None, name: str, type: Literal["text"],
+                   visibility: str = "private", *, isolated: bool = False) -> TextAsset | None: ...
+
+    @overload
+    def save_asset(self, content: JSONValue | None, name: str, type: Literal["json"],
+                   visibility: str = "private", *, isolated: bool = False) -> JSONAsset | None: ...
+
+    @overload
+    def save_asset(self, content: AssetUpload | None, name: str, type: Literal["image"],
+                   visibility: str = "private", *, isolated: bool = False) -> ImageAsset | None: ...
+
+    @overload
+    def save_asset(self, content: AssetUpload | None, name: str, type: Literal["file"],
+                   visibility: str = "private", *, isolated: bool = False) -> FileAsset | None: ...
+
+    @overload
+    def save_asset(self, content: AssetContent, name: str, type: str,
+                   visibility: str = "private", *, isolated: bool = False) -> StoredAsset | None: ...
+
+    def save_asset(
+        self, content: AssetContent, name: str, type: str, visibility: str = "private",
+        *, isolated: bool = False,
+    ) -> StoredAsset | None:
         asset = self.get_asset(name)
         if not content:
             self.delete_asset(name)
             return None
-        elif content and not asset:
+        elif not asset:
             asset = Assets.create(type, name, self)
             asset.visibility = visibility
             asset.content_type = getattr(
@@ -106,7 +167,7 @@ class AssetMixin:
         if isolated:
             # A losing checkpoint must never overwrite the winning checkpoint's
             # blob before its guarded Datastore metadata commit.
-            if type == "html" and asset.fingerprint == hashlib.md5(content.strip().encode()).hexdigest():
+            if type == "html" and asset.fingerprint == hashlib.md5(cast(str, content).strip().encode()).hexdigest():
                 return asset
             asset = Assets.create(type, name, self)
             # Never reuse a retired path: delayed cleanup from an older save
@@ -119,7 +180,9 @@ class AssetMixin:
                 content,
             )
 
-        saved = asset.save(content)
+        # The runtime registry pairs each storage type with its accepted content.
+        writer = cast("Asset[object, AssetContent]", asset)
+        saved = writer.save(content)
         if not saved:
             return None
 
@@ -131,7 +194,7 @@ class AssetMixin:
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_asset_mixin_copy_asset_copies_storage_and_updates_definition
     # @matrix asset-storage : copy metadata visibility
-    def copy_asset(self, asset, name=None, *, isolated=False):
+    def copy_asset(self, asset: StoredAsset | None, name: str | None = None, *, isolated: bool = False) -> StoredAsset | None:
         if not asset:
             return None
 

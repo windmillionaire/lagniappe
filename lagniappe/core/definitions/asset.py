@@ -4,10 +4,11 @@ import hashlib
 import json
 import re
 from enum import Enum
-from typing import TYPE_CHECKING, Protocol, TypedDict
+from typing import TYPE_CHECKING, Protocol, TypedDict, cast
 
 if TYPE_CHECKING:
     from google.cloud.datastore import Key
+    from werkzeug.datastructures import FileStorage
 
 from smartypants import smartypants
 
@@ -74,17 +75,23 @@ class AssetDefinition(TypedDict, total=False):
 
 class AssetOwner(Protocol):
     @property
-    def key(self) -> Key: ...
+    def key(self) -> Key | None: ...
     @property
     def hash(self) -> str: ...
-    @property
-    def encoding(self) -> str: ...
     def delete_asset(self, name: str) -> None: ...
 
 
-class _Upload(Protocol):
+class _EncodedOwner(AssetOwner, Protocol):
+    @property
+    def encoding(self) -> str: ...
+
+
+class _UploadStream(Protocol):
     def seek(self, offset: int, /) -> object: ...
     def read(self) -> bytes: ...
+
+
+type AssetUpload = _UploadStream | FileStorage
 
 
 type JSONValue = str | int | float | bool | None | list[JSONValue] | dict[str, JSONValue]
@@ -285,7 +292,7 @@ class Asset[ReadResult = str, WriteContent = str]:
 # @covered-by lagniappe/core/properties/common_assets.py::Document.add_image
 # @covered-by lagniappe/core/properties/file_assets.py::FileAsset.preview
 # @covered-by lagniappe/core/properties/file_assets.py::TextAsset.asset
-class FileAsset(Asset[bytes | None, _Upload]):
+class FileAsset(Asset[bytes | None, AssetUpload]):
     _type = "file"
 
     # @testable true
@@ -308,10 +315,10 @@ class FileAsset(Asset[bytes | None, _Upload]):
 
     def text(self) -> str:
         return database_assets.get_text(
-            self.path, self.visibility.value, self._owner.encoding
+            self.path, self.visibility.value, cast(_EncodedOwner, self._owner).encoding
         )
 
-    def save(self, content: _Upload) -> bool:
+    def save(self, content: AssetUpload) -> bool:
         if not content:
             return False
 
@@ -332,7 +339,7 @@ class ImageAsset(FileAsset):
     # @testable false
     # @covered-by lagniappe/core/properties/common_assets.py::Document.add_image
     # @reason image fingerprinting is a storage detail of document image uploads
-    def save(self, content: _Upload) -> bool:
+    def save(self, content: AssetUpload) -> bool:
         if not content:
             return False
 
@@ -481,3 +488,7 @@ class AssetTypes(Enum, metaclass=DefaultEnum):
     JSON = JSONAsset
 
     DEFAULT = None
+
+
+type StoredAsset = TextAsset | YDocAsset | JSONAsset | HTMLAsset | FileAsset | ImageAsset
+type AssetContent = JSONValue | AssetUpload

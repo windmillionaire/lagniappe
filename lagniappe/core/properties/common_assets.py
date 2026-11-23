@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Self, cast
 if TYPE_CHECKING:
     from werkzeug.datastructures import FileStorage
 
+    from ..definitions.asset import HTMLAsset, YDocAsset
     from ..entities.page import Page
     from ..entities.project import Project
 
@@ -76,7 +77,7 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property["Document", DocumentOw
         if self._html is not UNSET:
             return cast("str | None", self._html)
 
-        html_asset = self.entity.get_asset(self.id)
+        html_asset = cast("HTMLAsset | None", self.entity.get_asset(self.id))
         self._html = html_asset.html() if html_asset else None
         return self._html
 
@@ -90,7 +91,7 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property["Document", DocumentOw
         if self._ydoc is not UNSET:
             return cast("str | None", self._ydoc)
 
-        ydoc_asset = self.entity.get_asset(self._ydoc_id)
+        ydoc_asset = cast("YDocAsset | None", self.entity.get_asset(self._ydoc_id))
         self._ydoc = ydoc_asset.get() if ydoc_asset else None
         return self._ydoc
 
@@ -139,6 +140,8 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property["Document", DocumentOw
             if asset and asset.get("path") != (self.entity.assets.get(name) or {}).get("path"):
                 # Retire only after the new pair commits. This deletes the live
                 # object, not its backup generations or any embedded images.
+                if "path" not in asset:
+                    raise KeyError("path")
                 self.entity.add_mutation_intents(
                     MutationIntent.delete_blob(
                         asset["path"], asset.get("visibility", "private"),
