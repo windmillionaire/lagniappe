@@ -363,6 +363,20 @@ def test_direct_upload_full_read_requires_named_bounded_consumer():
     assert downloads == [{}]
 
 
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("record", "payload", "expected"),
+    [
+        ({"content_type": "image/jpeg"}, {"content_type": "image/png"}, "image/png"),
+        ({"content_type": "application/pdf"}, {}, "application/pdf"),
+        ({"content_type": 17}, {}, "application/octet-stream"),
+    ],
+)
+def test_direct_upload_exposes_a_string_content_type(record, payload, expected):
+    upload = assets.DirectUploadFile(record, payload, None)
+    assert upload.content_type == upload.lagniappe_content_type == expected
+
+
 # @matrix storage : cors origins
 @pytest.mark.unit
 def test_storage_cors_origins_include_configured_urls():

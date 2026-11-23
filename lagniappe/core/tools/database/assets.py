@@ -123,10 +123,9 @@ class DirectUploadFile:
         self.payload = payload
         self.blob = blob
         self.filename = str(payload.get("filename") or record.get("filename") or "upload")
+        content_type = payload.get("content_type") or record.get("content_type")
         self.content_type = (
-            payload.get("content_type")
-            or record.get("content_type")
-            or "application/octet-stream"
+            content_type if isinstance(content_type, str) and content_type else "application/octet-stream"
         )
         self.lagniappe_content_type = self.content_type
         self._buffer: io.BytesIO | None = None
