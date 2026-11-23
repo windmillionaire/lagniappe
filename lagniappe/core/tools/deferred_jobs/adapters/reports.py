@@ -1,5 +1,12 @@
 """Deferred-job adapters for the reports domain."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.definitions import DeferredJobSpec
+    from lagniappe.core.tools.deferred_jobs.context import DeferredJobContext
+    from collections.abc import Mapping
+
 from ..context import required_input
 from copy import deepcopy
 import hashlib
@@ -43,7 +50,7 @@ class ReportAdapter(DeferredJobAdapter):
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_replacement_supersedes_old_job_and_ignores_old_failure
     # @pairs ai-report:active-operation deferred-jobs:superseded
-    def started(self, context):
+    def started(self, context: DeferredJobContext) -> None:
         report = required_input(context, "report")
         current = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
         if isinstance(current, Entities.REPORT):
@@ -64,7 +71,7 @@ class ReportAdapter(DeferredJobAdapter):
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_corrective_report_generation_requires_create_access
     # @pair ai-access:provider-boundary
-    def authorize(self, context):
+    def authorize(self, context: DeferredJobContext) -> None:
         super().authorize(context)
         report = context.input("report")
         if not isinstance(context.actor, Entities.USER):
@@ -82,7 +89,7 @@ class ReportAdapter(DeferredJobAdapter):
                 "You do not have permission to update this report."
             )
 
-    def validate_apply(self, context):
+    def validate_apply(self, context: DeferredJobContext) -> None:
         """Only the operation recorded on the report may publish its proposal."""
         report = required_input(context, "report")
         active_job = report.deferred_job or {}
@@ -92,7 +99,7 @@ class ReportAdapter(DeferredJobAdapter):
             )
 
     # @testable infrastructure
-    def inspect(self, context):
+    def inspect(self, context: DeferredJobContext) -> DeferredJobInspection:
         report = Entities.fetch_one(
             required_input(context, "report").urlsafe_key,
             request=Fetch.direct(),
@@ -115,7 +122,7 @@ class ReportAdapter(DeferredJobAdapter):
     # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
     # @matrix ai-report : proposal-publication status
     # @matrix ai-report : async persistence
-    def apply(self, context):
+    def apply(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         context.ensure_active()
         self.validate_apply(context)
         report = required_input(context, "report")
@@ -132,9 +139,12 @@ class ReportAdapter(DeferredJobAdapter):
         snapshot = external_operations.report_snapshot(report)
         report.properties.process.set_proposal(proposal)
         report.file_usage = deepcopy(context.checkpoint.get("file_usage") or [])
+        job_key, lease_token = context.job.key, context.job.lease_token
+        if job_key is None or not isinstance(lease_token, str):
+            raise DeferredJobDriftError("Report generation was cancelled or replaced.")
         outcome = external_operations.save_plan_if_idle(
             report, snapshot,
-            active_job=(context.job.key, context.job.lease_token),
+            active_job=(job_key, lease_token),
         )
         if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
             raise DeferredJobDriftError("Report generation was cancelled or replaced.")
@@ -146,7 +156,7 @@ class ReportAdapter(DeferredJobAdapter):
 
     # @testable true
     # @matrix ai-report : cancellation revision reload
-    def cleanup(self, context, *, terminal):
+    def cleanup(self, context: DeferredJobContext, *, terminal: bool) -> None:
         if not terminal:
             return
         report = context.input("report")
@@ -220,7 +230,7 @@ class ReportAdapter(DeferredJobAdapter):
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_replacement_supersedes_old_job_and_ignores_old_failure
     # @pair ai-report:failure-isolation
-    def failure(self, context, error):
+    def failure(self, context: DeferredJobContext, error: BaseException | str) -> None:
         report = context.input("report")
         if not isinstance(report, Entities.REPORT):
             return
@@ -235,15 +245,15 @@ class ReportAdapter(DeferredJobAdapter):
             report.properties.process.revision_failed(str(error))
         else:
             result = (
-                {"error_context": error.context}
-                if getattr(error, "context", None)
+                {"error_context": error_context}
+                if (error_context := getattr(error, "context", None))
                 else None
             )
             report.properties.process.fail(str(error), result=result)
         external_operations.save_plan_if_idle(report, snapshot)
 
     # @testable infrastructure
-    def terminal_message(self, context, *, succeeded, error=None):
+    def terminal_message(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> str:
         label = "AI"
         if context.job.status in {"cancelled", "superseded"}:
             return "AI report generation cancelled."
@@ -263,13 +273,13 @@ class AIReportAdapter(ReportAdapter):
     max_lifetime_seconds = 10 * 60
     resume_preparation = False
 
-    def checkpoint_ready(self, context):
+    def checkpoint_ready(self, context: DeferredJobContext) -> bool:
         checkpoint = context.checkpoint or {}
         return checkpoint.get("stage") == "ready_to_apply" and isinstance(
             checkpoint.get("proposal"), dict
         )
 
-    def prepare(self, context):
+    def prepare(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         report, actor = required_input(context, "report"), context.actor
         stage = (context.checkpoint or {}).get("stage")
         stage_index = {
@@ -353,11 +363,11 @@ class ReportExecutionAdapter(DeferredJobAdapter):
     active_message = "Still saving report changes..."
     notification_policy = "none"
 
-    def checkpoint_ready(self, context):
+    def checkpoint_ready(self, context: DeferredJobContext) -> bool:
         """The report's action ledger is the execution checkpoint."""
         return True
 
-    def authorization(self, spec):
+    def authorization(self, spec: DeferredJobSpec) -> dict[str, object]:
         authorization = super().authorization(spec)
         report = spec.inputs.get("report")
         assert report is not None
@@ -371,7 +381,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         )
         return authorization
 
-    def started(self, context):
+    def started(self, context: DeferredJobContext) -> None:
         report = required_input(context, "report")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
@@ -420,7 +430,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             report._form_additional_guards = [(report.key, ExactEntityState(initial_state))]
             Entities.save(report, context.actor)
 
-    def authorize(self, context):
+    def authorize(self, context: DeferredJobContext) -> None:
         report = context.input("report")
         if context.parameters.get("experiments_execution"):
             from lagniappe.core.tools.experiments import can_execute
@@ -451,7 +461,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
                 "You do not have permission to execute this report."
             )
 
-    def validate_apply(self, context):
+    def validate_apply(self, context: DeferredJobContext) -> None:
         report = required_input(context, "report")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
@@ -466,7 +476,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
                 "The report proposal changed while execution was queued."
             )
 
-    def inspect(self, context):
+    def inspect(self, context: DeferredJobContext) -> DeferredJobInspection:
         report = Entities.fetch_one(
             required_input(context, "report").urlsafe_key,
             request=Fetch.direct(),
@@ -484,7 +494,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             return DeferredJobInspection.NOT_APPLIED
         return DeferredJobInspection.DRIFTED
 
-    def apply(self, context):
+    def apply(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         context.ensure_active()
         self.validate_apply(context)
         report = required_input(context, "report")
@@ -529,7 +539,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             if not can_auto_execute_onsite_plan(actor):
                 raise exceptions.ValidationError("Automatic plan execution is no longer allowed for this actor.")
 
-    def failure(self, context, error):
+    def failure(self, context: DeferredJobContext, error: BaseException | str) -> None:
         report = context.input("report")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
@@ -577,7 +587,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         else:
             Entities.save(report, context.actor)
 
-    def cleanup(self, context, *, terminal):
+    def cleanup(self, context: DeferredJobContext, *, terminal: bool) -> None:
         if not terminal:
             return
         report = context.input("report")
@@ -608,7 +618,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             else:
                 Entities.save(report, context.actor)
 
-    def terminal_message(self, context, *, succeeded, error=None):
+    def terminal_message(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> str:
         if succeeded:
             return "Report changes are saved."
         return f"Report execution failed. {str(error or '').strip()}".strip()

@@ -18,8 +18,11 @@ from lagniappe.core.tools.forms.review import launch_snapshot
 # @reason entity-specific destination projection is asserted through the public job spec
 def _destination(entity):
     if isinstance(entity, Entities.TASK):
+        page = entity.page
+        if page is None:
+            raise ValueError("Task autofill requires its owning Page.")
         return {
-            "key": entity.page.urlsafe_key,
+            "key": page.urlsafe_key,
             "source_widget": "TaskForm",
             "destination": f"{entity.hash}:TaskForm",
         }

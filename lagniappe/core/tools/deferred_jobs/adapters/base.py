@@ -17,10 +17,13 @@ if TYPE_CHECKING:
 from lagniappe.core.definitions import DeferredJobInspection
 
 from lagniappe.core.properties.deferred_job_request import Inputs
+
+
 from ..common import _load_reference
 from ..errors import DeferredJobDriftError
 
 
+type StartWrites = tuple[Sequence[tuple[Entity, tuple[str, ...] | None]], Sequence[tuple[Key, Mapping[str, object] | ExactEntityState | None]]]
 
 
 # @testable true
@@ -126,7 +129,7 @@ class DeferredJobAdapter:
         return None
 
     # @testable infrastructure
-    def start_writes(self, spec: DeferredJobSpec, job: DeferredJob) -> tuple[Sequence[tuple[Entity, tuple[str, ...] | None]], Sequence[tuple[Key, Mapping[str, object] | ExactEntityState | None]]]:
+    def start_writes(self, spec: DeferredJobSpec, job: DeferredJob) -> StartWrites:
         """Optional guarded domain writes committed atomically with job creation."""
         return (), ()
 
@@ -158,11 +161,11 @@ class DeferredJobAdapter:
         return None
 
     # @testable infrastructure
-    def failure(self, context: DeferredJobContext, error) -> None:
+    def failure(self, context: DeferredJobContext, error: BaseException | str) -> None:
         return None
 
     # @testable infrastructure
-    def terminal_message(self, context: DeferredJobContext, *, succeeded: bool, error=None) -> str:
+    def terminal_message(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> str:
         if succeeded:
             return self.success_message
         message = str(error or "").strip()
@@ -180,5 +183,5 @@ class DeferredJobAdapter:
         return False
 
     # @testable infrastructure
-    def external_delivery(self, context: DeferredJobContext, *, succeeded: bool, error=None) -> object:
+    def external_delivery(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> object:
         return None

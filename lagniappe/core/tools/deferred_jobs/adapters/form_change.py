@@ -1,5 +1,17 @@
 """One resumable form change with deterministic or prepared AI conversion batches."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.entities.user import User
+    from lagniappe.core.entities.deferred_job import DeferredJob
+    from lagniappe.core.entities.deferred_job_lock import DeferredJobLock
+    from lagniappe.core.definitions import DeferredJobSpec
+    from lagniappe.core.tools.deferred_jobs.adapters.base import StartWrites
+    from lagniappe.core.tools.deferred_jobs.context import DeferredJobContext
+    from collections.abc import Mapping
+
 from ..context import required_input
 from copy import deepcopy
 import json
@@ -30,7 +42,7 @@ class FormChangeAdapter(DeferredJobAdapter):
     success_message = "Form submissions updated."
     failure_prefix = "The form update needs attention."
 
-    def start_lock(self, spec, job):
+    def start_lock(self, spec: DeferredJobSpec, job: DeferredJob) -> DeferredJobLock | None:
         form = spec.inputs["form"]
         return Entities.DEFERRED_JOB_LOCK.create(
             {
@@ -42,7 +54,7 @@ class FormChangeAdapter(DeferredJobAdapter):
             }
         )
 
-    def start_writes(self, spec, job):
+    def start_writes(self, spec: DeferredJobSpec, job: DeferredJob) -> StartWrites:
         form = spec.inputs["form"]
         pending = deepcopy(form._starting_form_change)
         source = ExactEntityState(deepcopy(dict(form.db)))
@@ -54,7 +66,7 @@ class FormChangeAdapter(DeferredJobAdapter):
             (form.key, source),
         )
 
-    def authorize(self, context):
+    def authorize(self, context: DeferredJobContext) -> None:
         if self.inspect(context) == DeferredJobInspection.APPLIED:
             from lagniappe.core.definitions import Action
 
@@ -68,12 +80,12 @@ class FormChangeAdapter(DeferredJobAdapter):
         if change.get("report"):
             self.report_candidates(context, change)
 
-    def started(self, context):
+    def started(self, context: DeferredJobContext) -> None:
         from lagniappe.core.tools import cache
 
         cache.update(required_input(context, "form"))
 
-    def can_view_status(self, job, actor):
+    def can_view_status(self, job: DeferredJob, actor: User) -> bool:
         from lagniappe.core.definitions import Action
 
         form = Entities.fetch_one(
@@ -81,13 +93,13 @@ class FormChangeAdapter(DeferredJobAdapter):
         )
         return bool(form and form.allowed(Action.EDIT, user=actor))
 
-    def notification_target(self, context):
+    def notification_target(self, context: DeferredJobContext) -> Entity | None:
         return context.input("form")
 
-    def checkpoint_ready(self, context):
+    def checkpoint_ready(self, context: DeferredJobContext) -> bool:
         return bool(context.checkpoint.get("validated"))
 
-    def prepare(self, context):
+    def prepare(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         form, change = changes.owned_change(context)
         if not context.checkpoint and change.get("resume_checkpoint"):
             context.checkpoint_stage("resuming", change["resume_checkpoint"])
@@ -160,7 +172,7 @@ class FormChangeAdapter(DeferredJobAdapter):
                     self.report_candidates(context, change), scope, change["operations"]
                 )
 
-    def inspect(self, context):
+    def inspect(self, context: DeferredJobContext) -> DeferredJobInspection:
         form = Entities.fetch_one(required_input(context, "form").key, request=Fetch.root())
         receipt = contracts.json_value(form.db, "form_draft_receipt") if form else {}
         return (
@@ -170,7 +182,7 @@ class FormChangeAdapter(DeferredJobAdapter):
             else DeferredJobInspection.NOT_APPLIED
         )
 
-    def apply(self, context):
+    def apply(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         from lagniappe.core.mutations import execute_mutation
         from lagniappe.core.mutations.base import RootMutation
 
@@ -367,7 +379,7 @@ class FormChangeAdapter(DeferredJobAdapter):
                 "The Form was updated; its display refresh needs retrying."
             )
 
-    def before_cancel(self, job):
+    def before_cancel(self, job: DeferredJob) -> None:
         form = Entities.fetch_one(
             ((job.inputs or {}).get("form") or {}).get("id"), request=Fetch.root()
         )
@@ -382,7 +394,7 @@ class FormChangeAdapter(DeferredJobAdapter):
     # @testable true
     # @tests tests_unit/test_004l_form_schema_updates.py::test_preflight_rejection_releases_only_unapplied_change
     # @matrix form-migration : permissions preflight ownership
-    def failure(self, context, error):
+    def failure(self, context: DeferredJobContext, error: BaseException | str) -> None:
         from lagniappe.core.tools.forms.schema_updates import (
             RESTRICTED_MESSAGE,
             STALE_MESSAGE,
@@ -419,7 +431,7 @@ class FormChangeAdapter(DeferredJobAdapter):
         form._form_attempt_assets = pending.get("attempt_assets", [])
         cleanup_rejected_attempt(form)
 
-    def cleanup(self, context, *, terminal):
+    def cleanup(self, context: DeferredJobContext, *, terminal: bool) -> None:
         # A failed/expired job does not release ownership of partially converted values.
         from lagniappe.core.tools.database import deferred_jobs
 

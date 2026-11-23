@@ -1,5 +1,13 @@
 """Deferred-job adapters for the email domain."""
 
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.tools.email.ai import AttachmentRecord
+    from lagniappe.core.tools.deferred_jobs.context import DeferredJobContext
+    from collections.abc import Mapping
+
 from ..context import required_input
 import hashlib
 
@@ -39,7 +47,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
     failure_prefix = "Email submission failed."
     notification_policy = "failure"
 
-    def authorize(self, context):
+    def authorize(self, context: DeferredJobContext) -> None:
         super().authorize(context)
         report = context.input("report")
         if not isinstance(context.actor, Entities.USER):
@@ -53,10 +61,10 @@ class EmailIngestAdapter(DeferredJobAdapter):
                 "You do not have permission to update this report."
             )
 
-    def checkpoint_ready(self, context):
+    def checkpoint_ready(self, context: DeferredJobContext) -> bool:
         return (context.checkpoint or {}).get("stage") == "acceptance_sent"
 
-    def prepare(self, context):
+    def prepare(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         from lagniappe import CONFIG
         from lagniappe.core.definitions import enforce_file_consumer
         from lagniappe.core.tools.email.ai import (
@@ -103,8 +111,8 @@ class EmailIngestAdapter(DeferredJobAdapter):
                 parameters["_diagnostic_code"] = "attachment_download_failed"
                 try:
                     upload, actual_size = client.download_received_attachment(
-                        parameters.get("provider_message_id"),
-                        attachment,
+                        str(parameters.get("provider_message_id") or ""),
+                        cast("AttachmentRecord", attachment),
                         max_file_bytes=limits["maxFileBytes"],
                         max_total_bytes=limits["maxTotalFileBytes"],
                         total_bytes=total_bytes,
@@ -177,13 +185,13 @@ class EmailIngestAdapter(DeferredJobAdapter):
         )
         return context.checkpoint
 
-    def apply(self, context):
+    def apply(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         return {
             "report_key": required_input(context, "report").urlsafe_key,
             "report_job": context.checkpoint.get("report_job"),
         }
 
-    def failure(self, context, error):
+    def failure(self, context: DeferredJobContext, error: BaseException | str) -> None:
         from lagniappe.core.tools.email.ai import (
             AIEmailProviderError,
             AIEmailRejection,
@@ -220,7 +228,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
         current.properties.process.fail(message)
         Entities.save(current, context.actor)
 
-    def cleanup(self, context, *, terminal):
+    def cleanup(self, context: DeferredJobContext, *, terminal: bool) -> None:
         if not terminal:
             return
         context.parameters.pop("provider_message_id", None)
@@ -228,22 +236,22 @@ class EmailIngestAdapter(DeferredJobAdapter):
         context.parameters.pop("event_digest", None)
         context.parameters.pop("_diagnostic_code", None)
 
-    def external_delivery_required(self, context):
+    def external_delivery_required(self, context: DeferredJobContext) -> bool:
         return bool(
             context.job.status == DeferredJobStatus.FAILED.value
             and (context.checkpoint or {}).get("stage")
             not in {"report_job_started", "acceptance_sent"}
         )
 
-    def notification_target(self, context):
+    def notification_target(self, context: DeferredJobContext) -> Entity | None:
         report = context.input("report")
         return report if isinstance(report, Entities.REPORT) else None
 
-    def external_delivery(self, context, *, succeeded, error=None):
+    def external_delivery(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> object:
         from lagniappe.core.tools.email.ai import send_report_feedback
 
         return send_report_feedback(
-            context.input("report"),
+            required_input(context, "report"),
             "failure",
             message=(
                 context.parameters.get("_diagnostic_message")

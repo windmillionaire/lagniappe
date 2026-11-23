@@ -1,5 +1,14 @@
 """Deferred-job adapters for the files domain."""
 
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.definitions.asset import AssetDefinition
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.definitions import DeferredJobSpec
+    from lagniappe.core.tools.deferred_jobs.context import DeferredJobContext
+    from collections.abc import Mapping
+
 from ..context import required_input
 from copy import deepcopy
 import hashlib
@@ -32,7 +41,7 @@ class FileAdapter(DeferredJobAdapter):
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_adapter_drift_tracks_the_original_asset
     # @matrix deferred-jobs file : authorization fingerprint metadata-isolation original-asset
-    def authorization(self, spec):
+    def authorization(self, spec: DeferredJobSpec) -> dict[str, object]:
         authorization = super().authorization(spec)
         file = spec.inputs.get("file")
         try:
@@ -47,7 +56,7 @@ class FileAdapter(DeferredJobAdapter):
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_adapter_drift_tracks_the_original_asset
     # @matrix deferred-jobs file : fingerprint metadata-isolation original-asset validation
-    def validate_apply(self, context):
+    def validate_apply(self, context: DeferredJobContext) -> None:
         expected = (context.job.authorization or {}).get("file_asset_fingerprint")
         if expected is None:
             return super().validate_apply(context)
@@ -65,7 +74,7 @@ class FileAdapter(DeferredJobAdapter):
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_ai_adapters_reject_restricted_actor_before_prepare
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_adapter_requires_edit_permission_from_explicit_actor
     # @matrix deferred-jobs file : authorization explicit-actor
-    def authorize(self, context):
+    def authorize(self, context: DeferredJobContext) -> None:
         super().authorize(context)
         file = context.input("file")
         if not isinstance(context.actor, Entities.USER):
@@ -78,7 +87,7 @@ class FileAdapter(DeferredJobAdapter):
             )
 
     # @testable infrastructure
-    def notification_target(self, context):
+    def notification_target(self, context: DeferredJobContext) -> Entity | None:
         file = context.input("file")
         return file if isinstance(file, Entities.FILE) else None
 
@@ -92,7 +101,7 @@ class FileExtractAdapter(FileAdapter):
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_extract_adapter_checkpoints_and_applies_text_asset
     # @matrix file : extraction text-asset
     # @pair deferred-jobs:checkpoint
-    def prepare(self, context):
+    def prepare(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         context.set_phase(DeferredJobPhase.PREPARING_INPUTS)
         file = required_input(context, "file")
         extract = files.ocr_file(file, raise_errors=True)
@@ -113,7 +122,7 @@ class FileExtractAdapter(FileAdapter):
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_job_inspection_uses_loaded_input_without_fetch
     # @matrix deferred-jobs files : inspection loaded-input no-database-read
-    def inspect(self, context):
+    def inspect(self, context: DeferredJobContext) -> DeferredJobInspection:
         file = required_input(context, "file")
         if file is None:
             raise exceptions.ValidationError("Deferred file is missing.")
@@ -127,7 +136,7 @@ class FileExtractAdapter(FileAdapter):
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_extract_adapter_checkpoints_and_applies_text_asset
     # @matrix file : extraction text-asset
     # @pair deferred-jobs:checkpoint
-    def apply(self, context):
+    def apply(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         context.ensure_active()
         file = required_input(context, "file")
         text_asset = context.checkpoint.get("text_asset")
@@ -135,21 +144,21 @@ class FileExtractAdapter(FileAdapter):
             raise exceptions.ValidationError(
                 "Extracted text asset metadata is missing."
             )
-        file.assets["text"] = deepcopy(text_asset)
+        file.assets["text"] = deepcopy(cast("AssetDefinition", text_asset))
         file.db["assets"] = json.dumps(file.assets)
         file.properties.extract.section = context.checkpoint["process"]
         file.save()
         return {"file_key": file.urlsafe_key, "complete": True}
 
     # @testable infrastructure
-    def failure(self, context, error):
+    def failure(self, context: DeferredJobContext, error: BaseException | str) -> None:
         file = context.input("file")
         if isinstance(file, Entities.FILE):
             file.properties.extract.error = str(error)
             file.save()
 
     # @testable infrastructure
-    def terminal_message(self, context, *, succeeded, error=None):
+    def terminal_message(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> str:
         file = context.input("file")
         name = getattr(file, "name", "file")
         if succeeded:
@@ -166,7 +175,7 @@ class FileSummarizeAdapter(FileAdapter):
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_summary_expected_rejection_is_not_reported_twice
     # @matrix deferred-jobs file : expected-failure no-duplicate-capture summary
-    def prepare(self, context):
+    def prepare(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         context.set_phase(DeferredJobPhase.SUMMARIZING)
         file = required_input(context, "file")
         summarize = ai_summarize.generate_summary(file, raise_quota=True, raise_errors=True)
@@ -182,7 +191,7 @@ class FileSummarizeAdapter(FileAdapter):
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_job_inspection_uses_loaded_input_without_fetch
     # @matrix deferred-jobs files : inspection loaded-input no-database-read
-    def inspect(self, context):
+    def inspect(self, context: DeferredJobContext) -> DeferredJobInspection:
         file = required_input(context, "file")
         if file is None:
             raise exceptions.ValidationError("Deferred file is missing.")
@@ -194,7 +203,7 @@ class FileSummarizeAdapter(FileAdapter):
         return DeferredJobInspection.NOT_APPLIED
 
     # @testable infrastructure
-    def apply(self, context):
+    def apply(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         context.ensure_active()
         file = required_input(context, "file")
         file.summary = context.checkpoint.get("summary")
@@ -203,7 +212,7 @@ class FileSummarizeAdapter(FileAdapter):
         return {"file_key": file.urlsafe_key}
 
     # @testable infrastructure
-    def failure(self, context, error):
+    def failure(self, context: DeferredJobContext, error: BaseException | str) -> None:
         file = context.input("file")
         if isinstance(file, Entities.FILE):
             file.properties.summarize.error = str(error)
@@ -212,7 +221,7 @@ class FileSummarizeAdapter(FileAdapter):
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_summary_terminal_cleanup_starts_extraction_once
     # @matrix deferred-jobs file : extraction follow-up idempotency summary-first terminal
-    def cleanup(self, context, *, terminal):
+    def cleanup(self, context: DeferredJobContext, *, terminal: bool) -> None:
         if (
             not terminal
             or context.job.status
@@ -241,7 +250,7 @@ class FileSummarizeAdapter(FileAdapter):
         context.parameters.pop("extract_after_summary", None)
 
     # @testable infrastructure
-    def terminal_message(self, context, *, succeeded, error=None):
+    def terminal_message(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> str:
         file = context.input("file")
         name = getattr(file, "name", "file")
         if succeeded:
