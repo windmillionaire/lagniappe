@@ -9,12 +9,13 @@ from ..tools import cache
 from .base_property import Property
 
 if TYPE_CHECKING:
+    from ..restrictions import QueryHashes
     from ..entities.category import Category
     from ..entities.user import User as User
     from ..tools.cache.details import CachedDetail
 
 
-type Access = list[str] | Restriction
+type GroupMembership = list[str] | Literal[Restriction.BELONGS_TO_ALL, Restriction.BELONGS_TO_NONE]
 type AccessField = Literal['search', 'task', 'form', 'project', 'models', 'page', 'users', 'category', 'user_assign', 'category_edit', 'user_message']
 type PermissionDetails = Mapping[str, CachedDetail]
 
@@ -29,20 +30,20 @@ class RestrictionState(TypedDict):
     version: int
     fingerprint: str
     value: list[str]
-    belongs_to: Access
+    belongs_to: GroupMembership
     pages_by_category: dict[str, list[str]]
     can_initiate_messages: bool
-    search: Access
-    task: Access
-    form: Access
-    project: Access
-    models: Access
-    page: Access
-    users: Access
-    category: Access
-    user_assign: Access
-    category_edit: Access
-    user_message: Access
+    search: QueryHashes
+    task: QueryHashes
+    form: QueryHashes
+    project: QueryHashes
+    models: QueryHashes
+    page: QueryHashes
+    users: QueryHashes
+    category: QueryHashes
+    user_assign: QueryHashes
+    category_edit: QueryHashes
+    user_message: QueryHashes
 
 
 # @testable false
@@ -113,17 +114,17 @@ class Restrictions(Property[list[str], "User"]):
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_one_category_permissions
     # @matrix permissions restrictions : search
     @property
-    def search(self) -> Access:
+    def search(self) -> QueryHashes:
         return self._state_value("search")
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
     # @matrix permissions restrictions : facets
     @property
-    def task(self) -> Access:
+    def task(self) -> QueryHashes:
         return self._state_value("task")
 
-    def unrestricted_pages(self, category: Category) -> Access:
+    def unrestricted_pages(self, category: Category) -> QueryHashes:
         if self.entity.has_permission(category, Action.VIEW):
             return Restriction.UNRESTRICTED
 
@@ -133,22 +134,22 @@ class Restrictions(Property[list[str], "User"]):
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
     # @matrix permissions restrictions : facets
     @property
-    def form(self) -> Access:
+    def form(self) -> QueryHashes:
         return self._state_value("form")
 
     @property
-    def project(self) -> Access:
+    def project(self) -> QueryHashes:
         return self._state_value("project")
 
     @property
-    def models(self) -> Access:
+    def models(self) -> QueryHashes:
         return self._state_value("models")
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
     # @pair restrictions:page-list
     @property
-    def page(self) -> Access:
+    def page(self) -> QueryHashes:
         return self._state_value("page")
 
     # @testable true
@@ -156,11 +157,11 @@ class Restrictions(Property[list[str], "User"]):
     # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_user_assign_search_permission_filter_returns_assignable_users
     # @matrix permissions restrictions : assign search
     @property
-    def user_assign_restrictions(self) -> Access:
+    def user_assign_restrictions(self) -> QueryHashes:
         return self._state_value("user_assign")
 
     @property
-    def user_message_restrictions(self) -> Access:
+    def user_message_restrictions(self) -> QueryHashes:
         """Users eligible for direct messages and mention suggestions."""
         return self._state_value("user_message")
 
@@ -179,7 +180,7 @@ class Restrictions(Property[list[str], "User"]):
 # @tests tests_e2e/002_home/test_002k_home_pages.py::test_home_page_create_visible_for_category_editor
     # @matrix permissions restrictions : category-edit search
     @property
-    def category_edit_restrictions(self) -> Access:
+    def category_edit_restrictions(self) -> QueryHashes:
         return self._state_value("category_edit")
 
     # @testable true
@@ -195,11 +196,11 @@ class Restrictions(Property[list[str], "User"]):
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
     # @matrix permissions restrictions : facets
     @property
-    def users(self) -> Access:
+    def users(self) -> QueryHashes:
         return self._state_value("users")
 
     @property
-    def category(self) -> Access:
+    def category(self) -> QueryHashes:
         return self._state_value("category")
 
     # @testable true
@@ -211,7 +212,7 @@ class Restrictions(Property[list[str], "User"]):
     # @pair restrictions:search
     # @pair restrictions:root-fetch
     @property
-    def belongs_to(self) -> Access:
+    def belongs_to(self) -> GroupMembership:
         return self._ensure_loaded()["belongs_to"]
 
     # @testable true
@@ -240,7 +241,7 @@ class Restrictions(Property[list[str], "User"]):
         assert self._state is not None
         return self._state
 
-    def _state_value(self, key: AccessField) -> Access:
+    def _state_value(self, key: AccessField) -> QueryHashes:
         return self._ensure_loaded()[key]
 
     def _session_enabled(self) -> bool:
@@ -343,7 +344,7 @@ class Restrictions(Property[list[str], "User"]):
         )
 
     @staticmethod
-    def _has_access(restrictions: Access) -> bool:
+    def _has_access(restrictions: QueryHashes) -> bool:
         return Restriction.is_unrestricted(restrictions) or bool(restrictions)
 
     def _permission_hashes(
@@ -368,10 +369,10 @@ class Restrictions(Property[list[str], "User"]):
         return {key: sorted(value) for key, value in pages.items()}
 
     @staticmethod
-    def _page_restrictions(models: Access) -> Access:
+    def _page_restrictions(models: QueryHashes) -> QueryHashes:
         return ["models"] if Restriction.is_unrestricted(models) else models
 
-    def _task_restrictions(self, can_view_models: bool) -> Access:
+    def _task_restrictions(self, can_view_models: bool) -> QueryHashes:
         if self.entity.is_admin:
             return Restriction.UNRESTRICTED
         if can_view_models:
