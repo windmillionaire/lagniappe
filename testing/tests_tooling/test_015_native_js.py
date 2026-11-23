@@ -35,7 +35,9 @@ def native_inventory(tmp_path, monkeypatch):
     ]
     parsed = {"cases": rows, "imports": []}
     monkeypatch.setattr(native_js, "inventory", lambda path: parsed)
-    monkeypatch.setattr(native_js, "inventories", lambda paths: {})
+    monkeypatch.setattr(
+        native_js, "inventories", lambda paths: {str(p.resolve()): parsed for p in paths}
+    )
     return path, rows
 
 
