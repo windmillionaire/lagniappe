@@ -474,7 +474,7 @@ class IngressMutationPlanner:
         self.row_index = row_index
         self.service = service
         self.mapping = IngressMapping(entity)
-        self.created_entities = []
+        self.created_entities: list[Entity] = []
         self._history_index = 0
 
     @property

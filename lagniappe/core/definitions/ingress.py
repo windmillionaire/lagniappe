@@ -2,7 +2,10 @@
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
 
 INGRESS_FORMAT_VERSION = 1
 INGRESS_BATCH_SIZE = 25
@@ -97,7 +100,7 @@ class IngressMutationPlan:
     row_index: int
     idempotency_key: str
     result: dict[str, Any]
-    entities: tuple[Any, ...] = field(default=(), repr=False, compare=False)
+    entities: tuple[Entity, ...] = field(default=(), repr=False, compare=False)
 
     # @testable infrastructure
     def to_dict(self) -> dict[str, object]:
