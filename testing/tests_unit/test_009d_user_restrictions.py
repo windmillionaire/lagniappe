@@ -374,6 +374,8 @@ def test_restrictions_empty_list_is_loaded_state():
     with MockRestrictions().patch_cache() as details:
         restrictions = user.properties.restrictions
         assert restrictions.value == []
+        with pytest.raises(AttributeError):
+            restrictions.value = ["users"]
         assert restrictions.task == []
         assert restrictions.form == []
         assert restrictions.users == []

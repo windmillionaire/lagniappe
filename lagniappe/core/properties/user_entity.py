@@ -1,17 +1,24 @@
-from ..definitions import AI, NotificationEmailMode, Ordering
+from datetime import datetime
+from typing import TYPE_CHECKING, cast
 from uuid import uuid4
+
+from ..definitions import AI, NotificationEmailMode, Ordering
 from ..mixins import ColumnMixin, DateMixin
-from .base_db import DBProperty
-from .base_asset import AssetProperty
-from .base_property import UNSET
 from ..tools.files.downloads import download_image, downloaded_image_file
 from ..tools.http import PROFILE_IMAGE_POLICY
+from .base_asset import AssetProperty
+from .base_db import DBProperty
+from .base_property import UNSET
+
+if TYPE_CHECKING:
+    from ..definitions.asset import AssetUpload, ImageAsset
+    from ..entities.user import User as User
 
 
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_last_login
 # @matrix user : column date last-login
-class LastLogin(DateMixin, ColumnMixin, DBProperty):
+class LastLogin(DateMixin, ColumnMixin, DBProperty[datetime, "User"]):
     """User's last login timestamp.
 
     Set:
@@ -32,7 +39,7 @@ class LastLogin(DateMixin, ColumnMixin, DBProperty):
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_email
 # @matrix user : column email sort
-class Email(ColumnMixin, DBProperty):
+class Email(ColumnMixin, DBProperty[str, "User"]):
     """User's email address.
 
     Set:
@@ -49,27 +56,28 @@ class Email(ColumnMixin, DBProperty):
     _ordering = Ordering.EXISTS
 
     @property
-    def sort_value(self):
+    def sort_value(self) -> bool:
         return bool(self.value)
 
 
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_profile_photo_value_asset_lifecycle_and_google_download
 # @matrix user : asset-lifecycle default-image google-download profile-photo
-class ProfilePhoto(AssetProperty):
+class ProfilePhoto(AssetProperty["User", str, "AssetUpload | None"]):
     """User profile photo. Stored as an image asset. Downloaded on first access if logged in from Google."""
 
     _id = "photo"
 
     @property
-    def value(self):
-        if super().value:
-            return super().value.url
+    def value(self) -> str | None:
+        stored = cast("ImageAsset | None", self._stored_asset())
+        if stored:
+            return stored.url
 
         return "/images/anonymous.png"
 
     @value.setter
-    def value(self, value):
+    def value(self, value: AssetUpload | None) -> None:
         self._asset = UNSET
 
         if value:
@@ -78,10 +86,10 @@ class ProfilePhoto(AssetProperty):
             self.entity.delete_asset(self.id)
             self._value = None
 
-    def save_google_photo(self):
+    def save_google_photo(self) -> None:
         if self.entity.db.get("photo"):
             result = download_image(
-                self.entity.db["photo"], policy=PROFILE_IMAGE_POLICY
+                cast(str, self.entity.db["photo"]), policy=PROFILE_IMAGE_POLICY
             )
             image = downloaded_image_file(result)
             if image is not None:
@@ -90,7 +98,7 @@ class ProfilePhoto(AssetProperty):
 
 # @testable false
 # @covered-by lagniappe/core/properties/user_entity.py::InvalidateCache.value
-class InvalidateCache(DBProperty):
+class InvalidateCache(DBProperty[bool, "User", object]):
     """Flag to trigger client-side cache invalidation.
 
     Set to True when permissions change. The service worker reads this
@@ -110,12 +118,12 @@ class InvalidateCache(DBProperty):
     # @tests tests_unit/test_009a_user.py::test_user_invalidate_cache
     # @matrix cache user : invalidation test-user
     @property
-    def value(self):
+    def value(self) -> bool | None:
         return super().value
 
     @value.setter
-    def value(self, value):
-        DBProperty._write_db_value(self, value)
+    def value(self, value: object) -> None:
+        self._write_db_value(value)
         if value:
             # Each mutation owns a distinct acknowledgement, including a
             # second invalidation while an earlier one is still outstanding.
@@ -125,14 +133,14 @@ class InvalidateCache(DBProperty):
 # @testable true
 # @tests tests_unit/test_009f_user_ai_access.py::test_user_ai_access_legacy_defaults_validation_and_invalidation
 # @matrix ai-access : cache-invalidation legacy-default persistence public validation
-class AIAccess(DBProperty):
+class AIAccess(DBProperty[str, "User", object]):
     """Canonical per-user AI entitlement name."""
 
     _id = "ai_access"
 
     @property
-    def value(self):
-        stored = DBProperty._read_db_value(self)
+    def value(self) -> str:
+        stored = self._read_db_value()
         if stored is None:
             return (
                 AI.NONE.name
@@ -145,10 +153,10 @@ class AIAccess(DBProperty):
             return AI.NONE.name
 
     @value.setter
-    def value(self, value):
+    def value(self, value: object) -> None:
         name = AI.name_for(value)
         previous = self.value
-        DBProperty._write_db_value(self, name)
+        self._write_db_value(name)
         if previous != name:
             self.entity.invalidate_cache = True
 
@@ -156,16 +164,16 @@ class AIAccess(DBProperty):
 # @testable true
 # @tests tests_unit/test_029a_notification_email_policy.py::test_notification_email_preference_defaults_and_eligibility
 # @matrix notification-email : eligibility preference
-class NotificationEmailPreference(DBProperty):
+class NotificationEmailPreference(DBProperty[str, "User", object]):
     """Canonical per-user notification email mode."""
 
     _id = "notification_email_mode"
 
     @property
-    def value(self):
+    def value(self) -> str:
         if getattr(self.entity, "is_public", False):
             return NotificationEmailMode.NONE.name
-        stored = DBProperty._read_db_value(self)
+        stored = self._read_db_value()
         if stored is None:
             return NotificationEmailMode.DAILY.name
         try:
@@ -174,7 +182,7 @@ class NotificationEmailPreference(DBProperty):
             return NotificationEmailMode.NONE.name
 
     @value.setter
-    def value(self, value):
+    def value(self, value: object) -> None:
         name = NotificationEmailMode.name_for(value)
         if (
             getattr(self.entity, "is_public", False)
@@ -182,10 +190,10 @@ class NotificationEmailPreference(DBProperty):
         ):
             raise ValueError("Public users cannot receive notification email.")
         previous = self.value
-        DBProperty._write_db_value(self, name)
+        self._write_db_value(name)
         if name == NotificationEmailMode.NONE.name and previous != name:
             self.entity.db["notification_email_opt_out_epoch"] = (
-                int(self.entity.db.get("notification_email_opt_out_epoch") or 0) + 1
+                int(cast(int | str, self.entity.db.get("notification_email_opt_out_epoch") or 0)) + 1
             )
 
 
@@ -194,14 +202,14 @@ class NotificationEmailPreference(DBProperty):
 # @tests tests_unit/test_009a_user.py::test_user_admin_role_is_separate_from_owner_and_invalidates_cache
 # @matrix user : owner property
 # @pair owner:singleton
-class IsOwner(DBProperty):
+class IsOwner(DBProperty[bool, "User", object]):
     """Whether this row is the configured singleton primary Owner."""
 
     _id = "owner"
 
     @property
-    def value(self):
-        stored = bool(DBProperty._read_db_value(self))
+    def value(self) -> bool:
+        stored = bool(self._read_db_value())
         if getattr(self.entity, "_testing", False):
             return stored
 
@@ -217,7 +225,7 @@ class IsOwner(DBProperty):
         )
 
     @value.setter
-    def value(self, value):
+    def value(self, value: object) -> None:
         enabled = bool(value)
         if not getattr(self.entity, "_testing", False):
             email = str(self.entity.db.get("email") or "").strip().casefold()
@@ -234,29 +242,29 @@ class IsOwner(DBProperty):
                 raise ValueError("The configured primary Owner cannot be demoted.")
             if enabled:
                 self._validated_owner_email = owner_email
-        DBProperty._write_db_value(self, enabled)
+        self._write_db_value(enabled)
 
 
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_admin_role_is_separate_from_owner_and_invalidates_cache
 # @matrix admin : ai-independent legacy-default role
 # @pairs cache:cache-invalidation user:property
-class IsAdmin(DBProperty):
+class IsAdmin(DBProperty[bool, "User", object]):
     """Stored additional-Administrator role, with Owner inheritance."""
 
     _id = "admin"
 
     @property
-    def value(self):
+    def value(self) -> bool:
         return bool(
-            getattr(self.entity, "is_owner", False) or DBProperty._read_db_value(self)
+            getattr(self.entity, "is_owner", False) or self._read_db_value()
         )
 
     @value.setter
-    def value(self, value):
+    def value(self, value: object) -> None:
         enabled = bool(value)
-        previous = bool(DBProperty._read_db_value(self))
-        DBProperty._write_db_value(self, enabled)
+        previous = bool(self._read_db_value())
+        self._write_db_value(enabled)
         if previous != enabled:
             self.entity.invalidate_cache = True
 
@@ -264,7 +272,7 @@ class IsAdmin(DBProperty):
 # @testable true
 # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
 # @pair messaging:owner-opt-in
-class OwnerInboundToggle(DBProperty):
+class OwnerInboundToggle(DBProperty[bool, "User", object]):
     """Fail-closed owner opt-in for a collaboration channel."""
 
     _truthy = {True, "true", "True", "1", "on", "yes"}
@@ -273,11 +281,11 @@ class OwnerInboundToggle(DBProperty):
     # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
     # @pair messaging:owner-opt-in
     @property
-    def value(self):
+    def value(self) -> bool:
         return self.entity.db.get(self.db_key, False) in self._truthy
 
     @value.setter
-    def value(self, value):
+    def value(self, value: object) -> None:
         enabled = value in self._truthy
         self._value = enabled
         if enabled:

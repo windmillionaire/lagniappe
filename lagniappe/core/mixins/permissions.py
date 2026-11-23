@@ -1,8 +1,15 @@
 """Permission mixins for User, UserGroup, and PublicGroup entities."""
+from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING, cast
 
 from ..definitions import Action, Fetch, FetchReason, General, Levels, Site, Specific
 from ..entities import Entities
 from ..tools import cache
+
+if TYPE_CHECKING:
+    from ..entities.group import PublicGroup as PublicGroup
+    from ..entities.group import UserGroup
+    from ..entities.user import User
 
 
 # Config for the "assigned" section (user's group membership)
@@ -22,7 +29,7 @@ ASSIGNED_CONFIG = {
 # @testable true
 # @tests tests_unit/test_009c_user_permissions_form.py::test_form_permissions
 # @matrix permissions : form-data no-groups restricted
-class PermissionsMixin:
+class PermissionsMixin[Owner: User | UserGroup]:
     """Base permission management shared by User, Group, and Public mixins.
 
     Provides:
@@ -33,7 +40,13 @@ class PermissionsMixin:
             from form submission data.
     """
 
-    def get_specific_permissions(self):
+    if TYPE_CHECKING:
+        @property
+        def entity(self) -> Owner: ...
+        @entity.setter
+        def entity(self, value: Owner) -> None: ...
+
+    def get_specific_permissions(self) -> dict[str, list[dict[str, object]]]:
         """Return entity-specific permissions grouped by UI section."""
         permissions = self.entity.permissions
         general_keys = {g.value for g in General}
@@ -60,12 +73,14 @@ class PermissionsMixin:
                 "level": Levels[permissions[hash]].name,
                 "name": data.get("id"),
             }
-            section_name = Specific.section(data.get("kind")).value
+            section_name = Specific.section(data.get("kind", "")).value
             sections.setdefault(section_name, []).append(permission)
 
         return sections
 
-    def add_restricted_permissions(self, permissions, required):
+    def add_restricted_permissions(
+        self, permissions: dict[str, Action], required: Mapping[str, Iterable[str]]
+    ) -> None:
         """Prune redundant child permissions and mark parent restrictions."""
         for hash, parents in required.items():
             general_values = {g.value for g in General}
@@ -87,7 +102,7 @@ class PermissionsMixin:
     # @tests tests_unit/test_009e_user_groups.py::test_group_permissions
     # @tests tests_unit/test_009e_user_groups.py::test_general_forms_none_round_trips_for_default_view_permission
     # @matrix permissions user-groups : default-denial form-data restricted
-    def create_permissions(self, form_data):
+    def create_permissions(self, form_data: Mapping[str, str] | None) -> dict[str, str]:
         """Build a {hash: Action.name} dict from form submission data."""
         form_data = form_data or {}
         explicit_default_denials = {
@@ -95,11 +110,11 @@ class PermissionsMixin:
             for general in General
             if general.value in form_data
             and general.default != Levels.NONE
-            and Action[form_data.get(general.value)] == Action.NONE
+            and Action[form_data.get(general.value, Action.NONE.name)] == Action.NONE
         }
         permissions = {
-            **{s.value: Action[form_data.get(s.value)] for s in Site},
-            **{g.value: Action[form_data.get(g.value)] for g in General},
+            **{s.value: Action[form_data.get(s.value, Action.NONE.name)] for s in Site},
+            **{g.value: Action[form_data.get(g.value, Action.NONE.name)] for g in General},
         }
 
         entities = Entities.fetch(
@@ -109,8 +124,8 @@ class PermissionsMixin:
             ),
         )
         for entity in entities:
-            permissions[entity.hash] = Action[form_data.get(entity.urlsafe_key)]
-        required = {e.hash: e.required for e in entities}
+            permissions[entity.hash] = Action[form_data.get(entity.urlsafe_key, Action.NONE.name)]
+        required = {e.hash: cast(Iterable[str], e.required) for e in entities}
 
         self.add_restricted_permissions(permissions, required)
         return {
@@ -123,7 +138,7 @@ class PermissionsMixin:
 # @testable infrastructure
 # @covered-by lagniappe/core/properties/user_permissions.py::UserPermissions.create
 # @covered-by lagniappe/core/mixins/permissions.py::UserPermissionsMixin.combine_group_permissions
-class UserPermissionsMixin(PermissionsMixin):
+class UserPermissionsMixin(PermissionsMixin["User"]):
     """Permission management for User entities.
 
     Provides:
@@ -135,7 +150,7 @@ class UserPermissionsMixin(PermissionsMixin):
     # @testable true
     # @tests tests_unit/test_009b_user_permissions.py::test_combine_groups
     # @matrix permissions user-groups : combine-groups highest-permission restricted
-    def combine_group_permissions(self):
+    def combine_group_permissions(self) -> dict[str, str]:
         """Merge permissions from all groups (most permissive wins)."""
         permissions = {}
 
@@ -146,12 +161,16 @@ class UserPermissionsMixin(PermissionsMixin):
                     permissions[resource] = Action[action]
 
         entities = cache.get_details_by_hash(permissions.keys())
-        required = {h: e["requires"] for h, e in entities.items()}
+        required = {}
+        for entity_hash, entity in entities.items():
+            if "requires" not in entity:
+                raise KeyError("requires")
+            required[entity_hash] = entity["requires"]
         self.add_restricted_permissions(permissions, required)
 
         return {h: p.name for h, p in permissions.items() if p != Action.NONE}
 
-    def permissions_form(self):
+    def permissions_form(self) -> dict[str, object]:
         """Build section config for the user permissions UI."""
         specific_permissions = self.get_specific_permissions()
 
@@ -178,7 +197,7 @@ class UserPermissionsMixin(PermissionsMixin):
 # @testable infrastructure
 # @covered-by lagniappe/core/properties/user_groups.py::PublicPermissions.create
 # @covered-by lagniappe/core/mixins/permissions.py::PublicPermissionsMixin.permissions_form
-class PublicPermissionsMixin(PermissionsMixin):
+class PublicPermissionsMixin(PermissionsMixin["PublicGroup"]):
     """Permission management for the PublicGroup entity.
 
     Public permissions have restricted scope -- no user-level access,
@@ -191,7 +210,7 @@ class PublicPermissionsMixin(PermissionsMixin):
     # @testable true
     # @tests tests_unit/test_009e_user_groups.py::test_general_forms_none_round_trips_for_default_view_permission
     # @matrix permissions public-groups user-groups : default-denial form-data permission-form
-    def permissions_form(self):
+    def permissions_form(self) -> dict[str, object]:
         """Build section config for the public permissions UI."""
         specific_permissions = self.get_specific_permissions()
 
@@ -223,7 +242,7 @@ class PublicPermissionsMixin(PermissionsMixin):
 # @testable infrastructure
 # @covered-by lagniappe/core/properties/user_groups.py::GroupPermissions.create
 # @covered-by lagniappe/core/mixins/permissions.py::GroupPermissionsMixin.permissions_form
-class GroupPermissionsMixin(PermissionsMixin):
+class GroupPermissionsMixin(PermissionsMixin["UserGroup"]):
     """Permission management for UserGroup entities.
 
     Users inherit permissions from all groups they belong to
@@ -233,7 +252,7 @@ class GroupPermissionsMixin(PermissionsMixin):
         permissions_form(): Build section config for the group permissions UI.
     """
 
-    def permissions_form(self):
+    def permissions_form(self) -> dict[str, object]:
         """Build section config for the group permissions UI."""
         specific_permissions = self.get_specific_permissions()
 

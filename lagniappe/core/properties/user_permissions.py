@@ -1,12 +1,18 @@
+from typing import TYPE_CHECKING
+
 from ..definitions import Action
 from ..entities import Entities
 from ..mixins import UserPermissionsMixin
 from .common_entity import Permissions
 
+if TYPE_CHECKING:
+    from ..entities.group import UserGroup
+    from ..entities.user import User as User
+
 
 # @testable false
 # @covered-by lagniappe/core/properties/user_permissions.py::UserPermissions.create
-class UserPermissions(UserPermissionsMixin, Permissions):
+class UserPermissions(UserPermissionsMixin, Permissions["User"]):
     """Computed permission map for a user.
 
     Resolution order: application Administrators skip persisting a map.
@@ -28,7 +34,7 @@ class UserPermissions(UserPermissionsMixin, Permissions):
     # @tests tests_unit/test_009a_user.py::test_public_user_permissions_inherit_public_group_defaults_without_mutating_group
     # @matrix permissions public-users : combine-groups form-data no-group-mutation no-groups own-page public-group-defaults restricted
     # @pair permissions:public-group-defaults
-    def create(self, form_data=None):
+    def create(self, form_data: dict[str, str] | None = None) -> None:
         self.entity.properties.restrictions.clear()
         self.entity.invalidate_cache = True
 
@@ -40,21 +46,23 @@ class UserPermissions(UserPermissionsMixin, Permissions):
             permissions = dict(public_group.permissions)
         elif self.entity.groups:
             permissions = self.combine_group_permissions()
-        elif isinstance(form_data, dict) or not form_data:
+        else:
+            if form_data and not isinstance(form_data, dict):
+                raise TypeError("User permission form data must be a dictionary.")
             permissions = super().create_permissions(form_data)
 
         # Set permissions first
-        Permissions.value.fset(self, permissions)
+        self._write_db_value(permissions)
 
         # User always has EDIT on their own page - add only if not already covered
         if not self.entity.has_permission(self.entity.page, Action.EDIT):
             permissions[self.entity.page.hash] = Action.EDIT.name
-            Permissions.value.fset(self, permissions)
+            self._write_db_value(permissions)
 
     # @testable false
     # @covered-by lagniappe/core/properties/user_permissions.py::UserPermissions.create
     # @reason public users should reuse an already-attached public group when recalculating
-    def _public_group(self):
+    def _public_group(self) -> UserGroup:
         for group in self.entity.groups:
             if self._is_public_group(group):
                 return group
@@ -62,7 +70,7 @@ class UserPermissions(UserPermissionsMixin, Permissions):
         return Entities.PUBLIC_GROUP.get()
 
     @staticmethod
-    def _is_public_group(group):
+    def _is_public_group(group: UserGroup) -> bool:
         return (
             getattr(group, "kind", None) == "public_group"
             or getattr(group, "entity_kind", None) == "public_group"
