@@ -1,27 +1,47 @@
+from typing import TYPE_CHECKING, TypedDict, cast
+
 from ..mixins import ColumnMixin
 from ..tools.ai.summarize import summarize_file
 from ..tools.files.extract import get_file_text
 from .base_process import ProcessProperty
 from .base_property import Property
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from ..entities.file import File
+    from ..entities.user import User
+
+
+type _File = File
+
+
+class ProcessingRequest(TypedDict):
+    summarize: bool
+    extract: bool
+
 
 # @testable false
 # @covered-by lagniappe/core/properties/file_options.py::Extract.update
 # @covered-by lagniappe/core/properties/file_options.py::Summarize.update
 # @reason small submitted-field guard is owned by option update behavior
-def _has_any(form_data, *field_names):
+def _has_any(form_data: Mapping[str, object], *field_names: str) -> bool:
     return any(form_data.get(name) is not None for name in field_names)
 
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_extract_process
 # @matrix file : extract process
-class Extract(ProcessProperty):
+class Extract(ProcessProperty[_File]):
     """Text extraction options (OCR via Document AI).
 
     When complete, stores the extracted text on the entity. Attributes:
     enabled, search (include in search cache), status.
     """
+
+    if TYPE_CHECKING:
+        enabled: bool | None
+        search: bool | None
+        status: str | None
 
     process_id = "options"
     section_id = "extract"
@@ -33,7 +53,7 @@ class Extract(ProcessProperty):
     # @tests tests_unit/test_006_file_properties.py::test_file_update_preserves_processing_options_when_controls_absent
     # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
     # @matrix file : deferred-dispatch extract option-preservation process-complete text-asset update
-    def update(self, data):
+    def update(self, data: Mapping[str, object]) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride] -- File forms use the existing data keyword.
         if not _has_any(data, "enable-extract", "extract", "search-text"):
             return False
 
@@ -55,13 +75,19 @@ class Extract(ProcessProperty):
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_summarize_process
 # @matrix file : process summarize
-class Summarize(ProcessProperty):
+class Summarize(ProcessProperty[_File]):
     """AI summarization options.
 
     When complete, stores the generated summary on the entity.
     Attributes: enabled, search (include in search cache), status, and the two
     broad retrieval terms selected with an AI-generated summary.
     """
+
+    if TYPE_CHECKING:
+        retrieval_terms: list[str] | None
+        enabled: bool | None
+        search: bool | None
+        status: str | None
 
     process_id = "options"
     section_id = "summarize"
@@ -74,7 +100,7 @@ class Summarize(ProcessProperty):
     # @tests tests_unit/test_006_file_properties.py::test_file_update_preserves_processing_options_when_controls_absent
     # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
     # @matrix file : deferred-dispatch option-preservation search-opt-in summarize update
-    def update(self, data):
+    def update(self, data: Mapping[str, object]) -> bool:  # pyright: ignore[reportIncompatibleMethodOverride] -- File forms use the existing data keyword.
         if not _has_any(data, "enable-summarize", "summarize", "search-summary"):
             return False
 
@@ -105,7 +131,9 @@ class Summarize(ProcessProperty):
 # @matrix deferred-jobs file : deferred-dispatch extraction-follow-up post-save-dispatch summary-first
 # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatch_uses_explicit_actor
 # @matrix file deferred-jobs : explicit-actor
-def dispatch_file_processing(file, request, *, actor):
+def dispatch_file_processing(
+    file: File, request: ProcessingRequest, *, actor: User
+) -> Extract | Summarize | None:
     """Start persisted file work, chaining extraction behind summarization."""
     if request.get("summarize"):
         return summarize_file(
@@ -124,7 +152,7 @@ def dispatch_file_processing(file, request, *, actor):
 
 # @testable false
 # @covered-by lagniappe/core/properties/file_options.py::Options.value
-class Options(ColumnMixin, Property):
+class Options(ColumnMixin, Property[dict[str, object], _File]):
     """Aggregated file processing options (extract, summarize).
 
     Get:
@@ -137,14 +165,14 @@ class Options(ColumnMixin, Property):
     # @tests tests_unit/test_006_file_properties.py::test_options
     # @matrix file : extract options summarize
     @property
-    def value(self):
+    def value(self) -> dict[str, object]:  # pyright: ignore[reportIncompatibleMethodOverride] -- This projection is computed and read-only.
         if self.is_set:
-            return self._value
+            return cast("dict[str, object]", self._value)
 
         self._value = self.entity.get_process(self.id)
 
         return self._value
 
     @property
-    def preload(self):
+    def preload(self) -> dict[str, object]:
         return self.value
