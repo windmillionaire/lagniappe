@@ -2280,6 +2280,13 @@ def _latest_execution(infrastructure, *, environment="standard"):
     return newest.name.split("/", 2)[1]
 
 
+def _evidence_exit_status(document) -> int:
+    status = document.get("exit_status") if isinstance(document, dict) else None
+    if type(status) is not int:
+        raise HostedE2EError("Hosted result evidence requires an integer exit status.")
+    return status
+
+
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_remote_evidence_merges_tests_and_snapshot_provenance
 # @matrix hosted-e2e traceability : evidence merge provenance
@@ -2328,7 +2335,7 @@ def merge_remote_evidence(local, remote):
         "schema_version": TEST_RUN_SCHEMA_VERSION,
         "kind": "test-run",
         "provenance": remote.get("provenance") or {},
-        "exit_status": int(remote.get("exit_status") or 0),
+        "exit_status": _evidence_exit_status(remote),
         "sessions": sessions,
         "fingerprint_pairs": pairs,
         "snapshots": encoded,
@@ -2377,14 +2384,30 @@ def import_result_directory(directory, *, expected_execution=None):
         )
 
     remote = load_json(directory / "evidence.json")
+    status = _evidence_exit_status(manifest)
+    if _evidence_exit_status(remote) != status:
+        raise HostedE2EError("Hosted result manifest and evidence exit statuses disagree.")
+    provenance = remote.get("provenance")
+    hosted = provenance.get("hosted_e2e") if isinstance(provenance, dict) else None
+    if (
+        not isinstance(hosted, dict)
+        or not isinstance(manifest.get("suite"), str)
+        or any(
+            hosted.get(key) != manifest[key]
+            for key in ("execution", "source", "source_snapshot", "suite")
+        )
+        or any(
+            (key in manifest) != (key in hosted) or manifest.get(key) != hosted.get(key)
+            for key in ("targets", "environment")
+        )
+    ):
+        raise HostedE2EError("Hosted result manifest and evidence provenance disagree.")
     evidence_path = APP_DIR / LATEST_TEST_RUN
     local = load_json(evidence_path)
     if (
         manifest.get("suite") == "all"
         and "targets" not in manifest
-        and manifest.get("exit_status") == 0
-        and isinstance(remote, dict)
-        and remote.get("exit_status") == 0
+        and status == 0
     ):
         # A complete successful inventory supersedes retired test IDs, including
         # bare functions that now have parameters. Partial runs still merge.

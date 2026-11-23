@@ -1595,15 +1595,11 @@ def test_hosted_result_directory_import_requires_the_exact_source(
         "suite": "all",
     }
     test_evidence.write_json(result_dir / "manifest.json", manifest)
-    test_evidence.write_json(
-        result_dir / "evidence.json",
-        _evidence(
-            snapshot,
-            paths,
-            "tests_e2e/test_remote.py::test_remote",
-            outcome="failed",
-        ),
-    )
+    remote = _evidence(snapshot, paths, "tests_e2e/test_remote.py::test_remote", outcome="failed")
+    remote["provenance"]["hosted_e2e"] = {
+        key: manifest[key] for key in ("execution", "source", "source_snapshot", "suite")
+    }
+    test_evidence.write_json(result_dir / "evidence.json", remote)
     # The protected workflow imports its downloaded bundle with only PyYAML installed.
     packages = tmp_path / "packages"
     shutil.copytree(Path(yaml.__file__).parent, packages / "yaml")
@@ -1639,8 +1635,6 @@ def test_hosted_result_directory_import_requires_the_exact_source(
 @pytest.mark.parametrize("suite,status,remote_status,targets", [
     ("all", 0, 0, False),
     ("all", 1, 1, False),
-    ("all", 0, 1, False),
-    ("all", 1, 0, False),
     ("focused", 0, 0, True),
     ("full", 0, 0, False),
     ("all", 0, 0, True),
@@ -1667,6 +1661,11 @@ def test_hosted_complete_import_replaces_retired_parameter_results(
     }
     if targets:
         manifest["targets"] = [bare]
+    remote["provenance"]["hosted_e2e"] = {
+        key: manifest[key]
+        for key in ("execution", "source", "source_snapshot", "suite", "targets")
+        if key in manifest
+    }
     result_dir = tmp_path / "reports/result"
     test_evidence.write_json(result_dir / "manifest.json", manifest)
     test_evidence.write_json(result_dir / "evidence.json", remote)
@@ -1687,6 +1686,48 @@ def test_hosted_complete_import_replaces_retired_parameter_results(
         assert merged["tests"][bare]["outcome"] == "failed"
         assert merged["tests"]["tests_unit/test_other.py::test_other"]["outcome"] == "failed"
     assert merged["provenance"] == remote["provenance"]
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("exit_status", None), ("exit_status", False), ("exit_status", "0"), ("exit_status", 1),
+    ("source", "b" * 40), ("source_snapshot", "other"), ("execution", "lagniappe-e2e-other"),
+    ("suite", "focused"), ("targets", []),
+])
+def test_hosted_import_rejects_inconsistent_evidence_without_overwriting(
+    tmp_path, monkeypatch, field, value,
+):
+    source = "a" * 40
+    snapshot, paths = behavior_snapshot(tmp_path)
+    identity = {
+        "execution": "lagniappe-e2e-result1",
+        "source": source,
+        "source_snapshot": snapshot,
+        "suite": "all",
+    }
+    directory = tmp_path / "reports" / "result"
+    manifest = {**identity, "schema_version": 1, "kind": "hosted-e2e-result", "exit_status": 0}
+    remote = _evidence(snapshot, paths, "tests_e2e/test_remote.py::test_remote")
+    remote["provenance"]["hosted_e2e"] = dict(identity)
+    if field == "exit_status":
+        remote[field] = value
+    else:
+        remote["provenance"]["hosted_e2e"][field] = value
+    test_evidence.write_json(directory / "manifest.json", manifest)
+    test_evidence.write_json(directory / "evidence.json", remote)
+    evidence_path = tmp_path / test_evidence.LATEST_TEST_RUN
+    test_evidence.write_json(evidence_path, {"previous": True})
+    monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
+    monkeypatch.setattr(hosted_e2e, "_git", lambda *_: subprocess.CompletedProcess([], 0, stdout=source))
+    with pytest.raises(HostedE2EError, match="exit status|provenance"):
+        hosted_e2e.import_result_directory(directory)
+    assert test_evidence.load_json(evidence_path) == {"previous": True}
+
+
+def test_remote_evidence_with_missing_status_cannot_be_merged_as_passing():
+    remote = _evidence("remote", {"source.py": "fp"}, "tests_e2e/test_remote.py::test_remote")
+    del remote["exit_status"]
+    with pytest.raises(HostedE2EError, match="exit status"):
+        merge_remote_evidence(None, remote)
 
 
 def test_source_archive_snapshot_falls_back_when_git_is_not_installed(
