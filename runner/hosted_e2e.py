@@ -477,12 +477,11 @@ def _run_create_preflight(source, *, base_ref=None):
             [python, run_py, "template-contracts", "--check", "--no-report"],
         ),
         (
-            "style traceability",
+            "style and icon contracts",
             [
                 python,
                 run_py,
-                "traceability",
-                "--styles",
+                "style-contracts",
                 "--check",
                 "--no-report",
                 "--no-manifest",

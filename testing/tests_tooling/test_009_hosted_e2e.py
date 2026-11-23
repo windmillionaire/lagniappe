@@ -394,7 +394,9 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
         "--check",
         "--no-report",
     ]
-    assert command_arguments[5][2:5] == ["traceability", "--styles", "--check"]
+    assert command_arguments[5][2:] == [
+        "style-contracts", "--check", "--no-report", "--no-manifest",
+    ]
     assert command_arguments[6][2:] == ["mutation-contracts", "--check"]
     assert command_arguments[7][2:] == [
         "release-check",

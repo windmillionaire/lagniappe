@@ -1148,6 +1148,10 @@ if __name__ == "__main__":
         from testing.utility import template_contracts
 
         sys.exit(template_contracts.main(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "style-contracts":
+        from testing.utility import style_traceability
+
+        sys.exit(style_traceability.main(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "mutation-contracts":
         from testing.utility import mutation_contracts
 
@@ -1185,6 +1189,7 @@ if __name__ == "__main__":
             "test-server",
             "traceability",
             "template-contracts",
+            "style-contracts",
             "upgrade-dependencies",
             "version",
         ],
