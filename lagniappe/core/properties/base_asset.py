@@ -1,8 +1,15 @@
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
+    from ..mixins.assets import AssetMixin
+    from ..definitions.asset import Asset, AssetContent
+
 from .base_property import Property, UNSET
 
 
 # @testable infrastructure
-class AssetProperty(Property):
+class AssetProperty[Owner: Entity = Entity, Read = object, Write = object](Property[Read, Owner, Write]):
     """Property backed by a stored asset (image, document, file, etc.).
 
     Subclasses set ``_asset_type`` (image, html, text, ydoc, file, json).
@@ -18,38 +25,50 @@ class AssetProperty(Property):
     """
 
     @property
-    def asset_type(self):
-        return getattr(self, "_asset_type", None)
+    def asset_type(self) -> str | None:
+        return cast("str | None", getattr(self, "_asset_type", None))
 
     @asset_type.setter
-    def asset_type(self, value):
+    def asset_type(self, value: str | None) -> None:
         self._asset_type = value
 
     @property
-    def asset(self):
+    def asset(self) -> object:
         if getattr(self, "_asset", UNSET) is not UNSET:
             return self._asset
         elif not self.value:
             self._asset = None
         else:
-            self._asset = self.value.get()
+            self._asset = cast("Asset", self.value).get()
 
         return self._asset
 
     @property
-    def value(self):
-        if self.is_set:
-            return self._value
+    def value(self) -> Read | None:
+        return cast("Read | None", self._stored_asset())
 
-        self._value = self.entity.get_asset(self.id)
-        return self._value
+    def _stored_asset(self) -> Asset | None:
+        if self.is_set:
+            return cast("Asset | None", self._value)
+
+        self._value = cast("AssetMixin", self.entity).get_asset(self.id)
+        return cast("Asset | None", self._value)
 
     @value.setter
-    def value(self, value):
+    def value(self, value: Write) -> None:
+        self._store_asset_value(value)
+
+    def _store_asset_value(self, value: object) -> None:
         self._asset = UNSET
 
         if value:
-            self._value = self.entity.save_asset(value, self.id, self.asset_type)
+            asset_type = self.asset_type
+            if asset_type is None:
+                raise ValueError("An asset property must declare its storage type.")
+            # Each concrete setter supplies the content allowed by its registered asset type.
+            self._value = cast("AssetMixin", self.entity).save_asset(
+                cast("AssetContent", value), self.id, asset_type
+            )
         else:
-            self.entity.delete_asset(self.id)
+            cast("AssetMixin", self.entity).delete_asset(self.id)
             self._value = None

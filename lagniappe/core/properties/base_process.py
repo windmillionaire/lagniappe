@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 # @testable true
 # @tests tests_unit/test_013f_process_property_complete_error.py::test_process_property_contract_errors_are_explicit
 # @matrix process-property : initialization validation
-class ProcessProperty:
+class ProcessProperty[Owner: Entity = Entity]:
     """Property backed by a JSON process section in entity.db.
 
     Stores multi-step workflow state (ingress stages, file options, etc.).
@@ -26,7 +26,7 @@ class ProcessProperty:
     attributes: tuple[str, ...] = ()
 
     def __init__(
-        self, *args: object, entity: Entity | None = None, **kwargs: object
+        self, *args: object, entity: Owner | None = None, **kwargs: object
     ) -> None:
         process_id = getattr(type(self), "process_id", None)
         section_id = getattr(type(self), "section_id", None)
@@ -57,7 +57,7 @@ class ProcessProperty:
         if isinstance(value, dict):
             self._value.update({k.replace("_", "-"): v for k, v in value.items()})
 
-    def update(self, form_data: Mapping[str, object]) -> None:
+    def update(self, form_data: Mapping[str, object]) -> dict[str, object] | None:
         self.section = {**form_data}
 
     # @testable true

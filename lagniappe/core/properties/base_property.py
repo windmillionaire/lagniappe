@@ -18,7 +18,7 @@ UNSET = object()
 # @tests tests_unit/test_002_entity_general_properties.py::test_property_unset_state_is_distinct_from_explicit_values
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_property_defaults_to_config_test_user
 # @matrix property : current-user explicit-false explicit-none initialization propagation unset validation
-class Property[Value = object, Owner: Entity | Site = Entity]:
+class Property[Value = object, Owner: Entity | Site = Entity, Write = Value | None]:
     """Base property class. Most entity properties inherit from this.
 
     Subclasses must set _id (unique within the entity). Optionally set
@@ -43,7 +43,7 @@ class Property[Value = object, Owner: Entity | Site = Entity]:
         if not entity:
             raise ValueError(f"{type(self).__name__} requires entity")
         self._entity = entity
-        self._user = current_context_user(kwargs.get("user"))
+        self._user = current_context_user(cast("FieldUser", kwargs.get("user")))
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_property_getattribute_wraps_descriptor_attribute_error
@@ -130,7 +130,7 @@ class Property[Value = object, Owner: Entity | Site = Entity]:
         return cast("Value | None", self._value) if self.is_set else None
 
     @value.setter
-    def value(self, value: Value | None) -> None:
+    def value(self, value: Write) -> None:
         self._value = value
 
     @property
