@@ -1341,6 +1341,18 @@ def test_save_site_image_persists_version_without_mutating_input(monkeypatch):
     assert saved == [{"favicon-32x32.png": "favicon-32x32.png", "version": 5}]
 
 
+@pytest.mark.unit
+def test_upload_site_image_rejects_unknown_format_before_opening_storage(monkeypatch):
+    class UnusedStorage:
+        @property
+        def public_bucket(self):
+            pytest.fail("Invalid site images must not open a bucket")
+
+    monkeypatch.setattr(assets, "DATA", UnusedStorage())
+    with pytest.raises(ValueError, match=r"\.png or \.ico"):
+        assets.upload_site_image("site.webp", b"image data")
+
+
 # @pair admin:site-image-upload
 @pytest.mark.unit
 def test_site_image_rejects_oversized_input_before_decode():

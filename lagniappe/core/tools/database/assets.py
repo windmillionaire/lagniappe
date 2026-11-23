@@ -611,6 +611,8 @@ def upload_site_image(filename, image_data):
         content_type = "image/png"
     elif filename.endswith(".ico"):
         content_type = "image/x-icon"
+    else:
+        raise ValueError("Site image filenames must end in .png or .ico.")
 
     blob = DATA.public_bucket.blob(filename)
     blob.upload_from_string(image_data, content_type=content_type)
