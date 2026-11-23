@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from copy import deepcopy
 import json
-from typing import Any
+from typing import TypeGuard
 from urllib.parse import unquote
 
 from jsonschema import Draft202012Validator, FormatChecker
@@ -96,7 +97,7 @@ _MAX_REFERENCE_TOKENS = 32
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_schema_rejects_dangling_refs_and_non_finite_json
 # @tests tests_unit/test_033_mcp_adapter.py::test_mcp_v2_results_use_direct_structured_values_and_complete_aliases
-def compact_json(value: Any) -> str:
+def compact_json(value: object) -> str:
     try:
         return json.dumps(
             value,
@@ -111,13 +112,13 @@ def compact_json(value: Any) -> str:
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
-def json_size(value: Any) -> int:
+def json_size(value: object) -> int:
     return len(compact_json(value).encode("utf-8"))
 
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
-def _walk(value: Any):
+def _walk(value: object) -> Iterator[object]:
     pending = [(value, 0)]
     while pending:
         current, depth = pending.pop()
@@ -132,7 +133,7 @@ def _walk(value: Any):
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
-def _resolve_local_reference(schema: dict[str, Any], reference: str) -> Any:
+def _resolve_local_reference(schema: dict[str, object], reference: str) -> object:
     if reference == "#":
         return schema
     if not reference.startswith("#/"):
@@ -148,7 +149,7 @@ def _resolve_local_reference(schema: dict[str, Any], reference: str) -> Any:
             "schema_too_complex",
             "Upstream schema reference exceeds the adapter limit.",
         )
-    current: Any = schema
+    current: object = schema
     for encoded in unquote(reference[2:]).split("/"):
         token = encoded.replace("~1", "/").replace("~0", "~")
         if isinstance(current, dict) and token in current:
@@ -166,26 +167,26 @@ def _resolve_local_reference(schema: dict[str, Any], reference: str) -> Any:
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
-def _is_json_scalar(value: Any) -> bool:
+def _is_json_scalar(value: object) -> bool:
     return value is None or isinstance(value, (str, int, float, bool))
 
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
-def _bounded_non_negative_integer(value: Any) -> bool:
+def _bounded_non_negative_integer(value: object) -> TypeGuard[int]:
     return not isinstance(value, bool) and isinstance(value, int) and value >= 0
 
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
-def _reject_unsafe_schema_subset(schema: dict[str, Any]) -> None:
+def _reject_unsafe_schema_subset(schema: dict[str, object]) -> None:
     """Reject remote schema features outside the frozen, bounded subset.
 
     This runs before ``Draft202012Validator.check_schema`` so an upstream
     schema cannot select a regular-expression engine path or make the general
     validator traverse an attacker-sized applicator graph.
     """
-    pending: list[tuple[dict[str, Any], int, int]] = [(schema, 0, 0)]
+    pending: list[tuple[dict[str, object], int, int]] = [(schema, 0, 0)]
     node_count = 0
     while pending:
         node, depth, applicator_depth = pending.pop()
@@ -355,7 +356,8 @@ def _reject_unsafe_schema_subset(schema: dict[str, Any]) -> None:
             ("minLength", "maxLength"),
             ("minProperties", "maxProperties"),
         ):
-            if minimum in node and maximum in node and node[minimum] > node[maximum]:
+            lower, upper = node.get(minimum), node.get(maximum)
+            if isinstance(lower, int) and isinstance(upper, int) and lower > upper:
                 raise SchemaError(
                     "invalid_schema", "Upstream schema contains contradictory limits."
                 )
@@ -374,9 +376,10 @@ def _reject_unsafe_schema_subset(schema: dict[str, Any]) -> None:
             raise SchemaError(
                 "invalid_schema", "Upstream schema uniqueItems must be a boolean."
             )
+        max_items = node.get("maxItems")
         if unique_items is True and (
-            not _bounded_non_negative_integer(node.get("maxItems"))
-            or node["maxItems"] > _MAX_UNIQUE_ITEMS
+            not _bounded_non_negative_integer(max_items)
+            or max_items > _MAX_UNIQUE_ITEMS
         ):
             raise SchemaError(
                 "schema_too_complex",
@@ -424,9 +427,9 @@ def _reject_unsafe_schema_subset(schema: dict[str, Any]) -> None:
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
-def _reject_expensive_reference_expansion(schema: dict[str, Any]) -> None:
+def _reject_expensive_reference_expansion(schema: dict[str, object]) -> None:
     """Bound the validator work hidden behind a compact local-reference DAG."""
-    pending: list[tuple[dict[str, Any], int]] = [(schema, 0)]
+    pending: list[tuple[dict[str, object], int]] = [(schema, 0)]
     expanded_nodes = 0
     while pending:
         node, applicator_depth = pending.pop()
@@ -479,7 +482,7 @@ def _reject_expensive_reference_expansion(schema: dict[str, Any]) -> None:
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/schema.py::validate_schema_document
-def _reject_recursive_reference_graph(schema: dict[str, Any]) -> None:
+def _reject_recursive_reference_graph(schema: dict[str, object]) -> None:
     """Reject cycles formed by ordinary local ``$ref`` edges.
 
     Draft 2020-12 can express recursive schemas with an ordinary local
@@ -491,7 +494,7 @@ def _reject_recursive_reference_graph(schema: dict[str, Any]) -> None:
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/schema.py::_reject_recursive_reference_graph
-    def visit(node: Any) -> None:
+    def visit(node: object) -> None:
         if not isinstance(node, (dict, list)):
             return
         identity = id(node)
@@ -521,8 +524,8 @@ def _reject_recursive_reference_graph(schema: dict[str, Any]) -> None:
 # @tests tests_unit/test_033_mcp_adapter.py::test_schema_rejects_dangling_refs_and_non_finite_json
 # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
 def validate_schema_document(
-    schema: Any, *, input_root: bool = False
-) -> dict[str, Any]:
+    schema: object, *, input_root: bool = False
+) -> dict[str, object]:
     if not isinstance(schema, dict):
         raise SchemaError("invalid_schema", "Upstream schema must be a JSON object.")
     if json_size(schema) > MAX_SCHEMA_BYTES:
@@ -569,7 +572,7 @@ def validate_schema_document(
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_wrapped_result_schema_preserves_local_references
-def wrap_result_schema(schema: dict[str, Any]) -> dict[str, Any]:
+def wrap_result_schema(schema: dict[str, object]) -> dict[str, object]:
     """Put a validated output schema under an object's required result field."""
     nested = deepcopy(schema)
     # Local references resolve from the document root, not from the nested
@@ -600,7 +603,7 @@ def wrap_result_schema(schema: dict[str, Any]) -> dict[str, Any]:
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-def inject_plan_id(schema: Any) -> dict[str, Any]:
+def inject_plan_id(schema: object) -> dict[str, object]:
     # ``plan_id`` must genuinely be injectable, not merely present in the
     # rendered ``properties`` map.  Root-level applicators can independently
     # reject or reinterpret a newly added property (for example an ``allOf``
@@ -666,7 +669,7 @@ def inject_plan_id(schema: Any) -> dict[str, Any]:
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
 # @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_summary_and_preserves_candidate_and_api_errors
-def validate_value(schema: dict[str, Any], value: Any, *, phase: str) -> None:
+def validate_value(schema: dict[str, object], value: object, *, phase: str) -> None:
     try:
         Draft202012Validator(schema, format_checker=FormatChecker()).validate(value)
     except ValidationError as error:
@@ -674,9 +677,9 @@ def validate_value(schema: dict[str, Any], value: Any, *, phase: str) -> None:
             f"[{part}]" if isinstance(part, int) else f".{part}"
             for part in error.absolute_path
         )
-        details = {"path": path, "validator": error.validator}
+        details: dict[str, object] = {"path": path, "validator": error.validator}
         # Return only public bounds, never submitted values or nested schemas.
-        if error.validator in {
+        if isinstance(error.validator, str) and error.validator in {
             "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
             "minLength", "maxLength", "minItems", "maxItems",
         } and isinstance(error.validator_value, (int, float)):

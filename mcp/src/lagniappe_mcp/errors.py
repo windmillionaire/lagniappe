@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import math
-from typing import Any
 
+from . import JsonValue
 from .limits import MAX_ERROR_BYTES
 
 
@@ -24,7 +24,7 @@ def _bounded_text(value: object, limit: int = MAX_ERROR_BYTES) -> str:
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/errors.py::AdapterError
-def _safe_details(value: Any, *, depth: int = 0) -> Any:
+def _safe_details(value: object, *, depth: int = 0) -> JsonValue:
     """Keep only bounded JSON values; never stringify arbitrary exceptions."""
     if depth > 8:
         return None
@@ -69,7 +69,7 @@ class AdapterError(Exception):
     retryable: bool = False
     status: int | None = None
     request_id: str | None = None
-    details: Any = None
+    details: object = None
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/errors.py::AdapterError
@@ -81,7 +81,7 @@ class AdapterError(Exception):
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/errors.py::AdapterError
     def render(self) -> str:
-        payload: dict[str, Any] = {
+        payload: dict[str, object] = {
             "code": self.code,
             "message": self.message,
             "retryable": self.retryable,
@@ -93,7 +93,7 @@ class AdapterError(Exception):
         if self.details is not None:
             payload["details"] = self.details
 
-        def serialize(value: dict[str, Any]) -> str:
+        def serialize(value: dict[str, object]) -> str:
             return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
         rendered = serialize(payload)
@@ -116,7 +116,7 @@ class AdapterError(Exception):
         # Pathological control-heavy internal strings can expand when JSON-
         # escaped even though their source text is bounded. This fixed ASCII
         # fallback is always valid JSON and remains below the public cap.
-        fallback: dict[str, Any] = {
+        fallback: dict[str, object] = {
             "code": "adapter_error",
             "message": "The bounded error could not be rendered safely.",
             "retryable": bool(self.retryable),

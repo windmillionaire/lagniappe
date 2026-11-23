@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, replace
 import re
-from typing import Any
+from typing import cast
 
 from mcp import Tool
 from mcp_types import ToolAnnotations
@@ -47,7 +48,7 @@ GET_FILE_PRIVATE_FIELDS = frozenset(
         "x-goog-signature",
     }
 )
-GET_FILE_SAFE_PROPERTIES: dict[str, dict[str, Any]] = {
+GET_FILE_SAFE_PROPERTIES: dict[str, dict[str, object]] = {
     "hash": {"type": "string"},
     "display_name": {"type": "string"},
     "filename": {"type": "string"},
@@ -487,7 +488,7 @@ ENRICHED_UPLOAD_RESULT_SCHEMA = {
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
-def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, Any]:
+def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, object]:
     return {
         "type": "object",
         "required": [],
@@ -518,12 +519,13 @@ def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, Any]:
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
-def _plan_id_input() -> dict[str, Any]:
+def _plan_id_input(properties: dict[str, object]) -> dict[str, object]:
     return {
         "type": "object",
         "required": ["plan_id"],
         "properties": {
-            "plan_id": {"type": "string", "minLength": 1, "maxLength": 2048}
+            "plan_id": {"type": "string", "minLength": 1, "maxLength": 2048},
+            **properties,
         },
         "additionalProperties": False,
     }
@@ -532,7 +534,7 @@ def _plan_id_input() -> dict[str, Any]:
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_get_file_schema_projects_every_transport_extension
-def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
+def get_file_output_schema(rest_schema: dict[str, object]) -> dict[str, object]:
     """Expose a scoped original download alongside bounded inline media."""
     result = validate_schema_document(rest_schema)
     rest_properties = result.setdefault("properties", {})
@@ -612,7 +614,7 @@ def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
     required[:] = [field for field in required if field in properties]
     if "delivery" not in required:
         required.append("delivery")
-    result.setdefault("allOf", []).append({
+    cast(list[object], result.setdefault("allOf", [])).append({
         "if": {"properties": {"delivery": {"properties": {"kind": {"const": "download"}}}}},
         "then": {
             "required": ["original_file"],
@@ -640,12 +642,12 @@ def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
 class ToolDefinition:
     name: str
     description: str
-    input_schema: dict[str, Any]
-    output_schema: dict[str, Any]
+    input_schema: dict[str, object]
+    output_schema: dict[str, object]
     kind: str
     annotations: ToolAnnotations
-    rest_output_schema: dict[str, Any] | None = None
-    result_paths: dict[str, Any] | None = None
+    rest_output_schema: dict[str, object] | None = None
+    result_paths: dict[str, object] | None = None
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/catalog.py::ToolDefinition
@@ -676,7 +678,7 @@ class ToolDefinition:
                 else self.output_schema
             ),
             annotations=self.annotations,
-            meta=(
+            _meta=(
                 {"lagniappe/resultPaths": result_paths}
                 if result_paths is not None
                 else None
@@ -686,7 +688,7 @@ class ToolDefinition:
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/catalog.py::ToolDefinition
-def _wrap_result_paths(value: Any) -> Any:
+def _wrap_result_paths(value: object) -> object:
     """Keep catalog JSONPath hints relative to the advertised MCP value."""
     if isinstance(value, dict):
         return {key: _wrap_result_paths(child) for key, child in value.items()}
@@ -778,16 +780,12 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ToolDefinition(
             "get_plan",
             "Return current Plan state, current/original brief, and bounded execution outcomes with currently viewable result entities. Defaults to include_proposal=false for compact status polling; pass include_proposal=true to fetch the full round-trippable proposal body. Before execution, revise the existing plan_id. After execution, start_plan with revises_plan_id creates a linked correction; never replay successful creations. Entity null means unavailable, not proof an action never ran.",
-            {
-                **_plan_id_input(),
-                "properties": {
-                    **_plan_id_input()["properties"],
-                    "include_proposal": {
-                        "type": "boolean",
-                        "description": "Include the full round-trippable proposal body (default false for compact polling).",
-                    },
+            _plan_id_input({
+                "include_proposal": {
+                    "type": "boolean",
+                    "description": "Include the full round-trippable proposal body (default false for compact polling).",
                 },
-            },
+            }),
             SAFE_PLAN_SCHEMA,
             "get_plan",
             READ_ANNOTATIONS,
@@ -795,14 +793,10 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ToolDefinition(
             "get_plan_contract",
             "Load exact schemas for selected allowed actions; actions=[] returns a saved-answer schema with no changes. Use view=schema for a follow-up after receiving the plan context: it omits repeated workflow/inventory guidance. full includes context and, without actions, all schemas. The default summary includes context without schemas. Reuse selected schemas; refresh context for changed state/permissions. Submission uses the API's current validation and permissions.",
-            {
-                **_plan_id_input(),
-                "properties": {
-                    **_plan_id_input()["properties"],
-                    "actions": ACTION_SELECTION_SCHEMA,
-                    "view": {"enum": ["full", "summary", "schema"]},
-                },
-            },
+            _plan_id_input({
+                "actions": ACTION_SELECTION_SCHEMA,
+                "view": {"enum": ["full", "summary", "schema"]},
+            }),
             {"type": "object", "anyOf": [SAFE_CONTRACT_SCHEMA, SAFE_SCHEMA_CONTRACT_SCHEMA]},
             "get_plan_contract",
             READ_ANNOTATIONS,
@@ -873,7 +867,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-def catalog_tools(catalog: dict[str, Any]) -> tuple[ToolDefinition, ...]:
+def catalog_tools(catalog: Mapping[str, object]) -> tuple[ToolDefinition, ...]:
     """Validate and convert every REST read into one fixed-route MCP tool."""
     if json_size(catalog) > MAX_CATALOG_BYTES:
         raise TransportError(
@@ -1028,14 +1022,14 @@ def catalog_tools(catalog: dict[str, Any]) -> tuple[ToolDefinition, ...]:
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-def build_tool_registry(catalog: dict[str, Any], *, execute_plan: bool = False) -> dict[str, ToolDefinition]:
+def build_tool_registry(catalog: Mapping[str, object], *, execute_plan: bool = False) -> dict[str, ToolDefinition]:
     tools = (*lifecycle_tools(), *catalog_tools(catalog), *((execution_tool(),) if execute_plan else ()))
     if execute_plan:
         updated_tools = []
         for tool in tools:
             if tool.name == "submit_plan":
                 submit_schema = deepcopy(tool.input_schema)
-                submit_schema["properties"].update(
+                cast(dict[str, object], submit_schema["properties"]).update(
                     {
                         "execute": {
                             "type": "boolean",

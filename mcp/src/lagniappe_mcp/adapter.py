@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 import re
-from typing import Any
+from typing import Generic, NotRequired, TypedDict, TypeVar, cast
+
 from urllib.parse import parse_qsl, unquote, urlencode, urlsplit
 
+from . import JsonObject, JsonValue
 from .catalog import (
     ACTOR_SCHEMA,
     GET_FILE_PRIVATE_FIELDS,
@@ -38,6 +41,19 @@ from .schema import compact_json, json_size, validate_schema_document, validate_
 from .url_security import (
     quote_path_segment, validate_api_url, validate_human_url, validate_storage_url,
 )
+
+
+class _ContractArguments(TypedDict):
+    plan_id: str
+    actions: NotRequired[list[str]]
+    view: NotRequired[str]
+
+
+class _SubmissionFormat(TypedDict):
+    contract_version: int
+    method: str
+    url: str
+    body: dict[str, object]
 
 
 PLAN_ROUTES = {
@@ -113,7 +129,7 @@ def _has_private_transport_shape(value: str) -> bool:
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_model_visibility_screen_rejects_catalog_reflection_and_preserves_safe_result_paths
 # @tests tests_unit/test_033_mcp_adapter.py::test_model_visibility_screen_rejects_successful_output_reflection
-def _reject_private_model_data(value: Any, *, bearer: str) -> None:
+def _reject_private_model_data(value: object, *, bearer: str) -> None:
     """Reject credentials and storage capabilities at the MCP boundary.
 
     Catalog metadata and successful tool values both reach the model.  Walk
@@ -122,7 +138,7 @@ def _reject_private_model_data(value: Any, *, bearer: str) -> None:
     through an otherwise valid description, schema, result-path hint, or
     domain value.
     """
-    pending: list[tuple[str | None, Any]] = [(None, value)]
+    pending: list[tuple[str | None, object]] = [(None, value)]
     bearer_bytes = bearer.encode("utf-8")
     while pending:
         field, current = pending.pop()
@@ -156,11 +172,11 @@ def _reject_private_model_data(value: Any, *, bearer: str) -> None:
 # @testable true
 # @pair mcp-adapter:product-contract
 # @tests tests_unit/test_033_mcp_adapter.py::test_original_download_capability_is_scoped_to_requested_file_result
-def validate_file_result(value: Any, *, arguments: dict, bearer: str) -> None:
+def validate_file_result(value: object, *, arguments: Mapping[str, object], bearer: str) -> None:
     """Permit one explicitly requested, validated original download capability."""
     screened = deepcopy(value)
     delivery = screened.get("delivery") if isinstance(screened, dict) else None
-    if isinstance(delivery, dict) and delivery.get("kind") == "download":
+    if isinstance(screened, dict) and isinstance(delivery, dict) and delivery.get("kind") == "download":
         original = screened.get("original_file")
         if (
             arguments.get("include_original") is not True
@@ -197,11 +213,14 @@ class MediaContent:
     data: bytes
 
 
+ResultValue = TypeVar("ResultValue", covariant=True, default=JsonValue | Mapping[str, object])
+
+
 @dataclass(frozen=True, slots=True)
-class AdapterResult:
+class AdapterResult(Generic[ResultValue]):
     """A validated structured result plus optional non-text content."""
 
-    value: Any
+    value: ResultValue
     media: tuple[MediaContent, ...] = ()
 
 
@@ -219,8 +238,8 @@ class LagniappeAdapter:
     ) -> None:
         self.config = config
         self.rest = rest or RESTClient(config)
-        self.discovery: dict[str, Any] | None = None
-        self.actor: dict[str, Any] | None = None
+        self.discovery: JsonObject | None = None
+        self.actor: JsonObject | None = None
         self.tools: dict[str, ToolDefinition] = {}
 
     # @testable true
@@ -229,7 +248,8 @@ class LagniappeAdapter:
     async def initialize(self) -> None:
         discovery, actor, catalog = await self.rest.startup()
         validate_value(ACTOR_SCHEMA, actor, phase="actor")
-        registry = build_tool_registry(catalog, execute_plan=actor["capabilities"].get("execute_plan") is True)
+        capabilities = cast(JsonObject, actor["capabilities"])
+        registry = build_tool_registry(catalog, execute_plan=capabilities.get("execute_plan") is True)
         published_tools = [
             definition.as_mcp_tool().model_dump(
                 mode="json", by_alias=True, exclude_none=True
@@ -251,13 +271,14 @@ class LagniappeAdapter:
     # @pair mcp-adapter:product-contract
     # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
     # @tests tests_unit/test_033_mcp_adapter.py::test_submit_refetches_summary_and_preserves_candidate_and_api_errors
-    async def execute(self, name: str, arguments: Any) -> AdapterResult:
+    async def execute(self, name: str, arguments: object) -> AdapterResult:
         """Validate, dispatch, project, and validate one known MCP tool call."""
         definition = self.tools.get(name)
         if definition is None:
             raise KeyError(name)
-        value = {} if arguments is None else arguments
-        validate_value(definition.input_schema, value, phase="input")
+        raw_arguments = {} if arguments is None else arguments
+        validate_value(definition.input_schema, raw_arguments, phase="input")
+        value = cast(dict[str, object], raw_arguments)
 
         try:
             if definition.kind == "answer_context":
@@ -271,25 +292,27 @@ class LagniappeAdapter:
                 result = await self._start_plan(definition.kind, value)
             elif definition.kind == "get_plan":
                 result = await self._get_plan(
-                    value["plan_id"],
+                    cast(str, value["plan_id"]),
                     include_proposal=bool(value.get("include_proposal", False)),
                 )
             elif definition.kind == "get_plan_contract":
+                selection = cast(_ContractArguments, raw_arguments)
                 result = await self._get_contract_projection(
-                    value["plan_id"],
-                    actions=value.get("actions"),
-                    view=value.get("view", "summary"),
+                    selection["plan_id"],
+                    actions=selection.get("actions"),
+                    view=selection.get("view", "summary"),
                 )
             elif definition.kind == "submit":
                 result = await self._submit_plan(value)
             elif definition.kind == "execute_plan":
+                plan_id = cast(str, value["plan_id"])
                 raw, _request_id = await self.rest.request_json(
-                    "POST", f"plans/{quote_path_segment(value['plan_id'])}/execute",
+                    "POST", f"plans/{quote_path_segment(plan_id)}/execute",
                     body={key: value[key] for key in ("proposal_fingerprint", "operation_id")},
                 )
                 if not isinstance(raw, dict) or set(raw) != {"plan", "operation"}:
                     raise TransportError("invalid_response", "Execution returned an invalid receipt.")
-                result = AdapterResult({"plan": self._safe_plan(raw["plan"], expected_plan_id=value["plan_id"]), "operation": raw["operation"]})
+                result = AdapterResult({"plan": self._safe_plan(raw["plan"], expected_plan_id=plan_id), "operation": raw["operation"]})
             elif definition.kind == "upload":
                 result = await self._upload_files(value)
             elif definition.kind == "read":
@@ -315,17 +338,18 @@ class LagniappeAdapter:
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-    async def _get_actor(self) -> AdapterResult:
+    async def _get_actor(self) -> AdapterResult[JsonObject]:
         value, _request_id = await self.rest.request_json(
             "GET", "me", max_bytes=128 * 1024
         )
         validate_value(ACTOR_SCHEMA, value, phase="upstream_output")
-        self.actor = deepcopy(value)
-        return AdapterResult(value)
+        actor = cast(JsonObject, value)
+        self.actor = deepcopy(actor)
+        return AdapterResult(actor)
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-    async def _start_plan(self, kind: str, arguments: dict[str, Any]) -> AdapterResult:
+    async def _start_plan(self, kind: str, arguments: dict[str, object]) -> AdapterResult:
         method, route, _ = PLAN_ROUTES[kind]
         body = {"instructions": arguments.get("instructions", "")}
         if "name" in arguments:
@@ -337,21 +361,21 @@ class LagniappeAdapter:
         value, _request_id = await self.rest.request_json(method, route, body=body)
         plan = self._safe_plan(value)
         return await self._with_lifecycle_context(
-            plan, plan_id=plan["id"], actions=arguments.get("actions")
+            plan, plan_id=cast(str, plan["id"]), actions=cast(list[str] | None, arguments.get("actions"))
         )
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _with_lifecycle_context(
         self,
-        value: dict[str, Any],
+        value: Mapping[str, object],
         *,
         plan_id: str,
         actions: list[str] | None = None,
     ) -> AdapterResult:
         """Bundle a read without turning a successful mutation into a retry."""
         tool = "get_plan_contract"
-        arguments = {"plan_id": plan_id}
+        arguments: dict[str, object] = {"plan_id": plan_id}
         if actions is not None:
             arguments.update(actions=actions, view="full")
         try:
@@ -362,7 +386,7 @@ class LagniappeAdapter:
                 # A second caller can change the Plan between successful
                 # finalization and this read. Keep the completed upload's
                 # receipt, but do not bundle contradictory working context.
-                finalized_files = value["upload_inventory"]
+                finalized_files = cast(list[JsonObject], value["upload_inventory"])
                 inventory = result.value["upload_inventory"]
                 if (
                     not isinstance(inventory, dict)
@@ -427,8 +451,8 @@ class LagniappeAdapter:
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _load_contract(
-        self, plan_id: str, *, view, actions=None
-    ) -> dict[str, Any]:
+        self, plan_id: str, *, view: str, actions: list[str] | None = None
+    ) -> dict[str, object]:
         encoded = quote_path_segment(plan_id)
         method, route, _tool = PLAN_ROUTES["get_plan_contract"]
         value, _request_id = await self.rest.request_json(
@@ -467,7 +491,7 @@ class LagniappeAdapter:
             raise TransportError(
                 "invalid_response", "A full contract must include its proposal schema."
             )
-        submission = value["submission_format"]
+        submission = cast(_SubmissionFormat, value["submission_format"])
         if (
             value["contract_version"] != CONTRACT_VERSION_MAX
             or submission["contract_version"] != value["contract_version"]
@@ -484,17 +508,17 @@ class LagniappeAdapter:
             submission["url"],
             expected_path=expected_path,
         )
-        result = deepcopy(value)
+        result: dict[str, object] = dict(deepcopy(value))
         result["proposal_schema"] = proposal_schema
         return result
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     async def _get_contract_projection(
-        self, plan_id: str, *, actions=None, view="summary"
-    ) -> AdapterResult:
+        self, plan_id: str, *, actions: list[str] | None = None, view: str = "summary"
+    ) -> AdapterResult[dict[str, object]]:
         contract = await self._load_contract(plan_id, actions=actions, view=view)
-        submission = contract.pop("submission_format")
+        submission = cast(_SubmissionFormat, contract.pop("submission_format"))
         contract["mcp_submission"] = {
             "contract_version": submission["contract_version"],
             "proposal": {},
@@ -510,13 +534,13 @@ class LagniappeAdapter:
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-    async def _submit_plan(self, arguments: dict[str, Any]) -> AdapterResult:
-        plan_id = arguments["plan_id"]
+    async def _submit_plan(self, arguments: dict[str, object]) -> AdapterResult:
+        plan_id = cast(str, arguments["plan_id"])
         # The API validates the candidate against live permissions and state.
         # Only fetch the transport contract here: interpreting every action's
         # schema would add a second, potentially divergent rejection boundary.
         contract = await self._load_contract(plan_id, view="summary")
-        submission = contract["submission_format"]
+        submission = cast(_SubmissionFormat, contract["submission_format"])
         body = deepcopy(submission["body"])
         # Preserve the submitted version so the API can reject stale clients;
         # copying the current template's version would silently upgrade them.
@@ -535,10 +559,10 @@ class LagniappeAdapter:
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-    async def _upload_files(self, arguments: dict[str, Any]) -> AdapterResult:
+    async def _upload_files(self, arguments: dict[str, object]) -> AdapterResult:
         from .files import upload_local_files
 
-        plan_id = arguments["plan_id"]
+        plan_id = cast(str, arguments["plan_id"])
         contract = await self._load_contract(plan_id, view="summary")
         if contract["uploads_supported"] is not True:
             raise AdapterError(
@@ -566,10 +590,10 @@ class LagniappeAdapter:
     async def _read_tool(
         self,
         definition: ToolDefinition,
-        arguments: dict[str, Any],
+        arguments: dict[str, object],
     ) -> AdapterResult:
         rest_arguments = deepcopy(arguments)
-        plan_id = rest_arguments.pop("plan_id", None)
+        plan_id = cast(str | None, rest_arguments.pop("plan_id", None))
         route = (
             f"plans/{quote_path_segment(plan_id)}/tools/{definition.name}"
             if plan_id is not None
@@ -601,8 +625,8 @@ class LagniappeAdapter:
     # @tests tests_unit/test_033_mcp_adapter.py::test_original_media_delivery_matches_the_emitted_content_index
     async def _project_file_result(
         self,
-        raw_value: Any,
-        arguments: dict[str, Any],
+        raw_value: object,
+        arguments: dict[str, object],
     ) -> AdapterResult:
         if not isinstance(raw_value, dict):
             raise TransportError(
@@ -704,10 +728,10 @@ class LagniappeAdapter:
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
     def _safe_plan(
         self,
-        value: Any,
+        value: object,
         *,
         expected_plan_id: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         if not isinstance(value, dict):
             raise TransportError(
                 "invalid_response", "Plan response must be a JSON object."
@@ -747,7 +771,7 @@ class LagniappeAdapter:
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
-    def _safe_receipt(self, value: Any, *, expected_plan_id: str) -> dict[str, Any]:
+    def _safe_receipt(self, value: object, *, expected_plan_id: str) -> dict[str, object]:
         if not isinstance(value, dict):
             raise TransportError(
                 "invalid_response", "Submission receipt must be a JSON object."

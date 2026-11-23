@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 import json
 import logging
 import math
 import re
-from typing import Any
 import uuid
 
 import httpx
 
+from . import JsonObject, JsonValue
 from .configuration import ConnectionConfig
 from .errors import AdapterError, TransportError
 from .limits import (
@@ -91,8 +92,8 @@ def _finite_json_float(value: str) -> float:
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
-def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
+def _unique_json_object(pairs: list[tuple[str, JsonValue]]) -> JsonObject:
+    result: JsonObject = {}
     for key, value in pairs:
         if key in result:
             raise ValueError("duplicate JSON object key")
@@ -111,7 +112,7 @@ def _redact_upstream_text(value: str, *, api_key: str) -> str:
 
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
-def _redact_upstream_value(value: Any, *, api_key: str, depth: int = 0) -> Any:
+def _redact_upstream_value(value: object, *, api_key: str, depth: int = 0) -> JsonValue:
     if depth > 8:
         return None
     if isinstance(value, str):
@@ -124,7 +125,7 @@ def _redact_upstream_value(value: Any, *, api_key: str, depth: int = 0) -> Any:
             for item in value[:20]
         ]
     if isinstance(value, dict):
-        result: dict[str, Any] = {}
+        result: JsonObject = {}
         for key, item in list(value.items())[:20]:
             if not isinstance(key, str):
                 continue
@@ -161,7 +162,7 @@ def _reject_content_encoding(response: httpx.Response, *, storage: bool) -> None
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 # @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.download_media
-async def _raw_chunks(response: httpx.Response):
+async def _raw_chunks(response: httpx.Response) -> AsyncIterator[bytes]:
     """Yield transport bytes, including already-buffered synthetic responses."""
     if response.is_stream_consumed:
         # Mock transports commonly construct an already-buffered Response.
@@ -175,7 +176,7 @@ async def _raw_chunks(response: httpx.Response):
 # @testable false
 # @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.request_json
 # @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.download_media
-async def _raw_chunks_before(response: httpx.Response, *, deadline: float):
+async def _raw_chunks_before(response: httpx.Response, *, deadline: float) -> AsyncIterator[bytes]:
     """Yield response bytes within one wall-clock deadline."""
     iterator = _raw_chunks(response).__aiter__()
     while True:
@@ -260,9 +261,9 @@ class RESTClient:
         method: str,
         target: str,
         *,
-        body: Any = None,
+        body: object = None,
         max_bytes: int = MAX_STRUCTURED_RESULT_BYTES,
-    ) -> tuple[Any, str | None]:
+    ) -> tuple[JsonValue, str | None]:
         """Make one authenticated API request without retries or redirects."""
         url = self._resolve_api_url(target)
         content: bytes | None = None
@@ -348,7 +349,7 @@ class RESTClient:
                     status=response.status_code,
                 )
             try:
-                value = json.loads(
+                value: JsonValue = json.loads(
                     chunks,
                     object_pairs_hook=_unique_json_object,
                     parse_constant=_reject_json_constant,
@@ -368,7 +369,7 @@ class RESTClient:
                 ) from error
             if response.status_code >= 400:
                 problem = value.get("error") if isinstance(value, dict) else None
-                if not isinstance(problem, dict):
+                if not isinstance(value, dict) or not isinstance(problem, dict):
                     raise TransportError(
                         "api_error",
                         "The Lagniappe API request failed.",
@@ -438,7 +439,7 @@ class RESTClient:
     # @pair mcp-adapter:product-contract
     # @tests tests_unit/test_033_mcp_adapter.py::test_failed_concurrent_startup_cancels_sibling_requests
     # @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-    async def startup(self) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    async def startup(self) -> tuple[JsonObject, JsonObject, JsonObject]:
         """Fetch only authenticated discovery, actor, and catalog concurrently."""
         tasks = (
             asyncio.create_task(self.request_json("GET", "", max_bytes=64 * 1024)),
@@ -459,7 +460,7 @@ class RESTClient:
         discovery, _ = discovery_result
         actor, _ = actor_result
         catalog, _ = catalog_result
-        if not all(isinstance(value, dict) for value in (discovery, actor, catalog)):
+        if not isinstance(discovery, dict) or not isinstance(actor, dict) or not isinstance(catalog, dict):
             raise TransportError(
                 "invalid_response", "API startup resources must be JSON objects."
             )
@@ -468,7 +469,7 @@ class RESTClient:
 
     # @testable false
     # @covered-by mcp/src/lagniappe_mcp/rest.py::RESTClient.startup
-    def _validate_discovery(self, discovery: dict[str, Any]) -> None:
+    def _validate_discovery(self, discovery: JsonObject) -> None:
         if discovery.get("version") != "v1":
             raise TransportError(
                 "incompatible_api", "This adapter supports only Lagniappe API v1."
