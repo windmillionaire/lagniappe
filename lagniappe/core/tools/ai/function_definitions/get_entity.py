@@ -1,9 +1,14 @@
 """Function declaration and handler for loading entity details by ID."""
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.entities.page import Page
+    from lagniappe.core.entities.task import Task
+    from lagniappe.core.entities.model_task import ModelTask
+    from lagniappe.core.entities.project import Project
     from lagniappe.core.entities.user import User
 
 from google.genai import types
@@ -106,7 +111,7 @@ def _ensure_attached_form(entity):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
 # @reason edit projection shares authorization with the public entity and task readers
-def edit_entity(entity, user, schemas=None):
+def edit_entity(entity: Entity, user: User, schemas: dict[str, list[dict[str, object]]] | None = None) -> dict[str, object]:
     from copy import deepcopy
     from ..references import hash_reference
     from lagniappe.core.tools.entity_patches import PATCH_FIELDS
@@ -120,17 +125,19 @@ def edit_entity(entity, user, schemas=None):
     if entity.entity_kind in {"page", "task"}:
         result["answers"] = deepcopy(entity.submission or {})
         result["generation"] = entity.generation
-    if entity.entity_kind in {"task", "page", "model"} and entity.form and entity.form.allowed(Action.VIEW, user=user):
-        form = entity.form
-        result.pop(entity.properties.form.ai_key, None)
+    form_owner = cast("Task | Page | ModelTask", entity)
+    if entity.entity_kind in {"task", "page", "model"} and (form := form_owner.form) and form.allowed(Action.VIEW, user=user):
+        if ai_key := form_owner.properties.form.ai_key:
+            result.pop(ai_key, None)
         reference = hash_reference(form)
-        result["form"] = {"hash": reference, "name": form.name, "generation": form.generation, "revision": form.version}
+        assert reference is not None
+        result["form"] = form_details = {"hash": reference, "name": form.name, "generation": form.generation, "revision": form.version}
         schema = deepcopy(form.schema)
         if schemas is None:
-            result["form"]["schema"] = schema
+            form_details["schema"] = schema
         else:
             result.pop("schema", None)
             schemas[reference] = schema
     if entity.entity_kind == "project":
-        result["model_tasks"] = [{"hash": hash_reference(model), "name": model.name, "order": model.order, "form": hash_reference(model.form) if model.form and model.form.allowed(Action.VIEW, user=user) else None} for model in entity.model_tasks if model.allowed(Action.VIEW, user=user)]
+        result["model_tasks"] = [{"hash": hash_reference(model), "name": model.name, "order": model.order, "form": hash_reference(model.form) if model.form and model.form.allowed(Action.VIEW, user=user) else None} for model in cast("Project", entity).model_tasks if model.allowed(Action.VIEW, user=user)]
     return result

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import BinaryIO
+    from ..database.assets import DirectUploadFile
     from werkzeug.datastructures import FileStorage
     from lagniappe.core.entities.user import User
     from lagniappe.core.entities.file import File
@@ -352,7 +353,7 @@ class Prompt:
     def bytes(self) -> list[InlinePart]:
         return self._bytes
 
-    def add_bytes(self, file: BinaryIO | FileStorage, mime_type: str | None) -> Self | None:
+    def add_bytes(self, file: BinaryIO | FileStorage | DirectUploadFile, mime_type: object) -> Self | None:
         """Attach inline file bytes to the prompt.
 
         Args:

@@ -1,5 +1,12 @@
 """AI-powered file summarization with async task queue support."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ...entities.file import File
+    from ...entities.user import User
+    from ...properties.file_options import Summarize
+
 from ... import exceptions
 from ...definitions import FileConsumer, enforce_file_consumer
 from ..database import assets as storage_assets
@@ -50,7 +57,7 @@ PDF_PAGE_LIMIT_SUMMARY_ERROR = (
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_summary_eligibility_includes_ooxml_fallback
 # @matrix ai : eligibility ooxml summary-prompt
-def can_summarize_file(file):
+def can_summarize_file(file: File) -> bool:
     """Return whether a file has an AI-readable original or OOXML fallback."""
     if _file_part(file):
         return True
@@ -70,15 +77,15 @@ def can_summarize_file(file):
 # @tests tests_unit/test_006_file_properties.py::test_file_dispatch_rejects_missing_actor_before_changing_status
 # @matrix file deferred-jobs : explicit-actor validation
 def summarize_file(
-    file,
+    file: File,
     *,
-    actor=None,
-    dispatch=True,
-    parameters=None,
-    idempotency_key=None,
-):
+    actor: User | None = None,
+    dispatch: bool = True,
+    parameters: dict[str, object] | None = None,
+    idempotency_key: str | None = None,
+) -> Summarize:
     """Prepare summary status and optionally queue work for an explicit actor."""
-    if dispatch and not getattr(actor, "is_authenticated", False):
+    if dispatch and (actor is None or not getattr(actor, "is_authenticated", False)):
         raise exceptions.ValidationError("File processing requires an authenticated actor.")
     summarize = file.properties.summarize
     eligible = can_summarize_file(file)
@@ -86,6 +93,7 @@ def summarize_file(
     if eligible:
         summarize.status = "Summarizing file..."
         if dispatch:
+            assert actor is not None
             from ...definitions import DeferredJobSpec, DeferredJobType
             from ..deferred_jobs.service import DeferredJobs
 
@@ -229,11 +237,11 @@ def _is_pdf_page_limit_error(file, error):
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_populates_file_search_cache
 # @matrix ai : cache docx errors ooxml pdf-page-limit quota status summary-prompt unreadable-pdf
 def generate_summary(
-    file,
-    raise_quota=False,
-    raise_errors=False,
-    service_tier=None,
-):
+    file: File,
+    raise_quota: bool = False,
+    raise_errors: bool = False,
+    service_tier: str | None = None,
+) -> Summarize:
     """Generate a summary and two reusable workspace retrieval terms."""
     summarize = file.properties.summarize
 
