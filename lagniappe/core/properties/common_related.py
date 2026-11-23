@@ -41,7 +41,7 @@ class AttachedForm(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProp
 
     @property
     def value(self):
-        return RelatedEntityMixin.value.fget(self)
+        return RelatedEntityMixin._read_related(self)
 
     @value.setter
     def value(self, value):
@@ -59,7 +59,7 @@ class AttachedForm(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProp
 
         if self.entity.entity_kind in {"page", "task"} and self.key != getattr(value, "key", None):
             self.entity._permission_sources_changed = True
-        RelatedEntityMixin.value.fset(self, value)
+        RelatedEntityMixin._write_related(self, value)
         restricted_to = self.entity.properties.get("restricted_to")
         if restricted_to is not None:
             restricted_to.unset()
@@ -331,7 +331,7 @@ class RelatedForms(RelatedEntityListMixin, DBProperty):
 
     @property
     def value(self):
-        return RelatedEntityListMixin.value.fget(self)
+        return RelatedEntityListMixin._read_related_list(self)
 
     @value.setter
     def value(self, value):
@@ -343,7 +343,7 @@ class RelatedForms(RelatedEntityListMixin, DBProperty):
             if getattr(item, "entity_kind", None) != "form":
                 raise ValueError("Value must be a form")
 
-        RelatedEntityListMixin.value.fset(self, value)
+        RelatedEntityListMixin._write_related_list(self, value)
 
     # @testable true
     # @tests tests_unit/test_007_category_properties.py::test_related_forms_add_skips_primary_form_and_registers_relation

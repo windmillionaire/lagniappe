@@ -35,10 +35,10 @@ class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
 
     @property
     def value(self):
-        value = RelatedEntityListMixin.value.fget(self)
+        value = RelatedEntityListMixin._read_related_list(self)
         if self.entity.is_public and not self._is_public_only(value):
             value = [self._public_group(value)]
-            RelatedEntityListMixin.value.fset(self, value)
+            RelatedEntityListMixin._write_related_list(self, value)
         return value
 
     @value.setter
@@ -54,11 +54,11 @@ class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
             if not getattr(group, "key", None):
                 raise ValueError("Value must have a key")
 
-        existing = [g.key for g in RelatedEntityListMixin.value.fget(self)]
+        existing = [g.key for g in RelatedEntityListMixin._read_related_list(self)]
         new = [g.key for g in value]
 
         if set(existing) != set(new):
-            RelatedEntityListMixin.value.fset(self, value)
+            RelatedEntityListMixin._write_related_list(self, value)
             self.entity.properties.permissions.create()
 
     # DB Attributes
@@ -67,7 +67,7 @@ class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
             raise ValueError("Value must have a key")
 
         if self.entity.is_public:
-            existing_value = RelatedEntityListMixin.value.fget(self)
+            existing_value = RelatedEntityListMixin._read_related_list(self)
             public_group = self._public_group(existing_value)
             existing = [g.key for g in existing_value]
             self.value = [public_group]
@@ -138,7 +138,7 @@ class UserPage(RelatedEntityMixin, DBProperty):
             page = self._create_user_page(user_model)
 
         self._set_user_model(page, user_model)
-        RelatedEntityMixin.value.fset(self, page)
+        RelatedEntityMixin._write_related(self, page)
         page.user = self.entity
         self.entity.add_mutation_intents(
             MutationIntent.standard(page, reason="user-page-mirror")

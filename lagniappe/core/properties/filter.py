@@ -43,7 +43,7 @@ class FilterParent(RelatedEntityMixin, DBProperty):
 
     @value.setter
     def value(self, value):
-        RelatedEntityMixin.value.fset(self, value)
+        RelatedEntityMixin._write_related(self, value)
         if value:
             self.entity.db["parent_hash"] = value.hash
         else:

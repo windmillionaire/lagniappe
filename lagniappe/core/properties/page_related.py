@@ -126,7 +126,7 @@ class PageCategories(
 
         model = self.entity.model
         stored_categories = [
-            c for c in RelatedEntityListMixin.value.fget(self) if c.key != key
+            c for c in RelatedEntityListMixin._read_related_list(self) if c.key != key
         ]
 
         self._value = stored_categories
@@ -256,7 +256,7 @@ class PageModelCategory(RelatedEntityMixin, DetailsMixin, DBProperty):
 
     @RelatedEntityMixin.value.setter
     def value(self, value):
-        RelatedEntityMixin.value.fset(self, value)
+        RelatedEntityMixin._write_related(self, value)
         # Invalidate PageCategories cache since model is included in categories
         if self.entity and hasattr(self.entity.properties, "categories"):
             self.entity.properties.categories._all_categories = None

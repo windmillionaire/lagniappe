@@ -10,13 +10,13 @@ class AttachedEntity(RelatedEntityMixin, DBProperty):
 
     @property
     def value(self):
-        return RelatedEntityMixin.value.fget(self)
+        return RelatedEntityMixin._read_related(self)
 
     @value.setter
     def value(self, value):
         if value is not None and getattr(value, "entity_kind", None) != self._kind:
             raise ValueError(f"File {self.id} must be a live {self._kind}")
-        RelatedEntityMixin.value.fset(self, value)
+        RelatedEntityMixin._write_related(self, value)
         self.entity.properties.requires.unset()
         self.entity.properties.restricted_to.unset()
 

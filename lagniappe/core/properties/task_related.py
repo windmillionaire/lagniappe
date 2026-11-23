@@ -161,11 +161,11 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
 
     @property
     def value(self):
-        return RelatedEntityListMixin.value.fget(self)
+        return RelatedEntityListMixin._read_related_list(self)
 
     @value.setter
     def value(self, value):
-        existing = {file.key: file for file in RelatedEntityListMixin.value.fget(self)}
+        existing = {file.key: file for file in RelatedEntityListMixin._read_related_list(self)}
         updated = {file.key: file for file in value or []}
 
         for key, file in existing.items():
@@ -174,7 +174,7 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
         for file in updated.values():
             self._link_file(file)
 
-        RelatedEntityListMixin.value.fset(self, value)
+        RelatedEntityListMixin._write_related_list(self, value)
 
     def add(self, value):
         added = super().add(value)
@@ -361,15 +361,15 @@ class AssignedTo(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProper
     @value.setter
     def value(self, value):
         if not value:
-            RelatedEntityMixin.value.fset(self.entity.properties.assigned_by, None)
-            RelatedEntityMixin.value.fset(self, None)
+            RelatedEntityMixin._write_related(self.entity.properties.assigned_by, None)
+            RelatedEntityMixin._write_related(self, None)
             return
 
         assigned_to = value.page if isinstance(value, Entities.USER) else value
         if current_user and current_user.is_authenticated:
             self.entity.assigned_by = current_user
 
-        RelatedEntityMixin.value.fset(self, assigned_to)
+        RelatedEntityMixin._write_related(self, assigned_to)
 
     # Column Attributes
     _ordering = Ordering.CATEGORICAL
@@ -412,7 +412,7 @@ class AssignedBy(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProper
         if not isinstance(value, Entities.USER) or not value.is_authenticated:
             return
 
-        RelatedEntityMixin.value.fset(self, value.page)
+        RelatedEntityMixin._write_related(self, value.page)
 
     # Column Attributes
     _ordering = Ordering.CATEGORICAL
@@ -454,7 +454,7 @@ class CompletedBy(RelatedEntityMixin, FilterMixin, AIMixin, ColumnMixin, DBPrope
     def value(self, value):
         completed_by = value.page if isinstance(value, Entities.USER) else value
 
-        RelatedEntityMixin.value.fset(self, completed_by)
+        RelatedEntityMixin._write_related(self, completed_by)
 
     # Column Attributes
     _ordering = Ordering.CATEGORICAL
@@ -510,7 +510,7 @@ class LinkedPages(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
             }.values()
         )
 
-        RelatedEntityListMixin.value.fset(self, linked)
+        RelatedEntityListMixin._write_related_list(self, linked)
         updated_keys = {p.key for p in linked}
         for key, page in existing.items():
             if key not in updated_keys:
@@ -541,11 +541,11 @@ class TaskModel(RelatedEntityMixin, FilterMixin, AIMixin, DBProperty):
     # @matrix task : inheritance model-form
     @property
     def value(self):
-        return RelatedEntityMixin.value.fget(self)
+        return RelatedEntityMixin._read_related(self)
 
     @value.setter
     def value(self, value):
-        RelatedEntityMixin.value.fset(self, value)
+        RelatedEntityMixin._write_related(self, value)
         if not value or getattr(self.entity.properties.form, "key", None):
             return
 
@@ -603,7 +603,7 @@ class TaskPage(RelatedEntityMixin, DetailsMixin, FilterMixin, AIMixin, DBPropert
         previous_key = previous.key if previous else None
         next_key = value.key if value else None
 
-        RelatedEntityMixin.value.fset(self, value)
+        RelatedEntityMixin._write_related(self, value)
 
         if previous_key != next_key:
             self.entity.properties.restricted_to.unset()
