@@ -67,7 +67,7 @@ class RelatedEntityListMixin[Related: Entity = "Entity"](_RelationHost):
             self.entity._to_cache = None
 
     @property
-    def sort_value(self) -> dict[str, str | None]:
+    def sort_value(self) -> dict[str, str | None] | int | None:
         return {cast(str, e["hash"]): cast("str | None", e["name"]) for e in self.column_value}
 
     @property
@@ -181,7 +181,10 @@ class RelatedEntityListMixin[Related: Entity = "Entity"](_RelationHost):
             return True
         return False
 
-    def remove(self, value: Related) -> bool:
+    def remove(self, value: Related) -> bool | None:
+        return self._remove_related(value)
+
+    def _remove_related(self, value: Related) -> bool:
         key = getattr(value, "key", None)
         if not key:
             raise ValueError("Value must have a key")
