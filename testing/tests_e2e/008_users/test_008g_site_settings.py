@@ -284,17 +284,19 @@ def test_site_settings_ai_form_saves_current_models_through_route(
         )
     }
 
+    auto_execute = form.locator('[name="AI_AUTO_EXECUTE"]').is_checked()
     with owner.page.expect_response("**/l/set-ai-settings") as response_info:
         form.locator("button[type='submit']").click()
 
     response = response_info.value
     assert response.status == 200
-    assert response.json()["ai_settings"] == expected
+    expected_settings = {**expected, "AI_AUTO_EXECUTE": auto_execute}
+    assert response.json()["ai_settings"] == expected_settings
     expect(form.locator("button[type='submit']")).to_contain_text(
         "AI Model Settings Saved"
     )
     saved = dict(site_database.ai())
-    assert {name: saved[name] for name in expected} == expected
+    assert {name: saved[name] for name in expected_settings} == expected_settings
 
     owner.page.reload(wait_until="domcontentloaded")
     reloaded_settings_panel = owner.locate(admin.SITE_SETTINGS_FORM)
@@ -304,6 +306,7 @@ def test_site_settings_ai_form_saves_current_models_through_route(
         "ai-models",
     )
     reloaded_form = reloaded_ai_models.locator("[data-role='ai-settings']")
+    expect(reloaded_form.locator('[name="AI_AUTO_EXECUTE"]')).to_be_checked(checked=auto_execute)
     for name, value in expected.items():
         expect(reloaded_form.locator(f"[name='{name}']")).to_have_value(value)
 

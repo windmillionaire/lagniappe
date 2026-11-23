@@ -639,7 +639,9 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "Updates and creation do not require files"
         in submit_operation["description"]
     )
-    assert "never executes actions" in submit_operation["description"]
+    assert "A mutation proposal becomes ready for review" in submit_operation["description"]
+    assert "When capabilities.execute_plan is true" in submit_operation["description"]
+    assert "Pass require_review=true to force browser review" in submit_operation["description"]
     assert "only after the user requests saving" in submit_operation["description"]
     assert "mutation proposal replaces" in submit_operation["description"]
     assert "submit it again" in submit_operation["description"]
