@@ -6,12 +6,13 @@ import hashlib
 from pathlib import Path
 import re
 from types import MappingProxyType
+from typing import NotRequired, TypedDict
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 import yaml
 
 from lagniappe.core.definitions.manual import VALID_MANUAL_SECTIONS
-from lagniappe.core.tools.files.html import render_markdown, sanitize_html, strip_tags
+from lagniappe.core.tools.files.html import SafeHTML, render_markdown, sanitize_html, strip_tags
 
 TOPIC_DIRECTORY = Path(__file__).parent
 PROJECTION_VERSION = "1"
@@ -21,6 +22,16 @@ TOPIC_ID = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*\Z")
 # @testable false
 # @covered-by lagniappe/reference/__init__.py::topics
 # @reason immutable data record populated by the validated corpus loader
+class TopicRecord(TypedDict):
+    id: str
+    title: str
+    url: str
+    markdown: str
+    summary: str
+    related: list[str]
+    context: NotRequired[dict[str, str]]
+
+
 @dataclass(frozen=True)
 class Topic:
     """One immutable article; installation-specific context is kept separate."""
@@ -36,13 +47,13 @@ class Topic:
     # @covered-by lagniappe/reference/__init__.py::get_topic
     # @reason canonical address is part of the topic lookup contract
     @property
-    def url(self):
+    def url(self) -> str:
         return f"/help/{self.id}"
 
     # @testable true
     # @tests tests_unit/test_035_help.py::test_topics_are_canonical_and_portable
     # @pair help:canonical-source
-    def as_dict(self):
+    def as_dict(self) -> TopicRecord:
         return {
             "id": self.id, "title": self.title, "url": self.url,
             "markdown": self.markdown, "summary": self.summary,
@@ -55,7 +66,7 @@ class Topic:
 # @covered-by lagniappe/reference/__init__.py::topics
 # @reason deployed source snapshot is immutable for the life of a process
 @lru_cache(maxsize=1)
-def _sources():
+def _sources() -> tuple[tuple[str, bytes], ...]:
     return tuple((path.stem, path.read_bytes()) for path in sorted(TOPIC_DIRECTORY.glob("*.md")))
 
 
@@ -63,7 +74,7 @@ def _sources():
 # @tests tests_unit/test_035_help.py::test_help_version_changes_with_source_without_rendering
 # @pair help:version
 @lru_cache(maxsize=1)
-def help_version():
+def help_version() -> str:
     """Fingerprint source bytes without parsing Markdown on a warm startup."""
     digest = hashlib.sha256(PROJECTION_VERSION.encode())
     for topic_id, source in _sources():
@@ -76,7 +87,7 @@ def help_version():
 # @tests tests_unit/test_035_help.py::test_invalid_topic_sources_fail_validation
 # @matrix help : canonical-source validation
 @lru_cache(maxsize=1)
-def topics():
+def topics() -> MappingProxyType[str, Topic]:
     """Load and validate the complete corpus once, without Flask or Redis."""
     loaded = {}
     for topic_id, source in _sources():
@@ -101,7 +112,7 @@ def topics():
             raise ValueError(f"Help must be static Markdown: {topic_id}")
         html = render_markdown(body)
         soup = BeautifulSoup(html, "html.parser")
-        if soup.find("h1") or not soup.contents or soup.contents[0].name != "p":
+        if soup.find("h1") or not soup.contents or not isinstance(soup.contents[0], Tag) or soup.contents[0].name != "p":
             raise ValueError(f"Help must start with a summary paragraph and use level-two headings: {topic_id}")
         loaded[topic_id] = Topic(
             topic_id, title.strip(), body, strip_tags(str(soup.contents[0])),
@@ -115,6 +126,8 @@ def topics():
                 raise ValueError(f"Unknown related topic {related_id} in {topic.id}")
         for link in BeautifulSoup(render_markdown(topic.markdown), "html.parser").find_all("a", href=True):
             href = link["href"]
+            if not isinstance(href, str):
+                raise ValueError(f"Invalid help link in {topic.id}")
             if href.startswith("/help/") and href.removeprefix("/help/") not in loaded:
                 raise ValueError(f"Unknown help link {href} in {topic.id}")
             if href.startswith("/manual/") and href.removeprefix("/manual/").split("#")[0] not in VALID_MANUAL_SECTIONS:
@@ -126,7 +139,7 @@ def topics():
 # @tests tests_unit/test_035_help.py::test_topics_are_canonical_and_portable
 # @tests tests_unit/test_035_help.py::test_topic_lookup_rejects_aliases_and_paths
 # @pair help:canonical-source
-def get_topic(topic_id):
+def get_topic(topic_id: str) -> Topic:
     """Resolve exactly one canonical ID, never a filename, alias or path."""
     if not isinstance(topic_id, str) or not TOPIC_ID.fullmatch(topic_id):
         raise KeyError(topic_id)
@@ -137,7 +150,7 @@ def get_topic(topic_id):
 # @tests tests_unit/test_035_help.py::test_topic_rendering_preserves_safety_and_links
 # @pair help:rendering
 @lru_cache(maxsize=256)
-def topic_html(topic_id, *, embedded=False):
+def topic_html(topic_id: str, *, embedded: bool = False) -> SafeHTML:
     """Render the reference body with headings appropriate to its wrapper."""
     soup = BeautifulSoup(render_markdown(get_topic(topic_id).markdown), "html.parser")
     if embedded:
@@ -150,7 +163,7 @@ def topic_html(topic_id, *, embedded=False):
 # @tests tests_unit/test_035_help.py::test_topic_rendering_preserves_safety_and_links
 # @pair help:rendering
 @lru_cache(maxsize=256)
-def topic_sections(topic_id, *, embedded=False):
+def topic_sections(topic_id: str, *, embedded: bool = False) -> tuple[SafeHTML, ...]:
     """Split the safe body into introduction and details for template wrappers."""
     clean = BeautifulSoup(topic_html(topic_id, embedded=embedded), "html.parser")
     nodes = list(clean.contents)
@@ -172,7 +185,7 @@ def topic_sections(topic_id, *, embedded=False):
 # @testable true
 # @tests tests_unit/test_035_help.py::test_context_is_separate_and_requires_authenticated_user
 # @pair help:context-permissions
-def topic_context(topic_id, user=None):
+def topic_context(topic_id: str, user: object | None = None) -> dict[str, str]:
     """Return safe installation context only for an authenticated reader."""
     if not user or not getattr(user, "is_authenticated", False):
         return {}
