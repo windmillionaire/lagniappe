@@ -4,6 +4,11 @@ from ..context import required_input
 from copy import deepcopy
 import hashlib
 import json
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.page import Page
+    from lagniappe.core.entities.task import Task
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
@@ -418,6 +423,7 @@ class AutofillAdapter(DeferredJobAdapter):
             target = Entities.fetch_one(required_input(context, "target").key, request=Fetch.nested(
                 because=FetchReason.TASK_SAVE_REQUIREMENTS,
             ))
+            target = cast("Page | Task | None", target)
             if not target or not target.allowed(Action.EDIT, user=context.actor):
                 raise exceptions.ValidationError("This form is no longer available for autofill.")
             if isinstance(target, Entities.TASK) and target.completed:

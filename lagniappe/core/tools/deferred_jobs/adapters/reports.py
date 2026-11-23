@@ -552,7 +552,10 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         if result and result.get("ledger_version") == report_ledger.REPORT_LEDGER_VERSION:
             result["status"] = "failed"
             if not result.get("failed_at"):
-                for index, action in enumerate(result.get("actions") or [], 1):
+                records = result.get("actions") or []
+                if not isinstance(records, list):
+                    raise exceptions.ValidationError("Invalid execution action ledger.")
+                for index, action in enumerate(records, 1):
                     if action.get("status") not in {"complete", "skipped"}:
                         result["failed_at"] = index
                         break

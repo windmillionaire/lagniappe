@@ -592,7 +592,7 @@ def resolve_form_generations(pairs):
     requested = set(pairs)
     keys = {key for key, _generation in requested if key}
     current = {
-        form.key: form
+        form.key: cast("Form", form)
         for form in Entities.fetch(*keys, request=Fetch.root())
     }
     return {

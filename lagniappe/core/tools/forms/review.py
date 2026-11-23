@@ -2,6 +2,10 @@
 
 from copy import deepcopy
 import json
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
 
 from ...definitions import Action, Fetch
 from ...entities import Entities
@@ -96,7 +100,7 @@ def stage_submission_guard(target, submitted):
     expected = submitted.get("form-revision")
     if expected != target.autofill_revision:
         return False
-    guards = list(getattr(target, "_form_additional_guards", ()))
+    guards: list[tuple[Key, ExactEntityState]] = list(getattr(target, "_form_additional_guards", ()))
     guards.append((target.key, ExactEntityState(deepcopy(dict(target.db)))))
     target._form_additional_guards = guards
     return True
@@ -135,21 +139,23 @@ def review_projection(target, actor):
         if ((job.inputs or {}).get("target") or {}).get("id") != target.urlsafe_key:
             continue
         private = (job.parameters or {}).get("mode") == "revise"
-        if private and job.actor.key != actor.key:
+        if private and (job.actor is None or job.actor.key != actor.key):
             continue
         snapshot = (job.parameters or {}).get("snapshot") or {}
         checkpoint = job.checkpoint or {}
-        if (not job.db.get(RECEIPT) or "proposal" not in checkpoint
-                or not snapshot_matches_form(snapshot, target)):
+        proposal = checkpoint.get("proposal")
+        if not job.db.get(RECEIPT) or not isinstance(snapshot, dict) or not isinstance(proposal, dict):
+            continue
+        if not snapshot_matches_form(snapshot, target):
             continue
         result.append({
             "operation": job.urlsafe_key,
             "private": private,
-            "fields": list(checkpoint["proposal"]["values"]),
+            "fields": list(proposal["values"]),
             "schema": snapshot["prompt"]["schema"],
             "baseline": snapshot.get("values", {}),
             "saved_baseline": snapshot.get("saved_values", {}),
-            "submission": {**snapshot.get("values", {}), **checkpoint["proposal"]["values"]},
+            "submission": {**snapshot.get("values", {}), **proposal["values"]},
         })
     return result
 

@@ -59,7 +59,7 @@ class FormChangeAdapter(DeferredJobAdapter):
             from lagniappe.core.definitions import Action
 
             form = Entities.fetch_one(required_input(context, "form").key, request=Fetch.direct())
-            if not form.allowed(Action.EDIT, user=context.actor):
+            if form is None or not form.allowed(Action.EDIT, user=context.actor):
                 raise ValidationError(
                     "You no longer have permission to update this Form."
                 )
@@ -71,7 +71,7 @@ class FormChangeAdapter(DeferredJobAdapter):
     def started(self, context):
         from lagniappe.core.tools import cache
 
-        cache.update(context.input("form"))
+        cache.update(required_input(context, "form"))
 
     def can_view_status(self, job, actor):
         from lagniappe.core.definitions import Action
@@ -371,7 +371,9 @@ class FormChangeAdapter(DeferredJobAdapter):
         form = Entities.fetch_one(
             ((job.inputs or {}).get("form") or {}).get("id"), request=Fetch.root()
         )
-        pending = contracts.json_value(form.db, contracts.PENDING) if form else {}
+        if form is None:
+            return
+        pending = contracts.json_value(form.db, contracts.PENDING)
         if pending.get("job") == job.urlsafe_key and pending.get("applied"):
             raise ValidationError(
                 "Some submissions may already be updated. Retry this change to finish it."
@@ -392,7 +394,9 @@ class FormChangeAdapter(DeferredJobAdapter):
         if str(error) not in {RESTRICTED_MESSAGE, STALE_MESSAGE}:
             return
         form = Entities.fetch_one(required_input(context, "form").key, request=Fetch.root())
-        pending = contracts.json_value(form.db, contracts.PENDING) if form else {}
+        if form is None:
+            return
+        pending = contracts.json_value(form.db, contracts.PENDING)
         if pending.get("job") != context.job.urlsafe_key or pending.get("applied"):
             return
         expected = form.db.pop(contracts.PENDING)

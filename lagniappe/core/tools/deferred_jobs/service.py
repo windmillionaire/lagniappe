@@ -3,6 +3,10 @@
 import hashlib
 import json
 import uuid
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.deferred_job import DeferredJob
 
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
@@ -450,6 +454,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
 
         if job.status in TERMINAL_STATUSES:
             return True
+        job = cast("DeferredJob", job)
         self.adapter(job.job_type).before_cancel(job)
         if not isinstance(status, DeferredJobStatus):
             status = DeferredJobStatus(status)

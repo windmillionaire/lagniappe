@@ -51,7 +51,7 @@ def deferred_job_lock_descriptors(targets, scope=AUTOFILL_FORM_LOCK_SCOPE):
     active = {}
     for target_key in target_keys:
         lock = locks.get(target_key)
-        job = jobs.get(lock.operation) if lock else None
+        job = jobs.get(lock.operation) if lock and lock.operation else None
         if lock and job and job.status in ACTIVE_STATUSES:
             active[target_key] = (lock, job)
         elif lock:
