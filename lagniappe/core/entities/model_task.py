@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from ..properties import project
 from ..exceptions import PropertyError
@@ -63,11 +63,11 @@ class ModelTask(Entity):
         return properties
 
     @property
-    def order(self):
-        return self.db.get("order", None)
+    def order(self) -> int | None:
+        return cast("int | None", self.db.get("order"))
 
     @order.setter
-    def order(self, value):
+    def order(self, value: int | str) -> None:
         self.db["order"] = int(value)
 
     # @testable true

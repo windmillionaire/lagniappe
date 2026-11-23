@@ -55,7 +55,7 @@ class FilterMixin(FieldHost):
         return self.value
 
     @property
-    def filter_label(self) -> str:
+    def filter_label(self) -> str | None:
         return self.label
 
     @property

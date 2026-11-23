@@ -18,5 +18,5 @@ class AIMixin(FieldHost):
         return None if val is None else val
 
     @property
-    def ai_key(self) -> str:
+    def ai_key(self) -> str | None:
         return self.label

@@ -30,6 +30,9 @@ class Form(Entity, AssetMixin):
         schema: list[dict[str, object]]
 
         @property
+        def filters(self) -> form.FormFilters: ...
+
+        @property
         def properties(self) -> property_types.FormProperties: ...
 
     entity_kind = "form"

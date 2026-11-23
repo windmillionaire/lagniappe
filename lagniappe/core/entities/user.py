@@ -46,6 +46,7 @@ class UserCreationData(TypedDict, total=False):
 # @pair user:entity-lifecycle
 class User(AssetMixin, UserMixin, Entity):
     if TYPE_CHECKING:
+        notification_email_mode: str
         email: str | None
         groups: list[UserGroup]
         permissions: dict[str, str]

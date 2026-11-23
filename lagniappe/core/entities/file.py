@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 class File(AssetMixin, Entity):
     if TYPE_CHECKING:
         filename: str | None
+        mimetype: str
         page: Page | None
         task: Task | None
 

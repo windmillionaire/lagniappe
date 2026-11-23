@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from .field_host import FieldHost
 
 # @testable infrastructure
@@ -11,7 +13,7 @@ class SearchMixin(FieldHost):
     """
 
     @property
-    def search_key(self) -> str:
+    def search_key(self) -> str | Sequence[str | None] | None:
         return self.label
 
     @property
