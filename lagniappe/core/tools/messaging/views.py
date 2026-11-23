@@ -1,6 +1,6 @@
 """Participant-authorized direct-message reads and browser projections."""
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 
 if TYPE_CHECKING:
     from lagniappe.core.entities.user import User
@@ -13,6 +13,24 @@ from ...properties import message_conversation as conversation_values
 from .. import collaboration
 from lagniappe.core.tools.database import messaging as database_messaging
 from ..database import messaging as message_database
+
+
+class ConversationPeer(TypedDict):
+    id: str | None
+    name: str
+    available: bool
+    replyable: bool
+    deleted: bool
+
+
+class ConversationProjection(TypedDict):
+    id: str | None
+    peer: ConversationPeer
+    last_activity: str | None
+    last_sender: str | None
+    unread: int
+    revision: int
+    sequence: int
 
 
 CONVERSATION_PAGE_SIZE = 25
@@ -60,7 +78,7 @@ def serialize_conversation(
     peer_available: bool = True,
     peer_replyable: bool = True,
     peer_deleted: bool = False,
-) -> dict[str, object]:
+) -> ConversationProjection:
     user_id = conversation_values.participant_id(user)
     peer_key = conversation_values.peer_key(conversation, user)
     peer_id = conversation_values.encoded_identifier(peer_key) if peer_key else None

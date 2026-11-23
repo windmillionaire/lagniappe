@@ -24,7 +24,7 @@ import uuid
 from bs4 import BeautifulSoup
 import requests
 from svix.webhooks import Webhook, WebhookVerificationError
-from werkzeug.datastructures import FileStorage
+from werkzeug.datastructures import FileStorage, Headers
 from werkzeug.utils import secure_filename
 
 from config.ai_email import AI_EMAIL_ALIAS, AI_EMAIL_LIMITS, normalize_email_address
@@ -187,13 +187,13 @@ def _header_values(headers, name):
 # @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_rejects_missing_or_malformed_authentication_inputs
 # @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_rejects_replayed_or_future_events
 # @matrix ai-email webhook : event-id future headers invalid raw-body replay rotation secret signature timestamp
-def verify_svix_signature(raw_body: bytes, headers: dict[str, str], webhook_secret: str) -> str:
+def verify_svix_signature(raw_body: bytes, headers: Mapping[str, str] | Headers, webhook_secret: str) -> str:
     """Verify a Resend/Svix signature against the untouched request bytes."""
     if not isinstance(raw_body, bytes):
         raise AIEmailWebhookError("Webhook body must be raw bytes.")
 
     try:
-        Webhook(webhook_secret).verify(raw_body, headers)
+        Webhook(webhook_secret).verify(raw_body, dict(headers.items()))
     except WebhookVerificationError as error:
         raise AIEmailWebhookError() from error
     except Exception as error:
