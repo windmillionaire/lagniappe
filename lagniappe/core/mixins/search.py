@@ -1,7 +1,9 @@
+from .field_host import FieldHost
+
 # @testable infrastructure
 # @covered-by lagniappe/core/properties/form_inputs.py::TextInput
 # @covered-by lagniappe/core/properties/form_textarea.py::Textarea
-class SearchMixin:
+class SearchMixin(FieldHost):
     """Adds full-text search content. Indexed for text search.
 
     Provides:
@@ -9,9 +11,9 @@ class SearchMixin:
     """
 
     @property
-    def search_key(self):
+    def search_key(self) -> str:
         return self.label
 
     @property
-    def search_value(self):
+    def search_value(self) -> object:
         return self.value

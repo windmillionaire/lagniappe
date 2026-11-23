@@ -392,7 +392,7 @@ class Entity:
     # @matrix filter-index permissions task : column-view entity-metadata permission-neutral related-values unset-values
     # @pairs filter-index:related-values permissions:filter-index-neutral
     def to_filter_index(self, user=None):
-        values = {"id": self.urlsafe_key}
+        values: dict[str, object] = {"id": self.urlsafe_key}
 
         for p in self.properties.implementing(mixins.FilterMixin):
             values[p.filter_key] = p.filter_value
