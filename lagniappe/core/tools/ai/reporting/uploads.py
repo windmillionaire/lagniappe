@@ -64,9 +64,9 @@ def prepare_report_upload_manifest(
             )
 
         normalized = {
-            key: record.get(key)
+            key: value
             for key in DIRECT_UPLOAD_RECORD_KEYS
-            if record.get(key) is not None
+            if (value := record.get(key)) is not None
         }
         normalized["token"] = token.strip()
         normalized["filename"] = filename.strip()
@@ -136,12 +136,14 @@ def finalize_report_upload_manifest(
         # @testable false
         # @covered-by lagniappe/core/tools/ai/reporting/uploads.py::finalize_report_upload_manifest
         # @reason default factory ownership is asserted through the public finalizer
-        def file_factory(*, upload, data):
+        def create_report_file(*, upload, data):
             return Entities.FILE.create(
                 upload=upload,
                 data=data,
                 report_user=user,
             )
+
+        file_factory = create_report_file
 
     upload_cleanup = upload_cleanup or storage_assets.delete_direct_upload
     input_files = list(report.input_files or [])

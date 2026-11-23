@@ -1,6 +1,7 @@
 """AI-facing short reference helpers."""
 
 import re
+from typing import overload
 
 from lagniappe.core.definitions import Action
 from lagniappe.core.tools import cache
@@ -48,7 +49,17 @@ def personal_page_reference(user):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_hash_reference_normalizer_batches_lookup
 # @matrix ai : batched-cache hash-reference normalization
-def normalize_hash_references(value, *, resolved_details=None):
+@overload
+def normalize_hash_references[V](value: dict[str, V], *, resolved_details=None) -> dict[str, V]: ...
+@overload
+def normalize_hash_references(value: str, *, resolved_details=None) -> str: ...
+@overload
+def normalize_hash_references[V](value: list[V], *, resolved_details=None) -> list[V]: ...
+@overload
+def normalize_hash_references(value: object, *, resolved_details=None) -> object: ...
+
+
+def normalize_hash_references(value: object, *, resolved_details=None) -> object:
     """Replace known ``hash:...`` tokens with executable entity ids.
 
     The payload is scanned first so all hashes are resolved in one cache lookup.

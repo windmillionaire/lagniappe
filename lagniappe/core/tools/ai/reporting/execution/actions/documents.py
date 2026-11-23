@@ -2,6 +2,9 @@
 
 from datetime import datetime, UTC
 from html import escape
+from typing import cast
+
+from pycrdt import Map
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import MutationIntent
@@ -66,7 +69,7 @@ def _append_page_document(action, report, user, created, context):
         raise exceptions.ValidationError("Document is unavailable or no longer editable.")
     with document_write_lock(page.properties.document.sync_id):
         document = page.properties.document
-        receipt = load_document(document.ydoc)["lagniappeReports"].get(
+        receipt = cast(Map, load_document(document.ydoc)["lagniappeReports"]).get(
             record["idempotency_key"]
         )
         if receipt:
@@ -98,6 +101,7 @@ def _append_page_document(action, report, user, created, context):
             )
         html = addition if replacing else (document.html or "") + addition
         if replacing:
+            assert history is not None
             snapshot, receipt = replace_fragment(
                 document.ydoc, html, record["idempotency_key"],
                 previous_version=history.urlsafe_key, name=history.name,
@@ -121,7 +125,7 @@ def inspect_document_append(record, user):
         page = fresh_document(page, user)
     except exceptions.ValidationError:
         return "drifted"
-    receipt = load_document(page.properties.document.ydoc)["lagniappeReports"].get(
+    receipt = cast(Map, load_document(page.properties.document.ydoc)["lagniappeReports"]).get(
         record["idempotency_key"]
     )
     if not receipt:

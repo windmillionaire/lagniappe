@@ -85,8 +85,8 @@ def _create_task(action, _report, user, created, context=None):
             "completed": _is_completed_task_event(data),
             "submission_key_present": "submission" in data,
             "submission_field_count": (
-                len(data.get("submission"))
-                if isinstance(data.get("submission"), dict)
+                len(submission)
+                if isinstance(submission := data.get("submission"), dict)
                 else None
             ),
         },

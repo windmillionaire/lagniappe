@@ -1,5 +1,7 @@
 """Reference normalization helpers for AI report proposals."""
 
+from typing import TypeGuard
+
 
 # @testable false
 # @covered-by lagniappe/core/tools/ai/planner.py::generate_report
@@ -92,8 +94,8 @@ def _has_form_reference_or_label(data):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
 # @reason action-shape errors are exercised through proposal validation tests
-def _proposal_string(value):
-    return isinstance(value, str) and value.strip()
+def _proposal_string(value: object) -> TypeGuard[str]:
+    return isinstance(value, str) and bool(value.strip())
 
 
 # @testable false

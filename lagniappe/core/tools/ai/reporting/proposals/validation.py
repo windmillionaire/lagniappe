@@ -66,7 +66,7 @@ def normalize_report_markdown(proposal, *, preserve_markdown=False):
 # @matrix ai-report : action-reference-namespace completed-task explicit-task-identity file-placement file-summary future-date proposal schema-update submission task-page validation
 # @pairs ai-report:reference-kind permissions:personal-page
 def validate_proposal(
-    proposal,
+    proposal: object,
     allowed_actions=None,
     allow_pending_submissions=False,
     required_file_refs=None,
@@ -93,6 +93,7 @@ def validate_proposal(
     )
     proposal = normalized["proposal"]
     required_file_refs = normalized["required_file_refs"]
+    assert isinstance(required_file_refs, list)
     if not isinstance(proposal, dict):
         raise exceptions.AIException("Report proposal must be a JSON object.")
     if require_response:
@@ -305,7 +306,7 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
     if not isinstance(data, dict):
         return
 
-    for field, expected_kinds in rules.get(action.get("type"), ()):
+    for field, expected_kinds in rules.get(action.get("type") or "", ()):
         reference = _direct_entity_data_reference(data, field)
         match = re.fullmatch(r"hash:([0-9a-z]{12})", reference or "")
         if not match:

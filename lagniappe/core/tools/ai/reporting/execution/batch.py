@@ -6,6 +6,10 @@ from copy import copy, deepcopy
 from dataclasses import replace as replace_intent
 import json
 from uuid import uuid4
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
 
 from lagniappe.core.definitions import Fetch, MutationIntent, MutationIntentType
 from lagniappe.core.entities import Entities
@@ -196,7 +200,7 @@ class ExecutionBatch:
         report = self.report
         token = uuid4().hex
         previous_intents = list(report.mutation_intents)
-        guards = [(report.key, {"execution_commit": self.previous_commit})]
+        guards: list[tuple[Key, dict[str, object] | None]] = [(report.key, {"execution_commit": self.previous_commit})]
         with ExitStack() as locks:
             document_intents = []
             for key, document in sorted(self.documents.items(), key=lambda item: item[1]["sync_id"]):

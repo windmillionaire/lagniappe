@@ -146,7 +146,7 @@ def _inspect_action_applied(action, report, user, record):
     if action_type in {"update_form_schema"}:
         return (
             ACTION_APPLIED
-            if _value_fingerprint(entity.schema or [])
+            if entity is not None and _value_fingerprint(entity.schema or [])
             == expected.get("schema_fingerprint")
             else ACTION_DRIFTED
         )
@@ -161,7 +161,7 @@ def _inspect_action_applied(action, report, user, record):
     if action_type == "summarize_file":
         return (
             ACTION_APPLIED
-            if entity.summary == expected.get("summary")
+            if entity is not None and entity.summary == expected.get("summary")
             and entity.properties.summarize.complete is True
             and list(entity.properties.summarize.retrieval_terms or [])
             == expected.get("retrieval_terms")

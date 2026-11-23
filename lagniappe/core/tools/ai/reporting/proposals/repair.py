@@ -66,7 +66,7 @@ def _complete_form_schema_fields(proposal):
     for usage_action in repaired["actions"]:
         if not isinstance(usage_action, dict):
             continue
-        usage_type = usage_type_by_action.get(usage_action.get("type"))
+        usage_type = usage_type_by_action.get(usage_action.get("type") or "")
         usage_data = usage_action.get("data")
         if not usage_type or not isinstance(usage_data, dict):
             continue

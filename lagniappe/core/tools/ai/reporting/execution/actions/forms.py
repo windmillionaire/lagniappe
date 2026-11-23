@@ -114,7 +114,7 @@ def _update_form_schema(action, report, user, created, context):
     if response.get("rejected_change"):
         raise exceptions.ValidationError(response["rejected_change"]["error"])
     form = Entities.fetch_one(form.key, request=Fetch.direct())
-    if form_changes.json_value(form.db, "form_draft_receipt").get("id") != migration_id:
+    if form is None or form_changes.json_value(form.db, "form_draft_receipt").get("id") != migration_id:
         raise DeferredJobDependencyFailedError(
             "The Form migration did not publish. Refresh the schema preview and review a new proposal."
         )
