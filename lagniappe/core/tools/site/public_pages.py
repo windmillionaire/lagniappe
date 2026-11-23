@@ -379,14 +379,14 @@ def public_directory_snapshot() -> DirectorySnapshot:
             group_id,
             {
                 "id": group_id,
-                "name": selected.name if selected else PUBLIC_DIRECTORY_FALLBACK_NAME,
+                "name": (selected.name if selected else None) or PUBLIC_DIRECTORY_FALLBACK_NAME,
                 "pages": [],
             },
         )
         group["pages"].append(
             {
                 "path": f"/pages/public/{public_id}",
-                "title": settings["title"] or page.name,
+                "title": settings["title"] or page.name or "",
                 # Directory cards never derive an excerpt from document content.
                 "description": settings["description"],
             }

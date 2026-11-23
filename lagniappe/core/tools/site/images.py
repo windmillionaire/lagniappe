@@ -1,8 +1,9 @@
 import io
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, BinaryIO, cast
 
 if TYPE_CHECKING:
     from werkzeug.datastructures import FileStorage
+    from ..database.assets import DirectUploadFile
 
 from PIL import Image, ImageDraw, ImageFilter
 
@@ -61,7 +62,7 @@ def flood_fill_background(image: Image.Image, tolerance: int = 30) -> Image.Imag
 # @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @tests tests_unit/test_018_database_assets.py::test_site_image_rejects_oversized_input_before_decode
 # @matrix admin : generated-images metadata site-image-upload
-def create_site_image(image: FileStorage, remove_bg: bool = True, bg_tolerance: int = 30) -> dict[str, str]:
+def create_site_image(image: FileStorage | DirectUploadFile, remove_bg: bool = True, bg_tolerance: int = 30) -> dict[str, str]:
     """
     Save site image with optional background removal.
     Uploads to the public bucket and stores paths in datastore.
@@ -86,7 +87,8 @@ def create_site_image(image: FileStorage, remove_bg: bool = True, bg_tolerance: 
 
     try:
         image.stream.seek(0)
-        source_image = Image.open(image.stream)
+        # Pillow reads, seeks and tells on the bounded direct-upload stream.
+        source_image = Image.open(cast(BinaryIO, image.stream))
     except Exception as e:
         context = {
             "image_processing": {
