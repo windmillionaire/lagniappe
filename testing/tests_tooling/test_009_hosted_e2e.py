@@ -1899,7 +1899,12 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "npm run check" in quality_text
     assert "ruff check ." in quality_text
     assert "basedpyright --warnings" in quality_text
+    assert "--project pyrightconfig.json" in quality_text
     assert "--project mcp/pyrightconfig.json" in quality_text
+    for pathspec in ("config/*.py", "installer/*.py", "lagniappe/*.py", "runner/*.py", "main.py", "run.py", "mcp/src/*.py"):
+        assert pathspec in quality_text
+    for command in ("template-contracts", "style-contracts", "mutation-contracts"):
+        assert f"{command} --check" in quality_text
     assert "run.py traceability" not in quality_text
     assert "release-check --base" in quality_text
     assert "gcloud" not in quality_text

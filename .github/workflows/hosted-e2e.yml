@@ -533,14 +533,23 @@ jobs:
       - name: Check Python source
         run: venv/bin/python -m ruff check .
 
-      - name: Check Python types
-        run: venv/bin/python -m basedpyright --warnings
+      - name: Check every tracked application and operator Python file
+        run: |
+          git ls-files -z -- 'config/*.py' 'installer/*.py' 'lagniappe/*.py' 'runner/*.py' main.py run.py |
+            xargs -0 venv/bin/python -m basedpyright --warnings --project pyrightconfig.json
 
       - name: Check Python types in the locked MCP environment
         run: |
           venv/bin/python -m runner.uv_bootstrap install --non-interactive
           venv/bin/python -c 'from runner.mcp_environment import prepare_environment; prepare_environment()'
-          venv/bin/python -m basedpyright --warnings --project mcp/pyrightconfig.json
+          git ls-files -z -- 'mcp/src/*.py' |
+            xargs -0 venv/bin/python -m basedpyright --warnings --project mcp/pyrightconfig.json
+
+      - name: Check template, style, icon, and mutation contracts
+        run: |
+          venv/bin/python run.py template-contracts --check --no-report
+          venv/bin/python run.py style-contracts --check --no-report --no-manifest
+          venv/bin/python run.py mutation-contracts --check
 
       - name: Check complete release tree
         env:
