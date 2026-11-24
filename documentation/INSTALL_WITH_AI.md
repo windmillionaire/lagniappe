@@ -150,6 +150,11 @@ Supported values for `auth_email_provider`:
 - `"resend"` — Resend SMTP (`smtp.resend.com:465`, SSL); also supply `"auth_email_sender_email"`.
 - `"custom_smtp"` — Supply `"auth_email_host"`, `"auth_email_port"`, `"auth_email_security"` (`"starttls"` or `"ssl"`), `"auth_email_username"`, `"auth_email_sender_email"`, and optional `"auth_email_service"`.
 
+## After Install: Custom Domain, AI Email, and Updates
+
+- **Non-secret changes and maintenance (assistant-friendly):** An AI assistant can directly run `./setup.sh doctor`, `./setup.sh repair`, `./setup.sh update`, `./setup.sh upgrade`, `./setup.sh mcp`, `./setup.sh monitoring`, `./setup.sh jobs`, and `./setup.sh backup ...`. To flip non-secret feature toggles (such as built-in AI, external AI/MCP, or error reporting), update `answers.json` and rerun `./setup.sh --agent --answers answers.json --json`.
+- **Interactive credential workflows (terminal-guided):** Adding a custom domain (`./setup.sh url`), enabling inbound/outbound Resend AI email (`./setup.sh ai-email`), rotating sign-in email or Google OAuth credentials (`./setup.sh email`, `./setup.sh oauth`), or configuring Redis TLS (`./setup.sh security`) currently run interactively in a terminal. Assistants must **never** ask for Cloudflare, Resend, SMTP, or OAuth secrets in chat — instead, tell the user the exact `./setup.sh <command>` to run in their terminal. All of these commands honor `SECRETS_BACKEND: secret_manager` automatically, writing secrets straight to Secret Manager and keeping `config/files/lagniappe_settings.yaml` secret-free.
+
 ## Resuming, Recovery, and Migrating Existing Installs
 
 - **Interrupted install:** Rerun `./setup.sh --agent --answers answers.json --json`. Already-provisioned GCP resources and already-saved Secret Manager entries are reused automatically; the browser vault only asks for credentials that are still missing.
