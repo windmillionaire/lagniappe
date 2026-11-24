@@ -1,8 +1,21 @@
 import { PollingCoordinator } from "../../shared/polling.ts";
 import { request } from "../../shared/request.ts";
+import type { RequestResult } from "../../types/api.d.ts";
+import type FormBuilder from "./builder.ts";
+import type {
+	DraftChangeResponse,
+	DraftPublication,
+	PendingChange,
+} from "./types.ts";
 
 export class FormChangeStatus {
-	constructor(builder) {
+	declare builder: FormBuilder;
+	declare polling: PollingCoordinator;
+	declare node: HTMLSpanElement;
+	declare change?: PendingChange | null;
+	declare unsubscribe?: () => void;
+
+	constructor(builder: FormBuilder) {
 		this.builder = builder;
 		this.polling = new PollingCoordinator(builder).init();
 		this.node = document.createElement("span");
@@ -12,7 +25,7 @@ export class FormChangeStatus {
 			this.polling.blur(builder.blurredAt ?? Date.now());
 	}
 
-	show(change) {
+	show(change: PendingChange | null) {
 		this.change = change;
 		this.unsubscribe?.();
 		this.node.hidden = !change;
@@ -29,7 +42,7 @@ export class FormChangeStatus {
 		header.saveButton?.setAttribute(
 			"aria-disabled",
 			String(
-				Boolean(change || header._savePromise || !this.builder.draft.dirty),
+				Boolean(change || header._savePromise || !this.builder.draft?.dirty),
 			),
 		);
 		if (!change) {
@@ -38,7 +51,7 @@ export class FormChangeStatus {
 		}
 		const message = document.createElement("span");
 		const failed = ["failed", "expired", "cancelled", "superseded"].includes(
-			change.status,
+			change.status ?? "",
 		);
 		message.textContent = failed
 			? "Form update needs attention."
@@ -69,7 +82,7 @@ export class FormChangeStatus {
 				try {
 					const data = new FormData();
 					data.set("action", "retry");
-					const result = await request.post(
+					const result = await request.post<DraftChangeResponse>(
 						`/forms/${this.builder.key}/change`,
 						data,
 						{ replaceErrorPage: false },
@@ -100,7 +113,7 @@ export class FormChangeStatus {
 							checkVisibilityCSS: true,
 						}),
 					onResult: async () => {
-						const result = await request.get(
+						const result = await request.get<DraftChangeResponse>(
 							`/forms/${this.builder.key}/change`,
 							null,
 							{ replaceErrorPage: false },
@@ -112,30 +125,29 @@ export class FormChangeStatus {
 			);
 	}
 
-	async accept(result) {
+	async accept(result: RequestResult<DraftChangeResponse>) {
 		if (result.pending_change) {
 			// Keep the existing subscription while ordinary progress advances.
 			if (JSON.stringify(result.pending_change) !== JSON.stringify(this.change))
 				this.show(result.pending_change);
 			return;
 		}
+		const draft = this.builder.draft;
+		if (!draft || !result.draft || !result.baseline) return;
 		this.show(null);
 		if (result.rejected_change) {
 			// The staged draft was rejected before any values changed. Preserve
 			// local edits while restoring the real saved baseline for another Save.
-			this.builder.draft.saved = structuredClone(result.draft);
-			this.builder.draft.baseline = result.baseline;
-			this.builder.draft.formDirty = !this.builder.draft.equalForm(
-				this.builder.draft.state,
-				result.draft,
-			);
+			draft.saved = structuredClone(result.draft);
+			draft.baseline = result.baseline;
+			draft.formDirty = !draft.equalForm(draft.state, result.draft);
 			this.builder.refreshDraftControls();
 			this.builder.header.message(result.rejected_change.error, {
 				persistent: true,
 			});
 			return;
 		}
-		this.builder.draft.acknowledge(this.builder.draft.saved, result);
+		draft.acknowledge(draft.saved, result as DraftPublication);
 		await this.builder.restoreDraft();
 		this.builder.header.message("Form update finished.");
 	}

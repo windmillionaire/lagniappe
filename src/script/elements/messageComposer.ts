@@ -1,10 +1,31 @@
 import { STYLES } from "../generated/styles.mjs";
 import { createIcon } from "../shared/icons.ts";
 import { ENDPOINTS, Modal, request } from "../shared/index.ts";
+import type { RequestResult } from "../types/api.d.ts";
+import type { MessageSendResponse } from "../types/messaging.d.ts";
 import { FacetsBox } from "./combobox/index.ts";
 
+export type ComposerView = NonNullable<
+	ConstructorParameters<typeof Modal>[0]
+> & {
+	operationId?(): string;
+	MessageComposer?: MessageComposer | null;
+};
+
+export interface ComposerRecipient {
+	id?: string | null;
+	name?: string | null;
+	available?: boolean;
+}
+
+interface ComposerOptions {
+	onSent?: ((response: RequestResult<MessageSendResponse>) => unknown) | null;
+}
+
 class ComposerModal extends Modal {
-	constructor(composer) {
+	declare composer: MessageComposer;
+
+	constructor(composer: MessageComposer) {
 		super(composer.view, null);
 		this.composer = composer;
 	}
@@ -20,7 +41,21 @@ class ComposerModal extends Modal {
  *
  */
 export class MessageComposer {
-	constructor(view, { onSent = null } = {}) {
+	declare view: ComposerView;
+	declare onSent: ComposerOptions["onSent"];
+	declare operationId: string | null;
+	declare confirmation?: HTMLElement | null;
+	declare confirmationTimer?: ReturnType<typeof setTimeout>;
+	declare modalController?: ComposerModal | null;
+	declare dialog?: HTMLDivElement | null;
+	declare form?: HTMLFormElement | null;
+	declare input?: HTMLInputElement | null;
+	declare body?: HTMLTextAreaElement | null;
+	declare submit?: HTMLButtonElement | null;
+	declare error?: HTMLElement | null;
+	declare recipient?: FacetsBox | null;
+
+	constructor(view: ComposerView, { onSent = null }: ComposerOptions = {}) {
 		this.view = view;
 		this.onSent = onSent;
 		this.operationId = null;
@@ -82,18 +117,29 @@ export class MessageComposer {
 		return modal;
 	}
 
-	async open(recipient = null) {
+	async open(recipient: ComposerRecipient | null = null) {
 		await this.close();
 		const modal = this._buildModal();
 		const controller = new ComposerModal(this);
 		this.modalController = controller;
 		await controller.attach(modal, this);
 		this.dialog = modal;
-		this.form = modal.querySelector("[data-role='message-compose-form']");
-		this.input = this.form.querySelector("input[data-index='user']");
-		this.body = this.form.querySelector("textarea[name='body']");
-		this.submit = this.form.querySelector("button[type='submit']");
-		this.error = this.form.querySelector("[data-role='message-compose-error']");
+		this.form = modal.querySelector<HTMLFormElement>(
+			"[data-role='message-compose-form']",
+		);
+		this.input = this.form?.querySelector<HTMLInputElement>(
+			"input[data-index='user']",
+		);
+		this.body = this.form?.querySelector<HTMLTextAreaElement>(
+			"textarea[name='body']",
+		);
+		this.submit = this.form?.querySelector<HTMLButtonElement>(
+			"button[type='submit']",
+		);
+		this.error = this.form?.querySelector<HTMLElement>(
+			"[data-role='message-compose-error']",
+		);
+		if (!this.form || !this.input) return;
 		this.recipient = new FacetsBox(this.input);
 		this.recipient.init();
 		this.input.addEventListener("updated", this._recipientUpdated);
@@ -101,18 +147,28 @@ export class MessageComposer {
 		this._activate(recipient);
 	}
 
-	_recipientUpdated(event) {
-		if (Object.keys(event.detail?.options || {}).length) this.body?.focus();
+	_recipientUpdated(event: Event) {
+		if (!(event instanceof CustomEvent)) return;
+		const detail: unknown = event.detail;
+		if (
+			detail &&
+			typeof detail === "object" &&
+			"options" in detail &&
+			detail.options &&
+			Object.keys(detail.options).length
+		)
+			this.body?.focus();
 	}
 
-	_setSubmitting(value) {
+	_setSubmitting(value: boolean) {
 		if (!this.submit) return;
 		this.submit.disabled = value;
-		const icon = this.submit.querySelector("[data-role='icon']");
+		const icon = this.submit.querySelector<HTMLElement>("[data-role='icon']");
 		if (icon) icon.dataset.visible = value ? "true" : "false";
 	}
 
-	_activate(recipient = null) {
+	_activate(recipient: ComposerRecipient | null = null) {
+		if (!this.error || !this.recipient) return;
 		this.operationId = this.view.operationId?.() || crypto.randomUUID();
 		this.error.classList.add("hidden");
 		this.error.textContent = "";
@@ -121,20 +177,20 @@ export class MessageComposer {
 			this.recipient.addOption(
 				{
 					id: recipient.id,
-					name: recipient.name,
+					name: recipient.name ?? undefined,
 					kind: "user",
 				},
 				true,
 			);
 		}
-		(recipient ? this.body : this.input).focus();
+		(recipient ? this.body : this.input)?.focus();
 	}
 
 	async close() {
 		await this.modalController?.remove();
 	}
 
-	_releaseModal(controller) {
+	_releaseModal(controller: ComposerModal) {
 		this.form?.removeEventListener("submit", this._submit);
 		this.input?.removeEventListener("updated", this._recipientUpdated);
 		this.recipient?.destroy?.();
@@ -148,40 +204,49 @@ export class MessageComposer {
 		if (this.modalController === controller) this.modalController = null;
 	}
 
-	async _submit(event) {
+	async _submit(event: SubmitEvent) {
 		event.preventDefault();
-		const selected = this.recipient.selectedOptions?.[0];
-		if (!selected?.recipient_key && !selected?.id) {
-			this.error.textContent = "Choose a message recipient.";
-			this.error.classList.remove("hidden");
-			this.input.focus();
+		const { error, input, form, body, recipient, confirmation } = this;
+		if (!error || !input || !form || !body || !recipient || !confirmation)
+			return;
+		const selected = recipient.selectedOptions?.[0];
+		const selectedKey =
+			typeof selected?.recipient_key === "string"
+				? selected.recipient_key
+				: null;
+		const recipientKey = selectedKey || selected?.id;
+		if (!recipientKey) {
+			error.textContent = "Choose a message recipient.";
+			error.classList.remove("hidden");
+			input.focus();
 			return;
 		}
-		const data = new FormData(this.form);
-		if (selected?.recipient_key || selected?.id) {
-			data.set("recipient", selected.recipient_key || selected.id);
-		}
+		const data = new FormData(form);
+		data.set("recipient", recipientKey);
 		data.set("operation_id", this.operationId || crypto.randomUUID());
 		this._setSubmitting(true);
-		let response;
+		let response: RequestResult<MessageSendResponse> | undefined;
 		try {
-			response = await request.post(ENDPOINTS.messages.send, data);
+			response = await request.post<MessageSendResponse>(
+				ENDPOINTS.messages.send,
+				data,
+			);
 		} finally {
 			this._setSubmitting(false);
 		}
 		if (!response?.ok) {
-			this.error.textContent = response?.error || "Message could not be sent.";
-			this.error.classList.remove("hidden");
+			error.textContent = response?.error || "Message could not be sent.";
+			error.classList.remove("hidden");
 			return;
 		}
-		this.body.value = "";
-		this.recipient.clear({ notify: false });
+		body.value = "";
+		recipient.clear({ notify: false });
 		await this.close();
-		this.confirmation.textContent = "Message sent.";
-		this.confirmation.classList.remove("hidden");
+		confirmation.textContent = "Message sent.";
+		confirmation.classList.remove("hidden");
 		clearTimeout(this.confirmationTimer);
 		this.confirmationTimer = setTimeout(
-			() => this.confirmation.classList.add("hidden"),
+			() => confirmation.classList.add("hidden"),
 			3000,
 		);
 		await this.onSent?.(response);
@@ -193,7 +258,10 @@ export class MessageComposer {
 	}
 }
 
-export const ensureMessageComposer = (view, options = {}) => {
+export const ensureMessageComposer = (
+	view: ComposerView,
+	options: ComposerOptions = {},
+) => {
 	if (!view.MessageComposer) {
 		view.MessageComposer = new MessageComposer(view, options).init();
 	} else if (options.onSent) {

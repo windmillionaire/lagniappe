@@ -1,11 +1,33 @@
 import { STYLES } from "../../../generated/styles.mjs";
 import { Modal } from "../../../shared/modal.ts";
 import { request } from "../../../shared/request.ts";
-import { Dropdown } from "../../combobox/dropdown.ts";
+import { Dropdown, type DropdownItem } from "../../combobox/dropdown.ts";
+import type { ToolSettings } from "../config.ts";
 import { createMenuButton } from "../dropdowns.ts";
+import type { Toolbar } from "../toolbar.ts";
+import type { DocumentVersionEntry } from "../versions.ts";
+
+interface VersionHistory {
+	entries: DocumentVersionEntry[];
+	unpinned_count: number;
+}
+
+interface StorageBackup extends DocumentVersionEntry {
+	created: string;
+}
+
+interface DocumentBackups {
+	entries: StorageBackup[];
+	cursor?: string;
+}
 
 class DocumentHistoryButton {
-	constructor(toolbar) {
+	declare toolbar: Toolbar;
+	declare active: boolean;
+	declare button: HTMLButtonElement | null;
+	declare _dropdown: Dropdown | null;
+
+	constructor(toolbar: Toolbar) {
 		this.toolbar = toolbar;
 		this.active = false;
 		this.button = null;
@@ -14,7 +36,7 @@ class DocumentHistoryButton {
 		this.refresh = this.refresh.bind(this);
 	}
 
-	init(settings) {
+	init(settings: ToolSettings) {
 		Object.assign(this, settings);
 		this.button = createMenuButton(settings);
 
@@ -29,18 +51,20 @@ class DocumentHistoryButton {
 	}
 
 	show() {
-		this.button.hidden = false;
+		if (this.button) this.button.hidden = false;
 	}
 
-	async _loadEntries() {
-		const endpoint = this.toolbar.endpoints.history;
+	async _loadEntries(): Promise<DropdownItem[]> {
+		const endpoint = this.toolbar.endpoints?.history;
 		if (!endpoint) return [];
 
-		const response = await request.get(endpoint, { refresh: Date.now() });
+		const response = await request.get<VersionHistory>(endpoint, {
+			refresh: Date.now(),
+		});
 		if (!response?.ok) return [];
 
 		const entries = response.entries || [];
-		const items = [
+		const items: DropdownItem[] = [
 			{
 				name: "Pin Version",
 				icon: "pin",
@@ -54,7 +78,7 @@ class DocumentHistoryButton {
 			},
 		];
 
-		if (response.unpinned_count > 0) {
+		if ((response.unpinned_count ?? 0) > 0) {
 			items.push({
 				name: "Clear Unpinned Versions",
 				icon: "delete",
@@ -70,7 +94,7 @@ class DocumentHistoryButton {
 				return {
 					name: entry.pinned ? `${entry.name} — ${date}` : date,
 					icon: entry.pinned ? "pin" : "history",
-					onClick: () => this.toolbar.document.versions.preview(entry),
+					onClick: () => this.toolbar.document.versions?.preview(entry),
 				};
 			}),
 		);
@@ -83,21 +107,24 @@ class DocumentHistoryButton {
 		this._dropdown?.updateOptions(items);
 	}
 
-	async _confirmClear(trigger) {
-		const endpoint = this.toolbar.endpoints.history;
+	async _confirmClear(trigger: HTMLElement) {
+		const endpoint = this.toolbar.endpoints?.history;
 		if (!endpoint) return;
 
 		const modal = new Modal(this.toolbar.document.view, trigger);
 		await modal.load(`${endpoint}/unpinned?refresh=${Date.now()}`);
-		const deleteButton = modal.modal?.querySelector("[data-role='delete']");
-		if (!deleteButton) return;
+		const deleteButton = modal.modal?.querySelector<HTMLButtonElement>(
+			"[data-role='delete']",
+		);
+		const route = deleteButton?.dataset.route;
+		if (!deleteButton || !route) return;
 
 		deleteButton.addEventListener("click", async () => {
 			deleteButton.disabled = true;
-			const spinner = deleteButton.querySelector("#spinner");
+			const spinner = deleteButton.querySelector<HTMLElement>("#spinner");
 			if (spinner) spinner.dataset.visible = "true";
 
-			const response = await request.delete(deleteButton.dataset.route);
+			const response = await request.delete(route);
 			if (!response?.ok) {
 				deleteButton.disabled = false;
 				if (spinner) spinner.dataset.visible = "false";
@@ -110,13 +137,16 @@ class DocumentHistoryButton {
 		deleteButton.focus();
 	}
 
-	async _showBackups(cursor = null, entries = []) {
-		const response = await request.get(
-			`${this.toolbar.endpoints.history}/backups`,
+	async _showBackups(
+		cursor: string | null = null,
+		entries: StorageBackup[] = [],
+	) {
+		const response = await request.get<DocumentBackups>(
+			`${this.toolbar.endpoints?.history}/backups`,
 			{ ...(cursor ? { cursor } : {}), refresh: Date.now() },
 		);
 		if (!response?.ok) {
-			this.toolbar.document.versions.notice(
+			this.toolbar.document.versions?.notice(
 				response?.error || "Unable to list storage backups.",
 			);
 			return;
@@ -124,10 +154,10 @@ class DocumentHistoryButton {
 		const loaded = [...entries, ...(response.entries || [])].sort((a, b) =>
 			b.created.localeCompare(a.created),
 		);
-		const items = loaded.map((entry) => ({
+		const items: DropdownItem[] = loaded.map((entry) => ({
 			name: `Storage backup — ${new Date(entry.created).toLocaleString()}`,
 			icon: "database",
-			onClick: () => this.toolbar.document.versions.preview(entry),
+			onClick: () => this.toolbar.document.versions?.preview(entry),
 		}));
 		if (response.cursor)
 			items.push({
@@ -137,7 +167,7 @@ class DocumentHistoryButton {
 				onClick: () => this._showBackups(response.cursor, loaded),
 			});
 		if (!items.length)
-			this.toolbar.document.versions.notice(
+			this.toolbar.document.versions?.notice(
 				"No retained storage backups are available for this document.",
 			);
 		items.unshift({
@@ -146,7 +176,7 @@ class DocumentHistoryButton {
 			icon: "pin",
 			onClick: () => this._showPins(),
 		});
-		this._dropdown.updateOptions(items);
+		this._dropdown?.updateOptions(items);
 	}
 
 	async _showPins() {

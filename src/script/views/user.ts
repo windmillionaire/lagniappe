@@ -1,9 +1,17 @@
 import { request } from "../shared/request.ts";
 import { withTransition } from "../shared/transitions.ts";
+import type { LoadedWidget } from "../types/widgets.d.ts";
+import type ViewComponent from "./base/component.ts";
+import type { SubcomponentEvent } from "./base/component.ts";
+import type { ReconcileChange, RefreshOptions } from "./base/core.ts";
 import EntityIndex from "./base/index.ts";
 
+type UserMode = "public" | "regular";
+
 export default class Users extends EntityIndex {
-	constructor(node) {
+	declare _loadingPublicMode: boolean;
+
+	constructor(node: HTMLElement) {
 		super(node);
 		this._publicModeClick = this._publicModeClick.bind(this);
 		this._groupPanelChange = this._groupPanelChange.bind(this);
@@ -19,8 +27,11 @@ export default class Users extends EntityIndex {
 		this._setCreateUserAvailability();
 	}
 
-	_click(e) {
-		const groupLink = e.target.closest("a[data-kind='group'][href]");
+	_click(e: MouseEvent) {
+		const target = e.target as Element | null;
+		const groupLink = target?.closest?.<HTMLAnchorElement>(
+			"a[data-kind='group'][href]",
+		);
 		if (groupLink && this.elt.contains(groupLink)) {
 			const route = new URL(groupLink.href, window.location.href);
 			const groupKey = route.searchParams.get("group");
@@ -32,29 +43,32 @@ export default class Users extends EntityIndex {
 			}
 		}
 
-		const closeTools = e.target.closest("button[lp-close='tools']");
+		const closeTools = target?.closest?.("button[lp-close='tools']");
 		if (closeTools && this.elt.contains(closeTools)) this._replaceGroupUrl();
 
 		super._click(e);
 	}
 
-	_groupSelector(groupKey) {
+	_groupSelector(groupKey: string | null) {
 		if (!groupKey) return null;
 		return Array.from(
-			this.elt.querySelectorAll(
+			this.elt.querySelectorAll<HTMLButtonElement>(
 				"#user-groups button[data-key][lp-show^='user-groups:GroupPermissions/']",
 			),
 		).find((button) => button.dataset.key === groupKey);
 	}
 
-	_groupPanelChange(event) {
+	_groupPanelChange(event: SubcomponentEvent) {
 		const component = event.detail?.subcomponent;
 		if (component?.name !== "user-groups") return;
 
-		this._replaceGroupUrl(component.active?.target?.dataset.key);
+		const active = component.active;
+		this._replaceGroupUrl(
+			active && "target" in active ? active.target?.dataset.key : null,
+		);
 	}
 
-	_replaceGroupUrl(groupKey = null) {
+	_replaceGroupUrl(groupKey: string | null = null) {
 		const route = new URL(window.location.href);
 		if (groupKey) {
 			route.searchParams.set("group", groupKey);
@@ -66,27 +80,28 @@ export default class Users extends EntityIndex {
 		window.history.replaceState(window.history.state, "", route);
 	}
 
-	_defaultToolTarget(tools) {
+	_defaultToolTarget(tools: HTMLElement) {
 		const selector = this._groupSelector(this.queryParam("group"));
-		if (selector) {
-			const [componentId, widgetName] = selector
-				.getAttribute("lp-show")
-				.split(":");
+		const action = selector?.getAttribute("lp-show");
+		if (action) {
+			const [componentId, widgetName] = action.split(":");
 			return { componentId, widgetName };
 		}
 
 		return super._defaultToolTarget(tools);
 	}
 
-	async refreshCollections(navigation = false, options = {}) {
+	async refreshCollections(navigation = false, options: RefreshOptions = {}) {
 		this._syncUserModeRoute();
 		await super.refreshCollections(navigation, options);
 	}
 
-	async refreshSupplementalCollections(changes = []) {
+	async refreshSupplementalCollections(changes: ReconcileChange[] = []) {
 		const groupsElt = this.elt?.querySelector("[id='user-groups']");
 		const groups = groupsElt ? this.getComponent(groupsElt) : null;
-		const activeGroupKey = groups?.active?.target?.dataset.key;
+		const active = groups?.active;
+		const activeGroupKey =
+			active && "target" in active ? active.target?.dataset.key : undefined;
 		if (
 			activeGroupKey &&
 			changes.some(
@@ -108,8 +123,8 @@ export default class Users extends EntityIndex {
 		await withTransition(
 			() => {
 				Object.entries(groups.widgets).forEach(([key, widget]) => {
-					if (!groups.elt.contains(widget.target)) {
-						widget.destroy();
+					if (!groups.elt.contains(widget.target ?? null)) {
+						widget.destroy?.();
 						delete groups.widgets[key];
 					}
 				});
@@ -119,8 +134,10 @@ export default class Users extends EntityIndex {
 		);
 	}
 
-	async _publicModeClick(e) {
-		const button = e.target.closest("[data-role='public-users-toggle']");
+	async _publicModeClick(e: MouseEvent) {
+		const button = (e.target as Element | null)?.closest?.<HTMLButtonElement>(
+			"[data-role='public-users-toggle']",
+		);
 		if (!button || !this.elt.contains(button)) return;
 
 		e.preventDefault();
@@ -132,7 +149,7 @@ export default class Users extends EntityIndex {
 		await this._loadUserMode(nextMode, button);
 	}
 
-	async _loadUserMode(mode, button) {
+	async _loadUserMode(mode: UserMode, button: HTMLButtonElement) {
 		const table = this.getComponent(this.elt.querySelector("#table"));
 		const route = this._userModeRoute(mode, button);
 		if (!table || !route) return;
@@ -142,23 +159,29 @@ export default class Users extends EntityIndex {
 			const response = await request.get(route);
 			if (!this.successfulResponse(response, table)) return;
 
-			const body = response.html?.querySelector(
+			const html = response?.html;
+			if (!html) return;
+			const body = html.querySelector<HTMLTableSectionElement>(
 				"tbody[data-widget='IndexTable']",
 			);
 			if (!body) return;
 
 			// Mode replacement is atomic: collect every cursor page before
 			// marking the new table loaded, retaining the old mode on failure.
-			let continuation = body.querySelector("tr[lp-load]");
+			let continuation = body.querySelector<HTMLTableRowElement>("tr[lp-load]");
 			while (continuation) {
-				const next = await request.get(continuation.dataset.route);
+				const nextRoute = continuation.dataset.route;
+				if (!nextRoute) return;
+				const next = await request.get(nextRoute);
 				if (!this.successfulResponse(next, table)) return;
-				const nextBody = next.html?.querySelector(
+				const nextHtml = next?.html;
+				if (!nextHtml) return;
+				const nextBody = nextHtml.querySelector(
 					"tbody[data-widget='IndexTable']",
 				);
 				if (!nextBody) return;
 				continuation.replaceWith(...nextBody.children);
-				continuation = body.querySelector("tr[lp-load]");
+				continuation = body.querySelector<HTMLTableRowElement>("tr[lp-load]");
 			}
 
 			await withTransition(
@@ -176,7 +199,11 @@ export default class Users extends EntityIndex {
 		}
 	}
 
-	_replaceUserRows(table, body, route = null) {
+	_replaceUserRows(
+		table: ViewComponent,
+		body: HTMLTableSectionElement & { _lp_widget?: LoadedWidget },
+		route: string | null = null,
+	) {
 		const refreshRoute = route || body.dataset.route;
 		if (refreshRoute) body.dataset.route = refreshRoute;
 		body.setAttribute("loaded", "");
@@ -188,7 +215,7 @@ export default class Users extends EntityIndex {
 		if (indexTable) {
 			indexTable.target = body;
 			if (refreshRoute) indexTable.route = refreshRoute;
-			indexTable.target._lp_widget = indexTable;
+			body._lp_widget = indexTable;
 			indexTable.loaded = true;
 			indexTable.loading = false;
 			indexTable._created = [];
@@ -205,9 +232,15 @@ export default class Users extends EntityIndex {
 		}
 	}
 
-	_userModeRoute(mode = this.elt.dataset.userMode, button = null) {
+	_userModeRoute(
+		mode = this.elt.dataset.userMode,
+		button: HTMLButtonElement | null = null,
+	) {
 		const toggle =
-			button || this.elt.querySelector("[data-role='public-users-toggle']");
+			button ||
+			this.elt.querySelector<HTMLButtonElement>(
+				"[data-role='public-users-toggle']",
+			);
 		if (!toggle) return null;
 
 		return mode === "public"
@@ -233,7 +266,7 @@ export default class Users extends EntityIndex {
 			title.textContent = publicMode ? "Public User Index" : "User Index";
 
 		this.elt
-			.querySelectorAll("[data-role='public-users-toggle']")
+			.querySelectorAll<HTMLButtonElement>("[data-role='public-users-toggle']")
 			.forEach((button) => {
 				button.dataset.active = publicMode ? "true" : "false";
 				button.setAttribute("aria-label", label);
@@ -244,7 +277,7 @@ export default class Users extends EntityIndex {
 	_setCreateUserAvailability() {
 		const publicMode = this.elt.dataset.userMode === "public";
 		this.elt
-			.querySelectorAll("[data-role='create-user-toggle']")
+			.querySelectorAll<HTMLButtonElement>("[data-role='create-user-toggle']")
 			.forEach((button) => {
 				button.dataset.visible = publicMode ? "false" : "true";
 			});
@@ -265,10 +298,10 @@ export default class Users extends EntityIndex {
 		this._createDropdown();
 	}
 
-	_setPublicModeLoading(loading) {
+	_setPublicModeLoading(loading: boolean) {
 		this._loadingPublicMode = loading;
 		this.elt
-			.querySelectorAll("[data-role='public-users-toggle']")
+			.querySelectorAll<HTMLButtonElement>("[data-role='public-users-toggle']")
 			.forEach((button) => {
 				button.disabled = loading;
 			});

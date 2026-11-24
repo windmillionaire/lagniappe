@@ -4,15 +4,26 @@ import { withTransition } from "../../../shared/transitions.ts";
 import { BaseUpload } from "../../base/baseUpload.ts";
 import { buttons } from "../../buttons.ts";
 import { UploadMenu, uploadElement } from "../../upload.ts";
+import type { Toolbar } from "../toolbar.ts";
 
 const IMAGE_DROPZONE_TEXT =
 	"Drop image here, click to upload, or tap to choose camera/files<br>All images will be sized down to 1280x720";
 
 class Image extends BaseUpload {
-	constructor(toolbar) {
+	declare menuOptions: string[];
+	declare generate: ReturnType<typeof uploadElement.generateDocumentImage>;
+	declare submitButton: HTMLButtonElement;
+	declare toolbar: Toolbar;
+	declare name: "addImage";
+	declare messages: Record<string, string>;
+	declare target: HTMLFormElement;
+	declare dropzone: ReturnType<typeof uploadElement.dropzone>;
+	declare active: boolean;
+
+	constructor(toolbar: Toolbar) {
 		super();
 		this.toolbar = toolbar;
-		this.name = "addImage";
+		this.name = "addImage" as const;
 		this.inputName = "add-image";
 		this.messages = {
 			submit: "Upload Image",
@@ -57,7 +68,7 @@ class Image extends BaseUpload {
 		this.submitButton.dataset.visible = "false";
 
 		this.target.addEventListener("click", (e) => {
-			if (e.target.closest("[data-role='cancel']")) {
+			if ((e.target as Element | null)?.closest("[data-role='cancel']")) {
 				this.hideGenerateForm();
 			}
 		});
@@ -86,7 +97,7 @@ class Image extends BaseUpload {
 		super.reset();
 	}
 
-	async submit(submitter) {
+	async submit(submitter: HTMLButtonElement | HTMLInputElement | null) {
 		if (this.toolbar.document.addDraftImage) {
 			const file = this.fileInput?.element?.files?.[0];
 			if (!file) return;
@@ -95,9 +106,9 @@ class Image extends BaseUpload {
 			this.toolbar.toggleForm(this.name);
 			return;
 		}
-		const prepared = await this.prepareSubmit({
-			route: this.toolbar.endpoints.addImage,
-		});
+		const route = this.toolbar.endpoints?.addImage;
+		if (!route) return;
+		const prepared = await this.prepareSubmit({ route });
 		if (!prepared) return;
 
 		const formData = new FormData(this.target);
@@ -106,19 +117,16 @@ class Image extends BaseUpload {
 		formData.append("content", this.toolbar.editor.getText());
 
 		if (submitter) submitter.disabled = true;
-		const response = await request.post(
-			this.toolbar.endpoints.addImage,
-			formData,
-		);
+		const response = await request.post<{ src: string }>(route, formData);
 		if (submitter) submitter.disabled = false;
 
-		if (response.ok && response.modal) {
+		if (response?.ok && response.modal) {
 			const modal = new Modal(this.toolbar.builder);
-			modal.attach(response.modal, this);
-		} else if (response.ok && response.src) {
+			void modal.attach(response.modal as Document, this);
+		} else if (response?.ok && response.src) {
 			this.toolbar.editor.chain().focus().setImage({ src: response.src }).run();
 			this.toolbar.toggleForm(this.name);
-		} else if (response.error) {
+		} else if (response?.error) {
 			this.form.showError(response.error);
 			this.reset();
 		}

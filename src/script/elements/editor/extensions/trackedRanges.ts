@@ -1,8 +1,44 @@
-import { Extension } from "@tiptap/core";
+import {
+	type Command,
+	type CommandProps,
+	Extension,
+	type Range,
+} from "@tiptap/core";
+import type { Transaction } from "@tiptap/pm/state";
+
+interface TrackedRangesStorage {
+	ranges: Map<string, Range>;
+}
+
+type RangeOperation =
+	| { type: "set"; key: string; range: Range }
+	| { type: "clear"; key: string }
+	| { type: "clearAll" };
+
+// These read commands return their callback's value when invoked directly.
+export type RangeCommand<Result> = Result extends Command
+	? (props: CommandProps) => Range | null
+	: Result extends boolean
+		? Range | null
+		: Result;
+
+declare module "@tiptap/core" {
+	interface Commands<ReturnType> {
+		trackedRanges: {
+			setTrackedRange: (key: string, range: Range) => ReturnType;
+			getTrackedRange: (key: string) => RangeCommand<ReturnType>;
+			clearTrackedRange: (key: string) => ReturnType;
+			clearTrackedRanges: () => ReturnType;
+		};
+	}
+	interface Storage {
+		trackedRanges: TrackedRangesStorage;
+	}
+}
 
 const TRACKED_RANGE_META = "trackedRanges";
 
-const normalizedRange = (range, docEnd) => {
+const normalizedRange = (range: Range | null | undefined, docEnd: number) => {
 	if (!range) return null;
 	const from = Math.max(0, Math.min(Number(range.from), docEnd));
 	const to = Math.max(0, Math.min(Number(range.to), docEnd));
@@ -12,8 +48,10 @@ const normalizedRange = (range, docEnd) => {
 	return { from, to };
 };
 
-const addOperation = (transaction, operation) => {
-	const meta = transaction.getMeta(TRACKED_RANGE_META) || { operations: [] };
+const addOperation = (transaction: Transaction, operation: RangeOperation) => {
+	const meta: { operations: RangeOperation[] } = transaction.getMeta(
+		TRACKED_RANGE_META,
+	) || { operations: [] };
 	transaction.setMeta(TRACKED_RANGE_META, {
 		operations: [...meta.operations, operation],
 	});
@@ -24,15 +62,21 @@ const addOperation = (transaction, operation) => {
  * Associate a named range with the document produced by a transaction.
  *
  */
-export const setTrackedRangeInTransaction = (transaction, key, range) =>
-	addOperation(transaction, { type: "set", key, range });
+export const setTrackedRangeInTransaction = (
+	transaction: Transaction,
+	key: string,
+	range: Range,
+) => addOperation(transaction, { type: "set", key, range });
 
 /**
  * Keep independently named document ranges current across local, remote, and
  * appended ProseMirror transactions.
  *
  */
-export const TrackedRanges = Extension.create({
+export const TrackedRanges = Extension.create<
+	Record<never, never>,
+	TrackedRangesStorage
+>({
 	name: "trackedRanges",
 
 	addStorage() {
@@ -90,7 +134,8 @@ export const TrackedRanges = Extension.create({
 				}
 			}
 
-			const meta = tr.getMeta(TRACKED_RANGE_META);
+			const meta: { operations: RangeOperation[] } | undefined =
+				tr.getMeta(TRACKED_RANGE_META);
 			for (const operation of meta?.operations || []) {
 				if (operation.type === "clearAll") {
 					ranges.clear();

@@ -1,15 +1,52 @@
 import { BaseUpload } from "../elements/base/baseUpload.ts";
 import { sections } from "../elements/sections.ts";
 import { UploadMenu, uploadElement } from "../elements/upload.ts";
+import type { ENDPOINTS } from "../shared/endpoints.ts";
 import { createIcon } from "../shared/icons.ts";
 import { request } from "../shared/index.ts";
 import { withTransition } from "../shared/transitions.ts";
 
+import type ViewComponent from "../views/base/component.ts";
+import type Page from "../views/page.ts";
+
+type PagePhotoView = Pick<
+	Page,
+	| "photoBusy"
+	| "photoOpen"
+	| "photoGenerationReturnOpen"
+	| "setPhotoBusy"
+	| "cancelPhotoGeneration"
+	| "updatePhotoImage"
+	| "successfulResponse"
+> &
+	Partial<Pick<Page, "isSecondaryCardVisible">>;
+type PagePhotoComponent = Pick<ViewComponent, "elt" | "showError">;
+type PagePhotoEndpoints = ReturnType<typeof ENDPOINTS.PagePhoto>;
+type PagePhotoAttributes = NonNullable<
+	ConstructorParameters<typeof BaseUpload>[0]
+> & {
+	view: PagePhotoView;
+	component: PagePhotoComponent;
+	endpoints: PagePhotoEndpoints;
+};
+
 export class PagePhoto extends BaseUpload {
-	constructor(attributes) {
+	declare view: PagePhotoView;
+	declare component: PagePhotoComponent;
+	declare endpoints: PagePhotoEndpoints;
+	declare dropzone: ReturnType<typeof uploadElement.dropzone>;
+	declare uploadMenu: UploadMenu;
+	declare aiCreate: boolean;
+	declare menuOptions: ("remove" | "replace" | "generate" | "paste")[];
+	declare generateForm: ReturnType<typeof sections.generateImageForm> | null;
+	declare submitGroup?: HTMLElement;
+	declare messages: Record<string, string>;
+	declare icon: string;
+
+	constructor(attributes: PagePhotoAttributes) {
 		super(attributes);
 		this.dropzone = uploadElement.dropzone({
-			element: this.target.querySelector("[data-role='dropzone']"),
+			element: this.target.querySelector<HTMLElement>("[data-role='dropzone']"),
 		});
 		this.inputName = "page-photo";
 		this.uploadType = "image";
@@ -17,7 +54,7 @@ export class PagePhoto extends BaseUpload {
 		this.menuOptions = [
 			"remove",
 			"replace",
-			...(this.aiCreate ? ["generate"] : []),
+			...(this.aiCreate ? ["generate" as const] : []),
 			"paste",
 		];
 		this.uploadMenu = new UploadMenu(this);
@@ -36,7 +73,7 @@ export class PagePhoto extends BaseUpload {
 	get html() {
 		return [
 			this.dropzone.element,
-			...(this.aiCreate ? [this.generateForm.element] : []),
+			...(this.generateForm ? [this.generateForm.element] : []),
 		];
 	}
 
@@ -45,15 +82,21 @@ export class PagePhoto extends BaseUpload {
 	}
 
 	get feedback() {
-		return this.dropzone.element.querySelector("[data-role='feedback']");
+		return this.dropzone.element.querySelector<HTMLElement>(
+			"[data-role='feedback']",
+		);
 	}
 
 	get existingImage() {
-		return this.dropzone.element.querySelector("[data-role='existing-image']");
+		return this.dropzone.element.querySelector<HTMLElement>(
+			"[data-role='existing-image']",
+		);
 	}
 
 	get newImage() {
-		return this.dropzone.element.querySelector("[data-role='new-image']");
+		return this.dropzone.element.querySelector<HTMLElement>(
+			"[data-role='new-image']",
+		);
 	}
 
 	async init() {
@@ -61,8 +104,11 @@ export class PagePhoto extends BaseUpload {
 		if (this.readonly) return;
 
 		if (this.aiCreate) {
-			this.submitGroup.addEventListener("click", (e) => {
-				if (e.target.closest("[data-role='cancel']")) {
+			this.submitGroup?.addEventListener("click", (e) => {
+				if (
+					e.target instanceof Element &&
+					e.target.closest("[data-role='cancel']")
+				) {
 					void this.view.cancelPhotoGeneration(this);
 				}
 			});
@@ -79,9 +125,12 @@ export class PagePhoto extends BaseUpload {
 		await this.uploadImage();
 	}
 
-	_replaceDropzone(html) {
+	_replaceDropzone(html: Document) {
 		this.reset();
-		const newDropzone = html.querySelector("[data-role='dropzone']");
+		const newDropzone = html.querySelector<HTMLElement>(
+			"[data-role='dropzone']",
+		);
+		if (!newDropzone) return;
 		newDropzone.querySelectorAll("img[src]").forEach((image) => {
 			const source = image.getAttribute("src");
 			if (!source || /^(blob|data):/.test(source)) return;
@@ -109,9 +158,11 @@ export class PagePhoto extends BaseUpload {
 	async uploadImage() {
 		return this._withImageMutation(async () => {
 			withTransition(() => {
-				this.existingImage.dataset.visible = "false";
-				this.newImage.dataset.visible = "true";
-				this.feedback.replaceChildren(createIcon("spinner"), " Uploading...");
+				const existingImage = this.existingImage;
+				const newImage = this.newImage;
+				if (existingImage) existingImage.dataset.visible = "false";
+				if (newImage) newImage.dataset.visible = "true";
+				this.feedback?.replaceChildren(createIcon("spinner"), " Uploading...");
 			});
 
 			const prepared = await this.prepareSubmit({
@@ -120,15 +171,20 @@ export class PagePhoto extends BaseUpload {
 			if (!prepared) return;
 
 			const response = await request.post(this.endpoints.upload, this.formData);
-			if (!this.view.successfulResponse(response, this.component)) return;
+			if (
+				!this.view.successfulResponse(response, this.component) ||
+				!response?.html
+			)
+				return;
+			const { html } = response;
 
 			await this.view.updatePhotoImage(true, () => {
-				this._replaceDropzone(response.html);
+				this._replaceDropzone(html);
 			});
 		});
 	}
 
-	async _withImageMutation(operation) {
+	async _withImageMutation(operation: () => Promise<void>) {
 		if (this.view.photoBusy || this.readonly) return;
 		this.view.setPhotoBusy(true);
 		this.target.inert = true;
@@ -148,10 +204,15 @@ export class PagePhoto extends BaseUpload {
 	async _removeImage() {
 		return this._withImageMutation(async () => {
 			const response = await request.delete(this.endpoints.remove);
-			if (!this.view.successfulResponse(response, this.component)) return;
+			if (
+				!this.view.successfulResponse(response, this.component) ||
+				!response?.html
+			)
+				return;
+			const { html } = response;
 
 			await this.view.updatePhotoImage(false, () => {
-				this._replaceDropzone(response.html);
+				this._replaceDropzone(html);
 			});
 		});
 	}
@@ -162,10 +223,15 @@ export class PagePhoto extends BaseUpload {
 				this.endpoints.generate,
 				this.formData,
 			);
-			if (!this.view.successfulResponse(response, this.component)) return;
+			if (
+				!this.view.successfulResponse(response, this.component) ||
+				!response?.html
+			)
+				return;
+			const { html } = response;
 
 			await this.view.updatePhotoImage(true, () => {
-				this._replaceDropzone(response.html);
+				this._replaceDropzone(html);
 				this.hideGenerateForm({ transition: false });
 			});
 		});
@@ -177,26 +243,28 @@ export class PagePhoto extends BaseUpload {
 		this.hideError();
 	}
 
-	showError(message) {
+	showError(message: string) {
 		withTransition(() => {
 			if (this.generateForm?.visible()) {
 				this.form.showError(message);
 			} else {
-				this.newImage.dataset.visible = "true";
-				this.existingImage.dataset.visible = String(
-					this.dropzone.containsImage,
-				);
+				const newImage = this.newImage;
+				const existingImage = this.existingImage;
+				if (newImage) newImage.dataset.visible = "true";
+				if (existingImage) {
+					existingImage.dataset.visible = String(this.dropzone.containsImage);
+				}
 				const error = document.createElement("span");
 				error.className = "text-delete text-base italic";
 				error.textContent = message;
 				if (this.dropzone.containsImage) {
-					this.newImage.dataset.visible = "false";
+					if (newImage) newImage.dataset.visible = "false";
 					error.dataset.role = "image-error";
 					this.dropzone.element
 						.querySelector("[data-role='image-error']")
 						?.remove();
 					this.dropzone.element.append(error);
-				} else this.feedback.replaceChildren(error);
+				} else this.feedback?.replaceChildren(error);
 			}
 		});
 	}
@@ -206,21 +274,24 @@ export class PagePhoto extends BaseUpload {
 		if (this.generateForm?.visible()) {
 			this.form.hideError();
 		} else {
-			this.feedback.innerHTML = "drop image here<br>or click to upload";
+			const feedback = this.feedback;
+			if (feedback)
+				feedback.innerHTML = "drop image here<br>or click to upload";
 		}
 	}
 
 	showGenerateForm({ transition = true } = {}) {
-		if (!this.aiCreate || this.readonly) return;
-		if (this.generateForm.visible()) {
-			this.generateForm.show();
+		const generateForm = this.generateForm;
+		if (!this.aiCreate || this.readonly || !generateForm) return;
+		if (generateForm.visible()) {
+			generateForm.show();
 			return;
 		}
 		this.view.photoGenerationReturnOpen ??= this.view.photoOpen;
 		const show = () => {
 			this.reset();
 			this.dropzone.hide();
-			this.generateForm.show();
+			generateForm.show();
 			this.form.showSubmitButton();
 		};
 		const shouldTransition =

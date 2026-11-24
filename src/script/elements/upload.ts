@@ -1,11 +1,57 @@
 import { STYLES } from "../generated/styles.mjs";
 import { createIcon } from "../shared/icons.ts";
 import { buttons } from "./buttons.ts";
-import { Dropdown } from "./combobox/dropdown.ts";
+import { Dropdown, type DropdownItem } from "./combobox/dropdown.ts";
 import { primitives } from "./primitives.ts";
 
 const DEFAULT_DROPZONE_TEXT =
 	"Drop file here, click to upload, or tap to choose camera/files";
+
+interface FileInputSettings {
+	inputName: string;
+	multiple?: boolean;
+}
+
+interface ProcessingSettings {
+	aiCreate?: boolean;
+}
+
+interface ProcessingSelection {
+	filename?: string;
+	isTextFile: boolean;
+	fileCount?: number;
+}
+
+interface ContextDescriptionSettings {
+	name?: string;
+	placeholder?: string;
+	rows?: number;
+}
+
+interface ContextUploadSettings {
+	label?: string | false;
+	stacked?: boolean;
+	text?: string;
+	descriptionName?: string;
+	descriptionPlaceholder?: string;
+	descriptionRows?: number;
+}
+
+interface DropzoneOptions {
+	text?: string | null;
+	element?: HTMLElement | null;
+}
+
+interface UploadMenuHost {
+	dropzone?: { menuButton?: HTMLElement | null } | null;
+	menuOptions?: readonly string[];
+	fileAttached: boolean;
+	kind?: string | null;
+	removeFile(): void;
+	replaceFile(): void;
+	showGenerateForm?(): unknown;
+	processPaste(): unknown;
+}
 
 const visibility = () => {
 	const group = document.createElement("fieldset");
@@ -19,24 +65,18 @@ const visibility = () => {
 
 	options.forEach((option) => {
 		group.appendChild(
-			primitives.radio(
-				{
-					...option,
-					name: "visibility",
-					required: true,
-				},
-				{
-					label: STYLES.label.row,
-					radio: STYLES.radio.default,
-				},
-			),
+			primitives.radio({
+				...option,
+				name: "visibility",
+				required: true,
+			}),
 		);
 	});
 
 	return group;
 };
 
-const hiddenFileInput = (widget) => {
+const hiddenFileInput = (widget: FileInputSettings) => {
 	const hiddenInput = document.createElement("input");
 	hiddenInput.name = `${widget.inputName}`;
 	hiddenInput.type = "file";
@@ -84,7 +124,7 @@ const access = () => {
 	return accessGroup;
 };
 
-const processing = ({ aiCreate = true } = {}) => {
+const processing = ({ aiCreate = true }: ProcessingSettings = {}) => {
 	const optionsContainer = document.createElement("div");
 	optionsContainer.dataset.role = "options";
 	optionsContainer.dataset.visible = "false";
@@ -141,7 +181,7 @@ const processing = ({ aiCreate = true } = {}) => {
 		...(aiCreate ? [summarize, searchSummary] : []),
 	);
 
-	const setOptionVisibility = (element, visible) => {
+	const setOptionVisibility = (element: HTMLElement, visible: boolean) => {
 		element.dataset.visible = visible ? "true" : "false";
 	};
 
@@ -151,16 +191,23 @@ const processing = ({ aiCreate = true } = {}) => {
 		});
 	};
 
-	const setDisplayNameVisibility = (visible) => {
+	const setDisplayNameVisibility = (visible: boolean) => {
 		const input = editName.querySelector("input");
 		editName.dataset.visible = visible ? "true" : "false";
-		input.disabled = !visible;
-		if (!visible) input.value = "";
+		if (input) {
+			input.disabled = !visible;
+			if (!visible) input.value = "";
+		}
 	};
 
-	const prefill = ({ filename, isTextFile, fileCount = 1 }) => {
+	const prefill = ({
+		filename,
+		isTextFile,
+		fileCount = 1,
+	}: ProcessingSelection) => {
 		const singleFile = fileCount <= 1;
-		editName.querySelector("input").value = singleFile ? filename || "" : "";
+		const input = editName.querySelector("input");
+		if (input) input.value = singleFile ? filename || "" : "";
 		setDisplayNameVisibility(singleFile);
 		optionsContainer.dataset.visible = "true";
 		resetOptionVisibility();
@@ -176,6 +223,7 @@ const processing = ({ aiCreate = true } = {}) => {
 
 	options.addEventListener("change", (event) => {
 		const { target } = event;
+		if (!(target instanceof HTMLInputElement)) return;
 		if (target.name === "extract") {
 			searchText.dataset.visible = target.checked ? "true" : "false";
 		}
@@ -194,11 +242,14 @@ const processing = ({ aiCreate = true } = {}) => {
 			optionsContainer.dataset.visible = "false";
 		},
 		clear: () => {
-			editName.querySelector("input").value = "";
+			const input = editName.querySelector("input");
+			if (input) input.value = "";
 			setDisplayNameVisibility(true);
-			options.querySelectorAll("input[type='checkbox']").forEach((cb) => {
-				cb.checked = false;
-			});
+			options
+				.querySelectorAll<HTMLInputElement>("input[type='checkbox']")
+				.forEach((cb) => {
+					cb.checked = false;
+				});
 			resetOptionVisibility();
 			optionsContainer.dataset.visible = "false";
 		},
@@ -220,7 +271,7 @@ const menuButton = () => {
 	return menuButtonContainer;
 };
 
-const contextDescription = (settings = {}) => {
+const contextDescription = (settings: ContextDescriptionSettings = {}) => {
 	const description = document.createElement("textarea");
 	description.className = `${STYLES.textarea} grow h-24 placeholder:text-center`;
 	description.name = settings.name || "autofill-description";
@@ -229,7 +280,7 @@ const contextDescription = (settings = {}) => {
 	return description;
 };
 
-const contextUpload = (settings = {}) => {
+const contextUpload = (settings: ContextUploadSettings = {}) => {
 	const container = document.createElement("div");
 	container.className = "flex flex-col gap-1";
 
@@ -268,10 +319,11 @@ const contextUpload = (settings = {}) => {
 	};
 };
 
-const dropzone = (options) => {
+const dropzone = (options: DropzoneOptions) => {
 	const { text = DEFAULT_DROPZONE_TEXT, element = null } = options;
 
-	let dropzone, textElement;
+	let dropzone: HTMLElement;
+	let textElement: HTMLParagraphElement | undefined;
 	if (!element) {
 		dropzone = document.createElement("div");
 		dropzone.dataset.role = "dropzone";
@@ -282,7 +334,7 @@ const dropzone = (options) => {
 		dropzone = element;
 	}
 
-	let menu = dropzone.querySelector("[data-role='upload-menu']");
+	let menu = dropzone.querySelector<HTMLElement>("[data-role='upload-menu']");
 	if (!menu) {
 		menu = menuButton();
 		dropzone.appendChild(menu);
@@ -298,11 +350,11 @@ const dropzone = (options) => {
 			if (element) return;
 			if (textElement) textElement.innerHTML = text || "";
 		},
-		setText: (newText) => {
+		setText: (newText: string) => {
 			if (element) return;
 			if (textElement) textElement.textContent = newText;
 		},
-		setContent: (...children) => {
+		setContent: (...children: (Node | string)[]) => {
 			textElement?.replaceChildren(...children);
 		},
 		hide: () => {
@@ -315,7 +367,11 @@ const dropzone = (options) => {
 };
 
 export class UploadMenu {
-	constructor(instance) {
+	declare instance: UploadMenuHost;
+	declare dropdown: Dropdown | null;
+	declare itemBuilders: Partial<Record<string, () => DropdownItem | null>>;
+
+	constructor(instance: UploadMenuHost) {
 		this.instance = instance;
 		this.dropdown = null;
 		this.itemBuilders = {
@@ -340,7 +396,7 @@ export class UploadMenu {
 				const build = this.itemBuilders[option];
 				return typeof build === "function" ? build() : null;
 			})
-			.filter(Boolean);
+			.filter((item) => item !== null);
 	}
 
 	create() {
@@ -394,7 +450,7 @@ export class UploadMenu {
 			name: "Generate",
 			icon: "generate",
 			kind: this.instance.kind || "default",
-			onClick: () => this.instance.showGenerateForm(),
+			onClick: () => this.instance.showGenerateForm?.(),
 		};
 	}
 

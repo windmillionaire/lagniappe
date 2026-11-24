@@ -5,7 +5,21 @@
  *
  */
 export class TableVisibilityState {
-	constructor({ component, view, selected = [], columns = [] }) {
+	declare component: VisibilityComponent;
+	declare view: VisibilityView;
+	declare selected: string[];
+	declare columns: TableColumn[];
+	declare columnIndexes: Map<string, number>;
+	declare hiddenColumns: number[];
+	declare stylesheet: CSSStyleSheet | null;
+	declare initialized: boolean;
+
+	constructor({
+		component,
+		view,
+		selected = [],
+		columns = [],
+	}: TableVisibilityStateOptions) {
 		this.component = component;
 		this.view = view;
 		this.selected = selected;
@@ -20,15 +34,21 @@ export class TableVisibilityState {
 	init() {
 		if (this.initialized) return this;
 		this.initialized = true;
-		this.component.elt.querySelectorAll("th[data-column]").forEach((th, i) => {
-			this.columnIndexes.set(th.dataset.column, i + 1);
-		});
+		this.component.elt
+			.querySelectorAll<HTMLTableCellElement>("th[data-column]")
+			.forEach((th, i) => {
+				if (th.dataset.column !== undefined)
+					this.columnIndexes.set(th.dataset.column, i + 1);
+			});
 
 		const saved = localStorage.getItem(`columns-${this.view.hash}`);
 		try {
-			this.hiddenColumns = saved
-				? JSON.parse(saved)
-				: this.defaultHiddenColumns();
+			const parsed: unknown = saved ? JSON.parse(saved) : null;
+			this.hiddenColumns =
+				Array.isArray(parsed) &&
+				parsed.every((index) => typeof index === "number")
+					? parsed
+					: this.defaultHiddenColumns();
 		} catch {
 			this.hiddenColumns = this.defaultHiddenColumns();
 		}
@@ -52,14 +72,26 @@ export class TableVisibilityState {
 			: this.columns.filter((column) => column.selected !== true);
 		return hidden
 			.map((column) => this.columnIndexes.get(column.field))
-			.filter(Boolean);
+			.filter((index) => index !== undefined);
 	}
 
-	_toggle(event) {
-		this.toggle(event.detail.column, event.detail.active);
+	_toggle(event: Event) {
+		if (!("detail" in event)) return;
+		const { detail } = event;
+		if (
+			detail &&
+			typeof detail === "object" &&
+			"active" in detail &&
+			typeof detail.active === "boolean" &&
+			"column" in detail &&
+			typeof detail.column === "string"
+		) {
+			this.toggle(detail.column, detail.active);
+		}
 	}
 
-	toggle(column, visible) {
+	toggle(column: string | undefined, visible: boolean) {
+		if (column === undefined) return;
 		const index = this.columnIndexes.get(column);
 		if (!index) return;
 		this.hiddenColumns = visible
@@ -104,4 +136,35 @@ export class TableVisibilityState {
 		this.stylesheet = null;
 		this.initialized = false;
 	}
+}
+
+import type { LoadedWidget } from "../../types/widgets.d.ts";
+import type { TableWidgets } from "./types.d.ts";
+
+export interface TableColumn {
+	field: string;
+	title?: string;
+	selected?: boolean;
+}
+
+export interface TableVisibilityToggle {
+	column?: string;
+	active: boolean;
+}
+
+interface VisibilityView {
+	elt: HTMLElement;
+	hash?: string;
+}
+
+interface VisibilityComponent {
+	elt: HTMLElement;
+	widgets: Record<string, LoadedWidget> & TableWidgets;
+}
+
+interface TableVisibilityStateOptions {
+	component: VisibilityComponent;
+	view: VisibilityView;
+	selected?: string[];
+	columns?: TableColumn[];
 }

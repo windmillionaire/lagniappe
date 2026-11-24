@@ -1,13 +1,44 @@
 import { NavElement } from "../../elements/nav.ts";
 import { captureError } from "../../shared/errors.ts";
 import { withTransition } from "../../shared/transitions.ts";
+import type { RequestResult } from "../../types/api";
+import type { LoadedWidget } from "../../types/widgets";
 import { loadWidget } from "../../widgets/loader.ts";
+import type { PageTaskList } from "../../widgets/pageTaskList.ts";
+import type { TableWidgets } from "../../widgets/tables/types.d.ts";
+import type Core from "./core.ts";
+
+export type SubcomponentEvent = CustomEvent<{ subcomponent: ViewComponent }>;
+
+declare global {
+	interface HTMLElementEventMap {
+		"set-subcomponent": SubcomponentEvent;
+	}
+}
 
 export default class ViewComponent {
-	constructor(node, view) {
+	declare view: Core;
+	declare elt: HTMLElement;
+	declare key: string | undefined;
+	declare name: string;
+	declare kind: string | undefined;
+	declare widgets: Record<string, LoadedWidget> &
+		TableWidgets & {
+			PageTaskList?: PageTaskList & LoadedWidget;
+		};
+	declare widgetLoads: Map<string, Promise<LoadedWidget | null>>;
+	declare active: LoadedWidget | NavElement | null;
+	declare attributes: Record<string, unknown>;
+	declare _nav: NavElement | null;
+	declare _activeSubComponent: ViewComponent | null;
+	declare _creating: boolean;
+	declare _destroyed: boolean;
+	declare reconcile: (() => void) | null;
+
+	constructor(node: HTMLElement, view: Core) {
 		this.view = view;
 		this.elt = node;
-		this.key = node.closest("[data-key]")?.dataset.key;
+		this.key = node.closest<HTMLElement>("[data-key]")?.dataset.key;
 		this.name = node.id;
 		this.kind = node.dataset.kind || view.kind;
 
@@ -33,17 +64,19 @@ export default class ViewComponent {
 	}
 
 	get navElt() {
-		return this.elt.querySelector(`[lp-nav][data-nav="${this.name}"]`);
+		return this.elt.querySelector<HTMLElement>(
+			`[lp-nav][data-nav="${this.name}"]`,
+		);
 	}
 
-	get nav() {
+	get nav(): NavElement | null {
 		if (this._nav) return this._nav;
 
 		const nav = this.elt.dataset.parentNav;
 		const navElt = nav ? document.getElementById(nav) : null;
 
 		if (navElt && !this.elt.contains(navElt)) {
-			this._nav = this.view.getComponent(navElt).nav;
+			this._nav = this.view.getComponent(navElt)?.nav ?? null;
 		} else {
 			this._nav = this.navElt ? new NavElement(this, this.navElt) : null;
 			if (this.navElt) this.navElt.dataset.visible = "true";
@@ -52,23 +85,29 @@ export default class ViewComponent {
 		return this._nav;
 	}
 
-	set nav(newNav) {
+	set nav(newNav: NavElement | null) {
 		this._nav = newNav;
 
 		if (this.navElt) this.navElt.dataset.visible = newNav ? "false" : "true";
 	}
 
+	get activeWidget(): LoadedWidget | null {
+		return this.active instanceof NavElement ? null : this.active;
+	}
+
 	get subComponents() {
 		const filtered = Array.from(
-			this.elt.querySelectorAll(":scope [lp-component]"),
+			this.elt.querySelectorAll<HTMLElement>(":scope [lp-component]"),
 		).filter((component) => {
-			return component.parentElement.closest("[lp-component]") === this.elt;
+			return component.parentElement?.closest("[lp-component]") === this.elt;
 		});
 		return filtered;
 	}
 
 	get parentComponent() {
-		return this.elt.parentElement.closest("[lp-component]");
+		return (
+			this.elt.parentElement?.closest<HTMLElement>("[lp-component]") ?? null
+		);
 	}
 
 	get persistent() {
@@ -88,12 +127,12 @@ export default class ViewComponent {
 	}
 
 	get error() {
-		return this.elt.querySelector("[data-role='error']");
+		return this.elt.querySelector<HTMLElement>("[data-role='error']");
 	}
 
-	async activate(show) {
+	async activate(show?: string | null): Promise<boolean> {
 		if (this._destroyed) return false;
-		this.view?.DeferredOperations?.suspendTaskForm?.(this.active?.target);
+		this.view?.DeferredOperations?.suspendTaskForm?.(this.activeWidget?.target);
 		this.active?.disable();
 
 		if (!show) {
@@ -121,7 +160,7 @@ export default class ViewComponent {
 		const createForm = this.active?.ifEmpty;
 		if (createForm && !this._creating) {
 			const createTarget = Array.from(
-				this.elt.querySelectorAll("[data-widget]"),
+				this.elt.querySelectorAll<HTMLElement>("[data-widget]"),
 			).some((target) => target.dataset.widget === createForm);
 			if (createTarget) return await this.activate(createForm);
 		}
@@ -132,7 +171,9 @@ export default class ViewComponent {
 	}
 
 	async prefetch() {
-		const widgets = this.elt.querySelectorAll("[data-widget][lp-prefetch]");
+		const widgets = this.elt.querySelectorAll<HTMLElement>(
+			"[data-widget][lp-prefetch]",
+		);
 		await Promise.all(
 			Array.from(widgets).map(async (elt) => {
 				await this.loadWidget(elt.dataset.widget);
@@ -140,7 +181,7 @@ export default class ViewComponent {
 		);
 	}
 
-	async prepareCollectionRefresh(skip = new Set()) {
+	async prepareCollectionRefresh(skip = new Set<LoadedWidget>()) {
 		const widgets = Object.values(this.widgets);
 		const commits = await Promise.all(
 			widgets.map(async (widget) => {
@@ -161,29 +202,30 @@ export default class ViewComponent {
 					return await widget.prepareRefresh(response);
 				}
 				return () => {
-					const result = widget.refresh(response);
-					if (result?.then) void result.catch(captureError);
+					const result = widget.refresh?.(response);
+					if (result instanceof Promise) void result.catch(captureError);
 				};
 			}),
 		);
-		return commits.filter(Boolean);
+		return commits.filter((commit) => commit != null);
 	}
 
-	async refreshCollections(skip = new Set()) {
+	async refreshCollections(skip = new Set<LoadedWidget>()) {
 		const commits = await this.prepareCollectionRefresh(skip);
 		commits.forEach((commit) => {
 			commit();
 		});
 	}
 
-	async loadWidget(name) {
+	async loadWidget(name?: string | null): Promise<LoadedWidget | null> {
 		if (!name || this._destroyed) return null;
 		if (this.widgets[name]) return this.widgets[name];
-		if (this.widgetLoads.has(name)) return this.widgetLoads.get(name);
+		const existing = this.widgetLoads.get(name);
+		if (existing) return existing;
 
 		const pending = (async () => {
 			const widget = await loadWidget(this, name);
-			if (this._destroyed) {
+			if (!widget || this._destroyed) {
 				widget?.destroy?.();
 				return null;
 			}
@@ -208,7 +250,10 @@ export default class ViewComponent {
 	}
 
 	// this is called when a widget needs to be loaded/reloaded in response to an event
-	async load(widget = this.active, route = null) {
+	async load(
+		widget = this.activeWidget,
+		route?: string | URL | null,
+	): Promise<undefined | null> {
 		if (!widget || widget?.loaded) return null;
 		route = route || widget.route;
 
@@ -216,7 +261,8 @@ export default class ViewComponent {
 		widget.modified = true;
 		if (!response) return null;
 		if (response.updated === false && widget.initialized) return null;
-		const responseTarget = response.html?.querySelector?.(
+		const html = response.html || null;
+		const responseTarget = html?.querySelector<HTMLElement>(
 			`[data-widget='${widget.name}']`,
 		);
 		if (responseTarget && response.pollChannel) {
@@ -226,8 +272,8 @@ export default class ViewComponent {
 			responseTarget.dataset.pollRevision = response.pollRevision;
 		}
 
-		const append = await widget.updated(response);
-		if (append) this.load(widget, append.dataset.route);
+		const append = await widget.updated?.(response);
+		if (append) void this.load(widget, append.dataset.route);
 		if (widget !== this.active) {
 			await widget.prepareReconcile();
 			await withTransition(() => widget.reconcile(), {
@@ -240,12 +286,20 @@ export default class ViewComponent {
 	// any loaded widgets that have targets in the server response will be updated
 	// if the widget hasn't been loaded yet, its target will be replaced with the new html
 	// otherwise the widget's updated() method will be called with the response
-	async updated(response) {
-		const updates = { replace: [], append: [] };
+	async updated(response: RequestResult) {
+		const updates = {
+			replace: [] as { target: Element; elt: HTMLElement }[],
+			append: [] as HTMLElement[],
+		};
 
-		const widgetUpdates = [];
-		response.html?.querySelectorAll("[data-widget]").forEach((elt) => {
+		const widgetUpdates: ReturnType<NonNullable<LoadedWidget["updated"]>>[] =
+			[];
+		const targets = response.html
+			? response.html.querySelectorAll<HTMLElement>("[data-widget]")
+			: [];
+		targets.forEach((elt) => {
 			const name = elt.dataset.widget;
+			if (!name) return;
 			const widget = this.widgets[name];
 			const target = this.elt.querySelector(`[data-widget='${name}']`);
 
@@ -267,7 +321,7 @@ export default class ViewComponent {
 					target.replaceWith(elt);
 				});
 				this.elt.append(...updates.append);
-				this.active?.success?.();
+				this.activeWidget?.success?.();
 				this.render(true);
 			},
 			{ label: `${this.name}:update` },
@@ -287,19 +341,21 @@ export default class ViewComponent {
 	// if it needs to be reset or modified, that should happen in its postreconcile() method
 	// receiver is the widget that will receive the new html, this will be activated
 	// it may be the same component or a different component, both components will be rendered
-	async created(response) {
-		if (!this.active) return;
-		const originator = this.active;
+	async created(response: RequestResult) {
+		const originator = this.activeWidget;
+		if (!originator) return;
 		this._creating = true;
 
 		originator.modified = true;
 
-		const [componentId, widgetName] =
-			originator.target.dataset.destination.split(":");
+		const destination = originator.target?.dataset.destination;
+		if (destination === undefined)
+			throw new Error("Create widget requires data-destination");
+		const [componentId, widgetName] = destination.split(":");
 
-		await originator.created(response);
+		await originator.created?.(response);
 
-		let component;
+		let component: ViewComponent | null;
 		if (widgetName) {
 			if (componentId === this.name) {
 				component = this;
@@ -308,11 +364,11 @@ export default class ViewComponent {
 				component = this.view.getComponent(
 					document.getElementById(componentId),
 				);
-				await component.activate(widgetName);
+				await component?.activate(widgetName);
 			}
 
-			if (component.active) {
-				await component.active.created?.(response);
+			if (component?.active) {
+				await component.activeWidget?.created?.(response);
 				component.active.modified = true;
 			}
 		} else {
@@ -331,17 +387,22 @@ export default class ViewComponent {
 		this._creating = false;
 	}
 
-	preload(property) {
+	preload(property: string): unknown {
 		const data = this.elt.dataset.preload;
-		this.attributes = data ? JSON.parse(data) : {};
+		const attributes: unknown = data ? JSON.parse(data) : {};
+		this.attributes =
+			attributes && typeof attributes === "object" && !Array.isArray(attributes)
+				? (attributes as Record<string, unknown>)
+				: {};
 		return this.attributes[property] ?? null;
 	}
 
-	showError(message) {
+	showError(message: string) {
 		this.enable();
 
-		if (this.open !== "false" && this.active?.showError) {
-			this.active.showError(message);
+		const active = this.activeWidget;
+		if (this.open !== "false" && active?.showError) {
+			active.showError(message);
 		} else {
 			const errorElt = this.error;
 			if (!errorElt) return;
@@ -356,14 +417,14 @@ export default class ViewComponent {
 				},
 				{ label: `${this.name}:error` },
 			);
-			this.active?.enable();
+			active?.enable();
 		}
 	}
 
 	// if widgets return data, it must be a FormData object
 	// this FormData will have the data-role of the submitter added to it
 	get formData() {
-		return this.active?.formData;
+		return this.activeWidget?.formData;
 	}
 
 	get open() {
@@ -372,17 +433,21 @@ export default class ViewComponent {
 
 	get route() {
 		return (
-			this.active?.route ||
-			this.active?.target.dataset.route ||
+			this.activeWidget?.route ||
+			this.activeWidget?.target?.dataset.route ||
 			this.elt.dataset.route
 		);
 	}
 
-	deactivate(visible = true, originator = null) {
-		if (this.active) {
-			this.view?.DeferredOperations?.suspendTaskForm?.(this.active.target);
-			this.active.disable(true);
-			this.active.reconcile(true);
+	deactivate(visible = true, originator: ViewComponent | null = null) {
+		const active = this.active;
+		if (active) {
+			this.view?.DeferredOperations?.suspendTaskForm?.(
+				this.activeWidget?.target,
+			);
+			if (active instanceof NavElement) active.disable();
+			else active.disable(true);
+			active.reconcile(true);
 			this.nav?.reconcile(null, this.name);
 		}
 
@@ -404,7 +469,7 @@ export default class ViewComponent {
 
 		subComponents.forEach((elt) => {
 			const subComponent = this.view.getComponent(elt);
-			if (subComponent !== this) subComponent.deactivate(false);
+			if (subComponent && subComponent !== this) subComponent.deactivate(false);
 		});
 
 		if (!parent) return;
@@ -419,7 +484,7 @@ export default class ViewComponent {
 		parent._setSubComponent(this);
 	}
 
-	_setSubComponent(subComponent) {
+	_setSubComponent(subComponent: ViewComponent) {
 		const activeSubComponent = this._activeSubComponent;
 		if (activeSubComponent && activeSubComponent !== subComponent) {
 			const visible = activeSubComponent.persistent ? "true" : "false";
@@ -436,7 +501,7 @@ export default class ViewComponent {
 		subComponent.elt.dispatchEvent(event);
 	}
 
-	async prepareRender() {
+	async prepareRender(_visible?: boolean) {
 		await Promise.all(
 			Object.values(this.widgets).map((widget) => {
 				return widget.prepareReconcile();
@@ -446,7 +511,7 @@ export default class ViewComponent {
 
 	// User actions and initial entity enhancement call this within a transition.
 	// Connected-DOM manipulation in widgets belongs in postreconcile().
-	render(visible) {
+	render(visible: boolean) {
 		const open = visible ? this.active?.name || "true" : false;
 		this.elt.dataset.visible = this.persistent || visible ? "true" : "false";
 
@@ -471,6 +536,6 @@ export default class ViewComponent {
 			widget.destroy?.();
 		});
 		this.widgetLoads.clear();
-		delete this.view.components[this.key];
+		if (this.key !== undefined) delete this.view.components[this.key];
 	}
 }

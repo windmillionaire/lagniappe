@@ -3,14 +3,47 @@ import { ENDPOINTS } from "../shared/endpoints.ts";
 import { setIcon } from "../shared/icons.ts";
 import { request } from "../shared/request.ts";
 import { withTransition } from "../shared/transitions.ts";
+import type { ElementSchema } from "./base/baseElement.ts";
 import { primitives } from "./primitives.ts";
 import { TableElement } from "./table.ts";
 
+interface EmbeddedTableColumn {
+	field: string;
+	title?: string;
+	selected?: boolean;
+}
+
+function isEmbeddedColumn(value: unknown): value is EmbeddedTableColumn {
+	return Boolean(
+		value &&
+			typeof value === "object" &&
+			"field" in value &&
+			typeof value.field === "string" &&
+			(!("title" in value) || typeof value.title === "string") &&
+			(!("selected" in value) || typeof value.selected === "boolean"),
+	);
+}
+
 export class EmbeddedTableVisibility {
-	constructor(tableElt, storageKey = null) {
-		const preload = JSON.parse(tableElt.dataset.preload);
+	declare tableElt: HTMLTableElement;
+	declare columns: EmbeddedTableColumn[];
+	declare storageKey: string | null;
+	declare selected: string[];
+	declare visibilityRow: HTMLTableRowElement | null;
+	declare header: HTMLTableRowElement | null;
+	declare actions: HTMLDivElement | null;
+	declare toggle: HTMLButtonElement | null;
+
+	constructor(tableElt: HTMLTableElement, storageKey: string | null = null) {
+		const preload: unknown = JSON.parse(tableElt.dataset.preload ?? "{}");
 		this.tableElt = tableElt;
-		this.columns = preload.columns || [];
+		this.columns =
+			preload &&
+			typeof preload === "object" &&
+			"columns" in preload &&
+			Array.isArray(preload.columns)
+				? preload.columns.filter(isEmbeddedColumn)
+				: [];
 		this.storageKey = storageKey;
 		this.selected = this._loadSelected();
 		this.visibilityRow = this.tableElt.querySelector(
@@ -24,7 +57,7 @@ export class EmbeddedTableVisibility {
 
 	init() {
 		this._createHeaderAction();
-		this.header.addEventListener("click", this._headerClick);
+		this.header?.addEventListener("click", this._headerClick);
 
 		this.columns.forEach((column) => {
 			this._setColumnVisibility(
@@ -46,11 +79,14 @@ export class EmbeddedTableVisibility {
 		if (saved === null) return defaults;
 
 		try {
-			const selected = JSON.parse(saved);
+			const selected: unknown = JSON.parse(saved);
 			if (!Array.isArray(selected)) return defaults;
 
 			const available = new Set(this.columns.map((column) => column.field));
-			return [...new Set(selected)].filter((field) => available.has(field));
+			return [...new Set(selected)].filter(
+				(field): field is string =>
+					typeof field === "string" && available.has(field),
+			);
 		} catch {
 			return defaults;
 		}
@@ -64,6 +100,7 @@ export class EmbeddedTableVisibility {
 	}
 
 	_createHeaderAction() {
+		if (!this.header) return;
 		const cell = this.header.appendChild(document.createElement("th"));
 		cell.className = STYLES.table.thead.actionCell;
 		cell.scope = "col";
@@ -84,8 +121,12 @@ export class EmbeddedTableVisibility {
 		setIcon(icon, "column", STYLES.table.thead.actionIcon);
 	}
 
-	_headerClick(e) {
-		if (!e.target.closest("[data-role='embedded-table-visibility']")) return;
+	_headerClick(e: MouseEvent) {
+		if (
+			!(e.target instanceof Element) ||
+			!e.target.closest("[data-role='embedded-table-visibility']")
+		)
+			return;
 
 		e.preventDefault();
 		e.stopPropagation();
@@ -93,17 +134,19 @@ export class EmbeddedTableVisibility {
 	}
 
 	_toggleController() {
-		const visible = this.visibilityRow.dataset.visible === "true";
+		const visible = this.visibilityRow?.dataset.visible === "true";
 		return this._setControllerVisible(!visible);
 	}
 
-	_setControllerVisible(visible) {
-		this.visibilityRow.dataset.visible = visible ? "true" : "false";
+	_setControllerVisible(visible: boolean) {
+		if (this.visibilityRow)
+			this.visibilityRow.dataset.visible = visible ? "true" : "false";
 		this.toggle?.setAttribute("aria-expanded", visible ? "true" : "false");
 		return visible;
 	}
 
 	_createController() {
+		if (!this.visibilityRow || !this.header) return;
 		const cell = this.visibilityRow.appendChild(document.createElement("td"));
 		cell.colSpan = this.header.querySelectorAll("th").length;
 		cell.className = `p-3 border-t bg-kind-bg border-slate-300 group`;
@@ -125,7 +168,11 @@ export class EmbeddedTableVisibility {
 		}
 
 		cell.addEventListener("change", (e) => {
-			if (!e.target.matches("input[type='checkbox']")) return;
+			if (
+				!(e.target instanceof HTMLInputElement) ||
+				e.target.type !== "checkbox"
+			)
+				return;
 
 			const [column, visible] = [e.target.name, e.target.checked];
 
@@ -138,19 +185,42 @@ export class EmbeddedTableVisibility {
 		});
 	}
 
-	_setColumnVisibility(column, visible) {
+	_setColumnVisibility(column: string, visible: boolean) {
 		const display = visible ? "table-cell" : "none";
 
 		this.tableElt
-			.querySelectorAll(`[data-column="${column}"]`)
+			.querySelectorAll<HTMLElement>(`[data-column="${column}"]`)
 			.forEach((col) => {
 				col.style.display = display;
 			});
 	}
 }
 
+export interface ExpandedTableView {
+	mobile?: boolean;
+}
+
+export interface ExpandedTableButton extends HTMLButtonElement {
+	_embeddedTable?: ExpandedTableCell | null;
+}
+
+interface ExpandedTableResponse {
+	kind: string;
+	submission: unknown;
+	schema: ElementSchema;
+}
+
 export class ExpandedTableCell {
-	constructor(view, button) {
+	declare view: ExpandedTableView;
+	declare button: ExpandedTableButton;
+	declare row: HTMLTableRowElement | null;
+	declare table: HTMLDivElement | null;
+	declare mobileQuery: MediaQueryList;
+	declare kind: string | null;
+	declare submission: unknown;
+	declare schema: ElementSchema | null;
+
+	constructor(view: ExpandedTableView, button: ExpandedTableButton) {
 		this.view = view;
 		this.button = button;
 		this.row = null;
@@ -164,6 +234,10 @@ export class ExpandedTableCell {
 
 	async create() {
 		const row = this.button.closest("tr");
+		const key = row?.dataset.key;
+		const tableId =
+			this.button.closest<HTMLElement>("[data-column]")?.dataset.column;
+		if (!row || !key || !tableId) return;
 		const colSpan = Array.from(row.querySelectorAll("td")).length;
 
 		this.row = document.createElement("tr");
@@ -176,16 +250,16 @@ export class ExpandedTableCell {
 		const tableEmbed = this.row.appendChild(document.createElement("td"));
 		tableEmbed.colSpan = colSpan;
 
-		const key = row.dataset.key;
-		const tableId = this.button.closest("[data-column]").dataset.column;
 		if (!this.kind || !this.submission || !this.schema) {
-			const response = await request.get(
+			const response = await request.get<ExpandedTableResponse>(
 				ENDPOINTS.renderer.expandTableCell(key, tableId),
 			);
-			if (!response.ok) return;
-			Object.assign(this, response);
-			this.kind = this.kind || "form";
+			if (!response?.ok) return;
+			this.kind = response.kind || "form";
+			this.submission = response.submission;
+			this.schema = response.schema ?? null;
 		}
+		if (!this.schema) return;
 
 		this.table = new TableElement(
 			{ readonly: true },
@@ -193,10 +267,10 @@ export class ExpandedTableCell {
 			this.submission,
 		).embedded;
 		this.table.dataset.embedded = "true";
-		this.table.querySelectorAll("tr, th, table").forEach((tr) => {
+		this.table.querySelectorAll<HTMLElement>("tr, th, table").forEach((tr) => {
 			tr.dataset.embedded = "true";
 		});
-		this.table.querySelector("tbody").classList.add(`bg-${this.kind}-bg`);
+		this.table.querySelector("tbody")?.classList.add(`bg-${this.kind}-bg`);
 
 		tableEmbed.appendChild(this.table);
 
@@ -204,13 +278,14 @@ export class ExpandedTableCell {
 	}
 
 	get visible() {
-		return this.row.dataset.visible === "true";
+		return this.row?.dataset.visible === "true";
 	}
 
 	async toggle(hide = false) {
 		if (!this.table) await this.create();
 		await withTransition(
 			() => {
+				if (!this.row) return;
 				const visible = hide ? true : this.visible;
 				this.row.dataset.visible = visible ? "false" : "true";
 				if (
@@ -227,7 +302,7 @@ export class ExpandedTableCell {
 	}
 
 	destroy() {
-		this.row.remove();
+		this.row?.remove();
 		this.row = null;
 		this.table = null;
 		this.button.dataset.open = "false";

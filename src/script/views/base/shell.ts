@@ -1,21 +1,85 @@
+import type { SearchBox } from "../../elements/combobox/search.ts";
+import type { Notifications } from "../../elements/notifications.ts";
 import { connectivity } from "../../shared/connectivity.ts";
+import type { PollingCoordinator } from "../../shared/polling.ts";
+import type Builder from "../builder/builder.ts";
+import type ViewComponent from "./component.ts";
+import type { SubmissionManager, ViewSubmitEvent } from "./submission.ts";
 
 const MOBILE_QUERY = "(max-width: 640px)";
 
-export const markPerformance = (name) => {
+export interface ViewRoot extends HTMLElement {
+	_lp_view?: ShellView | Builder;
+}
+
+export interface ViewSyncOptions {
+	hidden?: boolean;
+	blurred?: boolean;
+	blurredAt?: number | null;
+	force?: boolean;
+}
+
+function hasClosest(target: EventTarget | null): target is Element {
+	return Boolean(
+		target && "closest" in target && typeof target.closest === "function",
+	);
+}
+
+export const markPerformance = (name: string) => {
 	if (typeof performance === "undefined" || !performance.mark) return;
 	if (performance.getEntriesByName?.(name, "mark")?.length) return;
 	performance.mark(name);
 };
 
 export const whenIdle = () =>
-	new Promise((resolve) => {
+	new Promise<IdleDeadline | undefined>((resolve) => {
 		if (typeof globalThis.requestIdleCallback === "function") {
 			globalThis.requestIdleCallback(resolve, { timeout: 1000 });
 			return;
 		}
 		setTimeout(resolve, 0);
 	});
+
+export const loadViewService = <
+	Handle extends string,
+	Slot extends string,
+	Manager extends object,
+>(
+	view: { _destroyed: boolean } & Record<Handle, NoInfer<Manager> | null> &
+		Partial<Record<Slot, Promise<NoInfer<Manager> | null> | null>>,
+	promiseKey: Slot,
+	handleKey: Handle,
+	loader: () => Promise<Manager | null>,
+): Promise<Manager | null> => {
+	const handles: Record<Handle, Manager | null> = view;
+	const promises: Partial<Record<Slot, Promise<Manager | null> | null>> = view;
+	const handle = handles[handleKey];
+	if (handle) return Promise.resolve(handle);
+	const existing = promises[promiseKey];
+	if (existing) return existing;
+
+	const pending = Promise.resolve()
+		.then(loader)
+		.then((manager) => {
+			if (view._destroyed) {
+				if (
+					manager &&
+					"destroy" in manager &&
+					typeof manager.destroy === "function"
+				)
+					manager.destroy();
+				return null;
+			}
+			if (manager) handles[handleKey] = manager;
+			return manager || null;
+		})
+		.catch((error) => {
+			if (promises[promiseKey] === pending) promises[promiseKey] = null;
+			throw error;
+		});
+	promises[promiseKey] = pending;
+	return pending;
+};
 
 /**
  * Lightweight page shell. It owns only interaction interception, viewport
@@ -24,7 +88,39 @@ export const whenIdle = () =>
  *
  */
 export default class ShellView {
-	constructor(node) {
+	declare elt: ViewRoot;
+	declare kind: string | undefined;
+	declare hash: string | undefined;
+	declare key: string | undefined;
+	declare readonly: boolean;
+	declare mobile: boolean;
+	declare online: boolean;
+	declare hidden: boolean;
+	declare components: Record<string, ViewComponent>;
+	declare SearchBox: SearchBox | null;
+	declare Notifications: Notifications | null;
+	declare PollingCoordinator: PollingCoordinator | null;
+	declare hasDeferredServices: boolean;
+	declare isDragging: boolean;
+	declare _destroyed: boolean;
+	declare _publishedReady: Promise<this>;
+	declare servicesReady: Promise<unknown>;
+	ensureSubmissionManager?(): Promise<SubmissionManager | null>;
+	declare _searchPromise?: Promise<SearchBox | null> | null;
+	declare _notificationsPromise?: Promise<Notifications | null> | null;
+	declare _pollingPromise?: Promise<PollingCoordinator | null> | null;
+
+	declare private _interactive: boolean;
+	declare private _published: boolean;
+	declare private _ownsShellServices?: boolean;
+	declare private _coldActions: Map<Element, Promise<unknown>>;
+	declare private copyResetTimers: Map<HTMLButtonElement, number>;
+	declare private _pointer: { id: number; x: number; y: number } | null;
+	declare private _mobileQuery?: MediaQueryList;
+	declare private _resolvePublished?: (view: this) => void;
+	declare private _shellColdControl?: EventListener | null;
+
+	constructor(node: ViewRoot) {
 		this.elt = node;
 		this.kind = node.dataset.kind;
 		this.hash = node.dataset.hash || node.dataset.index;
@@ -57,10 +153,10 @@ export default class ShellView {
 		this._publishedReady = new Promise((resolve) => {
 			this._resolvePublished = resolve;
 		});
-		/** @type {Promise<unknown>} */
 		this.servicesReady = Promise.resolve(this);
 	}
 
+	init(): Promise<this | undefined> | Promise<void>;
 	async init() {
 		if (this._interactive) return this;
 		this._interactive = true;
@@ -85,29 +181,9 @@ export default class ShellView {
 		return this;
 	}
 
-	_loadShellManager(promiseKey, handleKey, loader) {
-		if (this[handleKey]) return Promise.resolve(this[handleKey]);
-		if (this[promiseKey]) return this[promiseKey];
-		const pending = Promise.resolve()
-			.then(loader)
-			.then((manager) => {
-				if (this._destroyed) {
-					manager?.destroy?.();
-					return null;
-				}
-				if (manager) this[handleKey] = manager;
-				return manager || null;
-			})
-			.catch((error) => {
-				if (this[promiseKey] === pending) this[promiseKey] = null;
-				throw error;
-			});
-		this[promiseKey] = pending;
-		return pending;
-	}
-
 	ensurePollingCoordinator() {
-		return this._loadShellManager(
+		return loadViewService(
+			this,
 			"_pollingPromise",
 			"PollingCoordinator",
 			async () => {
@@ -118,8 +194,8 @@ export default class ShellView {
 	}
 
 	ensureSearchBox() {
-		return this._loadShellManager("_searchPromise", "SearchBox", async () => {
-			const search = document.querySelector("[lp-search]");
+		return loadViewService(this, "_searchPromise", "SearchBox", async () => {
+			const search = document.querySelector<HTMLElement>("[lp-search]");
 			if (!search) return null;
 			const { SearchBox } = await import("../../elements/combobox/search.ts");
 			if (this._destroyed) return null;
@@ -130,7 +206,8 @@ export default class ShellView {
 	}
 
 	ensureNotifications() {
-		return this._loadShellManager(
+		return loadViewService(
+			this,
 			"_notificationsPromise",
 			"Notifications",
 			async () => {
@@ -151,7 +228,7 @@ export default class ShellView {
 		this.servicesReady = this._publishedReady
 			.then(() => whenIdle())
 			.then(async () => {
-				const warmers = [];
+				const warmers: Promise<SearchBox | Notifications | null>[] = [];
 				if (document.querySelector("[lp-search]")) {
 					warmers.push(this.ensureSearchBox());
 				}
@@ -181,7 +258,11 @@ export default class ShellView {
 			});
 	}
 
-	reportStartupError(error, element = this.elt, context = "lazy-control") {
+	reportStartupError(
+		error: unknown,
+		element: Element | null = this.elt,
+		context = "lazy-control",
+	) {
 		void import("../../shared/errors.ts")
 			.then(({ captureError }) => {
 				captureError(error, element, { context });
@@ -191,7 +272,9 @@ export default class ShellView {
 
 	_installColdControlListeners() {
 		this._shellColdControl = (event) => {
-			const search = event.target?.closest?.("[lp-search]");
+			const { target } = event;
+			if (!hasClosest(target)) return;
+			const search = target.closest("[lp-search]");
 			if (search && !this.SearchBox) {
 				this.runColdAction(
 					search,
@@ -201,9 +284,7 @@ export default class ShellView {
 				);
 				return;
 			}
-			const notifications = event.target?.closest?.(
-				"[data-role='notifications']",
-			);
+			const notifications = target.closest("[data-role='notifications']");
 			if (!notifications || this.Notifications) return;
 			if (event.type === "click") {
 				event.preventDefault();
@@ -221,7 +302,7 @@ export default class ShellView {
 		}
 	}
 
-	_activateSearchBox(box) {
+	_activateSearchBox(box: SearchBox | null) {
 		if (!box) return;
 		const input = box.element;
 		if (input?.value?.trim()) box._input({ target: input });
@@ -236,7 +317,7 @@ export default class ShellView {
 		this._shellColdControl = null;
 	}
 
-	async sync({ hidden = document.hidden } = {}) {
+	async sync({ hidden = document.hidden }: ViewSyncOptions = {}) {
 		this.hidden = hidden;
 		this.online = connectivity.online;
 		if (hidden || !this.online) this.PollingCoordinator?.pause();
@@ -258,12 +339,12 @@ export default class ShellView {
 		return this;
 	}
 
-	_mobileChanged(event) {
+	_mobileChanged(event: MediaQueryListEvent) {
 		this.mobile = event.matches;
 		this.elt.dispatchEvent(new CustomEvent("mobile-resize"));
 	}
 
-	_pointerDown(event) {
+	_pointerDown(event: PointerEvent) {
 		if (event.button !== undefined && event.button !== 0) return;
 		this.isDragging = false;
 		this._pointer = {
@@ -276,7 +357,7 @@ export default class ShellView {
 		window.addEventListener("pointercancel", this._pointerUp);
 	}
 
-	_pointerMove(event) {
+	_pointerMove(event: PointerEvent) {
 		if (!this._pointer) return;
 		if (
 			this._pointer.id !== undefined &&
@@ -296,14 +377,15 @@ export default class ShellView {
 		window.removeEventListener("pointercancel", this._pointerUp);
 	}
 
-	_handleClick(event) {
+	_handleClick(event: MouseEvent) {
 		if (this.isDragging) {
 			this.isDragging = false;
 			return;
 		}
-		const copyButton = event.target?.closest?.(
-			"[data-role='manual-command-copy']",
-		);
+		const { target } = event;
+		const copyButton = hasClosest(target)
+			? target.closest<HTMLButtonElement>("[data-role='manual-command-copy']")
+			: null;
 		if (copyButton) {
 			event.preventDefault();
 			void this.copyCommand(copyButton);
@@ -312,9 +394,9 @@ export default class ShellView {
 		this._click(event);
 	}
 
-	_click() {}
+	_click(_event: MouseEvent) {}
 
-	async copyCommand(button) {
+	async copyCommand(button: HTMLButtonElement) {
 		const command = button
 			.closest("[data-role='manual-command-shell']")
 			?.querySelector("[data-role='manual-command'] code")?.textContent;
@@ -366,19 +448,22 @@ export default class ShellView {
 		);
 	}
 
-	_handleSubmit(event) {
+	_handleSubmit(event: ViewSubmitEvent) {
 		if (!this.ensureSubmissionManager || event.defaultPrevented) return;
 		const form = event.target;
-		if (!form?.closest?.("[lp-component]")) return;
+		if (!hasClosest(form) || !form.closest("[lp-component]")) return;
 
 		event.preventDefault();
 		event.stopPropagation();
-		const submitter = event.submitter;
+		const submitter =
+			"submitter" in event && event.submitter && "disabled" in event.submitter
+				? event.submitter
+				: null;
 		if (submitter) submitter.disabled = true;
 		let handedOff = false;
 		this.runColdAction(
 			form,
-			() => this.ensureSubmissionManager(),
+			() => this.ensureSubmissionManager?.(),
 			(manager) => {
 				if (this._destroyed || !form.isConnected || !manager) return;
 				handedOff = true;
@@ -390,14 +475,24 @@ export default class ShellView {
 		});
 	}
 
-	runColdAction(owner, load, activate, busyOwner = owner) {
+	runColdAction<Loaded>(
+		owner: Element | null | undefined,
+		load: () => Loaded | PromiseLike<Loaded>,
+		activate: (value: Loaded) => unknown,
+		busyOwner = owner,
+	): Promise<unknown> {
 		if (!owner || this._destroyed) return Promise.resolve(null);
-		if (this._coldActions.has(owner)) return this._coldActions.get(owner);
+		const existing = this._coldActions.get(owner);
+		if (existing) return existing;
 
 		busyOwner?.setAttribute?.("aria-busy", "true");
-		if (busyOwner?.dataset) busyOwner.dataset.loading = "true";
+		const dataset =
+			busyOwner && "dataset" in busyOwner
+				? (busyOwner as HTMLElement | SVGElement).dataset
+				: undefined;
+		if (dataset) dataset.loading = "true";
 		const pending = Promise.resolve()
-			.then(load)
+			.then<Loaded>(load)
 			.then((value) => {
 				if (this._destroyed) return null;
 				return activate(value);
@@ -408,7 +503,7 @@ export default class ShellView {
 			})
 			.finally(() => {
 				busyOwner?.removeAttribute?.("aria-busy");
-				if (busyOwner?.dataset) delete busyOwner.dataset.loading;
+				if (dataset) delete dataset.loading;
 				if (this._coldActions.get(owner) === pending) {
 					this._coldActions.delete(owner);
 				}

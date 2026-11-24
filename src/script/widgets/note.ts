@@ -1,7 +1,10 @@
-import { FormWidget } from "./base/formWidget.ts";
+import { FormWidget, type FormWidgetSettings } from "./base/formWidget.ts";
 
 export class CreateNote extends FormWidget {
-	constructor(attributes) {
+	declare target: HTMLFormElement;
+	declare photoUrl: string | null;
+
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Add Note",
@@ -15,11 +18,13 @@ export class CreateNote extends FormWidget {
 	}
 
 	get photoInput() {
-		return this.target.querySelector("[name='note-file']");
+		return this.target.querySelector<HTMLInputElement>("[name='note-file']");
 	}
 
 	get photoSelection() {
-		return this.target.querySelector("[data-role='photo-selection']");
+		return this.target.querySelector<HTMLElement>(
+			"[data-role='photo-selection']",
+		);
 	}
 
 	async init() {
@@ -30,10 +35,12 @@ export class CreateNote extends FormWidget {
 		this._showPhoto(this.photoInput?.files?.[0]);
 	}
 
-	_click(event) {
-		if (event.target.closest("[data-action='add-photo']")) {
+	_click(event: MouseEvent) {
+		const target = event.target;
+		if (!(target instanceof Element)) return;
+		if (target.closest("[data-action='add-photo']")) {
 			this.photoInput?.click();
-		} else if (event.target.closest("[data-action='remove-photo']")) {
+		} else if (target.closest("[data-action='remove-photo']")) {
 			this._clearPhoto();
 		}
 	}
@@ -46,7 +53,7 @@ export class CreateNote extends FormWidget {
 		queueMicrotask(() => this._clearPhoto());
 	}
 
-	_showPhoto(file) {
+	_showPhoto(file?: File) {
 		if (!file) {
 			this._clearPhoto(false);
 			return;
@@ -54,7 +61,9 @@ export class CreateNote extends FormWidget {
 
 		this._revokePhotoUrl();
 		this.photoUrl = URL.createObjectURL(file);
-		const preview = this.target.querySelector("[data-role='photo-preview']");
+		const preview = this.target.querySelector<HTMLImageElement>(
+			"[data-role='photo-preview']",
+		);
 		const name = this.target.querySelector("[data-role='photo-name']");
 		if (preview) preview.src = this.photoUrl;
 		if (name) name.textContent = file.name;
@@ -76,8 +85,8 @@ export class CreateNote extends FormWidget {
 		this.photoUrl = null;
 	}
 
-	created(response) {
-		super.created(response);
+	created() {
+		super.created();
 		this.target.reset();
 	}
 

@@ -3,13 +3,68 @@ import { createIcon, setIcon } from "../shared/icons.ts";
 import { ENDPOINTS, request } from "../shared/index.ts";
 import { withTransition } from "../shared/transitions.ts";
 import { BaseUpload } from "./base/baseUpload.ts";
+import type { SectionToggle } from "./sectionToggle.ts";
 import { UploadMenu, uploadElement } from "./upload.ts";
 
 const UPLOAD_DROPZONE_TEXT =
 	"Drop file/photo here, click to upload, or tap to choose camera/files";
 
+export interface TaskAsset {
+	key?: string | null;
+	id?: string | null;
+	name?: string | null;
+	filename?: string | null;
+	kind?: string | null;
+	url?: string | null;
+	delete_url?: string | null;
+	attached?: boolean | null;
+}
+
+type TaskAssets = Record<string, TaskAsset>;
+type TaskAssetResponse = { assets: unknown; deleted: unknown };
+
+function isTaskAsset(value: unknown): value is TaskAsset {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+	const data: Record<string, unknown> = { ...value };
+	return (
+		["key", "id", "name", "filename", "kind", "url", "delete_url"].every(
+			(key) => data[key] == null || typeof data[key] === "string",
+		) &&
+		(data.attached == null || typeof data.attached === "boolean")
+	);
+}
+
+function taskAssets(value: unknown): TaskAssets {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+	const entries = Object.entries(value).filter(
+		(entry): entry is [string, TaskAsset] => isTaskAsset(entry[1]),
+	);
+	return Object.fromEntries(entries);
+}
+
+interface TaskUploadWidget {
+	key?: string | null;
+	readonly?: boolean;
+}
+
 export class TaskUpload extends BaseUpload {
-	constructor(button, widget) {
+	declare button: HTMLButtonElement;
+	declare action?: string;
+	declare widget?: TaskUploadWidget;
+	declare assets: TaskAssets;
+	declare task: HTMLElement | null;
+	declare taskRow: HTMLLIElement | null;
+	declare key?: string | null;
+	declare endpoints: Partial<ReturnType<typeof ENDPOINTS.TaskUpload>>;
+	declare assetsInput: HTMLInputElement;
+	declare assetsList: HTMLUListElement;
+	declare kind: "file";
+	declare messages: Record<string, string>;
+	declare menuOptions: string[];
+	declare dropzone: ReturnType<typeof uploadElement.dropzone>;
+	declare toggle: SectionToggle | null;
+
+	constructor(button: HTMLButtonElement, widget?: TaskUploadWidget) {
 		super({
 			button,
 			action: button.dataset.action,
@@ -21,9 +76,12 @@ export class TaskUpload extends BaseUpload {
 		this.target.dataset.visible = "false";
 		this.button.insertAdjacentElement("afterend", this.target);
 
-		this.assets = JSON.parse(button.dataset.preload || "{}");
-		this.task = button.closest("[lp-component]");
-		this.taskRow = button.closest("li[lp-entity][data-kind='task']");
+		const preload: unknown = JSON.parse(button.dataset.preload || "{}");
+		this.assets = taskAssets(preload);
+		this.task = button.closest<HTMLElement>("[lp-component]");
+		this.taskRow = button.closest<HTMLLIElement>(
+			"li[lp-entity][data-kind='task']",
+		);
 		this.key = this.taskRow?.dataset.key || widget?.key;
 		this.endpoints = this.key ? ENDPOINTS.TaskUpload({ key: this.key }) : {};
 
@@ -52,7 +110,7 @@ export class TaskUpload extends BaseUpload {
 
 	get formData() {
 		const data = new FormData();
-		const file = this.fileInput?.element.files[0];
+		const file = this.fileInput?.element.files?.[0];
 		if (file) data.append(this.inputName, file);
 		if (this.mimeType?.element) {
 			data.append(this.mimeType.element.name, this.mimeType.element.value);
@@ -92,14 +150,14 @@ export class TaskUpload extends BaseUpload {
 		this.assetsInput.value = JSON.stringify(this.assets || {});
 	}
 
-	_deleteUrl(file) {
+	_deleteUrl(file: TaskAsset) {
 		if (file.delete_url) return file.delete_url;
 		const key = file.key || file.id;
 		if (!key || !file.attached || !this.taskRow) return null;
-		return this.endpoints.remove(key);
+		return this.endpoints.remove?.(key) ?? null;
 	}
 
-	_deleteButton(file) {
+	_deleteButton(file: TaskAsset) {
 		const name = file.name || file.filename || "attachment";
 		const button = document.createElement("button");
 		button.type = "button";
@@ -120,13 +178,13 @@ export class TaskUpload extends BaseUpload {
 		return button;
 	}
 
-	_fileUrl(file) {
+	_fileUrl(file: TaskAsset) {
 		if (file.url) return file.url;
 		if (file.kind === "file" && file.id) return `/files/${file.id}`;
 		return "#";
 	}
 
-	_assetItem([name, file]) {
+	_assetItem([name, file]: [string, TaskAsset]) {
 		const label = file.name || file.filename || name;
 		const item = document.createElement("li");
 		item.dataset.key = file.key || file.id || "";
@@ -162,29 +220,33 @@ export class TaskUpload extends BaseUpload {
 	}
 
 	async uploadFile() {
-		if (!this.endpoints.upload) {
+		const route = this.endpoints.upload;
+		if (!route) {
 			this.showError("Upload route unavailable");
 			return;
 		}
 
 		this.dropzone.setContent(createIcon("spinner"), " Uploading...");
-		const prepared = await this.prepareSubmit({ route: this.endpoints.upload });
+		const prepared = await this.prepareSubmit({ route });
 		if (!prepared) return;
 
-		const response = await request.post(this.endpoints.upload, this.formData);
-		if (!response.ok) {
-			this.showError(response.error || "Could not upload attachment");
+		const response = await request.post<TaskAssetResponse>(
+			route,
+			this.formData,
+		);
+		if (!response?.ok) {
+			this.showError(response?.error || "Could not upload attachment");
 			return;
 		}
 
 		withTransition(() => {
-			this.assets = response.assets || {};
+			this.assets = taskAssets(response.assets);
 			this.renderAssets();
 			this.reset();
 		});
 	}
 
-	_removeBadge(file) {
+	_removeBadge(file?: TaskAsset) {
 		if (!this.task || !file) return;
 		const labels = new Set([file.name, file.filename].filter(Boolean));
 		const url = this._fileUrl(file);
@@ -193,21 +255,25 @@ export class TaskUpload extends BaseUpload {
 		this.task.querySelectorAll("[data-kind='file']").forEach((badge) => {
 			if (badge.closest("[data-role='saved-files']")) return;
 			const link = badge.querySelector("a");
-			const text = badge.textContent.trim();
-			if (labels.has(text) || (link && urls.has(link.getAttribute("href")))) {
+			const text = badge.textContent?.trim();
+			const href = link?.getAttribute("href");
+			if ((text && labels.has(text)) || (href && urls.has(href))) {
 				badge.remove();
 			}
 		});
 	}
 
-	async _deleteFile(e) {
-		const button = e.target.closest("[data-role='delete-task-file']");
+	async _deleteFile(e: MouseEvent) {
+		const button =
+			e.target instanceof Element
+				? e.target.closest<HTMLButtonElement>("[data-role='delete-task-file']")
+				: null;
 		if (!button) return;
 
 		e.preventDefault();
 		e.stopPropagation();
 
-		const item = button.closest("[data-kind='file']");
+		const item = button.closest<HTMLElement>("[data-kind='file']");
 		const key = item?.dataset.key;
 		const file = Object.values(this.assets || {}).find(
 			(asset) => (asset.key || asset.id) === key,
@@ -228,17 +294,19 @@ export class TaskUpload extends BaseUpload {
 		const data = new FormData();
 		data.append("assets", JSON.stringify(this.assets || {}));
 		button.disabled = true;
-		const response = await request.delete(route, data);
+		const response = await request.delete<TaskAssetResponse>(route, data);
 		button.disabled = false;
-		if (!response.ok) {
-			this.showError(response.error || "Could not delete attachment");
+		if (!response?.ok) {
+			this.showError(response?.error || "Could not delete attachment");
 			return;
 		}
 
 		withTransition(() => {
-			this.assets = response.assets || {};
+			this.assets = taskAssets(response.assets);
 			this.renderAssets();
-			this._removeBadge(response.deleted || file);
+			this._removeBadge(
+				isTaskAsset(response.deleted) ? response.deleted : file,
+			);
 		});
 	}
 
@@ -253,10 +321,10 @@ export class TaskUpload extends BaseUpload {
 
 	clear() {
 		this.reset();
-		this.toggle.display();
+		this.toggle?.display();
 	}
 
-	showError(message) {
+	showError(message: string) {
 		super.showError(message);
 	}
 

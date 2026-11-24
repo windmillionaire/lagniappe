@@ -1,12 +1,17 @@
 import { SelectBox } from "../../../elements/combobox/index.ts";
 import { primitives } from "../../../elements/primitives.ts";
 import { generateElementId } from "../../../shared/utilities.ts";
+import type { FormFieldSchema, InputType } from "../../../types/forms.d.ts";
+import type FormBuilder from "../builder.ts";
 import { CONFIG } from "../config.ts";
 import { fieldKind } from "../migrations.ts";
-import { Condition } from "./base.ts";
+import { Condition, type ConditionSelectionEvent } from "./base.ts";
 
-export default class Columns extends Condition {
-	constructor(builder) {
+export default class Columns extends Condition<Partial<FormFieldSchema>> {
+	declare setting: Partial<FormFieldSchema>;
+	declare key: "columns";
+	declare columnType: SelectBox | null;
+	constructor(builder: FormBuilder) {
 		super(builder);
 		this.key = "columns";
 		this.messages = {
@@ -15,7 +20,7 @@ export default class Columns extends Condition {
 		this._updated = this._updated.bind(this);
 	}
 
-	init() {
+	init(): undefined {
 		if (this.index !== -1) {
 			this.setTitle("Edit Column");
 			this.messages.submit = "Update Column";
@@ -54,21 +59,21 @@ export default class Columns extends Condition {
 		this.focusTarget = columnName;
 
 		columnName.addEventListener("input", (e) => {
-			this.setting.title = e.target.value;
+			this.setting.title = (e.target as HTMLInputElement).value;
 			this.showProgress();
 		});
 	}
 
-	_updateSetting(value) {
+	_updateSetting(value: string) {
 		delete this.setting.location;
 		delete this.setting.input;
 		delete this.setting.type;
 
-		if (["out", "in"].includes(value)) {
+		if (value === "out" || value === "in") {
 			this.setting.location = value;
 			this.setting.type = "link";
 		} else if (value && value !== "checkbox") {
-			this.setting.input = value;
+			this.setting.input = value as InputType;
 			this.setting.type = "input";
 		} else if (value === "checkbox") {
 			this.setting.type = "checkbox";
@@ -98,7 +103,7 @@ export default class Columns extends Condition {
 					(this.builder.conversionCatalog?.rules[fieldKind(saved)]?.[
 						input.type
 					] &&
-						this.builder.conversionCatalog.rules[fieldKind(saved)][
+						this.builder.conversionCatalog.rules[fieldKind(saved)]?.[
 							input.type
 						] !== "ai"),
 			).map((input) => ({
@@ -126,8 +131,10 @@ export default class Columns extends Condition {
 
 	refreshSavedState() {}
 
-	_updated(e) {
-		const options = Object.values(e.detail.options);
+	_updated(e: Event) {
+		const options = Object.values(
+			(e as ConditionSelectionEvent).detail.options,
+		);
 		const value = options[0]?.id;
 		if (!value) return;
 		this._updateSetting(value);
@@ -143,11 +150,11 @@ export default class Columns extends Condition {
 
 	validate() {
 		if (!this.setting.title) {
-			this.form.showError("Please enter a column name");
+			this.form?.showError("Please enter a column name");
 			return false;
 		}
 		if (!this.setting.type) {
-			this.form.showError("Please select a column type");
+			this.form?.showError("Please select a column type");
 			return false;
 		}
 		if (!this.setting.id) {

@@ -1,22 +1,47 @@
+import type { Dropdown } from "../elements/combobox/dropdown.ts";
 import { ENDPOINTS } from "../shared/endpoints.ts";
 import { request } from "../shared/request.ts";
 import { withTransition } from "../shared/transitions.ts";
 import ShellView from "./base/shell.ts";
 
+interface ManualSection {
+	key: string;
+	name: string;
+	icon: string;
+	kind: string;
+	metadata?: {
+		title: string;
+		description: string;
+		robots: string;
+		canonical_url: string;
+		path: string;
+	};
+}
+
 export default class Manual extends ShellView {
+	declare endpoints: typeof ENDPOINTS.manual;
+	declare sections: Map<string, ManualSection>;
+	declare mobileDropdown?: Dropdown | null;
+	declare _mobileDropdownPromise?: Promise<Dropdown | null> | null;
+	declare _manualClick?: (event: MouseEvent) => void;
+	declare _onPopState?: (event: PopStateEvent) => void;
+	declare _manualMobileResize?: EventListener;
+	declare loading?: boolean;
+
 	async init() {
 		await super.init();
 		this.endpoints = ENDPOINTS.manual;
 
 		if (!this.elt) return;
 		const sectionData =
-			this.elt.querySelector("#manual-nav-button")?.dataset?.sections;
-		this.sections = new Map(
-			JSON.parse(sectionData || "[]").map((section) => [section.key, section]),
-		);
+			this.elt.querySelector<HTMLButtonElement>("#manual-nav-button")?.dataset
+				?.sections;
+		const sections: ManualSection[] = JSON.parse(sectionData || "[]");
+		this.sections = new Map(sections.map((section) => [section.key, section]));
 
 		this._manualClick = (e) => {
-			const mobileNavButton = e.target.closest("#manual-nav-button");
+			const target = e.target as Element | null;
+			const mobileNavButton = target?.closest?.("#manual-nav-button");
 			if (mobileNavButton && this.mobile && !this.mobileDropdown) {
 				e.preventDefault();
 				e.stopPropagation();
@@ -29,8 +54,8 @@ export default class Manual extends ShellView {
 				return;
 			}
 
-			const button = e.target.closest("[data-section]");
-			if (button) {
+			const button = target?.closest?.<HTMLButtonElement>("[data-section]");
+			if (button?.dataset.section) {
 				e.preventDefault();
 				this.fetchSection(button.dataset.section, true);
 			}
@@ -38,9 +63,8 @@ export default class Manual extends ShellView {
 		this.elt.addEventListener("click", this._manualClick);
 
 		this._onPopState = (e) => {
-			if (e.state?.manualSection) {
-				this.fetchSection(e.state.manualSection, false);
-			}
+			const state: { manualSection?: string } | null = e.state;
+			if (state?.manualSection) this.fetchSection(state.manualSection, false);
 		};
 		window.addEventListener("popstate", this._onPopState);
 
@@ -53,7 +77,7 @@ export default class Manual extends ShellView {
 		return this;
 	}
 
-	_updateMetadata(key) {
+	_updateMetadata(key: string) {
 		const metadata = this.sections.get(key)?.metadata;
 		if (!metadata) return null;
 
@@ -67,11 +91,12 @@ export default class Manual extends ShellView {
 		return metadata;
 	}
 
-	async _ensureMobileDropdown() {
+	async _ensureMobileDropdown(): Promise<Dropdown | null> {
 		if (this.mobileDropdown || this._mobileDropdownPromise) {
-			return this.mobileDropdown || this._mobileDropdownPromise;
+			return this.mobileDropdown ?? this._mobileDropdownPromise ?? null;
 		}
-		const mobileNavButton = this.elt.querySelector("#manual-nav-button");
+		const mobileNavButton =
+			this.elt.querySelector<HTMLButtonElement>("#manual-nav-button");
 		if (!mobileNavButton) return null;
 
 		this._mobileDropdownPromise = import("../elements/combobox/dropdown.ts")
@@ -107,7 +132,7 @@ export default class Manual extends ShellView {
 		return { elt: this.elt };
 	}
 
-	async fetchSection(key, pushState) {
+	async fetchSection(key: string, pushState: boolean) {
 		if (this.loading) return;
 		this.loading = true;
 
@@ -117,7 +142,7 @@ export default class Manual extends ShellView {
 			const newTarget = response.html.querySelector("body");
 			await withTransition(
 				() => {
-					if (newTarget) target.replaceChildren(newTarget);
+					if (newTarget) target?.replaceChildren(newTarget);
 					const metadata = this._updateMetadata(key);
 					if (pushState) {
 						const url = metadata?.path || `/manual/${key}`;
@@ -136,8 +161,10 @@ export default class Manual extends ShellView {
 		if (this._onPopState) {
 			window.removeEventListener("popstate", this._onPopState);
 		}
-		this.elt.removeEventListener("click", this._manualClick);
-		this.elt.removeEventListener("mobile-resize", this._manualMobileResize);
+		if (this._manualClick)
+			this.elt.removeEventListener("click", this._manualClick);
+		if (this._manualMobileResize)
+			this.elt.removeEventListener("mobile-resize", this._manualMobileResize);
 		this._destroyMobileDropdown();
 		super.destroy();
 	}

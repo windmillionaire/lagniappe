@@ -3,6 +3,8 @@ import { RadioElement } from "../elements/radio.ts";
 import { FormWidget } from "./base/formWidget.ts";
 
 export class CreateForm extends FormWidget {
+	declare nameElement: InputElement;
+
 	init() {
 		this.messages = {
 			submit: "Create Form",
@@ -10,26 +12,34 @@ export class CreateForm extends FormWidget {
 			submitted: "Form Created",
 		};
 
-		super.init();
+		void super.init();
 	}
 
 	get html() {
-		this.nameElement = new InputElement(this, {
-			name: "name",
-			required: true,
-			type: "text",
-			label: "Name",
-		});
+		this.nameElement = new InputElement(
+			this,
+			{
+				id: "name",
+				required: true,
+				input: "text",
+				label: "Name",
+			},
+			undefined,
+		);
 
-		const formType = new RadioElement(this, {
-			name: "form-type",
-			required: true,
-			layout: "row",
-			options: [
-				{ label: "Page", value: "page" },
-				{ label: "Task", value: "task" },
-			],
-		});
+		const formType = new RadioElement(
+			this,
+			{
+				id: "form-type",
+				required: true,
+				layout: "row",
+				options: [
+					{ label: "Page", value: "page" },
+					{ label: "Task", value: "task" },
+				],
+			},
+			undefined,
+		);
 
 		return [this.nameElement.edit, formType.edit];
 	}

@@ -1,23 +1,56 @@
 import { createIcon } from "../shared/icons.ts";
 import { captureLoginError } from "./error.ts";
+import type { IdentityPlatformClient } from "./identity.ts";
 import {
+	authErrorCode,
 	checkUserStatus,
 	getAuthErrorMessage,
 	handleIdentityUser,
 } from "./tools.ts";
 
-const setLoginActionButton = (button, text, icon = null) => {
+interface LoginFormData {
+	email?: string | null;
+	error?: string | null;
+	code?: string | null;
+	action?:
+		| "reset-password"
+		| "existing-account"
+		| "verification-delivery-failed";
+}
+
+declare global {
+	interface DocumentEventMap {
+		"login:show-signin": CustomEvent<LoginFormData>;
+		"login:show-first-time-setup": CustomEvent<LoginFormData>;
+		"login:show-forgot-form": CustomEvent<LoginFormData>;
+	}
+}
+
+function requiredControl<T extends HTMLElement = HTMLElement>(
+	root: ParentNode,
+	selector: string,
+): T {
+	const control = root.querySelector<T>(selector);
+	if (!control) throw new Error(`Missing login control: ${selector}`);
+	return control;
+}
+
+const setLoginActionButton = (
+	button: HTMLElement | null,
+	text: string | null | undefined,
+	icon: string | null = null,
+) => {
 	if (!button) return;
 
-	let textElement = button.querySelector("[data-role='text']");
+	let textElement = button.querySelector<HTMLElement>("[data-role='text']");
 	if (!textElement) {
 		textElement = document.createElement("span");
 		textElement.dataset.role = "text";
 		button.replaceChildren(textElement);
 	}
-	textElement.textContent = text;
+	textElement.textContent = text ?? null;
 
-	let iconWrapper = button.querySelector("[data-role='icon']");
+	let iconWrapper = button.querySelector<HTMLElement>("[data-role='icon']");
 	if (!iconWrapper) {
 		iconWrapper = document.createElement("span");
 		iconWrapper.dataset.role = "icon";
@@ -33,8 +66,8 @@ const setLoginActionButton = (button, text, icon = null) => {
 	}
 };
 
-const recoverExistingAccount = (error, email) => {
-	if (error.code !== "auth/email-already-in-use") return false;
+const recoverExistingAccount = (error: unknown, email: string) => {
+	if (authErrorCode(error) !== "auth/email-already-in-use") return false;
 	document.dispatchEvent(
 		new CustomEvent("login:show-signin", {
 			detail: { email, action: "existing-account" },
@@ -43,8 +76,21 @@ const recoverExistingAccount = (error, email) => {
 	return true;
 };
 
-class LoginForms {
-	constructor(auth, form) {
+abstract class LoginForms {
+	declare auth: IdentityPlatformClient;
+	declare form: HTMLElement;
+	declare data: LoginFormData;
+	declare initialized: boolean;
+	declare actionButton: HTMLElement | null;
+	declare oldActionText: string | null | undefined;
+	declare error: Element | null;
+	declare success: Element | null;
+	declare hideOnConfirmation: NodeListOf<Element>;
+	declare email?: HTMLInputElement | string;
+	declare password?: HTMLInputElement;
+	declare verificationSuccessMessage?: string;
+
+	constructor(auth: IdentityPlatformClient, form: HTMLElement) {
 		this.auth = auth;
 		this.form = form;
 		this.data = {};
@@ -56,6 +102,8 @@ class LoginForms {
 			"[data-hide-on-confirmation]",
 		);
 	}
+
+	abstract init(): void;
 
 	show() {
 		if (!this.initialized) {
@@ -74,7 +122,7 @@ class LoginForms {
 		this.reset();
 	}
 
-	setActionButton(button) {
+	setActionButton(button: HTMLElement | null) {
 		this.reset();
 		this.actionButton = button;
 		this.oldActionText =
@@ -83,11 +131,13 @@ class LoginForms {
 	}
 
 	remember() {
-		return this.form.querySelector("input[name='remember-me']")?.checked;
+		return this.form.querySelector<HTMLInputElement>(
+			"input[name='remember-me']",
+		)?.checked;
 	}
 
 	getEmailAndPassword() {
-		if (this.email) {
+		if (this.email && typeof this.email !== "string" && this.password) {
 			const email = this.email.value.trim();
 			const password = this.password.value.trim();
 			if (!email || !password) {
@@ -99,33 +149,37 @@ class LoginForms {
 		return null;
 	}
 
-	showSuccess(message) {
+	showSuccess(message: string) {
 		this.reset();
+		if (!this.success) return;
 		this.success.textContent = message;
 		this.success.classList.remove("hidden");
 	}
 
-	showConfirmation(message) {
+	showConfirmation(message: string) {
 		this.showSuccess(message);
-		this.form.querySelectorAll("input[type='password']").forEach((input) => {
-			input.value = "";
-		});
+		this.form
+			.querySelectorAll<HTMLInputElement>("input[type='password']")
+			.forEach((input) => {
+				input.value = "";
+			});
 		this.hideOnConfirmation.forEach((element) => {
 			element.classList.add("hidden");
 		});
 	}
 
-	showError(message) {
+	showError(message: string) {
 		this.reset();
+		if (!this.error) return;
 		this.error.textContent = message;
 		this.error.classList.remove("hidden");
 	}
 
 	getToken() {
-		return document.getElementById("token")?.value;
+		return document.querySelector<HTMLInputElement>("#token")?.value;
 	}
 
-	setActionState(text) {
+	setActionState(text: string) {
 		setLoginActionButton(this.actionButton, text, "spinner");
 	}
 
@@ -146,8 +200,11 @@ class LoginForms {
 }
 
 class AuthMethodForm extends LoginForms {
+	declare emailButton: HTMLElement;
+
 	init() {
-		this.emailButton = this.form.querySelector(
+		this.emailButton = requiredControl(
+			this.form,
 			"[data-role='show-email-check']",
 		);
 		this.emailButton.addEventListener("click", () => {
@@ -161,15 +218,24 @@ class AuthMethodForm extends LoginForms {
 }
 
 class EmailCheckForm extends LoginForms {
+	declare email: HTMLInputElement;
+	declare backButton: HTMLElement;
+
 	init() {
 		this.error = this.form.querySelector("[data-role='error']");
-		this.email = this.form.querySelector("input[type='email']");
-		this.backButton = this.form.querySelector("[data-role='back-to-method']");
-		this.setActionButton(this.form.querySelector("[data-role='signin']"));
+		this.email = requiredControl<HTMLInputElement>(
+			this.form,
+			"input[type='email']",
+		);
+		this.backButton = requiredControl(
+			this.form,
+			"[data-role='back-to-method']",
+		);
+		this.setActionButton(requiredControl(this.form, "[data-role='signin']"));
 
 		this.email.focus();
 
-		this.actionButton.addEventListener("click", this.handleSignIn.bind(this));
+		this.actionButton?.addEventListener("click", this.handleSignIn.bind(this));
 		this.backButton.addEventListener("click", () => {
 			document.dispatchEvent(new CustomEvent("login:show-auth-method"));
 		});
@@ -192,11 +258,21 @@ class EmailCheckForm extends LoginForms {
 }
 
 class OwnerSetupForm extends LoginForms {
+	declare googleSetup: HTMLElement;
+	declare passwordSetup: HTMLElement;
+	declare googleError: Element | null;
+	declare passwordError: Element | null;
+	declare password: HTMLInputElement;
+	declare showPasswordButton: Element | null;
+	declare backToGoogleButton: Element | null;
+
 	init() {
-		this.googleSetup = this.form.querySelector(
+		this.googleSetup = requiredControl(
+			this.form,
 			"[data-role='owner-google-setup']",
 		);
-		this.passwordSetup = this.form.querySelector(
+		this.passwordSetup = requiredControl(
+			this.form,
 			"[data-role='owner-password-setup']",
 		);
 		this.googleError = this.googleSetup.querySelector("[data-role='error']");
@@ -205,7 +281,10 @@ class OwnerSetupForm extends LoginForms {
 		);
 		this.verificationSuccessMessage =
 			"We've sent a verification link to the application owner email on file.";
-		this.password = this.passwordSetup.querySelector("input[type='password']");
+		this.password = requiredControl<HTMLInputElement>(
+			this.passwordSetup,
+			"input[type='password']",
+		);
 		this.showPasswordButton = this.form.querySelector(
 			"[data-role='show-owner-password']",
 		);
@@ -213,7 +292,7 @@ class OwnerSetupForm extends LoginForms {
 			"[data-role='back-to-owner-google']",
 		);
 
-		this.setActionButton(this.form.querySelector("[data-role='signin']"));
+		this.setActionButton(requiredControl(this.form, "[data-role='signin']"));
 		if (!this.showPasswordButton) this.error = this.passwordError;
 		this.showPasswordButton?.addEventListener("click", () => {
 			this.reset();
@@ -229,7 +308,7 @@ class OwnerSetupForm extends LoginForms {
 			this.passwordSetup.classList.add("hidden");
 			this.googleSetup.classList.remove("hidden");
 		});
-		this.actionButton.addEventListener("click", this.handleSignIn.bind(this));
+		this.actionButton?.addEventListener("click", this.handleSignIn.bind(this));
 	}
 
 	handleSignIn() {
@@ -262,16 +341,28 @@ class OwnerSetupForm extends LoginForms {
 }
 
 class FirstTimeSetupForm extends LoginForms {
+	declare email: HTMLInputElement;
+	declare selectedEmail: HTMLElement;
+	declare password: HTMLInputElement;
+	declare backButton: HTMLElement;
+
 	init() {
-		this.email = this.form.querySelector("input[name='email']");
-		this.selectedEmail = this.form.querySelector(
+		this.email = requiredControl<HTMLInputElement>(
+			this.form,
+			"input[name='email']",
+		);
+		this.selectedEmail = requiredControl(
+			this.form,
 			"[data-role='selected-email']",
 		);
-		this.password = this.form.querySelector("input[type='password']");
-		this.backButton = this.form.querySelector("[data-role='back-to-email']");
+		this.password = requiredControl<HTMLInputElement>(
+			this.form,
+			"input[type='password']",
+		);
+		this.backButton = requiredControl(this.form, "[data-role='back-to-email']");
 
-		this.setActionButton(this.form.querySelector("[data-role='signin']"));
-		this.actionButton.addEventListener("click", this.handleSignIn.bind(this));
+		this.setActionButton(requiredControl(this.form, "[data-role='signin']"));
+		this.actionButton?.addEventListener("click", this.handleSignIn.bind(this));
 		this.backButton.addEventListener("click", () => {
 			document.dispatchEvent(new CustomEvent("login:show-email-check"));
 		});
@@ -304,19 +395,39 @@ class FirstTimeSetupForm extends LoginForms {
 }
 
 class SignInForm extends LoginForms {
+	declare email: HTMLInputElement;
+	declare selectedEmail: HTMLElement;
+	declare password: HTMLInputElement;
+	declare rememberMe: HTMLInputElement | null;
+	declare signinButton: HTMLElement | null;
+	declare backButton: HTMLElement;
+	declare forgotPasswordButton: HTMLElement;
+
 	init() {
-		this.email = this.form.querySelector("input[name='email']");
-		this.selectedEmail = this.form.querySelector(
+		this.email = requiredControl<HTMLInputElement>(
+			this.form,
+			"input[name='email']",
+		);
+		this.selectedEmail = requiredControl(
+			this.form,
 			"[data-role='selected-email']",
 		);
-		this.password = this.form.querySelector("input[type='password']");
-		this.rememberMe = this.form.querySelector("input[type='checkbox']");
-		this.signinButton = this.form.querySelector("[data-role='signin']");
-		this.backButton = this.form.querySelector("[data-role='back-to-email']");
+		this.password = requiredControl<HTMLInputElement>(
+			this.form,
+			"input[type='password']",
+		);
+		this.rememberMe = this.form.querySelector<HTMLInputElement>(
+			"input[type='checkbox']",
+		);
+		this.signinButton = this.form.querySelector<HTMLElement>(
+			"[data-role='signin']",
+		);
+		this.backButton = requiredControl(this.form, "[data-role='back-to-email']");
 		this.setActionButton(this.signinButton);
 		this.signinButton?.addEventListener("click", this.handleSignIn.bind(this));
 
-		this.forgotPasswordButton = this.form.querySelector(
+		this.forgotPasswordButton = requiredControl(
+			this.form,
 			"[data-role='show-forgot-form']",
 		);
 		this.forgotPasswordButton.addEventListener("click", () => {
@@ -350,8 +461,9 @@ class SignInForm extends LoginForms {
 
 	handleSignIn() {
 		this.setActionState("Signing In");
-		const { email, password } = this.getEmailAndPassword();
-		if (!email || !password) return;
+		const credentials = this.getEmailAndPassword();
+		if (!credentials) return;
+		const { email, password } = credentials;
 
 		this.auth
 			.signInWithPassword(email, password)
@@ -365,17 +477,26 @@ class SignInForm extends LoginForms {
 }
 
 class ForgotPasswordForm extends LoginForms {
+	declare email: HTMLInputElement;
+	declare resetPasswordButton: HTMLElement;
+	declare backToSigninButton: HTMLElement;
+
 	init() {
-		this.email = this.form.querySelector("input[type='email']");
-		this.resetPasswordButton = this.form.querySelector(
+		this.email = requiredControl<HTMLInputElement>(
+			this.form,
+			"input[type='email']",
+		);
+		this.resetPasswordButton = requiredControl(
+			this.form,
 			"[data-role='reset-password-email']",
 		);
-		this.backToSigninButton = this.form.querySelector(
+		this.backToSigninButton = requiredControl(
+			this.form,
 			"[data-role='back-to-signin']",
 		);
 
 		this.setActionButton(this.resetPasswordButton);
-		this.actionButton.addEventListener(
+		this.actionButton?.addEventListener(
 			"click",
 			this.handleResetPassword.bind(this),
 		);
@@ -417,21 +538,34 @@ class ForgotPasswordForm extends LoginForms {
 }
 
 class ResetPasswordForm extends LoginForms {
+	declare linkValidated: boolean;
+	declare password: HTMLInputElement;
+	declare controls: HTMLElement;
+	declare resetPasswordButton: HTMLButtonElement;
+	declare requestNewLinkButton: HTMLElement;
+	declare email: string | undefined;
+
 	init() {
 		this.linkValidated = false;
-		this.password = this.form.querySelector("input[type='password']");
-		this.controls = this.form.querySelector(
+		this.password = requiredControl<HTMLInputElement>(
+			this.form,
+			"input[type='password']",
+		);
+		this.controls = requiredControl(
+			this.form,
 			"[data-role='reset-password-controls']",
 		);
-		this.resetPasswordButton = this.form.querySelector(
+		this.resetPasswordButton = requiredControl<HTMLButtonElement>(
+			this.form,
 			"[data-role='reset-password']",
 		);
-		this.requestNewLinkButton = this.form.querySelector(
+		this.requestNewLinkButton = requiredControl(
+			this.form,
 			"[data-role='request-new-reset-link']",
 		);
 		this.resetPasswordButton.disabled = true;
 		this.setActionButton(this.resetPasswordButton);
-		this.actionButton.addEventListener(
+		this.actionButton?.addEventListener(
 			"click",
 			this.handleResetPassword.bind(this),
 		);
@@ -485,15 +619,30 @@ class ResetPasswordForm extends LoginForms {
 }
 
 class VerifyEmailForm extends LoginForms {
+	declare password: HTMLInputElement;
+	declare signinButton: HTMLButtonElement;
+	declare email: HTMLInputElement;
+	declare forgotPasswordButton: HTMLElement;
+
 	init() {
-		this.password = this.form.querySelector("input[type='password']");
-		this.signinButton = this.form.querySelector("[data-role='signin']");
+		this.password = requiredControl<HTMLInputElement>(
+			this.form,
+			"input[type='password']",
+		);
+		this.signinButton = requiredControl<HTMLButtonElement>(
+			this.form,
+			"[data-role='signin']",
+		);
 		this.signinButton.disabled = true;
-		this.email = this.form.querySelector("input[type='email']");
-		this.email.value = localStorage.getItem("verificationEmail");
+		this.email = requiredControl<HTMLInputElement>(
+			this.form,
+			"input[type='email']",
+		);
+		this.email.value = localStorage.getItem("verificationEmail") ?? "";
 		localStorage.removeItem("verificationEmail");
 
-		this.forgotPasswordButton = this.form.querySelector(
+		this.forgotPasswordButton = requiredControl(
+			this.form,
 			"[data-role='show-forgot-form']",
 		);
 		this.forgotPasswordButton.addEventListener("click", () => {
@@ -508,7 +657,7 @@ class VerifyEmailForm extends LoginForms {
 			.then(() => {
 				this.signinButton.disabled = false;
 				this.setActionButton(this.signinButton);
-				this.actionButton.addEventListener(
+				this.actionButton?.addEventListener(
 					"click",
 					this.handleSignIn.bind(this),
 				);
@@ -522,8 +671,9 @@ class VerifyEmailForm extends LoginForms {
 
 	handleSignIn() {
 		this.setActionState("Signing In");
-		const { email, password } = this.getEmailAndPassword();
-		if (!email || !password) return;
+		const credentials = this.getEmailAndPassword();
+		if (!credentials) return;
+		const { email, password } = credentials;
 
 		this.auth
 			.signInWithPassword(email, password)
@@ -541,6 +691,7 @@ export {
 	EmailCheckForm,
 	FirstTimeSetupForm,
 	ForgotPasswordForm,
+	type LoginForms,
 	OwnerSetupForm,
 	ResetPasswordForm,
 	SignInForm,

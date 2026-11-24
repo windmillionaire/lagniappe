@@ -1,8 +1,31 @@
-import { EmbeddedTable } from "../elements/base/baseTable.ts";
+import {
+	EmbeddedTable,
+	type EmbeddedTableAttributes,
+} from "../elements/base/baseTable.ts";
+import type { ExpandedTableView } from "../elements/embeddedTable.ts";
 import { STYLES } from "../generated/styles.mjs";
 
-export class FilterResults extends EmbeddedTable {
-	constructor(attributes) {
+type FilterResultsComponent = {
+	widgets: { Filters: { filters: HTMLElement } };
+};
+type FilterResultsAttributes = EmbeddedTableAttributes<
+	ExpandedTableView,
+	FilterResultsComponent
+>;
+
+import type { RequestResult } from "../types/api";
+
+export class FilterResults extends EmbeddedTable<
+	ExpandedTableView,
+	FilterResultsComponent
+> {
+	declare badges: HTMLElement | null;
+	declare table: HTMLTableElement | null;
+	declare tableContainer: HTMLElement | null;
+	declare container: HTMLElement | null;
+	declare filtering?: string;
+
+	constructor(attributes: FilterResultsAttributes) {
 		super(attributes);
 		this.badges = null;
 		this.table = null;
@@ -11,25 +34,29 @@ export class FilterResults extends EmbeddedTable {
 		this.filtering = this.target.dataset.kind;
 	}
 
-	async updated(response) {
+	async updated(response: RequestResult) {
+		const html = response.html;
+		if (!html) return;
 		this.table =
-			response.html.querySelector("#embedded-table") ||
-			response.html.querySelector("table");
+			html.querySelector<HTMLTableElement>("#embedded-table") ||
+			html.querySelector("table");
 		if (this.filtering === "page") {
-			this.badges = this.component.widgets.Filters.filters.cloneNode(true);
+			this.badges = this.component.widgets.Filters.filters.cloneNode(
+				true,
+			) as HTMLElement;
 		}
 	}
 
 	get tbody() {
-		return this.table.querySelector("tbody");
+		return this.table?.querySelector("tbody");
 	}
 
 	get rows() {
-		return this.tbody.querySelectorAll("tr:not([data-role='empty'])");
+		return this.tbody?.querySelectorAll("tr:not([data-role='empty'])");
 	}
 
 	get empty() {
-		return this.tbody.querySelector("tr[data-role='empty']");
+		return this.tbody?.querySelector("tr[data-role='empty']");
 	}
 
 	postreconcile() {
@@ -46,7 +73,7 @@ export class FilterResults extends EmbeddedTable {
 		this.container.appendChild(this.tableContainer);
 		this.table.dataset.visible = "true";
 		this.initVisibility(this.table);
-		if (this.filtering === "page") {
+		if (this.filtering === "page" && this.badges) {
 			this.target.replaceChildren(this.badges, this.container);
 		} else {
 			this.target.replaceChildren(this.container);

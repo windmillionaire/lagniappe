@@ -1,18 +1,41 @@
 import "../style/main.css";
 
-import { connectivity } from "./shared/connectivity.ts";
+import {
+	type ConnectivityPatch,
+	type ConnectivitySnapshot,
+	connectivity,
+} from "./shared/connectivity.ts";
 import { applyNotificationStateHeader } from "./shared/notificationState.ts";
 import { connectivityMessage } from "./shared/protocol.ts";
 import { installUpstreamUnavailableBanner } from "./shared/upstreamUnavailable.ts";
-import { loadView } from "./viewRegistry.ts";
+import { type ActiveView, loadView } from "./viewRegistry.ts";
+import type { ViewRoot, ViewSyncOptions } from "./views/base/shell.ts";
 
-async function onError(event) {
+declare global {
+	interface Window {
+		__CONNECTIVITY__?: ConnectivitySnapshot;
+		__CONNECTIVITY_READY__?: Promise<void>;
+		__INITIALIZED__?: boolean;
+		__NAVIGATION_TRANSITION_READY__?: Promise<void>;
+		__NAVIGATION_TRANSITION_SETTLED__?: boolean;
+		__PING_PENDING__?: Promise<boolean> | null;
+	}
+}
+
+type LifecycleSyncOptions = ViewSyncOptions & {
+	browser?: ConnectivitySnapshot["browser"];
+};
+
+async function onError(event: ErrorEvent | PromiseRejectionEvent) {
 	const {
 		captureError,
 		isSkippedViewTransitionError,
 		isTransientNetworkError,
 	} = await import("./shared/errors.ts");
-	const error = event.error || event.reason || event.message || "Unknown error";
+	const eventError: unknown = "error" in event ? event.error : undefined;
+	const rejection: unknown = "reason" in event ? event.reason : undefined;
+	const message = "message" in event ? event.message : undefined;
+	const error = eventError || rejection || message || "Unknown error";
 	if (isSkippedViewTransitionError(error) || isTransientNetworkError(error)) {
 		event.preventDefault();
 		return;
@@ -37,7 +60,7 @@ function publishNavigationTransitionReadiness() {
 	// this deferred module evaluates. Preserve it when available.
 	if (window.__NAVIGATION_TRANSITION_READY__) return;
 	window.__NAVIGATION_TRANSITION_SETTLED__ = false;
-	window.__NAVIGATION_TRANSITION_READY__ = new Promise((resolve) => {
+	window.__NAVIGATION_TRANSITION_READY__ = new Promise<void>((resolve) => {
 		const publishWhenInactive = () => {
 			const transition = document.activeViewTransition;
 			if (transition) {
@@ -66,15 +89,16 @@ function publishNavigationTransitionReadiness() {
 // completion after the destination view publishes structural readiness.
 publishNavigationTransitionReadiness();
 
-let __activeView = null;
+let __activeView: Promise<ActiveView | null> | null = null;
 const getView = async () => {
-	const viewElt = document.querySelector("[lp-view]");
+	const viewElt = document.querySelector<ViewRoot>("[lp-view]");
 	if (!viewElt) return null;
 
 	if (viewElt._lp_view) return viewElt._lp_view;
 
 	if (__activeView) return await __activeView;
 
+	const disconnected = () => viewElt.isConnected === false;
 	__activeView = (async () => {
 		const viewModule = await loadView(viewElt.dataset.kind);
 		if (!viewModule) {
@@ -87,10 +111,10 @@ const getView = async () => {
 			return null;
 		}
 
-		if (viewElt.isConnected === false) return null;
+		if (disconnected()) return null;
 		const view = new viewModule.default(viewElt);
 		await view.init();
-		if (view._destroyed || viewElt.isConnected === false) return null;
+		if (view._destroyed || disconnected()) return null;
 		view.publish?.();
 		return view;
 	})();
@@ -98,7 +122,7 @@ const getView = async () => {
 	return await __activeView;
 };
 
-let _ping = null;
+let _ping: Promise<boolean> | null = null;
 // Include browser scheduling and connection setup, not just handler latency.
 const SERVER_HEALTH_TIMEOUT_MS = 5_000;
 
@@ -134,7 +158,7 @@ export async function pingServer() {
 	return pending;
 }
 
-let _pollTimeout = null;
+let _pollTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const KEEP_AWAKE_MS = 10 * 60 * 1000;
 const POLL_MS = 2 * 1000;
@@ -146,7 +170,7 @@ function stopPolling() {
 	_pollTimeout = null;
 }
 
-function pollServer(online) {
+function pollServer(online: boolean) {
 	stopPolling();
 	// Healthy testing-mode views do not need the production keep-awake timer,
 	// but an offline view still needs a retry in case the browser misses the
@@ -162,8 +186,8 @@ function pollServer(online) {
 	_pollTimeout = setTimeout(syncView, delay);
 }
 
-let _sync = null;
-let _syncPending = null;
+let _sync: Promise<void> | null = null;
+let _syncPending: LifecycleSyncOptions | null = null;
 
 /**
  * Treat a visible tab in an unfocused browser window as inactive. Focus runs
@@ -176,7 +200,7 @@ function documentInactive() {
 	return document.hidden || document.hasFocus?.() === false;
 }
 
-function updateConnectivity(patch) {
+function updateConnectivity(patch: ConnectivityPatch) {
 	const state = connectivity.transition(patch);
 	window.__CONNECTIVITY__ = state;
 	navigator.serviceWorker?.controller?.postMessage(connectivityMessage(state));
@@ -189,7 +213,7 @@ function queueSync({
 	blurredAt,
 	force = false,
 	browser,
-} = {}) {
+}: LifecycleSyncOptions = {}) {
 	const pendingHidden =
 		hidden === undefined ? _syncPending?.hidden : Boolean(hidden);
 	const pendingBlurred =
@@ -214,7 +238,7 @@ async function syncViewOnce({
 	blurredAt = blurred ? Date.now() : null,
 	force = false,
 	browser = navigator.onLine === false ? "offline" : "online",
-} = {}) {
+}: LifecycleSyncOptions = {}) {
 	const controller = navigator.serviceWorker?.controller
 		? "controlled"
 		: "uncontrolled";
@@ -246,12 +270,12 @@ async function syncViewOnce({
 	}
 }
 
-export async function syncView(options = {}) {
+export async function syncView(options: LifecycleSyncOptions = {}) {
 	queueSync(options);
 	if (_sync) return _sync;
 
 	_sync = (async () => {
-		let firstError = null;
+		let firstError: unknown = null;
 		while (_syncPending) {
 			const nextSync = _syncPending;
 			_syncPending = null;
@@ -276,7 +300,7 @@ export async function syncView(options = {}) {
  * only callers that need the background cycle's completion await the result.
  *
  */
-function browserConnectivityChanged(browser) {
+function browserConnectivityChanged(browser: ConnectivitySnapshot["browser"]) {
 	updateConnectivity({ browser });
 	return syncView({ browser });
 }
@@ -284,7 +308,7 @@ function browserConnectivityChanged(browser) {
 export function suspendCurrentView({
 	blurred = false,
 	blurredAt = blurred ? Date.now() : null,
-} = {}) {
+}: Pick<ViewSyncOptions, "blurred" | "blurredAt"> = {}) {
 	updateConnectivity({
 		browser: navigator.onLine === false ? "offline" : "online",
 		controller: navigator.serviceWorker?.controller
@@ -361,7 +385,7 @@ async function startAuthenticatedLifecycle() {
 	window.addEventListener("focus", () =>
 		syncView({ hidden: false, blurred: false, blurredAt: null }),
 	);
-	window.addEventListener("pagehide", suspendCurrentView);
+	window.addEventListener("pagehide", () => suspendCurrentView());
 	window.addEventListener("pageshow", (event) => {
 		syncView({ force: event.persisted });
 	});

@@ -1,8 +1,19 @@
-import { Decoration, Extension } from "@tiptap/core";
+import { Decoration, type Editor, Extension } from "@tiptap/core";
+import type { RangeCommand } from "./trackedRanges.ts";
+
+declare module "@tiptap/core" {
+	interface Commands<ReturnType> {
+		selectionHighlight: {
+			setSelectionHighlight: () => ReturnType;
+			clearSelectionHighlight: () => ReturnType;
+			getSelectionHighlightRange: () => RangeCommand<ReturnType>;
+		};
+	}
+}
 
 const SELECTION_RANGE = "selectionHighlight";
 
-const selectionRange = (editor) => {
+const selectionRange = (editor: Editor) => {
 	const range = editor?.storage?.trackedRanges?.ranges?.get(SELECTION_RANGE);
 	return range ? { ...range } : null;
 };
@@ -53,7 +64,7 @@ export const SelectionHighlight = Extension.create({
 				const to = Math.max(from, Math.min(rangeEnd, docEnd));
 				if (from >= to) return [];
 
-				const decorations = [];
+				const decorations: Decoration[] = [];
 				state.doc.nodesBetween(from, to, (node, pos) => {
 					if (!node.isText) return true;
 					const start = Math.max(from, pos);

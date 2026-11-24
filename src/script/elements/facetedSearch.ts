@@ -1,44 +1,48 @@
 import { STYLES } from "../generated/styles.mjs";
 import { BaseElement } from "./base/baseElement.ts";
-import { FacetsBox } from "./combobox/index.ts";
+import { FacetsBox, isFacetOption } from "./combobox/facets.ts";
 import { formatting } from "./formatting.ts";
 import { primitives } from "./primitives.ts";
 
 export class FacetedSearchElement extends BaseElement {
-	active(value) {
+	declare combobox?: FacetsBox;
+
+	active(value: unknown) {
 		return (
-			this.combobox?.values.has(value) ??
-			this.values.some((v) => v?.id === value || v === value)
+			(typeof value === "string"
+				? this.combobox?.values.has(value)
+				: undefined) ??
+			this.values.some((option) => option.id === value || option === value)
 		);
 	}
 
 	get values() {
-		let submission = this.submission;
-		if (typeof this.submission === "string") {
-			submission = JSON.parse(this.submission);
-			return Array.isArray(submission) ? submission : [submission];
-		} else if (submission && typeof submission === "object") {
-			return [submission];
+		let submission: unknown = this.submission;
+		if (typeof submission === "string") {
+			submission = JSON.parse(submission);
+			return (Array.isArray(submission) ? submission : [submission]).filter(
+				isFacetOption,
+			);
 		}
-		return [];
+		return isFacetOption(submission) ? [submission] : [];
 	}
 
 	get read() {
 		if (this._read) return this._read;
 
-		this._read = document.createElement("div");
-		this._read.className = "flex flex-row flex-wrap gap-2";
-		this._read.dataset.kind = this.renderer.kind;
+		const read = document.createElement("div");
+		read.className = "flex flex-row flex-wrap gap-2";
+		read.dataset.kind = String(this.renderer.kind);
 
 		this.values.forEach((item) => {
-			const container = this._read.appendChild(document.createElement("div"));
+			const container = read.appendChild(document.createElement("div"));
 			container.className = STYLES.form.submission.default;
 			container.appendChild(formatting.name(item));
-			this._read.appendChild(container);
 		});
 
-		this._read.classList.add("group-data-[mode=edit]/element:hidden");
-		return this._read;
+		read.classList.add("group-data-[mode=edit]/element:hidden");
+		this._read = read;
+		return read;
 	}
 
 	get edit() {
@@ -55,19 +59,20 @@ export class FacetedSearchElement extends BaseElement {
 				creatable: this.schema.creatable,
 			},
 		});
-		this._edit.querySelector("input").setAttribute("lp-select", "");
+		this._edit.querySelector("input")?.setAttribute("lp-select", "");
 
-		this.combobox = new FacetsBox(this._edit);
+		const combobox = new FacetsBox(this._edit);
+		this.combobox = combobox;
 
 		this.values.forEach((value) => {
-			this.combobox.addOption(value);
+			combobox.addOption(value);
 		});
-		this.combobox.init();
-		this.destroyables.push(this.combobox);
+		combobox.init();
+		this.destroyables.push(combobox);
 
 		this._edit
 			.querySelector("[lp-select]")
-			.classList.add("group-data-[mode=read]/element:hidden");
+			?.classList.add("group-data-[mode=read]/element:hidden");
 
 		return this._edit;
 	}

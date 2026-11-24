@@ -1,23 +1,58 @@
 import { FormRenderer } from "../../../forms/renderer.ts";
 import { areEqual, captureError, request } from "../../../shared/index.ts";
 import { withTransition } from "../../../shared/transitions.ts";
+import type { RequestResult } from "../../../types/api.d.ts";
+import type FormBuilder from "../builder.ts";
+import { builderControl } from "../controls.ts";
+import type {
+	DraftAttempt,
+	DraftChangeResponse,
+	DraftPublication,
+	DraftState,
+} from "../types.ts";
 
 export class Header {
-	constructor(builder) {
+	declare builder: FormBuilder;
+	declare _destroyed: boolean;
+	declare _previewGeneration: number;
+	declare _messageTimer: number | null;
+	declare _savePromise: Promise<boolean> | null;
+	declare _saveAttempt?: (DraftAttempt & { baseline: string | null }) | null;
+	declare _originalName: string;
+	declare nameDisplay: HTMLElement;
+	declare nameInput: HTMLInputElement;
+	declare nameHidden: HTMLInputElement;
+	declare saveButton: HTMLButtonElement | null;
+	declare schemaForm: HTMLFormElement | null;
+	declare notification: HTMLElement;
+	declare previewToggle: HTMLElement;
+	declare previewPanel: HTMLElement;
+	declare draftControls: HTMLElement | null;
+	declare renderer: FormRenderer | null;
+
+	constructor(builder: FormBuilder) {
 		this._destroyed = false;
 		this._previewGeneration = 0;
 		this._messageTimer = null;
 		this._savePromise = null;
 		this.builder = builder;
-		this.nameDisplay = document.getElementById("form-name-display");
-		this.nameInput = document.getElementById("form-name-input");
-		this.nameHidden = document.getElementById("form-name-hidden");
-		this.saveButton = document.querySelector("[data-saved]");
-		this.schemaForm = document.getElementById("schema-form");
-		this.notification = document.getElementById("notification");
-		this.previewToggle = document.getElementById("preview-toggle");
-		this.previewPanel = document.getElementById("preview-panel");
-		this.draftControls = document.querySelector("[data-role='draft-history']");
+		this.nameDisplay = builderControl("form-name-display");
+		this.nameInput = document.getElementById(
+			"form-name-input",
+		) as HTMLInputElement;
+		this.nameHidden = document.getElementById(
+			"form-name-hidden",
+		) as HTMLInputElement;
+		this.saveButton = document.querySelector<HTMLButtonElement>("[data-saved]");
+		this.schemaForm = document.getElementById(
+			"schema-form",
+		) as HTMLFormElement | null;
+		this.notification = builderControl("notification");
+		this.previewToggle = builderControl("preview-toggle");
+		this.previewPanel = builderControl("preview-panel");
+		this.draftControls = document.querySelector<HTMLElement>(
+			"[data-role='draft-history']",
+		);
 		this.saveButton?.setAttribute("aria-describedby", "notification");
 		this.notification?.setAttribute("role", "status");
 		this.notification?.setAttribute("aria-live", "polite");
@@ -66,16 +101,16 @@ export class Header {
 	}
 
 	clearMessage() {
-		clearTimeout(this._messageTimer);
+		clearTimeout(this._messageTimer ?? undefined);
 		this._messageTimer = null;
 		if (!this.notification) return;
 		this.notification.textContent = "";
 		this.notification.dataset.visible = "false";
 	}
 
-	message(text, { persistent = false } = {}) {
+	message(text: string, { persistent = false } = {}) {
 		if (this._destroyed) return;
-		clearTimeout(this._messageTimer);
+		clearTimeout(this._messageTimer ?? undefined);
 		this._messageTimer = null;
 		this.notification.textContent = text;
 		this.notification.dataset.visible = "true";
@@ -87,7 +122,9 @@ export class Header {
 		}
 	}
 
-	showConflict(response) {
+	showConflict(
+		response: RequestResult<{ saved_url?: string }> | null | undefined,
+	) {
 		if (response?.code !== "stale_form_draft" || !response.saved_url)
 			return false;
 		this.message(
@@ -109,7 +146,7 @@ export class Header {
 		return this.builder.captureDraft();
 	}
 
-	acknowledge(state) {
+	acknowledge(state: DraftState) {
 		const current = this.persistenceState;
 		if (current.name === state.name && areEqual(current.schema, state.schema)) {
 			this.saved();
@@ -136,7 +173,7 @@ export class Header {
 		this.previewToggle.dataset.active = active ? "false" : "true";
 		this.previewToggle.setAttribute("aria-checked", active ? "false" : "true");
 
-		let renderer = null;
+		let renderer: FormRenderer | null = null;
 		if (!active) {
 			renderer = new FormRenderer({
 				target: this.previewPanel,
@@ -188,27 +225,30 @@ export class Header {
 		if (this.builder.pendingChange) return Promise.resolve(false);
 		if (this._savePromise) return this._savePromise;
 		if (this.builder.online === false) return Promise.resolve(false);
-		if (this._destroyed || !this.saveButton || !this.schemaForm) {
+		const route = this.schemaForm?.dataset.route;
+		const draft = this.builder.draft;
+		if (this._destroyed || !this.saveButton || !route || !draft) {
 			return Promise.resolve(false);
 		}
 
 		const button = this.saveButton;
 		const hadFocus = document.activeElement === button;
 		this.builder.updateSchema();
-		if (!this.builder.draft.dirty) return Promise.resolve(true);
-		this.builder.draft.group = null;
+		if (!draft.dirty) return Promise.resolve(true);
+		draft.group = null;
 		const state = this.persistenceState;
 		if (
 			!this._saveAttempt ||
-			!this.builder.draft.equal(this._saveAttempt.state, state) ||
-			this._saveAttempt.baseline !== this.builder.draft.baseline
+			!draft.equal(this._saveAttempt.state, state) ||
+			this._saveAttempt.baseline !== draft.baseline
 		) {
 			this._saveAttempt = {
 				state,
-				baseline: this.builder.draft.baseline,
+				baseline: draft.baseline,
 				id: crypto.randomUUID(),
 			};
 		}
+		const attempt = this._saveAttempt;
 		this.unsaved();
 		this.clearMessage();
 		// Keep keyboard focus; clean and in-flight saves are guarded above.
@@ -219,12 +259,12 @@ export class Header {
 			try {
 				const payload = await this.builder.draftPayload(
 					state,
-					this.schemaForm.dataset.route,
-					this._saveAttempt.id,
+					route,
+					attempt.id,
 				);
 				if (this._destroyed) return false;
-				const response = await request.put(
-					this.schemaForm.dataset.route,
+				const response = await request.put<DraftChangeResponse>(
+					route,
 					payload,
 					{ replaceErrorPage: false },
 				);
@@ -235,15 +275,10 @@ export class Header {
 					return false;
 				}
 				if (response?.ok === true && response.draft && response.baseline) {
-					this.builder.draft.acknowledge(state, response);
+					draft.acknowledge(state, response as DraftPublication);
 					this._saveAttempt = null;
 					this.builder.setPendingChange?.(response.pending_change || null);
-					if (
-						this.builder.draft.equal(
-							this.persistenceState,
-							this.builder.draft.state,
-						)
-					) {
+					if (draft.equal(this.persistenceState, draft.state)) {
 						this.builder.settings.refreshSavedState();
 						this.builder.conditions.condition?.refreshSavedState?.();
 						this.builder.refreshDraftControls();
@@ -297,7 +332,7 @@ export class Header {
 
 	editFormName() {
 		if (this.builder.pendingChange) return;
-		this._originalName = this.nameDisplay.textContent;
+		this._originalName = this.nameDisplay.textContent ?? "";
 		this.nameDisplay.dataset.visible = "false";
 		this.nameInput.dataset.visible = "true";
 		this.nameInput.focus();
@@ -309,7 +344,7 @@ export class Header {
 		this.nameDisplay.textContent = newName;
 		this.nameHidden.value = newName;
 		this.builder.updateSchema(false, "form-name");
-		this.builder.draft.group = null;
+		if (this.builder.draft) this.builder.draft.group = null;
 		this.nameInput.dataset.visible = "false";
 		this.nameDisplay.dataset.visible = "true";
 	}
@@ -319,7 +354,7 @@ export class Header {
 		this.builder.updateSchema(false, "form-name");
 	}
 
-	_nameKeyDown(e) {
+	_nameKeyDown(e: KeyboardEvent) {
 		if (e.key === "Enter") {
 			e.preventDefault();
 			this.nameInput.blur();
@@ -333,7 +368,7 @@ export class Header {
 		if (this._destroyed) return;
 		this._destroyed = true;
 		this._previewGeneration += 1;
-		clearTimeout(this._messageTimer);
+		clearTimeout(this._messageTimer ?? undefined);
 		this._messageTimer = null;
 		this.nameInput.removeEventListener("blur", this._nameBlur);
 		this.nameInput.removeEventListener("keydown", this._nameKeyDown);

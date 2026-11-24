@@ -1,13 +1,23 @@
-import Sortable from "sortablejs";
+import Sortable, { type SortableEvent } from "sortablejs";
 import { primitives } from "../../../elements/primitives.ts";
 import { STYLES } from "../../../generated/styles.mjs";
+import type { FieldType, FormFieldSchema } from "../../../types/forms.d.ts";
+import type FormBuilder from "../builder.ts";
 import { CONFIG } from "../config.ts";
+import { builderControl } from "../controls.ts";
 
 export class ModelPanel {
-	constructor(builder) {
+	declare builder: FormBuilder;
+	declare panel: HTMLElement;
+	declare defaultPanel: HTMLElement;
+	declare sortable: Sortable | null;
+	declare uniqueElements: string[];
+	declare defaultElements: string[];
+
+	constructor(builder: FormBuilder) {
 		this.builder = builder;
-		this.panel = document.getElementById("model-panel");
-		this.defaultPanel = document.getElementById("default-panel");
+		this.panel = builderControl("model-panel");
+		this.defaultPanel = builderControl("default-panel");
 		this.uniqueElements = ["status", "signature", "bookmark"];
 		this.defaultElements = ["name", "description"];
 		this._addElement = this._addElement.bind(this);
@@ -15,11 +25,15 @@ export class ModelPanel {
 	}
 
 	get elements() {
-		return Array.from(this.panel.querySelectorAll(".form-element"));
+		return Array.from(
+			this.panel.querySelectorAll<HTMLElement>(".form-element"),
+		);
 	}
 
 	get defaults() {
-		return Array.from(this.defaultPanel.querySelectorAll(".form-element"));
+		return Array.from(
+			this.defaultPanel.querySelectorAll<HTMLElement>(".form-element"),
+		);
 	}
 
 	show() {
@@ -67,12 +81,15 @@ export class ModelPanel {
 		});
 	}
 
-	_addElement(event) {
-		const item = this.builder.createElement({
-			type: event.item.dataset.type,
-		});
+	_addElement(event: SortableEvent) {
+		const type = event.item.dataset.type as FieldType | undefined;
+		if (!type) return;
+		const item = this.builder.createElement({ type });
 		event.item.remove();
-		event.to.insertBefore(item, event.to.children[event.newDraggableIndex]);
+		event.to.insertBefore(
+			item,
+			event.to.children[event.newDraggableIndex ?? -1] ?? null,
+		);
 		this.builder.updateSchemaOrder();
 		this.builder.selectElement(item.id);
 	}
@@ -83,6 +100,7 @@ export class ModelPanel {
 
 	updateItem() {
 		const element = this.builder.selectedElement;
+		if (!element) return;
 		const item = ModelElement[element.schema.type](element.schema);
 		element.item.replaceWith(item);
 		element.item = item;
@@ -90,7 +108,8 @@ export class ModelPanel {
 	}
 
 	selectItem() {
-		const selected = this.builder.selectedElement.item;
+		const selected = this.builder.selectedElement?.item;
+		if (!selected) return;
 
 		this.elements.forEach((element) => {
 			element.dataset.selected = element === selected ? "true" : "false";
@@ -105,8 +124,9 @@ export class ModelPanel {
 		if (selected) selected.item.dataset.selected = "false";
 	}
 
-	hasUniqueElement(type) {
+	hasUniqueElement(type: string | undefined) {
 		return (
+			type !== undefined &&
 			this.uniqueElements.includes(type) &&
 			Array.from(this.builder.elements.values()).some(
 				(element) => element.schema.type === type,
@@ -115,7 +135,8 @@ export class ModelPanel {
 	}
 
 	focusItem() {
-		const selected = this.builder.selectedElement.item;
+		const selected = this.builder.selectedElement?.item;
+		if (!selected) return;
 		this.elements.forEach((element) => {
 			element.dataset.visible = element === selected ? "true" : "false";
 		});
@@ -139,7 +160,7 @@ export class ModelPanel {
 	}
 }
 
-const _model = (schema) => {
+const _model = (schema: FormFieldSchema) => {
 	const element = document.createElement("div");
 	element.id = schema.id;
 	element.dataset.selected = "false";
@@ -148,17 +169,19 @@ const _model = (schema) => {
 	return element;
 };
 
-const _presentation = (schema) => {
-	const defaults = CONFIG.PRESENTATION_DEFAULTS[schema.type] || {};
+const _presentation = (schema: FormFieldSchema) => {
+	const defaults = CONFIG.PRESENTATION_DEFAULTS[schema.type] as
+		| Partial<Pick<FormFieldSchema, "title" | "input" | "location">>
+		| undefined;
 	return {
 		...schema,
-		title: schema.title ?? defaults.title,
-		input: schema.input ?? defaults.input,
-		location: schema.location ?? defaults.location,
+		title: schema.title ?? defaults?.title,
+		input: schema.input ?? defaults?.input,
+		location: schema.location ?? defaults?.location,
 	};
 };
 
-const checkbox = (schema) => {
+const checkbox = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 	element.classList.add("flex", "flex-row", "gap-2");
@@ -175,7 +198,7 @@ const checkbox = (schema) => {
 	return element;
 };
 
-const html = (schema) => {
+const html = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 
@@ -188,7 +211,7 @@ const html = (schema) => {
 	return element;
 };
 
-const input = (schema) => {
+const input = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 	element.classList.add("flex", "flex-col", "gap-1");
@@ -206,11 +229,11 @@ const input = (schema) => {
 	return element;
 };
 
-const link = (schema) => {
+const link = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 
-	let linkElt;
+	let linkElt: HTMLElement;
 	if (display.location === "out") {
 		linkElt = primitives.label({
 			icon: display.location,
@@ -230,7 +253,7 @@ const link = (schema) => {
 	return element;
 };
 
-const bookmark = (schema) => {
+const bookmark = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 
@@ -243,7 +266,7 @@ const bookmark = (schema) => {
 	return element;
 };
 
-const location = (schema) => {
+const location = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 	element.classList.add("flex", "flex-col", "gap-1");
@@ -252,7 +275,6 @@ const location = (schema) => {
 		label: display.title,
 		icon: "location",
 		name: schema.id,
-		selectIcon: "search",
 		type: "text",
 		disabled: true,
 		placeholder: schema.placeholder,
@@ -262,7 +284,7 @@ const location = (schema) => {
 	return element;
 };
 
-const select = (schema) => {
+const select = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 	element.classList.add("flex", "flex-col", "gap-1");
@@ -280,7 +302,7 @@ const select = (schema) => {
 	return element;
 };
 
-const radio = (schema) => {
+const radio = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 
@@ -316,7 +338,7 @@ const radio = (schema) => {
 	return element;
 };
 
-const signature = (schema) => {
+const signature = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 
@@ -330,7 +352,7 @@ const signature = (schema) => {
 	return element;
 };
 
-const status = (schema) => {
+const status = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 
@@ -344,7 +366,7 @@ const status = (schema) => {
 	return element;
 };
 
-const textarea = (schema) => {
+const textarea = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 	element.classList.add("flex", "flex-col", "gap-1");
@@ -361,7 +383,7 @@ const textarea = (schema) => {
 	return element;
 };
 
-const todo = (schema) => {
+const todo = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 
@@ -375,7 +397,7 @@ const todo = (schema) => {
 	return element;
 };
 
-const table = (schema) => {
+const table = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
 	element.classList.add("flex", "flex-col", "gap-1");

@@ -1,14 +1,38 @@
 import { analytics } from "../shared/analytics.ts";
 import { request } from "../shared/request.ts";
+import type { IdentityPlatformClient, IdentityUser } from "./identity.ts";
 
-async function getUserStatus(email) {
+type UserStatus =
+	| { success: true; next: "first_time_setup" | "signin" }
+	| { success: false; error: string };
+
+type IdentityLoginResponse = {
+	success: boolean;
+	redirect?: string;
+	requires_verification?: boolean;
+	error?: string;
+};
+
+interface IdentityLoginForm {
+	auth: IdentityPlatformClient;
+	remember(): boolean | undefined;
+	getToken(): string | undefined;
+	showError(message: string): void;
+	showConfirmation(message: string): void;
+	verificationSuccessMessage?: string;
+}
+
+async function getUserStatus(email: string): Promise<UserStatus> {
 	const response = await fetch(
 		`/users/check-user-status?email=${encodeURIComponent(email)}`,
 	);
 	return await response.json();
 }
 
-async function checkUserStatus(email, form) {
+async function checkUserStatus(
+	email: string,
+	form: Pick<IdentityLoginForm, "showError">,
+) {
 	try {
 		const userData = await getUserStatus(email);
 
@@ -33,20 +57,21 @@ async function checkUserStatus(email, form) {
 	}
 }
 
-async function handleIdentityUser(user, form) {
+async function handleIdentityUser(user: IdentityUser, form: IdentityLoginForm) {
 	const body = JSON.stringify({
 		authResult: user.idToken,
 		name: user.displayName,
 		email: user.email,
 		remember: form.remember(),
 	});
-	let csrfToken = (await request.token()) || form.getToken();
+	let csrfToken: string | null | undefined =
+		(await request.token()) || form.getToken();
 	const send = () =>
 		fetch("/users/login-identity", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				"X-CSRFToken": csrfToken,
+				"X-CSRFToken": String(csrfToken),
 			},
 			body,
 		});
@@ -60,7 +85,7 @@ async function handleIdentityUser(user, form) {
 		return;
 	}
 
-	const results = await response.json();
+	const results: IdentityLoginResponse = await response.json();
 
 	if (results.success && results.redirect) {
 		analytics.tag("login", {
@@ -93,8 +118,14 @@ async function handleIdentityUser(user, form) {
 	}
 }
 
-function getAuthErrorMessage(error) {
-	switch (error.code) {
+function authErrorCode(error: unknown) {
+	return error && typeof error === "object" && "code" in error
+		? error.code
+		: undefined;
+}
+
+function getAuthErrorMessage(error: unknown) {
+	switch (authErrorCode(error)) {
 		case "auth/wrong-password":
 		case "auth/invalid-credential":
 		case "auth/user-not-found":
@@ -125,4 +156,9 @@ function getAuthErrorMessage(error) {
 	}
 }
 
-export { checkUserStatus, getAuthErrorMessage, handleIdentityUser };
+export {
+	authErrorCode,
+	checkUserStatus,
+	getAuthErrorMessage,
+	handleIdentityUser,
+};

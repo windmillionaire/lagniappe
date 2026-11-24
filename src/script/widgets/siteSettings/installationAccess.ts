@@ -1,13 +1,34 @@
 import { SiteSetting } from "./base.ts";
 
-const display = (value) => value || "None";
+interface InstallationAccess {
+	summary: string;
+	state: "application-complete" | "pending" | "owner-managed";
+	project_id: string;
+	owner_email: string;
+	installer_email: string;
+	deployer_email: string;
+	bootstrap_admin_email: string;
+	runtime_service_account: string;
+	project_iam_url: string;
+	authentication_email?: {
+		service: string;
+		sender_email: string;
+		login: string;
+		configured: boolean;
+		uses_installer: boolean;
+	};
+}
+
+const display = (value: string | null | undefined) => value || "None";
 
 /**
  * Presents the Owner-safe installation identity and cleanup boundary.
  *
  */
 export class SiteInstallationAccess extends SiteSetting {
-	updated(response) {
+	declare _access?: InstallationAccess;
+
+	updated(response: { installation_access?: InstallationAccess }) {
 		this._access = response.installation_access;
 	}
 
@@ -15,7 +36,7 @@ export class SiteInstallationAccess extends SiteSetting {
 		if (this._access) this._render(this._access);
 	}
 
-	_render(access) {
+	_render(access: InstallationAccess) {
 		this.updateSummary(access.summary);
 		this.target.dataset.state = access.state;
 
@@ -40,36 +61,42 @@ export class SiteInstallationAccess extends SiteSetting {
 		const statusDescription = status?.querySelector(
 			"[data-role='status-description']",
 		);
-		if (access.state === "application-complete") {
+		if (
+			statusTitle &&
+			statusDescription &&
+			access.state === "application-complete"
+		) {
 			statusTitle.textContent = "Application handoff configured";
 			statusDescription.textContent =
 				"The saved deployer is the permanent Owner and automatic installer bootstrap is closed. Confirm Cloud IAM separately before considering cloud cleanup complete.";
-		} else if (access.state === "pending") {
+		} else if (statusTitle && statusDescription && access.state === "pending") {
 			statusTitle.textContent = "Delegated handoff pending";
 			statusDescription.textContent =
 				"Keep the installer’s Google Cloud access until setup handoff completes. Removing it early can prevent deployment and managed-resource transfer.";
-		} else {
+		} else if (statusTitle && statusDescription) {
 			statusTitle.textContent = "Owner-managed installation";
 			statusDescription.textContent =
 				"The permanent Owner also installed this site; there is no separate delegated installer to hand off.";
 		}
 
-		const iamLink = this.target.querySelector("[data-role='project-iam-link']");
+		const iamLink = this.target.querySelector<HTMLAnchorElement>(
+			"[data-role='project-iam-link']",
+		);
 		if (iamLink) iamLink.href = access.project_iam_url;
 
-		const email = access.authentication_email || {};
-		const emailDetails = this.target.querySelector(
+		const email = access.authentication_email;
+		const emailDetails = this.target.querySelector<HTMLElement>(
 			"[data-role='authentication-email-details']",
 		);
 		if (emailDetails)
-			emailDetails.dataset.visible = email.configured ? "true" : "false";
-		const emailWarning = this.target.querySelector(
+			emailDetails.dataset.visible = email?.configured ? "true" : "false";
+		const emailWarning = this.target.querySelector<HTMLElement>(
 			"[data-role='installer-email-warning']",
 		);
 		if (emailWarning) {
-			emailWarning.dataset.visible = email.uses_installer ? "true" : "false";
+			emailWarning.dataset.visible = email?.uses_installer ? "true" : "false";
 		}
-		const handoffInstructions = this.target.querySelector(
+		const handoffInstructions = this.target.querySelector<HTMLElement>(
 			"[data-role='handoff-instructions']",
 		);
 		if (handoffInstructions) {

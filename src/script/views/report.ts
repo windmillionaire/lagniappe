@@ -1,12 +1,29 @@
+import type { FormController } from "../forms/controller.ts";
 import { createIcon, setIcon } from "../shared/icons.ts";
 import { request } from "../shared/request.ts";
 import { withTransition } from "../shared/transitions.ts";
+import type { DeferredOperationStatus } from "../types/api.d.ts";
 import Core from "./base/core.ts";
 
 const REPORT_FORM_SELECTOR =
 	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='revise-report-form']";
 
+interface ReportExecution {
+	notification?: string;
+	deferred?: boolean;
+	operation?: string;
+}
+
 export default class Report extends Core {
+	declare RunReportForm?: FormController;
+	declare ReviseReportForm?: FormController;
+	declare _runningReport?: boolean;
+	declare _revisingReport?: boolean;
+	declare _reportFormsReady?: boolean;
+	declare _reportReloadScheduled?: boolean;
+	declare _reportFormsPromise?: Promise<this | null> | null;
+	declare _reportFormBootstrap?: ((event: SubmitEvent) => void) | null;
+
 	async init() {
 		await super.init();
 		this._receiveDeferredOperation = this._receiveDeferredOperation.bind(this);
@@ -26,7 +43,7 @@ export default class Report extends Core {
 		return this;
 	}
 
-	ensureReportForms() {
+	ensureReportForms(): Promise<this | null> {
 		if (this._reportFormsReady) return Promise.resolve(this);
 		if (this._reportFormsPromise) return this._reportFormsPromise;
 
@@ -55,13 +72,12 @@ export default class Report extends Core {
 	_installReportFormBootstrap() {
 		if (this._reportFormBootstrap) return;
 		this._reportFormBootstrap = (event) => {
-			const form = event.target?.matches?.(REPORT_FORM_SELECTOR)
-				? event.target
-				: null;
-			if (!form || this._reportFormsReady) return;
+			const form = event.target as HTMLFormElement | null;
+			if (!form?.matches?.(REPORT_FORM_SELECTOR) || this._reportFormsReady)
+				return;
 			event.preventDefault();
 			event.stopImmediatePropagation?.();
-			const submitter = event.submitter;
+			const submitter = event.submitter as HTMLElement | null;
 			void this.runColdAction(
 				form,
 				() => this.ensureReportForms(),
@@ -82,14 +98,14 @@ export default class Report extends Core {
 		this._reportFormBootstrap = null;
 	}
 
-	async _initRunReportForm(FormController) {
-		const target = this.elt.querySelector(
+	async _initRunReportForm(Controller: typeof FormController) {
+		const target = this.elt.querySelector<HTMLFormElement>(
 			"[data-role='run-report-form'], [data-role='retry-report-form']",
 		);
 		if (!target) return;
 		const retrying = target.dataset.role === "retry-report-form";
 
-		this.RunReportForm = new FormController({
+		this.RunReportForm = new Controller({
 			target,
 			view: this,
 			messages: {
@@ -103,11 +119,13 @@ export default class Report extends Core {
 		target.addEventListener("submit", this._runReport.bind(this));
 	}
 
-	async _initReviseReportForm(FormController) {
-		const target = this.elt.querySelector("[data-role='revise-report-form']");
+	async _initReviseReportForm(Controller: typeof FormController) {
+		const target = this.elt.querySelector<HTMLFormElement>(
+			"[data-role='revise-report-form']",
+		);
 		if (!target) return;
 
-		this.ReviseReportForm = new FormController({
+		this.ReviseReportForm = new Controller({
 			target,
 			view: this,
 			messages: {
@@ -121,17 +139,20 @@ export default class Report extends Core {
 		target.addEventListener("submit", this._reviseReport.bind(this));
 	}
 
-	_click(event) {
-		const skipButton = event.target.closest("[data-role='skip-action']");
-		if (skipButton && this.elt.contains(skipButton)) {
+	_click(event?: MouseEvent) {
+		const target = event?.target as Element | null | undefined;
+		const skipButton = target?.closest?.<HTMLButtonElement>(
+			"[data-role='skip-action']",
+		);
+		if (event && skipButton && this.elt.contains(skipButton)) {
 			event.preventDefault();
 			event.stopPropagation();
 			this._toggleActionSkip(skipButton);
 			return;
 		}
 
-		const expandButton = event.target.closest("[lp-expand]");
-		if (expandButton && this.elt.contains(expandButton)) {
+		const expandButton = target?.closest?.<HTMLButtonElement>("[lp-expand]");
+		if (event && expandButton && this.elt.contains(expandButton)) {
 			event.preventDefault();
 			event.stopPropagation();
 			this._toggleAccordion(expandButton);
@@ -141,18 +162,19 @@ export default class Report extends Core {
 		super._click(event);
 	}
 
-	async _runReport(event) {
+	async _runReport(event: SubmitEvent) {
 		event.preventDefault();
 		event.stopPropagation();
 		if (this._runningReport) return;
 
+		const form = event.currentTarget as HTMLFormElement | null;
+		if (!form) return;
 		this._runningReport = true;
-		const form = event.currentTarget;
 		const data = new FormData(form);
 		data.append("operation-id", this.operationId());
 		this.RunReportForm?.submitting();
 
-		const response = await request.post(form.action, data);
+		const response = await request.post<ReportExecution>(form.action, data);
 		this._runningReport = false;
 		if (!response?.ok) {
 			this.RunReportForm?.showError(
@@ -174,25 +196,27 @@ export default class Report extends Core {
 		this.RunReportForm?.success();
 		if (response.deferred) {
 			const operations = await this.ensureDeferredOperations();
-			operations?.track(response.operation, { node: this.elt });
+			if (response.operation)
+				operations?.track(response.operation, { node: this.elt });
 			this._showDeferredReportStatus("running", "Saving report changes...");
 			return;
 		}
 		window.setTimeout(() => window.location.reload(), 250);
 	}
 
-	async _reviseReport(event) {
+	async _reviseReport(event: SubmitEvent) {
 		event.preventDefault();
 		event.stopPropagation();
 		if (this._revisingReport) return;
 
+		const form = event.currentTarget as HTMLFormElement | null;
+		if (!form) return;
 		this._revisingReport = true;
-		const form = event.currentTarget;
 		const data = new FormData(form);
 		data.append("operation-id", this.operationId());
 		this.ReviseReportForm?.submitting();
 
-		const response = await request.post(form.action, data);
+		const response = await request.post<ReportExecution>(form.action, data);
 		this._revisingReport = false;
 		if (!response?.ok) {
 			this.ReviseReportForm?.showError(
@@ -208,14 +232,18 @@ export default class Report extends Core {
 		this.ReviseReportForm?.success();
 		if (response.deferred) {
 			const operations = await this.ensureDeferredOperations();
-			operations?.track(response.operation, { node: this.elt });
+			if (response.operation)
+				operations?.track(response.operation, { node: this.elt });
 			this._showDeferredReportStatus("revising", "Revising report...");
 			return;
 		}
 		window.setTimeout(() => window.location.reload(), 250);
 	}
 
-	_showDeferredReportStatus(statusValue, message) {
+	_showDeferredReportStatus(
+		statusValue: "running" | "revising",
+		message: string,
+	) {
 		const section = this.elt.querySelector("#layout section");
 		if (!section) return;
 		void withTransition(
@@ -223,7 +251,9 @@ export default class Report extends Core {
 				this.elt.dataset.pending = "true";
 				this.elt.dataset.status = statusValue;
 
-				let status = section.querySelector("[data-role='report-status']");
+				let status = section.querySelector<HTMLElement>(
+					"[data-role='report-status']",
+				);
 				if (!status) {
 					status = document.createElement("div");
 					status.dataset.role = "report-status";
@@ -245,7 +275,9 @@ export default class Report extends Core {
 				const spinner = createIcon("spinner", "mr-1");
 				spinner.setAttribute("aria-hidden", "true");
 				note.replaceChildren(spinner, ` ${message}`);
-				let progress = status.querySelector("[data-role='deferred-progress']");
+				let progress = status.querySelector<HTMLElement>(
+					"[data-role='deferred-progress']",
+				);
 				if (!progress) {
 					progress = document.createElement("p");
 					progress.dataset.role = "deferred-progress";
@@ -267,7 +299,7 @@ export default class Report extends Core {
 		);
 	}
 
-	_receiveDeferredOperation(event) {
+	_receiveDeferredOperation(event: CustomEvent<DeferredOperationStatus>) {
 		const status = event.detail;
 		if (!status?.terminal || status.key !== this.elt.dataset.operation) return;
 		this._reloadReport();
@@ -290,20 +322,22 @@ export default class Report extends Core {
 		super.destroy();
 	}
 
-	async _toggleActionSkip(button) {
-		if (button.disabled) return;
+	async _toggleActionSkip(button: HTMLButtonElement) {
+		const route = button.dataset.route;
+		if (button.disabled || !route) return;
 
 		button.disabled = true;
 		const actionIndexes = (
-			button.closest("[data-action-indexes]")?.dataset.actionIndexes || ""
+			button.closest<HTMLElement>("[data-action-indexes]")?.dataset
+				.actionIndexes || ""
 		)
 			.split(",")
 			.map((value) => Number(value))
 			.filter(Boolean);
 		const includeDependencies =
-			button.closest("[data-skip-dependencies]")?.dataset.skipDependencies !==
-			"false";
-		const response = await request.post(button.dataset.route, {
+			button.closest<HTMLElement>("[data-skip-dependencies]")?.dataset
+				.skipDependencies !== "false";
+		const response = await request.post<{ skipped: number[] }>(route, {
 			action_indexes: actionIndexes,
 			include_dependencies: includeDependencies,
 		});
@@ -313,46 +347,54 @@ export default class Report extends Core {
 		const skipped = new Set(response.skipped || []);
 		await withTransition(
 			() => {
-				this.elt.querySelectorAll("[data-action-index]").forEach((item) => {
-					this._setActionSkipped(
-						item,
-						skipped.has(Number(item.dataset.actionIndex)),
-					);
-				});
 				this.elt
-					.querySelectorAll("[data-schema-action-index]")
+					.querySelectorAll<HTMLElement>("[data-action-index]")
+					.forEach((item) => {
+						this._setActionSkipped(
+							item,
+							skipped.has(Number(item.dataset.actionIndex)),
+						);
+					});
+				this.elt
+					.querySelectorAll<HTMLElement>("[data-schema-action-index]")
 					.forEach((impact) => {
 						const isSkipped = skipped.has(
 							Number(impact.dataset.schemaActionIndex),
 						);
-						impact.querySelector(
+						const skippedMessage = impact.querySelector<HTMLElement>(
 							"[data-role='schema-impact-skipped']",
-						).dataset.visible = isSkipped ? "true" : "false";
-						impact.querySelector(
+						);
+						const details = impact.querySelector<HTMLElement>(
 							"[data-role='schema-impact-details']",
-						).dataset.visible = isSkipped ? "false" : "true";
+						);
+						if (skippedMessage)
+							skippedMessage.dataset.visible = isSkipped ? "true" : "false";
+						if (details) details.dataset.visible = isSkipped ? "false" : "true";
 					});
 			},
 			{ label: "report:toggle-skipped-actions" },
 		);
 	}
 
-	_setActionSkipped(item, skipped) {
+	_setActionSkipped(item: HTMLElement, skipped: boolean) {
 		item.dataset.skipped = skipped ? "true" : "false";
-		const label = item.querySelector("[data-role='skipped-label']");
+		const label = item.querySelector<HTMLElement>(
+			"[data-role='skipped-label']",
+		);
 		if (label) label.dataset.visible = item.dataset.skipped;
 
-		const button = item.querySelector("[data-role='skip-action']");
+		const button = item.querySelector<HTMLButtonElement>(
+			"[data-role='skip-action']",
+		);
 		if (!button) return;
 		button.title = skipped ? "Restore action" : "Skip action";
-		button.dataset.kind = skipped
-			? button.dataset.restoreKind
-			: button.dataset.skipKind;
+		const kind = skipped ? button.dataset.restoreKind : button.dataset.skipKind;
+		if (kind) button.dataset.kind = kind;
 		button.setAttribute(
 			"aria-label",
 			`${button.title} ${item.dataset.actionIndex}`,
 		);
-		const icon = button.querySelector("[data-icon]");
+		const icon = button.querySelector<HTMLElement>("[data-icon]");
 		if (icon) {
 			setIcon(
 				icon,
@@ -361,9 +403,11 @@ export default class Report extends Core {
 		}
 	}
 
-	async _toggleAccordion(button) {
-		const accordion = button.closest("[data-role='accordion']");
-		const panel = accordion?.querySelector("[data-role='accordion-panel']");
+	async _toggleAccordion(button: HTMLButtonElement) {
+		const accordion = button.closest<HTMLElement>("[data-role='accordion']");
+		const panel = accordion?.querySelector<HTMLElement>(
+			"[data-role='accordion-panel']",
+		);
 		if (!accordion || !panel) return;
 
 		await withTransition(

@@ -1,4 +1,5 @@
 import type { FormRevisionResponse } from "../../types/forms.d.ts";
+import type { LoadedWidget } from "../../types/widgets";
 import type { FormWidget } from "../../widgets/base/formWidget.ts";
 import { loadWidget } from "../../widgets/loader.ts";
 
@@ -40,11 +41,11 @@ export async function loadRevisionPreview(
 			return readonly;
 		},
 	};
-	const preview: FormWidget = await loadWidget(component, liveWidget.name, {
+	const preview = (await loadWidget(component, liveWidget.name, {
 		revisionPreview: true,
 		schema: response.schema ?? null,
 		submission: response.submission ?? null,
-	});
+	})) as LoadedWidget & FormWidget;
 	const previewResponse = {
 		...response,
 		html: html.cloneNode(true) as Document,

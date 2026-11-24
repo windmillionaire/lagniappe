@@ -1,9 +1,22 @@
 import { withTransition } from "../../../shared/transitions.ts";
+import type {
+	FieldCondition,
+	FieldOption,
+	FormFieldSchema,
+} from "../../../types/forms.d.ts";
+import type FormBuilder from "../builder.ts";
+import type { Condition } from "../conditions/base.ts";
+import { builderControl } from "../controls.ts";
 
 export class ConditionPanel {
-	constructor(builder) {
+	declare builder: FormBuilder;
+	declare panel: HTMLElement;
+	declare loading: boolean;
+	declare condition: Condition | null;
+
+	constructor(builder: FormBuilder) {
 		this.builder = builder;
-		this.panel = document.getElementById("condition-panel");
+		this.panel = builderControl("condition-panel");
 		this.loading = false;
 		this.condition = null;
 		this._click = this._click.bind(this);
@@ -21,31 +34,52 @@ export class ConditionPanel {
 		if (this.builder._restoringDraft || !this.condition?.key) return;
 		// Dialog buffers are applied with Add/Update, but already count as newer
 		// user work when deciding whether an asynchronous proposal can replace UI.
-		this.builder.draft.revision += 1;
-		this.builder.draft.group = null;
+		const draft = this.builder.draft;
+		if (!draft) return;
+		draft.revision += 1;
+		draft.group = null;
 	}
 
-	_click(e) {
-		const button = e.target.closest("button");
+	_click(e: MouseEvent) {
+		const button = (e.target as Element | null)?.closest("button");
 		if (button?.dataset.role === "save") {
-			const validated = this.condition.validate();
-			if (!validated) return;
+			const condition = this.condition;
+			if (!condition?.key || !condition.validate?.()) return;
 
-			const index = this.condition.index;
-			const schema = this.condition.element.schema;
-			const conditions = schema[this.condition.key] ?? [];
-
-			if (index === -1) {
-				conditions.push(this.condition.setting);
-			} else {
-				conditions[index] = this.condition.setting;
+			const schema = condition.element.schema;
+			const index = condition.index;
+			const update = <T>(items: T[], setting: T): T[] => {
+				if (index === -1) items.push(setting);
+				else items[index] = setting;
+				return items;
+			};
+			// Each condition validates the fields its schema list requires.
+			switch (condition.key) {
+				case "columns":
+					schema.columns = update(
+						schema.columns ?? [],
+						condition.setting as FormFieldSchema,
+					);
+					break;
+				case "options":
+					schema.options = update(
+						schema.options ?? [],
+						condition.setting as FieldOption,
+					);
+					break;
+				case "visibility":
+				case "status":
+					schema[condition.key] = update(
+						schema[condition.key] ?? [],
+						condition.setting as FieldCondition,
+					);
+					break;
 			}
-
-			schema[this.condition.key] = conditions;
-			this.condition.element.settings = this.builder.settings.create(schema);
+			condition.element.settings = this.builder.settings.create(schema);
 			this.builder.updateSchema();
 
 			withTransition(() => {
+				if (!this.condition) return;
 				this.condition.index = -1;
 				this.condition.init();
 				this.condition.showSuccess();
@@ -66,9 +100,9 @@ export class ConditionPanel {
 		this.condition = null;
 	}
 
-	open(condition) {
-		this.builder.model.sortable.option("disabled", true);
-		this.builder.components.sortable.option("disabled", true);
+	open(condition: Condition) {
+		this.builder.model.sortable?.option("disabled", true);
+		this.builder.components.sortable?.option("disabled", true);
 		this.builder.model.focusItem();
 
 		if (condition.expand) {
@@ -82,8 +116,8 @@ export class ConditionPanel {
 	}
 
 	hide() {
-		this.builder.model.sortable.option("disabled", false);
-		this.builder.components.sortable.option("disabled", false);
+		this.builder.model.sortable?.option("disabled", false);
+		this.builder.components.sortable?.option("disabled", false);
 		this.builder.model.blurItem();
 		this.panel.dataset.visible = "false";
 		this.condition = null;

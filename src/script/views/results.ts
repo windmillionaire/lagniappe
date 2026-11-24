@@ -3,6 +3,11 @@ import { withTransition } from "../shared/transitions.ts";
 import ShellView from "./base/shell.ts";
 
 export default class Results extends ShellView {
+	declare selected: Set<string>;
+	declare facetsContainer: HTMLElement | null;
+	declare reset: HTMLElement | null;
+	declare facets: NodeListOf<HTMLElement>;
+
 	/**
 	 * @template search/search.html::facet_button
 	 */
@@ -11,18 +16,22 @@ export default class Results extends ShellView {
 
 		const url = new URL(window.location.href);
 		this.selected = new Set(url.searchParams.getAll("kind"));
-		this.facetsContainer = document.querySelector("[data-role='facets']");
-		this.reset = document.querySelector("[data-role='reset']");
-		this.facets = document.querySelectorAll("[data-role='attribute']");
+		this.facetsContainer = document.querySelector<HTMLElement>(
+			"[data-role='facets']",
+		);
+		this.reset = document.querySelector<HTMLElement>("[data-role='reset']");
+		this.facets = document.querySelectorAll<HTMLElement>(
+			"[data-role='attribute']",
+		);
 
 		this.updateSelectionState();
 		this.facets.forEach((facet) => {
-			if (this.selected.has(facet.dataset.kind)) {
+			if (facet.dataset.kind && this.selected.has(facet.dataset.kind)) {
 				facet.dataset.selected = "true";
 			}
 		});
 
-		this.reset.addEventListener("click", (e) => this.handleResetClick(e));
+		this.reset?.addEventListener("click", (e) => this.handleResetClick(e));
 
 		this.facets.forEach((facet) => {
 			facet.addEventListener("click", (e) => this.handleFacetClick(e, facet));
@@ -57,34 +66,37 @@ export default class Results extends ShellView {
 	}
 
 	updateSelectionState() {
+		if (!this.facetsContainer) return;
 		this.facetsContainer.dataset.hasSelection = (
 			this.selected.size > 0
 		).toString();
 	}
 
-	updateResults(html) {
-		document
-			.querySelector("[data-role='results']")
-			.replaceWith(html.querySelector("[data-role='results']"));
+	updateResults(html: Document) {
+		const replacement = html.querySelector("[data-role='results']");
+		if (!replacement) return;
+		document.querySelector("[data-role='results']")?.replaceWith(replacement);
 		this.addPagination();
 	}
 
 	/**
 	 * @template search/results.html::footer
 	 */
-	async handlePaginationClick(e) {
+	async handlePaginationClick(e: Event) {
 		e.preventDefault();
 		e.stopPropagation();
 
-		const page = e.currentTarget?.dataset.page;
+		const page = (e.currentTarget as HTMLElement | null)?.dataset.page;
 		if (page === undefined) return;
 
 		const url = new URL(window.location.href);
 		url.searchParams.set("page", page);
 		const response = await request.get(url.toString());
+		const html = response?.html;
+		if (!html) return;
 		await withTransition(
 			() => {
-				this.updateResults(response.html);
+				this.updateResults(html);
 				window.history.pushState({}, "", url.toString());
 			},
 			{ label: "search:paginate" },
@@ -94,7 +106,7 @@ export default class Results extends ShellView {
 	/**
 	 * @template search/search.html::main
 	 */
-	async handleResetClick(e) {
+	async handleResetClick(e: Event) {
 		e.preventDefault();
 		e.stopPropagation();
 
@@ -105,6 +117,8 @@ export default class Results extends ShellView {
 		url.searchParams.delete("page");
 		const newUrl = url.toString();
 		const response = await request.get(newUrl);
+		const html = response?.html;
+		if (!html) return;
 		await withTransition(
 			() => {
 				this.facets.forEach((facet) => {
@@ -112,7 +126,7 @@ export default class Results extends ShellView {
 					delete facet.dataset.justSelected;
 				});
 				this.updateSelectionState();
-				this.updateResults(response.html);
+				this.updateResults(html);
 				window.history.pushState({}, "", newUrl);
 			},
 			{ label: "search:reset-facets" },
@@ -122,13 +136,14 @@ export default class Results extends ShellView {
 	/**
 	 * @template search/search.html::facet_button
 	 */
-	async handleFacetClick(e, facet) {
+	async handleFacetClick(e: Event, facet: HTMLElement) {
 		e.preventDefault();
 		e.stopPropagation();
 
 		const url = new URL(window.location.href);
 		url.searchParams.delete("page");
 		const kind = facet.dataset.kind;
+		if (kind === undefined) return;
 		const wasSelected = facet.dataset.selected === "true";
 
 		if (this.selected.has(kind)) {
@@ -141,13 +156,15 @@ export default class Results extends ShellView {
 
 		const newUrl = url.toString();
 		const response = await request.get(newUrl);
+		const html = response?.html;
+		if (!html) return;
 		await withTransition(
 			() => {
 				const selected = this.selected.has(kind);
 				facet.dataset.selected = selected ? "true" : "false";
 				if (selected && !wasSelected) facet.dataset.justSelected = "true";
 				this.updateSelectionState();
-				this.updateResults(response.html);
+				this.updateResults(html);
 				window.history.pushState({}, "", newUrl);
 			},
 			{ label: "search:change-facet" },

@@ -2,11 +2,13 @@ import { SelectBox } from "../../../elements/combobox/index.ts";
 import { primitives } from "../../../elements/primitives.ts";
 import { STYLES } from "../../../generated/styles.mjs";
 import { withTransition } from "../../../shared/transitions.ts";
+import type { FormFieldSchema } from "../../../types/forms.d.ts";
 import { CONFIG } from "../config.ts";
 import { fieldKind } from "../migrations.ts";
+import type { ConversionChoice, FieldKind } from "../types.ts";
 import { Condition } from "./base.ts";
 
-const MESSAGES = {
+const MESSAGES: Partial<Record<FieldKind, Partial<Record<string, string>>>> = {
 	checkbox: {
 		text: "Values will be converted to 'True' or 'False'.",
 		radio:
@@ -38,13 +40,13 @@ const MESSAGES = {
 };
 
 export default class Modify extends Condition {
-	init() {
+	init(): undefined {
 		this.destroy();
 		this.setTitle("Replace or Delete");
 		const help = this.header.querySelector("[data-role='help']");
-		help.setAttribute("lp-control", "help");
-		help.setAttribute("lp-help", "form_element_changes");
-		help.setAttribute(
+		help?.setAttribute("lp-control", "help");
+		help?.setAttribute("lp-help", "form_element_changes");
+		help?.setAttribute(
 			"aria-label",
 			"Help with converting or deleting form elements",
 		);
@@ -60,7 +62,7 @@ export default class Modify extends Condition {
 		const choices = (this.builder.conversionCatalog?.types || []).filter(
 			(item) => {
 				const rule =
-					this.builder.conversionCatalog.rules[sourceKind]?.[item.value];
+					this.builder.conversionCatalog?.rules[sourceKind]?.[item.value];
 				return (
 					rule &&
 					item.value !== (kind === "multiple" ? "select" : kind) &&
@@ -113,7 +115,11 @@ export default class Modify extends Condition {
 		});
 	}
 
-	addReplacement(choices, source, actions) {
+	addReplacement(
+		choices: ConversionChoice[],
+		source: FormFieldSchema,
+		actions: HTMLElement,
+	) {
 		const sourceKind = fieldKind(source);
 		const selectElt = primitives.select({
 			label: "Replace With",
@@ -127,11 +133,12 @@ export default class Modify extends Condition {
 		this.target.append(selectElt);
 		const select = selectElt.querySelector("select");
 		const catalog = this.builder.conversionCatalog;
+		if (!select || !catalog) return;
 		const canUseAI = this.builder.elt.dataset.aiConversion === "true";
 		for (const [title, ai] of [
 			["Deterministic conversions", false],
 			["AI conversions", true],
-		]) {
+		] as const) {
 			const group = document.createElement("optgroup");
 			group.label = title;
 			for (const item of choices) {
@@ -210,9 +217,20 @@ export default class Modify extends Condition {
 			const type = catalog.types.find(({ value }) => value === select.value);
 			if (!type) return;
 			const previous = this.element.schema;
-			const next = { id: previous.id, title: previous.title, ...type.schema };
-			for (const key of ["required", "placeholder", "visibility"])
-				if (previous[key] !== undefined) next[key] = previous[key];
+			const next: FormFieldSchema = {
+				id: previous.id,
+				title: previous.title,
+				...type.schema,
+				...(previous.required !== undefined
+					? { required: previous.required }
+					: {}),
+				...(previous.placeholder !== undefined
+					? { placeholder: previous.placeholder }
+					: {}),
+				...(previous.visibility !== undefined
+					? { visibility: previous.visibility }
+					: {}),
+			};
 			if (["radio", "select"].includes(next.type)) {
 				const options = previous.options ?? source.options;
 				next.options = options

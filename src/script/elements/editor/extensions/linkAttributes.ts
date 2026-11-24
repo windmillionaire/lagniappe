@@ -10,7 +10,7 @@ const ROUTE_LINK_CLASSES = new Set([
 
 const currentLocation = () => globalThis.window?.location ?? null;
 
-const cleanClassName = (className) => {
+const cleanClassName = (className: unknown) => {
 	const classes = String(className || "")
 		.split(/\s+/)
 		.filter(Boolean)
@@ -19,7 +19,7 @@ const cleanClassName = (className) => {
 	return classes.length > 0 ? classes.join(" ") : null;
 };
 
-const internalLinkDetails = (href) => {
+const internalLinkDetails = (href: unknown) => {
 	const location = currentLocation();
 	const value = String(href || "").trim();
 
@@ -49,7 +49,16 @@ const internalLinkDetails = (href) => {
 	}
 };
 
-export const normalizeLinkAttributes = (attributes = {}) => {
+interface LinkAttributes {
+	href?: string | null;
+	class?: string | null;
+	target?: string | null;
+	rel?: string | null;
+}
+
+export const normalizeLinkAttributes = <Attributes extends LinkAttributes>(
+	attributes: Attributes = {} as Attributes,
+) => {
 	const details = internalLinkDetails(attributes.href);
 
 	if (!details) {

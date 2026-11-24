@@ -3,7 +3,7 @@
 The `lp-*` attributes are the handshake between server-rendered Jinja
 templates and the frontend. Templates write ordinary HTML with stable
 `lp-*` markers, and the browser code reacts to those markers after
-`main.mjs` initializes the page.
+`main.ts` initializes the page.
 
 Think of an `lp-*` attribute as the opt-in signal and the neighboring
 `data-*` attributes as the configuration and mutable state. For example,
@@ -45,7 +45,7 @@ The usual page shape is:
 
 The flow is:
 
-1. `main.mjs` finds `[lp-view]`, reads `data-kind`, imports the matching view,
+1. `main.ts` finds `[lp-view]`, reads `data-kind`, imports the matching view,
    and calls `init()`.
 2. The view delegates clicks and submits from the root. It creates
    `ViewComponent` instances from `[lp-component]` elements as needed.

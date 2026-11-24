@@ -1,8 +1,10 @@
+import type { ComboboxOption } from "../elements/combobox/combobox.ts";
 import { InputElement } from "../elements/input.ts";
 import { SectionToggle } from "../elements/sectionToggle.ts";
 import { TextareaElement } from "../elements/textarea.ts";
 import { withTransition } from "../shared/transitions.ts";
-import { FormWidget } from "./base/formWidget.ts";
+import type { LoadedWidget } from "../types/widgets";
+import { FormWidget, type FormWidgetSettings } from "./base/formWidget.ts";
 
 const TASK_BUTTONS = {
 	selectUser: "facet",
@@ -11,23 +13,41 @@ const TASK_BUTTONS = {
 	selectCategory: "facet",
 	schedule: "date",
 	uploadFile: "upload",
+} as const;
+
+type TaskControl = ReturnType<
+	(typeof SectionToggle)[(typeof TASK_BUTTONS)[keyof typeof TASK_BUTTONS]]
+>;
+type TaskButtons = Partial<Record<string, TaskControl>> & {
+	selectForm?: ReturnType<typeof SectionToggle.facet>;
 };
+type TaskSettingsComponent = NonNullable<FormWidget["component"]> & {
+	elt: HTMLElement;
+	widgets: { TaskForm?: LoadedWidget; PageTaskList?: { itemCount: number } };
+};
+type TaskSettingsSelection = CustomEvent<{
+	name: string;
+	options: Record<string, ComboboxOption & { form?: ComboboxOption }>;
+}>;
 
 export class BaseTaskSettings extends FormWidget {
-	constructor(attributes) {
+	declare component?: TaskSettingsComponent | null;
+	declare buttons: TaskButtons;
+	declare _actions: HTMLElement | null;
+
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.buttons = {};
 		this._actions = null;
 		this._formUpdatedListener = this._formUpdatedListener.bind(this);
 	}
 
-	_formUpdatedListener(e) {
-		const project = e.detail.options
-			? Object.values(e.detail.options)[0]
-			: null;
+	_formUpdatedListener(e: Event) {
+		const detail = (e as TaskSettingsSelection).detail;
+		const project = detail.options ? Object.values(detail.options)[0] : null;
 		const formControl = this.buttons.selectForm;
 		if (
-			e.detail.name === "project" &&
+			detail.name === "project" &&
 			project?.form &&
 			formControl &&
 			!formControl.readonly
@@ -36,23 +56,25 @@ export class BaseTaskSettings extends FormWidget {
 				formControl.clear();
 				formControl.addOption(project.form);
 			}
-		} else if (e.detail.name === "form") {
-			const options = Object.keys(e.detail.options);
+		} else if (detail.name === "form") {
+			const options = Object.keys(detail.options);
 			if (options.length === 0) return;
 
-			const formKey = Object.keys(e.detail.options)[0];
-			const existingForm = this.component.elt.querySelector(
+			const formKey = Object.keys(detail.options)[0];
+			const component = this.component;
+			if (!component) return;
+			const existingForm = component.elt.querySelector<HTMLElement>(
 				`[data-widget="TaskForm"]`,
 			)?.dataset.formKey;
 			if (!existingForm || existingForm === formKey) return;
 
-			const form = this.component.widgets.TaskForm;
+			const form = component.widgets.TaskForm;
 			void withTransition(
 				() => {
-					form.destroy();
-					delete this.component.widgets.TaskForm;
-					this.component.elt.querySelector(`[data-widget="TaskForm"]`).remove();
-					this.component.elt.querySelector('[lp-control="form"]').remove();
+					form?.destroy?.();
+					delete component.widgets.TaskForm;
+					component.elt.querySelector(`[data-widget="TaskForm"]`)?.remove();
+					component.elt.querySelector('[lp-control="form"]')?.remove();
 				},
 				{ label: "task-settings:replace-attached-form" },
 			);
@@ -64,7 +86,9 @@ export class BaseTaskSettings extends FormWidget {
 	}
 
 	get actions() {
-		return this.target.querySelector("[data-role='action-buttons']");
+		return this.target.querySelector<HTMLElement>(
+			"[data-role='action-buttons']",
+		);
 	}
 
 	async _initForm() {
@@ -76,14 +100,17 @@ export class BaseTaskSettings extends FormWidget {
 		const actions = this.actions;
 		if (!actions) return;
 
-		const buttons = Array.from(actions.querySelectorAll("button[data-action]"));
+		const buttons = Array.from(
+			actions.querySelectorAll<HTMLButtonElement>("button[data-action]"),
+		);
 		if (buttons.length === 0) return;
 
 		this.buttons = {};
 
 		for (const button of buttons) {
 			const action = button.dataset.action;
-			const factory = TASK_BUTTONS[action];
+			if (!action || !(action in TASK_BUTTONS)) continue;
+			const factory = TASK_BUTTONS[action as keyof typeof TASK_BUTTONS];
 			const control =
 				factory && SectionToggle[factory]
 					? SectionToggle[factory](this, button)
@@ -92,7 +119,9 @@ export class BaseTaskSettings extends FormWidget {
 
 			await control.init();
 			this.buttons[action] = control;
-			this.destroyables.push(control);
+			if ("destroy" in control && typeof control.destroy === "function") {
+				this.destroyables.push(control as { destroy(): void });
+			}
 		}
 
 		actions.addEventListener("updated", this._formUpdatedListener);
@@ -145,8 +174,8 @@ export class BaseTaskSettings extends FormWidget {
 		return data;
 	}
 
-	_facetElement(selector) {
-		const target = this.target.querySelector(selector);
+	_facetElement(selector: string) {
+		const target = this.target.querySelector<HTMLElement>(selector);
 		if (!target) return null;
 
 		const control = SectionToggle.facet(this, target);
@@ -164,7 +193,7 @@ export class BaseTaskSettings extends FormWidget {
 }
 
 export class TaskSettings extends BaseTaskSettings {
-	constructor(attributes) {
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Update Task",
@@ -175,7 +204,7 @@ export class TaskSettings extends BaseTaskSettings {
 }
 
 export class TaskMove extends BaseTaskSettings {
-	constructor(attributes) {
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Move Task",
@@ -190,7 +219,7 @@ export class TaskMove extends BaseTaskSettings {
 }
 
 export class TaskCombine extends FormWidget {
-	constructor(attributes) {
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Combine Tasks",
@@ -201,7 +230,9 @@ export class TaskCombine extends FormWidget {
 }
 
 export class CreateUserTask extends BaseTaskSettings {
-	constructor(attributes) {
+	declare _resetAfterCreate?: boolean;
+
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Create Personal Task",
@@ -217,7 +248,9 @@ export class CreateUserTask extends BaseTaskSettings {
 		}
 		super.postreconcile();
 		if (this.target.dataset.visible === "true") {
-			this.target.querySelector("input[name='name']")?.focus();
+			this.target
+				.querySelector<HTMLInputElement>("input[name='name']")
+				?.focus();
 		}
 	}
 
@@ -235,7 +268,10 @@ export class CreateUserTask extends BaseTaskSettings {
 }
 
 export class CreateTask extends BaseTaskSettings {
-	constructor(attributes) {
+	declare _resetAfterCreate?: boolean;
+	declare _closeAfterCreate?: string | null;
+
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Create Task",
@@ -243,7 +279,7 @@ export class CreateTask extends BaseTaskSettings {
 			submitted: "Task Created",
 		};
 
-		if (this.component.widgets.PageTaskList?.itemCount === 0) {
+		if (this.component?.widgets.PageTaskList?.itemCount === 0) {
 			delete this.target.dataset.close;
 		}
 	}
@@ -259,14 +295,16 @@ export class CreateTask extends BaseTaskSettings {
 		}
 		super.postreconcile();
 		if (this.target.dataset.visible === "true") {
-			this.target.querySelector("input[name='name']").focus();
+			this.target
+				.querySelector<HTMLInputElement>("input[name='name']")
+				?.focus();
 		}
 	}
 
 	async created() {
 		await this.prepareReset();
 		this._resetAfterCreate = true;
-		if (this.component.widgets.PageTaskList?.itemCount > 0) {
+		if ((this.component?.widgets.PageTaskList?.itemCount ?? 0) > 0) {
 			this._closeAfterCreate = "tasks:PageTaskList";
 		}
 	}

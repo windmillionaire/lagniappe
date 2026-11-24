@@ -1,12 +1,75 @@
+import type { Dropdown } from "../elements/combobox/dropdown.ts";
 import { ensureMessageComposer } from "../elements/messageComposer.ts";
 import { STYLES } from "../generated/styles.mjs";
 import { createIcon } from "../shared/icons.ts";
 import { ENDPOINTS, request } from "../shared/index.ts";
-import Core from "./base/core.ts";
+import type { RequestResult } from "../types/api.d.ts";
+import type {
+	MessageConversation,
+	MessageEntry,
+	MessageSendResponse,
+} from "../types/messaging.d.ts";
+import Core, { type ReconcileChange } from "./base/core.ts";
 
 const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
 
+type Conversation = MessageConversation & { id: string };
+type ConversationOptions = { selectionRevision?: number | null };
+type ConversationList = {
+	conversations: MessageConversation[];
+	cursor: string | null;
+};
+type MessageHistory = MessageSendResponse & {
+	messages: MessageEntry[];
+	cursor: string | null;
+};
+
+function hasConversationId(
+	conversation: MessageConversation | undefined,
+): conversation is Conversation {
+	return typeof conversation?.id === "string";
+}
+
+function requiredControl<T extends HTMLElement = HTMLElement>(
+	root: ParentNode,
+	selector: string,
+): T {
+	const control = root.querySelector<T>(selector);
+	if (!control) throw new Error(`Missing message control: ${selector}`);
+	return control;
+}
+
 export default class Messages extends Core {
+	declare list: HTMLElement;
+	declare selector: HTMLButtonElement;
+	declare selectorLabel: HTMLElement;
+	declare mobileClearConversation: HTMLButtonElement;
+	declare mobileClearConversationContainer: HTMLElement;
+	declare history: HTMLElement;
+	declare header: HTMLElement;
+	declare loadConversationsButton: HTMLButtonElement;
+	declare loadMessagesButton: HTMLButtonElement;
+	declare replyForm: HTMLFormElement;
+	declare replyTextarea: HTMLTextAreaElement;
+	declare replyError: HTMLElement;
+	declare replySubmit: HTMLButtonElement;
+	declare replySpinner: HTMLElement;
+	declare current: Conversation | null;
+	declare conversationSelectionRevision: number;
+	declare conversationListRevision: number;
+	declare conversationCursor: string | null;
+	declare messageCursor: string | null;
+	declare conversations: Map<string, Conversation>;
+	declare conversationStorageKey: string;
+	declare preferredConversation: string | null;
+	declare composer?: ReturnType<typeof ensureMessageComposer>;
+	declare conversationDropdown?: Dropdown | null;
+	declare replyOperationId?: string;
+	declare _conversationSelectorClick?: (event: MouseEvent) => void;
+	declare _messagesMobileResize?: EventListener;
+	declare _messageRefresh?: Promise<boolean> | null;
+	declare _conversationDropdownPromise?: Promise<Dropdown | null> | null;
+
 	_initPollingSubscription() {
 		if (!this.PollingCoordinator) return;
 		this.PollingCoordinator.subscribe(
@@ -36,34 +99,50 @@ export default class Messages extends Core {
 
 	async init() {
 		await super.init();
-		this.list = this.elt.querySelector("[data-role='conversation-list']");
-		this.selector = this.elt.querySelector(
+		this.list = requiredControl(this.elt, "[data-role='conversation-list']");
+		this.selector = requiredControl<HTMLButtonElement>(
+			this.elt,
 			"[data-role='conversation-selector']",
 		);
-		this.selectorLabel = this.selector.querySelector(
+		this.selectorLabel = requiredControl(
+			this.selector,
 			"[data-role='conversation-selector-label']",
 		);
-		this.mobileClearConversation = this.elt.querySelector(
+		this.mobileClearConversation = requiredControl<HTMLButtonElement>(
+			this.elt,
 			"[data-role='mobile-clear-conversation']",
 		);
-		this.mobileClearConversationContainer = this.elt.querySelector(
+		this.mobileClearConversationContainer = requiredControl(
+			this.elt,
 			"[data-role='mobile-clear-conversation-container']",
 		);
-		this.history = this.elt.querySelector("[data-role='message-history']");
-		this.header = this.elt.querySelector("[data-role='message-header']");
-		this.loadConversationsButton = this.elt.querySelector(
+		this.history = requiredControl(this.elt, "[data-role='message-history']");
+		this.header = requiredControl(this.elt, "[data-role='message-header']");
+		this.loadConversationsButton = requiredControl<HTMLButtonElement>(
+			this.elt,
 			"[data-action='load-conversations']",
 		);
-		this.loadMessagesButton = this.elt.querySelector(
+		this.loadMessagesButton = requiredControl<HTMLButtonElement>(
+			this.elt,
 			"[data-action='load-messages']",
 		);
-		this.replyForm = this.elt.querySelector("[data-role='message-reply']");
-		this.replyTextarea = this.replyForm.querySelector("textarea[name='body']");
-		this.replyError = this.replyForm.querySelector(
+		this.replyForm = requiredControl<HTMLFormElement>(
+			this.elt,
+			"[data-role='message-reply']",
+		);
+		this.replyTextarea = requiredControl<HTMLTextAreaElement>(
+			this.replyForm,
+			"textarea[name='body']",
+		);
+		this.replyError = requiredControl(
+			this.replyForm,
 			"[data-role='message-reply-error']",
 		);
-		this.replySubmit = this.replyForm.querySelector("button[type='submit']");
-		this.replySpinner = this.replySubmit.querySelector("[data-role='icon']");
+		this.replySubmit = requiredControl<HTMLButtonElement>(
+			this.replyForm,
+			"button[type='submit']",
+		);
+		this.replySpinner = requiredControl(this.replySubmit, "[data-role='icon']");
 		this.current = null;
 		this.conversationSelectionRevision = 0;
 		this.conversationListRevision = 0;
@@ -85,15 +164,16 @@ export default class Messages extends Core {
 			this.composer = ensureMessageComposer(this, {
 				onSent: (response) => this.handleMessageSent(response),
 			});
-			composeButton.addEventListener("click", () => this.composer.open());
+			composeButton.addEventListener("click", () => this.composer?.open());
 		}
 		this.list.addEventListener("click", (event) => {
-			const button = event.target.closest("[data-conversation]");
-			if (button) {
-				const selectionRevision = this._beginConversationSelection(
-					button.dataset.conversation,
-				);
-				void this.openConversation(button.dataset.conversation, {
+			const button = (
+				event.target as Element | null
+			)?.closest?.<HTMLButtonElement>("[data-conversation]");
+			const key = button?.dataset.conversation;
+			if (key) {
+				const selectionRevision = this._beginConversationSelection(key);
+				void this.openConversation(key, {
 					selectionRevision,
 				});
 			}
@@ -120,8 +200,11 @@ export default class Messages extends Core {
 		};
 		this.elt.addEventListener("mobile-resize", this._messagesMobileResize);
 		this.history.addEventListener("click", (event) => {
-			const button = event.target.closest("[data-action='delete-message']");
-			if (button) void this.deleteMessage(button.dataset.message);
+			const button = (
+				event.target as Element | null
+			)?.closest?.<HTMLButtonElement>("[data-action='delete-message']");
+			if (button?.dataset.message)
+				void this.deleteMessage(button.dataset.message);
 		});
 		this.loadConversationsButton.addEventListener("click", () =>
 			this.loadConversations({ append: true }),
@@ -140,7 +223,9 @@ export default class Messages extends Core {
 			Array.from(this.conversations.values()).find(
 				(conversation) => conversation.unread,
 			)?.id || this.conversations.values().next().value?.id,
-		].filter((key, index, values) => key && values.indexOf(key) === index);
+		].filter((key, index, values): key is string =>
+			Boolean(key && values.indexOf(key) === index),
+		);
 		this.preferredConversation = candidates[0] || null;
 		this.renderConversationSelector();
 		if (this.mobile && candidates.length) {
@@ -207,13 +292,14 @@ export default class Messages extends Core {
 		return false;
 	}
 
-	_beginConversationSelection(key) {
+	_beginConversationSelection(key: string | null) {
 		this.preferredConversation = key || null;
 		return ++this.conversationSelectionRevision;
 	}
 
-	async handleMessageSent(response) {
-		const conversation = response.conversation.id;
+	async handleMessageSent(response: RequestResult<MessageSendResponse>) {
+		const conversation = response.conversation?.id;
+		if (!conversation) return false;
 		const active = this.current?.id || null;
 		const selectionRevision = active
 			? this.conversationSelectionRevision
@@ -225,9 +311,11 @@ export default class Messages extends Core {
 		return this.openConversation(conversation, { selectionRevision });
 	}
 
-	async _ensureConversationDropdown() {
+	async _ensureConversationDropdown(): Promise<Dropdown | null> {
 		if (this.conversationDropdown || this._conversationDropdownPromise) {
-			return this.conversationDropdown || this._conversationDropdownPromise;
+			return (
+				this.conversationDropdown ?? this._conversationDropdownPromise ?? null
+			);
 		}
 		this._conversationDropdownPromise = import(
 			"../elements/combobox/dropdown.ts"
@@ -261,7 +349,7 @@ export default class Messages extends Core {
 			append && this.conversationCursor
 				? { cursor: this.conversationCursor }
 				: null;
-		const response = await request.get(
+		const response = await request.get<ConversationList>(
 			ENDPOINTS.messages.conversations,
 			params,
 		);
@@ -269,7 +357,8 @@ export default class Messages extends Core {
 		if (listRevision !== this.conversationListRevision) return;
 		if (!append) this.conversations.clear();
 		for (const conversation of response.conversations || []) {
-			this.conversations.set(conversation.id, conversation);
+			if (hasConversationId(conversation))
+				this.conversations.set(conversation.id, conversation);
 		}
 		this.conversationCursor = response.cursor || null;
 		this.renderConversations();
@@ -341,7 +430,8 @@ export default class Messages extends Core {
 	renderConversationSelector() {
 		const selected =
 			this.current ||
-			this.conversations.get(this.preferredConversation) ||
+			(this.preferredConversation &&
+				this.conversations.get(this.preferredConversation)) ||
 			null;
 		const selectedName = selected?.peer?.name || "";
 		this.selectorLabel.textContent = selectedName;
@@ -388,16 +478,22 @@ export default class Messages extends Core {
 		);
 	}
 
-	rememberConversation(key) {
+	rememberConversation(key: string | null) {
 		this.preferredConversation = key || null;
 		if (!this.conversationStorageKey) return;
 		if (key) localStorage.setItem(this.conversationStorageKey, key);
 		else localStorage.removeItem(this.conversationStorageKey);
 	}
 
-	async openConversation(key, { selectionRevision = null } = {}) {
-		const response = await request.get(ENDPOINTS.messages.history(key));
-		if (!response?.ok) return false;
+	async openConversation(
+		key: string,
+		{ selectionRevision = null }: ConversationOptions = {},
+	) {
+		const response = await request.get<MessageHistory>(
+			ENDPOINTS.messages.history(key),
+		);
+		if (!response?.ok || !hasConversationId(response.conversation))
+			return false;
 		if (
 			selectionRevision !== null &&
 			selectionRevision !== this.conversationSelectionRevision
@@ -425,6 +521,7 @@ export default class Messages extends Core {
 	}
 
 	renderHeader() {
+		if (!this.current) return;
 		const title = document.createElement("span");
 		title.className = "font-semibold";
 		title.textContent = this.current.peer.deleted
@@ -444,13 +541,13 @@ export default class Messages extends Core {
 		this.replyError.textContent = "";
 	}
 
-	async sendReply(event) {
+	async sendReply(event: Event) {
 		event.preventDefault();
 		if (!this.current?.peer?.replyable || this.replySubmit.disabled) return;
 		const selectionRevision = this.conversationSelectionRevision;
 		const conversation = this.current.id;
 		const data = new FormData();
-		data.set("recipient", this.current.peer.id);
+		data.set("recipient", String(this.current.peer.id));
 		data.set("conversation", conversation);
 		data.set("body", this.replyTextarea.value);
 		data.set(
@@ -460,9 +557,12 @@ export default class Messages extends Core {
 		this.replyError.classList.add("hidden");
 		this.replySubmit.disabled = true;
 		this.replySpinner.dataset.visible = "true";
-		let response;
+		let response: RequestResult<MessageSendResponse> | undefined;
 		try {
-			response = await request.post(ENDPOINTS.messages.send, data);
+			response = await request.post<MessageSendResponse>(
+				ENDPOINTS.messages.send,
+				data,
+			);
 		} finally {
 			this.replySubmit.disabled = false;
 			this.replySpinner.dataset.visible = "false";
@@ -476,18 +576,22 @@ export default class Messages extends Core {
 		this._boostMessagePolling();
 		this.replyTextarea.value = "";
 		await this.loadConversations();
-		if (selectionRevision === this.conversationSelectionRevision) {
-			await this.openConversation(response.conversation.id, {
+		const sentConversation = response.conversation?.id;
+		if (
+			sentConversation &&
+			selectionRevision === this.conversationSelectionRevision
+		) {
+			await this.openConversation(sentConversation, {
 				selectionRevision,
 			});
 			this.replyTextarea.focus();
 		}
 	}
 
-	renderMessages(messages, { prepend = false } = {}) {
+	renderMessages(messages: MessageEntry[], { prepend = false } = {}) {
 		const nodes = messages.map((message) => {
 			const article = document.createElement("article");
-			article.dataset.message = message.id;
+			article.dataset.message = String(message.id);
 			article.className = `group max-w-[85%] rounded-lg p-3 ${
 				message.mine ? "self-end bg-user-bg" : "self-start bg-base-bg"
 			}`;
@@ -505,7 +609,7 @@ export default class Messages extends Core {
 			const remove = document.createElement("button");
 			remove.type = "button";
 			remove.dataset.action = "delete-message";
-			remove.dataset.message = message.id;
+			remove.dataset.message = String(message.id);
 			remove.className =
 				"text-delete-default opacity-0 group-hover:opacity-100";
 			remove.textContent = "Delete";
@@ -525,7 +629,7 @@ export default class Messages extends Core {
 		const selectionRevision = this.conversationSelectionRevision;
 		const params =
 			prepend && this.messageCursor ? { cursor: this.messageCursor } : null;
-		const response = await request.get(
+		const response = await request.get<MessageHistory>(
 			ENDPOINTS.messages.history(conversation),
 			params,
 		);
@@ -547,7 +651,7 @@ export default class Messages extends Core {
 		if (!conversation) return;
 		const data = new FormData();
 		data.set("revision", String(conversation.revision));
-		const response = await request.post(
+		const response = await request.post<MessageSendResponse>(
 			ENDPOINTS.messages.read(conversation.id),
 			data,
 		);
@@ -555,7 +659,7 @@ export default class Messages extends Core {
 			selectionRevision !== this.conversationSelectionRevision ||
 			this.current?.id !== conversation.id
 		) {
-			if (response?.conversation) {
+			if (hasConversationId(response?.conversation)) {
 				this.conversations.set(conversation.id, response.conversation);
 			}
 			return;
@@ -566,19 +670,24 @@ export default class Messages extends Core {
 			}
 			return;
 		}
+		if (!hasConversationId(response.conversation)) return;
 		this.current = response.conversation;
 		this.conversations.set(this.current.id, this.current);
 		this.renderConversations();
 	}
 
-	async deleteMessage(key) {
+	async deleteMessage(key: string) {
 		const response = await request.delete(ENDPOINTS.messages.remove(key));
 		if (!response?.ok) return;
 		this.history.querySelector(`[data-message="${CSS.escape(key)}"]`)?.remove();
 	}
 
-	reconcileChange(change = {}) {
-		if (change.type !== "delete" || !this.conversations.has(change.key)) {
+	reconcileChange(change: ReconcileChange = {}) {
+		if (
+			change.type !== "delete" ||
+			!change.key ||
+			!this.conversations.has(change.key)
+		) {
 			return super.reconcileChange(change);
 		}
 		this.conversations.delete(change.key);
@@ -601,11 +710,15 @@ export default class Messages extends Core {
 	}
 
 	destroy() {
-		this.selector?.removeEventListener(
-			"click",
-			this._conversationSelectorClick,
-		);
-		this.elt.removeEventListener("mobile-resize", this._messagesMobileResize);
+		if (this._conversationSelectorClick) {
+			this.selector?.removeEventListener(
+				"click",
+				this._conversationSelectorClick,
+			);
+		}
+		if (this._messagesMobileResize) {
+			this.elt.removeEventListener("mobile-resize", this._messagesMobileResize);
+		}
 		this.conversationDropdown?.destroy?.();
 		this.conversationDropdown = null;
 		super.destroy();

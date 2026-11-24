@@ -2,7 +2,7 @@ import { InputElement } from "../elements/input.ts";
 import { sections } from "../elements/sections.ts";
 import { SectionToggle } from "../elements/sectionToggle.ts";
 import { TextareaElement } from "../elements/textarea.ts";
-import { FormWidget } from "./base/formWidget.ts";
+import { FormWidget, type FormWidgetSettings } from "./base/formWidget.ts";
 
 class CategoryForm extends FormWidget {
 	get nameElement() {
@@ -35,7 +35,9 @@ class CategoryForm extends FormWidget {
 	}
 
 	get formSelectElement() {
-		const target = this.target.querySelector('[data-action="select-form"]');
+		const target = this.target.querySelector<HTMLElement>(
+			'[data-action="select-form"]',
+		);
 		if (!target) return null;
 
 		const control = SectionToggle.facet(this, target);
@@ -45,8 +47,13 @@ class CategoryForm extends FormWidget {
 	}
 }
 
+type OfflineContext = Parameters<NonNullable<FormWidget["offline"]>>[0];
+type QueueContext = Parameters<
+	NonNullable<FormWidget["handleOfflineQueue"]>
+>[0];
+
 export class CategoryInfo extends CategoryForm {
-	constructor(attributes) {
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Update Category",
@@ -56,7 +63,7 @@ export class CategoryInfo extends CategoryForm {
 		};
 	}
 
-	offline({ data, method, route }) {
+	offline({ data, method, route }: OfflineContext) {
 		return {
 			id: `update:category:${this.key}`,
 			action: "update",
@@ -68,7 +75,7 @@ export class CategoryInfo extends CategoryForm {
 		};
 	}
 
-	handleOfflineQueue({ phase, record }) {
+	handleOfflineQueue({ phase, record }: QueueContext) {
 		if (record?.kind !== "category" || record.target_key !== this.key) return;
 		if (phase === "queued") {
 			this.form?.queued();
@@ -91,7 +98,7 @@ export class CategoryInfo extends CategoryForm {
 }
 
 export class CreateCategory extends CategoryForm {
-	constructor(attributes) {
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Create Category",
@@ -110,8 +117,8 @@ export class CreateCategory extends CategoryForm {
 	get html() {
 		const name = this.nameElement;
 		const description = this.descriptionElement;
-		name.dataset.role = "manual";
-		description.dataset.role = "manual";
+		if (name) name.dataset.role = "manual";
+		if (description) description.dataset.role = "manual";
 
 		return [
 			sections.generateEntityForm(this),

@@ -1,10 +1,54 @@
 import { NavElement } from "../../elements/nav.ts";
 import { withTransition } from "../../shared/transitions.ts";
 import { debounce } from "../../shared/utilities.ts";
+import type ViewComponent from "./component.ts";
+import type { SubcomponentEvent } from "./component.ts";
 import Core from "./core.ts";
+import type { ViewRoot } from "./shell.ts";
+
+type ComponentReference =
+	| HTMLElement
+	| Pick<ViewComponent, "elt">
+	| string
+	| null;
+
+export interface EntityLayoutOptions {
+	secondary?: ComponentReference;
+	secondaryActive?: boolean | null;
+	activeTabId?: string | null;
+	mutate?: ((state: { layoutChanged: boolean }) => unknown) | null;
+}
+
+export interface PreparedEntityLayout {
+	activeTab: ViewComponent;
+	activeTabId: string;
+	layout: HTMLElement;
+	secondary: ViewComponent | null;
+	tabs: ViewComponent;
+}
+
+export interface EntityLayoutResult {
+	activeTabId: string | null;
+	layoutChanged: boolean;
+	result: unknown;
+}
+
+interface LayoutSnapshot {
+	secondary: boolean;
+	wide: boolean;
+	narrow: boolean;
+	selected: string | null;
+	visible: boolean;
+	persistent: boolean;
+}
 
 export default class Entity extends Core {
-	constructor(node) {
+	declare collaborating: Record<string, unknown>;
+	declare _defaultTabId: string;
+	declare _mobileNav: NavElement | null;
+	declare postRender?: (() => unknown) | null;
+
+	constructor(node: ViewRoot) {
 		super(node);
 		this.collaborating = {};
 		this._renderLayout = this._renderLayout.bind(this);
@@ -28,10 +72,10 @@ export default class Entity extends Core {
 	}
 
 	get tabsCard() {
-		return this.elt.querySelector("#tabs");
+		return this.elt.querySelector<HTMLElement>("#tabs");
 	}
 
-	get secondaryCard() {
+	get secondaryCard(): HTMLElement | null {
 		return null;
 	}
 
@@ -42,16 +86,18 @@ export default class Entity extends Core {
 		);
 	}
 
-	_tabElement(tabId) {
+	_tabElement(tabId: string | null) {
 		if (!tabId) return null;
 		return (
 			Array.from(
-				this.elt.querySelectorAll("[lp-component][data-tab='true']"),
+				this.elt.querySelectorAll<HTMLElement>(
+					"[lp-component][data-tab='true']",
+				),
 			).find((tab) => tab.id === tabId) || null
 		);
 	}
 
-	_tabChange(event) {
+	_tabChange(event: SubcomponentEvent) {
 		const { subcomponent } = event.detail;
 		if (subcomponent.elt.dataset.tab !== "true") return;
 
@@ -61,24 +107,26 @@ export default class Entity extends Core {
 	get mobileNav() {
 		if (!this._mobileNav) {
 			const tabs = this.getComponent(this.tabsCard);
-			const mobileNav = this.elt.querySelector("[lp-nav][data-nav='mobile']");
+			const mobileNav = this.elt.querySelector<HTMLElement>(
+				"[lp-nav][data-nav='mobile']",
+			);
+			if (!tabs || !mobileNav)
+				throw new Error("Entity layout requires mobile tab navigation");
 			this._mobileNav = new NavElement(tabs, mobileNav);
 		}
 		return this._mobileNav;
 	}
 
-	_componentElement(component) {
+	_componentElement(component: ComponentReference): HTMLElement | null {
 		if (!component) return null;
-		if (component.elt) return component.elt;
-		if (typeof Element !== "undefined" && component instanceof Element) {
-			return component;
-		}
+		if (typeof component !== "string")
+			return "elt" in component ? component.elt : component;
 
 		const element = document.getElementById(component);
 		return element && this.elt.contains(element) ? element : null;
 	}
 
-	setSecondaryCardActive(component, active) {
+	setSecondaryCardActive(component: ComponentReference, active: boolean) {
 		const element = this._componentElement(component);
 		if (!element) return;
 
@@ -89,7 +137,7 @@ export default class Entity extends Core {
 		element.dataset.persistent = active ? "true" : "false";
 	}
 
-	isSecondaryCardVisible(component = this.secondaryCard) {
+	isSecondaryCardVisible(component: ComponentReference = this.secondaryCard) {
 		const element = this._componentElement(component);
 		return (
 			!!element &&
@@ -98,7 +146,7 @@ export default class Entity extends Core {
 		);
 	}
 
-	_layoutSnapshot(component = null) {
+	_layoutSnapshot(component: ComponentReference = null): LayoutSnapshot {
 		const element = this._componentElement(component);
 		return {
 			secondary: this.elt.dataset.secondary === "true",
@@ -110,8 +158,10 @@ export default class Entity extends Core {
 		};
 	}
 
-	_layoutChanged(before, after) {
-		return Object.keys(before).some((key) => before[key] !== after[key]);
+	_layoutChanged(before: LayoutSnapshot, after: LayoutSnapshot) {
+		return Object.entries(before).some(
+			([key, value]) => value !== after[key as keyof LayoutSnapshot],
+		);
 	}
 
 	async updateLayout({
@@ -119,12 +169,12 @@ export default class Entity extends Core {
 		secondaryActive = null,
 		activeTabId = null,
 		mutate = null,
-	} = {}) {
+	}: EntityLayoutOptions = {}): Promise<EntityLayoutResult> {
 		const secondaryElement = this._componentElement(secondary);
 		const before = this._layoutSnapshot(secondaryElement);
-		let mutationResult = null;
-		let commitMutation = null;
-		let activeLayoutTabId = null;
+		let mutationResult: unknown = null;
+		let commitMutation: (() => void) | null = null;
+		let activeLayoutTabId: string | null = null;
 		let layoutChanged = false;
 
 		if (activeTabId) {
@@ -132,7 +182,7 @@ export default class Entity extends Core {
 		}
 		const preparedMutation = await mutate?.({ layoutChanged: false });
 		if (typeof preparedMutation === "function") {
-			commitMutation = preparedMutation;
+			commitMutation = () => preparedMutation();
 		} else {
 			mutationResult = preparedMutation;
 		}
@@ -180,23 +230,35 @@ export default class Entity extends Core {
 		return prepared.activeTabId;
 	}
 
-	async _prepareLayoutBody(secondaryElement = undefined) {
+	async _prepareLayoutBody(
+		secondaryElement?: HTMLElement | null,
+	): Promise<PreparedEntityLayout> {
 		const tabId = this._initialTabId();
 		const [tabs, secondary, activeTabId] = this._prerender(
 			tabId,
 			secondaryElement,
 		);
 		const activeTabElt = this._tabElement(activeTabId);
-		const layout = this.elt.querySelector("#layout");
+		const layout = this.elt.querySelector<HTMLElement>("#layout");
 
 		const activeTab = this.getComponent(activeTabElt);
+		if (!activeTab || !layout)
+			throw new Error(
+				"Entity layout requires an active tab and layout container",
+			);
 
 		await activeTab.activate("default");
 		await activeTab.prepareRender?.(true);
 		return { activeTab, activeTabId, layout, secondary, tabs };
 	}
 
-	_commitLayoutBody({ activeTab, activeTabId, layout, secondary, tabs }) {
+	_commitLayoutBody({
+		activeTab,
+		activeTabId,
+		layout,
+		secondary,
+		tabs,
+	}: PreparedEntityLayout) {
 		const mobileNav = this.mobileNav;
 		tabs.nav = this.mobile ? mobileNav : null;
 		Object.values(this.components).forEach((component) => {
@@ -219,12 +281,13 @@ export default class Entity extends Core {
 		return activeTabId;
 	}
 
-	_reconcileTabsCard(tabs, tabId) {
+	_reconcileTabsCard(tabs: ViewComponent, tabId: string) {
 		tabs.reconcile = () => {
-			tabs.nav.element.dataset.visible = this.mobile ? "false" : "true";
+			const nav = tabs.nav;
+			if (nav) nav.element.dataset.visible = this.mobile ? "false" : "true";
 
 			tabs.elt
-				.querySelectorAll("[lp-component][data-tab='true']")
+				.querySelectorAll<HTMLElement>("[lp-component][data-tab='true']")
 				.forEach((component) => {
 					component.dataset.visible = component.id === tabId ? "true" : "false";
 				});
@@ -233,16 +296,16 @@ export default class Entity extends Core {
 		};
 	}
 
-	_reconcileSecondaryCard(secondary, tabId) {
+	_reconcileSecondaryCard(secondary: ViewComponent, tabId: string) {
 		secondary.reconcile = () => {
 			if (this.mobile) {
 				secondary.elt.dataset.persistent = "false";
-				this.tabsCard.appendChild(secondary.elt);
+				this.tabsCard?.appendChild(secondary.elt);
 				secondary.elt.dataset.visible =
 					tabId === secondary.name ? "true" : "false";
 			} else {
 				secondary.elt.dataset.persistent = "true";
-				this.elt.querySelector("#layout").prepend(secondary.elt);
+				this.elt.querySelector("#layout")?.prepend(secondary.elt);
 				secondary.elt.dataset.visible = "true";
 			}
 
@@ -250,9 +313,13 @@ export default class Entity extends Core {
 		};
 	}
 
-	_prerender(tabId, secondaryElement = undefined) {
+	_prerender(
+		tabId: string | null,
+		secondaryElement?: HTMLElement | null,
+	): [ViewComponent, ViewComponent | null, string] {
 		tabId ??= this._defaultTabId;
 		const tabs = this.getComponent(this.tabsCard);
+		if (!tabs) throw new Error("Entity layout requires a tabs component");
 		const resolvedSecondary =
 			secondaryElement === undefined ? this.secondaryCard : secondaryElement;
 		const secondary = resolvedSecondary

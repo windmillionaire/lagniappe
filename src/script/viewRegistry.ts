@@ -1,3 +1,16 @@
+import type { ViewRoot, ViewSyncOptions } from "./views/base/shell.ts";
+
+interface ActiveView {
+	_destroyed: boolean;
+	init(): Promise<unknown>;
+	publish?(): unknown;
+	sync?(options?: ViewSyncOptions): Promise<unknown>;
+}
+
+interface ViewModule {
+	default: new (root: ViewRoot) => ActiveView;
+}
+
 const BUILD_ID =
 	typeof __BUILD_ID__ === "undefined" ? "development" : __BUILD_ID__;
 
@@ -5,6 +18,8 @@ const BUILD_ID =
  * One registry owns both build inputs and runtime view selection. `entry` is a
  * stable emitted filename; `source` is consumed by the Rollup configuration.
  */
+export type { ActiveView };
+
 export const VIEW_REGISTRY = Object.freeze({
 	project: { entry: "project", source: "./views/project.ts" },
 	page: { entry: "page", source: "./views/page.ts" },
@@ -30,12 +45,15 @@ export const VIEW_ENTRIES = Object.freeze(
 	),
 );
 
-export const viewEntryUrl = (kind) => {
-	const entry = VIEW_REGISTRY[kind]?.entry;
+export const viewEntryUrl = (kind: string | null | undefined) => {
+	if (!kind || !Object.hasOwn(VIEW_REGISTRY, kind)) return null;
+	const entry = VIEW_REGISTRY[kind as keyof typeof VIEW_REGISTRY].entry;
 	return entry ? `./chunks/views/${entry}.js?v=${BUILD_ID}` : null;
 };
 
-export const loadView = (kind) => {
+export const loadView = (
+	kind: string | null | undefined,
+): Promise<ViewModule> | null => {
 	const url = viewEntryUrl(kind);
 	if (!url) return null;
 	return import(url);

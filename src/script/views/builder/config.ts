@@ -1,4 +1,45 @@
-const CONFIG = {
+import type {
+	FieldType,
+	FormFieldSchema,
+	InputType,
+} from "../../types/forms.d.ts";
+
+export type ConditionList = "visibility" | "status" | "columns" | "options";
+export type ConditionName = ConditionList | "html" | "modify";
+type SettingName =
+	| ConditionList
+	| "title"
+	| "placeholder"
+	| "input"
+	| "location"
+	| "required"
+	| "multiple"
+	| "checked"
+	| "editor"
+	| "deleteButton";
+
+interface ComponentDefinition {
+	type: FieldType;
+	label: string;
+	icon?: string;
+}
+
+type ComponentChoice<T> = { type: T; name: string };
+type PresentationDefaults = Pick<FormFieldSchema, "input" | "location"> & {
+	title: string;
+};
+
+const CONFIG: {
+	FORM_COMPONENTS: readonly ComponentDefinition[];
+	PAGE_COMPONENTS: readonly ComponentDefinition[];
+	INPUTS: readonly ComponentChoice<InputType>[];
+	TABLE_COLUMNS: readonly ComponentChoice<
+		InputType | "in" | "out" | "checkbox"
+	>[];
+	LINKS: readonly ComponentChoice<"in" | "out">[];
+	PRESENTATION_DEFAULTS: Record<FieldType, PresentationDefaults>;
+	DEFAULT_SETTINGS: Record<FieldType, readonly SettingName[]>;
+} = {
 	FORM_COMPONENTS: [
 		{ type: "input", label: "Input" },
 		{ type: "link", label: "Link" },

@@ -1,7 +1,9 @@
-import { FormWidget } from "./base/formWidget.ts";
+import type { FormSubmitOptions } from "../forms/controller.ts";
+import type { FormRevisionResponse } from "../types/forms";
+import { FormWidget, type FormWidgetSettings } from "./base/formWidget.ts";
 
 export class PublicPermissions extends FormWidget {
-	constructor(attributes) {
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Update Public Permissions",
@@ -12,7 +14,9 @@ export class PublicPermissions extends FormWidget {
 }
 
 export class GroupPermissions extends FormWidget {
-	constructor(attributes) {
+	declare _submittedName: FormDataEntryValue | null;
+
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Update User Group",
@@ -22,7 +26,7 @@ export class GroupPermissions extends FormWidget {
 		this._submittedName = null;
 	}
 
-	async prepareSubmit(options) {
+	async prepareSubmit(options?: FormSubmitOptions) {
 		if (!(await super.prepareSubmit(options))) return false;
 		this._submittedName = this.formData.get("name");
 		return true;
@@ -33,14 +37,15 @@ export class GroupPermissions extends FormWidget {
 		await super.reset();
 	}
 
-	async prepareRevision(response) {
+	async prepareRevision(response: FormRevisionResponse) {
 		this._submittedName = null;
 		return super.prepareRevision(response);
 	}
 
 	postreconcile() {
 		const updated = this._updated;
-		const localName = this.target.querySelector("[name='name']")?.value;
+		const localName =
+			this.target.querySelector<HTMLInputElement>("[name='name']")?.value;
 		const newerDraft =
 			updated &&
 			this._submittedName !== null &&
@@ -50,15 +55,17 @@ export class GroupPermissions extends FormWidget {
 		this._submittedName = null;
 		if (!this.revisionPreview) {
 			const selector = Array.from(
-				this.component.elt.querySelectorAll(
+				this.component?.elt?.querySelectorAll<HTMLButtonElement>(
 					"[data-role='group-selectors'] button[data-key]",
-				),
+				) ?? [],
 			).find((button) => button.dataset.key === this.key);
 			const label = selector?.querySelector("[data-role='group-name']");
-			if (label) label.textContent = this.target.dataset.name;
+			if (label) label.textContent = this.target.dataset.name ?? "";
 		}
-		if (newerDraft) {
-			this.target.querySelector("[name='name']").value = localName;
+		if (newerDraft && localName !== undefined) {
+			const input =
+				this.target.querySelector<HTMLInputElement>("[name='name']");
+			if (input) input.value = localName;
 			this.markUnsavedState();
 		}
 	}

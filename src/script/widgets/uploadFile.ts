@@ -6,7 +6,14 @@ const FILE_DROPZONE_TEXT =
 	"Drop file here, click to upload, or tap to choose camera/files";
 
 export class FileUpload extends BaseUpload {
-	constructor(attributes) {
+	declare messages: Record<string, string>;
+	declare dropzone: ReturnType<typeof uploadElement.dropzone>;
+	declare processing: ReturnType<typeof uploadElement.processing>;
+	declare menuOptions: ("remove" | "replace" | "paste")[];
+	declare submitButton: HTMLButtonElement;
+	declare _created?: boolean;
+
+	constructor(attributes: ConstructorParameters<typeof BaseUpload>[0]) {
 		super(attributes);
 		this.messages = {
 			submit: "Upload File",
@@ -34,8 +41,10 @@ export class FileUpload extends BaseUpload {
 		return [this.dropzone.element, this.processing.element];
 	}
 
-	onFileAttached(_file, context) {
-		const fileCount = this.fileInput?.element.files.length || 0;
+	onFileAttached(
+		...[_file, context]: Parameters<BaseUpload["onFileAttached"]>
+	) {
+		const fileCount = this.fileInput?.element.files?.length || 0;
 		this.processing.prefill({
 			filename: context.filename,
 			isTextFile: context.isTextFile,

@@ -1,15 +1,28 @@
 import { setIcon } from "../shared/icons.ts";
 import { withTransition } from "../shared/transitions.ts";
-import Entity from "./base/entity.ts";
+import type { PagePhoto } from "../widgets/pagePhoto.ts";
+import type { SubcomponentEvent } from "./base/component.ts";
+import Entity, {
+	type EntityLayoutOptions,
+	type PreparedEntityLayout,
+} from "./base/entity.ts";
 
 export default class Page extends Entity {
+	declare photoHasImage: boolean;
+	declare photoOpen: boolean;
+	declare photoToolsOpen: boolean;
+	declare photoGenerationReturnOpen: boolean | null;
+	declare photoActiveTab?: string;
+	declare photoBusy?: boolean;
+	declare _taskChannelUnsubscribe?: (() => void) | null;
+
 	async reconcilePollingSubscriptions() {
 		await super.reconcilePollingSubscriptions();
 		const component = this.components.tasks;
 		const list = Object.values(component?.widgets || {}).find(
-			(widget) => widget.name === "PageTaskList" && widget.loaded,
+			(widget) => widget?.name === "PageTaskList" && widget.loaded,
 		);
-		if (!list || !this.PollingCoordinator) {
+		if (!component || !list || !this.PollingCoordinator) {
 			this._taskChannelUnsubscribe?.();
 			this._taskChannelUnsubscribe = null;
 			return;
@@ -52,12 +65,12 @@ export default class Page extends Entity {
 
 		await super.init();
 
-		const photo = this.elt.querySelector("#photo");
+		const photo = this.elt.querySelector<HTMLElement>("#photo");
 		if (photo) {
 			const component = this.getComponent(photo);
 			const initiallyVisible =
 				component?.active || this.isSecondaryCardVisible(photo);
-			if (initiallyVisible && !component.active) {
+			if (initiallyVisible && component && !component.active) {
 				await component.activate("PagePhoto");
 			}
 		}
@@ -68,7 +81,7 @@ export default class Page extends Entity {
 			? this.photoHasImage || this.photoToolsOpen
 			: this.photoOpen;
 		if (!available) return null;
-		return this.elt.querySelector("#photo");
+		return this.elt.querySelector<HTMLElement>("#photo");
 	}
 
 	_initialTabId() {
@@ -78,22 +91,22 @@ export default class Page extends Entity {
 			: tabId;
 	}
 
-	_tabChange(event) {
+	_tabChange(event: SubcomponentEvent) {
 		super._tabChange(event);
 		if (event.detail.subcomponent.elt.dataset.tab === "true") {
 			this._syncPhotoControls(event.detail.subcomponent.name);
 		}
 	}
 
-	async updateLayout(options = {}) {
+	async updateLayout(options: EntityLayoutOptions = {}) {
 		return super.updateLayout({
-			secondary: this.elt.querySelector("#photo"),
+			secondary: this.elt.querySelector<HTMLElement>("#photo"),
 			secondaryActive: Boolean(this.secondaryCard),
 			...options,
 		});
 	}
 
-	_commitLayoutBody(prepared) {
+	_commitLayoutBody(prepared: PreparedEntityLayout) {
 		const tabId = super._commitLayoutBody(prepared);
 		this._syncPhotoControls(tabId);
 		return tabId;
@@ -101,7 +114,9 @@ export default class Page extends Entity {
 
 	_syncPhotoControls(
 		tabId = this.photoActiveTab || this._initialTabId() || "info",
-		controls = this.elt.querySelector("[data-role='photo-prompt']"),
+		controls = this.elt.querySelector<HTMLElement>(
+			"[data-role='photo-prompt']",
+		),
 	) {
 		this.photoActiveTab = tabId;
 		if (!controls) return;
@@ -109,7 +124,10 @@ export default class Page extends Entity {
 			!this.mobile || (!this.photoHasImage && tabId === "info")
 				? "true"
 				: "false";
-		const toggle = controls.querySelector("[data-role='photo-upload']");
+		const toggle = controls.querySelector<HTMLButtonElement>(
+			"[data-role='photo-upload']",
+		);
+		if (!toggle) return;
 		const icon = this.photoHasImage
 			? this.photoOpen
 				? "visibility.visible"
@@ -122,7 +140,8 @@ export default class Page extends Entity {
 			: this.photoOpen
 				? "Close image upload"
 				: "Upload page image";
-		setIcon(toggle.querySelector("[data-icon]"), icon);
+		const iconElement = toggle.querySelector<HTMLElement>("[data-icon]");
+		if (iconElement) setIcon(iconElement, icon);
 		toggle.title = label;
 		toggle.setAttribute("aria-label", label);
 		toggle.setAttribute("aria-expanded", String(this.photoOpen));
@@ -130,7 +149,7 @@ export default class Page extends Entity {
 			button.disabled = Boolean(this.photoBusy);
 		});
 		this.elt
-			.querySelectorAll("button[lp-show='photo:active']")
+			.querySelectorAll<HTMLButtonElement>("button[lp-show='photo:active']")
 			.forEach((button) => {
 				// The mobile flipper reveals unselected tabs via data-visible.
 				// Keep unavailable image tabs hidden independently of selection.
@@ -138,24 +157,32 @@ export default class Page extends Entity {
 			});
 	}
 
-	setPhotoBusy(busy) {
+	setPhotoBusy(busy: boolean) {
 		this.photoBusy = busy;
 		this._syncPhotoControls();
 	}
 
-	async _photoClick(event) {
-		const button = event.target.closest(
+	async _photoClick(event: MouseEvent) {
+		const button = (
+			event.target as Element | null
+		)?.closest?.<HTMLButtonElement>(
 			"[data-role='photo-upload'], [data-role='photo-generate']",
 		);
 		if (!button || this.photoBusy) return;
 		const controls = button.closest("[data-role='photo-prompt']");
 		if (!controls) return;
-		const error = controls.querySelector("[data-role='photo-prompt-error']");
+		const error = controls.querySelector<HTMLElement>(
+			"[data-role='photo-prompt-error']",
+		);
+		if (!error) return;
 		error.dataset.visible = "false";
 		this.setPhotoBusy(true);
 		try {
 			const generate = button.dataset.role === "photo-generate";
-			const component = this.getComponent(this.elt.querySelector("#photo"));
+			const component = this.getComponent(
+				this.elt.querySelector<HTMLElement>("#photo"),
+			);
+			if (!component) return;
 			const open = generate || this.mobile || !this.photoOpen;
 			if (open) await component.activate("PagePhoto");
 			if (generate) this.photoGenerationReturnOpen ??= this.photoOpen;
@@ -167,20 +194,22 @@ export default class Page extends Entity {
 			await this.updateLayout({
 				activeTabId: this.mobile ? "photo" : null,
 				mutate: () => () => {
-					if (generate)
-						component.active.showGenerateForm({ transition: false });
-					else component.active?.hideGenerateForm({ transition: false });
+					const photo = component.active as PagePhoto | null;
+					if (generate) photo?.showGenerateForm({ transition: false });
+					else photo?.hideGenerateForm({ transition: false });
 				},
 			});
 		} catch (failure) {
-			error.textContent = failure.message || "Unable to show image tools.";
+			error.textContent =
+				(failure instanceof Error && failure.message) ||
+				"Unable to show image tools.";
 			error.dataset.visible = "true";
 		} finally {
 			this.setPhotoBusy(false);
 		}
 	}
 
-	async cancelPhotoGeneration(widget) {
+	async cancelPhotoGeneration(widget: Pick<PagePhoto, "hideGenerateForm">) {
 		this.photoOpen = this.photoGenerationReturnOpen ?? this.photoHasImage;
 		this.photoToolsOpen = this.photoOpen && !this.photoHasImage;
 		this.photoGenerationReturnOpen = null;
@@ -189,7 +218,7 @@ export default class Page extends Entity {
 			mutate: () => () => widget.hideGenerateForm({ transition: false }),
 		});
 		this.elt
-			.querySelector(
+			.querySelector<HTMLElement>(
 				this.mobile && this.secondaryCard
 					? "#photo [data-role='upload-menu']"
 					: "[data-role='photo-generate']",
@@ -197,7 +226,7 @@ export default class Page extends Entity {
 			?.focus();
 	}
 
-	async updatePhotoImage(hasImage, mutate) {
+	async updatePhotoImage(hasImage: boolean, mutate: () => void) {
 		this.photoHasImage = hasImage;
 		this.photoOpen = hasImage;
 		this.photoToolsOpen = false;
@@ -212,14 +241,15 @@ export default class Page extends Entity {
 		});
 	}
 
-	async _focusTask(taskId) {
+	async _focusTask(taskId: string) {
 		const taskTab = this.getComponent(this.elt.querySelector("#tasks"));
+		if (!taskTab) return;
 		await taskTab.activate("PageTaskList");
 		await taskTab.prepareRender(true);
 		await withTransition(() => taskTab.render(true), {
 			label: "page:focus-task-tab",
 		});
-		await taskTab.active.focusTask(taskId);
+		await taskTab.widgets.PageTaskList?.focusTask(taskId);
 		this._replaceFocusedTaskUrl();
 		this.postRender = null;
 	}

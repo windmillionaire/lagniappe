@@ -1,4 +1,77 @@
-const TOOLBAR_TOOLS = [
+import type { ChainedCommands } from "@tiptap/core";
+import type { STYLES } from "../../generated/styles.mjs";
+import type { SyncManager } from "../../shared/sync.ts";
+import type { FORM_REGISTRY, OPTION_REGISTRY } from "./options/registry.ts";
+
+type EditorSyncManager = Pick<SyncManager, "state" | "sendUpdates">;
+
+export interface EditorView {
+	_destroyed?: boolean;
+	dataset?: DOMStringMap;
+	online?: boolean;
+	isDragging?: boolean;
+	ensureSyncManager?():
+		| Promise<EditorSyncManager | null>
+		| EditorSyncManager
+		| null;
+	syncReady?: Promise<EditorSyncManager | null> | null;
+	SyncManager?: EditorSyncManager | null;
+	reportStartupError?(
+		error: unknown,
+		target: HTMLElement,
+		context: string,
+	): void;
+}
+
+export interface EditorEndpoints {
+	addImage?: string;
+	generateText?: string;
+	history?: string;
+}
+
+export interface EditorDocumentAttributes {
+	target: HTMLElement;
+	key?: string | null;
+	kind?: keyof typeof STYLES.editor.toolbar.container;
+	component?: { key?: string | null } | null;
+	endpoints?: EditorEndpoints;
+	readonly?: boolean;
+	view?: EditorView | null;
+}
+
+export type ToolbarOptionCommand = keyof typeof OPTION_REGISTRY;
+export type ToolbarFormCommand = keyof typeof FORM_REGISTRY;
+type ImageCommand = "setImageAlignment" | "setImageFloat" | "setImageWidth";
+type ToolCommand = ToolbarOptionCommand | ImageCommand;
+type CommandWithArgument =
+	| "toggleHeading"
+	| "setTextAlign"
+	| "insertTable"
+	| ImageCommand;
+export type ToolArgument = Parameters<ChainedCommands[CommandWithArgument]>[0];
+
+interface ToolLabel {
+	title: string;
+	icon: string;
+	name?: string;
+	form?: boolean;
+}
+
+export type ToolSettings = ToolLabel &
+	(
+		| {
+				[Key in CommandWithArgument]: {
+					command: Key;
+					args: NonNullable<Parameters<ChainedCommands[Key]>[0]>;
+				};
+		  }[CommandWithArgument]
+		| { command: Exclude<ToolCommand, CommandWithArgument>; args?: undefined }
+	);
+
+export type ToolbarTool = ToolSettings & { command: ToolbarOptionCommand };
+export type ToolbarMenu = ToolbarTool | (ToolLabel & { items: ToolbarTool[] });
+
+const TOOLBAR_TOOLS: ToolbarTool[] = [
 	{ command: "toggleBold", icon: "bold", title: "Bold", name: "bold" },
 	{ command: "toggleItalic", icon: "italic", title: "Italic", name: "italic" },
 	{ command: "undo", icon: "undo", title: "Undo" },
@@ -6,7 +79,7 @@ const TOOLBAR_TOOLS = [
 	{ command: "toggleFocus", icon: "maximize", title: "Toggle Focus" },
 ];
 
-const TOOLBAR_MENUS = {
+const TOOLBAR_MENUS: Record<string, ToolbarMenu> = {
 	style: {
 		icon: "textStyle",
 		title: "Style",
@@ -214,7 +287,7 @@ const TOOLBAR_MENUS = {
 	history: { command: "documentHistory", icon: "history", title: "History" },
 };
 
-const IMAGE_GROUPS = [
+const IMAGE_GROUPS: ToolSettings[][] = [
 	[
 		// Alignment
 		{

@@ -1,9 +1,16 @@
 import { STYLES } from "../../../generated/styles.mjs";
 import { IMAGE_GROUPS } from "../config.ts";
-import { ToolbarButton } from "./toolbarButtons.ts";
+import type { Toolbar } from "../toolbar.ts";
+import { runToolCommand, ToolbarButton } from "./toolbarButtons.ts";
 
 class ImageOptions {
-	constructor(toolbar) {
+	declare toggles: Record<string, ToolbarButton>;
+	declare imagePosition: string | null;
+	declare toolbar: Toolbar;
+	declare name: "setImage";
+	declare usedWithEditor: boolean;
+	declare active: boolean;
+	constructor(toolbar: Toolbar) {
 		this.toolbar = toolbar;
 		this.name = "setImage";
 		this.usedWithEditor = true;
@@ -27,7 +34,7 @@ class ImageOptions {
 				const option = new ToolbarButton(this.toolbar);
 				option.init(settings);
 				option.onClick = () => this.toggleOption(option);
-				this.toggles[option.name] = option;
+				this.toggles[String(option.name)] = option;
 				if (option.name) {
 					this.toolbar.options[option.name] = option;
 				}
@@ -41,7 +48,7 @@ class ImageOptions {
 		});
 	}
 
-	toggleOption(option) {
+	toggleOption(option: ToolbarButton) {
 		const currentOption = Object.values(this.toggles).find(
 			(toggle) => toggle.active && toggle.name,
 		);
@@ -49,7 +56,12 @@ class ImageOptions {
 		option.active ? option.enable() : option.disable();
 		currentOption?.disable();
 
-		this.toolbar.editor.chain()[option.command](option.args).run();
+		runToolCommand(
+			this.toolbar.editor.chain(),
+			option.command,
+			option.args,
+			true,
+		);
 	}
 }
 

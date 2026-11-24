@@ -1,4 +1,6 @@
 import { withTransition } from "../shared/transitions.ts";
+import type { RequestResult } from "../types/api";
+import type { LoadedWidget } from "../types/widgets";
 import { SitePublicPages } from "./siteSettings/publicPages.ts";
 
 const SECTION_STORAGE_KEY = "lagniappe:site-settings-section";
@@ -18,8 +20,29 @@ const SETTING_WIDGETS = {
  * is owned by a focused persistent widget.
  *
  */
+type SiteSettingsResponse = RequestResult<
+	Parameters<SitePublicPages["updated"]>[0]
+>;
+type SectionWidget = Pick<LoadedWidget, "opened" | "modified" | "destroy"> & {
+	updated?(response: SiteSettingsResponse): unknown;
+};
+interface SiteSettingsAttributes {
+	target: HTMLElement;
+	component: { loadWidget(name: string): Promise<LoadedWidget | null> };
+}
+
+/**
+ * Coordinates shared section chrome for the persistent site settings widgets.
+ */
 export class SiteSettings {
-	constructor(attributes) {
+	declare target: SiteSettingsAttributes["target"];
+	declare component: SiteSettingsAttributes["component"];
+	declare sections: Map<string, HTMLElement>;
+	declare settingWidgets: Map<string, SectionWidget>;
+	declare _sectionRequest: number;
+	declare modified?: boolean;
+
+	constructor(attributes: SiteSettingsAttributes) {
 		Object.assign(this, attributes);
 		this.sections = new Map();
 		this.settingWidgets = new Map();
@@ -33,9 +56,10 @@ export class SiteSettings {
 		this.target.addEventListener("click", this._click);
 
 		const savedSection = localStorage.getItem(SECTION_STORAGE_KEY);
-		const initialSection = this.sections.has(savedSection)
-			? savedSection
-			: DEFAULT_SECTION;
+		const initialSection =
+			savedSection && this.sections.has(savedSection)
+				? savedSection
+				: DEFAULT_SECTION;
 		await this.settingWidgets.get(initialSection)?.opened?.();
 		this._setOpenSection(initialSection, { persist: false });
 		this.target.setAttribute("initialized", "");
@@ -43,7 +67,7 @@ export class SiteSettings {
 
 	_collectSections() {
 		this.target
-			.querySelectorAll("[data-role='site-settings-section']")
+			.querySelectorAll<HTMLElement>("[data-role='site-settings-section']")
 			.forEach((section) => {
 				const name = section.dataset.section;
 				if (name) this.sections.set(name, section);
@@ -59,7 +83,7 @@ export class SiteSettings {
 		);
 		const target = this.sections
 			.get("public-pages")
-			?.querySelector("[data-widget='SitePublicPages']");
+			?.querySelector<HTMLElement>("[data-widget='SitePublicPages']");
 		if (target) {
 			const widget = new SitePublicPages({ target, kind: "page" });
 			await widget.init();
@@ -67,7 +91,7 @@ export class SiteSettings {
 		}
 	}
 
-	updated(response) {
+	updated(response: SiteSettingsResponse) {
 		this.settingWidgets.forEach((widget) => {
 			widget.updated?.(response);
 			widget.modified = true;
@@ -79,11 +103,15 @@ export class SiteSettings {
 	// assigns it as current. Child widgets do the actual response rendering.
 	postreconcile() {}
 
-	_click(event) {
-		const section = event.target.closest("[data-role='site-settings-section']");
+	_click(event: MouseEvent) {
+		const target = event.target;
+		if (!(target instanceof Element)) return;
+		const section = target.closest<HTMLElement>(
+			"[data-role='site-settings-section']",
+		);
 		if (!section || !this.target.contains(section)) return;
 
-		const toggle = event.target.closest("[data-role='expand']");
+		const toggle = target.closest("[data-role='expand']");
 		if (toggle) {
 			event.preventDefault();
 			event.stopPropagation();
@@ -91,17 +119,19 @@ export class SiteSettings {
 			return;
 		}
 
-		const header = event.target.closest("header");
+		const header = target.closest("header");
 		if (!header || !section.contains(header)) return;
-		if (event.target.closest("button, a, input, select, textarea")) return;
+		if (target.closest("button, a, input, select, textarea")) return;
 		void this._toggleSection(section.dataset.section);
 	}
 
-	async _toggleSection(name) {
+	async _toggleSection(name?: string) {
 		const nextOpen = !this._isSectionOpen(name);
 		const nextSection = nextOpen ? name : null;
 		const request = ++this._sectionRequest;
-		await this.settingWidgets.get(nextSection)?.opened?.();
+		await (nextSection
+			? this.settingWidgets.get(nextSection)?.opened?.()
+			: undefined);
 		if (request !== this._sectionRequest) return;
 
 		return withTransition(() => this._setOpenSection(nextSection), {
@@ -109,15 +139,19 @@ export class SiteSettings {
 		});
 	}
 
-	_setOpenSection(name, { persist = true } = {}) {
+	_setOpenSection(name: string | null | undefined, { persist = true } = {}) {
 		this.sections.forEach((section, sectionName) => {
 			const open = sectionName === name;
 			section.dataset.open = open ? "true" : "false";
 
-			const body = section.querySelector("[data-role='section-body']");
+			const body = section.querySelector<HTMLElement>(
+				"[data-role='section-body']",
+			);
 			if (body) body.dataset.visible = open ? "true" : "false";
 
-			const toggle = section.querySelector("[data-role='expand']");
+			const toggle = section.querySelector<HTMLButtonElement>(
+				"[data-role='expand']",
+			);
 			if (toggle) {
 				toggle.dataset.open = open ? "true" : "false";
 				toggle.setAttribute("aria-expanded", open ? "true" : "false");
@@ -135,8 +169,10 @@ export class SiteSettings {
 		}
 	}
 
-	_isSectionOpen(name) {
-		return this.sections.get(name)?.dataset.open === "true";
+	_isSectionOpen(name?: string) {
+		return (
+			name !== undefined && this.sections.get(name)?.dataset.open === "true"
+		);
 	}
 
 	destroy() {

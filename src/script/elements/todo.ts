@@ -1,14 +1,52 @@
 import { STYLES } from "../generated/styles.mjs";
 import { setIcon } from "../shared/icons.ts";
 import { areEqual } from "../shared/utilities.ts";
-import { BaseElement } from "./base/baseElement.ts";
+import {
+	BaseElement,
+	type ElementRenderer,
+	type ElementSchema,
+	type FormElementTarget,
+} from "./base/baseElement.ts";
 import { primitives } from "./primitives.ts";
 
-export const normalizeTodoValue = (value, { resetChecked = false } = {}) => {
-	if (!value || !Array.isArray(value.items)) return null;
+export interface TodoItem {
+	text: string;
+	checked: boolean;
+}
+
+interface TodoButton {
+	role: string;
+	icon: string;
+	label: string;
+	kind?: string | null;
+	header?: boolean;
+}
+
+function isTodoItem(
+	value: unknown,
+): value is { text: string; checked?: unknown } {
+	return Boolean(
+		value &&
+			typeof value === "object" &&
+			"text" in value &&
+			typeof value.text === "string",
+	);
+}
+
+export const normalizeTodoValue = (
+	value: unknown,
+	{ resetChecked = false } = {},
+) => {
+	if (
+		!value ||
+		typeof value !== "object" ||
+		!("items" in value) ||
+		!Array.isArray(value.items)
+	)
+		return null;
 
 	const items = value.items
-		.filter((item) => item && typeof item.text === "string")
+		.filter(isTodoItem)
 		.map((item) => ({
 			text: item.text.trim(),
 			checked: resetChecked ? false : item.checked === true,
@@ -19,7 +57,19 @@ export const normalizeTodoValue = (value, { resetChecked = false } = {}) => {
 };
 
 export class TodoElement extends BaseElement {
-	constructor(renderer, schema, submission) {
+	declare _input: HTMLInputElement | null;
+	declare _editing: boolean;
+	declare _draftVisible: boolean;
+	declare _draft: string;
+	declare _renamingIndex: number | null;
+	declare _renameValue: string;
+	declare _historyValue: unknown;
+
+	constructor(
+		renderer: ElementRenderer,
+		schema: ElementSchema,
+		submission?: unknown,
+	) {
 		super(renderer, schema, normalizeTodoValue(submission));
 		this._input = null;
 		this._editing = false;
@@ -43,12 +93,12 @@ export class TodoElement extends BaseElement {
 		return this._editing ? "edit" : "read";
 	}
 
-	changed(value) {
+	changed(value: unknown) {
 		return !areEqual(this.value, normalizeTodoValue(value));
 	}
 
 	_items() {
-		return (this.submission?.items || []).map((item) => ({ ...item }));
+		return normalizeTodoValue(this.submission)?.items ?? [];
 	}
 
 	_payloadItems() {
@@ -64,7 +114,7 @@ export class TodoElement extends BaseElement {
 		return items;
 	}
 
-	_setSubmission(value) {
+	_setSubmission(value: unknown) {
 		this.submission = normalizeTodoValue(value);
 		this._syncInput();
 	}
@@ -79,22 +129,24 @@ export class TodoElement extends BaseElement {
 		this._input?.dispatchEvent(new Event("change", { bubbles: true }));
 	}
 
-	_commitItems(items, { notify = true, render = true } = {}) {
+	_commitItems(items: TodoItem[], { notify = true, render = true } = {}) {
 		this._setSubmission({ items });
 		if (render) this._render();
 		if (notify) this._notifyChange();
 	}
 
-	_focus(role, { select = false } = {}) {
+	_focus(role: string, { select = false } = {}) {
 		queueMicrotask(() => {
-			const input = this._elt?.querySelector(`[data-role='${role}']`);
+			const input = this._elt?.querySelector<HTMLInputElement>(
+				`[data-role='${role}']`,
+			);
 			if (!input) return;
 			input.focus();
 			if (select) input.select();
 		});
 	}
 
-	_button({ role, icon, label, kind = null, header = false }) {
+	_button({ role, icon, label, kind = null, header = false }: TodoButton) {
 		const button = document.createElement("button");
 		button.type = "button";
 		button.dataset.role = role;
@@ -112,22 +164,27 @@ export class TodoElement extends BaseElement {
 		return button;
 	}
 
-	_checkbox(item, index, { disabled = false } = {}) {
+	_checkbox(
+		item: TodoItem,
+		index: number | "draft",
+		{ disabled = false } = {},
+	) {
 		const checkbox = primitives.checkbox({
 			checked: item.checked,
 			disabled,
 		});
 		const input = checkbox.querySelector("input");
+		if (!input) return checkbox;
 		input.dataset.role = "todo-check";
-		input.dataset.index = index;
+		input.dataset.index = String(index);
 		input.ariaLabel = `${item.checked ? "Uncheck" : "Check"} ${item.text}`;
 		return checkbox;
 	}
 
-	_itemRow(item, index) {
+	_itemRow(item: TodoItem, index: number) {
 		const row = document.createElement("li");
 		row.className = STYLES.form.todo.row;
-		row.dataset.index = index;
+		row.dataset.index = String(index);
 		row.appendChild(
 			this._checkbox(item, index, {
 				disabled: this.readonly || this._editing,
@@ -139,7 +196,7 @@ export class TodoElement extends BaseElement {
 			input.type = "text";
 			input.autocomplete = "off";
 			input.dataset.role = "todo-rename-input";
-			input.dataset.index = index;
+			input.dataset.index = String(index);
 			input.value = this._renameValue;
 			input.className = STYLES.form.todo.inlineInput;
 			input.ariaLabel = `Rename ${item.text}`;
@@ -147,7 +204,7 @@ export class TodoElement extends BaseElement {
 			const text = row.appendChild(document.createElement("button"));
 			text.type = "button";
 			text.dataset.role = "todo-rename";
-			text.dataset.index = index;
+			text.dataset.index = String(index);
 			text.textContent = item.text;
 			text.className = STYLES.form.todo.text;
 			text.ariaLabel = `Rename ${item.text}`;
@@ -212,7 +269,7 @@ export class TodoElement extends BaseElement {
 	}
 
 	_render() {
-		if (!this._elt) return;
+		if (!this._elt || !this._input) return;
 
 		this._elt.dataset.mode = this.mode;
 		this._elt.replaceChildren(this._input);
@@ -322,9 +379,12 @@ export class TodoElement extends BaseElement {
 		this._render();
 	}
 
-	_click(event) {
-		const target = event.target.closest("[data-role]");
-		if (!target || !this._elt.contains(target)) return;
+	_click(event: MouseEvent) {
+		const target =
+			event.target instanceof Element
+				? event.target.closest<HTMLElement>("[data-role]")
+				: null;
+		if (!target || !this._elt?.contains(target)) return;
 		const role = target.dataset.role;
 		const handled = new Set([
 			"todo-edit",
@@ -334,7 +394,7 @@ export class TodoElement extends BaseElement {
 			"todo-remove",
 			"todo-rename",
 		]);
-		if (!handled.has(role)) return;
+		if (!role || !handled.has(role)) return;
 
 		event.preventDefault();
 		event.stopPropagation();
@@ -354,7 +414,7 @@ export class TodoElement extends BaseElement {
 		} else if (role === "todo-remove") {
 			this._commitRename({ render: false });
 			const index = Number.parseInt(
-				target.closest("[data-index]")?.dataset.index ?? "",
+				target.closest<HTMLElement>("[data-index]")?.dataset.index ?? "",
 				10,
 			);
 			if (Number.isNaN(index)) return;
@@ -373,8 +433,11 @@ export class TodoElement extends BaseElement {
 		}
 	}
 
-	_change(event) {
-		const checkbox = event.target.closest("[data-role='todo-check']");
+	_change(event: Event) {
+		const checkbox =
+			event.target instanceof Element
+				? event.target.closest<HTMLInputElement>("[data-role='todo-check']")
+				: null;
 		if (!checkbox || this._editing || this.readonly) return;
 		const index = Number.parseInt(checkbox.dataset.index ?? "", 10);
 		const items = this._items();
@@ -383,18 +446,25 @@ export class TodoElement extends BaseElement {
 		this._setSubmission({ items });
 	}
 
-	_inputEvent(event) {
-		if (event.target.dataset.role === "todo-draft") {
-			this._draft = event.target.value;
+	_inputEvent(event: Event) {
+		const { target } = event;
+		if (!(target instanceof HTMLInputElement)) return;
+		if (target.dataset.role === "todo-draft") {
+			this._draft = target.value;
 			this._syncInput();
-		} else if (event.target.dataset.role === "todo-rename-input") {
-			this._renameValue = event.target.value;
+		} else if (target.dataset.role === "todo-rename-input") {
+			this._renameValue = target.value;
 			this._syncInput();
 		}
 	}
 
-	_keydown(event) {
-		const role = event.target.dataset.role;
+	_keydown(event: KeyboardEvent) {
+		const { target } = event;
+		const dataset = target && "dataset" in target ? target.dataset : null;
+		const role =
+			dataset && typeof dataset === "object" && "role" in dataset
+				? dataset.role
+				: null;
 		if (role === "todo-draft") {
 			if (event.key === "Enter" || (event.key === "Tab" && !event.shiftKey)) {
 				event.preventDefault();
@@ -419,7 +489,7 @@ export class TodoElement extends BaseElement {
 		}
 	}
 
-	fillFromHistory(value) {
+	fillFromHistory(value: unknown) {
 		const restored = normalizeTodoValue(value, { resetChecked: true });
 		if (!restored) return false;
 		this._editing = false;
@@ -432,7 +502,7 @@ export class TodoElement extends BaseElement {
 		return true;
 	}
 
-	addHistoryFill(value) {
+	addHistoryFill(value: unknown) {
 		this._historyValue =
 			typeof value === "function"
 				? value
@@ -441,7 +511,7 @@ export class TodoElement extends BaseElement {
 		return Boolean(this._elt?.querySelector("[data-role='history-fill']"));
 	}
 
-	updateSubmission(value) {
+	updateSubmission(value: unknown) {
 		this._editing = false;
 		this._draftVisible = false;
 		this._draft = "";
@@ -451,10 +521,10 @@ export class TodoElement extends BaseElement {
 	}
 
 	create() {
-		const elt = document.createElement("div");
+		const elt: FormElementTarget = document.createElement("div");
 		elt.id = this.id;
 		elt.className = `${STYLES.form.todo.container} form-element group/element`;
-		elt.dataset.kind = this.renderer.kind;
+		elt.dataset.kind = String(this.renderer.kind);
 		elt._lp_element = this;
 
 		this._elt = elt;

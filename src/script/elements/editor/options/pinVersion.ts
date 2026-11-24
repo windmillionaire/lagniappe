@@ -3,10 +3,21 @@ import { request } from "../../../shared/request.ts";
 import { buttons } from "../../buttons.ts";
 import { primitives } from "../../primitives.ts";
 
+import type { Toolbar } from "../toolbar.ts";
+
 class PinVersion {
-	constructor(toolbar) {
+	declare _active: boolean;
+	declare toolbar: Toolbar;
+	declare name: "pinVersion";
+	declare messages: Record<string, string>;
+	declare target: HTMLFormElement;
+	declare input: HTMLInputElement;
+	declare html: HTMLElement[];
+	declare form: FormController;
+
+	constructor(toolbar: Toolbar) {
 		this.toolbar = toolbar;
-		this.name = "pinVersion";
+		this.name = "pinVersion" as const;
 		this.messages = {
 			submit: "Pin Version",
 			submitting: "Pinning Version...",
@@ -20,7 +31,7 @@ class PinVersion {
 		return this._active;
 	}
 
-	set active(value) {
+	set active(value: boolean) {
 		this._active = value;
 		if (value) this.focus();
 	}
@@ -62,7 +73,7 @@ class PinVersion {
 			return;
 		}
 
-		const endpoint = this.toolbar.endpoints.history;
+		const endpoint = this.toolbar.endpoints?.history;
 		const html = this.toolbar.editor.getHTML();
 		const response = await request.post(`${endpoint}/pin`, { name, html });
 		if (!response?.ok) {
@@ -73,7 +84,7 @@ class PinVersion {
 
 		this.reset();
 		await this.toolbar.closeForm(this.name);
-		await this.toolbar.toggles.documentHistory?.refresh();
+		await this.toolbar.toggles.documentHistory?.refresh?.();
 	}
 
 	destroy() {

@@ -2,14 +2,26 @@ import { request } from "../shared/request.ts";
 import { withTransition } from "../shared/transitions.ts";
 import ShellView from "./base/shell.ts";
 
+interface RunDiagnostic {
+	schema_version: number;
+	job_id: string;
+	telemetry_id: string | null;
+	operation: object;
+	ai_generations: object[];
+	ai_record_query_limit: number;
+	ai_records_may_be_truncated: boolean;
+}
+
 export default class Analytics extends ShellView {
+	declare _analyticsToggle?: EventListener;
+
 	async init() {
 		await super.init();
 		if (!this._analyticsToggle) {
 			this._analyticsToggle = (event) => {
-				const group = event.target;
+				const group = event.target as HTMLDetailsElement | null;
 				if (
-					group.matches("details[data-role='analytics-prefix']") &&
+					group?.matches?.("details[data-role='analytics-prefix']") &&
 					group.open
 				) {
 					void this._loadGroup(group);
@@ -21,12 +33,16 @@ export default class Analytics extends ShellView {
 	}
 
 	destroy() {
-		this.elt.removeEventListener("toggle", this._analyticsToggle, true);
+		if (this._analyticsToggle)
+			this.elt.removeEventListener("toggle", this._analyticsToggle, true);
 		super.destroy();
 	}
 
-	_click(event) {
-		const copyButton = event.target.closest("[data-role='ai-run-copy']");
+	_click(event: MouseEvent) {
+		const target = event.target as Element | null;
+		const copyButton = target?.closest?.<HTMLButtonElement>(
+			"[data-role='ai-run-copy']",
+		);
 		if (copyButton && this.elt.contains(copyButton)) {
 			event.preventDefault();
 			event.stopPropagation();
@@ -34,7 +50,9 @@ export default class Analytics extends ShellView {
 			return;
 		}
 
-		const clearButton = event.target.closest("[data-role='analytics-clear']");
+		const clearButton = target?.closest?.<HTMLButtonElement>(
+			"[data-role='analytics-clear']",
+		);
 		if (clearButton && this.elt.contains(clearButton)) {
 			event.preventDefault();
 			event.stopPropagation();
@@ -45,7 +63,7 @@ export default class Analytics extends ShellView {
 		super._click(event);
 	}
 
-	async _loadGroup(group) {
+	async _loadGroup(group: HTMLDetailsElement) {
 		if (group.dataset.loaded === "true") return;
 
 		const target = group.querySelector("[data-role='analytics-events']");
@@ -67,34 +85,44 @@ export default class Analytics extends ShellView {
 		);
 	}
 
-	async _copyRun(button) {
-		if (button.disabled) return;
+	async _copyRun(button: HTMLButtonElement) {
+		const route = button.dataset.route;
+		if (button.disabled || !route) return;
 		const run = button.closest("[data-role='ai-run']");
-		const status = run.querySelector("[data-role='ai-run-copy-status']");
-		const fallback = run.querySelector("[data-role='ai-run-json-fallback']");
+		const status = run?.querySelector("[data-role='ai-run-copy-status']");
+		const fallback = run?.querySelector<HTMLTextAreaElement>(
+			"[data-role='ai-run-json-fallback']",
+		);
+		if (!status || !fallback) return;
 		button.disabled = true;
 		button.setAttribute("aria-busy", "true");
 		status.textContent = "Loading run JSON…";
 		fallback.dataset.visible = "false";
 
 		try {
-			const response = await request.get(button.dataset.route);
+			const response = await request.get<RunDiagnostic>(route);
 			if (!response?.ok || !response.job_id) {
 				status.textContent = "Unable to load run JSON. Try again.";
 				return;
 			}
-			const payload = {};
-			for (const key of [
-				"schema_version",
-				"job_id",
-				"telemetry_id",
-				"operation",
-				"ai_generations",
-				"ai_record_query_limit",
-				"ai_records_may_be_truncated",
-			]) {
-				payload[key] = response[key];
-			}
+			const {
+				schema_version,
+				job_id,
+				telemetry_id,
+				operation,
+				ai_generations,
+				ai_record_query_limit,
+				ai_records_may_be_truncated,
+			} = response;
+			const payload = {
+				schema_version,
+				job_id,
+				telemetry_id,
+				operation,
+				ai_generations,
+				ai_record_query_limit,
+				ai_records_may_be_truncated,
+			};
 			const text = JSON.stringify(payload, null, 2);
 			try {
 				await navigator.clipboard.writeText(text);
@@ -114,17 +142,20 @@ export default class Analytics extends ShellView {
 		}
 	}
 
-	async _clearRecords(button) {
-		if (button.disabled) return;
+	async _clearRecords(button: HTMLButtonElement) {
+		const route = button.dataset.route;
+		if (button.disabled || !route) return;
 
-		const panel = button.closest("[data-role='analytics-retention-panel']");
+		const panel = button.closest<HTMLElement>(
+			"[data-role='analytics-retention-panel']",
+		);
 		const dataset = panel?.dataset.dataset || "activity";
 		const originalContent = button.innerHTML;
 		button.disabled = true;
 		button.setAttribute("aria-busy", "true");
 		this._setRetentionStatus(panel, "Clearing records...");
 
-		const response = await request.delete(button.dataset.route);
+		const response = await request.delete<{ deleted: number }>(route);
 		if (!response?.ok) {
 			button.disabled = false;
 			button.removeAttribute("aria-busy");
@@ -148,8 +179,14 @@ export default class Analytics extends ShellView {
 		);
 	}
 
-	_setRetentionStatus(panel, message, kind = "page") {
-		const status = panel?.querySelector("[data-role='analytics-clear-status']");
+	_setRetentionStatus(
+		panel: HTMLElement | null,
+		message: string,
+		kind = "page",
+	) {
+		const status = panel?.querySelector<HTMLElement>(
+			"[data-role='analytics-clear-status']",
+		);
 		if (!status) return;
 
 		status.dataset.kind = kind;
@@ -157,23 +194,23 @@ export default class Analytics extends ShellView {
 		status.textContent = message;
 	}
 
-	async _refreshDashboard(dataset) {
+	async _refreshDashboard(dataset: string) {
 		const response = await request.get(
 			`${window.location.pathname}${window.location.search}`,
 		);
-		const view = response?.html?.querySelector(
-			"[lp-view][data-kind='analytics']",
-		);
-		if (!response?.ok || !view) return null;
+		const html = response?.html;
+		if (!response?.ok || !html) return null;
+		const view = html.querySelector("[lp-view][data-kind='analytics']");
+		if (!view) return null;
 
-		let panel = null;
+		let panel: HTMLElement | null | undefined;
 		await withTransition(
 			() => {
 				this.elt.innerHTML = view.innerHTML;
-				const retention = this.elt.querySelector(
+				const retention = this.elt.querySelector<HTMLDetailsElement>(
 					`[data-role='analytics-retention'][data-dataset='${dataset}']`,
 				);
-				panel = retention?.querySelector(
+				panel = retention?.querySelector<HTMLElement>(
 					"[data-role='analytics-retention-panel']",
 				);
 				if (retention) retention.open = true;

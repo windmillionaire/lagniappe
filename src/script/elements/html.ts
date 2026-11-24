@@ -1,8 +1,19 @@
 import { captureError, ENDPOINTS, request } from "../shared/index.ts";
-import { BaseElement } from "./base/baseElement.ts";
+import {
+	BaseElement,
+	type ElementRenderer,
+	type ElementSchema,
+} from "./base/baseElement.ts";
 
 export class HtmlElement extends BaseElement {
-	constructor(renderer, schema, submission) {
+	declare html: string | null;
+	declare _destroyed: boolean;
+
+	constructor(
+		renderer: ElementRenderer,
+		schema: ElementSchema,
+		submission?: unknown,
+	) {
 		super(renderer, schema, submission);
 		this.static = true;
 		this.html = null;
@@ -10,11 +21,15 @@ export class HtmlElement extends BaseElement {
 	}
 
 	async _getHtml() {
+		const form = this.renderer.form;
+		if (!form?.key) return "";
 		return await request
-			.get(ENDPOINTS.html(this.renderer.form.key, this.schema.id).getContent)
-			.then((response) => response.markup)
+			.get<{ markup: string }>(
+				ENDPOINTS.html(form.key, this.schema.id).getContent,
+			)
+			.then((response) => response?.markup ?? "")
 			.catch((error) => {
-				captureError(error, this.renderer.form.target, {
+				captureError(error, form.target, {
 					schema: this.schema,
 				});
 				return "";
@@ -27,7 +42,7 @@ export class HtmlElement extends BaseElement {
 		const elt = document.createElement("div");
 		elt.className = "html-content";
 
-		const fields = this.renderer.form.htmlFields;
+		const fields = this.renderer.form?.htmlFields;
 		if (fields && Object.hasOwn(fields, this.schema.id)) {
 			this.html = fields[this.schema.id];
 			elt.innerHTML = this.html;

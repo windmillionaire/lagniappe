@@ -1,7 +1,14 @@
 import { FONT_MENU } from "../config.ts";
 
+import type { Toolbar } from "../toolbar.ts";
+
 class FontFamilyPicker {
-	constructor(toolbar) {
+	declare toggles: Map<string, { active: boolean; button: HTMLButtonElement }>;
+	declare toolbar: Toolbar;
+	declare name: "setFontFamily";
+	declare usedWithEditor: boolean;
+	declare active: boolean;
+	constructor(toolbar: Toolbar) {
 		this.toolbar = toolbar;
 		this.name = "setFontFamily";
 		this.usedWithEditor = true;
@@ -9,7 +16,7 @@ class FontFamilyPicker {
 		this.toggles = new Map();
 	}
 
-	_fontToggle(style, name) {
+	_fontToggle(style: string, name: string) {
 		const fontButton = document.createElement("button");
 		fontButton.className = `cursor-pointer rounded bg-slate-200 px-3 py-1.5 text-base transition-transform hover:scale-110 hover:bg-slate-300 data-[active=true]:bg-slate-300 sm:text-sm`;
 		fontButton.textContent = name;
@@ -19,7 +26,7 @@ class FontFamilyPicker {
 		return fontButton;
 	}
 
-	setActiveFontStyle(activeFont) {
+	setActiveFontStyle(activeFont: string | null | undefined) {
 		this.toggles.forEach((toggle, style) => {
 			const isActive = style === activeFont;
 			if (isActive !== toggle.active) {
@@ -47,10 +54,13 @@ class FontFamilyPicker {
 		this.active = true;
 
 		fontOptions.addEventListener("click", (e) => {
-			const fontButton = e.target.closest("button");
+			const fontButton = (e.target as Element | null)?.closest("button");
 			if (!fontButton) return;
 
-			const toggle = this.toggles.get(fontButton.dataset.style);
+			const style = fontButton.dataset.style;
+			if (!style) return;
+			const toggle = this.toggles.get(style);
+			if (!toggle) return;
 
 			const currentActive = Array.from(this.toggles.values()).find(
 				(t) => t.active && t !== toggle,
@@ -64,11 +74,7 @@ class FontFamilyPicker {
 			fontButton.dataset.active = toggle.active ? "true" : "false";
 
 			if (toggle.active) {
-				this.toolbar.editor
-					.chain()
-					.focus()
-					.setFontFamily(fontButton.dataset.style)
-					.run();
+				this.toolbar.editor.chain().focus().setFontFamily(style).run();
 			} else {
 				this.toolbar.editor.chain().focus().unsetFontFamily().run();
 			}

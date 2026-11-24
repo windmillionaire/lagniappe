@@ -41,6 +41,7 @@ interface FormControllerWidget {
 }
 
 interface FormControllerSubForm {
+	target?: HTMLElement | null;
 	submitGroup: HTMLElement | null;
 	submitButton: HTMLButtonElement | null;
 	messages: FormMessages;
@@ -48,6 +49,7 @@ interface FormControllerSubForm {
 	deferred?: boolean;
 	applyDirectUploads?(data: FormData): FormData;
 	prepareSubmit?(options?: FormSubmitOptions): boolean | Promise<boolean>;
+	reset?(): void;
 }
 
 interface SubmitButtonAttributes {

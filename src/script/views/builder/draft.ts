@@ -1,5 +1,26 @@
+import type {
+	DraftContent,
+	DraftGenerationResponse,
+	DraftPublication,
+	DraftState,
+} from "./types.ts";
+
+const identity = (item: unknown) => {
+	const entry = item as { id?: unknown; value?: unknown } | null | undefined;
+	return entry?.id ?? entry?.value;
+};
+
 export class BuilderDraft {
-	constructor(state, baseline = null) {
+	declare state: DraftState;
+	declare saved: DraftState;
+	declare baseline: string | null;
+	declare revision: number;
+	declare past: DraftState[];
+	declare future: DraftState[];
+	declare group: string | null;
+	declare formDirty: boolean;
+
+	constructor(state: DraftState, baseline: string | null = null) {
 		this.state = structuredClone(state);
 		this.saved = structuredClone(state);
 		this.baseline = baseline;
@@ -11,28 +32,28 @@ export class BuilderDraft {
 		this.formDirty = false;
 	}
 
-	content(state = this.state) {
+	content(state: DraftState = this.state): DraftContent {
 		const { selected_id: _selection, ...content } = state;
 		return content;
 	}
 
-	equal(a, b) {
+	equal(a: DraftState, b: DraftState) {
 		return this.serialize(this.content(a)) === this.serialize(this.content(b));
 	}
 
-	equalForm(a, b) {
+	equalForm(a: DraftState, b: DraftState) {
 		const { html_fields: _aHtml, ...aForm } = this.content(a);
 		const { html_fields: _bHtml, ...bForm } = this.content(b);
 		return this.serialize(aForm) === this.serialize(bForm);
 	}
 
-	serialize(value) {
-		return JSON.stringify(value, (_key, item) =>
+	serialize(value: unknown) {
+		return JSON.stringify(value, (_key, item: unknown) =>
 			item && typeof item === "object" && !Array.isArray(item)
 				? Object.fromEntries(
 						Object.keys(item)
 							.sort()
-							.map((key) => [key, item[key]]),
+							.map((key) => [key, (item as Record<string, unknown>)[key]]),
 					)
 				: item,
 		);
@@ -46,7 +67,7 @@ export class BuilderDraft {
 		);
 	}
 
-	updateHtml(fieldId, html) {
+	updateHtml(fieldId: string, html: string) {
 		if (this.state.html_fields[fieldId] === html) return false;
 		// The Document editor owns its history. Typing never snapshots the form.
 		this.state.html_fields[fieldId] = html;
@@ -54,7 +75,7 @@ export class BuilderDraft {
 		return true;
 	}
 
-	record(state, group = null) {
+	record(state: DraftState, group: string | null = null) {
 		if (this.equal(this.state, state)) {
 			this.state.selected_id = state.selected_id;
 			return false;
@@ -73,7 +94,7 @@ export class BuilderDraft {
 		return true;
 	}
 
-	restoreForm(state) {
+	restoreForm(state: DraftState) {
 		const documents = new Set(
 			this.state.schema
 				.filter((field) => field.type === "html")
@@ -94,22 +115,24 @@ export class BuilderDraft {
 	}
 
 	undo() {
-		if (!this.past.length) return false;
+		const previous = this.past.pop();
+		if (!previous) return false;
 		this.future.push(structuredClone(this.state));
-		this.restoreForm(this.past.pop());
+		this.restoreForm(previous);
 		return true;
 	}
 
 	redo() {
-		if (!this.future.length) return false;
+		const next = this.future.pop();
+		if (!next) return false;
 		this.past.push(structuredClone(this.state));
-		this.restoreForm(this.future.pop());
+		this.restoreForm(next);
 		return true;
 	}
 
-	acknowledge(submitted, response) {
+	acknowledge(submitted: DraftState, response: DraftPublication) {
 		const replacement = response.image_urls || {};
-		const map = (state) => {
+		const map = (state: DraftState) => {
 			const result = structuredClone(state);
 			for (const [id, html] of Object.entries(result.html_fields || {})) {
 				result.html_fields[id] = Object.entries(replacement).reduce(
@@ -123,7 +146,11 @@ export class BuilderDraft {
 			}
 			return result;
 		};
-		const reconcile = (value, source, accepted) => {
+		const reconcile = (
+			value: unknown,
+			source: unknown,
+			accepted: unknown,
+		): unknown => {
 			if (this.serialize(value) === this.serialize(source))
 				return structuredClone(accepted);
 			if (
@@ -132,15 +159,15 @@ export class BuilderDraft {
 				Array.isArray(accepted)
 			) {
 				return value.map((entry, index) => {
-					const identity = entry?.id ?? entry?.value;
+					const key = identity(entry);
 					const original =
-						identity === undefined
+						key === undefined
 							? source[index]
-							: source.find((item) => (item?.id ?? item?.value) === identity);
+							: source.find((item) => identity(item) === key);
 					const saved =
-						identity === undefined
+						key === undefined
 							? accepted[index]
-							: accepted.find((item) => (item?.id ?? item?.value) === identity);
+							: accepted.find((item) => identity(item) === key);
 					return original && saved
 						? reconcile(entry, original, saved)
 						: structuredClone(entry);
@@ -155,12 +182,15 @@ export class BuilderDraft {
 				typeof accepted === "object" &&
 				!Array.isArray(value)
 			) {
-				const result = structuredClone(value);
+				const current = value as Record<string, unknown>;
+				const original = source as Record<string, unknown>;
+				const saved = accepted as Record<string, unknown>;
+				const result = structuredClone(current);
 				for (const key of new Set([
 					...Object.keys(source),
 					...Object.keys(accepted),
 				])) {
-					const merged = reconcile(value[key], source[key], accepted[key]);
+					const merged = reconcile(current[key], original[key], saved[key]);
 					if (merged === undefined) delete result[key];
 					else result[key] = merged;
 				}
@@ -169,8 +199,13 @@ export class BuilderDraft {
 			return structuredClone(value);
 		};
 		const unchanged = this.equal(this.state, submitted);
-		const apply = (state) => ({
-			...reconcile(map(state), map(submitted), response.draft),
+		const apply = (state: DraftState): DraftState => ({
+			// Reconciliation retains the draft shape and applies server-normalized values.
+			...(reconcile(
+				map(state),
+				map(submitted),
+				response.draft,
+			) as DraftContent),
 			selected_id: state.selected_id,
 		});
 		this.past = this.past.map(apply);
@@ -189,7 +224,11 @@ export class BuilderDraft {
 		return unchanged;
 	}
 
-	applyGeneration(response) {
+	applyGeneration(
+		response: Partial<
+			Pick<DraftGenerationResponse, "operations" | "html_fields">
+		>,
+	) {
 		const next = structuredClone(this.state);
 		const fields = new Map(next.schema.map((field) => [field.id, field]));
 		if (!Array.isArray(response.operations))

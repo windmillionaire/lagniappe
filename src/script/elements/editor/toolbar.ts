@@ -1,24 +1,121 @@
+import type { Editor, Range } from "@tiptap/core";
 import { STYLES } from "../../generated/styles.mjs";
+import type { Modal } from "../../shared/modal.ts";
 import { withTransition } from "../../shared/transitions.ts";
 import { debounce } from "../../shared/utilities.ts";
-import { TOOLBAR_MENUS, TOOLBAR_TOOLS } from "./config.ts";
+import type { DropdownItem } from "../combobox/dropdown.ts";
+import {
+	type EditorDocumentAttributes,
+	TOOLBAR_MENUS,
+	TOOLBAR_TOOLS,
+	type ToolbarFormCommand,
+	type ToolbarMenu,
+	type ToolbarOptionCommand,
+	type ToolbarTool,
+	type ToolSettings,
+} from "./config.ts";
 import { toolbarDropdown } from "./dropdowns.ts";
 import { MarkdownPastePrompt } from "./options/markdownPaste.ts";
 import { FORM_REGISTRY, OPTION_REGISTRY } from "./options/registry.ts";
 import { UserManager } from "./users.ts";
+import type { DocumentVersions } from "./versions.ts";
+
+type ToolbarDocument = EditorDocumentAttributes & {
+	editor: Editor | null;
+	container: HTMLElement;
+	draftOnly?: boolean;
+	addDraftImage?: (file: File) => string;
+	versions?: DocumentVersions;
+};
+
+export type ToolbarOption = Pick<DropdownItem, "name" | "html" | "onClick"> & {
+	active: boolean;
+	button: HTMLElement | null;
+	form?: boolean;
+	command?: ToolSettings["command"];
+	init(settings: ToolSettings): void;
+	enable?(): void;
+	disable?(): void;
+	isAvailable?(): boolean;
+	show?(): void;
+	refresh?(): Promise<void>;
+};
+
+interface ToolbarForm {
+	active: boolean;
+	usedWithEditor?: boolean;
+	init(): void | Promise<void>;
+	submit?(
+		submitter: HTMLButtonElement | HTMLInputElement | null,
+	): void | Promise<void>;
+	focus?(): void;
+	reset?(): void;
+	destroy?(): void;
+	captureSelection?(): void;
+	setActiveColor?(color: string | null | undefined): void;
+	setActiveFontStyle?(font: string | null | undefined): void;
+}
+
+const registeredOption = async <Key extends string, Option>(
+	load: () => Promise<Partial<Record<Key, new (toolbar: Toolbar) => Option>>>,
+	command: Key,
+	toolbar: Toolbar,
+) => {
+	const module = await load();
+	const OptionClass = module[command];
+	if (!OptionClass)
+		throw new Error(`Missing editor toolbar registration for ${command}`);
+	return new OptionClass(toolbar);
+};
+
+const isFormCommand = (
+	command: string | undefined,
+): command is ToolbarFormCommand =>
+	typeof command === "string" && Object.hasOwn(FORM_REGISTRY, command);
 
 const DEBOUNCE_DELAY_MS = 100;
 
 export class Toolbar {
-	constructor(document) {
+	declare document: ToolbarDocument;
+	declare editor: Editor;
+	declare kind: NonNullable<EditorDocumentAttributes["kind"]>;
+	declare endpoints: EditorDocumentAttributes["endpoints"];
+	declare aiCreate: boolean;
+	declare publicLimited: boolean;
+	declare error: HTMLElement | null;
+	declare active: ToolbarOption | null;
+	declare _destroyed: boolean;
+	declare editorState: ReturnType<typeof debounce<Toolbar, []>>;
+	declare toggleForm: ReturnType<
+		typeof debounce<Toolbar, [ToolbarFormCommand]>
+	>;
+	declare windowClick: Toolbar["_windowClick"];
+	declare editorClick: Toolbar["_editorClick"];
+	declare editorKeydown: Toolbar["_editorKeydown"];
+	declare editorLinkEdit: Toolbar["_editorLinkEdit"];
+	declare formSubmit: Toolbar["_formSubmit"];
+	declare submitFormOption: Toolbar["_submitFormOption"];
+	declare builder?: ConstructorParameters<typeof Modal>[0];
+	declare element: HTMLDivElement;
+	declare editorDom: HTMLElement | null;
+	declare options: Record<string, ToolbarOption>;
+	declare forms: Partial<Record<ToolbarFormCommand, ToolbarForm>>;
+	declare toggles: Partial<
+		Record<ToolSettings["command"] | ToolbarFormCommand, ToolbarOption>
+	>;
+	declare userManager: UserManager | null;
+	declare markdownPastePrompt: MarkdownPastePrompt | null;
+
+	constructor(document: ToolbarDocument) {
 		this._destroyed = false;
 		this.document = document;
+		if (!document.editor)
+			throw new Error("Toolbar requires an initialized editor");
 		this.editor = document.editor;
 		this.kind = document.kind || "default";
 		this.endpoints = document.endpoints;
 		this.publicLimited = document.target?.dataset?.publicLimited === "true";
 		this.aiCreate = document.target?.dataset?.aiCreate === "true";
-		this.element = null;
 		this.editorDom = null;
 		this.options = {};
 		this.forms = {};
@@ -60,20 +157,21 @@ export class Toolbar {
 		document.addEventListener("click", this.windowClick, { capture: true });
 	}
 
-	_windowClick(e) {
+	_windowClick(e: MouseEvent) {
 		const openForm = this.element.dataset.openForm;
-		if (openForm === "false") return;
+		if (!isFormCommand(openForm)) return;
 		if (this.document.view?.isDragging) return;
+		const target = e.target as Element | null;
 		const editorSurface =
-			this.document.container?.contains(e.target) ||
-			this.editor.view.dom.contains(e.target);
-		if (editorSurface && !e.target.closest("[role='listbox'], #modal")) {
+			this.document.container?.contains(target) ||
+			this.editor.view.dom.contains(target);
+		if (editorSurface && !target?.closest("[role='listbox'], #modal")) {
 			const form = this.forms[openForm];
 			form && !form.usedWithEditor && this.toggleForm(openForm);
 		}
 	}
 
-	async _editorKeydown(event) {
+	async _editorKeydown(event: KeyboardEvent) {
 		if (
 			(event.ctrlKey || event.metaKey) &&
 			!event.altKey &&
@@ -85,7 +183,7 @@ export class Toolbar {
 		}
 	}
 
-	async _editorLinkEdit(event) {
+	async _editorLinkEdit(event: CustomEvent<{ range: Range }>) {
 		event.preventDefault();
 		event.stopPropagation();
 
@@ -122,10 +220,10 @@ export class Toolbar {
 
 		const style = this.editor.getAttributes("textStyle");
 		if (this.forms.setColor) {
-			this.forms.setColor.setActiveColor(style.color);
+			this.forms.setColor.setActiveColor?.(style.color);
 		}
 		if (this.forms.setFontFamily) {
-			this.forms.setFontFamily.setActiveFontStyle(style.fontFamily);
+			this.forms.setFontFamily.setActiveFontStyle?.(style.fontFamily);
 		}
 
 		const activeOptions = new Set(marks.map((mark) => mark.type.name));
@@ -151,25 +249,28 @@ export class Toolbar {
 
 		for (const [key, option] of Object.entries(this.options)) {
 			const isActive =
-				activeOptions.has(key) || this.editor.isActive(option.name);
+				activeOptions.has(key) ||
+				(option.name ? this.editor.isActive(option.name) : false);
 			if (option.active !== isActive) {
-				isActive ? option.enable() : option.disable();
+				isActive ? option.enable?.() : option.disable?.();
 			}
 		}
 	}
 
-	_formSubmit(e) {
+	_formSubmit(e: SubmitEvent) {
 		e.preventDefault();
 		e.stopPropagation();
-		this.submitFormOption(e.submitter);
+		this.submitFormOption(
+			e.submitter as HTMLButtonElement | HTMLInputElement | null,
+		);
 	}
 
-	_submitFormOption(submitter) {
-		const form = this.forms[this.element.dataset.openForm];
-		if (form) form.submit(submitter);
+	_submitFormOption(submitter: HTMLButtonElement | HTMLInputElement | null) {
+		const command = this.element.dataset.openForm;
+		if (isFormCommand(command)) this.forms[command]?.submit?.(submitter);
 	}
 
-	async openForm(command) {
+	async openForm(command: ToolbarFormCommand) {
 		const form = this.forms[command];
 		if (this.element.dataset.openForm === command && form?.active) {
 			this._focusForm(command);
@@ -180,14 +281,14 @@ export class Toolbar {
 		this._focusForm(command);
 	}
 
-	async closeForm(command) {
+	async closeForm(command: ToolbarFormCommand) {
 		const form = this.forms[command];
 		if (this.element.dataset.openForm !== command || !form?.active) return;
 
 		await this._toggleForm(command);
 	}
 
-	_focusForm(command) {
+	_focusForm(command: ToolbarFormCommand) {
 		const focus = () => {
 			const form = this.forms[command];
 			if (this.element.dataset.openForm === command && form?.active) {
@@ -199,16 +300,22 @@ export class Toolbar {
 		requestAnimationFrame(focus);
 	}
 
-	async _loadOption(command, settings) {
-		const module = await OPTION_REGISTRY[command]();
-		const option = new module[command](this);
+	async _loadOption(command: ToolbarOptionCommand, settings: ToolSettings) {
+		const option = await registeredOption<ToolbarOptionCommand, ToolbarOption>(
+			OPTION_REGISTRY[command],
+			command,
+			this,
+		);
 		option.init(settings);
 		return option;
 	}
 
-	async _loadForm(command) {
-		const module = await FORM_REGISTRY[command]();
-		const form = new module[command](this);
+	async _loadForm(command: ToolbarFormCommand) {
+		const form = await registeredOption<ToolbarFormCommand, ToolbarForm>(
+			FORM_REGISTRY[command],
+			command,
+			this,
+		);
 		form.init();
 		return form;
 	}
@@ -230,17 +337,17 @@ export class Toolbar {
 		const buttons = await Promise.all(
 			TOOLBAR_TOOLS.map((tool) => this._createToolbarButton(tool)),
 		);
-		primaryTools.append(...buttons.filter(Boolean));
+		primaryTools.append(...buttons.filter((button) => button !== null));
 
 		const dropdownButtons = await Promise.all(
 			Object.values(TOOLBAR_MENUS).map(async (menu) => {
 				return await this._createToolbarMenu(menu);
 			}),
 		);
-		menuTools.append(...dropdownButtons.filter(Boolean));
+		menuTools.append(...dropdownButtons.filter((button) => button !== null));
 	}
 
-	_toolAllowed(tool) {
+	_toolAllowed(tool: ToolbarTool) {
 		if (
 			this.document.draftOnly &&
 			["documentHistory", "toggleFocus", "generateText"].includes(tool.command)
@@ -251,7 +358,7 @@ export class Toolbar {
 		return true;
 	}
 
-	async _createToolbarButton(tool) {
+	async _createToolbarButton(tool: ToolbarTool) {
 		if (!this._toolAllowed(tool)) return null;
 
 		const option = await this._loadOption(tool.command, tool);
@@ -263,8 +370,8 @@ export class Toolbar {
 		return option.button;
 	}
 
-	async _createToolbarMenu(menu) {
-		if (menu.command) return this._createToolbarButton(menu);
+	async _createToolbarMenu(menu: ToolbarMenu) {
+		if ("command" in menu) return this._createToolbarButton(menu);
 		const menuItems = menu.items.filter((item) => this._toolAllowed(item));
 		const items = await Promise.all(
 			menuItems.map((item) => this._loadOption(item.command, item)),
@@ -273,7 +380,7 @@ export class Toolbar {
 		items.forEach((item) => {
 			if (item.name) {
 				this.options[item.name] = item;
-			} else if (item.form) {
+			} else if (item.form && item.command) {
 				this.toggles[item.command] = item;
 			}
 		});
@@ -284,7 +391,7 @@ export class Toolbar {
 		return dropdownButton;
 	}
 
-	async _toggleForm(command) {
+	async _toggleForm(command: ToolbarFormCommand) {
 		const form = this.forms[command];
 		const toggle = this.toggles[command];
 		const loaded = form || (await this._loadForm(command));
@@ -294,13 +401,13 @@ export class Toolbar {
 				if (form) {
 					form.active = !form.active;
 					this.element.dataset.openForm = form.active ? command : "false";
-					form.active ? toggle?.enable() : toggle?.disable();
+					form.active ? toggle?.enable?.() : toggle?.disable?.();
 					if (!form.active && form.reset) form.reset();
 				} else {
 					this.forms[command] = loaded;
 					this.element.dataset.openForm = command;
 					loaded.active = true;
-					toggle?.enable();
+					toggle?.enable?.();
 				}
 			},
 			{ label: `editor:toggle-${command}` },

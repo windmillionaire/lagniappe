@@ -1,10 +1,41 @@
+import type { Editor } from "@tiptap/core";
 import * as Y from "yjs";
 import { STYLES } from "../../generated/styles.mjs";
 import { request } from "../../shared/request.ts";
 import { base64ToUint8Array } from "../../shared/utilities.ts";
+import type { DocumentState, PersistedSyncRecord } from "../../types/sync.d.ts";
+import type { CollaborativeDocument } from "./collaborative.ts";
 import { previewEditor } from "./editor.ts";
 
-export function incomingReplacements(ydoc, remote, offline = null) {
+export interface DocumentVersionEntry {
+	key: string;
+	name: string;
+	created?: string;
+	pinned?: boolean;
+	backup?: boolean;
+}
+
+interface DocumentVersionMarkup {
+	markup: string;
+}
+
+const isReplacement = (
+	value: unknown,
+): value is Pick<DocumentVersionEntry, "key" | "name"> =>
+	Boolean(
+		value &&
+			typeof value === "object" &&
+			"key" in value &&
+			typeof value.key === "string" &&
+			"name" in value &&
+			typeof value.name === "string",
+	);
+
+export function incomingReplacements(
+	ydoc: Y.Doc,
+	remote: DocumentState | null,
+	offline: PersistedSyncRecord | null = null,
+) {
 	const candidate = new Y.Doc();
 	try {
 		Y.applyUpdate(candidate, Y.encodeStateAsUpdate(ydoc));
@@ -19,10 +50,8 @@ export function incomingReplacements(ydoc, remote, offline = null) {
 				Y.applyUpdate(candidate, base64ToUint8Array(change.update));
 		}
 		return [...candidate.getMap("lagniappeReplacements")].filter(
-			([id, value]) =>
-				!known.has(id) &&
-				typeof value?.key === "string" &&
-				typeof value?.name === "string",
+			(entry): entry is [string, Pick<DocumentVersionEntry, "key" | "name">] =>
+				!known.has(entry[0]) && isReplacement(entry[1]),
 		);
 	} finally {
 		candidate.destroy();
@@ -30,7 +59,13 @@ export function incomingReplacements(ydoc, remote, offline = null) {
 }
 
 export class DocumentVersions {
-	constructor(doc) {
+	declare doc: CollaborativeDocument;
+	declare selection: number;
+	declare banner?: HTMLDivElement;
+	declare previewPanel?: HTMLElement | null;
+	declare previewInstance?: Editor | null;
+
+	constructor(doc: CollaborativeDocument) {
 		this.doc = doc;
 		this.selection = 0;
 	}
@@ -43,7 +78,7 @@ export class DocumentVersions {
 		);
 	}
 
-	async pin(html, name, identity) {
+	async pin(html: string, name: string, identity: string | string[]) {
 		const digest = await crypto.subtle.digest(
 			"SHA-256",
 			new TextEncoder().encode(JSON.stringify([identity, html])),
@@ -51,11 +86,14 @@ export class DocumentVersions {
 		const recovery_id = Array.from(new Uint8Array(digest), (byte) =>
 			byte.toString(16).padStart(2, "0"),
 		).join("");
-		const response = await request.post(`${this.endpoint}/pin`, {
-			html,
-			name: name.slice(0, 100),
-			recovery_id,
-		});
+		const response = await request.post<{ entry: DocumentVersionEntry }>(
+			`${this.endpoint}/pin`,
+			{
+				html,
+				name: name.slice(0, 100),
+				recovery_id,
+			},
+		);
 		if (!response?.ok || !response.entry)
 			throw new Error(
 				response?.error ||
@@ -64,7 +102,7 @@ export class DocumentVersions {
 		return response.entry;
 	}
 
-	async beforeSync(remote) {
+	async beforeSync(remote: DocumentState) {
 		const doc = this.doc;
 		if (doc._versionBusy) return false;
 		const changes = incomingReplacements(doc.ydoc, remote, doc.offlineRecord);
@@ -78,11 +116,11 @@ export class DocumentVersions {
 		doc._versionBusy = true;
 		doc.editor.setEditable(false);
 		try {
-			let recovery;
+			let recovery: DocumentVersionEntry | undefined;
 			if (hasDraft) {
 				// A mounted editor may contain newer work than its persisted draft.
 				// Preserve both when they differ, before applying any remote deletes.
-				const drafts = new Set();
+				const drafts = new Set<string>();
 				if (typeof doc.offlineRecord?.html === "string")
 					drafts.add(doc.offlineRecord.html);
 				if (doc._dirty || !drafts.size) drafts.add(doc.editor.getHTML());
@@ -95,11 +133,11 @@ export class DocumentVersions {
 				}
 			}
 			if (doc._destroyed) return false;
-			const previous = changes.at(-1)[1];
+			const previous = changes[changes.length - 1][1];
 			this.notice("Document replaced.", previous, recovery);
 			return true;
 		} catch (error) {
-			this.notice(error.message);
+			this.notice(error instanceof Error ? error.message : String(error));
 			return false;
 		} finally {
 			doc._versionBusy = false;
@@ -107,7 +145,7 @@ export class DocumentVersions {
 		}
 	}
 
-	button(label, action) {
+	button(label: string, action: (event: MouseEvent) => unknown) {
 		const button = document.createElement("button");
 		button.type = "button";
 		button.className = STYLES.link.default;
@@ -116,7 +154,11 @@ export class DocumentVersions {
 		return button;
 	}
 
-	notice(message, previous = null, recovery = null) {
+	notice(
+		message: string,
+		previous: DocumentVersionEntry | null = null,
+		recovery: DocumentVersionEntry | null = null,
+	) {
 		if (this.doc.headless || this.doc._destroyed) return;
 		this.banner?.remove();
 		this.banner = document.createElement("div");
@@ -140,15 +182,18 @@ export class DocumentVersions {
 		this.doc.target.insertBefore(this.banner, this.doc.container);
 	}
 
-	async preview(entry) {
+	async preview(entry: DocumentVersionEntry) {
 		const selection = ++this.selection;
 		const url = `${this.endpoint}/${entry.backup ? "backups/" : ""}${encodeURIComponent(entry.key)}`;
-		const response = await request.get(url, { refresh: Date.now() });
+		const response = await request.get<DocumentVersionMarkup>(url, {
+			refresh: Date.now(),
+		});
 		if (selection !== this.selection || this.doc._destroyed) return;
 		if (typeof response?.markup !== "string") {
 			this.notice(response?.error || "Unable to load this version.");
 			return;
 		}
+		const markup = response.markup;
 		this.closePreview(false);
 		const doc = this.doc;
 		this.previewPanel = document.createElement("section");
@@ -164,16 +209,14 @@ export class DocumentVersions {
 		);
 		if (!doc.readonly)
 			controls.append(
-				this.button("Restore this version", () =>
-					this.restore(response.markup),
-				),
+				this.button("Restore this version", () => this.restore(markup)),
 			);
 		this.previewPanel.append(controls);
 		const surface = document.createElement("div");
 		surface.className = STYLES.editor.container;
 		surface.dataset.role = "version-content";
 		this.previewPanel.append(surface);
-		this.previewInstance = previewEditor(surface, response.markup);
+		this.previewInstance = previewEditor(surface, markup);
 		doc.target.insertBefore(this.previewPanel, doc.container);
 		if (this.banner) this.banner.hidden = true;
 		doc.container.hidden = true;
@@ -191,9 +234,15 @@ export class DocumentVersions {
 		if (this.doc.toolbar?.element) this.doc.toolbar.element.hidden = false;
 	}
 
-	async restore(markup) {
+	async restore(markup: string) {
 		const doc = this.doc;
-		if (doc._versionBusy || doc._destroyed || doc.readonly) return;
+		if (
+			doc._versionBusy ||
+			doc._destroyed ||
+			doc.readonly ||
+			!this.previewPanel
+		)
+			return;
 		if (!doc.view?.online) {
 			this.notice(
 				"Reconnect to preserve the current version before restoring.",
@@ -219,7 +268,7 @@ export class DocumentVersions {
 			this.closePreview();
 			this.notice("Version restored.", previous);
 		} catch (error) {
-			this.notice(error.message);
+			this.notice(error instanceof Error ? error.message : String(error));
 		} finally {
 			doc._versionBusy = false;
 			if (this.previewPanel) this.previewPanel.inert = false;

@@ -2,7 +2,27 @@ import { STYLES } from "../generated/styles.mjs";
 import { createIcon, setIcon } from "../shared/icons.ts";
 import { formatting } from "./formatting.ts";
 
-const buttonContents = (icon, text) => {
+interface ButtonAttributes {
+	text?: string;
+	type?: HTMLButtonElement["type"];
+	icon?: string | null;
+	style?: string;
+	kind?: string | null;
+	role?: string | null;
+	data?: Record<string, string | number | boolean | null | undefined>;
+	classes?: string[];
+}
+
+interface ActiveButtonAttributes extends ButtonAttributes {
+	existingButton?: HTMLButtonElement | null;
+	defaultText?: string | null;
+	processingText?: string | false | null;
+	processingIcon?: string | null;
+	completedText?: string | null;
+	completedIcon?: string | null;
+}
+
+const buttonContents = (icon: string | null, text: string) => {
 	if (icon && text) {
 		return formatting.iconLabel({
 			icon,
@@ -19,7 +39,7 @@ const buttonContents = (icon, text) => {
 	return textElt;
 };
 
-const submit = (attributes) => {
+const submit = (attributes: ButtonAttributes) => {
 	return button({
 		type: "submit",
 		style: STYLES.button.submit,
@@ -27,7 +47,7 @@ const submit = (attributes) => {
 	});
 };
 
-const button = (attributes) => {
+const button = (attributes: ButtonAttributes) => {
 	const {
 		text = "",
 		type = "button",
@@ -49,7 +69,7 @@ const button = (attributes) => {
 	if (role) buttonElt.dataset.role = role;
 
 	for (const [k, v] of Object.entries(data)) {
-		if (v != null) buttonElt.dataset[k] = v;
+		if (v != null) buttonElt.dataset[k] = String(v);
 	}
 
 	if (classes.length > 0) {
@@ -59,7 +79,7 @@ const button = (attributes) => {
 	return buttonElt;
 };
 
-const active = (attributes) => {
+const active = (attributes: ActiveButtonAttributes) => {
 	const buttonElt = attributes.existingButton || button(attributes);
 	const {
 		defaultText = attributes.defaultText ||
@@ -72,8 +92,8 @@ const active = (attributes) => {
 			buttonElt.textContent,
 		completedIcon = attributes.completedIcon || attributes.icon,
 	} = attributes;
-	const setState = (icon, text) => {
-		let textElt = buttonElt.querySelector("[data-role='text']");
+	const setState = (icon: string | null | undefined, text: string | null) => {
+		let textElt = buttonElt.querySelector<HTMLElement>("[data-role='text']");
 		if (!textElt) {
 			textElt = document.createElement("span");
 			textElt.dataset.role = "text";
@@ -81,7 +101,7 @@ const active = (attributes) => {
 		}
 		textElt.textContent = text;
 
-		let iconElt = buttonElt.querySelector("[data-role='icon']");
+		let iconElt = buttonElt.querySelector<HTMLElement>("[data-role='icon']");
 		if (!iconElt) {
 			iconElt = document.createElement("span");
 			iconElt.dataset.role = "icon";
@@ -101,14 +121,20 @@ const active = (attributes) => {
 
 	return {
 		element: buttonElt,
-		activate: (activeText = null, kind = null) => {
+		activate: (
+			activeText: string | null = null,
+			kind: string | null = null,
+		) => {
 			buttonElt.disabled = true;
 			const text = activeText || processingText || defaultText;
 
 			if (kind) buttonElt.dataset.kind = kind;
 			setState(processingIcon, text);
 		},
-		deactivate: (inactiveText = null, kind = null) => {
+		deactivate: (
+			inactiveText: string | null = null,
+			kind: string | null = null,
+		) => {
 			buttonElt.disabled = false;
 			const text = inactiveText || completedText || defaultText;
 

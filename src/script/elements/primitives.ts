@@ -1,10 +1,87 @@
 import { STYLES } from "../generated/styles.mjs";
 import { setIcon } from "../shared/icons.ts";
 
-const setAttributes = (elt, attributes) => {
+type DataAttributes = Record<
+	string,
+	string | number | boolean | null | undefined
+>;
+
+interface PrimitiveStyles {
+	label?: string;
+	container?: string;
+	icon?: string;
+	input?: string;
+	textarea?: string;
+	checkbox?: string;
+	radio?: string;
+	select?: string;
+	badge?: string;
+	text?: string;
+}
+
+interface LabelAttributes<Tag extends keyof HTMLElementTagNameMap = "label"> {
+	label?: string | false | null;
+	icon?: string | null;
+	role?: string;
+	tag?: Tag;
+	styles?: PrimitiveStyles;
+}
+
+interface ControlAttributes
+	extends LabelAttributes<keyof HTMLElementTagNameMap> {
+	name?: string | null;
+	id?: string | null;
+	value?: unknown;
+	required?: boolean;
+	disabled?: boolean;
+	kind?: string | null;
+	index?: number | string | null;
+	data?: DataAttributes;
+}
+
+interface TextControlAttributes extends ControlAttributes {
+	placeholder?: string | null;
+}
+
+interface InputAttributes extends TextControlAttributes {
+	type?: string;
+}
+
+interface TextareaAttributes extends TextControlAttributes {
+	rows?: number;
+}
+
+interface CheckAttributes extends ControlAttributes {
+	checked?: boolean;
+	visible?: boolean;
+}
+
+interface SelectOption {
+	value: string;
+	label: string;
+	details?: object;
+	selected?: boolean;
+}
+
+interface SelectAttributes extends TextControlAttributes {
+	options?: readonly SelectOption[];
+	selectIcon?: string;
+}
+
+type PrimitiveControl = (
+	| HTMLInputElement
+	| HTMLTextAreaElement
+	| HTMLSelectElement
+	| HTMLButtonElement
+) & { readOnly?: boolean; required?: boolean };
+
+const setAttributes = (
+	elt: PrimitiveControl,
+	attributes: ControlAttributes,
+) => {
 	if (attributes.name) elt.name = attributes.name;
 	if (attributes.id) elt.id = attributes.id;
-	if (attributes.value != null) elt.value = attributes.value;
+	if (attributes.value != null) elt.value = String(attributes.value);
 	if (attributes.required) elt.required = true;
 
 	if (attributes.disabled) {
@@ -14,11 +91,20 @@ const setAttributes = (elt, attributes) => {
 		elt.disabled = true;
 	}
 	for (const [k, v] of Object.entries(attributes.data || {})) {
-		if (v != null) elt.dataset[k] = v;
+		if (v != null) elt.dataset[k] = String(v);
 	}
 };
 
-export const label = (attributes) => {
+export function label<Tag extends keyof HTMLElementTagNameMap>(
+	attributes: LabelAttributes<Tag> & { tag: Tag },
+): HTMLElementTagNameMap[Tag];
+export function label(attributes: LabelAttributes<"label">): HTMLLabelElement;
+export function label(
+	attributes: LabelAttributes<keyof HTMLElementTagNameMap>,
+): HTMLElement;
+export function label(
+	attributes: LabelAttributes<keyof HTMLElementTagNameMap>,
+) {
 	const {
 		label,
 		icon,
@@ -37,16 +123,20 @@ export const label = (attributes) => {
 		const iconElt = container.appendChild(document.createElement("span"));
 		setIcon(iconElt, icon, styles.icon ?? STYLES.icon.default);
 		const span = container.appendChild(document.createElement("span"));
-		span.textContent = label;
+		span.textContent = label == null ? null : String(label);
 	} else {
 		const span = container.appendChild(document.createElement("span"));
-		span.textContent = label;
+		span.textContent = label == null ? null : String(label);
 	}
 
 	return labelElt;
-};
+}
 
-export const input = (attributes) => {
+export function input(
+	attributes: InputAttributes & { label?: null | false | "" },
+): HTMLInputElement;
+export function input(attributes: InputAttributes): HTMLElement;
+export function input(attributes: InputAttributes) {
 	const { type = "text", placeholder, styles = {} } = attributes;
 
 	const elt = document.createElement("input");
@@ -82,9 +172,13 @@ export const input = (attributes) => {
 	}
 
 	return elt;
-};
+}
 
-export const textarea = (attributes) => {
+export function textarea(
+	attributes: TextareaAttributes & { label?: null | false | "" },
+): HTMLTextAreaElement;
+export function textarea(attributes: TextareaAttributes): HTMLElement;
+export function textarea(attributes: TextareaAttributes) {
 	const { rows = 3, placeholder, styles = {} } = attributes;
 
 	const elt = document.createElement("textarea");
@@ -101,9 +195,9 @@ export const textarea = (attributes) => {
 	}
 
 	return elt;
-};
+}
 
-export const checkbox = (attributes) => {
+export const checkbox = (attributes: CheckAttributes) => {
 	const { checked = false, styles = {}, visible = true } = attributes;
 
 	styles.label ??= STYLES.checkbox.label;
@@ -137,7 +231,7 @@ export const checkbox = (attributes) => {
 	return element;
 };
 
-const radio = (attributes) => {
+const radio = (attributes: CheckAttributes) => {
 	const { checked = false, styles = {} } = attributes;
 
 	const elt = document.createElement("input");
@@ -149,7 +243,7 @@ const radio = (attributes) => {
 	const labelElt = document.createElement("label");
 	labelElt.dataset.role = "label";
 	const text = document.createElement("span");
-	text.textContent = attributes.label;
+	text.textContent = attributes.label == null ? null : String(attributes.label);
 	labelElt.className = styles.label ?? STYLES.radio.label;
 	elt.classList.add("order-first");
 	labelElt.append(elt, text);
@@ -157,7 +251,7 @@ const radio = (attributes) => {
 	return labelElt;
 };
 
-const select = (attributes) => {
+const select = (attributes: SelectAttributes) => {
 	const { placeholder, options = [], styles = {} } = attributes;
 
 	const container = document.createElement("div");
@@ -208,7 +302,12 @@ const select = (attributes) => {
 	return container;
 };
 
-const badge = (attributes) => {
+const badge = (attributes: {
+	icon?: string | null;
+	text?: string | null;
+	kind: string;
+	styles?: PrimitiveStyles;
+}) => {
 	const { icon, text, kind, styles = {} } = attributes;
 
 	const badge = document.createElement("div");
@@ -219,13 +318,13 @@ const badge = (attributes) => {
 	setIcon(badgeIcon, icon, styles.icon ?? STYLES.badge.icon);
 
 	const name = badge.appendChild(document.createElement("span"));
-	name.textContent = text;
+	name.textContent = text ?? null;
 	name.className = styles.text ?? "text-kind-default";
 
 	return badge;
 };
 
-const toggle = (attributes) => {
+const toggle = (attributes: ControlAttributes) => {
 	const { icon, styles = {} } = attributes;
 	const toggle = document.createElement("button");
 	toggle.className = styles.container ?? STYLES.toggle.container;
@@ -253,7 +352,12 @@ const loading = () => {
 	return wrapper;
 };
 
-const icon = (attributes) => {
+const icon = (attributes: {
+	icon?: string | null;
+	kind?: string | null;
+	role?: string | null;
+	style?: string | null;
+}) => {
 	const { icon, kind = null, role = null, style = null } = attributes;
 
 	const elt = document.createElement("span");
@@ -264,7 +368,12 @@ const icon = (attributes) => {
 	return elt;
 };
 
-const div = (attributes) => {
+const div = (attributes: {
+	kind?: string | null;
+	role?: string | null;
+	style?: string | null;
+	data?: DataAttributes;
+}) => {
 	const { kind = null, role = null, style = null, data = {} } = attributes;
 
 	const elt = document.createElement("div");
@@ -272,13 +381,13 @@ const div = (attributes) => {
 	if (role) elt.dataset.role = role;
 	if (style) elt.className = style;
 	for (const [k, v] of Object.entries(data)) {
-		if (v != null) elt.dataset[k] = v;
+		if (v != null) elt.dataset[k] = String(v);
 	}
 
 	return elt;
 };
 
-export const error = (message) => {
+export const error = (message?: string | null) => {
 	const error = document.createElement("div");
 	error.className = STYLES.message;
 	error.dataset.role = "error";
@@ -288,13 +397,17 @@ export const error = (message) => {
 	return error;
 };
 
-export const span = (attributes) => {
+export const span = (attributes: {
+	text?: string | null;
+	style?: string | null;
+	data?: DataAttributes;
+}) => {
 	const { text = "", style = null, data = {} } = attributes;
 	const span = document.createElement("span");
 	span.textContent = text;
 	if (style) span.className = style;
 	for (const [k, v] of Object.entries(data)) {
-		if (v != null) span.dataset[k] = v;
+		if (v != null) span.dataset[k] = String(v);
 	}
 	return span;
 };

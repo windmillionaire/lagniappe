@@ -1,17 +1,32 @@
 import { STYLES } from "../generated/styles.mjs";
 import { setIcon } from "../shared/icons.ts";
-import { BaseElement } from "./base/baseElement.ts";
+import {
+	BaseElement,
+	type ElementRenderer,
+	type ElementSchema,
+} from "./base/baseElement.ts";
 import { LocationBox } from "./combobox/index.ts";
 import { primitives } from "./primitives.ts";
 
 const MAPS_SEARCH = "https://www.google.com/maps/search/";
 
-function cleanText(value) {
+type LocationSelection = NonNullable<Parameters<LocationBox["addOption"]>[0]>;
+type LocationPayload = Partial<
+	Record<"id" | "name" | "address" | "address2", string>
+>;
+
+function locationSelection(value: unknown): LocationSelection | null {
+	return value && typeof value === "object" && !Array.isArray(value)
+		? value
+		: null;
+}
+
+function cleanText(value: unknown) {
 	if (value === null || value === undefined) return "";
 	return String(value).trim();
 }
 
-function addressWithUnit(location = {}) {
+function addressWithUnit(location: LocationSelection = {}) {
 	const address = cleanText(location.address);
 	const address2 = cleanText(location.address2);
 	if (!address || !address2) return address || "";
@@ -22,7 +37,7 @@ function addressWithUnit(location = {}) {
 	return `${address.slice(0, index)}, ${address2}${address.slice(index)}`;
 }
 
-function displayText(location = {}) {
+function displayText(location: LocationSelection = {}) {
 	const name = cleanText(location.name);
 	const address = addressWithUnit(location);
 	if (name && address && name !== cleanText(location.address)) {
@@ -31,7 +46,7 @@ function displayText(location = {}) {
 	return address || name;
 }
 
-function mapsUrl(location = {}) {
+function mapsUrl(location: LocationSelection = {}) {
 	const query = displayText(location);
 	if (!query) return "#";
 
@@ -44,7 +59,19 @@ function mapsUrl(location = {}) {
 }
 
 export class LocationElement extends BaseElement {
-	constructor(renderer, schema, submission) {
+	declare location: LocationPayload | null;
+	declare searchInput?: HTMLInputElement | null;
+	declare unitInput?: HTMLInputElement | null;
+	declare nameInput?: HTMLInputElement | null;
+	declare addressInput?: HTMLInputElement | null;
+	declare idInput?: HTMLInputElement | null;
+	declare combobox?: LocationBox;
+
+	constructor(
+		renderer: ElementRenderer,
+		schema: ElementSchema,
+		submission?: unknown,
+	) {
 		super(renderer, schema, submission);
 
 		this.location = null;
@@ -55,26 +82,28 @@ export class LocationElement extends BaseElement {
 	}
 
 	get value() {
-		return this._payload() || this.submission || null;
+		return this._payload() || locationSelection(this.submission);
 	}
 
-	changed(value) {
-		if (!value && !this.submission) return false;
-		if (!value || !this.submission) return true;
-		const pid = (v) => cleanText(v.id || v.place_id);
-		const a = pid(value);
-		const b = pid(this.submission);
-		const address2 = (v) => cleanText(v.address2);
-		if (a && b && a === b && address2(value) === address2(this.submission)) {
+	changed(value: unknown) {
+		const incoming = locationSelection(value);
+		const submission = locationSelection(this.submission);
+		if (!incoming && !submission) return false;
+		if (!incoming || !submission) return true;
+		const pid = (v: LocationSelection) => cleanText(v.id || v.place_id);
+		const a = pid(incoming);
+		const b = pid(submission);
+		const address2 = (v: LocationSelection) => cleanText(v.address2);
+		if (a && b && a === b && address2(incoming) === address2(submission)) {
 			return false;
 		}
-		const addr = (v) => cleanText(v.address || v.name);
+		const addr = (v: LocationSelection) => cleanText(v.address || v.name);
 		if (
 			!a &&
 			!b &&
-			addr(value) &&
-			addr(value) === addr(this.submission) &&
-			address2(value) === address2(this.submission)
+			addr(incoming) &&
+			addr(incoming) === addr(submission) &&
+			address2(incoming) === address2(submission)
 		) {
 			return false;
 		}
@@ -85,7 +114,7 @@ export class LocationElement extends BaseElement {
 		if (this._read) return this._read;
 
 		this._read = document.createElement("div");
-		const sub = this.submission;
+		const sub = locationSelection(this.submission) ?? {};
 		const name = cleanText(sub.name);
 		const address = addressWithUnit(sub);
 		const details =
@@ -171,8 +200,9 @@ export class LocationElement extends BaseElement {
 		this.idInput = this.combobox.hiddenInput;
 		this.destroyables.push(this.combobox);
 
-		if (this.submission) {
-			this.combobox.addOption(this.submission, false);
+		const submission = locationSelection(this.submission);
+		if (submission) {
+			this.combobox.addOption(submission, false);
 		} else {
 			this._syncHidden({ notify: false });
 		}
@@ -207,12 +237,15 @@ export class LocationElement extends BaseElement {
 		this.addressInput = null;
 	}
 
-	_handleLocationSelect(location, { notify = true } = {}) {
+	_handleLocationSelect(
+		location: LocationSelection | null,
+		{ notify = true } = {},
+	) {
 		this._setLocation(location, { notify });
 		if (this.searchInput) this.searchInput.value = "";
 	}
 
-	_createDetailInput(part) {
+	_createDetailInput(part: "name" | "address") {
 		const input = document.createElement("input");
 		input.type = "hidden";
 		input.name = `${this.schema.id}:${part}`;
@@ -233,7 +266,7 @@ export class LocationElement extends BaseElement {
 		return input;
 	}
 
-	_setLocation(details, { notify = true } = {}) {
+	_setLocation(details: LocationSelection | null, { notify = true } = {}) {
 		if (!details) {
 			this.location = null;
 			if (this.unitInput) this.unitInput.value = "";
@@ -304,7 +337,7 @@ export class LocationElement extends BaseElement {
 		return cleanText(this.unitInput?.value);
 	}
 
-	_selectedPlaceholder(payload) {
+	_selectedPlaceholder(payload: LocationPayload) {
 		return displayText(payload) || "search for a location...";
 	}
 }

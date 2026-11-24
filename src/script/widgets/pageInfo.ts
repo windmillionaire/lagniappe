@@ -1,19 +1,40 @@
+import type { ComboboxOption } from "../elements/combobox/combobox.ts";
 import { InputElement } from "../elements/input.ts";
 import { sections } from "../elements/sections.ts";
 import { SectionToggle } from "../elements/sectionToggle.ts";
 import { TextareaElement } from "../elements/textarea.ts";
 import { captureError, request } from "../shared/index.ts";
 import { withTransition } from "../shared/transitions.ts";
-import { FormWidget } from "./base/formWidget.ts";
+import type { FormRevisionFields } from "../types/forms";
+import type ViewComponent from "../views/base/component.ts";
+import type Core from "../views/base/core.ts";
+import type Page from "../views/page.ts";
+import {
+	type FormResetOptions,
+	FormWidget,
+	type FormWidgetSettings,
+} from "./base/formWidget.ts";
+
+type OfflineContext = Parameters<NonNullable<FormWidget["offline"]>>[0];
+type QueueContext = Parameters<
+	NonNullable<FormWidget["handleOfflineQueue"]>
+>[0];
+type FormSelection = CustomEvent<{
+	name?: string;
+	options?: Record<string, ComboboxOption>;
+}>;
 
 export class PageForm extends FormWidget {
-	constructor(attributes) {
+	declare formSelect: ReturnType<typeof SectionToggle.facet> | null;
+	declare view?: FormWidget["view"] & Partial<Pick<Page, "_syncPhotoControls">>;
+
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.formSelect = null;
 	}
 
 	get submitGroup() {
-		return this.target.querySelector("[data-role='submit-group']");
+		return this.target.querySelector<HTMLElement>("[data-role='submit-group']");
 	}
 
 	get nameElement() {
@@ -57,9 +78,9 @@ export class PageForm extends FormWidget {
 		const controller = new AbortController();
 		const signal = controller.signal;
 
-		const setSelected = (formId = null) => {
+		const setSelected = (formId: string | null = null) => {
 			section
-				.querySelectorAll("[data-role='related-form']")
+				.querySelectorAll<HTMLElement>("[data-role='related-form']")
 				.forEach((badge) => {
 					badge.dataset.selected = Boolean(
 						formId && badge.dataset.formId === formId,
@@ -67,30 +88,33 @@ export class PageForm extends FormWidget {
 				});
 		};
 
-		section.querySelectorAll("[data-role='related-form']").forEach((badge) => {
-			badge.addEventListener(
-				"click",
-				(e) => {
-					e.preventDefault();
-					e.stopPropagation();
+		section
+			.querySelectorAll<HTMLElement>("[data-role='related-form']")
+			.forEach((badge) => {
+				badge.addEventListener(
+					"click",
+					(e) => {
+						e.preventDefault();
+						e.stopPropagation();
 
-					const details = this._relatedFormDetails(badge);
-					if (!details?.id || !this.formSelect) return;
+						const details = this._relatedFormDetails(badge);
+						if (!details?.id || !this.formSelect) return;
 
-					this.formSelect.select?.values?.clear();
-					this.formSelect.addOption(details);
-					setSelected(details.id);
-				},
-				{ signal },
-			);
-		});
+						this.formSelect.select?.values?.clear();
+						this.formSelect.addOption(details);
+						setSelected(details.id);
+					},
+					{ signal },
+				);
+			});
 
 		this.target.addEventListener(
 			"updated",
 			(e) => {
-				if (e.detail?.name !== "form") return;
+				const detail = (e as FormSelection).detail;
+				if (detail?.name !== "form") return;
 
-				const details = Object.values(e.detail.options || {})[0];
+				const details = Object.values(detail.options || {})[0];
 				setSelected(details?.id || null);
 			},
 			{ signal },
@@ -98,9 +122,10 @@ export class PageForm extends FormWidget {
 		this.target.addEventListener(
 			"change",
 			(e) => {
-				if (e.target?.name !== "form") return;
+				const target = e.target as HTMLInputElement | null;
+				if (target?.name !== "form") return;
 
-				setSelected(e.target.value || null);
+				setSelected(target.value || null);
 			},
 			{ signal },
 		);
@@ -123,12 +148,14 @@ export class PageForm extends FormWidget {
 	}
 
 	get prepend() {
-		let imageControls = this.target.querySelector("[data-role='photo-prompt']");
+		let imageControls = this.target.querySelector<HTMLElement>(
+			"[data-role='photo-prompt']",
+		);
 		if (this.revisionPreview) {
 			imageControls?.remove();
 			imageControls = null;
 		} else if (imageControls) {
-			this.view._syncPhotoControls(undefined, imageControls);
+			this.view?._syncPhotoControls?.(undefined, imageControls);
 		}
 		return [imageControls, this.nameElement, this.descriptionElement];
 	}
@@ -141,8 +168,8 @@ export class PageForm extends FormWidget {
 		];
 	}
 
-	_facetElement(selector) {
-		const target = this.target.querySelector(selector);
+	_facetElement(selector: string) {
+		const target = this.target.querySelector<HTMLElement>(selector);
 		if (!target) return null;
 
 		const control = SectionToggle.facet(this, target);
@@ -154,7 +181,7 @@ export class PageForm extends FormWidget {
 		return control.elt;
 	}
 
-	_relatedFormDetails(badge) {
+	_relatedFormDetails(badge: HTMLElement): ComboboxOption {
 		try {
 			return JSON.parse(badge.dataset.details || "{}");
 		} catch {
@@ -164,7 +191,10 @@ export class PageForm extends FormWidget {
 }
 
 export class PageInfo extends PageForm {
-	constructor(attributes) {
+	declare view: PageForm["view"] & Pick<Core, "successfulResponse">;
+	declare component?: ViewComponent | null;
+
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: `Update Page`,
@@ -180,7 +210,7 @@ export class PageInfo extends PageForm {
 		this.target.addEventListener("updated", this._changeForm);
 	}
 
-	async prepareReset(options = {}) {
+	async prepareReset(options: FormResetOptions<this> = {}) {
 		const afterInit = options.afterInit;
 		await super.prepareReset({
 			...options,
@@ -196,7 +226,7 @@ export class PageInfo extends PageForm {
 		this.commitReset();
 	}
 
-	offline({ data, method, route }) {
+	offline({ data, method, route }: OfflineContext) {
 		return {
 			id: `update:page:${this.key}`,
 			action: "update",
@@ -208,7 +238,7 @@ export class PageInfo extends PageForm {
 		};
 	}
 
-	handleOfflineQueue({ phase, record }) {
+	handleOfflineQueue({ phase, record }: QueueContext) {
 		if (record?.kind !== "page" || record.target_key !== this.key) return;
 		if (phase === "queued") {
 			this.form?.queued();
@@ -225,44 +255,58 @@ export class PageInfo extends PageForm {
 		}
 	}
 
-	async _changeForm(e) {
-		if (!e.target.closest("[data-role='form-select']")) return;
+	async _changeForm(e: Event) {
+		const target = e.target;
+		if (
+			!(target instanceof Element) ||
+			!target.closest("[data-role='form-select']")
+		)
+			return;
 
 		e.stopPropagation();
 
-		const formSelect = this.initialTarget.querySelector(
+		const initialTarget = this.initialTarget;
+		if (!initialTarget) return;
+		const formSelect = initialTarget.querySelector<HTMLElement>(
 			"[data-action='select-form']",
 		);
-		const preloadedForm = JSON.parse(formSelect?.dataset.preload || "{}");
+		const preloadedForm: ComboboxOption = JSON.parse(
+			formSelect?.dataset.preload || "{}",
+		);
 
-		const selectedForm = Object.values(e.detail?.options || {})[0];
+		const selectedForm = Object.values(
+			(e as FormSelection).detail?.options || {},
+		)[0];
 
 		if (!selectedForm?.id) return;
 		if (selectedForm.id === preloadedForm?.id) return;
 
-		this.target.classList.add("opacity-50", "pointer-events-none");
 		const route = this.target.dataset.route;
+		if (!route) return;
+		this.target.classList.add("opacity-50", "pointer-events-none");
 		const params = new URLSearchParams();
 		params.set("form", selectedForm.id);
 
-		const response = await request.get(route, params);
-		if (!this.view.successfulResponse(response, this.component)) {
+		const response = await request.get<FormRevisionFields>(route, params);
+		if (
+			!this.view.successfulResponse(response, this.component ?? null) ||
+			!response
+		) {
 			this.target.classList.remove("opacity-50", "pointer-events-none");
 			captureError(new Error("Failed to replace form"), this.target, {
 				requestedForm: selectedForm,
 			});
 			return;
 		}
-		this.schema = response.schema;
-		this.submission = response.submission;
-		this.initialTarget.dataset.formGeneration = String(
-			response.generation || 0,
-		);
+		this.schema = response.schema ?? null;
+		this.submission = response.submission ?? null;
+		initialTarget.dataset.formGeneration = String(response.generation || 0);
 
-		const nextFormSelect = this.initialTarget.querySelector(
+		const nextFormSelect = initialTarget.querySelector<HTMLElement>(
 			'[data-action="select-form"]',
 		);
-		nextFormSelect.dataset.preload = JSON.stringify(selectedForm);
+		if (nextFormSelect)
+			nextFormSelect.dataset.preload = JSON.stringify(selectedForm);
 		await this.prepareReset();
 		await withTransition(
 			() => {
@@ -280,7 +324,7 @@ export class PageInfo extends PageForm {
 }
 
 export class CreatePage extends PageForm {
-	constructor(attributes) {
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Create Page",
@@ -291,7 +335,8 @@ export class CreatePage extends PageForm {
 
 	async init() {
 		await super.init();
-		const name = this.target.querySelector("input[name='name']");
+		const name =
+			this.target.querySelector<HTMLInputElement>("input[name='name']");
 		if (name) name.required = true;
 	}
 
@@ -327,7 +372,8 @@ export class CreatePage extends PageForm {
 		if (created) {
 			this.form?.resetSubmitButton();
 		}
-		const nameElement = this.target.querySelector("input[name='name']");
+		const nameElement =
+			this.target.querySelector<HTMLInputElement>("input[name='name']");
 		if (this.visible && nameElement) nameElement.focus();
 	}
 }

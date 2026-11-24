@@ -5,7 +5,12 @@ import { setIcon } from "../shared/icons.ts";
 import { request } from "../shared/request.ts";
 import { withTransition } from "../shared/transitions.ts";
 import { areEqual } from "../shared/utilities.ts";
-import { BaseElement } from "./base/baseElement.ts";
+import type { FormFieldSchema, FormSubmission } from "../types/forms.d.ts";
+import {
+	BaseElement,
+	type ElementRenderer,
+	type ElementSchema,
+} from "./base/baseElement.ts";
 import { CheckboxElement } from "./checkbox.ts";
 import { InputElement } from "./input.ts";
 import { LinkElement } from "./link.ts";
@@ -28,10 +33,56 @@ const ACTIONS = [
 	["moveDown", "down", "Move row down"],
 	["edit", "edit", "Edit row"],
 	["delete", "delete", "Delete row"],
-];
+] as const;
+
+type MoveAction = "moveUp" | "moveDown";
+type RowActionOptions = {
+	after?: (() => void) | null;
+	dispatchChange?: boolean;
+};
+
+interface PendingTouchAction {
+	row: HTMLTableRowElement;
+	pointerId: number;
+	x: number;
+	y: number;
+	canceled: boolean;
+}
+
+function isRowSubmission(value: unknown): value is FormSubmission {
+	return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function tableRows(value: unknown) {
+	if (!isRowSubmission(value) || !Array.isArray(value.rows)) return null;
+	return value.rows.filter(isRowSubmission);
+}
 
 export class TableElement extends BaseElement {
-	constructor(renderer, schema, submission) {
+	declare _input: HTMLInputElement | null;
+	declare _table: HTMLDivElement | null;
+	declare _tbody: HTMLTableSectionElement | null;
+	declare _thead: HTMLTableSectionElement | null;
+	declare _form: HTMLFormElement | null;
+	declare _container: HTMLDivElement | null;
+	declare _createButton: HTMLButtonElement | null;
+	declare _actions: HTMLElement | null;
+	declare _activeRow: HTMLTableRowElement | null;
+	declare _actionsOpen: boolean;
+	declare _actionsPinned: boolean;
+	declare _actionsListenersAdded: boolean;
+	declare _hideActionsTimer: number | null;
+	declare _pendingTouchAction: PendingTouchAction | null;
+	declare _suppressHoverUntil: number;
+	declare _suppressTapUntil: number;
+	declare _validate?: string;
+	declare _embedded?: HTMLDivElement;
+
+	constructor(
+		renderer: ElementRenderer,
+		schema: ElementSchema,
+		submission?: unknown,
+	) {
 		super(renderer, schema, submission);
 		this._input = null;
 		this._table = null;
@@ -50,10 +101,9 @@ export class TableElement extends BaseElement {
 		this._suppressHoverUntil = 0;
 		this._suppressTapUntil = 0;
 		if (!this.renderer.readonly) {
-			this._validate = ENDPOINTS.renderer.validateRow(
-				this.renderer.form.key,
-				this.schema.id,
-			);
+			const key = this.renderer.form?.key;
+			if (key)
+				this._validate = ENDPOINTS.renderer.validateRow(key, this.schema.id);
 			this._click = this._click.bind(this);
 			this._rowPointerOver = this._rowPointerOver.bind(this);
 			this._rowPointerDown = this._rowPointerDown.bind(this);
@@ -77,33 +127,36 @@ export class TableElement extends BaseElement {
 		return this.renderer.readonly ? "read" : "edit";
 	}
 
-	changed(value) {
+	changed(value: unknown) {
 		if (areEqual(this.value, value)) return false;
 		return true;
 	}
 
-	_setSubmission(value) {
+	_setSubmission(value: unknown) {
 		this.submission = value;
 		if (this._input) {
-			this._input.value = value?.rows ? JSON.stringify(value.rows) : "";
+			const rows = tableRows(value);
+			this._input.value = rows ? JSON.stringify(rows) : "";
 		}
 	}
 
-	updateSubmission(value) {
+	updateSubmission(value: unknown) {
 		this._hideActions();
 		this._setSubmission(value);
 		this._redrawRows();
 	}
 
 	_redrawRows() {
-		const rows = this.submission?.rows || [];
+		const { _tbody: tbody, _container: container } = this;
+		if (!tbody || !container) return;
+		const rows = tableRows(this.submission) ?? [];
 		if (rows.length === 0) {
-			this._tbody.innerHTML = "";
-			this._container.dataset.visible = "false";
+			tbody.innerHTML = "";
+			container.dataset.visible = "false";
 			return;
 		}
 
-		const existing = Array.from(this._tbody.children);
+		const existing = Array.from(tbody.rows);
 
 		for (let i = 0; i < rows.length; i++) {
 			const serialized = JSON.stringify(rows[i]);
@@ -111,25 +164,28 @@ export class TableElement extends BaseElement {
 				if (existing[i].dataset.submission !== serialized) {
 					existing[i].replaceWith(this.row(i, rows[i]));
 				} else {
-					existing[i].dataset.index = i;
-					const actions = existing[i].querySelector(
+					existing[i].dataset.index = String(i);
+					const actions = existing[i].querySelector<HTMLElement>(
 						"[data-role='row-actions']",
 					);
-					if (actions) actions.dataset.index = i;
+					if (actions) actions.dataset.index = String(i);
 				}
 			} else {
-				this._tbody.appendChild(this.row(i, rows[i]));
+				tbody.appendChild(this.row(i, rows[i]));
 			}
 		}
 
-		while (this._tbody.children.length > rows.length) {
-			this._tbody.lastChild.remove();
+		while (tbody.children.length > rows.length) {
+			tbody.lastChild?.remove();
 		}
 
-		this._container.dataset.visible = "true";
+		container.dataset.visible = "true";
 	}
 
-	_redrawTable({ after = null, dispatchChange = false } = {}) {
+	_redrawTable({
+		after = null,
+		dispatchChange = false,
+	}: RowActionOptions = {}) {
 		return withTransition(() => {
 			this._hideActions();
 			this._redrawRows();
@@ -140,7 +196,7 @@ export class TableElement extends BaseElement {
 		});
 	}
 
-	_commitRows(rows, { after = null } = {}) {
+	_commitRows(rows: FormSubmission[], { after = null }: RowActionOptions = {}) {
 		const value = rows.length > 0 ? { rows } : null;
 		this._suppressHoverUntil = performance.now() + HOVER_SUPPRESSION_MS;
 		this._setSubmission(value);
@@ -148,21 +204,23 @@ export class TableElement extends BaseElement {
 	}
 
 	_removeForm() {
-		this._form.remove();
+		this._form?.remove();
 		this._form = null;
-		if (this._tbody.children.length === 0) {
-			this._container.dataset.visible = "false";
-		} else {
-			this._container.dataset.visible = "true";
+		if (this._container) {
+			this._container.dataset.visible = this._tbody?.children.length
+				? "true"
+				: "false";
 		}
 	}
 
-	_actionRow(e) {
-		return e.target.closest("tr[data-index]") || this._activeRow;
+	_actionRow(target: Element) {
+		return (
+			target.closest<HTMLTableRowElement>("tr[data-index]") || this._activeRow
+		);
 	}
 
-	_moveRow(index, direction) {
-		const rows = [...(this.submission?.rows || [])];
+	_moveRow(index: number, direction: MoveAction) {
+		const rows = tableRows(this.submission) ?? [];
 		const newIndex = direction === "moveUp" ? index - 1 : index + 1;
 		if (newIndex < 0 || newIndex >= rows.length) return;
 
@@ -170,10 +228,12 @@ export class TableElement extends BaseElement {
 		this._commitRows(rows);
 	}
 
-	async _click(e) {
+	async _click(e: MouseEvent) {
 		e.stopPropagation();
+		const target = e.target;
+		if (!(target instanceof Element)) return;
 
-		const role = e.target.closest("[data-role]")?.dataset.role;
+		const role = target.closest<HTMLElement>("[data-role]")?.dataset.role;
 		const handled = [
 			"create",
 			"cancel",
@@ -197,6 +257,7 @@ export class TableElement extends BaseElement {
 			const form = await this.form();
 			await withTransition(
 				() => {
+					if (!this._container || !this._edit) return;
 					this._container.dataset.visible = "false";
 					this._form = form;
 					this._edit.appendChild(this._form);
@@ -208,12 +269,13 @@ export class TableElement extends BaseElement {
 				this._removeForm();
 			});
 		} else if (role === "edit") {
-			const index = this._actionRow(e)?.dataset.index;
+			const index = this._actionRow(target)?.dataset.index;
 			if (index === undefined) return;
 			this._hideActions();
 			const form = await this.form(index);
 			const success = await withTransition(
 				() => {
+					if (!this._container || !this._edit) return;
 					this._container.dataset.visible = "false";
 					this._form = form;
 					this._edit.appendChild(this._form);
@@ -223,36 +285,37 @@ export class TableElement extends BaseElement {
 			if (success) this._scrollFormIntoView();
 		} else if (role === "delete") {
 			const index = Number.parseInt(
-				this._actionRow(e)?.dataset.index ?? "",
+				this._actionRow(target)?.dataset.index ?? "",
 				10,
 			);
-			if (Number.isNaN(index) || !this.submission?.rows) return;
+			const previousRows = tableRows(this.submission);
+			if (Number.isNaN(index) || !previousRows) return;
 
-			const rows = this.submission.rows.filter(
-				(_, rowIndex) => rowIndex !== index,
-			);
+			const rows = previousRows.filter((_, rowIndex) => rowIndex !== index);
 			this._commitRows(rows);
 		} else if (role === "moveUp" || role === "moveDown") {
 			const index = Number.parseInt(
-				this._actionRow(e)?.dataset.index ?? "",
+				this._actionRow(target)?.dataset.index ?? "",
 				10,
 			);
 			if (Number.isNaN(index)) return;
 			this._moveRow(index, role);
 		} else if (role === "validate") {
-			const button = e.target.closest("button");
+			const button = target.closest("button");
 			const form = this._form;
-			if (!button || !form) return;
+			const route = this._validate;
+			if (!button || !form || !route) return;
 
 			const index = form.dataset.index;
 			const formData = new FormData(form);
 			button.disabled = true;
 			try {
-				const response = await request.get(this._validate, formData);
-				if (!response.ok || this._form !== form) return;
+				const response = await request.get<{ row: unknown }>(route, formData);
+				if (!response?.ok || this._form !== form) return;
 
 				const row = response.row;
-				const rows = [...(this.submission?.rows || [])];
+				if (!isRowSubmission(row)) return;
+				const rows = tableRows(this.submission) ?? [];
 				if (index !== undefined && index !== "") {
 					rows[Number.parseInt(index, 10)] = row;
 				} else {
@@ -276,11 +339,12 @@ export class TableElement extends BaseElement {
 		const table = this._container.appendChild(document.createElement("table"));
 		table.className = STYLES.form.table.table;
 
-		this._thead = table.appendChild(document.createElement("thead"));
-		this._thead.className = "bg-base-bg";
+		const thead = table.appendChild(document.createElement("thead"));
+		this._thead = thead;
+		thead.className = "bg-base-bg";
 
-		this.schema.columns.forEach((column) => {
-			const headerCell = this._thead.appendChild(document.createElement("th"));
+		this.schema.columns?.forEach((column) => {
+			const headerCell = thead.appendChild(document.createElement("th"));
 			headerCell.className = COMPACT_COLUMN_TYPES.has(column.type)
 				? STYLES.form.table.cell.compact.th
 				: STYLES.form.table.cell.th;
@@ -289,7 +353,7 @@ export class TableElement extends BaseElement {
 			title.className = STYLES.form.table.cell.title;
 
 			const span = title.appendChild(document.createElement("span"));
-			span.textContent = column.title;
+			span.textContent = column.title ?? null;
 		});
 		if (!this.renderer.readonly) {
 			const actionHeader = this._thead.appendChild(
@@ -311,7 +375,7 @@ export class TableElement extends BaseElement {
 			this._tbody.addEventListener("focusout", this._scheduleHideActions);
 		}
 
-		const rows = this.submission?.rows || [];
+		const rows = tableRows(this.submission) ?? [];
 		for (const [index, submission] of rows.entries()) {
 			this._tbody.appendChild(this.row(index, submission));
 		}
@@ -336,15 +400,14 @@ export class TableElement extends BaseElement {
 
 		this._edit = document.createElement("div");
 		this._edit.className = STYLES.form.table.container;
-		this._edit.dataset.kind = this.renderer.kind;
+		this._edit.dataset.kind = String(this.renderer.kind);
 
+		const rows = tableRows(this.submission);
 		this._input = this._edit.appendChild(
 			primitives.input({
 				name: this.schema.id,
 				type: "hidden",
-				value: this.submission?.rows
-					? JSON.stringify(this.submission.rows)
-					: "",
+				value: rows ? JSON.stringify(rows) : "",
 			}),
 		);
 		const label = this._edit.appendChild(
@@ -383,22 +446,31 @@ export class TableElement extends BaseElement {
 		return this._edit;
 	}
 
-	_tableCellElement(column, submission) {
-		const ElementClass = TABLE_CELL_ELEMENTS[column.type];
+	_tableCellElement(column: FormFieldSchema, submission: FormSubmission) {
+		const ElementClass =
+			column.type === "checkbox" ||
+			column.type === "input" ||
+			column.type === "link"
+				? TABLE_CELL_ELEMENTS[column.type]
+				: null;
 		if (!ElementClass) {
 			captureError(new Error(`Unsupported table column type: ${column.type}`));
 			return null;
 		}
-		return new ElementClass(this, column, submission?.[column.id]);
+		return new ElementClass(this._rowRenderer(), column, submission[column.id]);
 	}
 
-	row(index, submission) {
+	_rowRenderer(): ElementRenderer {
+		return { id: this.id, readonly: this.readonly, mode: this.mode };
+	}
+
+	row(index: number, submission: FormSubmission) {
 		const rowElt = document.createElement("tr");
-		rowElt.dataset.index = index;
+		rowElt.dataset.index = String(index);
 		rowElt.dataset.submission = JSON.stringify(submission);
 		if (!this.renderer.readonly) rowElt.tabIndex = 0;
 
-		this.schema.columns.forEach((column) => {
+		this.schema.columns?.forEach((column) => {
 			const cell = document.createElement("td");
 			cell.className = COMPACT_COLUMN_TYPES.has(column.type)
 				? STYLES.form.table.cell.compact.default
@@ -406,8 +478,9 @@ export class TableElement extends BaseElement {
 			rowElt.appendChild(cell);
 
 			const element = this._tableCellElement(column, submission);
-			const content = element.cell;
-			cell.innerHTML = content ? content : "";
+			const content = element?.cell;
+			cell.innerHTML =
+				typeof content === "string" ? content : (content?.outerHTML ?? "");
 		});
 		if (!this.renderer.readonly) {
 			const actionCell = rowElt.appendChild(document.createElement("td"));
@@ -418,10 +491,10 @@ export class TableElement extends BaseElement {
 		return rowElt;
 	}
 
-	_rowActions(index) {
+	_rowActions(index: number) {
 		const actions = document.createElement("div");
 		actions.dataset.role = "row-actions";
-		actions.dataset.index = index;
+		actions.dataset.index = String(index);
 		actions.setAttribute("aria-label", "Row actions");
 		actions.className = STYLES.form.table.rowActions;
 		actions.hidden = true;
@@ -447,24 +520,31 @@ export class TableElement extends BaseElement {
 		return actions;
 	}
 
-	_rowPointerOver(e) {
+	_rowPointerOver(e: PointerEvent) {
 		if (e.pointerType && e.pointerType !== "mouse") return;
 		if (performance.now() < this._suppressHoverUntil) return;
 		if (this._actionsPinned) return;
 
-		const row = e.target.closest("tr[data-index]");
+		const row =
+			e.target instanceof Element
+				? e.target.closest<HTMLTableRowElement>("tr[data-index]")
+				: null;
 		if (!row) return;
 
 		this._showActions(row);
 	}
 
-	_rowPointerDown(e) {
+	_rowPointerDown(e: PointerEvent) {
 		if (e.pointerType === "mouse") return;
-		if (e.target.closest("a, button, input, select, textarea, [data-role]")) {
+		const target = e.target;
+		if (
+			!(target instanceof Element) ||
+			target.closest("a, button, input, select, textarea, [data-role]")
+		) {
 			return;
 		}
 
-		const row = e.target.closest("tr[data-index]");
+		const row = target.closest<HTMLTableRowElement>("tr[data-index]");
 		if (!row) return;
 
 		this._pendingTouchAction = {
@@ -479,7 +559,7 @@ export class TableElement extends BaseElement {
 		document.addEventListener("pointercancel", this._rowPointerCancel, true);
 	}
 
-	_rowPointerMove(e) {
+	_rowPointerMove(e: PointerEvent) {
 		const pending = this._pendingTouchAction;
 		if (!pending || pending.pointerId !== e.pointerId) return;
 
@@ -491,7 +571,7 @@ export class TableElement extends BaseElement {
 		}
 	}
 
-	_rowPointerUp(e) {
+	_rowPointerUp(e: PointerEvent) {
 		const pending = this._pendingTouchAction;
 		if (!pending || pending.pointerId !== e.pointerId) return;
 
@@ -512,7 +592,7 @@ export class TableElement extends BaseElement {
 		}
 	}
 
-	_rowPointerCancel(e) {
+	_rowPointerCancel(e: PointerEvent) {
 		if (
 			this._pendingTouchAction &&
 			this._pendingTouchAction.pointerId !== e.pointerId
@@ -522,17 +602,21 @@ export class TableElement extends BaseElement {
 		this._clearPendingTouchAction();
 	}
 
-	_rowClick(e) {
+	_rowClick(e: MouseEvent) {
 		if (performance.now() < this._suppressTapUntil) return;
 		const fineHover = window.matchMedia(
 			"(hover: hover) and (pointer: fine)",
 		).matches;
 		if (fineHover) return;
-		if (e.target.closest("a, button, input, select, textarea, [data-role]")) {
+		const target = e.target;
+		if (
+			!(target instanceof Element) ||
+			target.closest("a, button, input, select, textarea, [data-role]")
+		) {
 			return;
 		}
 
-		const row = e.target.closest("tr[data-index]");
+		const row = target.closest<HTMLTableRowElement>("tr[data-index]");
 		if (!row) return;
 
 		if (this._actionsOpen && this._actionsPinned && row === this._activeRow) {
@@ -549,23 +633,26 @@ export class TableElement extends BaseElement {
 		document.removeEventListener("pointercancel", this._rowPointerCancel, true);
 	}
 
-	_rowFocusIn(e) {
+	_rowFocusIn(e: FocusEvent) {
 		if (this._pendingTouchAction) return;
 
-		const row = e.target.closest("tr[data-index]");
+		const row =
+			e.target instanceof Element
+				? e.target.closest<HTMLTableRowElement>("tr[data-index]")
+				: null;
 		if (!row) return;
 
 		this._showActions(row, { pinned: true });
 	}
 
-	_showActions(row, { pinned = false } = {}) {
+	_showActions(row: HTMLTableRowElement, { pinned = false } = {}) {
 		if (this._form || !row || !this._edit?.contains(row)) return;
 
 		this._cancelHideActions();
 		this._activeRow = row;
 		this._actionsPinned = pinned;
 
-		const actions = row.querySelector("[data-role='row-actions']");
+		const actions = row.querySelector<HTMLElement>("[data-role='row-actions']");
 		if (!actions) return;
 		if (this._actions && this._actions !== actions) {
 			this._actions.hidden = true;
@@ -579,10 +666,10 @@ export class TableElement extends BaseElement {
 		}
 	}
 
-	_updateActionStates(row) {
+	_updateActionStates(row: HTMLTableRowElement) {
 		const index = Number.parseInt(row.dataset.index ?? "", 10);
 		const length =
-			this.submission?.rows?.length || this._tbody?.children.length || 0;
+			tableRows(this.submission)?.length || this._tbody?.children.length || 0;
 		if (Number.isNaN(index)) return;
 
 		const states = {
@@ -590,7 +677,9 @@ export class TableElement extends BaseElement {
 			moveDown: index >= length - 1,
 		};
 		for (const [role, disabled] of Object.entries(states)) {
-			const button = this._actions?.querySelector(`[data-role='${role}']`);
+			const button = this._actions?.querySelector<HTMLButtonElement>(
+				`[data-role='${role}']`,
+			);
 			if (!button) continue;
 			button.disabled = disabled;
 			button.setAttribute("aria-disabled", disabled ? "true" : "false");
@@ -617,14 +706,15 @@ export class TableElement extends BaseElement {
 		this._actionsListenersAdded = false;
 	}
 
-	_documentPointerDown(e) {
+	_documentPointerDown(e: PointerEvent) {
+		if (!(e.target instanceof Node)) return;
 		if (this._actions?.contains(e.target)) return;
 		if (this._activeRow?.contains(e.target)) return;
 
 		this._hideActions();
 	}
 
-	_documentKeyDown(e) {
+	_documentKeyDown(e: KeyboardEvent) {
 		if (e.key === "Escape") this._hideActions();
 	}
 
@@ -685,9 +775,11 @@ export class TableElement extends BaseElement {
 		});
 	}
 
-	async form(index) {
+	async form(index?: string | null) {
 		const hasIndex = index !== undefined && index !== null && index !== "";
-		const submission = hasIndex ? this.submission.rows[index] : {};
+		const submission = hasIndex
+			? tableRows(this.submission)?.[Number(index)]
+			: undefined;
 
 		const form = document.createElement("form");
 		form.className = STYLES.form.table.form;
@@ -696,13 +788,13 @@ export class TableElement extends BaseElement {
 			form.dataset.index = index;
 		}
 
-		for (const column of this.schema.columns) {
+		for (const column of this.schema.columns ?? []) {
 			const element = await getFormElement(
-				this,
+				this._rowRenderer(),
 				column,
 				submission?.[column.id],
 			);
-			form.appendChild(element.edit);
+			if (element.edit) form.appendChild(element.edit);
 		}
 
 		const buttons = form.appendChild(document.createElement("div"));

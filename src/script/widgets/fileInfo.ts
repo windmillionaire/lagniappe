@@ -4,10 +4,31 @@ import { SectionToggle } from "../elements/sectionToggle.ts";
 import { TextareaElement } from "../elements/textarea.ts";
 import { STYLES } from "../generated/styles.mjs";
 import { setIcon } from "../shared/icons.ts";
-import { FormWidget } from "./base/formWidget.ts";
+import type { FormRevisionResponse } from "../types/forms";
+import { FormWidget, type FormWidgetSettings } from "./base/formWidget.ts";
+
+type FileTaskRole = "extract" | "summarize";
+interface FileTaskSettings {
+	role: FileTaskRole;
+	action: string;
+	title: string;
+}
+interface FileTaskStatus {
+	enabled?: boolean;
+	complete?: boolean;
+	status?: string | null;
+	error?: string | null;
+}
+type FileTaskOptions = Partial<Record<FileTaskRole, FileTaskStatus>>;
 
 export class FileInfo extends FormWidget {
-	constructor(attributes) {
+	declare aiCreate: boolean;
+	declare options?: FileTaskOptions;
+	declare _taskSettings: Record<FileTaskRole, FileTaskSettings>;
+	declare _refreshExtractOnReconcile: boolean;
+	declare view?: FormWidget["view"] & { showExtractReloadNotice?(): void };
+
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.aiCreate = this.target.dataset.aiCreate === "true";
 		this.messages = {
@@ -37,7 +58,7 @@ export class FileInfo extends FormWidget {
 			...[
 				this._taskStatus(this._taskSettings.extract),
 				this._taskStatus(this._taskSettings.summarize),
-			].filter(Boolean),
+			].filter((element) => element !== null),
 		);
 		return [
 			this.filenameElement,
@@ -89,7 +110,7 @@ export class FileInfo extends FormWidget {
 
 		const value = wrapper.appendChild(document.createElement("p"));
 		value.className = "sm:text-sm text-kind-default";
-		value.textContent = this.target.dataset.filename;
+		value.textContent = this.target.dataset.filename ?? "";
 
 		return wrapper;
 	}
@@ -117,8 +138,8 @@ export class FileInfo extends FormWidget {
 		return this._facetElement('[data-role="owner"]');
 	}
 
-	_facetElement(selector) {
-		const target = this.target.querySelector(selector);
+	_facetElement(selector: string) {
+		const target = this.target.querySelector<HTMLElement>(selector);
 		if (!target) return null;
 
 		const control = SectionToggle.facet(this, target);
@@ -127,7 +148,7 @@ export class FileInfo extends FormWidget {
 		return control.elt;
 	}
 
-	_taskStatus(taskSettings) {
+	_taskStatus(taskSettings: FileTaskSettings) {
 		const taskOptions = this.options?.[taskSettings.role];
 		if (
 			taskSettings.role === "summarize" &&
@@ -171,20 +192,23 @@ export class FileInfo extends FormWidget {
 		return status;
 	}
 
-	updated(response) {
+	updated(response: FormRevisionResponse) {
 		super.updated(response);
 
-		const target = response.html?.querySelector("[data-widget='FileInfo']");
+		const target = (response.html || null)?.querySelector<HTMLElement>(
+			"[data-widget='FileInfo']",
+		);
 		const options = target?.dataset.options;
 		if (!options) {
 			this._refreshExtractOnReconcile = false;
 			return;
 		}
 
-		this.options = JSON.parse(options);
+		const fileOptions: FileTaskOptions = JSON.parse(options);
+		this.options = fileOptions;
 		const hasTextTab = Boolean(document.getElementById("text"));
 		this._refreshExtractOnReconcile =
-			this.options.extract?.complete === true && !hasTextTab;
+			fileOptions.extract?.complete === true && !hasTextTab;
 	}
 
 	postreconcile() {
@@ -192,7 +216,7 @@ export class FileInfo extends FormWidget {
 		this.setEntityMetadata();
 		if (this._refreshExtractOnReconcile) {
 			this._refreshExtractOnReconcile = false;
-			this.view.showExtractReloadNotice?.();
+			this.view?.showExtractReloadNotice?.();
 		}
 	}
 

@@ -1,10 +1,14 @@
 import { withTransition } from "../shared/transitions.ts";
-import { AutofillUpload } from "./autofill.ts";
+import { type AutofillParent, AutofillUpload } from "./autofill.ts";
 import { buttons } from "./buttons.ts";
 import { primitives } from "./primitives.ts";
 
-const autofill = (form) => {
-	const section = form.target.querySelector('[data-role="autofill"]');
+const autofill = (
+	form: AutofillParent & { destroyables: { destroy?(): void }[] },
+) => {
+	const section = form.target.querySelector<HTMLElement>(
+		'[data-role="autofill"]',
+	);
 	if (!section) return null;
 
 	const autofill = new AutofillUpload({
@@ -16,26 +20,39 @@ const autofill = (form) => {
 	return section;
 };
 
-const generateEntityForm = (form) => {
-	const section = form.target.querySelector('div[data-role="generate"]');
+const generateEntityForm = (form: { target: HTMLElement }) => {
+	const section = form.target.querySelector<HTMLElement>(
+		'div[data-role="generate"]',
+	);
 	if (!section) return null;
 
-	const manualButton = section.querySelector('button[data-role="manual"]');
-	const aiButton = section.querySelector('button[data-role="ai"]');
-	const generate = section.querySelector('[name="generate"]');
-	const description = section.querySelector('[name="user_description"]');
-	const aiFields = section.querySelectorAll('[data-role="ai"]:not(button)');
+	const manualButton = section.querySelector<HTMLButtonElement>(
+		'button[data-role="manual"]',
+	);
+	const aiButton = section.querySelector<HTMLButtonElement>(
+		'button[data-role="ai"]',
+	);
+	const generate = section.querySelector<HTMLInputElement>('[name="generate"]');
+	const description = section.querySelector<HTMLElement>(
+		'[name="user_description"]',
+	);
+	const aiFields = section.querySelectorAll<HTMLElement>(
+		'[data-role="ai"]:not(button)',
+	);
+	if (!manualButton || !aiButton || !generate || !description) return section;
 
-	const setMode = (mode) => {
+	const setMode = (mode: string) => {
 		form.target.dataset.mode = mode;
 		aiFields.forEach((element) => {
 			element.dataset.visible = mode === "ai" ? "true" : "false";
 		});
-		form.target.querySelectorAll('[data-role="manual"]').forEach((element) => {
-			if (!section.contains(element)) {
-				element.dataset.visible = mode === "manual" ? "true" : "false";
-			}
-		});
+		form.target
+			.querySelectorAll<HTMLElement>('[data-role="manual"]')
+			.forEach((element) => {
+				if (!section.contains(element)) {
+					element.dataset.visible = mode === "manual" ? "true" : "false";
+				}
+			});
 	};
 
 	setMode(form.target.dataset.mode || "manual");
@@ -74,7 +91,7 @@ const generateImageForm = () => {
 	container.className = "flex flex-col gap-4";
 	container.dataset.visible = "false";
 
-	const usePageInfo = primitives.checkbox({
+	const usePageInfo: HTMLElement & { checked?: boolean } = primitives.checkbox({
 		label: "Use page info",
 		name: "info",
 		checked: true,

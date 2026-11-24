@@ -1,37 +1,56 @@
+import type { ToggleColumnFilterDetail } from "../../elements/base/baseTable.ts";
+import type ViewComponent from "../../views/base/component.ts";
+import type { TableWidgets } from "./types.d.ts";
+import type { TableVisibilityToggle } from "./visibilityState.ts";
+
+interface MobileTableControlAttributes {
+	view: { elt: HTMLElement };
+	component: ViewComponent & { widgets: TableWidgets };
+}
+
 export class MobileTableControls {
-	constructor(attributes) {
+	declare view: MobileTableControlAttributes["view"];
+	declare component: MobileTableControlAttributes["component"];
+
+	constructor(attributes: MobileTableControlAttributes) {
 		Object.assign(this, attributes);
 	}
 
 	get target() {
-		return this.view.elt.querySelector("[data-widget='MobileTableControls']");
+		return this.view.elt.querySelector<HTMLElement>(
+			"[data-widget='MobileTableControls']",
+		);
 	}
 
 	async init() {
-		const visibility = await this.component.loadWidget("TableVisibility");
+		await this.component.loadWidget("TableVisibility");
+		const visibility = this.component.widgets.TableVisibility;
 
-		this._syncVisibilityButtons(visibility.visibleColumns);
-		this.target.addEventListener("click", (e) => this._handleButtonClick(e));
+		this._syncVisibilityButtons(visibility?.visibleColumns ?? []);
+		this.target?.addEventListener("click", (e) => this._handleButtonClick(e));
 	}
 
 	postreconcile() {
 		const sorting = this.component.widgets.TableSorting;
-		if (sorting?.initialized) sorting.refreshRows();
+		if (sorting?.initialized) sorting.refreshRows?.();
 	}
 
-	_syncVisibilityButtons(visibleColumns) {
+	_syncVisibilityButtons(visibleColumns: readonly string[]) {
 		this.target
-			.querySelectorAll("button[data-toggle='visibility']")
+			?.querySelectorAll<HTMLButtonElement>("button[data-toggle='visibility']")
 			.forEach((button) => {
-				const column = button.closest("[data-column]").dataset.column;
-				button.dataset.active = visibleColumns.includes(column)
-					? "true"
-					: "false";
+				const column =
+					button.closest<HTMLElement>("[data-column]")?.dataset.column;
+				button.dataset.active =
+					column !== undefined && visibleColumns.includes(column)
+						? "true"
+						: "false";
 			});
 	}
 
-	_handleButtonClick(e) {
-		const button = e.target.closest("button");
+	_handleButtonClick(e: MouseEvent) {
+		const button =
+			e.target instanceof Element ? e.target.closest("button") : null;
 		if (!button) return;
 
 		const active = button.dataset.active === "false";
@@ -44,24 +63,30 @@ export class MobileTableControls {
 		}
 	}
 
-	_dispatchVisibilityToggle(button, active) {
-		const event = new CustomEvent("toggle-column-visibility", {
-			detail: {
-				column: button.closest("[data-column]").dataset.column,
-				active: active,
+	_dispatchVisibilityToggle(button: HTMLButtonElement, active: boolean) {
+		const event = new CustomEvent<TableVisibilityToggle>(
+			"toggle-column-visibility",
+			{
+				detail: {
+					column: button.closest<HTMLElement>("[data-column]")?.dataset.column,
+					active: active,
+				},
+				bubbles: true,
 			},
-			bubbles: true,
-		});
-		this.target.dispatchEvent(event);
+		);
+		this.target?.dispatchEvent(event);
 	}
 
-	_dispatchFilterToggle(button) {
-		const event = new CustomEvent("toggle-column-filter", {
-			detail: {
-				column: button.closest("[data-column]").dataset.column,
+	_dispatchFilterToggle(button: HTMLButtonElement) {
+		const event = new CustomEvent<Omit<ToggleColumnFilterDetail, "button">>(
+			"toggle-column-filter",
+			{
+				detail: {
+					column: button.closest<HTMLElement>("[data-column]")?.dataset.column,
+				},
+				bubbles: true,
 			},
-			bubbles: true,
-		});
-		this.target.dispatchEvent(event);
+		);
+		this.target?.dispatchEvent(event);
 	}
 }

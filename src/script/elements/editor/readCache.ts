@@ -4,6 +4,10 @@ import {
 	uint8ArrayToBase64,
 } from "../../shared/utilities.ts";
 
+import type { DocumentState } from "../../types/sync.d.ts";
+
+type CachedSnapshot = Extract<DocumentState, { mode: "snapshot" }>;
+
 /**
  * Retain server document reads separately from pending offline edits. Sharing
  * the response cache also shares logout/permission/build invalidation and
@@ -11,7 +15,10 @@ import {
  *
  */
 export class DocumentReadCache {
-	constructor(scope, syncId) {
+	declare key: string | null;
+	declare cache: Promise<Cache | null | undefined>;
+	declare pending: Promise<void>;
+	constructor(scope: string | undefined, syncId: string | null) {
 		this.key =
 			scope && syncId
 				? new URL(
@@ -27,26 +34,27 @@ export class DocumentReadCache {
 		this.pending = Promise.resolve();
 	}
 
-	async read() {
+	async read(): Promise<CachedSnapshot | null> {
 		await this.pending;
 		try {
 			const cache = await this.cache;
-			const response = await cache?.match(this.key);
-			return response ? await response.json() : null;
+			if (!this.key || !cache) return null;
+			const response = await cache.match(this.key);
+			return response ? ((await response.json()) as CachedSnapshot) : null;
 		} catch {
 			return null;
 		}
 	}
 
-	accept(payload) {
+	accept(payload: DocumentState | null | undefined) {
 		// Presence-only deltas don't change the retained content.
 		if (payload?.mode !== "snapshot" && !payload?.updates?.length)
 			return this.pending;
-		return this._queue(async (cache) => {
-			const previous =
+		return this._queue(async (cache, key) => {
+			const previous: CachedSnapshot | null | undefined =
 				payload.mode === "snapshot"
 					? payload
-					: await (await cache.match(this.key))?.json();
+					: await (await cache.match(key))?.json();
 			if (!previous) return;
 			const updates = [
 				...(previous.updates ?? []),
@@ -64,7 +72,7 @@ export class DocumentReadCache {
 					: [],
 			};
 			await cache.put(
-				this.key,
+				key,
 				new Response(JSON.stringify(snapshot), {
 					headers: { "Content-Type": "application/json" },
 				}),
@@ -73,14 +81,14 @@ export class DocumentReadCache {
 	}
 
 	clear() {
-		return this._queue((cache) => cache.delete(this.key));
+		return this._queue((cache, key) => cache.delete(key));
 	}
 
-	_queue(operation) {
+	_queue(operation: (cache: Cache, key: string) => Promise<unknown>) {
 		this.pending = this.pending
 			.then(async () => {
 				const cache = await this.cache;
-				if (cache) await operation(cache);
+				if (cache && this.key) await operation(cache, this.key);
 			})
 			.catch(() => undefined); // Storage availability never blocks online use.
 		return this.pending;

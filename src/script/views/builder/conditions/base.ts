@@ -1,14 +1,44 @@
+import type { ComboboxOption } from "../../../elements/combobox/combobox.ts";
 import { SelectBox } from "../../../elements/combobox/index.ts";
 import { primitives } from "../../../elements/primitives.ts";
 import { FormController } from "../../../forms/controller.ts";
 import { STYLES } from "../../../generated/styles.mjs";
 import { setIcon } from "../../../shared/icons.ts";
 import { withTransition } from "../../../shared/transitions.ts";
+import type { FieldCondition } from "../../../types/forms.d.ts";
+import type FormBuilder from "../builder.ts";
+import type { BuilderElement } from "../builder.ts";
+import type { ConditionList } from "../config.ts";
+import type { DraftDocument } from "../draftDocument.ts";
 
-export class Condition {
-	constructor(builder) {
+export type ConditionSelectionEvent = CustomEvent<{
+	options: Record<string, ComboboxOption>;
+}>;
+
+export class Condition<Setting extends object = object> {
+	declare builder: FormBuilder;
+	declare element: BuilderElement;
+	declare target: HTMLDivElement;
+	declare submitButton: HTMLButtonElement;
+	declare header: HTMLDivElement;
+	declare progress: HTMLDivElement;
+	declare form: FormController | null;
+	declare destroyables: { destroy?(): void }[];
+	declare options: Map<string, HTMLElement>;
+	declare complete: boolean;
+	declare focusTarget: HTMLElement | null;
+	declare index: number;
+	declare _successTimer: number | null;
+	declare key?: ConditionList;
+	declare messages: { submit: string };
+	declare setting?: Setting;
+	declare draftSetting?: object | null;
+	declare expand?: boolean;
+	declare document?: DraftDocument | null;
+
+	constructor(builder: FormBuilder) {
 		this.builder = builder;
-		this.element = builder.selectedElement;
+		this.element = builder.selectedElement as BuilderElement;
 		this.target = document.createElement("div");
 		this.target.className = "flex flex-col gap-4";
 		this.submitButton = this._createSubmitButton();
@@ -19,7 +49,7 @@ export class Condition {
 		this.options = new Map();
 		this.complete = false;
 		this.focusTarget = null;
-		this.index = null;
+		this.index = -1;
 		this._successTimer = null;
 	}
 
@@ -27,24 +57,25 @@ export class Condition {
 		return [this.progress];
 	}
 
-	init() {
+	init(): Promise<boolean> | undefined {
 		this.destroy();
 		if (this.draftSetting) {
-			this.setting = structuredClone(this.draftSetting);
+			this.setting = structuredClone(this.draftSetting) as Setting;
 			delete this.draftSetting;
 		}
 		this.complete = false;
 		this.form = new FormController(this);
 		this.form.init();
+		return;
 	}
 
 	showSuccess() {
-		clearTimeout(this._successTimer);
+		clearTimeout(this._successTimer ?? undefined);
 		const status = document.createElement("span");
 		const icon = status.appendChild(document.createElement("span"));
 		status.dataset.kind = "success";
 		setIcon(icon, "check", "ml-2 text-kind-default");
-		this.header.querySelector("[data-role='title']").appendChild(status);
+		this.header.querySelector("[data-role='title']")?.appendChild(status);
 
 		this._successTimer = setTimeout(() => {
 			void withTransition(() => status.remove(), {
@@ -62,14 +93,14 @@ export class Condition {
 	}
 
 	showProgress() {
-		this.options.values().forEach((option) => {
+		for (const option of this.options.values()) {
 			if (!this.progress.contains(option)) {
 				this.progress.appendChild(option);
 			}
-		});
+		}
 		this.progress.dataset.visible = "true";
 		if (this.complete) {
-			this.form.showSubmitButton();
+			this.form?.showSubmitButton();
 		}
 	}
 
@@ -87,9 +118,9 @@ export class Condition {
 		const selector = `${inputSelector}, ${textareaSelector}, ${selectSelector}`;
 		const focusable = target?.matches?.(selector)
 			? target
-			: (target?.querySelector?.(inputSelector) ??
-				target?.querySelector?.(textareaSelector) ??
-				target?.querySelector?.(selectSelector));
+			: (target?.querySelector?.<HTMLInputElement>(inputSelector) ??
+				target?.querySelector?.<HTMLTextAreaElement>(textareaSelector) ??
+				target?.querySelector?.<HTMLSelectElement>(selectSelector));
 
 		focusable?.focus();
 	}
@@ -118,8 +149,9 @@ export class Condition {
 		return header;
 	}
 
-	setTitle(title) {
-		this.header.querySelector("[data-role='title']").textContent = title;
+	setTitle(title: string) {
+		const node = this.header.querySelector("[data-role='title']");
+		if (node) node.textContent = title;
 	}
 
 	_createSubmitButton() {
@@ -130,15 +162,19 @@ export class Condition {
 		return submitButton;
 	}
 
+	validate() {
+		return false;
+	}
+
+	refreshSavedState() {}
+
 	clearOptions() {
-		this.options.values().forEach((option) => {
-			option.remove();
-		});
+		for (const option of this.options.values()) option.remove();
 		this.options.clear();
 	}
 
 	destroy() {
-		clearTimeout(this._successTimer);
+		clearTimeout(this._successTimer ?? undefined);
 		this._successTimer = null;
 		this.form?.destroy?.();
 		this.form = null;
@@ -151,10 +187,10 @@ export class Condition {
 	}
 }
 
-export class ConditionTarget extends Condition {
+export class ConditionTarget extends Condition<FieldCondition> {
+	declare setting: FieldCondition;
 	addTargetSelect() {
 		const selectElt = primitives.select({
-			title: this.targetSelectTitle,
 			options: this.builder.getEligibleConditionTargets(),
 			placeholder: "select a target element...",
 			id: "target-element",
@@ -172,7 +208,9 @@ export class ConditionTarget extends Condition {
 
 		selectElt.addEventListener("updated", (e) => {
 			this.clearOptions();
-			const options = Object.values(e.detail.options);
+			const options = Object.values(
+				(e as ConditionSelectionEvent).detail.options,
+			);
 			this.setting.id = options[0].id;
 			this.setting.name = options[0].name;
 			this.showProgress();
@@ -198,14 +236,15 @@ export class ConditionTarget extends Condition {
 	addChooseValue() {
 		if (this.options.has("value")) return;
 
-		const element = this.builder.elements.get(this.setting.id);
+		const element =
+			this.setting.id && this.builder.elements.get(this.setting.id);
+		if (!element) return;
 		this.setting.type = element.schema.type;
 
 		const options = element.schema.options || [];
 
 		if (options.length > 0) {
 			const selectElt = primitives.select({
-				title: "has the value",
 				options: options.map((option) => ({
 					label: option.label,
 					value: option.value,
@@ -220,7 +259,7 @@ export class ConditionTarget extends Condition {
 			});
 
 			const selectBox = new SelectBox(selectElt);
-			if (this.setting.value) {
+			if (typeof this.setting.value === "string" && this.setting.value) {
 				selectBox.values.add(this.setting.value);
 			}
 			selectBox.init();
@@ -229,26 +268,28 @@ export class ConditionTarget extends Condition {
 			this.focusTarget = selectElt;
 
 			selectElt.addEventListener("updated", (e) => {
-				const options = Object.values(e.detail.options);
+				const options = Object.values(
+					(e as ConditionSelectionEvent).detail.options,
+				);
 				this.setting.value = options[0].id;
 				this.setting.label = options[0].name;
 				this.showProgress();
 			});
 		} else {
-			this.form.showError("The target element must have at least one option.");
+			this.form?.showError("The target element must have at least one option.");
 		}
 	}
 
 	validate() {
 		if (!this.setting.id) {
-			this.form.showError("Please select a target element.");
+			this.form?.showError("Please select a target element.");
 			return false;
 		} else if (this.setting.checked) {
 			return true;
 		} else if (this.setting.value) {
 			return true;
 		} else {
-			this.form.showError("Please select an option.");
+			this.form?.showError("Please select an option.");
 			return false;
 		}
 	}

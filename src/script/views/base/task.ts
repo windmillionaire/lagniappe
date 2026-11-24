@@ -1,14 +1,18 @@
 import { withTransition } from "../../shared/transitions.ts";
+import type { RequestResult } from "../../types/api";
+import type { PageTaskDelta } from "../../widgets/pageTaskList.ts";
 import ViewComponent from "./component.ts";
 
 const ISOLATED_TASK_ACTIONS = new Set(["TaskMove", "TaskCombine"]);
 
 export class Task extends ViewComponent {
-	async activate(show) {
+	async activate(show?: string | null) {
 		const existingCombine =
 			show === "TaskCombine" ? this.widgets.TaskCombine : null;
 		if (show === "TaskCombine" && this.view.key) {
-			const target = this.elt.querySelector("[data-widget='TaskCombine']");
+			const target = this.elt.querySelector<HTMLElement>(
+				"[data-widget='TaskCombine']",
+			);
 			if (target?.dataset.route) {
 				const route = new URL(target.dataset.route, window.location.origin);
 				route.searchParams.set("page", this.view.key);
@@ -18,7 +22,7 @@ export class Task extends ViewComponent {
 			}
 		}
 		const activated = await super.activate(show);
-		if (activated && existingCombine) {
+		if (activated && existingCombine?.route) {
 			const separator = existingCombine.route.includes("?") ? "&" : "?";
 			await this.load(
 				existingCombine,
@@ -44,8 +48,9 @@ export class Task extends ViewComponent {
 	}
 
 	get formData() {
-		if (ISOLATED_TASK_ACTIONS.has(this.active?.name)) {
-			return this.active.formData;
+		const active = this.activeWidget;
+		if (active && ISOLATED_TASK_ACTIONS.has(active.name)) {
+			return active.formData;
 		}
 
 		const taskWidgets = Object.values(this.widgets).filter(
@@ -63,7 +68,7 @@ export class Task extends ViewComponent {
 				}
 				return null;
 			})
-			.filter(Boolean)
+			.filter((form) => form !== null)
 			.reduce((merged, current) => {
 				for (const [key, value] of current.entries()) {
 					merged.append(key, value);
@@ -78,7 +83,7 @@ export class Task extends ViewComponent {
 		return data;
 	}
 
-	async updated(response) {
+	async updated(response: RequestResult<{ task_delta: PageTaskDelta }>) {
 		if (response.task_delta) {
 			this.deactivate(false);
 			const parent = this.view.getComponent(this.parentComponent);
@@ -86,7 +91,8 @@ export class Task extends ViewComponent {
 			return;
 		}
 
-		const update = response.html?.querySelector(`[id='${this.name}']`);
+		const html = response.html || null;
+		const update = html?.querySelector<HTMLElement>(`[id='${this.name}']`);
 		if (update && this.completed !== (update.dataset.completed === "true")) {
 			// Commit the closed row and its list move together, after server acceptance.
 			// Widgets stay unloaded, including History, until the next explicit open.
@@ -94,6 +100,8 @@ export class Task extends ViewComponent {
 				() => {
 					if (this._destroyed || this.view._destroyed) return;
 					const replacement = this.view.getComponent(update);
+					if (!replacement)
+						throw new Error("Task response requires a replacement component");
 					update.dataset.open = "false";
 					this.elt.replaceWith(update);
 					this.destroy();
@@ -118,7 +126,7 @@ export class Task extends ViewComponent {
 		await super.updated(response);
 	}
 
-	_replaceNav(update) {
+	_replaceNav(update: HTMLElement) {
 		const elt = update.querySelector("[lp-nav]");
 		const target = this.nav?.element;
 		if (!elt || !target) return;
@@ -127,11 +135,12 @@ export class Task extends ViewComponent {
 		this._nav = null;
 	}
 
-	_removeMissingWidgets(update) {
-		this.elt.querySelectorAll("[data-widget]").forEach((elt) => {
+	_removeMissingWidgets(update: HTMLElement) {
+		this.elt.querySelectorAll<HTMLElement>("[data-widget]").forEach((elt) => {
 			// Nested components own their widgets, including loaded history rows.
 			if (elt.closest("[lp-component]") !== this.elt) return;
 			const name = elt.dataset.widget;
+			if (!name) return;
 			const target = update.querySelector(`[data-widget='${name}']`);
 			if (target) return;
 

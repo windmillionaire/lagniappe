@@ -1,17 +1,18 @@
 import { primitives } from "../../../elements/primitives.ts";
+import type FormBuilder from "../builder.ts";
 import { ConditionTarget } from "./base.ts";
 
 export default class Status extends ConditionTarget {
-	constructor(builder) {
+	declare key: "status";
+	constructor(builder: FormBuilder) {
 		super(builder);
 		this.key = "status";
 		this.messages = {
 			submit: "Add Status Message",
 		};
-		this.targetSelectTitle = "Show this status message when";
 	}
 
-	init() {
+	init(): undefined {
 		if (this.index !== -1) {
 			this.setTitle("Edit Status Message");
 			this.messages.submit = "Update Status Message";
@@ -25,7 +26,7 @@ export default class Status extends ConditionTarget {
 
 		const targets = this.builder.getEligibleConditionTargets();
 		if (targets.length === 0) {
-			this.form.showError(
+			this.form?.showError(
 				"Status messages cannot be set using available components. " +
 					"Please add a radio button, checkbox, or select menu to the form before " +
 					"setting a status message.",
@@ -38,7 +39,8 @@ export default class Status extends ConditionTarget {
 	}
 
 	showProgress() {
-		const target = this.builder.elements.get(this.setting.id);
+		const target =
+			this.setting.id && this.builder.elements.get(this.setting.id);
 		if (!target) return;
 
 		if (this.setting.text) {
@@ -70,7 +72,7 @@ export default class Status extends ConditionTarget {
 		this.focusTarget = statusText;
 
 		statusText.addEventListener("input", (e) => {
-			this.setting.text = e.target.value;
+			this.setting.text = (e.target as HTMLInputElement).value;
 			this.showProgress();
 		});
 	}
@@ -79,7 +81,7 @@ export default class Status extends ConditionTarget {
 		if (!super.validate()) return false;
 
 		if (!this.setting.text) {
-			this.form.showError("Please enter a status message.");
+			this.form?.showError("Please enter a status message.");
 			return false;
 		}
 

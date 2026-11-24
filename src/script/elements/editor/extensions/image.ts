@@ -1,7 +1,24 @@
 import { mergeAttributes } from "@tiptap/core";
 import Image from "@tiptap/extension-image";
 
-const getImageStyles = (attrs) => {
+type ImageAlignment = "left" | "center" | "right";
+type ImageFloat = "left" | "right" | "none";
+
+declare module "@tiptap/core" {
+	interface Commands<ReturnType> {
+		customImage: {
+			setImageWidth: (delta: number) => ReturnType;
+			setImageFloat: (float: ImageFloat) => ReturnType;
+			setImageAlignment: (alignment: ImageAlignment) => ReturnType;
+		};
+	}
+}
+
+const getImageStyles = (attrs: {
+	width?: string;
+	float?: string;
+	alignment?: string;
+}) => {
 	const styles = [`width: ${attrs.width || "100%"}`, "display: block"];
 
 	if (attrs.float && attrs.float !== "none") {
@@ -29,7 +46,7 @@ const getImageStyles = (attrs) => {
 export const CustomImage = Image.extend({
 	addAttributes() {
 		return {
-			...Image.config.addAttributes(),
+			...this.parent?.(),
 			width: {
 				default: "100%",
 				rendered: false,
@@ -89,7 +106,7 @@ export const CustomImage = Image.extend({
 
 	addCommands() {
 		return {
-			...Image.config.addCommands(),
+			...this.parent?.(),
 			setImageWidth:
 				(delta) =>
 				({ tr, dispatch }) => {

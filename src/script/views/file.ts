@@ -1,7 +1,8 @@
+import type { ReconcileChange } from "./base/core.ts";
 import Entity from "./base/entity.ts";
 
 export default class File extends Entity {
-	constructor(node) {
+	constructor(node: HTMLElement) {
 		super(node);
 		this._defaultTabId = node.dataset.defaultTab || "info";
 		this._reloadAfterExtract = this._reloadAfterExtract.bind(this);
@@ -12,7 +13,7 @@ export default class File extends Entity {
 		this.elt.addEventListener("click", this._reloadAfterExtract);
 	}
 
-	afterReconcileChange(change) {
+	afterReconcileChange(change: ReconcileChange) {
 		if (change.type !== "extract-complete") return;
 		if (change.key !== this.key) return;
 		if (this.elt.querySelector("#text")) return;
@@ -21,15 +22,19 @@ export default class File extends Entity {
 	}
 
 	showExtractReloadNotice() {
-		const notice = this.elt.querySelector("[data-role='extract-reload']");
+		const notice = this.elt.querySelector<HTMLElement>(
+			"[data-role='extract-reload']",
+		);
 		if (!notice) return;
 
 		notice.dataset.visible = "true";
 		this.addFlash(notice);
 	}
 
-	_reloadAfterExtract(event) {
-		const button = event.target.closest("[data-role='extract-reload-button']");
+	_reloadAfterExtract(event: MouseEvent) {
+		const button = (event.target as Element | null)?.closest?.(
+			"[data-role='extract-reload-button']",
+		);
 		if (!button) return;
 
 		window.location.reload();

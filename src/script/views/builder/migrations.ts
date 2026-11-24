@@ -1,4 +1,7 @@
-export const fieldKind = (field) =>
+import type { FormFieldSchema, FormSchema } from "../../types/forms.d.ts";
+import type { FieldKind } from "./types.ts";
+
+export const fieldKind = (field: FormFieldSchema): FieldKind =>
 	field.type === "input"
 		? field.input || "text"
 		: field.type === "link"
@@ -7,7 +10,10 @@ export const fieldKind = (field) =>
 				? "multiple"
 				: field.type;
 
-export const needsMigration = (before, after) =>
+export const needsMigration = (
+	before: FormSchema,
+	after: FormSchema,
+): boolean =>
 	before.some((field) => {
 		if (["html", "status"].includes(field.type)) return false;
 		const target = after.find(({ id }) => id === field.id);
@@ -25,10 +31,10 @@ export const needsMigration = (before, after) =>
 			: false;
 	});
 
-export const repairConditions = (schema) => {
+export const repairConditions = (schema: FormSchema) => {
 	let removed = 0;
 	for (const field of schema)
-		for (const key of ["visibility", "status"]) {
+		for (const key of ["visibility", "status"] as const) {
 			if (!Array.isArray(field[key])) continue;
 			field[key] = field[key].filter((condition) => {
 				const source = schema.find(({ id }) => id === condition.id);

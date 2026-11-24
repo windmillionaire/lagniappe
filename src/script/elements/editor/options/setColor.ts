@@ -1,7 +1,14 @@
 import { COLOR_MENU } from "../config.ts";
 
+import type { Toolbar } from "../toolbar.ts";
+
 class ColorPicker {
-	constructor(toolbar) {
+	declare toggles: Map<string, { active: boolean; button: HTMLButtonElement }>;
+	declare toolbar: Toolbar;
+	declare name: "setColor";
+	declare usedWithEditor: boolean;
+	declare active: boolean;
+	constructor(toolbar: Toolbar) {
 		this.toolbar = toolbar;
 		this.name = "setColor";
 		this.usedWithEditor = true;
@@ -9,7 +16,7 @@ class ColorPicker {
 		this.toggles = new Map();
 	}
 
-	_colorSwatch(color, title) {
+	_colorSwatch(color: string, title: string) {
 		const colorButton = document.createElement("button");
 		colorButton.className = `size-6 rounded transition-transform hover:scale-110 hover:outline-2 hover:outline-offset-2 data-[active=true]:outline-2 data-[active=true]:outline-offset-2`;
 		colorButton.style.backgroundColor = color;
@@ -20,7 +27,7 @@ class ColorPicker {
 		return colorButton;
 	}
 
-	setActiveColor(activeColor) {
+	setActiveColor(activeColor: string | null | undefined) {
 		this.toggles.forEach((toggle, color) => {
 			const isActive = color === activeColor;
 			if (isActive !== toggle.active) {
@@ -48,10 +55,13 @@ class ColorPicker {
 		this.active = true;
 
 		colorOptions.addEventListener("click", (e) => {
-			const colorButton = e.target.closest("button");
+			const colorButton = (e.target as Element | null)?.closest("button");
 			if (!colorButton) return;
 
-			const toggle = this.toggles.get(colorButton.dataset.color);
+			const color = colorButton.dataset.color;
+			if (!color) return;
+			const toggle = this.toggles.get(color);
+			if (!toggle) return;
 
 			const currentActive = Array.from(this.toggles.values()).find(
 				(t) => t.active && t !== toggle,
@@ -65,11 +75,7 @@ class ColorPicker {
 			colorButton.dataset.active = toggle.active ? "true" : "false";
 
 			if (toggle.active) {
-				this.toolbar.editor
-					.chain()
-					.focus()
-					.setColor(colorButton.dataset.color)
-					.run();
+				this.toolbar.editor.chain().focus().setColor(color).run();
 			} else {
 				this.toolbar.editor.chain().focus().unsetColor().run();
 			}

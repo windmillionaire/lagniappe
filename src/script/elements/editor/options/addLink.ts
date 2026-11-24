@@ -1,19 +1,27 @@
-import { getMarkRange } from "@tiptap/core";
+import { getMarkRange, type Range } from "@tiptap/core";
 import { FormController } from "../../../forms/controller.ts";
 import { STYLES } from "../../../generated/styles.mjs";
 import { ENDPOINTS } from "../../../shared/endpoints.ts";
 import { request } from "../../../shared/request.ts";
 import { buttons } from "../../buttons.ts";
-import { RemoteQueryCombobox } from "../../combobox/remote.ts";
+import {
+	type ComboboxQueryResponse,
+	type RemoteInputEvent,
+	RemoteQueryCombobox,
+} from "../../combobox/remote.ts";
 import { Results } from "../../combobox/results.ts";
 import { primitives } from "../../primitives.ts";
 import { normalizeLinkAttributes } from "../extensions/linkAttributes.ts";
+import type { Toolbar } from "../toolbar.ts";
 
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:/i;
 const BARE_DOMAIN_PATTERN = /^[^\s/]+\.[^\s]+(?:\/.*)?$/;
 
 class LinkSearchBox extends RemoteQueryCombobox {
-	constructor(element, addLink) {
+	declare addLink: AddLink;
+	declare results: Results;
+	declare endpoints: typeof ENDPOINTS.search;
+	constructor(element: HTMLInputElement, addLink: AddLink) {
 		super(element);
 		this.addLink = addLink;
 		this.index = "search";
@@ -27,7 +35,7 @@ class LinkSearchBox extends RemoteQueryCombobox {
 		super.init();
 	}
 
-	_input(event) {
+	_input(event: RemoteInputEvent) {
 		const query = event.target.value.trim();
 		if (this.addLink.linkHref(query)) {
 			this.settleQueryInput({ clear: true });
@@ -40,18 +48,20 @@ class LinkSearchBox extends RemoteQueryCombobox {
 		this.settleQueryInput({ clear: true });
 	}
 
-	elementClick(event) {
+	elementClick(event: MouseEvent) {
 		super.elementClick(event);
 		if (!this.panelOpen && this.options.length > 0) this.showPanel();
 	}
 
-	_search(query) {
+	_search(query: string) {
 		const params = new URLSearchParams();
 		params.set("q", query);
 		return this.runQuery(
 			query,
 			(token) =>
-				request.get(this.endpoints.bar, params, { signal: token.signal }),
+				request.get<ComboboxQueryResponse>(this.endpoints.bar, params, {
+					signal: token.signal,
+				}),
 			(response) => {
 				if (response?.ok) {
 					this.updatePanel(response.results || null);
@@ -63,7 +73,7 @@ class LinkSearchBox extends RemoteQueryCombobox {
 		);
 	}
 
-	selectOption(option) {
+	selectOption(option: HTMLElement) {
 		if (!option.dataset.url) return;
 
 		this.results.save(option);
@@ -72,12 +82,30 @@ class LinkSearchBox extends RemoteQueryCombobox {
 	}
 }
 
+interface LinkState {
+	attrs: { href?: string | null };
+	range: Range;
+}
+
 class AddLink {
-	constructor(toolbar) {
+	declare editor: Toolbar["editor"];
+	declare usedWithEditor: boolean;
+	declare _active: boolean;
+	declare toolbar: Toolbar;
+	declare name: "addLink";
+	declare messages: Record<string, string>;
+	declare target: HTMLFormElement;
+	declare link: HTMLInputElement;
+	declare html: HTMLElement[];
+	declare form: FormController;
+	declare linkState: LinkState | null;
+	declare combobox: LinkSearchBox | null;
+
+	constructor(toolbar: Toolbar) {
 		this.toolbar = toolbar;
 		this.editor = toolbar.editor;
 		this.submit = this.submit.bind(this);
-		this.name = "addLink";
+		this.name = "addLink" as const;
 		this.messages = {
 			select: "Please select some text first",
 			link: "Please add a URL",
@@ -94,7 +122,7 @@ class AddLink {
 		return this._active;
 	}
 
-	set active(value) {
+	set active(value: boolean) {
 		this._active = value;
 		if (value) {
 			this.captureSelection();
@@ -173,9 +201,9 @@ class AddLink {
 		});
 	}
 
-	singleLinkInRange(range) {
+	singleLinkInRange(range: Range): LinkState | null {
 		const linkType = this.editor.state.schema.marks.link;
-		const links = new Map();
+		const links = new Map<string, Range & { attrs: LinkState["attrs"] }>();
 
 		this.editor.state.doc.nodesBetween(range.from, range.to, (node, pos) => {
 			if (!node.isText) return true;
@@ -212,13 +240,13 @@ class AddLink {
 		return this.linkState?.range || this.highlightRange();
 	}
 
-	displayHref(href) {
+	displayHref(href: string) {
 		if (!href || !this.emailMode) return href;
 
 		return this.fullyQualifiedUrl(href) || href;
 	}
 
-	linkHref(value) {
+	linkHref(value: string) {
 		const href = value.trim();
 		if (!href) return "";
 
@@ -243,7 +271,7 @@ class AddLink {
 		return null;
 	}
 
-	fullyQualifiedUrl(value) {
+	fullyQualifiedUrl(value: string) {
 		const href = value.trim();
 		if (!href) return "";
 
@@ -270,13 +298,13 @@ class AddLink {
 		}
 	}
 
-	linkAttributes(href) {
+	linkAttributes(href: string) {
 		if (this.emailMode) return { href };
 
 		return normalizeLinkAttributes({ href });
 	}
 
-	applySearchResult(url) {
+	applySearchResult(url: string) {
 		const href = this.emailMode ? this.fullyQualifiedUrl(url) : url;
 		if (!href) {
 			this.form.showError(this.messages.link);

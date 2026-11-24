@@ -1,13 +1,33 @@
-import { Decoration, Extension } from "@tiptap/core";
+import { Decoration, Extension, type Range } from "@tiptap/core";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import type { Transaction } from "@tiptap/pm/state";
+
+interface RemoteFlash extends Range {
+	id: string;
+	attributes: Record<string, string>;
+}
+
+interface RemoteChangesStorage {
+	color: string;
+	author: string;
+	flashes: RemoteFlash[];
+	timeouts: Map<string, ReturnType<typeof setTimeout>>;
+}
+
+declare module "@tiptap/core" {
+	interface Storage {
+		flashRemoteChanges: RemoteChangesStorage;
+	}
+}
 
 const FLASH_FADE_DURATION_MS = 1000;
 
-const buildTextPosMap = (doc) => {
-	const map = [];
+const buildTextPosMap = (doc: ProseMirrorNode) => {
+	const map: number[] = [];
 	let currentTextPos = 0;
 
 	doc.descendants((node, pos) => {
-		if (node.isText) {
+		if (node.isText && node.text) {
 			for (let i = 0; i < node.text.length; i++) {
 				map[currentTextPos++] = pos + i;
 			}
@@ -20,7 +40,7 @@ const buildTextPosMap = (doc) => {
 	return map;
 };
 
-const mapFlashes = (flashes, transaction) => {
+const mapFlashes = (flashes: RemoteFlash[], transaction: Transaction) => {
 	if (!transaction.docChanged || flashes.length === 0) return flashes;
 
 	return flashes.flatMap((flash) => {
@@ -30,8 +50,12 @@ const mapFlashes = (flashes, transaction) => {
 	});
 };
 
-const remoteTransactionFlashes = (transaction, userColor, author) => {
-	const flashes = [];
+const remoteTransactionFlashes = (
+	transaction: Transaction,
+	userColor: string,
+	author: string,
+) => {
+	const flashes: RemoteFlash[] = [];
 	let docBeforeStep = transaction.before;
 	let prevText = docBeforeStep.textBetween(
 		0,
@@ -113,7 +137,7 @@ const remoteTransactionFlashes = (transaction, userColor, author) => {
 						const from = Math.max(highlightFrom, pos);
 						const to = Math.min(highlightTo, pos + node.nodeSize);
 						if (to > from) {
-							const attributes = {
+							const attributes: RemoteFlash["attributes"] = {
 								style: `color: ${userColor}; --remote-change-color: ${userColor};`,
 								class: "remote-change-flash",
 								"data-decoration-id": decorationId,
@@ -145,7 +169,10 @@ const remoteTransactionFlashes = (transaction, userColor, author) => {
 	return flashes;
 };
 
-export const FlashRemoteChanges = Extension.create({
+export const FlashRemoteChanges = Extension.create<
+	Record<never, never>,
+	RemoteChangesStorage
+>({
 	name: "flashRemoteChanges",
 
 	addStorage() {

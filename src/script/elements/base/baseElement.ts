@@ -1,11 +1,59 @@
 import { STYLES } from "../../generated/styles.mjs";
 import { setIcon } from "../../shared/icons.ts";
+import type { FormFieldSchema } from "../../types/forms.d.ts";
 import { primitives } from "../primitives.ts";
 
 const NON_HISTORY_FILLABLE_TYPES = new Set(["html", "signature", "status"]);
 
+/** Standalone widget fields can omit the loader's type discriminator. */
+export interface ElementSchema extends Omit<FormFieldSchema, "type" | "input"> {
+	type?: FormFieldSchema["type"];
+	input?: string;
+	index?: string;
+	creatable?: boolean | string;
+	kind?: string;
+}
+
+interface ConditionSource {
+	schema: ElementSchema;
+	active?(value: unknown): boolean;
+}
+
+export interface ElementRenderer {
+	id?: string;
+	kind?: string;
+	readonly?: boolean;
+	showEmptyFields?: boolean;
+	historyFillEnabled?: boolean;
+	cellEditing?: boolean;
+	mode?: "read" | "edit" | null;
+	form?: {
+		target: HTMLElement;
+		key?: string | null;
+		htmlFields?: Record<string, string> | null;
+	} | null;
+	elements?: ReadonlyMap<string, ConditionSource>;
+}
+
+export type FormElementTarget = HTMLElement & { _lp_element?: BaseElement };
+
 export class BaseElement {
-	constructor(renderer, schema, submission) {
+	declare renderer: ElementRenderer;
+	declare schema: ElementSchema;
+	declare readonly?: boolean;
+	declare element: HTMLElement | null;
+	declare destroyables: { destroy?(): void }[];
+	declare static: boolean;
+	declare _submission: unknown;
+	declare _elt: HTMLElement | null;
+	declare _read: HTMLElement | null;
+	declare _edit: HTMLElement | null;
+
+	constructor(
+		renderer: ElementRenderer,
+		schema: ElementSchema,
+		submission?: unknown,
+	) {
 		this.renderer = renderer;
 		this.schema = schema;
 		this.readonly = renderer.readonly;
@@ -22,7 +70,7 @@ export class BaseElement {
 		return this._submission ?? null;
 	}
 
-	set submission(value) {
+	set submission(value: unknown) {
 		const submission = value ?? null;
 		if (
 			submission === null ||
@@ -43,7 +91,7 @@ export class BaseElement {
 	}
 
 	get historyFillable() {
-		return !NON_HISTORY_FILLABLE_TYPES.has(this.schema?.type);
+		return !NON_HISTORY_FILLABLE_TYPES.has(this.schema?.type ?? "");
 	}
 
 	get canHistoryFill() {
@@ -100,7 +148,7 @@ export class BaseElement {
 
 		this._elt = edit;
 		edit.dataset.editing = "true";
-		edit.dataset.type = this.schema.type;
+		edit.dataset.type = String(this.schema.type);
 		return edit;
 	}
 
@@ -117,28 +165,31 @@ export class BaseElement {
 		return empty;
 	}
 
-	historyValueAvailable(value) {
+	historyValueAvailable(value: unknown) {
 		if (value === null || value === undefined || value === "") return false;
 		if (Array.isArray(value)) return value.length > 0;
 		if (typeof value === "object") return Object.keys(value).length > 0;
 		return true;
 	}
 
-	fillFromHistory(value) {
+	fillFromHistory(value: unknown) {
 		if (!this.historyValueAvailable(value)) return false;
 
+		const current = this._elt;
+		if (!current) return false;
 		this.submission = value;
-		this._elt.classList.add("opacity-50", "pointer-events-none");
+		current.classList.add("opacity-50", "pointer-events-none");
 
 		this.destroy();
 		const elt = this.create();
-		this._elt.replaceWith(elt);
+		if (!elt) return false;
+		current.replaceWith(elt);
 		this._elt = elt;
-		this.elt.dispatchEvent(new Event("change", { bubbles: true }));
+		elt.dispatchEvent(new Event("change", { bubbles: true }));
 		return true;
 	}
 
-	historyFillButton(value) {
+	historyFillButton(value: unknown) {
 		if (!this.canHistoryFill || !this.historyValueAvailable(value)) return null;
 
 		const button = document.createElement("button");
@@ -161,14 +212,16 @@ export class BaseElement {
 				this.fillFromHistory(value);
 				return;
 			}
-			const before = JSON.stringify(this.value ?? this.submission);
+			const readValue = () =>
+				"value" in this ? (this.value ?? this.submission) : this.submission;
+			const before = JSON.stringify(readValue());
 			button.disabled = true;
 			try {
-				const restored = await value();
+				const restored: unknown = await value();
 				if (
 					button.isConnected &&
 					this.canHistoryFill &&
-					JSON.stringify(this.value ?? this.submission) === before
+					JSON.stringify(readValue()) === before
 				)
 					this.fillFromHistory(restored);
 			} finally {
@@ -179,7 +232,7 @@ export class BaseElement {
 		return button;
 	}
 
-	addHistoryFill(value) {
+	addHistoryFill(value: unknown) {
 		const button = this.historyFillButton(value);
 		if (!button) return false;
 
@@ -199,7 +252,7 @@ export class BaseElement {
 	}
 
 	create() {
-		let elt;
+		let elt: FormElementTarget | null;
 		if (this.readonly && this.schema.type !== "table") {
 			elt = document.createElement("div");
 			const label = primitives.label({
@@ -244,13 +297,19 @@ export class BaseElement {
 					"edit",
 					"icon-sm",
 				);
-				label.append(button);
+				label?.append(button);
 			} else {
 				elt.classList.add("flex", "flex-col", "gap-1");
 			}
 		}
 
-		if (this.clear && this.mode === "read" && !this.readonly) {
+		if (
+			label &&
+			"clear" in this &&
+			this.clear &&
+			this.mode === "read" &&
+			!this.readonly
+		) {
 			const clearButton = label.appendChild(document.createElement("button"));
 			clearButton.type = "button";
 			clearButton.dataset.role = "clear";
@@ -292,24 +351,32 @@ export class BaseElement {
 		this._edit = null;
 	}
 
-	update(value) {
-		if (this.elt.contains(document.activeElement)) {
+	changed(value: unknown) {
+		return this.submission !== value;
+	}
+
+	update(value: unknown): boolean | undefined {
+		const current = this.elt;
+		if (current?.contains(document.activeElement)) {
 			return false;
 		} else if (!this.changed(value)) {
 			return true;
 		}
 
-		if (this.updateSubmission) {
+		if (
+			"updateSubmission" in this &&
+			typeof this.updateSubmission === "function"
+		) {
 			this.updateSubmission(value);
 			return true;
 		}
 
 		this.submission = value;
-		this._elt.classList.add("opacity-50", "pointer-events-none");
+		current?.classList.add("opacity-50", "pointer-events-none");
 
 		this.destroy();
 		const elt = this.create();
-		this._elt.replaceWith(elt);
+		if (elt) current?.replaceWith(elt);
 		this._elt = elt;
 		return true;
 	}

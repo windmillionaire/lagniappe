@@ -1,7 +1,20 @@
-import { IndependentDocument } from "../../elements/editor/independent.ts";
+import {
+	IndependentDocument,
+	type IndependentDocumentAttributes,
+} from "../../elements/editor/independent.ts";
+import type FormBuilder from "./builder.ts";
 
 export class DraftDocument extends IndependentDocument {
-	constructor(attributes) {
+	declare builder: FormBuilder;
+	declare fieldId: string;
+	declare _lastFlushedContent: string;
+
+	constructor(
+		attributes: IndependentDocumentAttributes & {
+			builder: FormBuilder;
+			fieldId: string;
+		},
+	) {
 		super(attributes);
 		this.draftOnly = true;
 	}
@@ -23,7 +36,7 @@ export class DraftDocument extends IndependentDocument {
 			await this._publishLoadedContent(this.builder.previewHtml(html));
 			if (this._destroyed) return false;
 			this._lastFlushedContent = this._currentContent();
-			this.editor.on("update", () => this.flush());
+			this.editor?.on("update", () => this.flush());
 			this._hideStatus();
 			return true;
 		})().finally(() => {
@@ -47,7 +60,7 @@ export class DraftDocument extends IndependentDocument {
 		return Promise.resolve(true);
 	}
 
-	addDraftImage(file) {
+	addDraftImage(file: File) {
 		return this.builder.addDraftImage(this.fieldId, file);
 	}
 }

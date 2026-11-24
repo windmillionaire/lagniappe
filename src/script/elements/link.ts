@@ -1,37 +1,67 @@
 import { STYLES } from "../generated/styles.mjs";
 import { areEqual } from "../shared/utilities.ts";
-import { BaseElement } from "./base/baseElement.ts";
+import {
+	BaseElement,
+	type ElementRenderer,
+	type ElementSchema,
+} from "./base/baseElement.ts";
 import { FacetsBox } from "./combobox/index.ts";
-import { formatting } from "./formatting.ts";
+import { type EntityLabel, formatting } from "./formatting.ts";
 import { primitives } from "./primitives.ts";
 
+interface LinkSubmission extends Omit<EntityLabel, "link"> {
+	url?: string | null;
+	title?: string | null;
+}
+
+function isLinkSubmission(value: unknown): value is LinkSubmission {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+	const data: Record<string, unknown> = { ...value };
+	return (
+		["id", "name", "kind", "index", "type"].every(
+			(key) => data[key] === undefined || typeof data[key] === "string",
+		) &&
+		["url", "title"].every(
+			(key) => data[key] == null || typeof data[key] === "string",
+		)
+	);
+}
+
 export class LinkElement extends BaseElement {
-	constructor(renderer, schema, submission) {
+	declare combobox: FacetsBox | null;
+	declare _cell?: HTMLDivElement;
+
+	constructor(
+		renderer: ElementRenderer,
+		schema: ElementSchema,
+		submission?: unknown,
+	) {
 		super(renderer, schema, submission);
 		this.combobox = null;
 	}
 
 	get value() {
+		const submission = this.linkSubmission;
 		if (this.combobox) {
 			const id =
 				this.combobox?.values.size > 0
 					? Array.from(this.combobox.values)[0]
 					: null;
-			if (this.submission?.id === id) return this.submission;
+			if (submission?.id === id) return submission;
 			const selected = this.combobox.selectedOptions;
 			return selected.length > 0 ? selected[0] : null;
 		} else {
 			const inputs = this.elt?.querySelectorAll("input");
 			if (!inputs?.length) {
-				if (this.submission?.url) {
+				if (submission?.url) {
 					return {
-						url: this.submission.url,
-						title: this.submission.title ?? "",
+						url: submission.url,
+						title: submission.title ?? "",
 					};
 				}
 				return null;
 			}
-			const result = {};
+			const result: Record<string, string> = {};
 			inputs.forEach((input) => {
 				const key = input.name.slice(input.name.indexOf(":") + 1);
 				result[key] = input.value;
@@ -40,39 +70,42 @@ export class LinkElement extends BaseElement {
 		}
 	}
 
-	changed(value) {
+	changed(value: unknown) {
 		if (areEqual(this.value, value)) return false;
 		return true;
 	}
 
+	get linkSubmission() {
+		return isLinkSubmission(this.submission) ? this.submission : null;
+	}
+
 	get read() {
 		if (this._read) return this._read;
-		if (!this.submission) return null;
+		const submission = this.linkSubmission;
+		if (!submission) return null;
 
 		this._read = document.createElement("div");
 		this._read.className = `${STYLES.form.submission.default} group-data-[mode=edit]/element:hidden`;
 
-		if (this.submission?.id) {
-			if (!this.submission.name) return null;
-			const name = formatting.name({ ...this.submission, link: true });
+		if (submission.id) {
+			if (!submission.name) return null;
+			const name = formatting.name({ ...submission, link: true });
 			this._read.appendChild(
 				formatting.iconLabel({
 					icon: "in",
-					kind: this.submission.kind,
+					kind: submission.kind,
 					content: name,
 					classes: STYLES.form.linkLabel,
 					iconClasses: "text-kind-default",
 				}),
 			);
-		} else if (this.submission?.url) {
+		} else if (submission.url) {
 			const link = document.createElement("a");
 			link.dataset.kind = "page";
 			link.className = STYLES.link.default;
 			link.target = "_blank";
-			link.href = this.submission.url;
-			link.textContent = this.submission.title
-				? this.submission.title
-				: this.submission.url;
+			link.href = submission.url;
+			link.textContent = submission.title || submission.url;
 			this._read.appendChild(
 				formatting.iconLabel({
 					icon: "out",
@@ -100,7 +133,8 @@ export class LinkElement extends BaseElement {
 	get edit() {
 		if (this._edit) return this._edit;
 
-		let edit;
+		const submission = this.linkSubmission;
+		let edit: HTMLElement;
 		if (this.schema.location === "in") {
 			edit = primitives.input({
 				name: this.schema.id,
@@ -109,7 +143,7 @@ export class LinkElement extends BaseElement {
 				data: {
 					index: "internal",
 					placeholder: "search...",
-					preload: this.submission ? JSON.stringify(this.submission) : null,
+					preload: submission ? JSON.stringify(submission) : null,
 				},
 			});
 			this.combobox = new FacetsBox(edit);
@@ -135,13 +169,13 @@ export class LinkElement extends BaseElement {
 					name: `${this.schema.id}:url`,
 					type: "url",
 					placeholder: "url",
-					value: this.submission?.url,
+					value: submission?.url,
 				}),
 				primitives.input({
 					name: `${this.schema.id}:title`,
 					type: "text",
 					placeholder: "name (optional)",
-					value: this.submission?.title,
+					value: submission?.title,
 				}),
 			);
 			inputs.classList.add("group-data-[mode=read]/element:hidden");

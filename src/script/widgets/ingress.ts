@@ -1,16 +1,94 @@
 import { buttons } from "../elements/buttons.ts";
+import type { ComboboxOption } from "../elements/combobox/combobox.ts";
 import { FacetsBox, SelectBox } from "../elements/combobox/index.ts";
 import { primitives } from "../elements/primitives.ts";
+import type { ENDPOINTS } from "../shared/endpoints.ts";
 import { captureError, Modal, request } from "../shared/index.ts";
+import type { PollingCoordinator } from "../shared/polling.ts";
 import { withTransition } from "../shared/transitions.ts";
 
+import type { RequestResult } from "../types/api";
+
+interface IngressStageFields {
+	stage: string;
+	progress: string;
+	stopped: boolean | "true" | "false";
+	actions: string[];
+	run_status: string;
+	poll_after_ms: number | null;
+}
+type IngressStageResponse = Omit<
+	RequestResult<IngressStageFields>,
+	"status"
+> & {
+	status?: string | number;
+};
+type IngressView = NonNullable<ConstructorParameters<typeof Modal>[0]> & {
+	PollingCoordinator?: Pick<PollingCoordinator, "subscribe"> | null;
+	ensurePollingCoordinator?(): Promise<unknown>;
+};
+interface IngressSettings {
+	target: HTMLElement;
+	key: string;
+	endpoints: ReturnType<typeof ENDPOINTS.ImportData>;
+	component?: { active?: object | null; visible?: boolean; elt?: HTMLElement };
+	view: IngressView;
+	visible?: boolean;
+}
+interface IngressStageAction {
+	pendingText: string;
+	pendingKind?: string | null;
+	fallback: string;
+	operation(): Promise<IngressStageResponse | null | undefined>;
+	pausePolling?: boolean;
+}
+type IngressStageControl = SelectBox | FacetsBox;
+interface IngressStageSettings {
+	target: HTMLFormElement | null;
+	destroyables: IngressStageControl[];
+}
+
 export class ImportData {
-	constructor(attributes) {
+	declare target: IngressSettings["target"];
+	declare key: IngressSettings["key"];
+	declare endpoints: IngressSettings["endpoints"];
+	declare component: IngressSettings["component"];
+	declare view: IngressSettings["view"];
+	declare visible?: boolean;
+	declare _destroyed: boolean;
+	declare _stageActionPromise: Promise<boolean> | null;
+	declare stageElt: HTMLElement;
+	declare progressElt: HTMLElement;
+	declare stage?: string;
+	declare stageSettings: IngressStageSettings | null;
+	declare error: HTMLElement | null;
+	declare stopButton: ReturnType<typeof buttons.active> | null;
+	declare stopped: boolean;
+	declare actions: Set<string>;
+	declare runStatus: string;
+	declare pollAfterMs: number | null;
+	declare importRequestStarted: boolean;
+	declare _unsubscribeImport: (() => void) | null | undefined;
+	declare _stageUpdate: Promise<RequestResult | undefined>;
+	declare _parser: DOMParser;
+
+	constructor(attributes: IngressSettings) {
 		Object.assign(this, attributes);
 		this._destroyed = false;
 		this._stageActionPromise = null;
-		this.stageElt = this.target.querySelector("[data-role='stage']");
-		this.progressElt = this.target.querySelector("[data-role='progress']");
+		const stageElt = this.target.querySelector<HTMLElement>(
+			"[data-role='stage']",
+		);
+		const progressElt = this.target.querySelector<HTMLElement>(
+			"[data-role='progress']",
+		);
+		if (!stageElt || !progressElt) {
+			throw new Error(
+				"Import widget is missing its stage or progress element.",
+			);
+		}
+		this.stageElt = stageElt;
+		this.progressElt = progressElt;
 		this.stage = this.target.dataset.stage;
 		this.stageSettings = null;
 		this.error = null;
@@ -21,7 +99,7 @@ export class ImportData {
 		this.pollAfterMs = null;
 		this.importRequestStarted = false;
 		this._unsubscribeImport = null;
-		this._stageUpdate = Promise.resolve();
+		this._stageUpdate = Promise.resolve(undefined);
 
 		this._parser = new DOMParser();
 		this._refreshProgress = this._refreshProgress.bind(this);
@@ -34,7 +112,7 @@ export class ImportData {
 
 	init() {
 		request
-			.get(this.endpoints.get(this.key))
+			.get<IngressStageFields>(this.endpoints.get(this.key))
 			.then((resp) => {
 				if (!this._destroyed) this._setStage(resp);
 			})
@@ -47,8 +125,8 @@ export class ImportData {
 		this.progressElt.addEventListener("input", this._updateVisibility);
 	}
 
-	async _click(e) {
-		if (this._destroyed) return;
+	async _click(e: MouseEvent) {
+		if (this._destroyed || !(e.target instanceof Element)) return;
 		const button = e.target.closest("button");
 		if (!button) return;
 
@@ -67,7 +145,10 @@ export class ImportData {
 		} else if (button.dataset.role === "set-stage") {
 			const stage = button.dataset.stage;
 			this._setStage(
-				await request.put(this.endpoints.setStage(this.key), { stage }),
+				await request.put<IngressStageFields>(
+					this.endpoints.setStage(this.key),
+					{ stage },
+				),
 			);
 		} else if (button.dataset.role === "delete-imported") {
 			await this._deleteImported(button);
@@ -77,7 +158,8 @@ export class ImportData {
 				pendingKind: "delete",
 				fallback: "Import could not be stopped. Please try again.",
 				pausePolling: true,
-				operation: () => request.post(this.endpoints.stop(this.key)),
+				operation: () =>
+					request.post<IngressStageFields>(this.endpoints.stop(this.key)),
 			});
 		} else if (button.dataset.role === "stop" && this.actions.has("restart")) {
 			await this._runStageAction(button, {
@@ -90,19 +172,19 @@ export class ImportData {
 	}
 
 	_runStageAction(
-		button,
+		button: HTMLButtonElement,
 		{
 			pendingText,
 			pendingKind = null,
 			fallback,
 			operation,
 			pausePolling = false,
-		},
+		}: IngressStageAction,
 	) {
 		if (this._stageActionPromise) return this._stageActionPromise;
 		if (this._destroyed || !button) return Promise.resolve(false);
 
-		const originalText = button.textContent.trim();
+		const originalText = (button.textContent ?? "").trim();
 		const originalKind = button.dataset.kind;
 		const hadFocus = document.activeElement === button;
 		const wasPolling = this.importRequestStarted;
@@ -170,12 +252,13 @@ export class ImportData {
 		return pending;
 	}
 
-	async _change(e) {
-		const form = e.target.closest("form");
+	async _change(e: Event) {
+		const target = e.target;
+		const form = target instanceof Element ? target.closest("form") : null;
 		if (!form) return;
 
 		this.stageElt
-			.querySelectorAll("[data-process]")
+			.querySelectorAll<HTMLElement>("[data-process]")
 			.forEach((processButton) => {
 				if (processButton.dataset.process === this.stage) {
 					processButton.dataset.visible = "true";
@@ -191,7 +274,7 @@ export class ImportData {
 		return this._stageUpdate;
 	}
 
-	_setStage(resp) {
+	_setStage(resp: IngressStageResponse | null | undefined) {
 		if (this._destroyed || !resp) return false;
 		const {
 			stage,
@@ -206,8 +289,8 @@ export class ImportData {
 		if (!stage) return false;
 
 		withTransition(() => {
-			this.stageElt.innerHTML = progress;
-			this.progressElt.innerHTML = status;
+			this.stageElt.innerHTML = progress as string;
+			this.progressElt.innerHTML = status as string;
 			this.stage = stage;
 			this.stopped = stopped === true || stopped === "true";
 			this.actions = new Set(actions);
@@ -256,33 +339,39 @@ export class ImportData {
 		return true;
 	}
 
-	_updateVisibility(e) {
-		if (e.target.dataset?.optionToggle !== "true") return;
+	_updateVisibility(e: Event) {
+		const target = e.target;
+		if (
+			!(target instanceof HTMLInputElement) ||
+			target.dataset.optionToggle !== "true"
+		)
+			return;
 
-		const option =
-			e.target.type === "checkbox" ? e.target.name : e.target.value;
-		const section = e.target.closest("[data-section]");
+		const option = target.type === "checkbox" ? target.name : target.value;
+		const section = target.closest("[data-section]");
 
-		section.querySelectorAll("[data-option]").forEach((section) => {
-			if (e.target.checked && section.dataset.option === option) {
-				section.dataset.visible = "true";
-			} else {
-				section.dataset.visible = "false";
-			}
-			const visible = section.dataset.visible === "true";
-			if (!visible) {
-				this.stageSettings.destroyables.forEach((destroyable) => {
-					if (destroyable.clear) destroyable.clear();
-				});
-				section.querySelectorAll("input").forEach((input) => {
-					input.checked = false;
-					input.value = "";
-				});
-			}
-		});
+		section
+			?.querySelectorAll<HTMLElement>("[data-option]")
+			.forEach((section) => {
+				if (target.checked && section.dataset.option === option) {
+					section.dataset.visible = "true";
+				} else {
+					section.dataset.visible = "false";
+				}
+				const visible = section.dataset.visible === "true";
+				if (!visible) {
+					this.stageSettings?.destroyables.forEach((destroyable) => {
+						if (destroyable.clear) destroyable.clear();
+					});
+					section.querySelectorAll("input").forEach((input) => {
+						input.checked = false;
+						input.value = "";
+					});
+				}
+			});
 	}
 
-	_showError(message) {
+	_showError(message: string) {
 		this._clearError();
 		this.error = primitives.error(message);
 		this.error.setAttribute("role", "status");
@@ -308,42 +397,56 @@ export class ImportData {
 	}
 
 	_setVerifyImport() {
-		const target = this.stageSettings.target;
-		let section = target.querySelector("[data-section='page-form-index']");
-		if (!section) return;
+		const settings = this.stageSettings;
+		const target = settings?.target;
+		const initialSection = target?.querySelector<HTMLElement>(
+			"[data-section='page-form-index']",
+		);
+		if (!settings || !target || !initialSection) return;
+		let section = initialSection;
 
 		const setupSelects = () => {
-			const pageSelect = section.querySelector("[data-option='page-form']");
-			const indexFrom = section.querySelector("[data-role='index-from']");
-			const indexTo = section.querySelector("[data-role='index-to']");
+			const pageSelect = section.querySelector<HTMLElement>(
+				"[data-option='page-form']",
+			);
+			const indexFrom = section.querySelector<HTMLElement>(
+				"[data-role='index-from']",
+			);
+			const indexTo = section.querySelector<HTMLElement>(
+				"[data-role='index-to']",
+			);
 
 			if (pageSelect) {
 				const selectPageForm = new FacetsBox(pageSelect);
 				selectPageForm.init();
-				this.stageSettings.destroyables.push(selectPageForm);
+				settings.destroyables.push(selectPageForm);
 			}
 
 			if (indexFrom) {
 				const selectIndexFrom = new SelectBox(indexFrom);
 				selectIndexFrom.init();
-				this.stageSettings.destroyables.push(selectIndexFrom);
+				settings.destroyables.push(selectIndexFrom);
 			}
 
 			if (indexTo?.hasAttribute("lp-select")) {
 				const selectIndexTo = new SelectBox(indexTo);
 				selectIndexTo.init();
-				this.stageSettings.destroyables.push(selectIndexTo);
+				settings.destroyables.push(selectIndexTo);
 			}
 		};
 
 		setupSelects();
 
 		target.addEventListener("change", async (e) => {
-			if (!["page-form-id", "index-field-choice"].includes(e.target.name)) {
+			const input = e.target as HTMLInputElement | HTMLSelectElement | null;
+			if (
+				!input ||
+				!["page-form-id", "index-field-choice"].includes(input.name)
+			) {
 				return;
 			} else if (
-				e.target.name === "index-field-choice" &&
-				e.target.value === "page-form"
+				input.name === "index-field-choice" &&
+				input.value === "page-form"
 			) {
 				return;
 			}
@@ -352,23 +455,26 @@ export class ImportData {
 
 			section.classList.add("opacity-50", "pointer-events-none");
 			const params = new URLSearchParams();
-			params.set("update-form-index", e.target.value);
+			params.set("update-form-index", input.value);
 			const resp = await request.get(
 				this.endpoints.getPageForm(this.key),
 				params,
 			);
+			if (!resp) return;
 			const html =
 				resp.html instanceof Document
 					? resp.html
-					: this._parser.parseFromString(resp.html, "text/html");
-			const newSection = html.querySelector("[data-section='page-form-index']");
+					: this._parser.parseFromString(resp.html as string, "text/html");
+			const newSection = html.querySelector<HTMLElement>(
+				"[data-section='page-form-index']",
+			);
 			if (!newSection) return;
 
 			withTransition(() => {
-				this.stageSettings.destroyables.forEach((destroyable) => {
+				settings.destroyables.forEach((destroyable) => {
 					destroyable.destroy();
 				});
-				this.stageSettings.destroyables = [];
+				settings.destroyables = [];
 				section.replaceWith(newSection);
 				section = newSection;
 				setupSelects();
@@ -377,24 +483,30 @@ export class ImportData {
 	}
 
 	_setChooseForm() {
-		const formElt = this.stageSettings.target;
-		const selectButton = formElt.querySelector("[data-option='existing-form']");
+		const settings = this.stageSettings;
+		const selectButton = settings?.target?.querySelector<HTMLElement>(
+			"[data-option='existing-form']",
+		);
+		if (!settings || !selectButton) return;
 		const selectForm = new FacetsBox(selectButton);
 
 		selectForm.init();
-		this.stageSettings.destroyables.push(selectForm);
+		settings.destroyables.push(selectForm);
 	}
 
 	_setChooseParent() {
-		const parentElt = this.stageSettings.target;
-		const selectButton = parentElt.querySelector(
+		const settings = this.stageSettings;
+		const parentElt = settings?.target;
+		if (!settings || !parentElt) return;
+		const selectButton = parentElt.querySelector<HTMLElement>(
 			"[data-option='existing-parent']",
 		);
+		if (!selectButton) return;
 		const selectParent = new FacetsBox(selectButton);
 		selectParent.init();
-		this.stageSettings.destroyables.push(selectParent);
+		settings.destroyables.push(selectParent);
 
-		const createModel = this.stageSettings.target.querySelector(
+		const createModel = parentElt.querySelector<HTMLElement>(
 			"[data-section='create-model']",
 		);
 		if (!createModel) return;
@@ -405,8 +517,11 @@ export class ImportData {
 			createModel.dataset.visible = "false";
 		}
 
-		this.stageSettings.target.addEventListener("updated", (e) => {
-			Object.values(e.detail.options).forEach((option) => {
+		parentElt.addEventListener("updated", (e) => {
+			const { options } = (
+				e as CustomEvent<{ options: Record<string, ComboboxOption> }>
+			).detail;
+			Object.values(options).forEach((option) => {
 				if (option.kind === "project") {
 					createModel.dataset.visible = "true";
 					createModel.dataset.parentKind = "project";
@@ -419,17 +534,24 @@ export class ImportData {
 	}
 
 	_setAssignColumns() {
-		const target = this.stageSettings.target;
-		const columns = target.querySelectorAll("[lp-select]");
+		const settings = this.stageSettings;
+		const target = settings?.target;
+		if (!settings || !target) return;
+		const columns = target.querySelectorAll<HTMLElement>("[lp-select]");
 
 		columns.forEach((column) => {
 			const select = new SelectBox(column);
 			select.init();
-			this.stageSettings.destroyables.push(select);
+			settings.destroyables.push(select);
 		});
 
-		const _setOpacity = (checkbox) => {
-			const select = checkbox.closest("tr").querySelector("[lp-select]");
+		const _setOpacity = (checkbox: HTMLInputElement) => {
+			const select = checkbox
+				.closest("tr")
+				?.querySelector<HTMLElement & { _lp_combobox?: SelectBox }>(
+					"[lp-select]",
+				);
+			if (!select) return;
 			if (checkbox.checked) {
 				select.classList.add("opacity-50", "pointer-events-none");
 				select._lp_combobox?.clear();
@@ -438,14 +560,19 @@ export class ImportData {
 			}
 		};
 
-		target.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
-			if (checkbox.checked) {
-				_setOpacity(checkbox);
-			}
-		});
+		target
+			.querySelectorAll<HTMLInputElement>("input[type='checkbox']")
+			.forEach((checkbox) => {
+				if (checkbox.checked) {
+					_setOpacity(checkbox);
+				}
+			});
 
 		target.addEventListener("change", (e) => {
-			if (e.target.type === "checkbox") {
+			if (
+				e.target instanceof HTMLInputElement &&
+				e.target.type === "checkbox"
+			) {
 				_setOpacity(e.target);
 			}
 		});
@@ -454,15 +581,19 @@ export class ImportData {
 	async _next() {
 		await this._stageUpdate;
 		if (this._destroyed) return null;
-		const form = this.stageSettings.target;
+		const form = this.stageSettings?.target;
 		const updates = form ? new FormData(form) : new FormData();
-		updates.append("stage", this.stage);
+		updates.append("stage", this.stage as string);
 
-		return request.put(this.endpoints.next(this.key), updates);
+		return request.put<IngressStageFields>(
+			this.endpoints.next(this.key),
+			updates,
+		);
 	}
 
 	_setImportControls() {
-		const button = this.stageElt.querySelector("[data-role='stop']");
+		const button =
+			this.stageElt.querySelector<HTMLButtonElement>("[data-role='stop']");
 		if (!button) return;
 
 		this.stopButton = buttons.active({ existingButton: button });
@@ -475,7 +606,9 @@ export class ImportData {
 
 	async _refreshProgress() {
 		if (this._destroyed) return false;
-		const response = await request.get(this.endpoints.get(this.key));
+		const response = await request.get<IngressStageFields>(
+			this.endpoints.get(this.key),
+		);
 		if (this._destroyed || response?.ok !== true) return false;
 		return this._setStage(response);
 	}
@@ -494,10 +627,13 @@ export class ImportData {
 		)
 			return false;
 		let ancestor =
-			this.component?.elt?.parentElement?.closest?.("[lp-component]");
+			this.component?.elt?.parentElement?.closest?.<HTMLElement>(
+				"[lp-component]",
+			);
 		while (ancestor) {
 			if (ancestor.dataset.visible === "false") return false;
-			ancestor = ancestor.parentElement?.closest?.("[lp-component]");
+			ancestor =
+				ancestor.parentElement?.closest?.<HTMLElement>("[lp-component]");
 		}
 		return true;
 	}
@@ -541,11 +677,11 @@ export class ImportData {
 		this._unsubscribeImport = null;
 	}
 
-	async _deleteImported(button) {
+	async _deleteImported(button: HTMLButtonElement) {
 		const modal = new Modal(this.view, button);
 		await modal.load(this.endpoints.deleteImported(this.key));
 
-		const deleteButton = modal.modal?.querySelector(
+		const deleteButton = modal.modal?.querySelector<HTMLButtonElement>(
 			"[data-role='delete-imported']",
 		);
 		if (!deleteButton) return;
@@ -554,11 +690,14 @@ export class ImportData {
 			"click",
 			async () => {
 				deleteButton.disabled = true;
-				deleteButton.querySelector("#spinner").dataset.visible = "true";
-				const response = await request.delete(deleteButton.dataset.route);
-				if (!response.ok) {
+				const spinner = deleteButton.querySelector<HTMLElement>("#spinner");
+				if (spinner) spinner.dataset.visible = "true";
+				const response = await request.delete<IngressStageFields>(
+					deleteButton.dataset.route as string,
+				);
+				if (!response?.ok) {
 					deleteButton.disabled = false;
-					deleteButton.querySelector("#spinner").dataset.visible = "false";
+					if (spinner) spinner.dataset.visible = "false";
 					return;
 				}
 
@@ -571,7 +710,10 @@ export class ImportData {
 	}
 
 	_startImport() {
-		return request.post(this.endpoints.import(this.key), {});
+		return request.post<IngressStageFields>(
+			this.endpoints.import(this.key),
+			{},
+		);
 	}
 
 	destroy() {

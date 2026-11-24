@@ -1,8 +1,38 @@
+import type { ChainedCommands } from "@tiptap/core";
 import { STYLES } from "../../../generated/styles.mjs";
 import { setIcon } from "../../../shared/icons.ts";
 
+import type { ToolArgument, ToolSettings } from "../config.ts";
+import type { Toolbar } from "../toolbar.ts";
+
+// ToolSettings pairs each argument with the command that accepts it.
+export const runToolCommand = (
+	chain: ChainedCommands,
+	command: ToolSettings["command"],
+	args: ToolArgument,
+	passUndefined = false,
+) => {
+	const invoke = chain[command as keyof ChainedCommands] as (
+		args?: ToolArgument,
+	) => ChainedCommands;
+	const result =
+		passUndefined || args !== undefined
+			? invoke.call(chain, args)
+			: invoke.call(chain);
+	return result.run();
+};
+
 class ToolbarButton {
-	constructor(toolbar) {
+	declare button: HTMLButtonElement;
+	declare toolbar: Toolbar;
+	declare active: boolean;
+	declare command: ToolSettings["command"];
+	declare args: ToolArgument;
+	declare title: string;
+	declare icon: string;
+	declare name?: string;
+
+	constructor(toolbar: Toolbar) {
 		this.toolbar = toolbar;
 		this.active = false;
 		this.button = document.createElement("button");
@@ -16,16 +46,16 @@ class ToolbarButton {
 			"strike",
 			"superscript",
 			"subscript",
-		].includes(this.name);
+		].includes(this.name || "");
 	}
 
-	_addButtonIcon(icon) {
+	_addButtonIcon(icon: string) {
 		const iconElement = document.createElement("span");
 		setIcon(iconElement, icon);
 		this.button.replaceChildren(iconElement);
 	}
 
-	init(settings) {
+	init(settings: ToolSettings) {
 		Object.assign(this, settings);
 		this.button.title = this.title;
 		this.button.type = "button";
@@ -45,7 +75,7 @@ class ToolbarButton {
 		const shouldCollapseEmptySelection =
 			editor.isEmpty && this._isInlineMarkToggle();
 		if (shouldCollapseEmptySelection) chain.setTextSelection(1);
-		chain[this.command](this.args).run();
+		runToolCommand(chain, this.command, this.args, true);
 		this.active ? this.disable() : this.enable();
 	}
 
@@ -65,7 +95,8 @@ class ToolbarButton {
 class ToggleFocusButton extends ToolbarButton {
 	onClick() {
 		this.active = !this.active;
-		const editorContainer = this.button.closest("[data-widget]");
+		const editorContainer = this.button.closest<HTMLElement>("[data-widget]");
+		if (!editorContainer) return;
 		if (this.active) {
 			editorContainer.dataset.fullscreen = "true";
 			this._addButtonIcon("minimize");

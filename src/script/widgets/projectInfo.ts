@@ -1,7 +1,7 @@
 import { InputElement } from "../elements/input.ts";
 import { sections } from "../elements/sections.ts";
 import { TextareaElement } from "../elements/textarea.ts";
-import { FormWidget } from "./base/formWidget.ts";
+import { FormWidget, type FormWidgetSettings } from "./base/formWidget.ts";
 
 class ProjectForm extends FormWidget {
 	get nameElement() {
@@ -38,7 +38,7 @@ class ProjectForm extends FormWidget {
 }
 
 export class ProjectInfo extends ProjectForm {
-	constructor(attributes) {
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Update Project",
@@ -58,7 +58,7 @@ export class ProjectInfo extends ProjectForm {
 }
 
 export class CreateProject extends ProjectForm {
-	constructor(attributes) {
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Create Project",
@@ -72,19 +72,23 @@ export class CreateProject extends ProjectForm {
 	get html() {
 		const name = this.nameElement;
 		const description = this.descriptionElement;
-		name.dataset.role = "manual";
-		description.dataset.role = "manual";
+		if (name) name.dataset.role = "manual";
+		if (description) description.dataset.role = "manual";
 
 		return [sections.generateEntityForm(this), name, description];
 	}
 
 	postreconcile() {
-		this.target.querySelectorAll("input, textarea").forEach((element) => {
-			if (element.type !== "checkbox") {
-				element.value = "";
-			}
-		});
+		this.target
+			.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+				"input, textarea",
+			)
+			.forEach((element) => {
+				if (element.type !== "checkbox") {
+					element.value = "";
+				}
+			});
 		this.target.dataset.mode = "manual";
-		this.form.resetSubmitButton();
+		this.form?.resetSubmitButton();
 	}
 }

@@ -1,5 +1,7 @@
 import { withTransition } from "../shared/transitions.ts";
-import Core from "./base/core.ts";
+import type { LoadedWidget } from "../types/widgets.d.ts";
+import type ViewComponent from "./base/component.ts";
+import Core, { type ReconcileChange } from "./base/core.ts";
 
 const HOME_CHANNELS = Object.freeze({
 	HomeActivityList: "home-notes",
@@ -10,10 +12,12 @@ const HOME_CHANNELS = Object.freeze({
 	HomeCategoryList: "categories",
 	IngressList: "ingress",
 	ToolReportList: "tool-reports",
-});
+} as const);
 
 export default class Home extends Core {
-	constructor(elt) {
+	declare _homePollUnsubscribers: Map<string, () => void>;
+
+	constructor(elt: HTMLElement) {
 		super(elt);
 		this.hash = "home";
 		this._homePollUnsubscribers = new Map();
@@ -33,11 +37,12 @@ export default class Home extends Core {
 
 	_syncHomePollingSubscriptions() {
 		if (!this.PollingCoordinator) return;
-		const loaded = new Set();
+		const loaded = new Set<string>();
 		for (const component of Object.values(this.components)) {
 			for (const widget of Object.values(component.widgets)) {
-				const channel = HOME_CHANNELS[widget.name];
-				if (!channel || !widget.loaded) continue;
+				const channel =
+					widget && HOME_CHANNELS[widget.name as keyof typeof HOME_CHANNELS];
+				if (!widget?.loaded || !channel) continue;
 				const id = `home:channel:${channel}`;
 				loaded.add(id);
 				if (this._homePollUnsubscribers.has(id)) continue;
@@ -67,7 +72,10 @@ export default class Home extends Core {
 		}
 	}
 
-	async _prepareHomeWidgetRefresh(component, widget) {
+	async _prepareHomeWidgetRefresh(
+		component: ViewComponent,
+		widget: LoadedWidget,
+	) {
 		if (!widget?.loaded || !widget.route) return null;
 		const response = await this.load(component, widget.route);
 		if (!response || response.updated === false) return null;
@@ -76,24 +84,24 @@ export default class Home extends Core {
 			: () => widget.refresh?.(response);
 		return () => {
 			if (typeof commit === "function") commit();
-			if (response.pollChannel) {
+			if (response.pollChannel && widget.target) {
 				widget.target.dataset.pollChannel = response.pollChannel;
 			}
-			if (response.pollRevision) {
+			if (response.pollRevision && widget.target) {
 				widget.target.dataset.pollRevision = response.pollRevision;
 			}
 		};
 	}
 
-	async _refreshHomeWidget(component, widget) {
+	async _refreshHomeWidget(component: ViewComponent, widget: LoadedWidget) {
 		const commit = await this._prepareHomeWidgetRefresh(component, widget);
 		if (!commit) return false;
 		await withTransition(commit, { label: `home:refresh-${widget.name}` });
 		return true;
 	}
 
-	async refreshSupplementalCollections(changes = []) {
-		if (changes.some(({ type }) => ["star", "unstar"].includes(type))) {
+	async refreshSupplementalCollections(changes: ReconcileChange[] = []) {
+		if (changes.some(({ type }) => type === "star" || type === "unstar")) {
 			await this._refreshStarred();
 		}
 		if (changes.some(({ type }) => type === "delete")) this._hideEmptyLists();
@@ -127,7 +135,7 @@ export default class Home extends Core {
 	_hideEmptyLists() {
 		for (const component of Object.values(this.components)) {
 			for (const widget of Object.values(component.widgets)) {
-				const target = widget.target;
+				const target = widget?.target;
 				if (target?.tagName === "UL" && target.children.length === 0) {
 					target.dataset.visible = "false";
 				}

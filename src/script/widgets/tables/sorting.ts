@@ -1,11 +1,54 @@
 import { primitives } from "../../elements/primitives.ts";
 import { sessionStore } from "../../shared/storage.ts";
 import { withTransition } from "../../shared/transitions.ts";
+import type { LoadedWidget } from "../../types/widgets.d.ts";
+import type ViewComponent from "../../views/base/component.ts";
+
+type Row = HTMLTableRowElement;
+type Sort = RadioSort | CheckboxSort;
+type SortContainer = HTMLTableCellElement | HTMLDivElement;
+type SortState = { value?: unknown; values?: unknown };
+
+interface SavedSortState {
+	lastReorderColumn?: string | null;
+	sorts?: Record<string, SortState | null>;
+}
+
+interface TableSortingAttributes {
+	view: { elt: HTMLElement; hash?: string; mobile?: boolean };
+	component: ViewComponent;
+	target: HTMLElement;
+	kind?: string;
+	visible?: boolean;
+	modified?: boolean;
+}
 
 export class TableSorting {
-	constructor(attributes) {
+	declare view: TableSortingAttributes["view"];
+	declare component: ViewComponent;
+	declare target: HTMLElement;
+	declare kind?: string;
+	declare visible?: boolean;
+	declare modified?: boolean;
+	declare name: LoadedWidget["name"];
+	declare enable: LoadedWidget["enable"];
+	declare disable: LoadedWidget["disable"];
+	declare prepareReconcile: LoadedWidget["prepareReconcile"];
+	declare reconcile: LoadedWidget["reconcile"];
+	declare columns: unknown[];
+	declare sorts: Map<string, Sort>;
+	declare containers: Map<string, SortContainer>;
+	declare toggles: Map<string, HTMLButtonElement>;
+	declare headers: Map<string, HTMLTableCellElement>;
+	declare lastReorderColumn: string | null;
+	declare initialized: boolean;
+	declare _destroyed: boolean;
+	declare _onFilterToggle: (event: Event) => void;
+
+	constructor(attributes: TableSortingAttributes) {
 		Object.assign(this, attributes);
-		this.columns = this.component.preload("columns") || [];
+		const columns = this.component.preload("columns");
+		this.columns = Array.isArray(columns) ? columns : [];
 		this.sorts = new Map();
 		this.containers = new Map();
 		this.toggles = new Map();
@@ -21,7 +64,9 @@ export class TableSorting {
 	}
 
 	get header() {
-		return this.component.elt.querySelector("thead > tr:first-child");
+		return this.component.elt.querySelector<HTMLTableRowElement>(
+			"thead > tr:first-child",
+		);
 	}
 
 	get body() {
@@ -29,7 +74,7 @@ export class TableSorting {
 	}
 
 	get rows() {
-		return Array.from(this.body.querySelectorAll("tr")).filter(
+		return Array.from(this.body?.querySelectorAll("tr") ?? []).filter(
 			(row) => row.dataset.visible !== "false",
 		);
 	}
@@ -41,14 +86,17 @@ export class TableSorting {
 		this._setSortingToggles();
 		const saved = this._loadState();
 
-		this.header.querySelectorAll("th[data-ordering]").forEach((th) => {
-			const column = th.dataset.column;
-			const ordering = th.dataset.ordering;
-			this.headers.set(column, th);
+		this.header
+			?.querySelectorAll<HTMLTableCellElement>("th[data-ordering]")
+			.forEach((th) => {
+				const column = th.dataset.column;
+				const ordering = th.dataset.ordering;
+				if (!column || !ordering) return;
+				this.headers.set(column, th);
 
-			const sort = this._enableSort(this._createSort(column, ordering));
-			sort.restore(saved?.sorts?.[column]);
-		});
+				const sort = this._enableSort(this._createSort(column, ordering));
+				sort.restore(saved?.sorts?.[column]);
+			});
 
 		this._restoreLastReorderColumn(saved);
 		if (this._hasActiveSorts()) this.sort();
@@ -59,26 +107,42 @@ export class TableSorting {
 		);
 	}
 
-	_filterToggle(e) {
-		if (this._destroyed) return;
-		const column = e.detail.column;
+	_filterToggle(e: Event) {
+		if (this._destroyed || !("detail" in e)) return;
+		const { detail } = e;
+		if (
+			!detail ||
+			typeof detail !== "object" ||
+			!("column" in detail) ||
+			typeof detail.column !== "string"
+		)
+			return;
+		const { column } = detail;
 		if (this.view.mobile) {
 			void withTransition(
 				() => {
 					if (this._destroyed) return;
-					const sort = this._enableSort(this.sorts.get(column));
+					const current = this.sorts.get(column);
+					if (!current) return;
+					const sort = this._enableSort(current);
 					if (sort.active) {
 						const toggle = this.toggles.get(column);
-						toggle.dataset.active = "true";
+						if (toggle) toggle.dataset.active = "true";
 					}
 					const container = this.containers.get(column);
+					if (!container) return;
 					const visible = container.dataset.visible === "true";
 					container.dataset.visible = visible ? "false" : "true";
 				},
 				{ label: "table-sorting:toggle-mobile" },
 			);
 		} else {
-			void this._toggleColumn(column, e.detail.button);
+			void this._toggleColumn(
+				column,
+				"button" in detail && detail.button instanceof HTMLElement
+					? detail.button
+					: null,
+			);
 		}
 	}
 
@@ -96,12 +160,16 @@ export class TableSorting {
 		this.headers = new Map();
 		this.lastReorderColumn = null;
 		this._setSortingToggles();
-		this.header.querySelectorAll("th[data-ordering]").forEach((th) => {
-			const column = th.dataset.column;
-			this.headers.set(column, th);
-			th.dataset.sorting = "false";
-			this._enableSort(this._createSort(column, th.dataset.ordering));
-		});
+		this.header
+			?.querySelectorAll<HTMLTableCellElement>("th[data-ordering]")
+			.forEach((th) => {
+				const column = th.dataset.column;
+				const ordering = th.dataset.ordering;
+				if (!column || !ordering) return;
+				this.headers.set(column, th);
+				th.dataset.sorting = "false";
+				this._enableSort(this._createSort(column, ordering));
+			});
 	}
 
 	/**
@@ -114,7 +182,10 @@ export class TableSorting {
 		const saved = {
 			lastReorderColumn: this.lastReorderColumn,
 			sorts: Object.fromEntries(
-				Array.from(this.sorts, ([column, sort]) => [column, sort.state]),
+				Array.from(this.sorts, ([column, sort]): [string, SortState | null] => [
+					column,
+					sort.state,
+				]),
 			),
 		};
 		this.containers.forEach((container) => {
@@ -127,30 +198,33 @@ export class TableSorting {
 		this.lastReorderColumn = null;
 		this._setSortingToggles();
 
-		this.header.querySelectorAll("th[data-ordering]").forEach((th) => {
-			const column = th.dataset.column;
-			this.headers.set(column, th);
-			th.dataset.sorting = "false";
-			const sort = this._enableSort(
-				this._createSort(column, th.dataset.ordering),
-			);
-			sort.restore(saved.sorts[column]);
-		});
+		this.header
+			?.querySelectorAll<HTMLTableCellElement>("th[data-ordering]")
+			.forEach((th) => {
+				const column = th.dataset.column;
+				const ordering = th.dataset.ordering;
+				if (!column || !ordering) return;
+				this.headers.set(column, th);
+				th.dataset.sorting = "false";
+				const sort = this._enableSort(this._createSort(column, ordering));
+				sort.restore(saved.sorts[column]);
+			});
 
 		this._restoreLastReorderColumn(saved);
 		if (this._hasActiveSorts()) this.sort();
 	}
 
-	_loadState() {
+	_loadState(): SavedSortState | null {
 		const saved = sessionStore.getJSON(this.storageKey);
 		if (saved === null) return null;
-		if (typeof saved === "object" && !Array.isArray(saved)) return saved;
+		if (typeof saved === "object" && saved !== null && !Array.isArray(saved))
+			return saved;
 		sessionStore.remove(this.storageKey);
 		return null;
 	}
 
 	_saveState() {
-		const sorts = {};
+		const sorts: Record<string, SortState> = {};
 
 		this.sorts.forEach((sort) => {
 			const state = sort.state;
@@ -171,8 +245,10 @@ export class TableSorting {
 		sessionStore.remove(this.storageKey);
 	}
 
-	_restoreLastReorderColumn(saved) {
-		const savedSort = this.sorts.get(saved?.lastReorderColumn);
+	_restoreLastReorderColumn(saved: SavedSortState | null) {
+		const savedSort = saved?.lastReorderColumn
+			? this.sorts.get(saved.lastReorderColumn)
+			: undefined;
 		if (savedSort?.active && savedSort.reordering) {
 			this.lastReorderColumn = savedSort.column;
 			return;
@@ -188,8 +264,9 @@ export class TableSorting {
 		return Array.from(this.sorts.values()).some((sort) => sort.active);
 	}
 
-	_markSortActive(sort) {
-		this.headers.get(sort.column).dataset.sorting = "true";
+	_markSortActive(sort: Sort) {
+		const header = this.headers.get(sort.column);
+		if (header) header.dataset.sorting = "true";
 		if (!this.view.mobile) return;
 
 		const toggle = this.toggles.get(sort.column);
@@ -202,24 +279,26 @@ export class TableSorting {
 			: this.header;
 
 		container
-			.querySelectorAll("button[data-toggle='filter']")
+			?.querySelectorAll<HTMLButtonElement>("button[data-toggle='filter']")
 			.forEach((button) => {
-				this.toggles.set(
-					button.closest("[data-column]").dataset.column,
-					button,
-				);
+				const column =
+					button.closest<HTMLElement>("[data-column]")?.dataset.column;
+				if (column) this.toggles.set(column, button);
 			});
 	}
 
-	async _toggleColumn(column, button) {
+	async _toggleColumn(column: string, button: HTMLElement | null) {
 		await withTransition(
 			() => {
 				if (this._destroyed) return;
-				const sort = this._enableSort(this.sorts.get(column));
+				const current = this.sorts.get(column);
+				if (!current) return;
+				const sort = this._enableSort(current);
 				if (sort.disabled) return;
 
 				const visible = this.visible;
 				const container = this.containers.get(column);
+				if (!container) return;
 				this.containers.forEach((candidate) => {
 					if (candidate !== container) candidate.dataset.visible = "false";
 				});
@@ -248,18 +327,19 @@ export class TableSorting {
 		);
 	}
 
-	_resetRows(reorderRows, showRows) {
+	_resetRows(reorderRows: boolean, showRows: Set<Row>) {
 		if (!reorderRows && showRows.size === 0) return null;
-		const initialOrder = reorderRows ? new WeakMap() : null;
+		const initialOrder = reorderRows ? new WeakMap<Row, number>() : null;
 
-		this.body.querySelectorAll("tr").forEach((row) => {
+		this.body?.querySelectorAll("tr").forEach((row) => {
 			if (showRows.has(row)) {
 				row.dataset.visible = "true";
 			}
 			if (!initialOrder) return;
 
 			const modifiedColumn = Number(
-				row.querySelector(`td[data-column="modified"]`)?.dataset.sortValue || 0,
+				row.querySelector<HTMLTableCellElement>(`td[data-column="modified"]`)
+					?.dataset.sortValue || 0,
 			);
 			initialOrder.set(row, modifiedColumn * -1);
 		});
@@ -270,7 +350,7 @@ export class TableSorting {
 	sort() {
 		if (this._destroyed) return;
 		let reorderRows = false;
-		let showRows = new Set();
+		const showRows = new Set<Row>();
 
 		// clear inactive sorts, track rows hidden by inactive sorts
 		this.sorts.forEach((sort) => {
@@ -281,7 +361,7 @@ export class TableSorting {
 
 			if (sort.active || !sort.sorted) return;
 
-			showRows = sort.hiddenRows ? showRows.union(sort.hiddenRows) : showRows;
+			for (const row of sort.hiddenRows ?? []) showRows.add(row);
 
 			if (sort.reordering) reorderRows = true;
 
@@ -308,31 +388,34 @@ export class TableSorting {
 		});
 
 		// most recent reordering sort or initial order
-		const reorderingSort = this.sorts.get(this.lastReorderColumn);
+		const reorderingSort =
+			this.lastReorderColumn === null
+				? undefined
+				: this.sorts.get(this.lastReorderColumn);
 		if (reorderingSort?.active) {
 			reorderingSort.sort();
 			this._markSortActive(reorderingSort);
 		} else if (initialOrder) {
 			const rows = this.rows;
 			rows.sort((a, b) => {
-				return initialOrder.get(a) - initialOrder.get(b);
+				return (initialOrder.get(a) ?? 0) - (initialOrder.get(b) ?? 0);
 			});
-			this.body.append(...rows);
+			this.body?.append(...rows);
 			this.lastReorderColumn = null;
 		}
 
 		this._saveState();
 	}
 
-	_createContainer(column) {
-		this.containers.set(
-			column,
-			this.view.mobile ? this._createSection(column) : this._createCell(column),
-		);
-		return this.containers.get(column);
+	_createContainer(column: string) {
+		const container = this.view.mobile
+			? this._createSection(column)
+			: this._createCell(column);
+		this.containers.set(column, container);
+		return container;
 	}
 
-	_createCell(column) {
+	_createCell(column: string) {
 		const cell = document.createElement("td");
 		cell.colSpan = this.component.elt.querySelectorAll("th").length;
 		cell.className = `p-3 border-t bg-kind-bg border-slate-300`;
@@ -342,18 +425,19 @@ export class TableSorting {
 		return cell;
 	}
 
-	_createSection(column) {
+	_createSection(column: string) {
 		const section = document.createElement("div");
 		section.className = `flex flex-col gap-2 p-4 bg-white outline-kind-default rounded-md outline-1`;
 		section.dataset.sorts = column;
 		section.dataset.visible = "false";
 		const controls = document.getElementById("mobile-controls");
-		controls.querySelector(`[data-column="${column}"]`).after(section);
+		controls?.querySelector(`[data-column="${column}"]`)?.after(section);
 		return section;
 	}
 
-	_createCheckboxElement(sort) {
+	_createCheckboxElement(sort: CheckboxSort) {
 		const container = this.containers.get(sort.column);
+		if (!container) return;
 		const element = container.appendChild(document.createElement("div"));
 		if (sort.options === null) return;
 
@@ -367,31 +451,31 @@ export class TableSorting {
 		sort.createOptions(element);
 	}
 
-	_createRadioElement(sort) {
+	_createRadioElement(sort: RadioSort) {
 		const container = this.containers.get(sort.column);
+		if (!container) return;
 		const element = container.appendChild(document.createElement("fieldset"));
 		element.className = `flex flex-row flex-wrap gap-4`;
 		sort.createOptions(element);
 	}
 
-	_createSortElement(sort) {
-		if (sort.ordering === "categorical") {
+	_createSortElement(sort: Sort) {
+		if (sort instanceof CheckboxSort) {
 			this._createCheckboxElement(sort);
 		} else {
 			this._createRadioElement(sort);
 		}
 	}
 
-	_enableSort(sort) {
+	_enableSort(sort: Sort) {
 		sort.init();
 
 		const toggle = this.toggles.get(sort.column);
-		toggle.dataset.visible = sort.disabled ? "false" : "true";
+		if (toggle) toggle.dataset.visible = sort.disabled ? "false" : "true";
 		if (sort.disabled) return sort;
 
-		const container = this.containers.has(sort.column)
-			? this.containers.get(sort.column)
-			: this._createContainer(sort.column);
+		const container =
+			this.containers.get(sort.column) ?? this._createContainer(sort.column);
 
 		if (!container.children.length) {
 			this._createSortElement(sort);
@@ -400,7 +484,7 @@ export class TableSorting {
 		return sort;
 	}
 
-	_resetSort(sort) {
+	_resetSort(sort: Sort) {
 		sort.clear();
 		const container = this.containers.get(sort.column);
 		if (container) {
@@ -415,15 +499,13 @@ export class TableSorting {
 		}
 	}
 
-	_createSort(column, ordering) {
-		this.sorts.set(
-			column,
+	_createSort(column: string, ordering: string) {
+		const sort =
 			ordering === "categorical"
-				? new CheckboxSort(this, column, ordering)
-				: new RadioSort(this, column, ordering),
-		);
-
-		return this.sorts.get(column);
+				? new CheckboxSort(this, column)
+				: new RadioSort(this, column, ordering);
+		this.sorts.set(column, sort);
+		return sort;
 	}
 
 	destroy() {
@@ -445,7 +527,18 @@ export class TableSorting {
 }
 
 class RadioSort {
-	constructor(orchestrator, column, ordering) {
+	declare orchestrator: TableSorting;
+	declare column: string;
+	declare ordering: string;
+	declare reordering: boolean;
+	declare rowValues: WeakMap<Row, unknown> | null;
+	declare hiddenRows: Set<Row> | null;
+	declare sortedBy: number | boolean | null;
+	declare sortValue: string | null;
+	declare initialized: boolean;
+	declare sorted: boolean;
+
+	constructor(orchestrator: TableSorting, column: string, ordering: string) {
 		this.orchestrator = orchestrator;
 		this.column = column;
 		this.ordering = ordering;
@@ -476,7 +569,7 @@ class RadioSort {
 	}
 
 	get options() {
-		const setOptions = (options) => {
+		const setOptions = (options: { value: string; label: string }[]) => {
 			if (this.sortValue === null) this.sortValue = this.defaultValue;
 			return options;
 		};
@@ -509,7 +602,7 @@ class RadioSort {
 		}
 	}
 
-	createOptions(element) {
+	createOptions(element: HTMLElement) {
 		for (const option of this.options) {
 			element.appendChild(
 				primitives.radio({
@@ -523,6 +616,7 @@ class RadioSort {
 		}
 
 		element.addEventListener("change", (e) => {
+			if (!(e.target instanceof HTMLInputElement)) return;
 			this.sortValue = e.target.value;
 			this.sortedBy = this.sortBy(this.sortValue);
 			if (!this.rowValues) this.init();
@@ -534,8 +628,8 @@ class RadioSort {
 		});
 	}
 
-	restore(state) {
-		if (!state?.value) return;
+	restore(state?: SortState | null) {
+		if (typeof state?.value !== "string" || !state.value) return;
 		if (!this.options.some((option) => option.value === state.value)) return;
 
 		this.sortValue = state.value;
@@ -544,7 +638,7 @@ class RadioSort {
 
 		this.orchestrator.containers
 			.get(this.column)
-			?.querySelectorAll("input[type='radio']")
+			?.querySelectorAll<HTMLInputElement>("input[type='radio']")
 			.forEach((input) => {
 				if (input.name === this.column) {
 					input.checked = input.value === this.sortValue;
@@ -555,19 +649,20 @@ class RadioSort {
 	init() {
 		if (this.initialized) return;
 
-		this.rowValues = new WeakMap();
+		const rowValues = new WeakMap<Row, unknown>();
+		this.rowValues = rowValues;
 		this.orchestrator.rows.forEach((row) => {
-			const cell = row.querySelector(
+			const cell = row.querySelector<HTMLTableCellElement>(
 				`td[data-column="${this.column}"][data-sort-value]`,
 			);
-			if (!cell) return;
-			this.rowValues.set(row, JSON.parse(cell.dataset.sortValue));
+			if (cell?.dataset.sortValue === undefined) return;
+			rowValues.set(row, JSON.parse(cell.dataset.sortValue));
 		});
 		this.initialized = true;
 		return this;
 	}
 
-	sortBy(value) {
+	sortBy(value: string) {
 		switch (value) {
 			case "none":
 				return null;
@@ -591,49 +686,55 @@ class RadioSort {
 	}
 
 	sort() {
-		this.hiddenRows = new Set();
+		const { rowValues, sortedBy } = this;
+		if (!rowValues || sortedBy === null) return;
+		const hiddenRows = new Set<Row>();
+		this.hiddenRows = hiddenRows;
 
 		const rows = this.orchestrator.rows;
 
-		if (typeof this.sortedBy === "boolean") {
+		if (typeof sortedBy === "boolean") {
 			rows.forEach((row) => {
-				const data = this.rowValues.get(row);
-				if ((data ?? false) === this.sortedBy) {
+				const data = rowValues.get(row);
+				if ((data ?? false) === sortedBy) {
 					row.dataset.visible = "true";
 				} else {
 					row.dataset.visible = "false";
-					this.hiddenRows.add(row);
+					hiddenRows.add(row);
 				}
 			});
 			this.sorted = true;
 			return;
 		}
 
-		const [visible, hidden] = [[], []];
+		const visible: Row[] = [];
+		const hidden: Row[] = [];
 		this.orchestrator.rows.forEach((row) => {
-			this.rowValues.get(row) ? visible.push(row) : hidden.push(row);
+			const value = rowValues.get(row);
+			if (value) visible.push(row);
+			else hidden.push(row);
 		});
 
 		hidden.forEach((row) => {
 			row.dataset.visible = "false";
-			this.hiddenRows.add(row);
+			hiddenRows.add(row);
 		});
 
 		if (this.ordering === "numeric") {
 			visible.sort((a, b) => {
-				const aVal = this.rowValues.get(a);
-				const bVal = this.rowValues.get(b);
-				return (aVal - bVal) * this.sortedBy;
+				const aVal = rowValues.get(a);
+				const bVal = rowValues.get(b);
+				return (Number(aVal) - Number(bVal)) * sortedBy;
 			});
 		} else if (this.ordering === "lexical") {
 			visible.sort((a, b) => {
-				const aVal = this.rowValues.get(a);
-				const bVal = this.rowValues.get(b);
-				return aVal.localeCompare(bVal) * this.sortedBy;
+				const aVal = rowValues.get(a);
+				const bVal = rowValues.get(b);
+				return String(aVal).localeCompare(String(bVal)) * sortedBy;
 			});
 		}
 
-		this.orchestrator.body.append(...visible);
+		this.orchestrator.body?.append(...visible);
 		this.sorted = true;
 	}
 
@@ -650,10 +751,22 @@ class RadioSort {
 const OPTIONS = Symbol("options");
 
 class CheckboxSort {
-	constructor(orchestrator, column, ordering) {
+	declare orchestrator: TableSorting;
+	declare column: string;
+	declare ordering: "categorical";
+	declare reordering: false;
+	declare rowValues: WeakMap<Row, string[]> | null;
+	declare hiddenRows: Set<Row> | null;
+	declare options: Record<string, string> | typeof OPTIONS | null;
+	declare sortedBy: string[] | null;
+	declare sortValues: string[];
+	declare initialized: boolean;
+	declare sorted: boolean;
+
+	constructor(orchestrator: TableSorting, column: string) {
 		this.orchestrator = orchestrator;
 		this.column = column;
-		this.ordering = ordering;
+		this.ordering = "categorical";
 		this.reordering = false;
 		this.rowValues = null;
 		this.hiddenRows = null;
@@ -680,17 +793,20 @@ class CheckboxSort {
 	init() {
 		if (this.initialized) return;
 
-		this.rowValues = new WeakMap();
-		const options = {};
+		this.rowValues = new WeakMap<Row, string[]>();
+		const options: Record<string, string> = {};
 
-		for (const row of this.orchestrator.body.querySelectorAll("tr")) {
-			const cell = row.querySelector(
+		for (const row of this.orchestrator.body?.querySelectorAll("tr") ?? []) {
+			const cell = row.querySelector<HTMLTableCellElement>(
 				`td[data-column="${this.column}"][data-sort-value]`,
 			);
-			if (!cell) continue;
+			if (cell?.dataset.sortValue === undefined) continue;
 
-			const parsed = JSON.parse(cell.dataset.sortValue);
-			Object.assign(options, parsed);
+			const parsed: unknown = JSON.parse(cell.dataset.sortValue);
+			if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+				continue;
+			for (const [key, label] of Object.entries(parsed))
+				options[key] = String(label);
 			this.rowValues.set(row, Object.keys(parsed));
 		}
 
@@ -700,8 +816,8 @@ class CheckboxSort {
 		return this;
 	}
 
-	createOptions(element) {
-		if (this.options === null) return;
+	createOptions(element: HTMLElement) {
+		if (this.options === null || this.options === OPTIONS) return;
 
 		Object.entries(this.options).forEach(([key, value]) => {
 			element.appendChild(
@@ -715,36 +831,44 @@ class CheckboxSort {
 		});
 
 		element.addEventListener("change", (e) => {
-			this.sortValues = e.target.checked
-				? [...this.sortValues, e.target.name]
-				: this.sortValues.filter((value) => value !== e.target.name);
+			if (!(e.target instanceof HTMLInputElement)) return;
+			const { checked, name } = e.target;
+			this.sortValues = checked
+				? [...this.sortValues, name]
+				: this.sortValues.filter((value) => value !== name);
 			this.sortedBy = this.sortValues.length ? this.sortValues : null;
 			this.orchestrator.sort();
 		});
 	}
 
-	restore(state) {
-		if (this.options === null || !Array.isArray(state?.values)) return;
+	restore(state?: SortState | null) {
+		const { options } = this;
+		if (
+			options === null ||
+			options === OPTIONS ||
+			!Array.isArray(state?.values)
+		)
+			return;
 
 		this.sortValues = state.values.filter((value) => {
-			return Object.hasOwn(this.options, value);
+			return typeof value === "string" && Object.hasOwn(options, value);
 		});
 		this.sortedBy = this.sortValues.length ? this.sortValues : null;
 		if (!this.active) return;
 
 		this.orchestrator.containers
 			.get(this.column)
-			?.querySelectorAll("input[type='checkbox']")
+			?.querySelectorAll<HTMLInputElement>("input[type='checkbox']")
 			.forEach((input) => {
 				input.checked = this.sortValues.includes(input.name);
 			});
 	}
 
 	sort() {
-		const hiddenRows = new Set();
+		const hiddenRows = new Set<Row>();
 
 		this.orchestrator.rows.forEach((row) => {
-			const values = this.rowValues.get(row) || [];
+			const values = this.rowValues?.get(row) || [];
 			if (values.some((value) => this.sortValues.includes(value))) {
 				row.dataset.visible = "true";
 			} else {

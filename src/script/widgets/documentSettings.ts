@@ -1,7 +1,8 @@
 import { SelectBox } from "../elements/combobox/index.ts";
 import { primitives } from "../elements/primitives.ts";
 import { STYLES } from "../generated/styles.mjs";
-import { FormWidget } from "./base/formWidget.ts";
+import type { FormRevisionResponse } from "../types/forms";
+import { FormWidget, type FormWidgetSettings } from "./base/formWidget.ts";
 
 const PUBLIC_DIRECTORY_ROOT = "__public_pages__";
 
@@ -10,8 +11,27 @@ const VISIBILITY = {
 	private: "This page is private.",
 };
 
+interface PublicDocumentSettings {
+	allow_indexing?: boolean;
+	title?: string;
+	description?: string;
+	directory_category?: string;
+	preview_image_asset?: string;
+}
+
+interface DocumentPreviewImage {
+	name: string;
+	url: string;
+	alt?: string;
+}
+
+interface DirectoryCategory {
+	id: string;
+	name: string;
+}
+
 export class DocumentSettings extends FormWidget {
-	constructor(attributes) {
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Update Public Page",
@@ -20,7 +40,7 @@ export class DocumentSettings extends FormWidget {
 		};
 	}
 
-	get publicSettings() {
+	get publicSettings(): PublicDocumentSettings {
 		try {
 			return JSON.parse(this.target?.dataset.publicSettings || "{}");
 		} catch {
@@ -28,7 +48,7 @@ export class DocumentSettings extends FormWidget {
 		}
 	}
 
-	get previewImages() {
+	get previewImages(): DocumentPreviewImage[] {
 		try {
 			return JSON.parse(this.target?.dataset.previewImages || "[]");
 		} catch {
@@ -36,7 +56,7 @@ export class DocumentSettings extends FormWidget {
 		}
 	}
 
-	get directoryCategories() {
+	get directoryCategories(): DirectoryCategory[] {
 		try {
 			return JSON.parse(this.target?.dataset.directoryCategories || "[]");
 		} catch {
@@ -142,7 +162,8 @@ export class DocumentSettings extends FormWidget {
 			placeholder: "Uses the page name when blank",
 			kind: this.kind,
 		});
-		title.querySelector("input").maxLength = 120;
+		const titleInput = title.querySelector("input");
+		if (titleInput) titleInput.maxLength = 120;
 
 		const description = primitives.textarea({
 			label: "Public description (optional)",
@@ -152,7 +173,8 @@ export class DocumentSettings extends FormWidget {
 			rows: 3,
 			kind: this.kind,
 		});
-		description.querySelector("textarea").maxLength = 300;
+		const descriptionInput = description.querySelector("textarea");
+		if (descriptionInput) descriptionInput.maxLength = 300;
 
 		const directoryCategory = primitives.select({
 			label: "Public directory category",
@@ -240,7 +262,7 @@ export class DocumentSettings extends FormWidget {
 				"p-2",
 			);
 			const image = document.createElement("img");
-			image.src = option.url;
+			image.src = option.url as string;
 			image.alt = option.alt || "";
 			image.className = "aspect-video w-full rounded object-cover";
 			choice.prepend(image);
@@ -258,9 +280,9 @@ export class DocumentSettings extends FormWidget {
 		];
 	}
 
-	updated(response) {
+	updated(response: FormRevisionResponse) {
 		super.updated(response);
-		const updatedTarget = response.html?.querySelector(
+		const updatedTarget = (response.html || null)?.querySelector<HTMLElement>(
 			`[data-widget='${this.name}']`,
 		);
 		if (updatedTarget) {

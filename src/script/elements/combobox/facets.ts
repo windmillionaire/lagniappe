@@ -15,6 +15,14 @@ type CreatedFacetResponse = ComboboxQueryResponse & {
 	option?: ComboboxOption & { id: string; name: string; kind: string };
 };
 
+export function isFacetOption(value: unknown): value is ComboboxOption {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+	const data: Record<string, unknown> = { ...value };
+	return ["id", "name", "kind", "hash"].every(
+		(key) => data[key] === undefined || typeof data[key] === "string",
+	);
+}
+
 export class FacetsBox extends Submitter(RemoteQueryCombobox) {
 	declare endpoint: string;
 	declare indexArgs: FacetIndexArgs;

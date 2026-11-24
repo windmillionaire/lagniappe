@@ -5,7 +5,14 @@ const INGRESS_DROPZONE_TEXT =
 	"Drop a file here or click to upload. Only CSV files are supported.";
 
 export class IngressFileUpload extends BaseUpload {
-	constructor(attributes) {
+	declare messages: Record<string, string>;
+	declare dropzone: ReturnType<typeof uploadElement.dropzone>;
+	declare submitButton: HTMLButtonElement | null;
+	declare menuOptions: "paste"[];
+	declare createdFile?: boolean;
+	declare visible?: boolean;
+
+	constructor(attributes: ConstructorParameters<typeof BaseUpload>[0]) {
 		super(attributes);
 		this.messages = {
 			submit: "Upload File",

@@ -170,7 +170,7 @@ export class BaseUpload {
 	declare route?: UploadAttributes["route"];
 	declare endpoints?: UploadAttributes["endpoints"];
 	declare maxFileSize?: number;
-	declare uploadImage?: (file: File, context: UploadContext) => unknown;
+	uploadImage?(file: File, context: UploadContext): unknown;
 
 	// Created by init() on the interactive upload path.
 	declare form: FormController;

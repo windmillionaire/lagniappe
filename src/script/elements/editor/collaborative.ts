@@ -1,3 +1,4 @@
+import type { Editor } from "@tiptap/core";
 import * as Y from "yjs";
 import { STYLES } from "../../generated/styles.mjs";
 import {
@@ -5,14 +6,65 @@ import {
 	uint8ArrayToBase64,
 	waitForAttribute,
 } from "../../shared/utilities.ts";
+import type {
+	DocumentState,
+	PersistedSyncRecord,
+	SyncMention,
+} from "../../types/sync.d.ts";
+import type { EditorDocumentAttributes, EditorView } from "./config.ts";
 import { collaborativeEditor } from "./editor.ts";
 import { MentionSuggestions } from "./extensions/index.ts";
 import { DocumentReadCache } from "./readCache.ts";
 import { Toolbar } from "./toolbar.ts";
 import { DocumentVersions } from "./versions.ts";
 
+export interface CollaborativeDocumentAttributes
+	extends EditorDocumentAttributes {
+	key: string;
+	headless?: boolean;
+}
+
+export function hasDocumentSyncId(
+	document: CollaborativeDocument,
+): document is CollaborativeDocument & { syncId: string } {
+	return Boolean(document.syncId);
+}
+
 export class CollaborativeDocument {
-	constructor(attributes) {
+	declare ydoc: Y.Doc;
+	declare versions: DocumentVersions;
+	declare readCache: DocumentReadCache;
+	declare initialized: boolean;
+	declare _applyingRemote: boolean;
+	declare _destroyed: boolean;
+	declare _dirty: boolean;
+	declare target: HTMLElement;
+	declare key: string;
+	declare component: EditorDocumentAttributes["component"];
+	declare view: EditorView | null | undefined;
+	declare kind: EditorDocumentAttributes["kind"];
+	declare endpoints: EditorDocumentAttributes["endpoints"];
+	declare headless?: boolean;
+	declare readonly?: boolean;
+	declare visible?: boolean;
+	declare updateQueue: Uint8Array[];
+	declare pendingMentions: Map<string, SyncMention>;
+	declare syncId: string | null;
+	declare update: string | null;
+	declare offlineRecord: PersistedSyncRecord | null;
+	declare remote: DocumentState | null;
+	declare snapshot: string | null;
+	declare initialStateReady: Promise<DocumentState | null>;
+	declare _initialStateError?: boolean;
+	declare _versionBusy?: boolean;
+	declare container: HTMLDivElement;
+	declare editor: Editor;
+	declare toolbar?: Toolbar;
+	declare loadingStatus?: HTMLDivElement;
+	declare _loadingTimer?: ReturnType<typeof setTimeout>;
+	declare mentionSuggestions?: MentionSuggestions;
+
+	constructor(attributes: CollaborativeDocumentAttributes) {
 		Object.assign(this, attributes);
 		this.ydoc = new Y.Doc();
 		this.versions = new DocumentVersions(this);
@@ -50,12 +102,12 @@ export class CollaborativeDocument {
 		}
 	}
 
-	async _loadInitialState() {
+	async _loadInitialState(): Promise<DocumentState | null> {
 		try {
 			const syncManager = await (this.view?.ensureSyncManager?.() ??
 				this.view?.syncReady ??
 				this.view?.SyncManager);
-			if (!this._destroyed && syncManager) {
+			if (!this._destroyed && syncManager && hasDocumentSyncId(this)) {
 				this.remote = await syncManager.state(this);
 			}
 			if (!this._destroyed && !this.remote && !this.offlineRecord?.ydoc) {
@@ -78,7 +130,8 @@ export class CollaborativeDocument {
 	_startLoading() {
 		this.container.inert = true;
 		this.container.setAttribute("aria-busy", "true");
-		this.loadingStatus = document.createElement("div");
+		const status = document.createElement("div");
+		this.loadingStatus = status;
 		this.loadingStatus.dataset.role = "document-status";
 		// Overlay the empty editor space so showing/removing the message never
 		// moves the toolbar or changes the document panel's height.
@@ -90,8 +143,8 @@ export class CollaborativeDocument {
 		this.target.insertBefore(this.loadingStatus, this.container);
 		this._loadingTimer = setTimeout(() => {
 			if (this._destroyed) return;
-			this.loadingStatus.textContent = "Loading document…";
-			this.loadingStatus.hidden = false;
+			status.textContent = "Loading document…";
+			status.hidden = false;
 		}, 150);
 	}
 
@@ -100,7 +153,7 @@ export class CollaborativeDocument {
 		if (this._destroyed || this.headless) return;
 		this.container.removeAttribute("aria-busy");
 		this.toolbar?.element?.removeAttribute("aria-busy");
-		if (this._initialStateError) {
+		if (this._initialStateError && this.loadingStatus) {
 			this.loadingStatus.textContent =
 				"Unable to load document. Reload to try again.";
 			this.loadingStatus.hidden = false;
@@ -116,7 +169,7 @@ export class CollaborativeDocument {
 		return this.target.getAttribute("lp-fingerprint");
 	}
 
-	set fingerprint(value) {
+	set fingerprint(value: string | null | undefined) {
 		if (!value) return;
 		this.target.setAttribute("lp-fingerprint", value);
 	}
@@ -186,7 +239,7 @@ export class CollaborativeDocument {
 
 		this.editor.on("blur", async ({ event }) => {
 			await this.waitForRender();
-			const activeElement = event.relatedTarget;
+			const activeElement = event.relatedTarget as Element | null;
 			if (activeElement?.closest("[data-role='toolbar'], [role='listbox']")) {
 				return;
 			}
@@ -228,7 +281,7 @@ export class CollaborativeDocument {
 	 * request was in flight. Remote-only changes do not make the document dirty.
 	 *
 	 */
-	commitSavedBaseline(snapshot, mentions = []) {
+	commitSavedBaseline(snapshot: string, mentions: SyncMention[] = []) {
 		this.snapshot = snapshot;
 		for (const mention of mentions) {
 			this.pendingMentions?.delete(mention.occurrence_id);
@@ -290,7 +343,7 @@ export class CollaborativeDocument {
 
 		if (html) {
 			this.target.dataset.history = "true";
-			this.toolbar?.toggles?.documentHistory?.show();
+			this.toolbar?.toggles?.documentHistory?.show?.();
 		}
 
 		return {
@@ -313,11 +366,15 @@ export class CollaborativeDocument {
 				this.pendingMentions.set(mention.occurrence_id, mention);
 			}
 		}
-		if (this.toolbar && this.remote?.users) {
-			const others = this.remote.users.filter(
-				(u) => u.hash !== this.remote.user?.hash,
-			);
-			this.toolbar.userManager.setUsers(others);
+		if (
+			this.toolbar &&
+			this.remote &&
+			"users" in this.remote &&
+			this.remote.users
+		) {
+			const userHash = this.remote.user?.hash;
+			const others = this.remote.users.filter((u) => u.hash !== userHash);
+			this.toolbar.userManager?.setUsers(others);
 		}
 
 		if (!this.remote) {
@@ -333,9 +390,11 @@ export class CollaborativeDocument {
 		}
 
 		if (this.remote.mode === "snapshot" && this.remote.ydoc) {
-			this.toolbar?.userManager.remoteUpdate(
-				this.remote.user_hash,
-				this.remote.authors?.[this.remote.user_hash],
+			this.toolbar?.userManager?.remoteUpdate(
+				"user_hash" in this.remote ? this.remote.user_hash : undefined,
+				"user_hash" in this.remote && this.remote.user_hash
+					? this.remote.authors?.[this.remote.user_hash]
+					: undefined,
 			);
 			Y.applyUpdate(this.ydoc, base64ToUint8Array(this.remote.ydoc), "remote");
 			this.snapshot = this.remote.ydoc;
@@ -366,9 +425,15 @@ export class CollaborativeDocument {
 		this.offlineRecord = null;
 		for (const update of this.remote.updates ?? []) {
 			if (!update?.update) continue;
-			this.toolbar?.userManager.remoteUpdate(
-				update.user_hash,
-				this.remote.authors?.[update.user_hash],
+			const userHash =
+				"user_hash" in update && typeof update.user_hash === "string"
+					? update.user_hash
+					: undefined;
+			this.toolbar?.userManager?.remoteUpdate(
+				userHash,
+				"authors" in this.remote && userHash
+					? this.remote.authors?.[userHash]
+					: undefined,
 			);
 			Y.applyUpdate(this.ydoc, base64ToUint8Array(update.update), "remote");
 		}

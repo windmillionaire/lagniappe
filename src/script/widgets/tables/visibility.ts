@@ -1,11 +1,53 @@
 import { primitives } from "../../elements/primitives.ts";
-import { TableVisibilityState } from "./visibilityState.ts";
+import type { LoadedWidget } from "../../types/widgets.d.ts";
+import type ViewComponent from "../../views/base/component.ts";
+import type { TableEditor } from "./editor.ts";
+import { type TableColumn, TableVisibilityState } from "./visibilityState.ts";
+
+interface VisibilityAttributes {
+	component: ViewComponent;
+	view: {
+		elt: HTMLElement;
+		hash?: string;
+		TableVisibilityState?: TableVisibilityState | null;
+	};
+	target: HTMLElement;
+	kind?: string;
+	visible?: boolean;
+}
 
 export class TableVisibility {
-	constructor(attributes) {
+	declare component: ViewComponent;
+	declare view: VisibilityAttributes["view"];
+	declare target: HTMLElement;
+	declare kind: string | undefined;
+	declare visible: boolean | undefined;
+	declare name: LoadedWidget["name"];
+	declare enable: LoadedWidget["enable"];
+	declare disable: LoadedWidget["disable"];
+	declare prepareReconcile: LoadedWidget["prepareReconcile"];
+	declare reconcile: LoadedWidget["reconcile"];
+	declare selected: string[];
+	declare columns: TableColumn[];
+	declare state: TableVisibilityState;
+	declare _ownsState: boolean;
+	declare _preservedEditor: TableEditor | null;
+
+	constructor(attributes: VisibilityAttributes) {
 		Object.assign(this, attributes);
-		this.selected = this.component.preload("selected") || [];
-		this.columns = this.component.preload("columns") || [];
+		const selected = this.component.preload("selected");
+		const columns = this.component.preload("columns");
+		this.selected = Array.isArray(selected)
+			? selected.filter((field): field is string => typeof field === "string")
+			: [];
+		this.columns = Array.isArray(columns)
+			? columns.filter(
+					(column): column is TableColumn =>
+						column !== null &&
+						typeof column === "object" &&
+						typeof column.field === "string",
+				)
+			: [];
 		this.state =
 			this.view.TableVisibilityState ||
 			new TableVisibilityState({
@@ -27,7 +69,7 @@ export class TableVisibility {
 		return this.state.visibleColumns;
 	}
 
-	_toggleColumn(column, visible) {
+	_toggleColumn(column: string, visible: boolean) {
 		this.state.toggle(column, visible);
 	}
 
@@ -35,7 +77,7 @@ export class TableVisibility {
 	 * Keep quick edit active while the column picker is temporarily displayed.
 	 *
 	 */
-	preserveEditor(editor) {
+	preserveEditor(editor: TableEditor) {
 		this._preservedEditor = editor;
 	}
 
@@ -75,7 +117,11 @@ export class TableVisibility {
 		}
 
 		cell.addEventListener("change", (e) => {
-			if (!e.target.matches("input[type='checkbox']")) return;
+			if (
+				!(e.target instanceof HTMLInputElement) ||
+				e.target.type !== "checkbox"
+			)
+				return;
 			this._toggleColumn(e.target.name, e.target.checked);
 		});
 	}

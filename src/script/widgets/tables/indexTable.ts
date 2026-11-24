@@ -1,8 +1,46 @@
-import { BaseTable } from "../../elements/base/baseTable.ts";
+import {
+	BaseTable,
+	type BaseTableAttributes,
+	type TableComponent,
+} from "../../elements/base/baseTable.ts";
 import { captureError } from "../../shared/errors.ts";
+import type { RequestResult } from "../../types/api.d.ts";
+import type { TableWidgets } from "./types.d.ts";
 
-export class IndexTable extends BaseTable {
-	constructor(attributes) {
+interface IndexTableView {
+	elt: HTMLElement;
+	key?: string | null;
+	mobile?: boolean;
+	addFlash(row: HTMLElement): void;
+}
+
+interface IndexTableComponent extends TableComponent {
+	name: string;
+	widgets: TableWidgets;
+	loadWidget(
+		name: "TableSorting",
+	): Promise<{ init?(): void | Promise<void> } | null>;
+}
+
+interface IndexTableDelta {
+	remove?: string[];
+	upsert?: { key: string; html?: string | null }[];
+	order?: string[];
+	empty?: string | null;
+}
+
+export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
+	declare refreshScope: "collection";
+	declare loading: boolean;
+	declare loaded: boolean;
+	declare _empty: boolean;
+	declare _updated: Iterable<HTMLTableRowElement> & { length: number };
+	declare _created: Iterable<HTMLTableRowElement> & { length: number };
+	declare _finishLoading?: boolean;
+
+	constructor(
+		attributes: BaseTableAttributes<IndexTableView, IndexTableComponent>,
+	) {
 		super(attributes);
 		this.refreshScope = "collection";
 		this.loading = false;
@@ -12,15 +50,17 @@ export class IndexTable extends BaseTable {
 		this._created = [];
 	}
 
-	async updated(response) {
-		this._updated = response.html?.querySelectorAll("tr[lp-entity]") || [];
-		const append = response.html?.querySelector("tr[lp-load]");
+	async updated(response: RequestResult) {
+		const html = response.html || null;
+		this._updated =
+			html?.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]") || [];
+		const append = html?.querySelector<HTMLTableRowElement>("tr[lp-load]");
 		this.loaded = !append;
 		return append;
 	}
 
-	async created(response) {
-		this._created = response.html.querySelectorAll("tr");
+	async created(response: RequestResult) {
+		this._created = (response.html || null)?.querySelectorAll("tr") || [];
 	}
 
 	get selector() {
@@ -30,7 +70,9 @@ export class IndexTable extends BaseTable {
 	}
 
 	setEmptyRowVisibility() {
-		const emptyRow = this.target.querySelector("tr[data-role='empty']");
+		const emptyRow = this.target.querySelector<HTMLTableRowElement>(
+			"tr[data-role='empty']",
+		);
 		const notEmpty = this.target.querySelector("tr[lp-entity]");
 		if (emptyRow) {
 			if (!this.view.mobile) {
@@ -58,12 +100,12 @@ export class IndexTable extends BaseTable {
 		}
 		const supported =
 			Boolean(this.view.key) ||
-			["forms", "tasks", "users"].includes(this.view.elt.dataset.index);
+			["forms", "tasks", "users"].includes(this.view.elt.dataset.index ?? "");
 		if (!supported) return null;
 
 		return {
 			rows: Array.from(
-				this.target.querySelectorAll("tr[lp-entity]"),
+				this.target.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]"),
 				(row) => ({
 					key: row.dataset.key,
 					hash: row.dataset.hash || "",
@@ -73,20 +115,20 @@ export class IndexTable extends BaseTable {
 		};
 	}
 
-	_parseRefreshRow(html) {
+	_parseRefreshRow(html: string | null | undefined) {
 		if (!html) return null;
 		const template = document.createElement("template");
 		template.innerHTML = html.trim();
-		return template.content.querySelector("tr[lp-entity]");
+		return template.content.querySelector<HTMLTableRowElement>("tr[lp-entity]");
 	}
 
-	refreshDelta(delta) {
+	refreshDelta(delta: IndexTableDelta) {
 		const editor = this.component?.widgets?.TableEditor;
 		const existing = new Map(
-			Array.from(this.target.querySelectorAll("tr[lp-entity]"), (row) => [
-				row.dataset.key,
-				row,
-			]),
+			Array.from(
+				this.target.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]"),
+				(row) => [row.dataset.key, row],
+			),
 		);
 		editor?.releaseRows([
 			...(delta.remove || []).map((key) => existing.get(key)),
@@ -138,18 +180,20 @@ export class IndexTable extends BaseTable {
 		void editor?.refreshCheckboxes().catch(captureError);
 	}
 
-	refresh(response) {
+	refresh(response: RequestResult | undefined) {
 		if (!response?.html) return;
 		const editor = this.component?.widgets?.TableEditor;
-		const newRows = [...response.html.querySelectorAll("tr[lp-entity]")];
+		const newRows = [
+			...response.html.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]"),
+		];
 		const newKeys = new Set(
 			newRows.map((row) => row.dataset.key).filter(Boolean),
 		);
 		const prepend = [];
 		editor?.releaseRows(
-			Array.from(this.target.querySelectorAll("tr[lp-entity]")).filter(
-				(row) => !this.prefetched || newKeys.has(row.dataset.key),
-			),
+			Array.from(
+				this.target.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]"),
+			).filter((row) => !this.prefetched || newKeys.has(row.dataset.key ?? "")),
 		);
 
 		for (const newRow of newRows) {
@@ -170,11 +214,13 @@ export class IndexTable extends BaseTable {
 		}
 
 		if (!this.prefetched) {
-			this.target.querySelectorAll("tr[lp-entity]").forEach((row) => {
-				if (!newKeys.has(row.dataset.key)) {
-					row.remove();
-				}
-			});
+			this.target
+				.querySelectorAll<HTMLTableRowElement>("tr[lp-entity]")
+				.forEach((row) => {
+					if (!newKeys.has(row.dataset.key ?? "")) {
+						row.remove();
+					}
+				});
 		}
 
 		this.setEmptyRowVisibility();
@@ -187,7 +233,7 @@ export class IndexTable extends BaseTable {
 		if (!this.loaded || loaded) return;
 
 		const sorting = await this.component.loadWidget("TableSorting");
-		if (sorting) await sorting.init();
+		await sorting?.init?.();
 		this._finishLoading = true;
 	}
 
@@ -217,13 +263,13 @@ export class IndexTable extends BaseTable {
 			this._finishLoading = false;
 			this.target.setAttribute("loaded", "");
 			this.setEmptyRowVisibility();
-			target.dataset.visible = true;
+			target.dataset.visible = "true";
 			this.loading = false;
 		}
 
 		if (rowsChanged) {
 			this.setEmptyRowVisibility();
-			if (sortingWasInitialized) this.sortingWidget.refreshRows();
+			if (sortingWasInitialized) this.sortingWidget?.refreshRows?.();
 			void this.component?.widgets?.TableEditor?.refreshCheckboxes().catch(
 				captureError,
 			);

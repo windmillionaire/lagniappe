@@ -1,28 +1,116 @@
+import type {
+	BaseElement,
+	ElementRenderer,
+} from "../../elements/base/baseElement.ts";
 import { getFormElement } from "../../elements/loader.ts";
 import { captureError } from "../../shared/errors.ts";
 import { setIcon } from "../../shared/icons.ts";
-import { QueryLifecycle } from "../../shared/queryLifecycle.ts";
+import {
+	QueryLifecycle,
+	type QueryToken,
+} from "../../shared/queryLifecycle.ts";
 import { request } from "../../shared/request.ts";
 import { withTransition } from "../../shared/transitions.ts";
+import type { FormFieldSchema } from "../../types/forms.d.ts";
+import type { LoadedWidget } from "../../types/widgets.d.ts";
+import type ViewComponent from "../../views/base/component.ts";
+import type { TableWidgets } from "./types.d.ts";
+import type { TableColumn } from "./visibilityState.ts";
 
 const SAVED_STATE_MS = 1200;
 
-const ROUTES = {
+const ROUTES: Record<string, ((key: string) => string) | undefined> = {
 	page: (key) => `/pages/${key}/patch`,
 	task: (key) => `/tasks/${key}/patch`,
 };
 
+type Cell = HTMLTableCellElement;
+type CellEditor = HTMLElement | string;
+type TableEditorColumn = TableColumn & {
+	schema?: Omit<FormFieldSchema, "id"> & { id?: string };
+};
+
+interface TableEditorAttributes {
+	component: ViewComponent & { widgets: TableWidgets };
+	view: { elt: HTMLElement; _destroyed?: boolean };
+	visible?: boolean;
+	kind?: string;
+}
+
+interface CellEdit {
+	cell: Cell;
+	element:
+		| (Pick<BaseElement, "schema" | "destroy"> & {
+				changed?(value: unknown): boolean;
+				readonly value?: unknown;
+		  })
+		| null;
+	editor: CellEditor | null;
+	value: unknown;
+	column?: TableEditorColumn;
+	before?: string;
+}
+
+interface CheckboxPreparation {
+	token: QueryToken<HTMLElement> | null;
+	edits: Set<CellEdit>;
+	ready: boolean;
+}
+
+interface CellSave {
+	edit: CellEdit;
+	checkbox: boolean;
+	payload: {
+		schema_id: string;
+		form_generation: string;
+		value: unknown;
+		column?: TableEditorColumn;
+	};
+	route: string;
+	promise?: Promise<boolean>;
+}
+
 export class TableEditor {
-	constructor(attributes) {
+	declare component: TableEditorAttributes["component"];
+	declare view: TableEditorAttributes["view"];
+	declare kind?: string;
+	declare visible?: boolean;
+	declare name: LoadedWidget["name"];
+	declare enable: LoadedWidget["enable"];
+	declare disable: LoadedWidget["disable"];
+	declare prepareReconcile: LoadedWidget["prepareReconcile"];
+	declare reconcile: LoadedWidget["reconcile"];
+	declare rows: { target: HTMLElement } | null;
+	declare columns: Map<string, TableEditorColumn>;
+	declare activeEdit: CellEdit | null;
+	declare checkboxEdits: Map<Cell, CellEdit>;
+	declare _openLifecycle: QueryLifecycle;
+	declare _checkboxLifecycle: QueryLifecycle;
+	declare _preparedOpen: CellEdit | null;
+	declare _preparedCheckboxes: CheckboxPreparation | null;
+	declare _saves: Map<Cell, CellSave>;
+	declare _savedTimers: Map<Cell, ReturnType<typeof setTimeout>>;
+	declare _destroyed: boolean;
+	declare _listenerTarget: HTMLElement | null;
+	declare _onClick: (event: MouseEvent) => void;
+	declare _onChange: (event: Event) => void;
+	declare _onKeydown: (event: KeyboardEvent) => void;
+
+	constructor(attributes: TableEditorAttributes) {
 		Object.assign(this, attributes);
 
 		this.rows = null;
 		this.kind = this.kind || this.component.kind;
+		const columns = this.component.preload("columns");
 		this.columns = new Map(
-			(this.component.preload("columns") || []).map((column) => [
-				column.field,
-				column,
-			]),
+			(Array.isArray(columns) ? columns : [])
+				.filter(
+					(column): column is TableEditorColumn =>
+						column !== null &&
+						typeof column === "object" &&
+						typeof column.field === "string",
+				)
+				.map((column) => [column.field, column]),
 		);
 		this.activeEdit = null;
 		this.checkboxEdits = new Map();
@@ -46,10 +134,10 @@ export class TableEditor {
 			this._destroyed ||
 			this.component._destroyed ||
 			this.view._destroyed ||
-			!rows
+			!rows?.target
 		)
 			return;
-		this.rows = rows;
+		this.rows = { target: rows.target };
 		this._listenerTarget = rows.target;
 
 		this._listenerTarget.addEventListener("click", this._onClick);
@@ -57,7 +145,7 @@ export class TableEditor {
 		this._listenerTarget.addEventListener("keydown", this._onKeydown);
 	}
 
-	_ownsCell(cell) {
+	_ownsCell(cell: Cell | null | undefined): cell is Cell {
 		return Boolean(
 			!this._destroyed &&
 				!this.component._destroyed &&
@@ -67,11 +155,13 @@ export class TableEditor {
 		);
 	}
 
-	_canEdit(cell) {
-		return this.visible && this._ownsCell(cell) && !this._saves.has(cell);
+	_canEdit(cell: Cell | null | undefined): cell is Cell {
+		return (
+			this.visible === true && this._ownsCell(cell) && !this._saves.has(cell)
+		);
 	}
 
-	_parseValue(cell) {
+	_parseValue(cell: Cell): unknown {
 		try {
 			return JSON.parse(cell.dataset.editValue ?? "null");
 		} catch {
@@ -79,11 +169,11 @@ export class TableEditor {
 		}
 	}
 
-	_column(cell) {
-		return this.columns.get(cell.dataset.column);
+	_column(cell: Cell) {
+		return this.columns.get(cell.dataset.column ?? "");
 	}
 
-	_schema(cell) {
+	_schema(cell: Cell): FormFieldSchema | null {
 		const column = this._column(cell);
 		if (!column?.schema) return null;
 
@@ -94,54 +184,59 @@ export class TableEditor {
 		};
 	}
 
-	_route(cell) {
-		const route = ROUTES[this.kind];
-		const key = cell.closest("tr[data-key]")?.dataset.key;
+	_route(cell: Cell) {
+		const route = ROUTES[this.kind ?? ""];
+		const key = cell.closest<HTMLTableRowElement>("tr[data-key]")?.dataset.key;
 		return route && key ? route(key) : null;
 	}
 
-	_editRenderer() {
+	_editRenderer(target: HTMLElement): ElementRenderer {
 		return {
 			readonly: false,
 			kind: this.kind,
 			id: "quick-edit",
 			mode: "edit",
 			cellEditing: true,
-			form: { target: this.rows.target },
+			form: { target },
 		};
 	}
 
-	_control(root) {
+	_control(root: HTMLElement | string) {
+		if (typeof root === "string") return null;
 		for (const selector of [
 			"input:not([type='hidden']):not([disabled])",
 			"textarea:not([disabled])",
 			"select:not([disabled])",
 		]) {
 			if (root.matches?.(selector)) return root;
-			const control = root.querySelector(selector);
+			const control = root.querySelector<HTMLElement>(selector);
 			if (control) return control;
 		}
 		return null;
 	}
 
 	_editableCells() {
-		return Array.from(
-			this.rows.target.querySelectorAll('td[data-editable="true"]'),
-		).filter((candidate) => this._schema(candidate) && this._route(candidate));
+		const cells = this.rows?.target.querySelectorAll<Cell>(
+			'td[data-editable="true"]',
+		);
+		return Array.from(cells ?? []).filter(
+			(candidate) => this._schema(candidate) && this._route(candidate),
+		);
 	}
 
-	_isCheckboxCell(cell) {
+	_isCheckboxCell(cell: Cell) {
 		return this._schema(cell)?.type === "checkbox";
 	}
 
-	_changed(edit) {
+	_changed(edit: CellEdit) {
+		if (!edit.element) return false;
 		if (typeof edit.element.changed === "function") {
 			return edit.element.changed(edit.value);
 		}
 		return edit.element.value !== edit.value;
 	}
 
-	_renderValue(cell, html, { saved = false } = {}) {
+	_renderValue(cell: Cell, html: string, { saved = false } = {}) {
 		const wrapper = document.createElement("div");
 		wrapper.dataset.editing = "false";
 		wrapper.dataset.role = "quick-edit-result";
@@ -162,14 +257,16 @@ export class TableEditor {
 		cell.replaceChildren(wrapper);
 	}
 
-	_clearError(cell) {
+	_clearError(cell: Cell) {
 		cell.querySelector("[data-role='quick-edit-error']")?.remove();
 	}
 
-	_showError(cell, message) {
+	_showError(cell: Cell, message?: string) {
 		cell.dataset.editState = "error";
 
-		let error = cell.querySelector("[data-role='quick-edit-error']");
+		let error = cell.querySelector<HTMLParagraphElement>(
+			"[data-role='quick-edit-error']",
+		);
 		if (!error) {
 			error = document.createElement("p");
 			error.dataset.role = "quick-edit-error";
@@ -179,8 +276,8 @@ export class TableEditor {
 		error.textContent = message || "Could not save this value.";
 	}
 
-	_editableCell(target) {
-		const cell = target.closest("td");
+	_editableCell(target: EventTarget | null) {
+		const cell = target instanceof Element ? target.closest("td") : null;
 		if (!this._canEdit(cell) || cell?.dataset.editable !== "true") return null;
 		if (!this._schema(cell) || !this._route(cell)) return null;
 		return cell;
@@ -188,9 +285,9 @@ export class TableEditor {
 
 	async _prepareCheckboxes() {
 		this._discardPreparedCheckboxes();
-		if (this._destroyed || !this.visible) return null;
+		if (this._destroyed || !this.visible || !this.rows) return null;
 		this._cleanupCheckboxEdits();
-		const batch = {
+		const batch: CheckboxPreparation = {
 			token: this._checkboxLifecycle.begin(this.rows.target, {
 				cancelTransport: false,
 			}),
@@ -222,13 +319,19 @@ export class TableEditor {
 		});
 	}
 
-	async _prepareCheckbox(cell, batch) {
-		if (!this._canEdit(cell) || this.checkboxEdits.has(cell)) return;
+	async _prepareCheckbox(cell: Cell, batch: CheckboxPreparation) {
+		if (!this.rows || !this._canEdit(cell) || this.checkboxEdits.has(cell))
+			return;
 
 		const schema = this._schema(cell);
+		if (!schema) return;
 		const value = this._parseValue(cell);
-		const element = await getFormElement(this._editRenderer(), schema, value);
-		let edit;
+		const element = await getFormElement(
+			this._editRenderer(this.rows.target),
+			schema,
+			value,
+		);
+		let edit: CellEdit | undefined;
 		try {
 			if (
 				!this._checkboxLifecycle.isCurrent(batch.token) ||
@@ -262,6 +365,7 @@ export class TableEditor {
 			const { cell, editor } = edit;
 			if (
 				!edit.element ||
+				!editor ||
 				!this._canEdit(cell) ||
 				this.checkboxEdits.has(cell)
 			) {
@@ -289,14 +393,14 @@ export class TableEditor {
 		});
 	}
 
-	_releaseEdit(edit, restore = false) {
+	_releaseEdit(edit: CellEdit | null, restore = false) {
 		if (!edit?.element) return;
 		const { cell, element } = edit;
 		if (restore && cell.isConnected && this.rows?.target.contains(cell)) {
 			const error = cell.querySelector(
 				"[data-role='quick-edit-error']",
 			)?.textContent;
-			cell.innerHTML = edit.before;
+			cell.innerHTML = edit.before ?? "";
 			if (this._saves.has(cell)) cell.dataset.editState = "saving";
 			else delete cell.dataset.editState;
 			if (error) this._showError(cell, error);
@@ -314,7 +418,7 @@ export class TableEditor {
 			this._releaseEdit(edit, true);
 	}
 
-	async _click(e) {
+	async _click(e: MouseEvent) {
 		if (!this.visible) return;
 
 		e.stopPropagation();
@@ -329,7 +433,7 @@ export class TableEditor {
 		await this._open(cell);
 	}
 
-	async _change(e) {
+	async _change(e: Event) {
 		if (!this.visible) return;
 
 		const cell = this._editableCell(e.target);
@@ -346,7 +450,8 @@ export class TableEditor {
 		) {
 			if (this._canEdit(cell) && this.checkboxEdits.get(cell) === edit) {
 				const control = this._control(cell);
-				if (control) control.checked = edit.value === true;
+				if (control instanceof HTMLInputElement)
+					control.checked = edit.value === true;
 			}
 			return;
 		}
@@ -356,7 +461,7 @@ export class TableEditor {
 		}
 	}
 
-	async _open(cell) {
+	async _open(cell: Cell) {
 		if (!this._canEdit(cell)) return;
 		if (this.activeEdit?.cell === cell) return;
 		if (this._isCheckboxCell(cell)) return;
@@ -369,28 +474,40 @@ export class TableEditor {
 		if (!this._openLifecycle.isCurrent(token) || !this._canEdit(cell)) return;
 
 		const schema = this._schema(cell);
+		if (!schema || !this.rows) return;
 		const value = this._parseValue(cell);
-		const element = await getFormElement(this._editRenderer(), schema, value);
-		let edit;
+		const element = await getFormElement(
+			this._editRenderer(this.rows.target),
+			schema,
+			value,
+		);
+		let edit: CellEdit | undefined;
 		try {
 			if (!this._openLifecycle.isCurrent(token) || !this._canEdit(cell)) return;
 			const editor = element.cell;
 			if (!editor) return;
-			edit = { cell, element, editor, value, column: this._column(cell) };
-			this._preparedOpen = edit;
+			const prepared: CellEdit = {
+				cell,
+				element,
+				editor,
+				value,
+				column: this._column(cell),
+			};
+			edit = prepared;
+			this._preparedOpen = prepared;
 			await withTransition(
 				() => {
 					if (
-						!edit.element ||
+						!prepared.element ||
 						!this._openLifecycle.isCurrent(token) ||
 						!this._canEdit(cell)
 					)
 						return;
 					this._clearSavedTimer(cell);
 					this._clearError(cell);
-					edit.before = cell.innerHTML;
+					prepared.before = cell.innerHTML;
 					cell.dataset.editState = "editing";
-					this.activeEdit = edit;
+					this.activeEdit = prepared;
 					this._preparedOpen = null;
 					cell.replaceChildren(editor);
 				},
@@ -409,12 +526,12 @@ export class TableEditor {
 		}
 	}
 
-	async _keydown(e) {
+	async _keydown(e: KeyboardEvent) {
 		if (!this.activeEdit) return;
 		if (!["Enter", "Escape", "Tab"].includes(e.key)) return;
 
 		const { cell } = this.activeEdit;
-		if (!cell.contains(e.target)) return;
+		if (!(e.target instanceof Node) || !cell.contains(e.target)) return;
 
 		e.preventDefault();
 		e.stopPropagation();
@@ -438,7 +555,7 @@ export class TableEditor {
 			await this._focusNext(cell, e.shiftKey);
 	}
 
-	_nextEditableCell(cell, reverse = false) {
+	_nextEditableCell(cell: Cell, reverse = false) {
 		const cells = this._editableCells();
 		const index = cells.indexOf(cell);
 		if (index < 0) return null;
@@ -447,7 +564,7 @@ export class TableEditor {
 		return cells[index + offset] || null;
 	}
 
-	async _focusNext(cell, reverse = false) {
+	async _focusNext(cell: Cell, reverse = false) {
 		const next = this._nextEditableCell(cell, reverse);
 		if (!this._canEdit(next)) return;
 		next.focus?.();
@@ -458,13 +575,14 @@ export class TableEditor {
 		await this._open(next);
 	}
 
-	_cancel(cell) {
+	_cancel(cell: Cell) {
 		if (!this.activeEdit || this.activeEdit.cell !== cell) return;
 		this._releaseEdit(this.activeEdit, true);
 	}
 
-	async _commit(cell) {
-		if (this._saves.has(cell)) return this._saves.get(cell).promise;
+	async _commit(cell: Cell) {
+		const pending = this._saves.get(cell)?.promise;
+		if (pending) return pending;
 		if (!this._canEdit(cell)) return false;
 		if (!this.activeEdit || this.activeEdit.cell !== cell) return false;
 
@@ -476,8 +594,9 @@ export class TableEditor {
 		return this._startSave(edit, false);
 	}
 
-	async _commitCheckbox(cell) {
-		if (this._saves.has(cell)) return this._saves.get(cell).promise;
+	async _commitCheckbox(cell: Cell) {
+		const pending = this._saves.get(cell)?.promise;
+		if (pending) return pending;
 		if (!this._canEdit(cell)) return false;
 		const edit = this.checkboxEdits.get(cell);
 		if (!edit) return true;
@@ -490,8 +609,10 @@ export class TableEditor {
 		return this._startSave(edit, true);
 	}
 
-	_startSave(edit, checkbox) {
+	_startSave(edit: CellEdit, checkbox: boolean) {
 		const { cell } = edit;
+		const route = this._route(cell);
+		if (!edit.element || !route) return false;
 		// The request outlives its field when Quick Edit closes. Keep its payload
 		// and settlement authority separate from the currently mounted editor.
 		const payload = structuredClone({
@@ -500,7 +621,7 @@ export class TableEditor {
 			value: edit.element.value,
 			column: edit.column,
 		});
-		const operation = { edit, checkbox, payload, route: this._route(cell) };
+		const operation: CellSave = { edit, checkbox, payload, route };
 		this._saves.set(cell, operation);
 		this._clearSavedTimer(cell);
 		cell.dataset.editState = "saving";
@@ -511,7 +632,7 @@ export class TableEditor {
 		return operation.promise;
 	}
 
-	async _save(operation) {
+	async _save(operation: CellSave) {
 		const { edit, checkbox, payload, route } = operation;
 		const { cell } = edit;
 		try {
@@ -522,7 +643,8 @@ export class TableEditor {
 				this._showError(cell, response?.error);
 				return false;
 			}
-			const html = response.html?.body?.innerHTML ?? edit.before;
+			const html =
+				(response.html || null)?.body?.innerHTML ?? edit.before ?? "";
 			cell.dataset.editValue = JSON.stringify(payload.value);
 			if (checkbox && this.checkboxEdits.get(cell) === edit) {
 				edit.before = html;
@@ -551,12 +673,12 @@ export class TableEditor {
 		}
 	}
 
-	_unlockCell(cell) {
+	_unlockCell(cell: Cell) {
 		cell.removeAttribute("aria-busy");
 		cell.removeAttribute("inert");
 	}
 
-	_scheduleSavedTimer(cell) {
+	_scheduleSavedTimer(cell: Cell) {
 		this._clearSavedTimer(cell);
 		const timer = setTimeout(() => {
 			if (this._savedTimers.get(cell) !== timer) return;
@@ -566,7 +688,7 @@ export class TableEditor {
 		this._savedTimers.set(cell, timer);
 	}
 
-	_clearSavedState(cell) {
+	_clearSavedState(cell: Cell) {
 		if (cell.dataset.editState === "saved") {
 			if (this.checkboxEdits.has(cell)) cell.dataset.editState = "editing";
 			else delete cell.dataset.editState;
@@ -574,7 +696,7 @@ export class TableEditor {
 		cell.querySelector("[data-role='quick-edit-saved']")?.remove();
 	}
 
-	_clearSavedTimer(cell) {
+	_clearSavedTimer(cell: Cell) {
 		const timer = this._savedTimers.get(cell);
 		if (timer === undefined) return;
 		clearTimeout(timer);
@@ -598,11 +720,13 @@ export class TableEditor {
 		for (const cell of this._savedTimers.keys()) this._clearSavedTimer(cell);
 	}
 
-	releaseRows(rows) {
-		const retired = new Set(rows.filter(Boolean));
+	releaseRows(rows: readonly (HTMLElement | undefined)[]) {
+		const retired = new Set(rows.filter((row) => row !== undefined));
 		// View-level deletion can remove a row before the table delta commits.
-		const affected = (cell) =>
-			!this._ownsCell(cell) || retired.has(cell.closest("tr[lp-entity]"));
+		const affected = (cell: Cell) => {
+			const row = cell.closest<HTMLTableRowElement>("tr[lp-entity]");
+			return !this._ownsCell(cell) || (row !== null && retired.has(row));
+		};
 		for (const edit of [
 			this.activeEdit,
 			this._preparedOpen,
@@ -625,11 +749,12 @@ export class TableEditor {
 
 	async prereconcile() {
 		if (this._destroyed || !this.rows) return;
-		const visibility = this.component.active;
+		const visibility = this.component.widgets.TableVisibility;
 		const preserveForVisibility =
 			!this.visible &&
 			this.rows.target.dataset.editing === "true" &&
-			visibility?.name === "TableVisibility";
+			visibility &&
+			this.component.active === visibility;
 		if (preserveForVisibility) {
 			this.visible = true;
 			visibility.preserveEditor?.(this);
@@ -647,7 +772,9 @@ export class TableEditor {
 
 		this.rows.target.dataset.editing = this.visible ? "true" : "false";
 		this.view.elt
-			.querySelectorAll('button[lp-show="table:TableEditor"]')
+			.querySelectorAll<HTMLButtonElement>(
+				'button[lp-show="table:TableEditor"]',
+			)
 			.forEach((button) => {
 				button.dataset.editing = this.visible ? "true" : "false";
 				button.setAttribute("aria-pressed", this.visible ? "true" : "false");

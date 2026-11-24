@@ -5,28 +5,38 @@ import { SelectBox } from "./combobox/index.ts";
 import { primitives } from "./primitives.ts";
 
 export class SelectElement extends BaseElement {
+	declare combobox?: SelectBox;
+
 	get value() {
-		if (this.combobox?.values.size > 0) {
+		if (this.combobox?.values.size) {
 			const values = Array.from(this.combobox.values);
 			return this.schema.multiple ? values : values[0];
 		}
 		return null;
 	}
 
-	changed(value) {
+	changed(value: unknown) {
 		if (areEqual(this.value, value)) return false;
 		return true;
 	}
 
-	active(value) {
-		return this.combobox?.values.has(value) ?? this.values.includes(value);
+	active(value: unknown) {
+		return (
+			typeof value === "string" &&
+			(this.combobox?.values.has(value) ?? this.values.includes(value))
+		);
 	}
 
 	get values() {
 		if (!this.hasSubmission) return [];
-		return typeof this.submission === "string"
-			? [this.submission]
-			: this.submission;
+		const submission = this.submission;
+		return typeof submission === "string"
+			? [submission]
+			: Array.isArray(submission)
+				? submission.filter(
+						(value): value is string => typeof value === "string",
+					)
+				: [];
 	}
 
 	get read() {
@@ -35,21 +45,21 @@ export class SelectElement extends BaseElement {
 
 		const options = this.schema.options;
 
-		this._read = document.createElement("div");
-		this._read.className = "flex flex-row flex-wrap gap-2";
+		const read = document.createElement("div");
+		read.className = "flex flex-row flex-wrap gap-2";
 
 		this.values.forEach((item) => {
 			const option = options.find((opt) => opt.value === item);
 			if (!option) return;
 
-			const container = this._read.appendChild(document.createElement("div"));
+			const container = read.appendChild(document.createElement("div"));
 			container.className = STYLES.form.submission.default;
 			container.textContent = option.label;
 		});
 
-		this._read.classList.add("group-data-[mode=edit]/element:hidden");
-
-		return this._read;
+		read.classList.add("group-data-[mode=edit]/element:hidden");
+		this._read = read;
+		return read;
 	}
 
 	get edit() {
@@ -87,6 +97,7 @@ export class SelectElement extends BaseElement {
 			this.combobox.clear();
 		}
 		this.submission = null;
-		this.edit.querySelector("select").value = "";
+		const select = this.edit?.querySelector("select");
+		if (select) select.value = "";
 	}
 }

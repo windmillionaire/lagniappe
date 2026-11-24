@@ -1,13 +1,17 @@
-import { BaseList } from "../elements/base/baseList.ts";
+import { BaseList, type ListAttributes } from "../elements/base/baseList.ts";
 import { InputElement } from "../elements/input.ts";
 import { SectionToggle } from "../elements/sectionToggle.ts";
 import { request } from "../shared/index.ts";
 import { withTransition } from "../shared/transitions.ts";
-import { FormWidget } from "./base/formWidget.ts";
+import { FormWidget, type FormWidgetSettings } from "./base/formWidget.ts";
 
 class ModelTask extends FormWidget {
+	declare nameElement: InputElement;
+
 	get formSelectElement() {
-		const target = this.target.querySelector('[data-action="select-form"]');
+		const target = this.target.querySelector<HTMLElement>(
+			'[data-action="select-form"]',
+		);
 		if (!target) return null;
 
 		const control = SectionToggle.facet(this, target);
@@ -37,7 +41,7 @@ class ModelTask extends FormWidget {
 }
 
 export class CreateModelTask extends ModelTask {
-	constructor(attributes) {
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Create Model Task",
@@ -60,7 +64,7 @@ export class CreateModelTask extends ModelTask {
 }
 
 export class ModelTaskInfo extends ModelTask {
-	constructor(attributes) {
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Update Model Task",
@@ -71,23 +75,35 @@ export class ModelTaskInfo extends ModelTask {
 
 	postreconcile() {
 		super.postreconcile();
+		const component = this.component?.elt;
+		if (!component) return;
 		const name =
 			this.nameElement?.value ||
 			this.target.dataset.name ||
-			this.component.elt.dataset.title ||
+			component.dataset.title ||
 			"";
 		if (!name) return;
 
-		this.component.elt.dataset.title = name;
-		const title = this.component.elt.querySelector("span[data-role='title']");
+		component.dataset.title = name;
+		const title = component.querySelector("span[data-role='title']");
 		if (title && name !== title.textContent) {
 			title.textContent = name;
 		}
 	}
 }
 
+interface ModelTaskListSettings extends ListAttributes {
+	component: ListAttributes["component"] & { elt: HTMLElement };
+	view: ListAttributes["view"] & { online?: boolean };
+}
+
 export class ModelTaskList extends BaseList {
-	constructor(attributes) {
+	declare component: ModelTaskListSettings["component"];
+	declare view: ModelTaskListSettings["view"];
+	declare _moving: boolean;
+	declare _observer?: MutationObserver;
+
+	constructor(attributes: ModelTaskListSettings) {
 		super(attributes);
 		this._click = this._click.bind(this);
 		this._moving = false;
@@ -100,7 +116,9 @@ export class ModelTaskList extends BaseList {
 	}
 
 	get rows() {
-		return Array.from(this.target.querySelectorAll(":scope > li[lp-entity]"));
+		return Array.from(
+			this.target.querySelectorAll<HTMLLIElement>(":scope > li[lp-entity]"),
+		);
 	}
 
 	_observeRows() {
@@ -112,13 +130,18 @@ export class ModelTaskList extends BaseList {
 	_updateMoveButtons() {
 		const rows = this.rows;
 		rows.forEach((row, index) => {
-			for (const button of row.querySelectorAll("[data-role='move-model']")) {
+			for (const button of row.querySelectorAll<HTMLButtonElement>(
+				"[data-role='move-model']",
+			)) {
 				const atEnd =
 					button.dataset.direction === "up"
 						? index === 0
 						: index === rows.length - 1;
 				button.disabled =
-					this._moving || this.readonly || this.view.online === false || atEnd;
+					this._moving ||
+					Boolean(this.readonly) ||
+					this.view.online === false ||
+					atEnd;
 			}
 		});
 	}
@@ -127,8 +150,11 @@ export class ModelTaskList extends BaseList {
 		this._updateMoveButtons();
 	}
 
-	async _click(event) {
-		const button = event.target.closest("[data-role='move-model']");
+	async _click(event: MouseEvent) {
+		const button =
+			event.target instanceof Element
+				? event.target.closest<HTMLButtonElement>("[data-role='move-model']")
+				: null;
 		if (!button || !this.target.contains(button)) return;
 		event.preventDefault();
 		event.stopPropagation();
@@ -140,29 +166,34 @@ export class ModelTaskList extends BaseList {
 		)
 			return;
 		const rows = this.rows;
-		const index = rows.indexOf(button.closest("li[lp-entity]"));
+		const row = button.closest<HTMLLIElement>("li[lp-entity]");
+		if (!row) return;
+		const index = rows.indexOf(row);
 		const next = index + (button.dataset.direction === "up" ? -1 : 1);
 		if (index < 0 || next < 0 || next >= rows.length) return;
 		[rows[index], rows[next]] = [rows[next], rows[index]];
-		const error = this.component.elt.querySelector(
+		const error = this.component.elt.querySelector<HTMLElement>(
 			"[data-role='model-order-error']",
 		);
+		const route = this.target.dataset.reorderRoute;
+		if (!route) return;
 		if (error) error.dataset.visible = "false";
 		this._moving = true;
 		this.target.setAttribute("aria-busy", "true");
 		this._updateMoveButtons();
 		try {
-			const response = await request.put(
-				this.target.dataset.reorderRoute,
+			const response = await request.put<{ model_tasks: string[] }>(
+				route,
 				{
 					model_tasks: rows.map((row) => row.dataset.key),
 				},
 				{ replaceErrorPage: false },
 			);
-			if (!response.ok) {
+			if (!response?.ok) {
 				if (error) {
 					error.textContent =
-						response.error || "Could not save the model task order. Try again.";
+						response?.error ||
+						"Could not save the model task order. Try again.";
 					error.dataset.visible = "true";
 				}
 				return;
@@ -170,10 +201,10 @@ export class ModelTaskList extends BaseList {
 			const current = new Map(this.rows.map((row) => [row.dataset.key, row]));
 			await withTransition(
 				() => {
-					response.model_tasks.forEach((key, order) => {
+					response.model_tasks?.forEach((key, order) => {
 						const row = current.get(key);
 						if (!row) return;
-						row.dataset.order = order + 1;
+						row.dataset.order = String(order + 1);
 						this.target.append(row);
 					});
 				},

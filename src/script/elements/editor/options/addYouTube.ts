@@ -2,12 +2,24 @@ import { FormController } from "../../../forms/controller.ts";
 import { buttons } from "../../buttons.ts";
 import { primitives } from "../../primitives.ts";
 
+import type { Toolbar } from "../toolbar.ts";
+
 class AddYouTube {
-	constructor(toolbar) {
+	declare endpoints: Toolbar["endpoints"];
+	declare _active: boolean;
+	declare toolbar: Toolbar;
+	declare name: "addYouTube";
+	declare messages: Record<string, string>;
+	declare target: HTMLFormElement;
+	declare link: HTMLInputElement;
+	declare html: HTMLElement[];
+	declare form: FormController;
+
+	constructor(toolbar: Toolbar) {
 		this.toolbar = toolbar;
 		this.submit = this.submit.bind(this);
 		this.endpoints = toolbar.endpoints;
-		this.name = "addYouTube";
+		this.name = "addYouTube" as const;
 		this.messages = {
 			url: "Please add a YouTube URL",
 			submit: "Add YouTube Video",
@@ -19,7 +31,7 @@ class AddYouTube {
 		return this._active;
 	}
 
-	set active(value) {
+	set active(value: boolean) {
 		this._active = value;
 		this.link.focus();
 	}

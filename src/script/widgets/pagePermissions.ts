@@ -1,7 +1,7 @@
-import { FormWidget } from "./base/formWidget.ts";
+import { FormWidget, type FormWidgetSettings } from "./base/formWidget.ts";
 
 export class PagePermissions extends FormWidget {
-	constructor(attributes) {
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Save Restrictions",

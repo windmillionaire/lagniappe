@@ -1,16 +1,36 @@
+import type { Range } from "@tiptap/core";
 import { FormController } from "../../../forms/controller.ts";
 import { STYLES } from "../../../generated/styles.mjs";
 import { request } from "../../../shared/request.ts";
 import { buttons } from "../../buttons.ts";
 import { primitives } from "../../primitives.ts";
 
+import type { Toolbar } from "../toolbar.ts";
+
 class GenerateText {
-	constructor(toolbar) {
+	declare submitButton: HTMLButtonElement;
+	declare endpoints: Toolbar["endpoints"];
+	declare editor: Toolbar["editor"];
+	declare usedWithEditor: boolean;
+	declare _active: boolean;
+	declare toolbar: Toolbar;
+	declare name: "generateText";
+	declare messages: Record<string, string>;
+	declare target: HTMLFormElement;
+	declare prompt: HTMLTextAreaElement;
+	declare selectedTextInput: HTMLInputElement;
+	declare appendRadio: HTMLInputElement | null;
+	declare replaceSelectionRadio: HTMLInputElement | null;
+	declare html: HTMLElement[];
+	declare form: FormController;
+	declare _capturedRange: Range | null;
+
+	constructor(toolbar: Toolbar) {
 		this.toolbar = toolbar;
 		this.submit = this.submit.bind(this);
 		this.editor = toolbar.editor;
 		this.endpoints = toolbar.endpoints;
-		this.name = "generateText";
+		this.name = "generateText" as const;
 		this.messages = {
 			prompt: "Please describe the text you'd like to generate.",
 			submit: "Generate",
@@ -31,7 +51,7 @@ class GenerateText {
 		return this._active;
 	}
 
-	set active(value) {
+	set active(value: boolean) {
 		this._active = value;
 		if (value) {
 			this._captureSelection();
@@ -58,8 +78,8 @@ class GenerateText {
 
 		// Update radio button selection based on whether text is selected
 		if (hasSelection) {
-			this.appendRadio.checked = false;
-			this.replaceSelectionRadio.checked = true;
+			if (this.appendRadio) this.appendRadio.checked = false;
+			if (this.replaceSelectionRadio) this.replaceSelectionRadio.checked = true;
 
 			const selectedText = this.editor.state.doc.textBetween(from, to, " ");
 			this.selectedTextInput.value = selectedText;
@@ -73,8 +93,9 @@ class GenerateText {
 				}"`;
 			}
 		} else {
-			this.appendRadio.checked = true;
-			this.replaceSelectionRadio.checked = false;
+			if (this.appendRadio) this.appendRadio.checked = true;
+			if (this.replaceSelectionRadio)
+				this.replaceSelectionRadio.checked = false;
 			this.selectedTextInput.value = "";
 			this.prompt.placeholder = "Describe the text you want to generate...";
 		}
@@ -92,7 +113,7 @@ class GenerateText {
 		// Prompt textarea
 		this.prompt = primitives.textarea({
 			name: "prompt",
-			rows: "3",
+			rows: 3,
 			placeholder: "Describe the text you want to generate...",
 		});
 
@@ -148,17 +169,19 @@ class GenerateText {
 		});
 
 		// Store references to radio buttons for selection handling
-		this.appendRadio = processing.querySelector(
+		this.appendRadio = processing.querySelector<HTMLInputElement>(
 			'input[name="insert_mode"][value="append"]',
 		);
-		this.replaceSelectionRadio = processing.querySelector(
+		this.replaceSelectionRadio = processing.querySelector<HTMLInputElement>(
 			'input[name="insert_mode"][value="replace-selection"]',
 		);
 
 		return optionsContainer;
 	}
 
-	async submit(submitter) {
+	async submit(submitter: HTMLButtonElement | HTMLInputElement | null) {
+		const endpoint = this.endpoints?.generateText;
+		if (!endpoint) return;
 		if (!this.prompt.value) {
 			this.form.showError(this.messages.prompt);
 			return;
@@ -169,14 +192,14 @@ class GenerateText {
 		const formData = new FormData(this.target);
 		formData.append("role", submitter?.dataset?.role || "generate");
 
-		const response = await request.post(this.endpoints.generateText, formData);
+		const response = await request.post<{ markup: string }>(endpoint, formData);
 
 		if (submitter) submitter.disabled = false;
 
-		if (response.ok && response.markup) {
+		if (response?.ok && response.markup) {
 			const insertMode = formData.get("insert_mode") || "replace";
 			this._addText(response.markup, insertMode);
-		} else if (response.error) {
+		} else if (response?.error) {
 			this.form.showError(response.error);
 		}
 	}
@@ -193,7 +216,7 @@ class GenerateText {
 		return null;
 	}
 
-	_addText(html, insertMode = "replace") {
+	_addText(html: string, insertMode: FormDataEntryValue = "replace") {
 		const highlightedRange =
 			insertMode === "replace-selection" ? this._selectionRange() : null;
 		const cursorRange = insertMode === "cursor" ? this._capturedRange : null;

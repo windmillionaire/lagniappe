@@ -2,15 +2,121 @@ import { STYLES } from "../generated/styles.mjs";
 import { withTransition } from "../shared/transitions.ts";
 import { buttons } from "./buttons.ts";
 import { primitives } from "./primitives.ts";
+import type { SectionToggle } from "./sectionToggle.ts";
+
+interface RepeatDetails {
+	description?: string | null;
+	text?: string | null;
+}
+
+interface ScheduledDetails extends RepeatDetails {
+	mode?: string | null;
+	days?: (number | string)[] | null;
+}
+
+interface RecurringDetails {
+	interval?: string | number | null;
+	unit?: string | null;
+}
+
+export interface TaskSchedule {
+	due?: string | null;
+	start_date?: string | null;
+	recurring?: RecurringDetails | null;
+	scheduled?: ScheduledDetails | null;
+	periodic?: RepeatDetails | null;
+}
+
+type DueGroup =
+	| "dueDate"
+	| "recurring"
+	| "scheduled"
+	| "weekly"
+	| "monthly"
+	| "yearly"
+	| "periodic";
+type RepeatGroup = "recurring" | "scheduled" | "periodic";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function optionalText(value: unknown): value is string | null | undefined {
+	return value == null || typeof value === "string";
+}
+
+function isRepeatDetails(
+	value: unknown,
+): value is RepeatDetails | null | undefined {
+	return (
+		value == null ||
+		(isRecord(value) &&
+			optionalText(value.description) &&
+			optionalText(value.text))
+	);
+}
+
+function isSchedule(value: unknown): value is TaskSchedule {
+	if (
+		!isRecord(value) ||
+		!optionalText(value.due) ||
+		!optionalText(value.start_date)
+	)
+		return false;
+	const { recurring, scheduled, periodic } = value;
+	return (
+		(recurring == null ||
+			(isRecord(recurring) &&
+				optionalText(recurring.unit) &&
+				(optionalText(recurring.interval) ||
+					typeof recurring.interval === "number"))) &&
+		(scheduled == null ||
+			(isRecord(scheduled) &&
+				isRepeatDetails(scheduled) &&
+				optionalText(scheduled.mode) &&
+				(scheduled.days == null ||
+					(Array.isArray(scheduled.days) &&
+						scheduled.days.every(
+							(day) => typeof day === "number" || typeof day === "string",
+						))))) &&
+		isRepeatDetails(periodic)
+	);
+}
+
+function isRepeatGroup(group: string | undefined): group is RepeatGroup {
+	return group === "recurring" || group === "scheduled" || group === "periodic";
+}
+
+function isScheduleGroup(
+	group: string | undefined,
+): group is "weekly" | "monthly" | "yearly" {
+	return group === "weekly" || group === "monthly" || group === "yearly";
+}
 
 export class DueDate {
-	constructor(button, widget) {
+	declare destroy?: never;
+	declare widget?: { readonly?: boolean };
+	declare button: HTMLButtonElement;
+	declare action?: string;
+	declare kind: "task";
+	declare aiEnabled: boolean;
+	declare schedule: TaskSchedule;
+	declare container: HTMLDivElement | null;
+	declare groups: Partial<Record<DueGroup, HTMLDivElement>>;
+	declare toggles: Partial<Record<RepeatGroup, HTMLElement>>;
+	declare error: HTMLDivElement | null;
+	declare open: boolean;
+	declare closed?: boolean;
+	declare toggle?: SectionToggle;
+
+	constructor(button: HTMLButtonElement, widget?: { readonly?: boolean }) {
 		this.widget = widget;
 		this.action = button.dataset.action;
 		this.button = button;
 		this.kind = "task";
 		this.aiEnabled = this.button.dataset.aiEnabled !== "false";
-		this.schedule = JSON.parse(this.button.dataset.schedule ?? "{}");
+		const schedule: unknown = JSON.parse(this.button.dataset.schedule ?? "{}");
+		this.schedule = isSchedule(schedule) ? schedule : {};
 		if (this.button.dataset.dueDate) {
 			this.schedule.due = this.button.dataset.dueDate;
 		}
@@ -32,110 +138,125 @@ export class DueDate {
 
 		this.createOptionGroups();
 
-		this.container.addEventListener("input", this._input);
-		this.container.addEventListener("click", this._click);
-		this.container.addEventListener("change", this._change);
+		const { container } = this;
+		if (!container) return;
+		container.addEventListener("input", this._input);
+		container.addEventListener("click", this._click);
+		container.addEventListener("change", this._change);
 
 		if (this.schedule.recurring) {
-			this.container.appendChild(this.recurring);
+			container.appendChild(this.recurring);
 		} else if (this.schedule.scheduled) {
-			this.container.appendChild(this.scheduled);
+			const scheduled = container.appendChild(this.scheduled);
 			if (this.schedule.scheduled.mode === "weekly") {
-				this.groups.scheduled.appendChild(this.weekly);
+				scheduled.appendChild(this.weekly);
 			} else if (this.aiEnabled && this.schedule.scheduled.mode === "monthly") {
-				this.groups.scheduled.appendChild(this.monthly);
+				scheduled.appendChild(this.monthly);
 			} else if (this.aiEnabled && this.schedule.scheduled.mode === "yearly") {
-				this.groups.scheduled.appendChild(this.yearly);
+				scheduled.appendChild(this.yearly);
 			}
 		} else if (this.aiEnabled && this.schedule.periodic) {
-			this.container.appendChild(this.periodic);
+			container.appendChild(this.periodic);
 		}
 	}
 
-	_click(e) {
-		const role = e.target.closest("[data-role]")?.dataset.role;
+	_click(e: MouseEvent) {
+		const role =
+			e.target instanceof Element
+				? e.target.closest<HTMLElement>("[data-role]")?.dataset.role
+				: undefined;
 		if (!role) return;
+		const input = this.groups.dueDate?.querySelector("input");
 
 		switch (role) {
 			case "today":
 				this.schedule.due = new Date().toLocaleDateString("sv-SE");
-				this.groups.dueDate.querySelector("input").value = this.schedule.due;
+				if (input) input.value = this.schedule.due;
 				break;
 			case "remove-due-date":
-				this.groups.dueDate.querySelector("input").value = "";
+				if (input) input.value = "";
 				this.schedule.due = null;
 				break;
 		}
 	}
 
-	_input(e) {
-		if (e.target.name === "monthly-description") {
-			this.schedule.scheduled.description = e.target.value;
+	_input(e: Event) {
+		const { target } = e;
+		if (!(target instanceof HTMLInputElement)) return;
+		if (target.name === "monthly-description") {
+			if (this.schedule.scheduled)
+				this.schedule.scheduled.description = target.value;
 			return;
-		} else if (e.target.name === "yearly-description") {
-			this.schedule.scheduled.description = e.target.value;
+		} else if (target.name === "yearly-description") {
+			if (this.schedule.scheduled)
+				this.schedule.scheduled.description = target.value;
 			return;
-		} else if (e.target.name === "periodic-description") {
-			this.schedule.periodic.description = e.target.value;
+		} else if (target.name === "periodic-description") {
+			if (this.schedule.periodic)
+				this.schedule.periodic.description = target.value;
 			return;
-		} else if (e.target.name === "due-date") {
-			this.schedule.due = e.target.value;
+		} else if (target.name === "due-date") {
+			this.schedule.due = target.value;
 			return;
-		} else if (e.target.name === "interval") {
+		} else if (target.name === "interval") {
 			this.schedule.recurring ??= {};
-			this.schedule.recurring.interval = e.target.value;
+			this.schedule.recurring.interval = target.value;
 			return;
 		}
 	}
 
-	_change(e) {
-		if (e.target.name === "recurring") {
+	_change(e: Event) {
+		const { target } = e;
+		if (!(target instanceof HTMLInputElement) || !this.container) return;
+		if (target.name === "recurring") {
 			this.schedule.recurring ??= {};
 			this.container.appendChild(this.recurring);
-			if (!e.target.checked) {
+			if (!target.checked) {
 				this.clearGroup(this.recurring);
 			}
 			return;
-		} else if (e.target.name === "unit") {
+		} else if (target.name === "unit") {
 			this.schedule.recurring ??= {};
-			this.schedule.recurring.unit = e.target.value;
+			this.schedule.recurring.unit = target.value;
 			return;
-		} else if (e.target.name === "scheduled") {
+		} else if (target.name === "scheduled") {
 			this.schedule.scheduled ??= {};
 			this.container.appendChild(this.scheduled);
-			if (!e.target.checked) {
+			if (!target.checked) {
 				this.clearGroup(this.groups.scheduled);
 			}
 			return;
-		} else if (e.target.name === "schedule-type") {
+		} else if (target.name === "schedule-type") {
 			this.schedule.scheduled ??= {};
-			this.schedule.scheduled.mode = e.target.value;
-			if (!e.target.checked) {
-				this.clearGroup(this.groups[e.target.value]);
-			} else if (e.target.value === "daily") {
+			this.schedule.scheduled.mode = target.value;
+			if (!target.checked) {
+				if (isScheduleGroup(target.value))
+					this.clearGroup(this.groups[target.value]);
+			} else if (target.value === "daily") {
 				[this.groups.weekly, this.groups.monthly, this.groups.yearly].forEach(
 					(group) => {
 						this.clearGroup(group);
 					},
 				);
-			} else if (e.target.value === "weekly") {
-				this.groups.scheduled.appendChild(this.weekly);
-			} else if (this.aiEnabled && e.target.value === "monthly") {
-				this.groups.scheduled.appendChild(this.monthly);
-			} else if (this.aiEnabled && e.target.value === "yearly") {
-				this.groups.scheduled.appendChild(this.yearly);
+			} else if (target.value === "weekly") {
+				this.groups.scheduled?.appendChild(this.weekly);
+			} else if (this.aiEnabled && target.value === "monthly") {
+				this.groups.scheduled?.appendChild(this.monthly);
+			} else if (this.aiEnabled && target.value === "yearly") {
+				this.groups.scheduled?.appendChild(this.yearly);
 			}
 			return;
-		} else if (e.target.name.startsWith("weekly-day-")) {
+		} else if (target.name.startsWith("weekly-day-")) {
+			if (!this.schedule.scheduled) return;
 			this.schedule.scheduled.days = Array.from(
-				this.weekly.querySelectorAll("input:checked"),
+				this.weekly.querySelectorAll<HTMLInputElement>("input:checked"),
 			).map((input) => input.value);
 			return;
-		} else if (e.target.name === "periodic") {
+		} else if (target.name === "periodic") {
 			if (!this.aiEnabled) return;
 			this.schedule.periodic ??= {};
 			this.container.appendChild(this.periodic);
-			if (!e.target.checked) {
+			if (!target.checked) {
 				this.clearGroup(this.groups.periodic);
 			}
 			return;
@@ -146,11 +267,11 @@ export class DueDate {
 		return Object.keys(this.schedule).length > 0;
 	}
 
-	showError(message) {
+	showError(message: string) {
 		if (!this.error) {
 			this.error = primitives.error();
 			this.error.classList.add("mb-3");
-			this.container.prepend(this.error);
+			this.container?.prepend(this.error);
 		}
 		this.error.textContent = message;
 		this.error.dataset.visible = "true";
@@ -181,9 +302,10 @@ export class DueDate {
 			if (!this.open) {
 				this.button.focus({ preventScroll: true });
 			}
-			this.toggle.display();
+			this.toggle?.display();
 
-			this.container.dataset.visible = this.open ? "true" : "false";
+			if (this.container)
+				this.container.dataset.visible = this.open ? "true" : "false";
 		});
 	}
 
@@ -247,7 +369,7 @@ export class DueDate {
 			}),
 		);
 
-		this.toggles = {
+		const toggles = {
 			recurring: primitives.checkbox({
 				name: "recurring",
 				label: "This task repeats when completed",
@@ -265,27 +387,32 @@ export class DueDate {
 			}),
 		};
 
+		this.toggles = toggles;
 		choices.append(
 			this.dueDate,
-			this.toggles.recurring,
-			this.toggles.scheduled,
-			...(this.aiEnabled ? [this.toggles.periodic] : []),
+			toggles.recurring,
+			toggles.scheduled,
+			...(this.aiEnabled ? [toggles.periodic] : []),
 		);
 	}
 
-	clearGroup(container) {
+	clearGroup(container?: HTMLDivElement | null) {
 		if (!container) return;
 
 		const group = container.dataset.role;
 		if (group === "due-date") {
 			delete this.schedule.due;
-			this.groups.dueDate.querySelector("input").value = "";
+			const input = this.groups.dueDate?.querySelector("input");
+			if (input) input.value = "";
 		} else {
 			container.remove();
-			delete this.groups[group];
-			delete this.schedule[group];
-			if (this.toggles[group]) {
-				this.toggles[group].querySelector("input").checked = false;
+			if (isRepeatGroup(group)) {
+				delete this.groups[group];
+				delete this.schedule[group];
+				const toggle = this.toggles[group]?.querySelector("input");
+				if (toggle) toggle.checked = false;
+			} else if (isScheduleGroup(group)) {
+				delete this.groups[group];
 			}
 		}
 	}
@@ -370,7 +497,6 @@ export class DueDate {
 			primitives.input({
 				name: "interval",
 				type: "number",
-				min: "1",
 				value: this.schedule.recurring?.interval || "1",
 			}),
 		);
@@ -519,16 +645,14 @@ export class DueDate {
 	}
 
 	_createWeeklySchedule() {
-		const weeklyOptions = this.groups.scheduled.appendChild(
-			primitives.div({
-				style: STYLES.checkbox.grid,
-				role: "weekly",
-				data: {
-					visible:
-						this.schedule.scheduled?.mode === "weekly" ? "true" : "false",
-				},
-			}),
-		);
+		const weeklyOptions = primitives.div({
+			style: STYLES.checkbox.grid,
+			role: "weekly",
+			data: {
+				visible: this.schedule.scheduled?.mode === "weekly" ? "true" : "false",
+			},
+		});
+		this.groups.scheduled?.appendChild(weeklyOptions);
 
 		const weekDays = [
 			"Monday",
@@ -554,16 +678,14 @@ export class DueDate {
 	}
 
 	_createMonthlySchedule() {
-		const monthlyOptions = this.groups.scheduled.appendChild(
-			primitives.div({
-				style: "flex flex-col gap-2",
-				role: "monthly",
-				data: {
-					visible:
-						this.schedule.scheduled?.mode === "monthly" ? "true" : "false",
-				},
-			}),
-		);
+		const monthlyOptions = primitives.div({
+			style: "flex flex-col gap-2",
+			role: "monthly",
+			data: {
+				visible: this.schedule.scheduled?.mode === "monthly" ? "true" : "false",
+			},
+		});
+		this.groups.scheduled?.appendChild(monthlyOptions);
 
 		monthlyOptions.appendChild(
 			primitives.input({
@@ -582,16 +704,14 @@ export class DueDate {
 	}
 
 	_createYearlySchedule() {
-		const yearlyOptions = this.groups.scheduled.appendChild(
-			primitives.div({
-				style: "flex flex-col gap-2",
-				role: "yearly",
-				data: {
-					visible:
-						this.schedule.scheduled?.mode === "yearly" ? "true" : "false",
-				},
-			}),
-		);
+		const yearlyOptions = primitives.div({
+			style: "flex flex-col gap-2",
+			role: "yearly",
+			data: {
+				visible: this.schedule.scheduled?.mode === "yearly" ? "true" : "false",
+			},
+		});
+		this.groups.scheduled?.appendChild(yearlyOptions);
 
 		yearlyOptions.appendChild(
 			primitives.input({

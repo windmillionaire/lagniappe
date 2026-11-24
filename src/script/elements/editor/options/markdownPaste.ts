@@ -3,6 +3,8 @@ import { ENDPOINTS } from "../../../shared/endpoints.ts";
 import { request } from "../../../shared/request.ts";
 import { generateElementId } from "../../../shared/utilities.ts";
 import { buttons } from "../../buttons.ts";
+import type { MarkdownPasteContext } from "../extensions/paste.ts";
+import type { Toolbar } from "../toolbar.ts";
 
 /**
  * Own the nonmodal decision and asynchronous replacement for one pasted
@@ -10,7 +12,23 @@ import { buttons } from "../../buttons.ts";
  *
  */
 export class MarkdownPastePrompt {
-	constructor(toolbar) {
+	declare toolbar: Toolbar;
+	declare editor: Toolbar["editor"];
+	declare applying: boolean;
+	declare requestGeneration: number;
+	declare confirm: MarkdownPastePrompt["open"];
+	declare submit: MarkdownPastePrompt["_submit"];
+	declare keydown: MarkdownPastePrompt["_keydown"];
+	declare transaction: MarkdownPastePrompt["_transaction"];
+	declare current: { rangeKey: string; submittedText: string | null } | null;
+	declare requestController: AbortController | null;
+	declare target: HTMLFormElement;
+	declare status: HTMLParagraphElement;
+	declare convertAction: ReturnType<typeof buttons.active>;
+	declare keepButton: HTMLButtonElement;
+	declare editorElement: HTMLElement;
+
+	constructor(toolbar: Toolbar) {
 		this.toolbar = toolbar;
 		this.editor = toolbar.editor;
 		this.current = null;
@@ -91,7 +109,7 @@ export class MarkdownPastePrompt {
 		return { range, node, text: node.textContent };
 	}
 
-	open({ rangeKey }) {
+	open({ rangeKey }: Pick<MarkdownPasteContext, "rangeKey">) {
 		if (typeof rangeKey !== "string" || !rangeKey) return;
 		if (this.current) this._close({ clearRange: true });
 		this.current = { rangeKey, submittedText: null };
@@ -104,17 +122,17 @@ export class MarkdownPastePrompt {
 		this.target.dataset.active = "true";
 	}
 
-	_submit(event) {
+	_submit(event: SubmitEvent) {
 		event.preventDefault();
 		event.stopPropagation();
-		if (event.submitter?.dataset.action === "keep") {
+		if ((event.submitter as HTMLElement | null)?.dataset.action === "keep") {
 			this._close({ clearRange: true });
 			return;
 		}
 		void this._convert();
 	}
 
-	_keydown(event) {
+	_keydown(event: KeyboardEvent) {
 		if (event.key !== "Escape" || !this.current) return;
 		event.preventDefault();
 		event.stopPropagation();
@@ -136,7 +154,7 @@ export class MarkdownPastePrompt {
 
 	async _convert() {
 		const source = this._source();
-		if (!source || this.requestController) return;
+		if (!source || !this.current || this.requestController) return;
 		if (!source.text) {
 			this._setStatus("There is no source text to convert.");
 			return;
@@ -149,7 +167,7 @@ export class MarkdownPastePrompt {
 		this._setStatus("");
 		this.convertAction.activate();
 
-		const response = await request.post(
+		const response = await request.post<{ markup: string }>(
 			ENDPOINTS.markdown,
 			{ markdown: source.text },
 			{ signal: this.requestController.signal },
@@ -200,11 +218,11 @@ export class MarkdownPastePrompt {
 		this.convertAction.deactivate("Convert");
 	}
 
-	_setStatus(message) {
+	_setStatus(message: string) {
 		this.status.textContent = message;
 	}
 
-	_close({ clearRange }) {
+	_close({ clearRange }: { clearRange: boolean }) {
 		const rangeKey = this.current?.rangeKey;
 		this.current = null;
 		this._abortRequest();

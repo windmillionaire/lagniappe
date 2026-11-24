@@ -14,13 +14,20 @@ const WIDTH_WAIT_FRAMES = 8;
 const RANGE_CHUNK_SIZE = 1024 * 1024;
 
 class PDFRangeTransport extends pdfjs.PDFDataRangeTransport {
-	constructor({ url, length, filename }) {
+	declare url: string;
+	declare controllers: Set<AbortController>;
+
+	constructor({
+		url,
+		length,
+		filename,
+	}: { url: string; length: number; filename?: string }) {
 		super(length, null, true, filename);
 		this.url = url;
 		this.controllers = new Set();
 	}
 
-	requestDataRange(begin, end) {
+	requestDataRange(begin: number, end: number) {
 		const controller = new AbortController();
 		this.controllers.add(controller);
 		fetch(this.url, {
@@ -35,8 +42,8 @@ class PDFRangeTransport extends pdfjs.PDFDataRangeTransport {
 				}
 				this.onDataRange(begin, new Uint8Array(await response.arrayBuffer()));
 			})
-			.catch((error) => {
-				if (error.name !== "AbortError") {
+			.catch((error: unknown) => {
+				if (!(error instanceof DOMException && error.name === "AbortError")) {
 					console.error("Unable to load PDF range", error);
 				}
 			})
@@ -53,8 +60,42 @@ class PDFRangeTransport extends pdfjs.PDFDataRangeTransport {
 	}
 }
 
+interface PDFPreviewAttributes {
+	target: HTMLElement;
+	visible?: boolean;
+}
+
+interface PDFPreviewPage {
+	canvas: HTMLCanvasElement;
+	page: pdfjs.PDFPageProxy | null;
+	renderedWidth: number;
+	viewport: pdfjs.PageViewport;
+	wrapper: HTMLDivElement;
+}
+
+type PDFRenderResult = undefined | null;
+
 export class PDFPreview {
-	constructor(attributes) {
+	declare target: HTMLElement;
+	declare visible?: boolean;
+	declare _started: boolean;
+	declare _pdf: pdfjs.PDFDocumentProxy | null;
+	declare _pages: Map<number, PDFPreviewPage>;
+	declare _intersections: Map<number, IntersectionObserverEntry>;
+	declare _rendering: Map<number, Promise<PDFRenderResult>>;
+	declare _resizeTimer: ReturnType<typeof setTimeout> | null;
+	declare _loadRetryTimer: ReturnType<typeof setTimeout> | null;
+	declare _loadRetryResolve: (() => void) | null;
+	declare _renderObserver: IntersectionObserver | null;
+	declare _activeObserver: IntersectionObserver | null;
+	declare _resizeObserver: ResizeObserver | null;
+	declare _loadingTask: pdfjs.PDFDocumentLoadingTask | null;
+	declare _renderQueue: Promise<PDFRenderResult>;
+	declare _currentPage: number;
+	declare _numPages: number;
+	declare _destroyed: boolean;
+
+	constructor(attributes: PDFPreviewAttributes) {
 		Object.assign(this, attributes);
 		this._started = false;
 		this._pdf = null;
@@ -68,7 +109,7 @@ export class PDFPreview {
 		this._activeObserver = null;
 		this._resizeObserver = null;
 		this._loadingTask = null;
-		this._renderQueue = Promise.resolve();
+		this._renderQueue = Promise.resolve(undefined);
 		this._currentPage = 1;
 		this._numPages = 0;
 		this._destroyed = false;
@@ -87,31 +128,36 @@ export class PDFPreview {
 	}
 
 	get workerSrc() {
-		return document.querySelector("meta[name='pdf-worker-src']")?.content;
+		return document.querySelector<HTMLMetaElement>(
+			"meta[name='pdf-worker-src']",
+		)?.content;
 	}
 
 	get wasmUrl() {
-		return document.querySelector("meta[name='pdf-wasm-url']")?.content;
+		return document.querySelector<HTMLMetaElement>("meta[name='pdf-wasm-url']")
+			?.content;
 	}
 
 	get status() {
-		return this.target.querySelector("[data-role='pdf-status']");
+		return this.target.querySelector<HTMLElement>("[data-role='pdf-status']");
 	}
 
 	get pages() {
-		return this.target.querySelector("[data-role='pdf-pages']");
+		return this.target.querySelector<HTMLElement>("[data-role='pdf-pages']");
 	}
 
 	get fallback() {
-		return this.target.querySelector("[data-role='pdf-fallback']");
+		return this.target.querySelector<HTMLElement>("[data-role='pdf-fallback']");
 	}
 
 	get toolbar() {
-		return this.target.querySelector("[data-role='toolbar']");
+		return this.target.querySelector<HTMLElement>("[data-role='toolbar']");
 	}
 
 	get pageInput() {
-		return this.target.querySelector("[data-role='pdf-page-input']");
+		return this.target.querySelector<HTMLInputElement>(
+			"[data-role='pdf-page-input']",
+		);
 	}
 
 	get pageCount() {
@@ -119,15 +165,21 @@ export class PDFPreview {
 	}
 
 	get previousButton() {
-		return this.target.querySelector("[data-action='previous-page']");
+		return this.target.querySelector<HTMLButtonElement>(
+			"[data-action='previous-page']",
+		);
 	}
 
 	get nextButton() {
-		return this.target.querySelector("[data-action='next-page']");
+		return this.target.querySelector<HTMLButtonElement>(
+			"[data-action='next-page']",
+		);
 	}
 
 	get fullscreenButton() {
-		return this.target.querySelector("[data-action='toggle-fullscreen']");
+		return this.target.querySelector<HTMLButtonElement>(
+			"[data-action='toggle-fullscreen']",
+		);
 	}
 
 	init() {
@@ -151,7 +203,7 @@ export class PDFPreview {
 		void this._renderPreview();
 	}
 
-	_setStatus(text) {
+	_setStatus(text: string) {
 		const status = this.status;
 		if (!status) return;
 
@@ -208,7 +260,12 @@ export class PDFPreview {
 		this.target.prepend(toolbar);
 	}
 
-	_toolbarButton(action, icon, title, { pressed = null } = {}) {
+	_toolbarButton(
+		action: string,
+		icon: string,
+		title: string,
+		{ pressed = null }: { pressed?: boolean | null } = {},
+	) {
 		const button = document.createElement("button");
 		button.type = "button";
 		button.dataset.action = action;
@@ -220,7 +277,7 @@ export class PDFPreview {
 		return button;
 	}
 
-	_setButtonIcon(button, icon) {
+	_setButtonIcon(button: HTMLButtonElement, icon: string) {
 		const iconElement = document.createElement("span");
 		setIcon(iconElement, icon);
 		button.replaceChildren(iconElement);
@@ -271,7 +328,7 @@ export class PDFPreview {
 	}
 
 	async _loadDocument() {
-		let lastError = null;
+		let lastError: unknown = null;
 
 		for (
 			let attempt = 0;
@@ -293,13 +350,22 @@ export class PDFPreview {
 	}
 
 	async _loadOptions() {
-		const options = {};
+		const url = this.url;
+		if (!url) throw new Error("PDF preview is missing its source URL");
+		const options: {
+			wasmUrl?: string;
+			url?: string;
+			range?: PDFRangeTransport;
+			rangeChunkSize?: number;
+			disableStream?: boolean;
+			disableAutoFetch?: boolean;
+		} = {};
 		if (this.wasmUrl) options.wasmUrl = this.wasmUrl;
 
-		const size = this.size || (await this._loadSize());
+		const size = this.size || (await this._loadSize(url));
 		if (size) {
 			options.range = new PDFRangeTransport({
-				url: this.url,
+				url,
 				length: size,
 				filename: this.target.dataset.filename,
 			});
@@ -309,13 +375,13 @@ export class PDFPreview {
 			return options;
 		}
 
-		options.url = this.url;
+		options.url = url;
 		options.disableStream = true;
 		return options;
 	}
 
-	async _loadSize() {
-		const response = await fetch(this.url, { method: "HEAD" });
+	async _loadSize(url: string) {
+		const response = await fetch(url, { method: "HEAD" });
 		if (!response.ok) return null;
 
 		const size = Number.parseInt(
@@ -328,8 +394,8 @@ export class PDFPreview {
 		return size;
 	}
 
-	_delay(ms) {
-		return new Promise((resolve) => {
+	_delay(ms: number) {
+		return new Promise<void>((resolve) => {
 			this._loadRetryResolve = resolve;
 			this._loadRetryTimer = setTimeout(() => {
 				this._loadRetryTimer = null;
@@ -383,7 +449,7 @@ export class PDFPreview {
 	}
 
 	_nextFrame() {
-		return new Promise((resolve) => requestAnimationFrame(resolve));
+		return new Promise<number>((resolve) => requestAnimationFrame(resolve));
 	}
 
 	_observePages() {
@@ -395,32 +461,35 @@ export class PDFPreview {
 			return;
 		}
 
-		this._renderObserver = new IntersectionObserver(
+		const renderObserver = new IntersectionObserver(
 			(entries) => {
 				entries.forEach((entry) => {
-					if (!entry.isIntersecting) return;
+					if (!entry.isIntersecting || !(entry.target instanceof HTMLElement))
+						return;
 					this._renderPage(Number(entry.target.dataset.page));
 				});
 			},
 			{ root, rootMargin: RENDER_MARGIN },
 		);
 
-		this._activeObserver = new IntersectionObserver(
+		const activeObserver = new IntersectionObserver(
 			(entries) => this._updateActivePage(entries),
 			{ root, threshold: ACTIVE_PAGE_THRESHOLDS },
 		);
 
 		this._pages.forEach((entry) => {
-			this._renderObserver.observe(entry.wrapper);
-			this._activeObserver.observe(entry.wrapper);
+			renderObserver.observe(entry.wrapper);
+			activeObserver.observe(entry.wrapper);
 		});
+		this._renderObserver = renderObserver;
+		this._activeObserver = activeObserver;
 	}
 
 	_observeResize() {
 		if (!("ResizeObserver" in window)) return;
 
 		this._resizeObserver = new ResizeObserver(() => {
-			clearTimeout(this._resizeTimer);
+			if (this._resizeTimer !== null) clearTimeout(this._resizeTimer);
 			this._resizeTimer = setTimeout(() => {
 				this._pages.forEach((entry, number) => {
 					if (!entry.renderedWidth && entry.wrapper.clientWidth) {
@@ -445,8 +514,9 @@ export class PDFPreview {
 		this._resizeObserver.observe(this.target);
 	}
 
-	_updateActivePage(entries) {
+	_updateActivePage(entries: IntersectionObserverEntry[]) {
 		entries.forEach((entry) => {
+			if (!(entry.target instanceof HTMLElement)) return;
 			const number = Number(entry.target.dataset.page);
 			if (entry.isIntersecting) {
 				this._intersections.set(number, entry);
@@ -473,8 +543,11 @@ export class PDFPreview {
 		this._setCurrentPage(activeNumber);
 	}
 
-	_onToolbarClick(event) {
-		const button = event.target.closest("button[data-action]");
+	_onToolbarClick(event: MouseEvent) {
+		const button =
+			event.target instanceof Element
+				? event.target.closest<HTMLButtonElement>("button[data-action]")
+				: null;
 		if (!button || !this.target.contains(button) || button.disabled) return;
 
 		const action = button.dataset.action;
@@ -487,13 +560,21 @@ export class PDFPreview {
 		}
 	}
 
-	_onToolbarChange(event) {
-		if (!event.target.matches("[data-role='pdf-page-input']")) return;
+	_onToolbarChange(event: Event) {
+		if (
+			!(event.target instanceof HTMLInputElement) ||
+			!event.target.matches("[data-role='pdf-page-input']")
+		)
+			return;
 		this._goToPage(event.target.value);
 	}
 
-	_onToolbarKeydown(event) {
-		if (!event.target.matches("[data-role='pdf-page-input']")) return;
+	_onToolbarKeydown(event: KeyboardEvent) {
+		if (
+			!(event.target instanceof HTMLInputElement) ||
+			!event.target.matches("[data-role='pdf-page-input']")
+		)
+			return;
 
 		if (event.key === "Enter") {
 			event.preventDefault();
@@ -505,7 +586,7 @@ export class PDFPreview {
 		}
 	}
 
-	async _goToPage(value) {
+	async _goToPage(value: string | number) {
 		const number = this._clampPage(value);
 		if (!number) {
 			this._setCurrentPage(this._currentPage);
@@ -517,7 +598,7 @@ export class PDFPreview {
 		await this._renderPage(number);
 	}
 
-	_scrollPageIntoView(number) {
+	_scrollPageIntoView(number: number) {
 		const pages = this.pages;
 		const wrapper = this._pages.get(number)?.wrapper;
 		if (!pages || !wrapper) return;
@@ -533,13 +614,13 @@ export class PDFPreview {
 		}
 	}
 
-	_clampPage(value) {
-		const number = Number.parseInt(value, 10);
+	_clampPage(value: string | number) {
+		const number = Number.parseInt(String(value), 10);
 		if (!Number.isFinite(number) || number < 1 || !this._numPages) return null;
 		return Math.min(number, this._numPages);
 	}
 
-	_setCurrentPage(number) {
+	_setCurrentPage(number: number) {
 		const next = this._clampPage(number) ?? 1;
 		this._currentPage = next;
 		this._updateToolbar();
@@ -589,11 +670,15 @@ export class PDFPreview {
 		this._setButtonIcon(button, active ? "minimize" : "maximize");
 	}
 
-	async _renderPage(number, { force = false } = {}) {
+	async _renderPage(
+		number: number,
+		{ force = false } = {},
+	): Promise<PDFRenderResult> {
 		const entry = this._pages.get(number);
 		if (!entry) return null;
 		if (!force && entry.renderedWidth) return null;
-		if (this._rendering.has(number)) return this._rendering.get(number);
+		const pending = this._rendering.get(number);
+		if (pending) return pending;
 
 		const render = this._renderQueue.then(() => {
 			return this._renderPageTask(number, entry, force);
@@ -612,8 +697,13 @@ export class PDFPreview {
 		return task;
 	}
 
-	async _renderPageTask(number, entry, force) {
-		await this._loadPage(number, entry);
+	async _renderPageTask(
+		number: number,
+		entry: PDFPreviewPage,
+		force: boolean,
+	): Promise<undefined> {
+		const page = await this._loadPage(number, entry);
+		if (!page) return;
 
 		const cssWidth = await this._renderWidth(entry);
 		const context = entry.canvas.getContext("2d");
@@ -629,7 +719,7 @@ export class PDFPreview {
 			window.devicePixelRatio || 1,
 			MAX_DEVICE_SCALE,
 		);
-		const renderViewport = entry.page.getViewport({
+		const renderViewport = page.getViewport({
 			scale: scale * deviceScale,
 		});
 
@@ -637,7 +727,8 @@ export class PDFPreview {
 		entry.canvas.height = Math.floor(renderViewport.height);
 		entry.wrapper.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
 
-		await entry.page.render({
+		await page.render({
+			canvas: null,
 			canvasContext: context,
 			viewport: renderViewport,
 		}).promise;
@@ -647,7 +738,7 @@ export class PDFPreview {
 		if (number === 1) this._setStatus("");
 	}
 
-	async _renderWidth(entry) {
+	async _renderWidth(entry: PDFPreviewPage) {
 		for (let attempt = 0; attempt < WIDTH_WAIT_FRAMES; attempt += 1) {
 			const width = entry.wrapper.clientWidth || this.target.clientWidth;
 			if (width) return width;
@@ -656,19 +747,21 @@ export class PDFPreview {
 		return entry.wrapper.clientWidth || this.target.clientWidth;
 	}
 
-	async _loadPage(number, entry) {
-		if (entry.page) return;
+	async _loadPage(number: number, entry: PDFPreviewPage) {
+		if (entry.page) return entry.page;
+		if (!this._pdf) return null;
 
 		entry.page = await this._pdf.getPage(number);
 		entry.viewport = entry.page.getViewport({ scale: 1 });
 		entry.wrapper.style.aspectRatio = `${entry.viewport.width} / ${entry.viewport.height}`;
 		entry.wrapper.dataset.loaded = "true";
+		return entry.page;
 	}
 
 	destroy() {
 		this._destroyed = true;
-		clearTimeout(this._resizeTimer);
-		clearTimeout(this._loadRetryTimer);
+		if (this._resizeTimer !== null) clearTimeout(this._resizeTimer);
+		if (this._loadRetryTimer !== null) clearTimeout(this._loadRetryTimer);
 		this._loadRetryResolve?.();
 		this._loadRetryTimer = null;
 		this._loadRetryResolve = null;
@@ -678,7 +771,6 @@ export class PDFPreview {
 		this._renderObserver?.disconnect();
 		this._activeObserver?.disconnect();
 		this._resizeObserver?.disconnect();
-		this._loadingTask?.destroy?.();
-		this._pdf?.destroy?.();
+		void this._loadingTask?.destroy?.();
 	}
 }

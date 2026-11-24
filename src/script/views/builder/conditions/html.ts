@@ -1,9 +1,13 @@
 import { ENDPOINTS } from "../../../shared/endpoints.ts";
+import type FormBuilder from "../builder.ts";
 import { DraftDocument } from "../draftDocument.ts";
 import { Condition } from "./base.ts";
 
 export default class HtmlEditor extends Condition {
-	constructor(builder) {
+	declare endpoints: ReturnType<typeof ENDPOINTS.html>;
+	declare kind: "form";
+	declare _initialized: boolean;
+	constructor(builder: FormBuilder) {
 		super(builder);
 		this.expand = true;
 		this.endpoints = ENDPOINTS.html(builder.key, this.element.schema.id);

@@ -1,18 +1,32 @@
 import { STYLES } from "../generated/styles.mjs";
-import { BaseElement } from "./base/baseElement.ts";
+import {
+	BaseElement,
+	type ElementRenderer,
+	type ElementSchema,
+} from "./base/baseElement.ts";
 import { primitives } from "./primitives.ts";
 
 export class StatusElement extends BaseElement {
-	constructor(renderer, schema, submission) {
+	declare messageElement: HTMLSpanElement | null;
+	declare statusInput: HTMLInputElement | null;
+
+	constructor(
+		renderer: ElementRenderer,
+		schema: ElementSchema,
+		submission?: unknown,
+	) {
 		super(renderer, schema, submission);
 		this.messageElement = null;
 		this.statusInput = null;
 		this.static = true;
 	}
 
-	update() {
-		const messages = [];
-		const activeElementIds = [];
+	update(): undefined {
+		const elt = this.elt;
+		const { messageElement, statusInput } = this;
+		if (!elt || !messageElement || !statusInput) return;
+		const messages: string[] = [];
+		const activeElementIds: string[] = [];
 		const statuses = Array.isArray(this.schema.status)
 			? this.schema.status
 			: [];
@@ -20,29 +34,28 @@ export class StatusElement extends BaseElement {
 		statuses.forEach((status) => {
 			if (!status?.id || !status.text) return;
 
-			const element = this.renderer.elements.get(
+			const element = this.renderer.elements?.get(
 				`${status.id}-${this.renderer.id}`,
 			);
 			if (!element) return;
 
-			if (element.active(status.value)) {
+			if (element.active?.(status.value)) {
 				messages.push(status.text);
 				activeElementIds.push(element.schema.id);
 			}
 		});
 
-		this.messageElement.replaceChildren();
+		messageElement.replaceChildren();
 		if (messages.length > 0) {
 			messages.forEach((message, index) => {
-				if (index > 0)
-					this.messageElement.appendChild(document.createElement("br"));
-				this.messageElement.appendChild(document.createTextNode(message));
+				if (index > 0) messageElement.appendChild(document.createElement("br"));
+				messageElement.appendChild(document.createTextNode(message));
 			});
-			this.elt.dataset.visible = "true";
-			this.statusInput.value = JSON.stringify(activeElementIds);
+			elt.dataset.visible = "true";
+			statusInput.value = JSON.stringify(activeElementIds);
 		} else {
-			this.elt.dataset.visible = "false";
-			this.statusInput.value = null;
+			elt.dataset.visible = "false";
+			statusInput.value = "";
 		}
 	}
 

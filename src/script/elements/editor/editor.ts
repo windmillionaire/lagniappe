@@ -1,4 +1,4 @@
-import { Editor } from "@tiptap/core";
+import { type Content, Editor } from "@tiptap/core";
 import { Collaboration } from "@tiptap/extension-collaboration";
 import { FontFamily } from "@tiptap/extension-font-family";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
@@ -10,6 +10,7 @@ import { Color, TextStyle } from "@tiptap/extension-text-style";
 import { Typography } from "@tiptap/extension-typography";
 import { Youtube } from "@tiptap/extension-youtube";
 import { StarterKit } from "@tiptap/starter-kit";
+import type { Doc } from "yjs";
 import { STYLES } from "../../generated/styles.mjs";
 import {
 	CustomImage,
@@ -23,11 +24,14 @@ import {
 	TrackedRanges,
 } from "./extensions/index.ts";
 
-const focusEditorOnSurfacePointerDown = (editor, target) => {
-	const focusEditor = (event) => {
+const focusEditorOnSurfacePointerDown = (
+	editor: Editor,
+	target: HTMLElement,
+) => {
+	const focusEditor = (event: PointerEvent) => {
 		if (event.defaultPrevented || event.button !== 0) return;
 		if (!editor.isEditable || editor.isDestroyed || !editor.view?.dom) return;
-		if (editor.view.dom.contains(event.target)) return;
+		if (editor.view.dom.contains(event.target as Node | null)) return;
 
 		event.preventDefault();
 		editor.commands.focus();
@@ -88,11 +92,15 @@ const createEditingExtensions = () => [
 	TabCharacter,
 ];
 
-export const collaborativeEditor = (target, ydoc, editable = true) => {
+export const collaborativeEditor = (
+	target: HTMLElement,
+	ydoc: Doc,
+	editable = true,
+) => {
 	const extensions = [
 		StarterKit.configure({
 			link: false,
-			underline: true,
+			underline: {},
 			undoRedo: false,
 		}),
 		...createFormattingExtensions(),
@@ -121,11 +129,14 @@ export const collaborativeEditor = (target, ydoc, editable = true) => {
 	return editor;
 };
 
-export const independentEditor = (target, content = "") => {
+export const independentEditor = (
+	target: HTMLElement,
+	content: Content = "",
+) => {
 	const extensions = [
 		StarterKit.configure({
 			link: false,
-			underline: true,
+			underline: {},
 		}),
 		...createFormattingExtensions(),
 		...createEditingExtensions(),
@@ -144,14 +155,14 @@ export const independentEditor = (target, content = "") => {
 	return editor;
 };
 
-export const previewEditor = (target, content) =>
+export const previewEditor = (target: HTMLElement, content: Content) =>
 	new Editor({
 		element: target,
 		injectCSS: false,
 		editable: false,
 		content,
 		extensions: [
-			StarterKit.configure({ link: false, underline: true, undoRedo: false }),
+			StarterKit.configure({ link: false, underline: {}, undoRedo: false }),
 			...createFormattingExtensions(),
 			LagniappeMention,
 		],

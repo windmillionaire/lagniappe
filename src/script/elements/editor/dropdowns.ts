@@ -1,8 +1,9 @@
 import { STYLES } from "../../generated/styles.mjs";
 import { setIcon } from "../../shared/icons.ts";
 import { Dropdown } from "../combobox/dropdown.ts";
+import type { ToolbarOption } from "./toolbar.ts";
 
-export const createMenuButton = (settings) => {
+export const createMenuButton = (settings: { title: string; icon: string }) => {
 	const button = document.createElement("button");
 	button.title = settings.title;
 	button.type = "button";
@@ -17,7 +18,11 @@ export const createMenuButton = (settings) => {
 	return button;
 };
 
-export const toolbarDropdown = (menu, items, beforeOpen) => {
+export const toolbarDropdown = (
+	menu: { title: string; icon: string },
+	items: ToolbarOption[],
+	beforeOpen?: () => void | Promise<void>,
+) => {
 	const menuButton = createMenuButton(menu);
 
 	const dropdown = new Dropdown(menuButton);

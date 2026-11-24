@@ -3,13 +3,17 @@ import {
 	EmailCheckForm,
 	FirstTimeSetupForm,
 	ForgotPasswordForm,
+	type LoginForms,
 	OwnerSetupForm,
 	ResetPasswordForm,
 	SignInForm,
 	setLoginActionButton,
 	VerifyEmailForm,
 } from "./login/forms.ts";
-import { IdentityPlatformClient } from "./login/identity.ts";
+import {
+	IdentityPlatformClient,
+	type IdentityPlatformConfig,
+} from "./login/identity.ts";
 import { initializeLogoutForms } from "./shared/logout.ts";
 import { request } from "./shared/request.ts";
 import { withTransition } from "./shared/transitions.ts";
@@ -34,10 +38,13 @@ function initializeAgentLoginForms(root = document) {
 		const submitter = event.submitter;
 		const submitText =
 			submitter?.querySelector("[data-role='text']")?.textContent ||
-			submitter?.textContent.trim();
+			submitter?.textContent?.trim();
 		const error = form.querySelector("[data-role='error']");
 		error?.classList.add("hidden");
-		if (submitter && "disabled" in submitter) {
+		if (
+			submitter instanceof HTMLButtonElement ||
+			submitter instanceof HTMLInputElement
+		) {
 			submitter.disabled = true;
 			setLoginActionButton(submitter, "Signing In", "spinner");
 		}
@@ -53,7 +60,10 @@ function initializeAgentLoginForms(root = document) {
 			error.classList.remove("hidden");
 		}
 		form.dataset.submitting = "false";
-		if (submitter && "disabled" in submitter) {
+		if (
+			submitter instanceof HTMLButtonElement ||
+			submitter instanceof HTMLInputElement
+		) {
 			submitter.disabled = false;
 			setLoginActionButton(submitter, submitText);
 		}
@@ -76,7 +86,7 @@ function initializeOAuthForms(root = document) {
 		}
 		form.dataset.submitting = "true";
 		const button = event.submitter;
-		if (!button) return;
+		if (!(button instanceof HTMLElement)) return;
 		button.dataset.idleText =
 			button.querySelector("[data-role='text']")?.textContent ||
 			button.textContent.trim();
@@ -87,9 +97,13 @@ function initializeOAuthForms(root = document) {
 		// here would omit the Allow/Cancel decision from the actual POST.
 	});
 	window.addEventListener("pageshow", () => {
-		for (const form of root.querySelectorAll("form[data-oauth-form]")) {
+		for (const form of root.querySelectorAll<HTMLFormElement>(
+			"form[data-oauth-form]",
+		)) {
 			delete form.dataset.submitting;
-			for (const button of form.querySelectorAll("button[data-idle-text]")) {
+			for (const button of form.querySelectorAll<HTMLButtonElement>(
+				"button[data-idle-text]",
+			)) {
 				setLoginActionButton(button, button.dataset.idleText);
 				button.removeAttribute("aria-busy");
 				button.removeAttribute("aria-disabled");
@@ -103,12 +117,18 @@ initializeOAuthForms();
 async function initializeIdentityPlatform() {
 	try {
 		const response = await fetch("/l/identity-config");
-		const config = await response.json();
+		const config: IdentityPlatformConfig | null = await response.json();
 		return new IdentityPlatformClient(config);
 	} catch (error) {
 		console.error("Failed to initialize Identity Platform:", error);
 		throw error;
 	}
+}
+
+function loginFormElement(id: string): HTMLElement {
+	const form = document.getElementById(id);
+	if (!form) throw new Error(`Missing login form: ${id}`);
+	return form;
 }
 
 if (document.getElementById("emailCheck")) {
@@ -120,7 +140,16 @@ if (document.getElementById("emailCheck")) {
 	const mode = document.body.getAttribute("data-mode");
 	const code = document.body.getAttribute("data-code");
 
-	const forms = {};
+	const forms: Partial<{
+		resetPassword: ResetPasswordForm;
+		verifyEmail: VerifyEmailForm;
+		ownerSetup: OwnerSetupForm;
+		authMethod: AuthMethodForm;
+		signIn: SignInForm;
+		emailCheck: EmailCheckForm;
+		firstTimeSetup: FirstTimeSetupForm;
+		forgotPassword: ForgotPasswordForm;
+	}> = {};
 
 	const rememberPreference = () => {
 		const cookie = document.cookie
@@ -132,19 +161,21 @@ if (document.getElementById("emailCheck")) {
 
 	const syncRememberInputs = () => {
 		const remember = rememberPreference();
-		document.querySelectorAll("input[name='remember-me']").forEach((input) => {
-			input.checked = remember;
-		});
+		document
+			.querySelectorAll<HTMLInputElement>("input[name='remember-me']")
+			.forEach((input) => {
+				input.checked = remember;
+			});
 	};
 
-	const setRememberPreference = (remember) => {
+	const setRememberPreference = (remember: boolean) => {
 		const secure = window.location.protocol === "https:" ? "; Secure" : "";
 		// biome-ignore lint/suspicious/noDocumentCookie: this stores a non-sensitive UI preference for Google redirect login.
 		document.cookie = `${REMEMBER_COOKIE_NAME}=${remember ? "1" : "0"}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
 		syncRememberInputs();
 	};
 
-	const showForm = (form) => {
+	const showForm = (form: LoginForms) => {
 		withTransition(() => {
 			Object.values(forms).forEach((form) => {
 				if (form) form.hide();
@@ -155,22 +186,22 @@ if (document.getElementById("emailCheck")) {
 	};
 
 	if (mode === "resetPassword") {
-		const resetPasswordForm = document.getElementById("resetPassword");
+		const resetPasswordForm = loginFormElement("resetPassword");
 		forms.resetPassword = new ResetPasswordForm(auth, resetPasswordForm);
 		forms.resetPassword.data.code = code;
 		showForm(forms.resetPassword);
 	} else if (mode === "verifyEmail") {
-		const verifyEmailForm = document.getElementById("verifyEmail");
+		const verifyEmailForm = loginFormElement("verifyEmail");
 		forms.verifyEmail = new VerifyEmailForm(auth, verifyEmailForm);
 		forms.verifyEmail.data.code = code;
 		showForm(forms.verifyEmail);
 	} else if (ownerSetup) {
-		const ownerSetupForm = document.getElementById("ownerSetup");
+		const ownerSetupForm = loginFormElement("ownerSetup");
 		forms.ownerSetup = new OwnerSetupForm(auth, ownerSetupForm);
 		forms.ownerSetup.data = { email: ownerEmail, error: authError };
 		showForm(forms.ownerSetup);
 	} else {
-		const authMethodForm = document.getElementById("authMethod");
+		const authMethodForm = loginFormElement("authMethod");
 		forms.authMethod = new AuthMethodForm(auth, authMethodForm);
 		forms.authMethod.data = { error: authError };
 		showForm(forms.authMethod);
@@ -178,7 +209,7 @@ if (document.getElementById("emailCheck")) {
 
 	document.addEventListener("login:show-auth-method", () => {
 		if (!forms.authMethod) {
-			const formElt = document.getElementById("authMethod");
+			const formElt = loginFormElement("authMethod");
 			forms.authMethod = new AuthMethodForm(auth, formElt);
 		}
 		forms.authMethod.data = {};
@@ -187,7 +218,7 @@ if (document.getElementById("emailCheck")) {
 
 	document.addEventListener("login:show-signin", (event) => {
 		if (!forms.signIn) {
-			const formElt = document.getElementById("signIn");
+			const formElt = loginFormElement("signIn");
 			forms.signIn = new SignInForm(auth, formElt);
 		}
 		forms.signIn.data = { ...event.detail };
@@ -196,7 +227,7 @@ if (document.getElementById("emailCheck")) {
 
 	document.addEventListener("login:show-email-check", () => {
 		if (!forms.emailCheck) {
-			const formElt = document.getElementById("emailCheck");
+			const formElt = loginFormElement("emailCheck");
 			forms.emailCheck = new EmailCheckForm(auth, formElt);
 		}
 		showForm(forms.emailCheck);
@@ -204,7 +235,7 @@ if (document.getElementById("emailCheck")) {
 
 	document.addEventListener("login:show-first-time-setup", (event) => {
 		if (!forms.firstTimeSetup) {
-			const formElt = document.getElementById("firstTimeSetup");
+			const formElt = loginFormElement("firstTimeSetup");
 			forms.firstTimeSetup = new FirstTimeSetupForm(auth, formElt);
 		}
 		const form = forms.firstTimeSetup;
@@ -214,7 +245,7 @@ if (document.getElementById("emailCheck")) {
 
 	document.addEventListener("login:show-forgot-form", (event) => {
 		if (!forms.forgotPassword) {
-			const formElt = document.getElementById("forgotPassword");
+			const formElt = loginFormElement("forgotPassword");
 			forms.forgotPassword = new ForgotPasswordForm(auth, formElt);
 		}
 		const form = forms.forgotPassword;
@@ -223,8 +254,12 @@ if (document.getElementById("emailCheck")) {
 	});
 
 	document.addEventListener("change", (event) => {
-		if (event.target.matches("input[name='remember-me']")) {
-			setRememberPreference(event.target.checked);
+		const input = event.target;
+		if (
+			input instanceof HTMLInputElement &&
+			input.matches("input[name='remember-me']")
+		) {
+			setRememberPreference(input.checked);
 		}
 	});
 }

@@ -1,4 +1,5 @@
 import { SearchBox } from "../../elements/combobox/search.ts";
+import type { IndependentDocument } from "../../elements/editor/independent.ts";
 import { EntityMenu } from "../../elements/entityMenu.ts";
 import { directUpload } from "../../shared/directUpload.ts";
 import {
@@ -11,8 +12,11 @@ import {
 	request,
 } from "../../shared/index.ts";
 import { withTransition } from "../../shared/transitions.ts";
+import type { FormFieldSchema, FormSchema } from "../../types/forms.d.ts";
 import { FormChangeStatus } from "./changeStatus.ts";
+import type { Condition } from "./conditions/base.ts";
 import { loadCondition } from "./conditions/loader.ts";
+import type { ConditionName } from "./config.ts";
 import { BuilderDraft } from "./draft.ts";
 import { fieldKind, needsMigration, repairConditions } from "./migrations.ts";
 import { ComponentsPanel } from "./panels/components.ts";
@@ -22,8 +26,84 @@ import { FormSettings } from "./panels/formSettings.ts";
 import { Header } from "./panels/header.ts";
 import { ModelElement, ModelPanel } from "./panels/model.ts";
 
+import type {
+	ConversionCatalog,
+	DraftAttempt,
+	DraftBootstrap,
+	DraftCopyResponse,
+	DraftState,
+	PendingChange,
+} from "./types.ts";
+
+interface DraftImageUpload {
+	token: string;
+	input_name: string;
+	filename: string;
+	content_type: string;
+	size: number;
+	generation?: string | number;
+	path?: string;
+}
+
+interface DraftImage {
+	file: File;
+	fieldId: string;
+	url: string;
+	uploads: Map<string, DraftImageUpload>;
+}
+
+export interface BuilderElement {
+	item: HTMLElement;
+	schema: FormFieldSchema;
+	settings: HTMLElement[];
+	conditions?: Partial<Record<ConditionName, Condition>>;
+	destroy?(): void;
+}
+
+interface BuilderSyncOptions {
+	hidden?: boolean;
+	blurred?: boolean;
+	blurredAt?: number | null;
+}
+
 class FormBuilder {
-	constructor(node) {
+	declare elt: HTMLElement & { _lp_view?: FormBuilder };
+	declare _destroyed: boolean;
+	declare elements: Map<string, BuilderElement>;
+	declare _independentDocuments: Set<IndependentDocument>;
+	declare images: Map<string, DraftImage>;
+	declare _restoringDraft: boolean;
+	declare bootstrap: DraftBootstrap | null;
+	declare htmlFields: Record<string, string>;
+	declare conversionInstructions: Record<string, string>;
+	declare conversionCatalog: ConversionCatalog | null;
+	declare draft: BuilderDraft | null;
+	declare selectedElement: BuilderElement | null | undefined;
+	declare schemaElt: HTMLInputElement;
+	declare key: string;
+	declare offlineIndicator: HTMLElement | null;
+	declare online: boolean;
+	declare hidden: boolean;
+	declare blurred: boolean;
+	declare blurredAt: number | null;
+	declare EntityMenu: EntityMenu;
+	declare SearchBox: SearchBox | null;
+	declare offlineModal: OfflineModal | null;
+	declare _searchPromise: Promise<SearchBox | null> | null;
+	declare changeStatus?: FormChangeStatus;
+	declare pendingChange?: PendingChange | null;
+	declare _copyAttempt?: DraftAttempt | null;
+	declare components: ComponentsPanel;
+	declare model: ModelPanel;
+	declare settings: ElementSettings;
+	declare conditions: ConditionPanel;
+	declare header: Header;
+	declare formSettings: FormSettings;
+	declare click: (event: MouseEvent) => void;
+	declare keydown: (event: KeyboardEvent) => void;
+	declare beforeUnload: (event: BeforeUnloadEvent) => void;
+
+	constructor(node: HTMLElement) {
 		this._destroyed = false;
 		this.elt = node;
 		this.elements = new Map();
@@ -40,19 +120,22 @@ class FormBuilder {
 		this.conversionCatalog = JSON.parse(
 			document.getElementById("builder-conversions")?.textContent || "null",
 		);
-		this.draft = this.bootstrap
-			? new BuilderDraft(this.bootstrap, this.bootstrap.baseline)
-			: null;
-		if (this.draft) {
-			delete this.draft.state.baseline;
-			delete this.draft.saved.baseline;
-			delete this.draft.state.pending_change;
-			delete this.draft.saved.pending_change;
-		}
+		if (this.bootstrap) {
+			const { baseline, pending_change: _pending, ...state } = this.bootstrap;
+			this.draft = new BuilderDraft(state, baseline);
+		} else this.draft = null;
 		this.selectedElement = null;
-		this.schemaElt = document.querySelector('input[name="schema"]');
-		this.key = node.dataset.key;
-		this.offlineIndicator = document.querySelector('[data-role="offline"]');
+		const schemaElt = document.querySelector<HTMLInputElement>(
+			'input[name="schema"]',
+		);
+		if (!schemaElt) throw new Error("Missing builder schema input");
+		this.schemaElt = schemaElt;
+		const key = node.dataset.key;
+		if (!key) throw new Error("Missing builder form key");
+		this.key = key;
+		this.offlineIndicator = document.querySelector<HTMLElement>(
+			'[data-role="offline"]',
+		);
 		this.online = connectivity.online;
 		this.hidden = connectivity.hidden;
 		this.blurred = false;
@@ -110,7 +193,7 @@ class FormBuilder {
 	}
 
 	async _initSearch() {
-		const search = document.querySelector("[lp-search]");
+		const search = document.querySelector<HTMLElement>("[lp-search]");
 		if (!search || this._destroyed) return null;
 
 		const searchBox = new SearchBox(search);
@@ -127,7 +210,7 @@ class FormBuilder {
 		hidden = document.hidden,
 		blurred = false,
 		blurredAt = null,
-	} = {}) {
+	}: BuilderSyncOptions = {}) {
 		const wasOnline = this.online;
 		const wasInactive = this.hidden || !wasOnline;
 		const visibleBlur = Boolean(hidden && blurred);
@@ -139,7 +222,8 @@ class FormBuilder {
 		this.offline(!this.online);
 		const polling = this.changeStatus?.polling;
 		if (hidden || !this.online) {
-			if (visibleBlur && this.online) polling?.blur(this.blurredAt);
+			if (visibleBlur && this.online)
+				polling?.blur(this.blurredAt ?? undefined);
 			else polling?.pause();
 		}
 		// A request started before leaving may still report the job as pending.
@@ -150,16 +234,16 @@ class FormBuilder {
 		}
 	}
 
-	registerIndependentDocument(document) {
+	registerIndependentDocument<T extends IndependentDocument>(document: T) {
 		this._independentDocuments.add(document);
 		return document;
 	}
 
-	unregisterIndependentDocument(document) {
+	unregisterIndependentDocument(document: IndependentDocument) {
 		this._independentDocuments.delete(document);
 	}
 
-	async flushIndependentDocuments(options = {}) {
+	async flushIndependentDocuments(options: { keepalive?: boolean } = {}) {
 		const results = await Promise.allSettled(
 			[...this._independentDocuments].map((document) =>
 				Promise.resolve().then(() => document.flush(options)),
@@ -170,8 +254,8 @@ class FormBuilder {
 		);
 	}
 
-	offline(offline) {
-		const search = document.querySelector("[lp-search]");
+	offline(offline: boolean) {
+		const search = document.querySelector<HTMLElement>("[lp-search]");
 		if (this.offlineIndicator) {
 			this.offlineIndicator.dataset.visible = offline ? "true" : "false";
 			this.offlineIndicator.setAttribute(
@@ -199,7 +283,7 @@ class FormBuilder {
 		}
 	}
 
-	updateSchema(silent = false, group = null) {
+	updateSchema(silent = false, group: string | null = null) {
 		const schemas = Array.from(this.elements.values()).map(
 			(element) => element.schema,
 		);
@@ -219,18 +303,18 @@ class FormBuilder {
 		}
 	}
 
-	get schema() {
+	get schema(): FormSchema {
 		return Array.from(this.elements.values(), (element) =>
 			structuredClone(element.schema),
 		);
 	}
 
-	setPendingChange(change) {
+	setPendingChange(change: PendingChange | null) {
 		if (change) this.changeStatus ??= new FormChangeStatus(this);
 		this.changeStatus?.show(change);
 	}
 
-	captureDraft() {
+	captureDraft(): DraftState {
 		const instructions = Object.fromEntries(
 			Object.entries(this.conversionInstructions || {}).filter(
 				([id, value]) => {
@@ -259,25 +343,25 @@ class FormBuilder {
 		};
 	}
 
-	setHtml(fieldId, html) {
+	setHtml(fieldId: string, html: string) {
 		this.htmlFields[fieldId] = this.canonicalHtml(html);
-		if (this.draft.updateHtml(fieldId, this.htmlFields[fieldId]))
+		if (this.draft?.updateHtml(fieldId, this.htmlFields[fieldId]))
 			this.refreshDraftControls();
 	}
 
-	canonicalHtml(html) {
+	canonicalHtml(html: string) {
 		for (const [id, image] of this.images)
 			html = html.replaceAll(image.url, `draft-image:${id}`);
 		return html;
 	}
 
-	previewHtml(html) {
+	previewHtml(html: string) {
 		for (const [id, image] of this.images)
 			html = html.replaceAll(`draft-image:${id}`, image.url);
 		return html;
 	}
 
-	addDraftImage(fieldId, file) {
+	addDraftImage(fieldId: string, file: File) {
 		const id = crypto.randomUUID();
 		const url = URL.createObjectURL(file);
 		this.images.set(id, { file, fieldId, url, uploads: new Map() });
@@ -285,10 +369,12 @@ class FormBuilder {
 	}
 
 	pruneImages() {
+		const draft = this.draft;
+		if (!draft) return;
 		const states = [
-			this.draft.state,
-			...this.draft.past,
-			...this.draft.future,
+			draft.state,
+			...draft.past,
+			...draft.future,
 			this.header._saveAttempt?.state,
 			this._copyAttempt?.state,
 		];
@@ -312,11 +398,13 @@ class FormBuilder {
 		}
 	}
 
-	async draftPayload(state, route, saveId) {
+	async draftPayload(state: DraftState, route: string, saveId: string) {
+		const draft = this.draft;
+		if (!draft) throw new Error("The builder draft is unavailable");
 		const data = new FormData();
 		data.set("name", state.name);
 		data.set("schema", JSON.stringify(state.schema));
-		if (needsMigration(this.draft.saved.schema, state.schema))
+		if (needsMigration(draft.saved.schema, state.schema))
 			data.set(
 				"migration",
 				JSON.stringify({
@@ -326,7 +414,7 @@ class FormBuilder {
 				}),
 			);
 		data.set("html_fields", JSON.stringify(state.html_fields));
-		data.set("baseline", this.draft.baseline || "");
+		data.set("baseline", draft.baseline || "");
 		data.set("save_id", saveId);
 		const manifest = [];
 		const direct = [];
@@ -375,14 +463,23 @@ class FormBuilder {
 	refreshDraftControls() {
 		if (!this.draft) return;
 		this.draft.dirty ? this.header.unsaved() : this.header.saved();
-		const undo = this.elt.querySelector("[data-role='undo-draft']");
-		const redo = this.elt.querySelector("[data-role='redo-draft']");
+		const undo = this.elt.querySelector<HTMLButtonElement>(
+			"[data-role='undo-draft']",
+		);
+		const redo = this.elt.querySelector<HTMLButtonElement>(
+			"[data-role='redo-draft']",
+		);
 		if (undo) undo.disabled = !this.draft.past.length;
 		if (redo) redo.disabled = !this.draft.future.length;
 	}
 
 	restoreDraft({ preserveFocus = false } = {}) {
-		const active = document.activeElement;
+		const state = this.draft?.state;
+		if (!state) return;
+		const active = document.activeElement as
+			| HTMLInputElement
+			| HTMLTextAreaElement
+			| null;
 		const condition = this.conditions.condition;
 		const dialog =
 			preserveFocus && condition?.key
@@ -390,7 +487,7 @@ class FormBuilder {
 						key: condition.key,
 						index: condition.index,
 						fieldId: condition.element.schema.id,
-						setting: structuredClone(condition.setting),
+						setting: structuredClone(condition.setting ?? null),
 					}
 				: null;
 		const editor = this.conditions.condition?.document?.editor;
@@ -402,7 +499,7 @@ class FormBuilder {
 			preserveFocus &&
 			(this.settings.panel.contains(active) ||
 				this.conditions.panel.contains(active)) &&
-			active.name
+			active?.name
 				? {
 						name: active.name,
 						start: active.selectionStart,
@@ -412,9 +509,9 @@ class FormBuilder {
 		this._restoringDraft = true;
 		this.conditions.hide();
 		this.header.closePreview();
-		const retainedDocuments = new Map();
+		const retainedDocuments = new Map<string, Condition>();
 		this.elements.forEach((element) => {
-			const survives = this.draft.state.schema.some(
+			const survives = state.schema.some(
 				(field) => field.id === element.schema.id && field.type === "html",
 			);
 			for (const [name, condition] of Object.entries(
@@ -430,7 +527,6 @@ class FormBuilder {
 		this.model.panel.replaceChildren();
 		this.model.defaultPanel.replaceChildren();
 		this.selectedElement = null;
-		const state = this.draft.state;
 		this.htmlFields = structuredClone(state.html_fields);
 		this.conversionInstructions = structuredClone(
 			state.conversion_instructions || {},
@@ -441,23 +537,24 @@ class FormBuilder {
 		for (const field of state.schema) {
 			const item = this.createElement(structuredClone(field));
 			const documentCondition = retainedDocuments.get(field.id);
-			if (documentCondition) {
-				const element = this.elements.get(field.id);
+			const element = this.elements.get(field.id);
+			if (documentCondition && element) {
 				documentCondition.element = element;
 				element.conditions = { html: documentCondition };
 				element.destroy = () =>
-					Object.values(element.conditions).forEach((condition) => {
+					Object.values(element.conditions ?? {}).forEach((condition) => {
 						condition.destroy();
 					});
-				const editor = documentCondition.document?.editor;
+				const draftDocument = documentCondition.document;
+				const editor = draftDocument?.editor;
 				const html = this.previewHtml(state.html_fields[field.id] || "");
 				if (
+					draftDocument &&
 					editor &&
 					this.canonicalHtml(editor.getHTML()) !== state.html_fields[field.id]
 				) {
 					editor.commands.setContent(html, { emitUpdate: false });
-					documentCondition.document._lastFlushedContent =
-						documentCondition.document._currentContent();
+					draftDocument._lastFlushedContent = draftDocument._currentContent();
 				}
 			}
 			const isDefault = ["name", "description"].includes(field.id);
@@ -483,7 +580,9 @@ class FormBuilder {
 				if (!inputFocus || this._destroyed) return;
 				const panel = dialog ? this.conditions.panel : this.settings.panel;
 				const input = Array.from(
-					panel.querySelectorAll("input, textarea"),
+					panel.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+						"input, textarea",
+					),
 				).find((control) => control.name === inputFocus.name);
 				input?.focus();
 				if (input?.setSelectionRange && inputFocus.start !== null)
@@ -491,9 +590,11 @@ class FormBuilder {
 			});
 		if (dialog && this.elements.has(dialog.fieldId)) {
 			this.selectElement(dialog.fieldId);
-			return this.showCondition(dialog.key, dialog.index, dialog.setting).then(
-				restoreInput,
-			);
+			return this.showCondition(
+				dialog.key,
+				dialog.index ?? undefined,
+				dialog.setting,
+			).then(restoreInput);
 		}
 		if (htmlFocus && this.selectedElement) {
 			return this.showCondition("html").then(() => {
@@ -505,7 +606,7 @@ class FormBuilder {
 		if (inputFocus) return restoreInput();
 	}
 
-	async prepareGeneratedDocuments(htmlFields) {
+	async prepareGeneratedDocuments(htmlFields?: Record<string, string>) {
 		const { default: HtmlEditor } = await import("./conditions/html.ts");
 		for (const [id, html] of Object.entries(htmlFields || {})) {
 			const element = this.elements.get(id);
@@ -522,7 +623,7 @@ class FormBuilder {
 				element.conditions.html = new HtmlEditor(this);
 				this.selectedElement = selected;
 				element.destroy = () =>
-					Object.values(element.conditions).forEach((condition) => {
+					Object.values(element.conditions ?? {}).forEach((condition) => {
 						condition.destroy();
 					});
 			}
@@ -531,17 +632,20 @@ class FormBuilder {
 	}
 
 	undoDraft(redo = false) {
-		if (this.pendingChange) return;
+		const draft = this.draft;
+		if (this.pendingChange || !draft) return;
 		this.updateSchema();
-		if (redo ? this.draft.redo() : this.draft.undo()) {
+		if (redo ? draft.redo() : draft.undo()) {
 			this.restoreDraft();
 		}
 	}
 
-	_keydown(event) {
+	_keydown(event: KeyboardEvent) {
 		if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
 		if (
-			event.target.closest("input, textarea, select, [contenteditable='true']")
+			(event.target as Element | null)?.closest(
+				"input, textarea, select, [contenteditable='true']",
+			)
 		)
 			return;
 		if (event.key.toLowerCase() === "z" || event.key.toLowerCase() === "y") {
@@ -550,7 +654,7 @@ class FormBuilder {
 		}
 	}
 
-	savedField(id) {
+	savedField(id: string) {
 		return this.draft?.saved.schema.find((field) => field.id === id);
 	}
 
@@ -561,7 +665,7 @@ class FormBuilder {
 			: recentSchema
 				? recentSchema
 				: this.elt.dataset.schema;
-		const schema = schemaJSON ? JSON.parse(schemaJSON) : [];
+		const schema: FormSchema = schemaJSON ? JSON.parse(schemaJSON) : [];
 
 		for (const elt of schema) {
 			this.createElement(elt);
@@ -570,9 +674,11 @@ class FormBuilder {
 		this.updateSchema(true);
 	}
 
-	_click(event) {
-		const menuTrigger = event.target.closest("[data-role='menu-trigger']");
-		const menu = menuTrigger?.closest("[lp-menu]");
+	_click(event: MouseEvent) {
+		const target = event.target as Element | null;
+		if (!target) return;
+		const menuTrigger = target.closest("[data-role='menu-trigger']");
+		const menu = menuTrigger?.closest<HTMLElement>("[lp-menu]");
 		if (menu && this.elt.contains(menu)) {
 			event.preventDefault();
 			event.stopPropagation();
@@ -580,9 +686,9 @@ class FormBuilder {
 			return;
 		}
 
-		const button = event.target.closest("button");
-		const element = event.target.closest(".form-element");
-		const preview = event.target.closest("#preview-panel");
+		const button = target.closest("button");
+		const element = target.closest(".form-element");
+		const preview = target.closest("#preview-panel");
 
 		if (element && !preview) {
 			this.selectElement(element.id);
@@ -595,19 +701,24 @@ class FormBuilder {
 			this.header.togglePreviewPanel();
 		} else if (button?.dataset.role === "save-form") {
 			this.header.saveForm();
-		} else if (["undo-draft", "redo-draft"].includes(button?.dataset.role)) {
+		} else if (
+			button?.dataset.role === "undo-draft" ||
+			button?.dataset.role === "redo-draft"
+		) {
 			this.undoDraft(button.dataset.role === "redo-draft");
 		} else if (button?.dataset.action === "copy-form") {
 			this.copyForm(button);
 		} else if (button?.getAttribute("lp-control") === "delete") {
 			this._showDeleteModal(button);
-		} else if (event.target?.id === "form-name-display") {
+		} else if (target.id === "form-name-display") {
 			this.header.editFormName();
 		}
 	}
 
-	async copyForm(button) {
-		if (this._destroyed || !button?.dataset.route || button.disabled) return;
+	async copyForm(button: HTMLButtonElement) {
+		const draft = this.draft;
+		if (this._destroyed || !draft || !button.dataset.route || button.disabled)
+			return;
 
 		const hadFocus = document.activeElement === button;
 		let terminal = false;
@@ -617,26 +728,30 @@ class FormBuilder {
 		this.header.clearMessage();
 		try {
 			this.updateSchema();
-			this.draft.group = null;
+			draft.group = null;
 			const state = this.captureDraft();
-			const revision = this.draft.revision;
+			const revision = draft.revision;
 			this._copyAttempt ??= { state, id: crypto.randomUUID() };
-			if (!this.draft.equal(state, this._copyAttempt.state))
+			if (!draft.equal(state, this._copyAttempt.state))
 				this._copyAttempt = { state, id: crypto.randomUUID() };
 			const data = await this.draftPayload(
 				state,
 				button.dataset.route,
 				this._copyAttempt.id,
 			);
-			const response = await request.post(button.dataset.route, data, {
-				replaceErrorPage: false,
-			});
+			const response = await request.post<DraftCopyResponse>(
+				button.dataset.route,
+				data,
+				{
+					replaceErrorPage: false,
+				},
+			);
 			if (this._destroyed) return;
 			if (response?.ok === true && response.url) {
 				this._copyAttempt = null;
 				if (
-					this.draft.revision !== revision ||
-					!this.draft.equal(this.captureDraft(), state)
+					draft.revision !== revision ||
+					!draft.equal(this.captureDraft(), state)
 				) {
 					this.header.message(
 						"Copy created. Your later draft edits are still here. ",
@@ -682,19 +797,19 @@ class FormBuilder {
 		}
 	}
 
-	async _showDeleteModal(button) {
+	async _showDeleteModal(button: HTMLButtonElement) {
 		if (this._destroyed) return;
 		const modal = new DeleteModal(this, button);
 		await modal.init();
 	}
 
-	async _showHelpModal(button) {
+	async _showHelpModal(button: HTMLButtonElement) {
 		if (this._destroyed) return;
 		const modal = new HelpModal(this, button);
 		await modal.init();
 	}
 
-	selectElement(id) {
+	selectElement(id: string) {
 		this.selectedElement = this.elements.get(id);
 		if (this.draft) this.draft.state.selected_id = id;
 		withTransition(() => {
@@ -710,8 +825,10 @@ class FormBuilder {
 		if (this.draft) this.draft.state.selected_id = null;
 	}
 
-	createElement(schema) {
-		schema.id = schema.id ?? generateElementId(schema.type);
+	createElement(definition: Omit<FormFieldSchema, "id"> & { id?: string }) {
+		const schema: FormFieldSchema = Object.assign(definition, {
+			id: definition.id ?? generateElementId(definition.type),
+		});
 		if (schema.type === "html" && !Object.hasOwn(this.htmlFields, schema.id))
 			this.htmlFields[schema.id] = "";
 		if (schema.type === "table" && !Array.isArray(schema.columns)) {
@@ -736,7 +853,7 @@ class FormBuilder {
 					element !== this.selectedElement,
 			)
 			.map((element) => ({
-				label: element.schema.title,
+				label: element.schema.title ?? "",
 				value: element.schema.id,
 				details: {
 					icon: element.schema.type,
@@ -746,7 +863,11 @@ class FormBuilder {
 			}));
 	}
 
-	async showCondition(name, index = -1, draftSetting = null) {
+	async showCondition(
+		name: ConditionName,
+		index = -1,
+		draftSetting: object | null = null,
+	) {
 		if (this._destroyed || this.conditions.loading) return;
 		this.conditions.loading = true;
 		const element = this.selectedElement;
@@ -771,7 +892,7 @@ class FormBuilder {
 
 		if (!element.destroy) {
 			element.destroy = () => {
-				Object.values(element.conditions).forEach((condition) => {
+				Object.values(element.conditions ?? {}).forEach((condition) => {
 					condition.destroy();
 				});
 			};
@@ -799,14 +920,16 @@ class FormBuilder {
 	}
 
 	updateSchemaOrder() {
-		const sortedMap = new Map();
+		const sortedMap = new Map<string, BuilderElement>();
 
 		Array.from(this.model.defaults).forEach((element) => {
-			sortedMap.set(element.id, this.elements.get(element.id));
+			const entry = this.elements.get(element.id);
+			if (entry) sortedMap.set(element.id, entry);
 		});
 
 		Array.from(this.model.elements).forEach((element) => {
-			sortedMap.set(element.id, this.elements.get(element.id));
+			const entry = this.elements.get(element.id);
+			if (entry) sortedMap.set(element.id, entry);
 		});
 
 		this.elements = sortedMap;
@@ -815,10 +938,12 @@ class FormBuilder {
 	}
 
 	removeElement() {
-		delete this.htmlFields[this.selectedElement.schema.id];
-		if (this.selectedElement.destroy) this.selectedElement.destroy();
-		this.selectedElement.item.remove();
-		this.elements.delete(this.selectedElement.schema.id);
+		const element = this.selectedElement;
+		if (!element) return;
+		delete this.htmlFields[element.schema.id];
+		element.destroy?.();
+		element.item.remove();
+		this.elements.delete(element.schema.id);
 
 		this.selectedElement = null;
 		this.updateSchema();

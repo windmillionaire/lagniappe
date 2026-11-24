@@ -7,7 +7,7 @@ export class CheckboxElement extends BaseElement {
 	active() {
 		const input = this.elt?.querySelector("input");
 		if (input) return input.checked;
-		if ([true, false].includes(this.submission)) return this.submission;
+		if (typeof this.submission === "boolean") return this.submission;
 		return Boolean(this.schema.checked);
 	}
 
@@ -15,7 +15,7 @@ export class CheckboxElement extends BaseElement {
 		return this.active();
 	}
 
-	changed(value) {
+	changed(value: unknown) {
 		if (this.value === value) return false;
 		return true;
 	}
@@ -54,9 +54,10 @@ export class CheckboxElement extends BaseElement {
 	get edit() {
 		if (this._edit) return this._edit;
 
-		const value = [true, false].includes(this.submission)
-			? this.submission
-			: this.schema.checked;
+		const value =
+			typeof this.submission === "boolean"
+				? this.submission
+				: this.schema.checked;
 
 		this._edit = primitives.checkbox({
 			label: this.label,

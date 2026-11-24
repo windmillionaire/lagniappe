@@ -5,12 +5,19 @@ import {
 	offset,
 	shift,
 } from "@floating-ui/dom";
-import { mergeAttributes, Node } from "@tiptap/core";
+import {
+	type Editor,
+	type JSONContent,
+	mergeAttributes,
+	Node,
+	type Range,
+} from "@tiptap/core";
 import { STYLES } from "../../../generated/styles.mjs";
 import { captureError } from "../../../shared/errors.ts";
 import { QueryLifecycle } from "../../../shared/queryLifecycle.ts";
 import { request } from "../../../shared/request.ts";
 import { debounce, generateElementId } from "../../../shared/utilities.ts";
+import type { SyncMention } from "../../../types/sync.d.ts";
 
 export const LagniappeMention = Node.create({
 	name: "lagniappeMention",
@@ -73,7 +80,20 @@ export const LagniappeMention = Node.create({
 	},
 });
 
-const currentQuery = (editor) => {
+interface MentionQuery extends Range {
+	query: string;
+}
+
+interface MentionResults {
+	results: string;
+}
+
+interface MentionSuggestionOptions {
+	documentKey: string;
+	onInsert?: ((mention: SyncMention) => void) | null;
+}
+
+const currentQuery = (editor: Editor): MentionQuery | null => {
 	const { selection } = editor.state;
 	if (!selection.empty) return null;
 	const { $from } = selection;
@@ -87,11 +107,28 @@ const currentQuery = (editor) => {
 	};
 };
 
-const queryKey = (active) =>
+const queryKey = (active: MentionQuery | null) =>
 	active ? `${active.from}:${active.to}:${active.query}` : null;
 
 export class MentionSuggestions {
-	constructor(editor, { documentKey, onInsert = null }) {
+	declare editor: Editor;
+	declare documentKey: string;
+	declare onInsert: MentionSuggestionOptions["onInsert"];
+	declare _destroyed: boolean;
+	declare focused: number;
+	declare queries: QueryLifecycle;
+	declare _debouncedSearch: ReturnType<typeof debounce<MentionSuggestions, []>>;
+	declare options: HTMLElement[];
+	declare rows: HTMLElement[];
+	declare active: MentionQuery | null;
+	declare dismissedFrom: number | null;
+	declare popup: HTMLDivElement | null;
+	declare positionCleanup?: (() => void) | null;
+
+	constructor(
+		editor: Editor,
+		{ documentKey, onInsert = null }: MentionSuggestionOptions,
+	) {
 		this._destroyed = false;
 		this.editor = editor;
 		this.documentKey = documentKey;
@@ -154,13 +191,15 @@ export class MentionSuggestions {
 		return this.queries.run(
 			key,
 			(token) =>
-				request.get("/l/search-index/user", params, { signal: token.signal }),
+				request.get<MentionResults>("/l/search-index/user", params, {
+					signal: token.signal,
+				}),
 			(response) => {
 				if (!response?.ok) return this.hide();
 				const template = document.createElement("template");
 				template.innerHTML = response.results || "";
 				this.rows = Array.from(
-					template.content.querySelectorAll("[role='option']"),
+					template.content.querySelectorAll<HTMLElement>("[role='option']"),
 				);
 				this.options = this.rows.filter((option) => option.dataset.id);
 				if (!this.rows.length) return this.hide();
@@ -173,12 +212,13 @@ export class MentionSuggestions {
 	}
 
 	render() {
-		if (this._destroyed || !this.popup?.isConnected) return;
-		this.popup.replaceChildren(
+		const popup = this.popup;
+		if (this._destroyed || !popup?.isConnected) return;
+		popup.replaceChildren(
 			...this.rows.map((option, rowIndex) => {
-				const rendered = option.cloneNode(true);
+				const rendered = option.cloneNode(true) as HTMLElement;
 				const index = this.options.indexOf(option);
-				rendered.id = `${this.popup.id}-option-${rowIndex}`;
+				rendered.id = `${popup.id}-option-${rowIndex}`;
 				if (index >= 0) {
 					rendered.dataset.index = String(index);
 					rendered.classList.add("w-full", "text-left", "hover:bg-user-bg");
@@ -191,10 +231,10 @@ export class MentionSuggestions {
 				return rendered;
 			}),
 		);
-		this.popup.classList.remove("hidden");
-		this.popup.dataset.visible = "true";
+		popup.classList.remove("hidden");
+		popup.dataset.visible = "true";
 		this.editor.view.dom.setAttribute("aria-expanded", "true");
-		const focused = this.popup.querySelector(`[data-index='${this.focused}']`);
+		const focused = popup.querySelector(`[data-index='${this.focused}']`);
 		if (focused) {
 			this.editor.view.dom.setAttribute("aria-activedescendant", focused.id);
 		} else {
@@ -204,13 +244,14 @@ export class MentionSuggestions {
 	}
 
 	_startPositioning() {
-		if (this._destroyed || !this.active || !this.popup?.isConnected) return;
+		const { active, popup } = this;
+		if (this._destroyed || !active || !popup?.isConnected) return;
 		this._cleanupPositioning();
 		const contextElement = this.editor.view.dom;
 		const reference = {
 			contextElement,
 			getBoundingClientRect: () => {
-				const coordinates = this.editor.view.coordsAtPos(this.active.to);
+				const coordinates = this.editor.view.coordsAtPos(active.to);
 				return {
 					x: coordinates.left,
 					y: coordinates.top,
@@ -223,8 +264,8 @@ export class MentionSuggestions {
 				};
 			},
 		};
-		this.positionCleanup = autoUpdate(reference, this.popup, () => {
-			computePosition(reference, this.popup, {
+		this.positionCleanup = autoUpdate(reference, popup, () => {
+			computePosition(reference, popup, {
 				placement: "bottom-start",
 				strategy: "fixed",
 				middleware: [offset(4), shift({ padding: 5 }), flip({ padding: 5 })],
@@ -251,8 +292,8 @@ export class MentionSuggestions {
 		this.positionCleanup = null;
 	}
 
-	_keydown(event) {
-		if (this.popup.classList.contains("hidden")) return;
+	_keydown(event: KeyboardEvent) {
+		if (this.popup?.classList.contains("hidden")) return;
 		if (event.key === "Escape") {
 			event.preventDefault();
 			this.dismissedFrom = this.active?.from ?? null;
@@ -272,16 +313,21 @@ export class MentionSuggestions {
 		}
 	}
 
-	_click(event) {
-		const button = event.target.closest("[role='option'][data-index]");
+	_click(event: MouseEvent) {
+		const button = (event.target as Element | null)?.closest<HTMLElement>(
+			"[role='option'][data-index]",
+		);
 		if (!button) return;
 		this.insert(this.options[Number(button.dataset.index)]);
 	}
 
-	insert(option) {
+	insert(option: HTMLElement | undefined) {
 		if (!option || !this.active) return;
-		const details = JSON.parse(option.dataset.details || "{}");
-		if (!details.recipient_key) return;
+		const details: { recipient_key?: string } = JSON.parse(
+			option.dataset.details || "{}",
+		);
+		const displayName = option.dataset.name;
+		if (!details.recipient_key || displayName === undefined) return;
 		const occurrenceId =
 			globalThis.crypto?.randomUUID?.() ||
 			`mention-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -295,7 +341,7 @@ export class MentionSuggestions {
 					attrs: {
 						occurrenceId,
 						recipient: details.recipient_key,
-						displayName: option.dataset.name,
+						displayName,
 						profilePage: option.dataset.id,
 					},
 				},
@@ -305,7 +351,7 @@ export class MentionSuggestions {
 		this.onInsert?.({
 			occurrence_id: occurrenceId,
 			recipient: details.recipient_key,
-			display_name: option.dataset.name,
+			display_name: displayName,
 		});
 		this.hide();
 	}
@@ -341,9 +387,11 @@ export class MentionSuggestions {
 	}
 }
 
-export const collectMentions = (document) => {
-	const mentions = [];
-	const visit = (node) => {
+export const collectMentions = (
+	document: JSONContent | null | undefined,
+): SyncMention[] => {
+	const mentions: SyncMention[] = [];
+	const visit = (node: JSONContent | null | undefined) => {
 		if (node?.type === "lagniappeMention" && node.attrs) {
 			mentions.push({
 				occurrence_id: node.attrs.occurrenceId,

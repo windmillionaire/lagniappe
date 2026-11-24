@@ -4,24 +4,20 @@ import { primitives } from "./primitives.ts";
 
 export class TextareaElement extends BaseElement {
 	get value() {
-		const textarea = this.elt?.matches?.("textarea")
-			? this.elt
-			: this.elt?.querySelector("textarea");
+		const textarea = findTextarea(this.elt);
 		if (textarea) return textarea.value;
 		if (this.submission === null || this.submission === undefined) return null;
 		return String(this.submission);
 	}
 
-	changed(value) {
+	changed(value: unknown) {
 		if (this.value === String(value ?? "")) return false;
 		return true;
 	}
 
 	clear() {
 		this.submission = null;
-		const textarea = this._edit?.matches?.("textarea")
-			? this._edit
-			: this._edit?.querySelector("textarea");
+		const textarea = findTextarea(this._edit);
 		if (textarea) textarea.value = "";
 	}
 
@@ -59,3 +55,8 @@ export class TextareaElement extends BaseElement {
 		return this._edit;
 	}
 }
+
+const findTextarea = (root: HTMLElement | null) =>
+	root?.matches("textarea")
+		? (root as HTMLTextAreaElement)
+		: root?.querySelector("textarea");

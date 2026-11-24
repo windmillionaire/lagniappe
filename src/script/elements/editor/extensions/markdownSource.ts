@@ -5,7 +5,9 @@ import { mergeAttributes, Node } from "@tiptap/core";
  * conversion decision.
  *
  */
-export const MarkdownSource = Node.create({
+export const MarkdownSource = Node.create<{
+	HTMLAttributes: Record<string, string>;
+}>({
 	name: "markdownSource",
 	priority: 1000,
 	content: "text*",

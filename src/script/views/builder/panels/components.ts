@@ -1,13 +1,21 @@
-import Sortable from "sortablejs";
+import Sortable, { type MoveEvent } from "sortablejs";
 import { STYLES } from "../../../generated/styles.mjs";
 import { setIcon } from "../../../shared/icons.ts";
+import type { FieldType } from "../../../types/forms.d.ts";
+import type FormBuilder from "../builder.ts";
 import { CONFIG } from "../config.ts";
+import { builderControl } from "../controls.ts";
 
 export class ComponentsPanel {
-	constructor(builder) {
+	declare builder: FormBuilder;
+	declare column: HTMLElement;
+	declare panel: HTMLElement;
+	declare sortable: Sortable | null;
+
+	constructor(builder: FormBuilder) {
 		this.builder = builder;
-		this.column = document.getElementById("components-column");
-		this.panel = document.getElementById("components-panel");
+		this.column = builderControl("components-column");
+		this.panel = builderControl("components-panel");
 		this._click = this._click.bind(this);
 		this._move = this._move.bind(this);
 		this.init();
@@ -19,7 +27,7 @@ export class ComponentsPanel {
 				? CONFIG.PAGE_COMPONENTS
 				: CONFIG.FORM_COMPONENTS;
 
-		const components = [];
+		const components: HTMLDivElement[] = [];
 
 		componentConfig.forEach(({ type, label, icon: iconType = type }) => {
 			const component = document.createElement("div");
@@ -62,7 +70,7 @@ export class ComponentsPanel {
 		this.column.addEventListener("click", this._click);
 	}
 
-	_move(event) {
+	_move(event: MoveEvent) {
 		const type = event.dragged.dataset.type;
 		if (this.builder.model.hasUniqueElement(type)) {
 			this.builder.header.message(
@@ -74,10 +82,15 @@ export class ComponentsPanel {
 		return true;
 	}
 
-	_click(event) {
-		const button = event.target.closest("[data-role]");
+	_click(event: MouseEvent) {
+		const button = (event.target as Element | null)?.closest<HTMLElement>(
+			"[data-role]",
+		);
 		if (button?.dataset.role === "add") {
-			const type = button.closest("[data-type]").dataset.type;
+			const type = button.closest<HTMLElement>("[data-type]")?.dataset.type as
+				| FieldType
+				| undefined;
+			if (!type) return;
 			if (this.builder.model.hasUniqueElement(type)) {
 				this.builder.header.message(
 					`Only one ${type} element is allowed per form`,
@@ -85,8 +98,10 @@ export class ComponentsPanel {
 				return;
 			}
 
+			const sortable = this.builder.model.sortable;
+			if (!sortable) return;
 			const element = this.builder.createElement({ type });
-			this.builder.model.sortable.el.appendChild(element);
+			sortable.el.appendChild(element);
 			this.builder.updateSchemaOrder();
 			this.builder.selectElement(element.id);
 		}

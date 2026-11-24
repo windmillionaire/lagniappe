@@ -1,9 +1,37 @@
 import { sections } from "../elements/sections.ts";
 import { FormController } from "../forms/controller.ts";
+import type { ENDPOINTS } from "../shared/endpoints.ts";
 import { captureError, request } from "../shared/index.ts";
-import { FormWidget } from "./base/formWidget.ts";
+import type { RequestResult } from "../types/api";
+import type { FormRevisionFields, FormSubmission } from "../types/forms";
+import {
+	type FormResetOptions,
+	FormWidget,
+	type FormWidgetSettings,
+} from "./base/formWidget.ts";
 
-async function renderOriginalSubmission(response, key) {
+interface OriginalSubmissionFields
+	extends Pick<FormRevisionFields, "schema" | "submission"> {
+	html_fields: Record<string, string>;
+	schema_error: string;
+	content_error: string;
+	raw_submission: unknown;
+}
+
+interface HistorySubmissionFields {
+	history_fields: string[];
+	latest_submission: FormSubmission;
+}
+
+type OfflineContext = Parameters<NonNullable<FormWidget["offline"]>>[0];
+type QueueContext = Parameters<
+	NonNullable<FormWidget["handleOfflineQueue"]>
+>[0];
+
+async function renderOriginalSubmission(
+	response: RequestResult<OriginalSubmissionFields>,
+	key?: string | null,
+) {
 	const host = document.createElement("div");
 	host.dataset.kind = "task";
 	const form = new FormController({
@@ -34,7 +62,15 @@ async function renderOriginalSubmission(response, key) {
 }
 
 export class TaskForm extends FormWidget {
-	constructor(attributes) {
+	declare endpoints?: ReturnType<typeof ENDPOINTS.TaskForm>;
+	declare _historyFillRequest: Promise<string[]> | null;
+	declare _historyFillSubmission: string[] | null;
+	declare _historyFillGeneration: number;
+	declare _originalCompletionForm: FormController | null;
+	declare _archivedSubmissionForm: FormController | null;
+	declare _originalCompletionGeneration: number;
+
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Update",
@@ -75,7 +111,7 @@ export class TaskForm extends FormWidget {
 	get hasHistory() {
 		return Boolean(
 			this.target?.dataset.history ||
-				this.component?.elt.querySelector("[data-widget='TaskHistory']"),
+				this.component?.elt?.querySelector("[data-widget='TaskHistory']"),
 		);
 	}
 
@@ -86,14 +122,16 @@ export class TaskForm extends FormWidget {
 		archived
 			?.querySelector("[data-role='load-archived-submission']")
 			?.addEventListener("click", this._showArchivedSubmission);
-		const original = this.target.querySelector(
+		const original = this.target.querySelector<HTMLElement>(
 			"[data-role='original-completion-controls']",
 		);
 		original
 			?.querySelector("[data-role='view-original-completion']")
 			?.addEventListener("click", this._showOriginalCompletion);
 		original
-			?.querySelector("[data-role='completion-submission-options']")
+			?.querySelector<HTMLElement>(
+				"[data-role='completion-submission-options']",
+			)
 			?.addEventListener("change", this._selectCompletionSubmission);
 		return [
 			archived,
@@ -106,7 +144,7 @@ export class TaskForm extends FormWidget {
 		const error = this.target?.dataset.schemaError;
 		const notice = error ? document.createElement("p") : null;
 		if (notice) {
-			notice.textContent = error;
+			notice.textContent = error ?? null;
 			notice.setAttribute("role", "status");
 		}
 		let raw = null;
@@ -123,11 +161,12 @@ export class TaskForm extends FormWidget {
 		return [this.autofillElement, notice, raw];
 	}
 
-	_setCompletionView(showOriginal) {
-		const controls = this.target.querySelector(
+	_setCompletionView(showOriginal: boolean) {
+		const controls = this.target.querySelector<HTMLElement>(
 			"[data-role='original-completion-controls']",
 		);
-		let current = this.target.querySelector(
+		if (!controls) return;
+		let current = this.target.querySelector<HTMLElement>(
 			"[data-role='current-completion-detail']",
 		);
 		if (!current) {
@@ -143,31 +182,39 @@ export class TaskForm extends FormWidget {
 			controls.after(current);
 		}
 		current.hidden = showOriginal;
-		controls.querySelector("[data-role='original-completion-detail']").hidden =
-			!showOriginal;
+		const original = controls.querySelector<HTMLElement>(
+			"[data-role='original-completion-detail']",
+		);
+		if (original) original.hidden = !showOriginal;
 	}
 
-	_selectCompletionSubmission(event) {
+	_selectCompletionSubmission(event: Event) {
 		event.stopPropagation();
-		this._setCompletionView(event.target.value === "original");
+		if (event.target instanceof HTMLInputElement)
+			this._setCompletionView(event.target.value === "original");
 	}
 
-	async _showOriginalCompletion(event) {
+	async _showOriginalCompletion(event: Event) {
 		event.preventDefault();
 		event.stopPropagation();
-		const button = event.currentTarget;
+		const button = event.currentTarget as HTMLButtonElement | null;
+		if (!button) return;
 		const controls = button.closest(
 			"[data-role='original-completion-controls']",
 		);
-		const target = controls.querySelector(
+		const target = controls?.querySelector<HTMLElement>(
 			"[data-role='original-completion-detail']",
 		);
-		if (button.disabled) return;
+		if (!controls || !target) return;
+		if (button.disabled || !button.dataset.route) return;
 		const generation = this._originalCompletionGeneration;
 		button.disabled = true;
 		try {
 			if (!this._originalCompletionForm) {
-				const response = await request.get(button.dataset.route);
+				const response = await request.get<OriginalSubmissionFields>(
+					button.dataset.route,
+				);
+				if (!response) throw new Error("Submission response is unavailable.");
 				const { form, host } = await renderOriginalSubmission(
 					response,
 					this.key,
@@ -184,15 +231,16 @@ export class TaskForm extends FormWidget {
 				this._originalCompletionForm = form;
 			}
 			this._setCompletionView(true);
-			const options = controls.querySelector(
+			const options = controls.querySelector<HTMLElement>(
 				"[data-role='completion-submission-options']",
 			);
+			if (!options) return;
 			for (const radio of options.querySelectorAll("input")) {
 				radio.disabled = false;
 				radio.checked = radio.value === "original";
 			}
 			options.hidden = false;
-			options.querySelector("input:checked").focus();
+			options.querySelector<HTMLInputElement>("input:checked")?.focus();
 		} catch (error) {
 			if (generation !== this._originalCompletionGeneration) return;
 			target.textContent =
@@ -204,19 +252,24 @@ export class TaskForm extends FormWidget {
 		}
 	}
 
-	async _showArchivedSubmission(event) {
+	async _showArchivedSubmission(event: Event) {
 		event.preventDefault();
 		event.stopPropagation();
-		const button = event.currentTarget;
-		if (button.disabled) return;
+		const button = event.currentTarget as HTMLButtonElement | null;
+		if (!button) return;
+		if (button.disabled || !button.dataset.route) return;
 		const generation = this._originalCompletionGeneration;
 		const target = button
 			.closest("[data-role='archived-submission-controls']")
-			.querySelector("[data-role='archived-submission-detail']");
+			?.querySelector<HTMLElement>("[data-role='archived-submission-detail']");
+		if (!target) return;
 		button.disabled = true;
 		try {
 			if (!this._archivedSubmissionForm) {
-				const response = await request.get(button.dataset.route);
+				const response = await request.get<OriginalSubmissionFields>(
+					button.dataset.route,
+				);
+				if (!response) throw new Error("Submission response is unavailable.");
 				const { form, host } = await renderOriginalSubmission(
 					response,
 					this.key,
@@ -233,7 +286,7 @@ export class TaskForm extends FormWidget {
 				this._archivedSubmissionForm = form;
 			}
 			target.hidden = false;
-			const original = this.target.querySelector(
+			const original = this.target.querySelector<HTMLElement>(
 				"[data-role='original-completion-controls']",
 			);
 			if (original) original.hidden = false;
@@ -261,7 +314,7 @@ export class TaskForm extends FormWidget {
 		super.destroy();
 	}
 
-	offline({ data, method, route }) {
+	offline({ data, method, route }: OfflineContext) {
 		return {
 			id: `update:task:${this.key}`,
 			action: "update",
@@ -273,7 +326,7 @@ export class TaskForm extends FormWidget {
 		};
 	}
 
-	handleOfflineQueue({ phase, record }) {
+	handleOfflineQueue({ phase, record }: QueueContext) {
 		if (record?.kind !== "task" || record.target_key !== this.key) return;
 		if (phase === "queued") this.form?.queued();
 		if (phase === "conflict") {
@@ -297,7 +350,7 @@ export class TaskForm extends FormWidget {
 		await this.loadHistoryFill();
 	}
 
-	async prepareReset(options = {}) {
+	async prepareReset(options: FormResetOptions<this> = {}) {
 		this._clearOriginalCompletion();
 		this._resetHistoryFillCache();
 		const afterInit = options.afterInit;
@@ -319,9 +372,11 @@ export class TaskForm extends FormWidget {
 		if (this._historyFillSubmission) return this._historyFillSubmission;
 
 		if (!this._historyFillRequest) {
+			const route = this.historyFillRoute;
+			if (!route) return [];
 			const pending = request
-				.get(this.historyFillRoute)
-				.then((response) => response.history_fields || [])
+				.get<HistorySubmissionFields>(route)
+				.then((response) => response?.history_fields || [])
 				.catch((error) => {
 					if (this._historyFillRequest === pending) {
 						this._historyFillRequest = null;
@@ -339,11 +394,13 @@ export class TaskForm extends FormWidget {
 		return submission;
 	}
 
-	async historyValue(fieldId) {
+	async historyValue(fieldId: string) {
 		const form = this.form;
 		const generation = this._historyFillGeneration;
-		const response = await request.get(
-			this.historyFillRoute,
+		const route = this.historyFillRoute;
+		if (!form || !route) return null;
+		const response = await request.get<HistorySubmissionFields>(
+			route,
 			{ field: fieldId },
 			{ replaceErrorPage: false },
 		);
@@ -360,14 +417,14 @@ export class TaskForm extends FormWidget {
 	}
 
 	async loadHistoryFill() {
-		if (!this.historyFillEnabled || !this.form?.renderer) return;
-
 		const form = this.form;
+		const renderer = form?.renderer;
+		if (!this.historyFillEnabled || !renderer) return;
 		const generation = this._historyFillGeneration;
 		const fields = await this.latestHistorySubmission();
 		if (this.form !== form || this._historyFillGeneration !== generation)
 			return;
-		form.renderer.addHistoryFillButtons(
+		renderer.addHistoryFillButtons(
 			Object.fromEntries(fields.map((id) => [id, () => this.historyValue(id)])),
 		);
 	}

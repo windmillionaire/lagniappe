@@ -1,26 +1,65 @@
+import type { Editor } from "@tiptap/core";
 import { STYLES } from "../../generated/styles.mjs";
 import { captureError } from "../../shared/errors.ts";
 import { request } from "../../shared/request.ts";
+import type { EditorDocumentAttributes } from "./config.ts";
 import { independentEditor } from "./editor.ts";
 import { Toolbar } from "./toolbar.ts";
 
 const EMPTY_HTML = new Set(["", "<p></p>", "<p><br></p>"]);
 const KEEPALIVE_BODY_LIMIT = 64 * 1024;
 
-const normalizeHTML = (html) => {
+const normalizeHTML = (html: unknown) => {
 	const normalized = typeof html === "string" ? html.trim() : "";
 	return EMPTY_HTML.has(normalized) ? "" : normalized;
 };
 
-const keepaliveCompatible = (body) => {
+const keepaliveCompatible = (body: { html: string }) => {
 	const serialized = JSON.stringify(body);
 	return (
 		new TextEncoder().encode(serialized).byteLength <= KEEPALIVE_BODY_LIMIT
 	);
 };
 
+type StatusScope = "load" | "save";
+
+interface IndependentContentResponse {
+	markup?: string;
+}
+
+export interface IndependentDocumentAttributes
+	extends EditorDocumentAttributes {
+	endpoints?: EditorDocumentAttributes["endpoints"] & {
+		getContent?: string;
+		save?: string;
+	};
+}
+
 export class IndependentDocument {
-	constructor(attributes) {
+	declare _destroyed: boolean;
+	declare _pendingKeepalive: boolean;
+	declare target: HTMLElement;
+	declare kind: EditorDocumentAttributes["kind"];
+	declare view: EditorDocumentAttributes["view"];
+	declare readonly?: boolean;
+	declare endpoints: IndependentDocumentAttributes["endpoints"];
+	declare draftOnly?: boolean;
+	declare acknowledgedContent: string | null;
+	declare dirtyContent: string | null;
+	declare pendingContent: string | null;
+	declare _loadPromise: Promise<boolean> | null;
+	declare _savePromise: Promise<boolean> | null;
+	declare _statusScope: StatusScope | null;
+	declare ready: Promise<boolean>;
+	declare status: HTMLDivElement;
+	declare statusMessage: HTMLSpanElement;
+	declare retryButton: HTMLButtonElement;
+	declare _retry: () => void;
+	declare container: HTMLDivElement;
+	declare editor: Editor | null;
+	declare toolbar?: Toolbar | null;
+
+	constructor(attributes: IndependentDocumentAttributes) {
 		Object.assign(this, attributes);
 		this.acknowledgedContent = null;
 		this.dirtyContent = null;
@@ -52,9 +91,15 @@ export class IndependentDocument {
 
 		const pending = (async () => {
 			this._showLoading();
-			const response = await request.get(this.endpoints.getContent, null, {
-				replaceErrorPage: false,
-			});
+			const endpoint = this.endpoints?.getContent;
+			if (!endpoint) throw new Error("Missing document content endpoint");
+			const response = await request.get<IndependentContentResponse>(
+				endpoint,
+				null,
+				{
+					replaceErrorPage: false,
+				},
+			);
 			if (response?.ok !== true) {
 				this._showFailure(
 					response?.error || "Could not load this text. Try again.",
@@ -128,7 +173,7 @@ export class IndependentDocument {
 		this.container.setAttribute("aria-busy", "true");
 	}
 
-	_showFailure(message, scope) {
+	_showFailure(message: string, scope: StatusScope) {
 		if (this._destroyed) return;
 		this._statusScope = scope;
 		this.status.dataset.kind = "error";
@@ -140,7 +185,7 @@ export class IndependentDocument {
 		if (scope === "load") this.container.removeAttribute("aria-busy");
 	}
 
-	_hideStatus(scope = null) {
+	_hideStatus(scope: StatusScope | null = null) {
 		if (!this.status || (scope && this._statusScope !== scope)) return;
 		this._statusScope = null;
 		this.statusMessage.textContent = "";
@@ -159,7 +204,7 @@ export class IndependentDocument {
 		});
 	}
 
-	async _publishLoadedContent(html) {
+	async _publishLoadedContent(html: string) {
 		if (this._destroyed) return;
 		if (this.readonly) {
 			this.container.innerHTML = html;
@@ -243,7 +288,9 @@ export class IndependentDocument {
 			}
 
 			const body = { html };
-			const response = await request.put(this.endpoints.save, body, {
+			const endpoint = this.endpoints?.save;
+			if (!endpoint) throw new Error("Missing document save endpoint");
+			const response = await request.put(endpoint, body, {
 				keepalive: keepalive && keepaliveCompatible(body),
 				replaceErrorPage: false,
 			});
@@ -278,14 +325,15 @@ export class IndependentDocument {
 	}
 
 	_currentContent() {
-		return normalizeHTML(this.editor.getHTML());
+		return normalizeHTML(this.editor?.getHTML());
 	}
 
-	_initEditor(html) {
-		return new Promise((resolve) => {
-			this.editor = independentEditor(this.container, html);
+	_initEditor(html: string) {
+		return new Promise<boolean>((resolve) => {
+			const editor = independentEditor(this.container, html);
+			this.editor = editor;
 
-			this.editor.on("create", () => {
+			editor.on("create", () => {
 				if (this._destroyed) {
 					resolve(false);
 					return;
@@ -293,14 +341,14 @@ export class IndependentDocument {
 				if (!html.length) {
 					this.container
 						.querySelector(".ProseMirror")
-						.classList.add("min-h-[200px]");
-					this.editor.commands.focus("start");
+						?.classList.add("min-h-[200px]");
+					editor.commands.focus("start");
 				}
 				this._markLoaded();
 				resolve(true);
 			});
 
-			this.editor.on("blur", () => {
+			editor.on("blur", () => {
 				requestAnimationFrame(() => {
 					const activeElement = document.activeElement;
 					if (activeElement?.closest("[data-role='toolbar'], [role='listbox']"))
@@ -317,7 +365,7 @@ export class IndependentDocument {
 		this.target.prepend(this.toolbar.element);
 	}
 
-	_captureUnexpected(error, context) {
+	_captureUnexpected(error: unknown, context: string) {
 		captureError(error, this.target, { context });
 	}
 

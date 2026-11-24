@@ -3,12 +3,41 @@ import { createIcon } from "../shared/icons.ts";
 import { ENDPOINTS, request } from "../shared/index.ts";
 import { renderNotificationBadge } from "../shared/notificationState.ts";
 import { withTransition } from "../shared/transitions.ts";
-import { Dropdown } from "./combobox/dropdown.ts";
+import type { NotificationState } from "../types/api.d.ts";
+import type { ComboboxOptionElement } from "./combobox/combobox.ts";
+import { Dropdown, type DropdownItem } from "./combobox/dropdown.ts";
+import type { ComposerView } from "./messageComposer.ts";
 
 const CLEAR_ALL_KEY = "__clear_all_notifications__";
 
+interface NotificationOption extends DropdownItem {
+	key: string | null;
+	action?: string | null;
+	cursor?: string | null;
+}
+
+type NotificationView = ComposerView & { online?: boolean };
+
+function clickTarget(event: MouseEvent | null) {
+	const target = event?.target;
+	return target && "closest" in target && typeof target.closest === "function"
+		? (target as Pick<Element, "closest">)
+		: null;
+}
+
 export class Notifications {
-	constructor(view) {
+	declare view: NotificationView;
+	declare dropdown: Dropdown | null;
+	declare button: HTMLElement | null;
+	declare count: HTMLElement | null;
+	declare notifications: NotificationOption[];
+	declare loaded: boolean;
+	declare stale: boolean;
+	declare menuOpen: boolean;
+	declare state: NotificationState | null;
+	declare localMutation: boolean;
+
+	constructor(view: NotificationView) {
 		this.view = view;
 		this.dropdown = null;
 		this.button = document.querySelector("[data-role='notifications']");
@@ -30,7 +59,7 @@ export class Notifications {
 		return this.button?.dataset.visible === "true";
 	}
 
-	set visible(value) {
+	set visible(value: boolean) {
 		if (!this.button) return;
 		const visible = Boolean(value);
 		this.button.dataset.visible = visible ? "true" : "false";
@@ -38,7 +67,7 @@ export class Notifications {
 		this.button.tabIndex = visible ? 0 : -1;
 	}
 
-	init(notifications = []) {
+	init(notifications: NotificationOption[] = []) {
 		if (!this.button) return;
 
 		this.notifications = this.notifications.concat(notifications);
@@ -65,7 +94,7 @@ export class Notifications {
 		window.addEventListener("notification-state", this._notificationState);
 	}
 
-	async _notificationState(event) {
+	async _notificationState(event: CustomEvent<NotificationState>) {
 		const next = event?.detail;
 		if (!next || next.miss) return;
 		const changed = Boolean(
@@ -84,7 +113,7 @@ export class Notifications {
 		return await this.refresh();
 	}
 
-	upsertNotification(html) {
+	upsertNotification(html: string) {
 		if (!this.dropdown || !html) return;
 		if (!this.loaded) {
 			this.stale = true;
@@ -121,15 +150,18 @@ export class Notifications {
 		return true;
 	}
 
-	_optionsFromHtml(html) {
-		return Array.from(html.querySelectorAll("[role='option']")).map(
-			(option) => {
-				return this._notificationOption(option.outerHTML, option.dataset.key);
-			},
-		);
+	_optionsFromHtml(html: ParentNode) {
+		return Array.from(
+			html.querySelectorAll<HTMLElement>("[role='option']"),
+		).map((option) => {
+			return this._notificationOption(option.outerHTML, option.dataset.key);
+		});
 	}
 
-	_notificationOption(html, key = null) {
+	_notificationOption(
+		html: string,
+		key: string | null = null,
+	): NotificationOption {
 		const element = this._htmlOption(html);
 		return {
 			key: key || element?.dataset.key || null,
@@ -149,7 +181,9 @@ export class Notifications {
 		const messageAggregate = this.notifications.find(
 			(item) => item.action === "open-messages",
 		);
-		const leading = [messageUser, messageAggregate].filter(Boolean);
+		const leading = [messageUser, messageAggregate].filter(
+			(item) => item !== undefined,
+		);
 		const remaining = this.notifications.filter(
 			(item) => !leading.includes(item),
 		);
@@ -160,7 +194,7 @@ export class Notifications {
 		return [...leading, this._clearAllOption(), ...remaining];
 	}
 
-	_clearAllOption() {
+	_clearAllOption(): NotificationOption {
 		return {
 			key: CLEAR_ALL_KEY,
 			html: `
@@ -177,13 +211,17 @@ export class Notifications {
 		};
 	}
 
-	_htmlOption(html) {
+	_htmlOption(html: string) {
 		const template = document.createElement("template");
 		template.innerHTML = String(html || "").trim();
-		return template.content.querySelector("[role='option']");
+		return template.content.querySelector<HTMLElement>("[role='option']");
 	}
 
-	async _selectNotification(option, event) {
+	async _selectNotification(
+		option: ComboboxOptionElement,
+		event: MouseEvent | null,
+	) {
+		const target = clickTarget(event);
 		const action = option?.dataset?.action;
 		if (action === "message-user") {
 			event?.preventDefault();
@@ -196,23 +234,27 @@ export class Notifications {
 			await this._loadOlder(option.dataset.cursor);
 			return;
 		}
-		const deleteButton = event?.target?.closest(
+		const deleteButton = target?.closest<HTMLElement>(
 			"[data-action='delete-notification']",
 		);
 		if (deleteButton) {
-			event.preventDefault();
-			event.stopPropagation();
+			event?.preventDefault();
+			event?.stopPropagation();
 			await this._deleteNotification(deleteButton.dataset.key);
 			return;
 		}
 
 		const link =
-			event?.target?.closest("a[href]") || option.querySelector("a[href]");
+			target?.closest<HTMLAnchorElement>("a[href]") ||
+			option.querySelector<HTMLAnchorElement>("a[href]");
 		if (link) window.location.href = link.href;
 	}
 
-	_closeOnNotificationClick(_option, event) {
-		return !event?.target?.closest("[data-action='delete-notification']");
+	_closeOnNotificationClick(
+		_option: ComboboxOptionElement,
+		event: MouseEvent | null,
+	) {
+		return !clickTarget(event)?.closest("[data-action='delete-notification']");
 	}
 
 	async _clearNotifications() {
@@ -232,7 +274,7 @@ export class Notifications {
 		await this.refresh();
 	}
 
-	async _loadOlder(cursor) {
+	async _loadOlder(cursor?: string) {
 		if (!cursor || !this.view.online) return;
 		const response = await request.get(ENDPOINTS.notifications, { cursor });
 		if (!response?.ok || !response.html) return;
@@ -253,7 +295,7 @@ export class Notifications {
 		this._updateDropdown();
 	}
 
-	async _deleteNotification(key) {
+	async _deleteNotification(key?: string) {
 		if (!key) return;
 
 		this.localMutation = true;
@@ -270,15 +312,16 @@ export class Notifications {
 	}
 
 	_updateDropdown() {
-		if (!this.dropdown) return;
+		const { dropdown } = this;
+		if (!dropdown) return;
 
 		const items = this._dropdownItems();
 		this._updateCount();
 		if (!this.menuOpen) {
-			this.dropdown.items = items;
+			dropdown.items = items;
 			return;
 		}
-		void withTransition(() => this.dropdown.updateOptions(items), {
+		void withTransition(() => dropdown.updateOptions(items), {
 			label: "notifications:update-open-menu",
 		});
 	}

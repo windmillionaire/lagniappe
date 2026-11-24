@@ -4,27 +4,28 @@ import { primitives } from "./primitives.ts";
 
 export class RadioElement extends BaseElement {
 	get value() {
-		return Array.from(this.elt.querySelectorAll("input[type='radio']")).find(
-			(radio) => radio.checked,
-		)?.value;
+		return Array.from(
+			this.elt?.querySelectorAll<HTMLInputElement>("input[type='radio']") ?? [],
+		).find((radio) => radio.checked)?.value;
 	}
 
-	changed(value) {
+	changed(value: unknown) {
 		if (this.value === value) return false;
 		return true;
 	}
 
-	active(value) {
+	active(value: unknown) {
 		return (
-			this.elt?.querySelector(`input[type="radio"][value="${value}"]`)
-				?.checked ?? this.submission === value
+			this.elt?.querySelector<HTMLInputElement>(
+				`input[type="radio"][value="${String(value)}"]`,
+			)?.checked ?? this.submission === value
 		);
 	}
 
 	get read() {
 		if (this._read) return this._read;
 
-		const option = this.schema.options.find(
+		const option = this.schema.options?.find(
 			(opt) => opt.value === this.submission,
 		);
 
@@ -58,7 +59,7 @@ export class RadioElement extends BaseElement {
 		const layout = this.schema.layout ?? "column";
 		container.className = `${STYLES.radio.fieldset[layout]}`;
 
-		this.schema.options.forEach((option) => {
+		this.schema.options?.forEach((option) => {
 			container.appendChild(
 				primitives.radio({
 					label: option.label,
@@ -76,8 +77,10 @@ export class RadioElement extends BaseElement {
 
 	clear() {
 		this.submission = null;
-		this.edit.querySelectorAll('input[type="radio"]').forEach((radio) => {
-			radio.checked = false;
-		});
+		this.edit
+			.querySelectorAll<HTMLInputElement>('input[type="radio"]')
+			.forEach((radio) => {
+				radio.checked = false;
+			});
 	}
 }

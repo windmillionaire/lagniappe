@@ -13,6 +13,23 @@
 
 import { ENDPOINTS } from "../shared/endpoints.ts";
 import { captureError } from "../shared/errors.ts";
+import type { LoadedWidget, WidgetSettings } from "../types/widgets";
+
+interface LoaderView {
+	key?: string | null;
+}
+
+interface LoaderComponent {
+	elt: HTMLElement;
+	view: LoaderView;
+	key?: string | null;
+	kind?: string | null;
+	readonly?: boolean;
+}
+
+type LoaderSettings = WidgetSettings<LoaderComponent, LoaderView> &
+	Record<string, unknown>;
+type WidgetConstructor = new (settings: LoaderSettings) => LoadedWidget;
 
 const WIDGETS = {
 	BaseList: () => import("../elements/base/baseList.ts"),
@@ -88,8 +105,8 @@ const JSON_ATTRIBUTES = [
 	"options",
 ];
 
-const _attributes = (component, show) => {
-	const settings = {
+const _attributes = (component: LoaderComponent, show: string) => {
+	const settings: LoaderSettings = {
 		component: component,
 		view: component.view,
 		name: show,
@@ -99,7 +116,9 @@ const _attributes = (component, show) => {
 
 	// Components that cam be toggled visibly should have a target element
 	// either in the html or as a getter in the widget
-	const target = component.elt.querySelector(`[data-widget="${show}"]`);
+	const target = component.elt.querySelector<HTMLElement>(
+		`[data-widget="${show}"]`,
+	);
 	if (target) {
 		settings.target = target;
 		settings.key = target.dataset.key || component.key || settings.view.key;
@@ -111,46 +130,59 @@ const _attributes = (component, show) => {
 
 	settings.route = target?.dataset.route || component.elt.dataset.route;
 
-	JSON_ATTRIBUTES.filter((attribute) => target?.dataset[attribute]).forEach(
-		(attribute) => {
-			settings[attribute] = JSON.parse(target.dataset[attribute]);
-		},
-	);
+	for (const attribute of JSON_ATTRIBUTES) {
+		const value = target?.dataset[attribute];
+		if (value) settings[attribute] = JSON.parse(value) as unknown;
+	}
 
 	if (show in ENDPOINTS) {
-		settings.endpoints = ENDPOINTS[show](settings);
+		const endpoint =
+			ENDPOINTS[show as keyof typeof WIDGETS & keyof typeof ENDPOINTS];
+		// Keyed routes are registered for widgets whose markup identifies an entity.
+		settings.endpoints = endpoint(settings as LoaderSettings & { key: string });
 	}
 
 	return settings;
 };
 
-const _defineReadonly = (widget, component) => {
+const _defineReadonly = (widget: LoadedWidget, component: LoaderComponent) => {
 	Object.defineProperty(widget, "readonly", {
 		configurable: true,
 		enumerable: true,
-		get() {
+		get(this: LoadedWidget) {
 			return component.readonly || this.target?.dataset.readonly === "true";
 		},
 	});
 };
 
 class DefaultWidget {
-	constructor(attributes) {
+	declare name: string;
+	declare DEFAULT: true;
+
+	constructor(attributes: LoaderSettings) {
 		Object.assign(this, attributes);
 		this.DEFAULT = true;
 	}
 }
 
-export async function loadWidget(component, show, extraAttributes = {}) {
-	let widget;
+export async function loadWidget(
+	component: LoaderComponent,
+	show: string,
+	extraAttributes: Partial<LoaderSettings> = {},
+): Promise<LoadedWidget> {
+	let widget: LoadedWidget;
 	const attributes = { ..._attributes(component, show), ...extraAttributes };
 	const name = show.split("/")[0];
 
 	if (name in WIDGETS) {
-		const module = await WIDGETS[name]();
-		widget = new module[name](attributes);
+		const module = await WIDGETS[name as keyof typeof WIDGETS]();
+		// The selected template widget owns the shape of its dataset and endpoints.
+		const Widget = (module as unknown as Record<string, WidgetConstructor>)[
+			name
+		];
+		widget = new Widget(attributes);
 	} else {
-		widget = new DefaultWidget(attributes);
+		widget = new DefaultWidget(attributes) as LoadedWidget;
 	}
 
 	_defineReadonly(widget, component);
@@ -184,18 +216,26 @@ export async function loadWidget(component, show, extraAttributes = {}) {
 
 		if (widget.postreconcile && !silent) {
 			const result = widget.postreconcile();
-			if (result?.then) {
+			if (
+				result &&
+				typeof result === "object" &&
+				"then" in result &&
+				result.then
+			) {
 				captureError(
 					new TypeError(
 						`${widget.name}.postreconcile() must commit synchronously. Move awaited work to prereconcile().`,
 					),
 					widget.target,
 				);
-				void result.catch(captureError);
+				void (result as Promise<unknown>).catch(captureError);
 			}
 		}
 	};
 
-	if (widget.target) widget.target._lp_widget = widget;
+	if (widget.target) {
+		const target: HTMLElement & { _lp_widget?: LoadedWidget } = widget.target;
+		target._lp_widget = widget;
+	}
 	return widget;
 }

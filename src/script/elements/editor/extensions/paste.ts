@@ -1,5 +1,6 @@
-import { Extension } from "@tiptap/core";
+import { type Editor, Extension, type Range } from "@tiptap/core";
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
+import type { EditorView } from "@tiptap/pm/view";
 import { setTrackedRangeInTransaction } from "./trackedRanges.ts";
 
 const BLOCK_MARKDOWN_PATTERNS = [
@@ -27,7 +28,7 @@ const INDENTED_CODE_PATTERN = /^(?: {4}|\t)/;
 const HARD_BREAK_PATTERN = /(?: {2,}|\\)$/;
 const SOFT_WRAP_MINIMUM = 40;
 
-const normalizeLineEndings = (value) =>
+const normalizeLineEndings = (value: unknown) =>
 	String(value || "")
 		.replaceAll("\r\n", "\n")
 		.replaceAll("\r", "\n");
@@ -37,7 +38,7 @@ const normalizeLineEndings = (value) =>
  * Markdown renderer. This detects; it never interprets or converts source.
  *
  */
-export const looksLikeConvertibleMarkup = (content) => {
+export const looksLikeConvertibleMarkup = (content: unknown) => {
 	const source = normalizeLineEndings(content);
 	if (!source.trim()) return false;
 	const lines = source.split("\n");
@@ -56,7 +57,7 @@ export const looksLikeConvertibleMarkup = (content) => {
 		return true;
 	}
 
-	let fence = null;
+	let fence: string | null = null;
 	const proseLines = lines.map((line) => {
 		const marker = line.match(FENCE_PATTERN)?.[1] || null;
 		if (marker) {
@@ -84,7 +85,11 @@ export const looksLikeConvertibleMarkup = (content) => {
  * transaction-produced range.
  *
  */
-export const insertMarkdownSource = (view, content, rangeKey) => {
+export const insertMarkdownSource = (
+	view: EditorView,
+	content: string,
+	rangeKey: string,
+) => {
 	const { state } = view;
 	const sourceType = state.schema.nodes.markdownSource;
 	if (!sourceType || typeof rangeKey !== "string" || !rangeKey) return false;
@@ -95,13 +100,14 @@ export const insertMarkdownSource = (view, content, rangeKey) => {
 		source ? state.schema.text(source) : undefined,
 	);
 	const transaction = state.tr.replaceSelectionWith(node);
-	let range = null;
+	const inserted: { range?: Range } = {};
 	transaction.doc.descendants((child, position) => {
 		if (child === node) {
-			range = { from: position, to: position + node.nodeSize };
+			inserted.range = { from: position, to: position + node.nodeSize };
 		}
-		return range === null;
+		return inserted.range === undefined;
 	});
+	const { range } = inserted;
 	if (!range) return false;
 
 	transaction.setSelection(TextSelection.create(transaction.doc, range.to - 1));
@@ -115,7 +121,26 @@ export const insertMarkdownSource = (view, content, rangeKey) => {
  * an explicit conversion decision.
  *
  */
-export const EditorPaste = Extension.create({
+export interface MarkdownPasteContext {
+	editor: Editor;
+	rangeKey: string;
+}
+
+interface EditorPasteStorage {
+	confirm: ((context: MarkdownPasteContext) => void) | null;
+	sequence: number;
+}
+
+declare module "@tiptap/core" {
+	interface Storage {
+		editorPaste: EditorPasteStorage;
+	}
+}
+
+export const EditorPaste = Extension.create<
+	Record<never, never>,
+	EditorPasteStorage
+>({
 	name: "editorPaste",
 
 	addStorage() {

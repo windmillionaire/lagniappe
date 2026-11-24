@@ -6,11 +6,14 @@ import { BaseElement } from "./base/baseElement.ts";
 import { primitives } from "./primitives.ts";
 
 export class SignatureElement extends BaseElement {
+	declare signatureInput?: HTMLInputElement;
+	declare signature?: Signature;
+
 	get value() {
 		return this.signatureInput?.value ?? null;
 	}
 
-	changed(value) {
+	changed(value: unknown) {
 		if (areEqual(this.value, value)) return false;
 		return true;
 	}
@@ -22,7 +25,7 @@ export class SignatureElement extends BaseElement {
 		this._read.className = STYLES.signature.pad;
 
 		const signature = this._read.appendChild(document.createElement("img"));
-		signature.src = this.submission;
+		signature.src = String(this.submission);
 		signature.alt = "Signature";
 
 		if (this.submission && this.signatureInput) {
@@ -72,18 +75,19 @@ export class SignatureElement extends BaseElement {
 		const resetIcon = reset.appendChild(document.createElement("span"));
 		setIcon(resetIcon, "reset");
 
-		this.signature = new Signature(
+		const signature = new Signature(
 			signatureContainer,
-			this.submission,
+			typeof this.submission === "string" ? this.submission : null,
 			this.schema.id,
 		);
+		this.signature = signature;
 		this.signature.init();
 		this.destroyables.push(this.signature);
 
 		reset.addEventListener("click", () => this.clear());
 
 		this._edit.addEventListener("updated", () => {
-			this.signatureInput.value = this.signature.inputName;
+			if (this.signatureInput) this.signatureInput.value = signature.inputName;
 		});
 
 		signatureContainer.classList.add("group-data-[mode=read]/element:hidden");
@@ -103,7 +107,32 @@ export class SignatureElement extends BaseElement {
 }
 
 export class Signature {
-	constructor(container, imageUrl = null, inputName = "signature-image") {
+	declare container: HTMLElement;
+	declare imageUrl: string | null;
+	declare inputName: string;
+	declare canvas: HTMLCanvasElement | null;
+	declare ctx: CanvasRenderingContext2D | null;
+	declare isDrawing: boolean;
+	declare lastX: number;
+	declare lastY: number;
+	declare fileInput: HTMLInputElement | null;
+	declare resizeObserver: ResizeObserver | null;
+	declare intersectionObserver: IntersectionObserver | null;
+	declare resetButton: HTMLButtonElement | null;
+	declare boundHandlers: {
+		resize?: () => void;
+		pointerDown?: (event: PointerEvent) => void;
+		pointerMove?: (event: PointerEvent) => void;
+		pointerUp?: () => void;
+		pointerLeave?: () => void;
+	};
+	declare debouncedSave: () => void;
+
+	constructor(
+		container: HTMLElement,
+		imageUrl: string | null = null,
+		inputName = "signature-image",
+	) {
 		this.container = container;
 		this.imageUrl = imageUrl;
 		this.inputName = inputName;
@@ -169,6 +198,8 @@ export class Signature {
 	}
 
 	resizeCanvas() {
+		const { canvas, ctx, fileInput } = this;
+		if (!canvas || !ctx || !fileInput) return;
 		const rect = this.container.getBoundingClientRect();
 
 		// Skip resize when container is hidden (0 dimensions)
@@ -177,25 +208,27 @@ export class Signature {
 		// Save current drawing
 		const tempCanvas = document.createElement("canvas");
 		const tempCtx = tempCanvas.getContext("2d");
-		tempCanvas.width = this.canvas.width;
-		tempCanvas.height = this.canvas.height;
-		if (this.canvas.width > 0 && this.canvas.height > 0) {
-			tempCtx.drawImage(this.canvas, 0, 0);
+		tempCanvas.width = canvas.width;
+		tempCanvas.height = canvas.height;
+		if (canvas.width > 0 && canvas.height > 0) {
+			tempCtx?.drawImage(canvas, 0, 0);
 		}
 
 		// Resize canvas to container
-		this.canvas.width = rect.width;
-		this.canvas.height = rect.height;
+		canvas.width = rect.width;
+		canvas.height = rect.height;
 
 		// Restore drawing
-		if (this.fileInput.files.length > 0) {
-			this.loadSignatureFromFile(this.fileInput.files[0]);
+		const file = fileInput.files?.[0];
+		if (file) {
+			this.loadSignatureFromFile(file);
 		} else if (tempCanvas.width > 0 && tempCanvas.height > 0) {
-			this.ctx.drawImage(tempCanvas, 0, 0);
+			ctx.drawImage(tempCanvas, 0, 0);
 		}
 	}
 
 	attachEventListeners() {
+		if (!this.canvas) return;
 		this.boundHandlers.pointerDown = this.handlePointerDown.bind(this);
 		this.boundHandlers.pointerMove = this.handlePointerMove.bind(this);
 		this.boundHandlers.pointerUp = this.handlePointerUp.bind(this);
@@ -210,7 +243,8 @@ export class Signature {
 		);
 	}
 
-	handlePointerDown(e) {
+	handlePointerDown(e: PointerEvent) {
+		if (!this.canvas || !this.ctx) return;
 		e.preventDefault();
 		this.isDrawing = true;
 		const rect = this.canvas.getBoundingClientRect();
@@ -224,8 +258,8 @@ export class Signature {
 		this.ctx.lineJoin = "round";
 	}
 
-	handlePointerMove(e) {
-		if (!this.isDrawing) return;
+	handlePointerMove(e: PointerEvent) {
+		if (!this.isDrawing || !this.canvas || !this.ctx) return;
 
 		e.preventDefault();
 		const rect = this.canvas.getBoundingClientRect();
@@ -254,9 +288,12 @@ export class Signature {
 	}
 
 	async saveSignature() {
-		const blob = await new Promise((resolve) => {
-			this.canvas.toBlob(resolve, "image/png", 1.0);
+		const { canvas, fileInput } = this;
+		if (!canvas || !fileInput) return;
+		const blob = await new Promise<Blob | null>((resolve) => {
+			canvas.toBlob(resolve, "image/png", 1.0);
 		});
+		if (!blob) return;
 
 		const file = new File([blob], "signature.png", {
 			type: "image/png",
@@ -265,19 +302,18 @@ export class Signature {
 
 		const dataTransfer = new DataTransfer();
 		dataTransfer.items.add(file);
-		this.fileInput.files = dataTransfer.files;
+		fileInput.files = dataTransfer.files;
 
 		this.container.dispatchEvent(new CustomEvent("updated", { bubbles: true }));
 	}
 
-	async loadSignature(url) {
-		return new Promise((resolve, reject) => {
+	async loadSignature(url: string) {
+		return new Promise<void>((resolve, reject) => {
 			const img = new Image();
 			img.crossOrigin = "anonymous";
 
 			img.onload = () => {
-				this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-				this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+				this._drawImage(img);
 				resolve();
 			};
 
@@ -290,22 +326,27 @@ export class Signature {
 		});
 	}
 
-	loadSignatureFromFile(file) {
+	loadSignatureFromFile(file: File) {
 		const reader = new FileReader();
-		reader.onload = (e) => {
+		reader.onload = () => {
+			if (typeof reader.result !== "string") return;
 			const img = new Image();
-			img.onload = () => {
-				this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-				this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
-			};
-			img.src = e.target.result;
+			img.onload = () => this._drawImage(img);
+			img.src = reader.result;
 		};
 		reader.readAsDataURL(file);
 	}
 
-	clear() {
+	_drawImage(image: HTMLImageElement) {
+		if (!this.canvas || !this.ctx) return;
 		this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-		this.fileInput.value = "";
+		this.ctx.drawImage(image, 0, 0, this.canvas.width, this.canvas.height);
+	}
+
+	clear() {
+		if (this.canvas)
+			this.ctx?.clearRect(0, 0, this.canvas.width, this.canvas.height);
+		if (this.fileInput) this.fileInput.value = "";
 	}
 
 	destroy() {
@@ -323,22 +364,15 @@ export class Signature {
 		}
 
 		if (this.canvas) {
-			this.canvas.removeEventListener(
-				"pointerdown",
-				this.boundHandlers.pointerDown,
-			);
-			this.canvas.removeEventListener(
-				"pointermove",
-				this.boundHandlers.pointerMove,
-			);
-			this.canvas.removeEventListener(
-				"pointerup",
-				this.boundHandlers.pointerUp,
-			);
-			this.canvas.removeEventListener(
-				"pointerleave",
-				this.boundHandlers.pointerLeave,
-			);
+			const { pointerDown, pointerMove, pointerUp, pointerLeave } =
+				this.boundHandlers;
+			if (pointerDown)
+				this.canvas.removeEventListener("pointerdown", pointerDown);
+			if (pointerMove)
+				this.canvas.removeEventListener("pointermove", pointerMove);
+			if (pointerUp) this.canvas.removeEventListener("pointerup", pointerUp);
+			if (pointerLeave)
+				this.canvas.removeEventListener("pointerleave", pointerLeave);
 		}
 	}
 }

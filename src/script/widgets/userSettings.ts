@@ -2,10 +2,29 @@ import { InputElement } from "../elements/input.ts";
 import { RadioElement } from "../elements/radio.ts";
 import { SectionToggle } from "../elements/sectionToggle.ts";
 import { captureError, Modal, request } from "../shared/index.ts";
-import { FormWidget } from "./base/formWidget.ts";
+import { FormWidget, type FormWidgetSettings } from "./base/formWidget.ts";
+
+interface ApiKeyCredential {
+	active?: boolean;
+	expires_at?: string;
+	display_prefix?: string;
+}
+interface ApiKeyResponse {
+	credential: ApiKeyCredential | null;
+	token: string | null;
+}
+interface ApiKeyConfirmation {
+	title: string;
+	description: string;
+	label: string;
+}
+type SettingsFacet = ReturnType<typeof SectionToggle.facet>;
 
 export class UserSettings extends FormWidget {
-	constructor(attributes) {
+	declare _groupSelect: SettingsFacet | null;
+	declare _pageSelect?: SettingsFacet | null;
+
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Update User Settings",
@@ -15,7 +34,7 @@ export class UserSettings extends FormWidget {
 		this._groupSelect = null;
 	}
 
-	async _initForm(options) {
+	async _initForm(options?: Parameters<FormWidget["_initForm"]>[0]) {
 		await super._initForm(options);
 		this._groupSelect = null;
 		this._pageSelect = null;
@@ -34,14 +53,14 @@ export class UserSettings extends FormWidget {
 		const controller = new AbortController();
 		const signal = controller.signal;
 		section
-			.querySelector("[data-action='issue-api-key']")
+			.querySelector<HTMLButtonElement>("[data-action='issue-api-key']")
 			?.addEventListener(
 				"click",
 				() => void this._issueApiKey(section, route),
 				{ signal },
 			);
 		section
-			.querySelector("[data-action='revoke-api-key']")
+			.querySelector<HTMLButtonElement>("[data-action='revoke-api-key']")
 			?.addEventListener(
 				"click",
 				() => void this._revokeApiKey(section, route),
@@ -51,20 +70,30 @@ export class UserSettings extends FormWidget {
 			destroy: () => controller.abort(),
 		});
 		void request
-			.get(route, null, { signal, replaceErrorPage: false })
+			.get<ApiKeyResponse>(route, null, { signal, replaceErrorPage: false })
 			.then((response) => {
 				if (signal.aborted) return;
-				if (response.ok) this._renderApiKey(section, response.credential);
-				else this._apiKeyError(section, response.error);
+				if (response?.ok) this._renderApiKey(section, response.credential);
+				else this._apiKeyError(section, response?.error);
 			});
 	}
 
-	_renderApiKey(section, credential = {}, token = null) {
+	_renderApiKey(
+		section: Element,
+		credential: ApiKeyCredential | null = {},
+		token: string | null = null,
+	) {
 		const active = credential?.active === true;
 		const status = section.querySelector("[data-role='api-key-status']");
-		const issue = section.querySelector("[data-action='issue-api-key']");
-		const revoke = section.querySelector("[data-action='revoke-api-key']");
-		const secret = section.querySelector("[data-role='api-key-secret']");
+		const issue = section.querySelector<HTMLButtonElement>(
+			"[data-action='issue-api-key']",
+		);
+		const revoke = section.querySelector<HTMLButtonElement>(
+			"[data-action='revoke-api-key']",
+		);
+		const secret = section.querySelector<HTMLElement>(
+			"[data-role='api-key-secret']",
+		);
 		const value = section.querySelector("[data-role='api-key-value']");
 		if (status) {
 			const expires = credential?.expires_at
@@ -82,20 +111,26 @@ export class UserSettings extends FormWidget {
 		this._apiKeyError(section, null);
 	}
 
-	_apiKeyError(section, message) {
-		const target = section.querySelector("[data-role='api-key-message']");
+	_apiKeyError(section: Element, message?: string | null) {
+		const target = section.querySelector<HTMLElement>(
+			"[data-role='api-key-message']",
+		);
 		if (!target) return;
 		target.textContent = message || "";
 		target.dataset.visible = Boolean(message).toString();
 	}
 
-	async _confirmApiKeyAction(section, trigger, options) {
-		const template = section.querySelector(
+	async _confirmApiKeyAction(
+		section: Element,
+		trigger: HTMLButtonElement | null,
+		options: ApiKeyConfirmation,
+	) {
+		const template = section.querySelector<HTMLTemplateElement>(
 			"template[data-role='api-key-confirmation-template']",
 		);
 		const modalElement = template?.content
 			?.querySelector("#modal")
-			?.cloneNode(true);
+			?.cloneNode(true) as HTMLElement | undefined;
 		if (!modalElement) {
 			captureError(
 				new Error("API key confirmation template is missing."),
@@ -105,25 +140,25 @@ export class UserSettings extends FormWidget {
 			return false;
 		}
 
-		modalElement.querySelector("[data-role='confirmation-title']").textContent =
-			options.title;
-		modalElement.querySelector(
+		const title = modalElement.querySelector(
+			"[data-role='confirmation-title']",
+		);
+		const description = modalElement.querySelector(
 			"[data-role='confirmation-description']",
-		).textContent = options.description;
-		const confirm = modalElement.querySelector(
+		);
+		const confirm = modalElement.querySelector<HTMLButtonElement>(
 			"[data-role='confirmation-confirm']",
 		);
-		confirm.querySelector("[data-role='text']").textContent = options.label;
+		const label = confirm?.querySelector("[data-role='text']");
+		if (!title || !description || !confirm || !label) return false;
+		title.textContent = options.title;
+		description.textContent = options.description;
+		label.textContent = options.label;
 
 		const modal = new Modal(this.view, trigger);
-		let settled = false;
-		let settle;
-		const confirmation = new Promise((resolve) => {
-			settle = (value) => {
-				if (settled) return;
-				settled = true;
-				resolve(value);
-			};
+		let settle!: (value: boolean) => void;
+		const confirmation = new Promise<boolean>((resolve) => {
+			settle = resolve;
 		});
 		const remove = modal.remove.bind(modal);
 		modal.remove = async () => {
@@ -147,8 +182,10 @@ export class UserSettings extends FormWidget {
 		return confirmation;
 	}
 
-	async _issueApiKey(section, route) {
-		const issue = section.querySelector("[data-action='issue-api-key']");
+	async _issueApiKey(section: Element, route: string) {
+		const issue = section.querySelector<HTMLButtonElement>(
+			"[data-action='issue-api-key']",
+		);
 		const isRotation = issue?.textContent?.includes("Regenerate");
 		if (
 			isRotation &&
@@ -162,14 +199,16 @@ export class UserSettings extends FormWidget {
 			return;
 		}
 		if (issue) issue.disabled = true;
-		const response = await request.post(route, {});
+		const response = await request.post<ApiKeyResponse>(route, {});
 		if (issue) issue.disabled = false;
-		if (!response.ok) return this._apiKeyError(section, response.error);
+		if (!response?.ok) return this._apiKeyError(section, response?.error);
 		this._renderApiKey(section, response.credential, response.token);
 	}
 
-	async _revokeApiKey(section, route) {
-		const revoke = section.querySelector("[data-action='revoke-api-key']");
+	async _revokeApiKey(section: Element, route: string) {
+		const revoke = section.querySelector<HTMLButtonElement>(
+			"[data-action='revoke-api-key']",
+		);
 		if (
 			!(await this._confirmApiKeyAction(section, revoke, {
 				title: "Revoke API key",
@@ -181,9 +220,9 @@ export class UserSettings extends FormWidget {
 			return;
 		}
 		if (revoke) revoke.disabled = true;
-		const response = await request.delete(route);
+		const response = await request.delete<ApiKeyResponse>(route);
 		if (revoke) revoke.disabled = false;
-		if (!response.ok) return this._apiKeyError(section, response.error);
+		if (!response?.ok) return this._apiKeyError(section, response?.error);
 		this._renderApiKey(section, response.credential);
 	}
 
@@ -195,7 +234,7 @@ export class UserSettings extends FormWidget {
 
 		this._groupSelect = SectionToggle.facet(
 			this,
-			groupInput.closest("[lp-select]"),
+			groupInput.closest<HTMLElement>("[lp-select]"),
 		);
 		this._groupSelect.init();
 		this.destroyables.push(this._groupSelect);
@@ -209,7 +248,7 @@ export class UserSettings extends FormWidget {
 
 		this._pageSelect = SectionToggle.facet(
 			this,
-			pageInput.closest("[lp-select]"),
+			pageInput.closest<HTMLElement>("[lp-select]"),
 		);
 		this._pageSelect.init();
 		this.destroyables.push(this._pageSelect);
@@ -221,8 +260,12 @@ export class UserSettings extends FormWidget {
 		);
 		if (!removePageInput) return;
 		removePageInput.addEventListener("change", (e) => {
-			if (e.target.checked && this._pageSelect) {
-				this._pageSelect.select.clear();
+			if (
+				e.target instanceof HTMLInputElement &&
+				e.target.checked &&
+				this._pageSelect
+			) {
+				this._pageSelect.select?.clear();
 			}
 		});
 	}
@@ -253,7 +296,8 @@ export class UserSettings extends FormWidget {
 			name,
 		).elt;
 		if (!field) return null;
-		const input = field.matches("input") ? field : field.querySelector("input");
+		const input =
+			field instanceof HTMLInputElement ? field : field.querySelector("input");
 		if (input) input.value = name;
 		return field;
 	}
@@ -267,7 +311,7 @@ export class UserSettings extends FormWidget {
 		const field = new RadioElement(
 			this,
 			{
-				name: "ai_access",
+				id: "ai_access",
 				label: "AI Access",
 				required: true,
 				layout: "row",
@@ -288,7 +332,7 @@ export class UserSettings extends FormWidget {
 		const field = new RadioElement(
 			this,
 			{
-				name: "notification_email_mode",
+				id: "notification_email_mode",
 				label: "Email Notifications",
 				required: true,
 				layout: "column",
@@ -359,14 +403,14 @@ export class UserSettings extends FormWidget {
 				publicEmailConsent,
 				this.ownerInboundElement,
 				userPage,
-			].filter(Boolean),
+			].filter((element) => element !== null && element !== undefined),
 		);
 
 		return [
 			this.target.querySelector("[data-role='visible-to']"),
 			this.target.querySelector("[data-role='restrict-access']"),
 			card,
-		].filter(Boolean);
+		].filter((element) => element !== null && element !== undefined);
 	}
 
 	get formData() {
@@ -376,20 +420,21 @@ export class UserSettings extends FormWidget {
 			for (const value of fields.getAll(key)) data.append(key, value);
 		}
 		const card = this.userCardElement;
-		const name = card?.querySelector("[name='name']");
-		const email = card?.querySelector("[name='email']");
+		const name = card?.querySelector<HTMLInputElement>("[name='name']");
+		const email = card?.querySelector<HTMLInputElement>("[name='email']");
 
-		if (name?.value || this.target.dataset.name) {
-			data.set("name", name?.value || this.target.dataset.name);
-		}
+		const nameValue = name?.value || this.target.dataset.name;
+		if (nameValue) data.set("name", nameValue);
 		if (email && !email.disabled) {
 			data.set("email", email.value);
 		}
-		const aiAccess = card?.querySelector("[name='ai_access']:checked");
+		const aiAccess = card?.querySelector<HTMLInputElement>(
+			"[name='ai_access']:checked",
+		);
 		if (this.canEditAi && aiAccess) {
 			data.set("ai_access", aiAccess.value);
 		}
-		const notificationEmail = card?.querySelector(
+		const notificationEmail = card?.querySelector<HTMLInputElement>(
 			"[name='notification_email_mode']:checked",
 		);
 		if (
@@ -399,7 +444,7 @@ export class UserSettings extends FormWidget {
 			data.set("notification_email_mode", notificationEmail.value);
 		}
 		if (this.target.dataset.canEditAutoExecute === "true") {
-			const allowAutoExecute = card?.querySelector(
+			const allowAutoExecute = card?.querySelector<HTMLInputElement>(
 				"[name='allow_auto_execute']",
 			);
 			if (allowAutoExecute) {
@@ -410,18 +455,20 @@ export class UserSettings extends FormWidget {
 			}
 		}
 		if (this.target.dataset.canEditPublicEmail === "true") {
-			const allowSiteEmail = card?.querySelector("[name='allow_site_email']");
+			const allowSiteEmail = card?.querySelector<HTMLInputElement>(
+				"[name='allow_site_email']",
+			);
 			if (allowSiteEmail) {
 				data.set("allow_site_email", allowSiteEmail.checked ? "true" : "false");
 			}
 		}
 		if (this._groupSelect) {
-			Array.from(this._groupSelect.select.values).forEach((value) => {
+			Array.from(this._groupSelect.select?.values ?? []).forEach((value) => {
 				data.append("group", value);
 			});
 		}
 		if (this._pageSelect) {
-			Array.from(this._pageSelect.select.values).forEach((value) => {
+			Array.from(this._pageSelect.select?.values ?? []).forEach((value) => {
 				data.append("reassign-page", value);
 			});
 		}
@@ -430,11 +477,13 @@ export class UserSettings extends FormWidget {
 				"allow_messages_and_mentions",
 				"allow_task_assignments",
 			]) {
-				const toggle = card?.querySelector(`[name='${name}']`);
+				const toggle = card?.querySelector<HTMLInputElement>(
+					`[name='${name}']`,
+				);
 				if (toggle) data.set(name, toggle.checked ? "true" : "false");
 			}
 		}
-		card?.querySelector("[name='remove-user']")?.checked &&
+		card?.querySelector<HTMLInputElement>("[name='remove-user']")?.checked &&
 			data.set("remove-user", "true");
 		data.set("role", "user-settings");
 		return data;

@@ -1,8 +1,17 @@
 import { setIcon } from "../../shared/icons.ts";
 import { SiteSetting } from "./base.ts";
 
+interface ServiceProviderLink {
+	url: string;
+	icon: string;
+	title: string;
+	description: string;
+}
+
 export class SiteServiceProviders extends SiteSetting {
-	updated(response) {
+	declare _links?: ServiceProviderLink[];
+
+	updated(response: { service_providers?: ServiceProviderLink[] }) {
 		this._links = response.service_providers;
 	}
 
@@ -10,7 +19,7 @@ export class SiteServiceProviders extends SiteSetting {
 		if (this._links) this._renderServiceProviders(this._links);
 	}
 
-	_renderServiceProviders(links) {
+	_renderServiceProviders(links: ServiceProviderLink[]) {
 		const container = this.target.querySelector(
 			"[data-role='service-providers']",
 		);

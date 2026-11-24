@@ -1,7 +1,24 @@
-import { EmbeddedTable } from "../elements/base/baseTable.ts";
+import {
+	EmbeddedTable,
+	type EmbeddedTableAttributes,
+} from "../elements/base/baseTable.ts";
 
-export class TaskHistory extends EmbeddedTable {
-	constructor(attributes) {
+import type { ExpandedTableView } from "../elements/embeddedTable.ts";
+import type { RequestResult } from "../types/api";
+
+type TaskHistoryComponent = { name: string };
+type TaskHistoryAttributes = EmbeddedTableAttributes<
+	ExpandedTableView,
+	TaskHistoryComponent
+>;
+
+export class TaskHistory extends EmbeddedTable<
+	ExpandedTableView,
+	TaskHistoryComponent
+> {
+	declare _updated: HTMLElement | null;
+
+	constructor(attributes: TaskHistoryAttributes) {
 		super(attributes);
 		this._updated = null;
 	}
@@ -10,10 +27,11 @@ export class TaskHistory extends EmbeddedTable {
 		return this.target.querySelector("[data-role='table']");
 	}
 
-	async updated(response) {
-		this._updated = response.html.querySelector(
-			"[data-role='completion-history']",
-		);
+	async updated(response: RequestResult) {
+		this._updated =
+			(response.html || null)?.querySelector<HTMLElement>(
+				"[data-role='completion-history']",
+			) ?? null;
 	}
 
 	postreconcile() {
@@ -21,7 +39,7 @@ export class TaskHistory extends EmbeddedTable {
 
 		this.visible = true;
 		this.target.dataset.visible = "true";
-		this.table.replaceChildren(this._updated);
+		this.table?.replaceChildren(this._updated);
 		this._updated.dataset.visible = "true";
 		for (const table of this._updated.querySelectorAll("table")) {
 			table.dataset.visible = "true";

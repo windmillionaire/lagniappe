@@ -1,19 +1,40 @@
 import { FormController } from "../../../forms/controller.ts";
 import { captureError, ENDPOINTS, request } from "../../../shared/index.ts";
+import type { RequestResult } from "../../../types/api.d.ts";
+import type FormBuilder from "../builder.ts";
+import type { DraftGenerationResponse } from "../types.ts";
 
 export class FormSettings {
-	constructor(builder) {
+	declare builder: FormBuilder;
+	declare _destroyed: boolean;
+	declare _generationPromise: Promise<boolean> | null;
+	declare _generationIdentity: {
+		request_id: string;
+		draft_revision: number;
+	} | null;
+	declare _restrictionPromise: Promise<void> | null;
+	declare column: HTMLElement | null;
+	declare restrictions: HTMLFormElement | null;
+	declare restrictionForm: FormController | null;
+	declare generateForm: FormController | null;
+
+	constructor(builder: FormBuilder) {
 		this._destroyed = false;
 		this._generationPromise = null;
 		this.builder = builder;
 		this.column = document.getElementById("form-settings-panel");
-		this.restrictions = document.querySelector("[data-role='restrict-access']");
+		this.restrictions = document.querySelector<HTMLFormElement>(
+			"[data-role='restrict-access']",
+		);
 
-		const generateTarget = this.column?.querySelector("#generate");
+		const generateTarget =
+			this.column?.querySelector<HTMLFormElement>("#generate");
 		if (generateTarget) {
 			this.generateForm = new FormController({
 				target: generateTarget,
-				submitGroup: generateTarget.querySelector("[data-role='submit-group']"),
+				submitGroup: generateTarget.querySelector<HTMLElement>(
+					"[data-role='submit-group']",
+				),
 				messages: {
 					submit: "Generate",
 					submitting: "Thinking...",
@@ -56,15 +77,17 @@ export class FormSettings {
 
 		this.column?.addEventListener("click", this._click);
 
-		if (this.restrictions) {
+		if (this.restrictions && this.restrictionForm) {
 			await this.restrictionForm.init();
 			if (this._destroyed) return;
 			this.restrictions.addEventListener("submit", this._saveRestrictions);
 		}
 	}
 
-	_click(event) {
-		const button = event.target.closest("[data-role]");
+	_click(event: MouseEvent) {
+		const button = (event.target as Element | null)?.closest<HTMLElement>(
+			"[data-role]",
+		);
 		if (button?.dataset.role === "generate" && this.generateForm?.target) {
 			const visible = this.generateForm.target.dataset.visible === "true";
 			this.generateForm.target.dataset.visible = visible ? "false" : "true";
@@ -80,36 +103,37 @@ export class FormSettings {
 	}
 
 	get visible() {
-		return this.column.dataset.visible === "true";
+		return this.column?.dataset.visible === "true";
 	}
 
 	set visible(value) {
-		this.column.dataset.visible = value ? "true" : "false";
+		if (this.column) this.column.dataset.visible = value ? "true" : "false";
 	}
 
 	/**
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_group
 	 */
-	_saveRestrictions(event) {
+	_saveRestrictions(event: Event) {
 		event.preventDefault();
 		event.stopPropagation();
 		if (this._restrictionPromise) return this._restrictionPromise;
 		if (this._destroyed) return;
 		const form = this.restrictionForm;
-		const data = new FormData(this.restrictions);
+		const restrictions = this.restrictions;
+		const route = restrictions?.dataset.route;
+		if (!form || !restrictions || !route) return;
+		const data = new FormData(restrictions);
 		const snapshot = JSON.stringify([...data]);
 		form.submitting();
-		form.submitButton.disabled = true;
+		const button = form.submitButton;
+		if (button) button.disabled = true;
 		this._restrictionPromise = (async () => {
 			try {
-				const response = await request.put(
-					this.restrictions.dataset.route,
-					data,
-				);
+				const response = await request.put(route, data);
 				if (this._destroyed) return;
 				if (response?.ok === true) {
-					if (JSON.stringify([...new FormData(this.restrictions)]) === snapshot)
+					if (JSON.stringify([...new FormData(restrictions)]) === snapshot)
 						form.success();
 					else {
 						form.resetSubmitButton();
@@ -126,41 +150,47 @@ export class FormSettings {
 				if (!this._destroyed)
 					form.showError("Could not save restrictions. Try again.");
 			} finally {
-				if (!this._destroyed) form.submitButton.disabled = false;
+				if (!this._destroyed && button) button.disabled = false;
 				this._restrictionPromise = null;
 			}
 		})();
 		return this._restrictionPromise;
 	}
 
-	_generateSchema(event) {
+	_generateSchema(event: Event) {
 		event.preventDefault();
 		event.stopPropagation();
 		if (this._generationPromise) return this._generationPromise;
-		if (this._destroyed || !this.generateForm?.target) {
+		const form = this.generateForm;
+		const builderDraft = this.builder.draft;
+		if (this._destroyed || !form?.target || !builderDraft) {
 			return Promise.resolve(false);
 		}
 
-		const data = new FormData(this.generateForm.target);
+		const data = new FormData(form.target as HTMLFormElement);
 		const prompt = data.get("description");
-		const submitter = event.submitter || this.generateForm.submitButton;
+		const submitter =
+			((event as SubmitEvent).submitter as
+				| HTMLButtonElement
+				| HTMLInputElement
+				| null) || form.submitButton;
 
 		if (!prompt) {
-			this.generateForm.showError("Please enter a description");
+			form.showError("Please enter a description");
 			return Promise.resolve(false);
 		}
 
 		this.builder.updateSchema();
-		this.builder.draft.group = null;
+		builderDraft.group = null;
 		const identity = {
 			request_id: crypto.randomUUID(),
-			draft_revision: this.builder.draft.revision,
+			draft_revision: builderDraft.revision,
 		};
 		this._generationIdentity = identity;
 		const draft = this.builder.captureDraft();
 		data.set("schema", JSON.stringify(draft.schema));
 		data.set("html_fields", JSON.stringify(draft.html_fields));
-		data.set("baseline", this.builder.draft.baseline || "");
+		data.set("baseline", builderDraft.baseline || "");
 		data.set("draft_revision", String(identity.draft_revision));
 		data.set("request_id", identity.request_id);
 		if (submitter) {
@@ -171,19 +201,23 @@ export class FormSettings {
 
 		const pending = (async () => {
 			try {
-				const response = await request.post(ENDPOINTS.createSchema, data, {
-					replaceErrorPage: false,
-				});
+				const response = await request.post<DraftGenerationResponse>(
+					ENDPOINTS.createSchema,
+					data,
+					{
+						replaceErrorPage: false,
+					},
+				);
 				if (this._destroyed) return false;
 				if (this._generationIdentity !== identity) return false;
 				if (
-					identity.draft_revision !== this.builder.draft.revision ||
+					identity.draft_revision !== builderDraft.revision ||
 					response?.request_id !== identity.request_id ||
 					response?.draft_revision !== identity.draft_revision
 				) {
 					if (response?.ok === true) {
-						this.generateForm.messages.submit = "Regenerate";
-						this.generateForm.showError(
+						form.messages.submit = "Regenerate";
+						form.showError(
 							"Your draft changed while generation was running. Regenerate using your current draft.",
 						);
 						return false;
@@ -192,16 +226,14 @@ export class FormSettings {
 				const success = await this._updateSchema(response);
 				if (this._destroyed) return false;
 				if (success) {
-					this.generateForm.messages.submit = "Generate";
-					this.generateForm.success();
+					form.messages.submit = "Generate";
+					form.success();
 				}
 				return success;
 			} catch (error) {
 				captureError(error, submitter, { context: "builder-generate-schema" });
 				if (!this._destroyed) {
-					this.generateForm.showError(
-						"Could not generate this form. Try again.",
-					);
+					form.showError("Could not generate this form. Try again.");
 				}
 				return false;
 			} finally {
@@ -220,27 +252,33 @@ export class FormSettings {
 		return pending;
 	}
 
-	async _updateSchema(response) {
+	async _updateSchema(
+		response: RequestResult<DraftGenerationResponse> | null | undefined,
+	) {
 		if (this._destroyed || !this.generateForm) return false;
 
 		if (response?.ok === true && response.operations) {
 			try {
-				const revision = this.builder.draft.revision;
+				const draft = this.builder.draft;
+				if (!draft) return false;
+				const revision = draft.revision;
 				if (Object.keys(response.html_fields || {}).length)
 					await this.builder.prepareGeneratedDocuments(response.html_fields);
 				if (this._destroyed || this.builder._destroyed) return false;
-				if (revision !== this.builder.draft.revision) {
+				if (revision !== draft.revision) {
 					this.generateForm.messages.submit = "Regenerate";
 					this.generateForm.showError(
 						"Your draft changed while generation was running. Regenerate using your current draft.",
 					);
 					return false;
 				}
-				if (this.builder.draft.applyGeneration(response)) {
+				if (draft.applyGeneration(response)) {
 					this.builder.restoreDraft();
 				}
 			} catch (error) {
-				this.generateForm.showError(error.message);
+				this.generateForm.showError(
+					error instanceof Error ? error.message : String(error),
+				);
 				return false;
 			}
 			return true;

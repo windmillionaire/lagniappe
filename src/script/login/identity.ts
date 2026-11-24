@@ -15,8 +15,35 @@ const ERROR_CODES = new Map([
 	["INVALID_OOB_CODE", "auth/invalid-action-code"],
 ]);
 
+export interface IdentityPlatformConfig {
+	apiKey?: string;
+	projectId?: string;
+}
+
+export interface IdentityUser {
+	idToken: string;
+	email: string;
+	displayName?: string;
+}
+
+interface IdentityResponses {
+	"accounts:signUp": IdentityUser;
+	"accounts:signInWithPassword": IdentityUser;
+	"accounts:resetPassword": { email?: string };
+	"accounts:update": { email?: string };
+}
+
+type ActionCode = string | null | undefined;
+type CsrfToken = string | null | undefined;
+type ProviderError = { error?: { message?: string } };
+type AppResponse = { success?: boolean; error?: string };
+
 class IdentityPlatformError extends Error {
-	constructor(providerMessage, status = 0) {
+	declare providerCode: string;
+	declare status: number;
+	declare code: string;
+
+	constructor(providerMessage: unknown, status = 0) {
 		const providerCode = String(providerMessage || "")
 			.split(" : ", 1)[0]
 			.trim();
@@ -33,7 +60,10 @@ class IdentityPlatformError extends Error {
 }
 
 class IdentityPlatformClient {
-	constructor(config) {
+	declare apiKey: string;
+	declare projectId: string;
+
+	constructor(config: IdentityPlatformConfig | null) {
 		this.apiKey = String(config?.apiKey || "").trim();
 		this.projectId = String(config?.projectId || "").trim();
 		if (!this.apiKey || !this.projectId) {
@@ -41,8 +71,11 @@ class IdentityPlatformClient {
 		}
 	}
 
-	async request(method, payload) {
-		let response;
+	async request<Method extends keyof IdentityResponses>(
+		method: Method,
+		payload: object,
+	): Promise<IdentityResponses[Method]> {
+		let response: Response;
 		try {
 			response = await fetch(
 				`${IDENTITY_PLATFORM_API}/${method}?key=${encodeURIComponent(this.apiKey)}`,
@@ -56,7 +89,7 @@ class IdentityPlatformClient {
 			throw new IdentityPlatformError("", 0);
 		}
 
-		let data = {};
+		let data: (Partial<IdentityResponses[Method]> & ProviderError) | null = {};
 		try {
 			data = await response.json();
 		} catch (_error) {
@@ -65,11 +98,11 @@ class IdentityPlatformClient {
 		if (!response.ok) {
 			throw new IdentityPlatformError(data?.error?.message, response.status);
 		}
-		return data;
+		return data as IdentityResponses[Method];
 	}
 
-	async appRequest(path, payload, csrfToken) {
-		let response;
+	async appRequest(path: string, payload: object, csrfToken: CsrfToken) {
+		let response: Response;
 		try {
 			response = await fetch(path, {
 				method: "POST",
@@ -83,13 +116,13 @@ class IdentityPlatformClient {
 			throw new IdentityPlatformError("", 0);
 		}
 
-		let data = {};
+		let data: AppResponse | null = {};
 		try {
 			data = await response.json();
 		} catch (_error) {
 			// Invalid application responses are normalized below.
 		}
-		if (!response.ok || !data.success) {
+		if (!response.ok || !data?.success) {
 			throw new IdentityPlatformError(
 				response.status === 429 ? "TOO_MANY_ATTEMPTS_TRY_LATER" : data?.error,
 				response.status,
@@ -98,7 +131,7 @@ class IdentityPlatformClient {
 		return data;
 	}
 
-	signUp(email, password) {
+	signUp(email: string, password: string) {
 		return this.request("accounts:signUp", {
 			email,
 			password,
@@ -106,7 +139,7 @@ class IdentityPlatformClient {
 		});
 	}
 
-	signInWithPassword(email, password) {
+	signInWithPassword(email: string, password: string) {
 		return this.request("accounts:signInWithPassword", {
 			email,
 			password,
@@ -114,7 +147,7 @@ class IdentityPlatformClient {
 		});
 	}
 
-	sendPasswordResetEmail(email, csrfToken) {
+	sendPasswordResetEmail(email: string, csrfToken: CsrfToken) {
 		return this.appRequest(
 			"/users/send-password-reset-email",
 			{
@@ -124,7 +157,10 @@ class IdentityPlatformClient {
 		);
 	}
 
-	sendEmailVerification(user, csrfToken) {
+	sendEmailVerification(
+		user: Pick<IdentityUser, "idToken">,
+		csrfToken: CsrfToken,
+	) {
 		return this.appRequest(
 			"/users/send-verification-email",
 			{
@@ -134,18 +170,18 @@ class IdentityPlatformClient {
 		);
 	}
 
-	confirmPasswordReset(oobCode, newPassword) {
+	confirmPasswordReset(oobCode: ActionCode, newPassword: string) {
 		return this.request("accounts:resetPassword", {
 			oobCode,
 			newPassword,
 		});
 	}
 
-	verifyPasswordResetCode(oobCode) {
+	verifyPasswordResetCode(oobCode: ActionCode) {
 		return this.request("accounts:resetPassword", { oobCode });
 	}
 
-	applyActionCode(oobCode) {
+	applyActionCode(oobCode: ActionCode) {
 		return this.request("accounts:update", { oobCode });
 	}
 }

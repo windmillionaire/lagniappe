@@ -2,10 +2,22 @@ import { STYLES } from "../../generated/styles.mjs";
 import { Dropdown } from "../combobox/index.ts";
 import { USER_COLORS } from "./config.ts";
 import { createMenuButton } from "./dropdowns.ts";
+import type { Toolbar } from "./toolbar.ts";
+
+interface KnownUser {
+	name: string;
+	hash: string;
+	color: string;
+}
+
+interface PresenceUser {
+	hash?: string;
+	name?: string;
+}
 
 const DEFAULT_USER_COLOR = "rgba(22, 163, 74, 0.6)";
 
-const _userItem = (item) => {
+const _userItem = (item: KnownUser) => {
 	const itemElt = document.createElement("div");
 	itemElt.role = "option";
 	itemElt.className = STYLES.dropdown.option.action;
@@ -24,7 +36,15 @@ const _userItem = (item) => {
 };
 
 export class UserManager {
-	constructor(toolbar) {
+	declare toolbar: Toolbar;
+	declare menuSettings: { icon: string; title: string };
+	declare users: KnownUser[];
+	declare knownUsers: Map<string, KnownUser>;
+	declare user: PresenceUser | null;
+	declare button: HTMLButtonElement | null;
+	declare dropdown: Dropdown | null;
+
+	constructor(toolbar: Toolbar) {
 		this.toolbar = toolbar;
 		this.users = [];
 		this.knownUsers = new Map();
@@ -37,7 +57,10 @@ export class UserManager {
 		};
 	}
 
-	getUserColor(hash, user = null) {
+	getUserColor(
+		hash: string | null | undefined,
+		user: PresenceUser | null = null,
+	) {
 		if (!hash) return "";
 		let known = this.knownUsers.get(hash);
 		if (!known && user?.name) {
@@ -55,29 +78,32 @@ export class UserManager {
 		return known?.color || DEFAULT_USER_COLOR;
 	}
 
-	remoteUpdate(userHash, user = null) {
+	remoteUpdate(
+		userHash: string | null | undefined,
+		user: PresenceUser | null = null,
+	) {
 		const storage = this.toolbar.editor.storage.flashRemoteChanges;
 		storage.color = this.getUserColor(userHash, user);
-		storage.author = this.knownUsers.get(userHash)?.name ?? "";
+		storage.author =
+			(userHash ? this.knownUsers.get(userHash)?.name : undefined) ?? "";
 	}
 
-	setUsers(users) {
+	setUsers(users: PresenceUser[]) {
 		const menuRow = this.toolbar.element.querySelector(
 			'[data-role="toolbar-menus"]',
 		);
 
 		if (this.button) {
-			if (this.button._lp_combobox) {
-				this.button._lp_combobox.destroy();
-			}
+			this.dropdown?.destroy();
 			this.button.remove();
 			this.button = null;
 			this.dropdown = null;
 		}
 
-		const activeUsers = new Map();
+		const activeUsers = new Map<string, { hash: string; name: string }>();
 		for (const user of users) {
-			if (user?.hash && user?.name) activeUsers.set(user.hash, user);
+			if (user?.hash && user?.name)
+				activeUsers.set(user.hash, { hash: user.hash, name: user.name });
 		}
 		this.users = [...activeUsers.values()].map((user) => {
 			const color = this.getUserColor(user.hash, user);
@@ -97,11 +123,11 @@ export class UserManager {
 			},
 		});
 
-		menuRow.appendChild(this.button);
+		menuRow?.appendChild(this.button);
 	}
 
 	destroy() {
-		this.button?._lp_combobox?.destroy();
+		this.dropdown?.destroy();
 		this.button?.remove();
 		this.users = [];
 		this.knownUsers.clear();

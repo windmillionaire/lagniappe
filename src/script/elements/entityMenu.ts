@@ -6,21 +6,24 @@ import { Dropdown } from "./combobox/dropdown.ts";
  *
  */
 export class EntityMenu {
-	constructor(view) {
+	declare view: object | null;
+	declare dropdowns: Set<Dropdown>;
+
+	constructor(view: object) {
 		this.view = view;
 		this.dropdowns = new Set();
 	}
 
-	_items(container) {
-		const entityKey = container.closest("[data-key]")?.dataset.key;
+	_items(container: HTMLElement) {
+		const entityKey = container.closest<HTMLElement>("[data-key]")?.dataset.key;
 		return Array.from(
-			container.querySelectorAll(
+			container.querySelectorAll<HTMLElement & { disabled?: boolean }>(
 				":scope > [data-role='menu-items'] > [data-menu-item]",
 			),
 		)
 			.filter((item) => !item.disabled && item.dataset.visible !== "false")
 			.map((source) => {
-				const option = source.cloneNode(true);
+				const option = source.cloneNode(true) as HTMLElement;
 				option.hidden = false;
 				option.removeAttribute("id");
 				option.setAttribute("role", "menuitem");
@@ -36,18 +39,18 @@ export class EntityMenu {
 			});
 	}
 
-	toggle(container) {
+	toggle(container: HTMLElement | null) {
 		if (!container) return;
 		this._prune();
 
-		const trigger = container.querySelector(
+		const trigger = container.querySelector<HTMLElement>(
 			":scope > [data-role='menu-trigger']",
 		);
 		const items = this._items(container);
 		if (!trigger || items.length === 0) return;
 		const title = container
 			.closest("[data-menu-anchor]")
-			?.querySelector("[data-role='title']");
+			?.querySelector<HTMLElement>("[data-role='title']");
 
 		const dropdown = new Dropdown(trigger).init({
 			items,

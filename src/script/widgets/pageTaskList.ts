@@ -1,8 +1,50 @@
-import { BaseList } from "../elements/base/baseList.ts";
+import { BaseList, type ListAttributes } from "../elements/base/baseList.ts";
 import { withTransition } from "../shared/transitions.ts";
+import type { RequestResult } from "../types/api";
+import type ViewComponent from "../views/base/component.ts";
+import type Core from "../views/base/core.ts";
+import type { Task } from "../views/base/task.ts";
+
+export interface PageTaskDelta {
+	remove?: string[];
+	upsert?: { key: string; html: string }[];
+	order?: string[];
+	empty?: string | null;
+}
+
+type TaskRowUpdate = { from: HTMLLIElement; to: HTMLLIElement };
+type StagedReplacement = TaskRowUpdate & {
+	current: ViewComponent | null;
+	replacement: ViewComponent | null;
+};
+type StagedCreation = {
+	hasForm: boolean;
+	newTask: ViewComponent;
+	elt: HTMLLIElement;
+};
+type TaskListView = Pick<
+	Core,
+	"key" | "getComponent" | "addFlash" | "update" | "load" | "components"
+>;
+type TaskListResponse = { html?: Document | HTMLElement | "" | null };
+type TaskListSettings = ListAttributes & {
+	component: ViewComponent;
+	view: TaskListView;
+};
 
 export class PageTaskList extends BaseList {
-	constructor(attributes) {
+	declare component: ViewComponent;
+	declare view: TaskListView;
+	declare route?: string;
+	declare _added: HTMLLIElement[];
+	declare _removed: HTMLLIElement[];
+	declare _replaced: TaskRowUpdate[];
+	declare _updated: HTMLElement[];
+	declare _replaceAll?: HTMLElement[] | null;
+	declare _preparedReplacements?: StagedReplacement[];
+	declare _preparedCreated?: StagedCreation[];
+
+	constructor(attributes: TaskListSettings) {
 		super(attributes);
 		this._change = this._change.bind(this);
 		this._click = this._click.bind(this);
@@ -22,26 +64,31 @@ export class PageTaskList extends BaseList {
 		this.target.addEventListener("component-opened", this._scrollOpenedTask);
 	}
 
-	_change(e) {
-		const widget = e.target.closest("[data-widget]")?.dataset.widget;
-		if (!["TaskSettings", "TaskForm"].includes(widget)) {
+	_change(e: Event) {
+		const target = e.target as Element | null;
+		if (!target?.closest) return;
+		const widget = target.closest<HTMLElement>("[data-widget]")?.dataset.widget;
+		if (widget !== "TaskSettings" && widget !== "TaskForm") {
 			return;
 		}
-		const task = e.target.closest("li");
-		const saved = task.querySelector("[data-saved]");
+		const task = target.closest("li");
+		const saved = task?.querySelector<HTMLElement>("[data-saved]");
 		if (saved) {
 			saved.dataset.saved = "false";
 			saved.dataset.visible = "true";
 		}
 	}
 
-	_click(e) {
-		const submitter = e.target.closest(
+	_click(e: MouseEvent) {
+		const target = e.target as Element | null;
+		if (!target?.closest) return;
+		const submitter = target.closest<HTMLElement>(
 			"[data-role='save-toggle'], [data-role='complete-toggle']",
 		);
 		const role = submitter?.dataset?.role;
 		if (submitter && this.target.contains(submitter)) {
 			const task = this.view.getComponent(submitter);
+			if (!task) return;
 			const route = task.elt.dataset.route;
 			task.disable();
 			e.stopPropagation();
@@ -54,12 +101,12 @@ export class PageTaskList extends BaseList {
 				const data = new FormData();
 				data.append("role", role);
 				if (task.elt.dataset.completed === "true") {
-					const choice = task.elt.querySelector(
+					const choice = task.elt.querySelector<HTMLInputElement>(
 						"[data-role='completion-submission-choice']:checked",
 					);
 					data.append("completion_submission", choice?.value || "modified");
 				}
-				this.view.update(task, data, route);
+				void this.view.update(task, data, route);
 				return;
 			}
 
@@ -73,7 +120,7 @@ export class PageTaskList extends BaseList {
 		}
 
 		const completedHeader = this.completedHeader;
-		if (completedHeader?.contains(e.target)) {
+		if (completedHeader?.contains(target)) {
 			const expandToggle = this.expandToggle;
 			const completedTasks = this.completedTasks;
 			if (!expandToggle || !completedTasks) return;
@@ -87,14 +134,21 @@ export class PageTaskList extends BaseList {
 		}
 	}
 
-	_setActiveTask(e) {
-		const activeTask = e.detail.subcomponent;
-		this._moveTaskIfNecessary(activeTask.elt);
+	_setActiveTask(e: Event) {
+		const { subcomponent } = (e as CustomEvent<{ subcomponent: ViewComponent }>)
+			.detail;
+		this._moveTaskIfNecessary(subcomponent.elt as HTMLLIElement);
 		this._setListVisibility();
 	}
 
-	_scrollOpenedTask(e) {
-		const { component, trigger } = e.detail || {};
+	_scrollOpenedTask(e: Event) {
+		const { component, trigger } =
+			(
+				e as CustomEvent<{
+					component?: ViewComponent;
+					trigger?: Element | null;
+				}>
+			).detail || {};
 		const task = component?.elt;
 		if (
 			e.target !== task ||
@@ -104,7 +158,12 @@ export class PageTaskList extends BaseList {
 		)
 			return;
 
-		if (!component.active?.target) return;
+		if (
+			!component?.active ||
+			!("target" in component.active) ||
+			!component.active.target
+		)
+			return;
 		const { top, bottom } = task.getBoundingClientRect();
 		const viewportTop = 80;
 		const viewportBottom =
@@ -123,27 +182,29 @@ export class PageTaskList extends BaseList {
 		});
 	}
 
-	_moveTaskIfNecessary(taskElt) {
+	_moveTaskIfNecessary(taskElt: HTMLLIElement) {
 		if (this._existingTask(taskElt)) return;
 
 		const completed = taskElt.dataset.completed === "true";
 		const list = completed ? this.completedTasks : this.activeTasks;
-		if (!list.contains(taskElt)) {
+		if (list && !list.contains(taskElt)) {
 			const moving =
-				this.activeTasks.contains(taskElt) ||
-				this.completedTasks.contains(taskElt);
+				this.activeTasks?.contains(taskElt) ||
+				this.completedTasks?.contains(taskElt);
 			list.prepend(taskElt);
 			if (!moving) this.view.addFlash(taskElt);
 		}
 	}
 
-	_existingTask(taskElt) {
+	_existingTask(taskElt: HTMLLIElement) {
 		const key = taskElt?.dataset?.key;
 		const id = taskElt?.id;
 		if (!key && !id) return null;
 
 		return Array.from(
-			this.target.querySelectorAll("li[lp-component][data-kind='task']"),
+			this.target.querySelectorAll<HTMLLIElement>(
+				"li[lp-component][data-kind='task']",
+			),
 		).find((elt) => {
 			return (
 				elt !== taskElt &&
@@ -152,14 +213,14 @@ export class PageTaskList extends BaseList {
 		});
 	}
 
-	async focusTask(taskId) {
+	async focusTask(taskId: string) {
 		const taskElt = this.target.querySelector(`[data-key="${taskId}"]`);
 		if (!taskElt) return false;
 
 		const task = this.view.getComponent(taskElt);
 		if (!task) return false;
 
-		const revealCompleted = this.completedTasks.contains(taskElt);
+		const revealCompleted = this.completedTasks?.contains(taskElt);
 		await task.activate("default");
 		await task.prepareRender(true);
 		await withTransition(
@@ -174,11 +235,14 @@ export class PageTaskList extends BaseList {
 	}
 
 	_openCompletedTasks() {
-		this.completedTasks.dataset.visible = "true";
-		this.expandToggle.dataset.open = "true";
-		this.expandToggle.setAttribute("aria-expanded", "true");
-		this.expandToggle.setAttribute("aria-label", "Collapse");
-		this.expandToggle.title = "Collapse";
+		const completed = this.completedTasks;
+		const toggle = this.expandToggle;
+		if (!completed || !toggle) return;
+		completed.dataset.visible = "true";
+		toggle.dataset.open = "true";
+		toggle.setAttribute("aria-expanded", "true");
+		toggle.setAttribute("aria-label", "Collapse");
+		toggle.title = "Collapse";
 	}
 
 	_setListVisibility() {
@@ -190,12 +254,12 @@ export class PageTaskList extends BaseList {
 
 		const hasActive = this.activeCount > 0;
 		const hasCompleted = this.completedCount > 0;
-		const empty = activeTasks.querySelector("[data-role='empty']");
+		const empty = activeTasks.querySelector<HTMLElement>("[data-role='empty']");
 		const showEmpty =
 			Boolean(empty) &&
 			!hasActive &&
 			!hasCompleted &&
-			this.component.active === this;
+			Object.is(this.component.active, this);
 
 		if (empty) empty.dataset.visible = showEmpty ? "true" : "false";
 		activeTasks.dataset.visible = hasActive || showEmpty ? "true" : "false";
@@ -214,19 +278,23 @@ export class PageTaskList extends BaseList {
 	}
 
 	get activeTasks() {
-		return this.target.querySelector("[data-role='active-tasks']");
+		return this.target.querySelector<HTMLElement>("[data-role='active-tasks']");
 	}
 
 	get expandToggle() {
-		return this.target.querySelector("[data-role='expand']");
+		return this.target.querySelector<HTMLElement>("[data-role='expand']");
 	}
 
 	get completedTasks() {
-		return this.target.querySelector("[data-role='completed-tasks']");
+		return this.target.querySelector<HTMLElement>(
+			"[data-role='completed-tasks']",
+		);
 	}
 
 	get completedHeader() {
-		return this.target.querySelector("[data-role='completed-header']");
+		return this.target.querySelector<HTMLElement>(
+			"[data-role='completed-header']",
+		);
 	}
 
 	get activeCount() {
@@ -253,7 +321,9 @@ export class PageTaskList extends BaseList {
 		}
 		return {
 			rows: Array.from(
-				this.target.querySelectorAll("li[lp-entity][data-kind='task']"),
+				this.target.querySelectorAll<HTMLLIElement>(
+					"li[lp-entity][data-kind='task']",
+				),
 				(task) => ({
 					key: task.dataset.key,
 					hash: task.dataset.hash || "",
@@ -263,17 +333,21 @@ export class PageTaskList extends BaseList {
 		};
 	}
 
-	_parseRefreshTask(html) {
+	_parseRefreshTask(html: string) {
 		if (!html) return null;
 		const template = document.createElement("template");
 		template.innerHTML = html.trim();
-		return template.content.querySelector("li[lp-component][data-kind='task']");
+		return template.content.querySelector<HTMLLIElement>(
+			"li[lp-component][data-kind='task']",
+		);
 	}
 
-	async prepareRefreshDelta(delta) {
+	async prepareRefreshDelta(delta: PageTaskDelta) {
 		const existing = new Map(
 			Array.from(
-				this.target.querySelectorAll("li[lp-entity][data-kind='task']"),
+				this.target.querySelectorAll<HTMLLIElement>(
+					"li[lp-entity][data-kind='task']",
+				),
 				(task) => [task.dataset.key, task],
 			),
 		);
@@ -285,11 +359,11 @@ export class PageTaskList extends BaseList {
 			// have added a task since this list loaded; reconcile the full list
 			// through the usual draft-preserving path before applying anything.
 			const response = await this.view.load(this.component, this.route);
-			return this.prepareRefresh(response);
+			return this.prepareRefresh(response ?? undefined);
 		}
 		this._removed = (delta.remove || [])
 			.map((key) => existing.get(key))
-			.filter(Boolean);
+			.filter((task) => task !== undefined);
 		this._replaced = [];
 		this._added = [];
 
@@ -309,7 +383,9 @@ export class PageTaskList extends BaseList {
 
 			const refreshed = new Map(
 				Array.from(
-					this.target.querySelectorAll("li[lp-entity][data-kind='task']"),
+					this.target.querySelectorAll<HTMLLIElement>(
+						"li[lp-entity][data-kind='task']",
+					),
 					(task) => [task.dataset.key, task],
 				),
 			);
@@ -326,8 +402,8 @@ export class PageTaskList extends BaseList {
 					"li[lp-entity][data-kind='task'][data-open]:not([data-open='false'])",
 				),
 			);
-			const activeOrder = [];
-			const completedOrder = [];
+			const activeOrder: HTMLLIElement[] = [];
+			const completedOrder: HTMLLIElement[] = [];
 			for (const key of delta.order || []) {
 				const task = refreshed.get(key);
 				if (!task) {
@@ -342,7 +418,7 @@ export class PageTaskList extends BaseList {
 						? preserveCompletedOrder
 						: preserveActiveOrder;
 				if (preserveOrder) {
-					if (!list.contains(task)) list.append(task);
+					if (list && !list.contains(task)) list.append(task);
 				} else {
 					(task.dataset.completed === "true"
 						? completedOrder
@@ -353,8 +429,8 @@ export class PageTaskList extends BaseList {
 			for (const [list, desired] of [
 				[this.activeTasks, activeOrder],
 				[this.completedTasks, completedOrder],
-			]) {
-				if (!desired.length) continue;
+			] as const) {
+				if (!list || !desired.length) continue;
 				const current = Array.from(list.children).filter((child) =>
 					child.matches("li[lp-entity][data-kind='task']"),
 				);
@@ -374,24 +450,26 @@ export class PageTaskList extends BaseList {
 				const template = document.createElement("template");
 				template.innerHTML = delta.empty.trim();
 				const empty = template.content.querySelector("li[data-role='empty']");
-				if (empty) this.activeTasks.append(empty);
+				if (empty) this.activeTasks?.append(empty);
 			}
 			this._setListVisibility();
 		};
 	}
 
-	async refreshDelta(delta) {
+	async refreshDelta(delta: PageTaskDelta) {
 		const commit = await this.prepareRefreshDelta(delta);
 		commit?.();
 	}
 
-	updated(response) {
+	updated(response: RequestResult) {
 		if (!response.html) return;
 
 		const updated = [
-			response.html.querySelector("[data-role='active-tasks']"),
-			response.html.querySelector("[data-role='completed-header']"),
-			response.html.querySelector("[data-role='completed-tasks']"),
+			response.html.querySelector<HTMLElement>("[data-role='active-tasks']"),
+			response.html.querySelector<HTMLElement>(
+				"[data-role='completed-header']",
+			),
+			response.html.querySelector<HTMLElement>("[data-role='completed-tasks']"),
 		];
 		if (updated.some((element) => !element)) {
 			this._updated = [];
@@ -399,30 +477,34 @@ export class PageTaskList extends BaseList {
 		}
 
 		this._isEmpty = !response.html.querySelector("[data-key]");
-		this._updated = updated;
+		this._updated = updated.filter((element) => element !== null);
 	}
-	async prepareRefresh(response) {
+	async prepareRefresh(response: TaskListResponse | undefined) {
 		if (!this._queueRefresh(response)) return;
 		await this.prereconcile();
 		return () => this.postreconcile();
 	}
 
-	async refresh(response) {
+	async refresh(response: RequestResult | undefined) {
 		const commit = await this.prepareRefresh(response);
 		commit?.();
 	}
 
-	_queueRefresh(response) {
+	_queueRefresh(response: TaskListResponse | undefined) {
 		if (!response?.html) return;
 		const existingTasks = new Map(
 			Array.from(
-				this.target.querySelectorAll("li[lp-component][data-kind='task']"),
+				this.target.querySelectorAll<HTMLLIElement>(
+					"li[lp-component][data-kind='task']",
+				),
 			).map((elt) => [elt.id, elt]),
 		);
 
 		const newTasks = new Map(
 			Array.from(
-				response.html.querySelectorAll("li[lp-component][data-kind='task']"),
+				response.html.querySelectorAll<HTMLLIElement>(
+					"li[lp-component][data-kind='task']",
+				),
 			).map((elt) => [elt.id, elt]),
 		);
 
@@ -437,10 +519,10 @@ export class PageTaskList extends BaseList {
 		});
 
 		newTasks.forEach((elt, id) => {
-			if (existingTasks.has(id)) {
-				const existingFingerprint = existingTasks.get(id).dataset.fingerprint;
-				if (existingFingerprint !== elt.dataset.fingerprint) {
-					this._replaced.push({ from: existingTasks.get(id), to: elt });
+			const existing = existingTasks.get(id);
+			if (existing) {
+				if (existing.dataset.fingerprint !== elt.dataset.fingerprint) {
+					this._replaced.push({ from: existing, to: elt });
 				}
 			} else {
 				this._added.push(elt);
@@ -450,7 +532,7 @@ export class PageTaskList extends BaseList {
 		return true;
 	}
 
-	_restorableWidgetName(taskElt, open) {
+	_restorableWidgetName(taskElt: HTMLLIElement, open?: string) {
 		if (!open || open === "false") return null;
 
 		const widget = open === "true" ? taskElt.dataset.default : open;
@@ -459,7 +541,10 @@ export class PageTaskList extends BaseList {
 		return taskElt.querySelector(`[data-widget='${widget}']`) ? widget : null;
 	}
 
-	_hasPendingLocalFormState(component, replacement = null) {
+	_hasPendingLocalFormState(
+		component: ViewComponent | null,
+		replacement: HTMLLIElement | null = null,
+	) {
 		return Object.values(component?.widgets ?? {}).some((widget) => {
 			if (
 				widget.unsavedState === true ||
@@ -472,7 +557,7 @@ export class PageTaskList extends BaseList {
 			}
 
 			if (
-				component.active !== widget ||
+				component?.active !== widget ||
 				widget.visible !== true ||
 				!widget.name
 			) {
@@ -535,6 +620,7 @@ export class PageTaskList extends BaseList {
 			if (pendingAdded || this._existingTask(elt)) continue;
 
 			const newTask = this.view.getComponent(elt);
+			if (!newTask) continue;
 			const hasForm = newTask.elt.dataset.default === "TaskForm";
 			if (hasForm) {
 				await newTask.activate("TaskForm");
@@ -567,7 +653,8 @@ export class PageTaskList extends BaseList {
 			from.replaceWith(to);
 			current?.destroy?.();
 			if (replacement) {
-				this.view.components[replacement.key] = replacement;
+				if (replacement.key)
+					this.view.components[replacement.key] = replacement;
 				if (replacement.active) replacement.render(true);
 			}
 			this._moveTaskIfNecessary(to);
@@ -580,7 +667,7 @@ export class PageTaskList extends BaseList {
 		this._added = [];
 
 		for (const { hasForm, newTask, elt } of this._preparedCreated || []) {
-			this.activeTasks.prepend(elt);
+			this.activeTasks?.prepend(elt);
 			this.view.addFlash(elt);
 			if (hasForm) newTask.render(true);
 		}
@@ -595,7 +682,7 @@ export class PageTaskList extends BaseList {
 			"li[lp-component][data-kind='task'][data-open]:not([data-open='false'])",
 		);
 		openTasks.forEach((elt) => {
-			const task = this.view.getComponent(elt);
+			const task = this.view.getComponent(elt) as Task | null;
 			task?.closeOpenWidget?.();
 		});
 	}

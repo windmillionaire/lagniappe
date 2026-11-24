@@ -1,29 +1,9 @@
-import { markPerformance, whenIdle } from "./shell.ts";
+import type Core from "./core.ts";
+import type { EssentialService, ViewNotifications } from "./core.ts";
+import { loadViewService, markPerformance, whenIdle } from "./shell.ts";
 
-const loadOnce = (view, promiseKey, handleKey, loader) => {
-	if (view[handleKey]) return Promise.resolve(view[handleKey]);
-	if (view[promiseKey]) return view[promiseKey];
-
-	const pending = Promise.resolve()
-		.then(loader)
-		.then((manager) => {
-			if (view._destroyed) {
-				manager?.destroy?.();
-				return null;
-			}
-			if (manager) view[handleKey] = manager;
-			return manager || null;
-		})
-		.catch((error) => {
-			if (view[promiseKey] === pending) view[promiseKey] = null;
-			throw error;
-		});
-	view[promiseKey] = pending;
-	return pending;
-};
-
-export const ensureOfflineQueue = (view) =>
-	loadOnce(view, "_offlineQueuePromise", "offlineQueue", async () => {
+export const ensureOfflineQueue = (view: Core) =>
+	loadViewService(view, "_offlineQueuePromise", "offlineQueue", async () => {
 		const { OfflineQueue } = await import("../../shared/offlineQueue.ts");
 		if (view._destroyed) return null;
 		const queue = new OfflineQueue(view);
@@ -31,8 +11,8 @@ export const ensureOfflineQueue = (view) =>
 		return queue;
 	});
 
-export const ensurePollingCoordinator = (view) =>
-	loadOnce(view, "_pollingPromise", "PollingCoordinator", async () => {
+export const ensurePollingCoordinator = (view: Core) =>
+	loadViewService(view, "_pollingPromise", "PollingCoordinator", async () => {
 		const { PollingCoordinator } = await import("../../shared/polling.ts");
 		if (view._destroyed) return null;
 		const coordinator = new PollingCoordinator(view).init();
@@ -44,8 +24,8 @@ export const ensurePollingCoordinator = (view) =>
 		return coordinator;
 	});
 
-export const ensureSyncManager = (view) =>
-	loadOnce(view, "_syncPromise", "SyncManager", async () => {
+export const ensureSyncManager = (view: Core) =>
+	loadViewService(view, "_syncPromise", "SyncManager", async () => {
 		await ensurePollingCoordinator(view);
 		const { SyncManager } = await import("../../shared/sync.ts");
 		if (view._destroyed) return null;
@@ -54,8 +34,8 @@ export const ensureSyncManager = (view) =>
 		return manager;
 	});
 
-export const ensureEditWatcher = (view) =>
-	loadOnce(view, "_editWatcherPromise", "EditWatcher", async () => {
+export const ensureEditWatcher = (view: Core) =>
+	loadViewService(view, "_editWatcherPromise", "EditWatcher", async () => {
 		await ensurePollingCoordinator(view);
 		const { EditWatcher } = await import("../../forms/revisions/watcher.ts");
 		if (view._destroyed) return null;
@@ -64,8 +44,8 @@ export const ensureEditWatcher = (view) =>
 		return watcher;
 	});
 
-export const ensureDeferredOperations = (view) =>
-	loadOnce(
+export const ensureDeferredOperations = (view: Core) =>
+	loadViewService(
 		view,
 		"_deferredOperationsPromise",
 		"DeferredOperations",
@@ -79,8 +59,10 @@ export const ensureDeferredOperations = (view) =>
 		},
 	);
 
-export const ensureNotifications = (view) =>
-	loadOnce(view, "_notificationsPromise", "Notifications", async () => {
+export const ensureNotifications = (
+	view: Core,
+): Promise<ViewNotifications | null> =>
+	loadViewService(view, "_notificationsPromise", "Notifications", async () => {
 		if (!document.querySelector("[data-role='notifications']")) return null;
 		const { Notifications } = await import("../../elements/notifications.ts");
 		if (view._destroyed) return null;
@@ -89,9 +71,9 @@ export const ensureNotifications = (view) =>
 		return notifications;
 	});
 
-export const ensureSearchBox = (view) =>
-	loadOnce(view, "_searchPromise", "SearchBox", async () => {
-		const search = document.querySelector("[lp-search]");
+export const ensureSearchBox = (view: Core) =>
+	loadViewService(view, "_searchPromise", "SearchBox", async () => {
+		const search = document.querySelector<HTMLElement>("[lp-search]");
 		if (!search) return null;
 		const { SearchBox } = await import("../../elements/combobox/search.ts");
 		if (view._destroyed) return null;
@@ -100,22 +82,22 @@ export const ensureSearchBox = (view) =>
 		return box;
 	});
 
-export const ensureEntityMenu = (view) =>
-	loadOnce(view, "_entityMenuPromise", "EntityMenu", async () => {
+export const ensureEntityMenu = (view: Core) =>
+	loadViewService(view, "_entityMenuPromise", "EntityMenu", async () => {
 		const { EntityMenu } = await import("../../elements/entityMenu.ts");
 		if (view._destroyed) return null;
 		return new EntityMenu(view);
 	});
 
-export const ensureSubmissionManager = (view) =>
-	loadOnce(view, "_submissionPromise", "SubmissionManager", async () => {
+export const ensureSubmissionManager = (view: Core) =>
+	loadViewService(view, "_submissionPromise", "SubmissionManager", async () => {
 		const { SubmissionManager } = await import("./submission.ts");
 		if (view._destroyed) return null;
 		return new SubmissionManager(view);
 	});
 
-export const ensureOfflineModal = (view) =>
-	loadOnce(view, "_offlineModalPromise", "offlineModal", async () => {
+export const ensureOfflineModal = (view: Core) =>
+	loadViewService(view, "_offlineModalPromise", "offlineModal", async () => {
 		if (!view.offlineIndicator) return null;
 		const { OfflineModal } = await import("../../shared/modal.ts");
 		if (view._destroyed) return null;
@@ -124,8 +106,8 @@ export const ensureOfflineModal = (view) =>
 		return modal;
 	});
 
-export const ensureModalClasses = (view) =>
-	loadOnce(view, "_modalClassesPromise", "ModalClasses", async () => {
+export const ensureModalClasses = (view: Core) =>
+	loadViewService(view, "_modalClassesPromise", "ModalClasses", async () => {
 		const { DeleteModal, HelpModal, Modal } = await import(
 			"../../shared/modal.ts"
 		);
@@ -133,10 +115,14 @@ export const ensureModalClasses = (view) =>
 		return { DeleteModal, HelpModal, Modal };
 	});
 
-const hasSyncCapability = (view) =>
+const hasSyncCapability = (view: Core) =>
 	Boolean(view.elt.querySelector("[lp-sync]"));
 
-const settleServices = async (view, promises, context) => {
+const settleServices = async <Result>(
+	view: Core,
+	promises: Promise<Result>[],
+	context: string,
+) => {
 	const results = await Promise.allSettled(promises);
 	for (const result of results) {
 		if (result.status === "rejected") {
@@ -153,7 +139,7 @@ const settleServices = async (view, promises, context) => {
  * background schedule.
  *
  */
-export const initializeCoreServices = (view) => {
+export const initializeCoreServices = (view: Core): Core["servicesReady"] => {
 	if (view._servicesInitialized) return view.servicesReady;
 	view._servicesInitialized = true;
 	const start = view._publishedReady.then(() => view);
@@ -175,38 +161,49 @@ export const initializeCoreServices = (view) => {
 		return replayOfflineQueue(view, queue);
 	});
 
-	const essential = start.then(async () => {
-		if (view._destroyed) return [];
-		view._setOfflineIndicator();
-		return await settleServices(
-			view,
-			[
-				ensurePollingCoordinator(view),
-				// Server-backed widgets are the visible page. Start them directly;
-				// IndexedDB hydration and replay must never gate their first render.
-				view.prefetch(),
-			],
-			"essential-service-startup",
-		);
-	});
+	const essential = start.then(
+		async (): Promise<PromiseSettledResult<EssentialService>[]> => {
+			if (view._destroyed) return [];
+			view._setOfflineIndicator();
+			return await settleServices<EssentialService>(
+				view,
+				[
+					ensurePollingCoordinator(view),
+					// Server-backed widgets are the visible page. Start them directly;
+					// IndexedDB hydration and replay must never gate their first render.
+					view.prefetch(),
+				],
+				"essential-service-startup",
+			);
+		},
+	);
 
-	const optional = idle.then(async () => {
-		if (view._destroyed) return [];
-		const warmers = [];
-		if (document.querySelector("[data-role='notifications']")) {
-			warmers.push(ensureNotifications(view));
-		}
-		if (
-			view.elt.matches("[data-operation]") ||
-			view.elt.querySelector("[data-operation]")
-		) {
-			warmers.push(ensureDeferredOperations(view));
-		}
-		if (view.elt.querySelector("[lp-edited-marker]")) {
-			warmers.push(ensureEditWatcher(view));
-		}
-		return await settleServices(view, warmers, "optional-service-startup");
-	});
+	type OptionalService = Awaited<
+		ReturnType<
+			| typeof ensureNotifications
+			| typeof ensureDeferredOperations
+			| typeof ensureEditWatcher
+		>
+	>;
+	const optional = idle.then(
+		async (): Promise<PromiseSettledResult<OptionalService>[]> => {
+			if (view._destroyed) return [];
+			const warmers: Promise<OptionalService>[] = [];
+			if (document.querySelector("[data-role='notifications']")) {
+				warmers.push(ensureNotifications(view));
+			}
+			if (
+				view.elt.matches("[data-operation]") ||
+				view.elt.querySelector("[data-operation]")
+			) {
+				warmers.push(ensureDeferredOperations(view));
+			}
+			if (view.elt.querySelector("[lp-edited-marker]")) {
+				warmers.push(ensureEditWatcher(view));
+			}
+			return await settleServices(view, warmers, "optional-service-startup");
+		},
+	);
 
 	view.servicesReady = Promise.all([
 		essential,
@@ -215,7 +212,7 @@ export const initializeCoreServices = (view) => {
 		view.syncReady,
 		view.initialReplayReady,
 	])
-		.catch((error) => {
+		.catch((error): [] => {
 			view.reportStartupError(error, view.elt, "service-startup");
 			return [];
 		})

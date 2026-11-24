@@ -1,15 +1,15 @@
+import type { ElementSchema } from "../elements/base/baseElement.ts";
 import { getFormElement } from "../elements/loader.ts";
 import { captureError } from "../shared/errors.ts";
 import { withTransition } from "../shared/transitions.ts";
 import { generateElementId } from "../shared/utilities.ts";
 import type {
 	FieldCondition,
-	FormFieldSchema,
 	FormSchema,
 	FormSubmission,
 } from "../types/forms.d.ts";
 
-interface FormRendererHost {
+export interface FormRendererHost {
 	target: HTMLElement;
 	schema: FormSchema;
 	submission?: FormSubmission | null;
@@ -23,7 +23,7 @@ interface FormRendererHost {
 
 export interface RenderedFormElement {
 	id: string;
-	schema: FormFieldSchema;
+	schema: ElementSchema;
 	elt: HTMLElement | null;
 	value?: unknown;
 	active?(value: unknown): boolean;

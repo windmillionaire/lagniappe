@@ -1,9 +1,13 @@
 import { primitives } from "../../../elements/primitives.ts";
 import { generateElementId } from "../../../shared/utilities.ts";
+import type { FieldOption } from "../../../types/forms.d.ts";
+import type FormBuilder from "../builder.ts";
 import { Condition } from "./base.ts";
 
-export default class Options extends Condition {
-	constructor(builder) {
+export default class Options extends Condition<Partial<FieldOption>> {
+	declare setting: Partial<FieldOption>;
+	declare key: "options";
+	constructor(builder: FormBuilder) {
 		super(builder);
 		this.key = "options";
 		this.messages = {
@@ -11,7 +15,7 @@ export default class Options extends Condition {
 		};
 	}
 
-	init() {
+	init(): undefined {
 		if (this.index !== -1) {
 			this.setTitle("Edit Option");
 			this.messages.submit = "Update Option";
@@ -50,14 +54,14 @@ export default class Options extends Condition {
 		this.focusTarget = optionName;
 
 		optionName.addEventListener("input", (e) => {
-			this.setting.label = e.target.value;
+			this.setting.label = (e.target as HTMLInputElement).value;
 			this.showProgress();
 		});
 	}
 
 	validate() {
 		if (!this.setting.label) {
-			this.form.showError("Please enter an option name.");
+			this.form?.showError("Please enter an option name.");
 			return false;
 		}
 		if (!this.setting.value) {

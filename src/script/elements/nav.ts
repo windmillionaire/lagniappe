@@ -1,5 +1,31 @@
+interface NavComponent {
+	elt: HTMLElement;
+	view: { mobile?: boolean };
+	active: NavElement | { target?: HTMLElement | null } | null;
+}
+
 export class NavElement {
-	constructor(component, elt) {
+	declare target?: never;
+	declare component: NavComponent;
+	declare active: boolean;
+	declare modified: boolean;
+	declare _widget: string | null;
+	declare element: HTMLElement;
+	declare name?: string;
+	declare title: HTMLElement | null;
+	declare nav: HTMLElement;
+	declare standalone: boolean;
+	declare persistent: boolean;
+	declare componentToggles: Record<string, HTMLButtonElement>;
+	declare widgetToggles: Record<string, HTMLButtonElement>;
+	declare widgetControls: Record<string, HTMLButtonElement>;
+	declare _hideNavContainer: Set<string>;
+	declare _navContainer: HTMLElement;
+	declare header: HTMLElement | null;
+	declare controls: HTMLElement | null;
+	declare navToggles: HTMLElement | null;
+
+	constructor(component: NavComponent, elt: HTMLElement) {
 		this.component = component;
 		this.active = true;
 		this.modified = false;
@@ -12,7 +38,8 @@ export class NavElement {
 
 		this.nav =
 			document.querySelector(`nav[data-nav="${this.name}"]`) ||
-			this.component.elt.querySelector("nav");
+			this.component.elt.querySelector("nav") ||
+			this.element;
 		this.standalone = this.nav.dataset.standalone === "true";
 		this.persistent = this.nav.dataset.persistent === "true";
 		this.componentToggles = this._initNavToggles();
@@ -23,23 +50,29 @@ export class NavElement {
 
 		this._hideNavContainer = new Set();
 		this._navContainer =
-			this.element.querySelector("[data-flipped]") || this.nav;
+			this.element.querySelector<HTMLElement>("[data-flipped]") || this.nav;
 		this.header = elt.querySelector("[data-role='header']");
 		this.widgetToggles = this.header
 			? this._initWidgetToggles(this.header)
 			: {};
 
 		this.controls = elt.querySelector("[data-role='controls']");
-		this.widgetControls = this.controls ? this._initControls() : {};
+		this.widgetControls = this.controls
+			? this._initControls(this.controls)
+			: {};
 		this.navToggles = elt.querySelector("[data-role='nav-toggles']");
 	}
 
 	_initNavToggles() {
 		return Object.fromEntries(
 			Array.from(
-				this.nav.querySelectorAll("button[lp-show]:not([lp-control])"),
+				this.nav.querySelectorAll<HTMLButtonElement>(
+					"button[lp-show]:not([lp-control])",
+				),
 			).map((button) => {
-				const [component, widget] = button.getAttribute("lp-show").split(":");
+				const [component, widget] = (
+					button.getAttribute("lp-show") ?? ""
+				).split(":");
 				return [
 					["active", "nav"].includes(widget) ? component : widget,
 					button,
@@ -48,33 +81,42 @@ export class NavElement {
 		);
 	}
 
-	_initWidgetToggles() {
+	_initWidgetToggles(header: HTMLElement) {
 		return Object.fromEntries(
 			Array.from(
-				this.header.querySelectorAll("button[lp-show]:not([lp-control])"),
+				header.querySelectorAll<HTMLButtonElement>(
+					"button[lp-show]:not([lp-control])",
+				),
 			).map((button) => {
-				const [component, widget] = button.getAttribute("lp-show").split(":");
-				this._hideNavContainer.add(widget);
+				const [component, widget] = (
+					button.getAttribute("lp-show") ?? ""
+				).split(":");
+				if (widget) this._hideNavContainer.add(widget);
 				return [component, button];
 			}),
 		);
 	}
 
-	_initControls() {
+	_initControls(controls: HTMLElement) {
 		return Object.fromEntries(
-			Array.from(this.controls.querySelectorAll("button[lp-control]")).map(
-				(button) => [button.getAttribute("lp-control"), button],
-			),
+			Array.from(
+				controls.querySelectorAll<HTMLButtonElement>("button[lp-control]"),
+			).map((button) => [button.getAttribute("lp-control"), button]),
 		);
 	}
 
-	_click(event) {
-		if (!event.target.closest("[lp-show]:not([lp-control])")) return;
+	_click(event: MouseEvent) {
+		const target = event.target;
+		if (
+			!(target instanceof Element) ||
+			!target.closest("[lp-show]:not([lp-control])")
+		)
+			return;
 
 		Object.values(this.componentToggles).forEach((button) => {
 			if (!button.classList.contains("loader")) return;
 
-			const selected = button.contains(event.target);
+			const selected = button.contains(target);
 			if (selected) {
 				button.disabled = true;
 			} else {
@@ -84,7 +126,7 @@ export class NavElement {
 		});
 	}
 
-	_setSubToggleVisibility(hideToggles, component) {
+	_setSubToggleVisibility(hideToggles: boolean, component?: string | null) {
 		const controlsVisible = this.settings.controls === "true";
 		const keepSubToggles = this.settings.subtoggles === "true";
 		hideToggles = hideToggles || (controlsVisible && !keepSubToggles);
@@ -95,10 +137,18 @@ export class NavElement {
 		});
 	}
 
-	_setComponentToggleVisibility(hideToggles, widget, selected) {
+	_setComponentToggleVisibility(
+		hideToggles: boolean,
+		widget?: string | boolean | null,
+		selected?: string | boolean | null,
+	) {
 		const mobile = this.component.view.mobile;
 
-		if (this._hideNavContainer.has(widget) && hideToggles) {
+		if (
+			typeof widget === "string" &&
+			this._hideNavContainer.has(widget) &&
+			hideToggles
+		) {
 			this._navContainer.dataset.visible = "false";
 			return false;
 		}
@@ -118,7 +168,7 @@ export class NavElement {
 		return true;
 	}
 
-	_setNavVisibility(widget) {
+	_setNavVisibility(widget?: string | boolean | null) {
 		const togglesVisible = widget ? this.settings.nav !== "false" : true;
 		const visible =
 			this.persistent || this.component.active === this || togglesVisible
@@ -132,13 +182,16 @@ export class NavElement {
 		if (!this.modified) return;
 		this.modified = false;
 
-		this.nav.querySelectorAll(".loader").forEach((toggle) => {
-			toggle.disabled = false;
-			toggle.classList.remove("opacity-50");
-		});
+		this.nav
+			.querySelectorAll<HTMLButtonElement>(".loader")
+			.forEach((toggle) => {
+				toggle.disabled = false;
+				toggle.classList.remove("opacity-50");
+			});
 	}
 
-	_setControlOptions(widget) {
+	_setControlOptions(widget?: string | boolean | null) {
+		if (!this.controls) return;
 		const controlsVisible = widget ? this.settings.controls === "true" : false;
 		this.controls.dataset.visible = controlsVisible ? "true" : "false";
 		if (this.navToggles) {
@@ -157,10 +210,10 @@ export class NavElement {
 
 	_setTitle() {
 		const title = this.settings.title || this.component.elt.dataset.title;
-		this.title.textContent = title || "";
+		if (this.title) this.title.textContent = title || "";
 	}
 
-	enable(component) {
+	enable(component: NavComponent = this.component) {
 		this.component = component;
 		this.active = true;
 	}
@@ -183,8 +236,9 @@ export class NavElement {
 		);
 	}
 
-	reconcile(widget, component) {
-		const selected = this.componentToggles[widget] ? widget : component;
+	reconcile(widget?: string | boolean | null, component?: string | null) {
+		const selected =
+			widget && this.componentToggles[String(widget)] ? widget : component;
 		const hideToggles = this.settings.nav === "false";
 		this._setComponentToggleVisibility(hideToggles, widget, selected);
 		this.element.dataset.visible = this.active ? "true" : "false";
@@ -202,10 +256,11 @@ export class NavElement {
 		if (this.component.active === this) {
 			return this.nav.dataset;
 		}
-		return this.component.active?.target?.dataset || {};
+		const active = this.component.active;
+		return (active && "target" in active && active.target?.dataset) || {};
 	}
 
-	_setControlOption(option, element = this.widgetControls[option]) {
+	_setControlOption(option: string, element = this.widgetControls[option]) {
 		if (!element) return;
 
 		const settings = this.settings;
@@ -216,7 +271,7 @@ export class NavElement {
 		if (option === "delete") {
 			element.dataset.visible = settings.key ? "true" : "false";
 			return;
-		} else if (!value && element) {
+		} else if (!value) {
 			element.dataset.visible = "false";
 			return;
 		}

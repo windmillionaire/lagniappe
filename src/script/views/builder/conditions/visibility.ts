@@ -1,16 +1,17 @@
+import type FormBuilder from "../builder.ts";
 import { ConditionTarget } from "./base.ts";
 
 export default class Visibility extends ConditionTarget {
-	constructor(builder) {
+	declare key: "visibility";
+	constructor(builder: FormBuilder) {
 		super(builder);
 		this.key = "visibility";
-		this.targetSelectTitle = "Show this element when";
 		this.messages = {
 			submit: "Add Visibility Condition",
 		};
 	}
 
-	init() {
+	init(): undefined {
 		if (this.index !== -1) {
 			this.setTitle("Edit Visibility Condition");
 			this.messages.submit = "Update Visibility Condition";
@@ -24,7 +25,7 @@ export default class Visibility extends ConditionTarget {
 
 		const targets = this.builder.getEligibleConditionTargets();
 		if (targets.length === 0) {
-			this.form.showError(
+			this.form?.showError(
 				"Visibility cannot be set using available components. " +
 					"Please add a radio button, checkbox, or select menu to the form before " +
 					"setting the visibility of this element.",
@@ -37,7 +38,8 @@ export default class Visibility extends ConditionTarget {
 	}
 
 	showProgress() {
-		const target = this.builder.elements.get(this.setting.id);
+		const target =
+			this.setting.id && this.builder.elements.get(this.setting.id);
 		if (!target) return;
 
 		if (target.schema.type === "checkbox") {

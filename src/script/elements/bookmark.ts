@@ -5,17 +5,36 @@ import { formatting } from "./formatting.ts";
 import { primitives } from "./primitives.ts";
 
 export class BookmarkElement extends BaseElement {
+	get bookmark() {
+		const value = this.submission;
+		const url =
+			value &&
+			typeof value === "object" &&
+			"url" in value &&
+			typeof value.url === "string"
+				? value.url
+				: undefined;
+		const title =
+			value &&
+			typeof value === "object" &&
+			"title" in value &&
+			typeof value.title === "string"
+				? value.title
+				: undefined;
+		return { url, title };
+	}
+
 	get value() {
-		const inputs = this.elt.querySelectorAll("input");
-		const result = {};
-		inputs.forEach((input) => {
+		const inputs = this.elt?.querySelectorAll("input");
+		const result: Record<string, string | boolean> = {};
+		inputs?.forEach((input) => {
 			const key = input.name.slice(input.name.indexOf(":") + 1);
 			result[key] = input.type === "checkbox" ? input.checked : input.value;
 		});
 		return result;
 	}
 
-	changed(value) {
+	changed(value: unknown) {
 		if (areEqual(this.value, value)) return false;
 		return true;
 	}
@@ -30,10 +49,9 @@ export class BookmarkElement extends BaseElement {
 		link.dataset.kind = "page";
 		link.className = STYLES.link.default;
 		link.target = "_blank";
-		link.href = this.submission.url;
-		link.textContent = this.submission.title
-			? this.submission.title
-			: this.submission.url;
+		const { url, title } = this.bookmark;
+		link.href = url ?? "";
+		link.textContent = title || url || "";
 		this._read.appendChild(
 			formatting.iconLabel({
 				icon: "out",
@@ -64,18 +82,19 @@ export class BookmarkElement extends BaseElement {
 
 		const inputs = edit.appendChild(document.createElement("div"));
 		inputs.classList.add("flex", "flex-col", "gap-2");
+		const { url, title } = this.bookmark;
 		inputs.append(
 			primitives.input({
 				name: `${this.schema.id}:url`,
 				type: "url",
 				placeholder: "url",
-				value: this.submission?.url,
+				value: url,
 			}),
 			primitives.input({
 				name: `${this.schema.id}:title`,
 				type: "text",
 				placeholder: "name (optional)",
-				value: this.submission?.title,
+				value: title,
 			}),
 		);
 
@@ -87,21 +106,21 @@ export class BookmarkElement extends BaseElement {
 			primitives.checkbox({
 				label: "Replace page photo with link image",
 				name: `${this.schema.id}:replace-image`,
-				checked: !!this.submission?.url,
+				checked: Boolean(url),
 			}),
 		);
 		choices.appendChild(
 			primitives.checkbox({
 				label: "Replace page description with link description",
 				name: `${this.schema.id}:replace-description`,
-				checked: !!this.submission?.url,
+				checked: Boolean(url),
 			}),
 		);
 		choices.appendChild(
 			primitives.checkbox({
 				label: "Replace page name with link title",
 				name: `${this.schema.id}:replace-name`,
-				checked: !!this.submission?.url,
+				checked: Boolean(url),
 			}),
 		);
 

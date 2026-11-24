@@ -1,9 +1,36 @@
+import type {
+	Dropdown,
+	DropdownItem,
+} from "../../elements/combobox/dropdown.ts";
 import { withTransition } from "../../shared/transitions.ts";
-import { TableVisibilityState } from "../../widgets/tables/visibilityState.ts";
+import type { LoadedWidget } from "../../types/widgets";
+import {
+	type TableColumn,
+	TableVisibilityState,
+} from "../../widgets/tables/visibilityState.ts";
 import Core from "./core.ts";
+import type { ViewRoot } from "./shell.ts";
+
+function isTableColumn(value: unknown): value is TableColumn {
+	return Boolean(
+		value &&
+			typeof value === "object" &&
+			"field" in value &&
+			typeof value.field === "string" &&
+			(!("title" in value) || typeof value.title === "string") &&
+			(!("selected" in value) || typeof value.selected === "boolean"),
+	);
+}
 
 export default class EntityIndex extends Core {
-	constructor(node) {
+	declare dropdown: Dropdown | null;
+	declare nav: null;
+	declare toolsObserver: MutationObserver | null;
+	declare TableVisibilityState?: TableVisibilityState | null;
+	declare _indexMobileResize?: () => Promise<void>;
+	declare _dropdownPromise?: Promise<Dropdown | null> | null;
+
+	constructor(node: ViewRoot) {
 		super(node);
 		this.dropdown = null;
 		this.nav = null;
@@ -14,21 +41,29 @@ export default class EntityIndex extends Core {
 		await super.init();
 
 		const table = this.getComponent(this.elt.querySelector("#table"));
-		const tools = this.elt.querySelector("#tools");
-		const mobileControls = this.elt.querySelector("#mobile-controls");
-		let indexTable = null;
+		if (!table) throw new Error("Entity index requires a table component");
+		const tools = this.elt.querySelector<HTMLElement>("#tools");
+		const mobileControls =
+			this.elt.querySelector<HTMLElement>("#mobile-controls");
+		let indexTable: LoadedWidget | null = null;
 
 		if (this.mobile && tools) {
 			await this._createDropdown();
-			const toolsNav = document.querySelector("nav[data-nav='tools']");
+			const toolsNav = document.querySelector<HTMLElement>(
+				"nav[data-nav='tools']",
+			);
 			if (toolsNav) toolsNav.style.display = "none";
 		}
 
+		const selected = table.preload("selected");
+		const columns = table.preload("columns");
 		this.TableVisibilityState = new TableVisibilityState({
 			component: table,
 			view: this,
-			selected: table.preload("selected") || [],
-			columns: table.preload("columns") || [],
+			selected: Array.isArray(selected)
+				? selected.filter((field): field is string => typeof field === "string")
+				: [],
+			columns: Array.isArray(columns) ? columns.filter(isTableColumn) : [],
 		}).init();
 
 		if (!table.elt.hasAttribute("lp-prefetch")) {
@@ -42,8 +77,9 @@ export default class EntityIndex extends Core {
 			{ label: "index:initial-table" },
 		);
 
-		const continuation = indexTable?.target.querySelector("tr[lp-load]");
-		if (continuation) {
+		const continuation =
+			indexTable?.target?.querySelector<HTMLTableRowElement>("tr[lp-load]");
+		if (continuation && indexTable?.target) {
 			const route = continuation.dataset.route;
 			continuation.remove();
 			indexTable.target.removeAttribute("loaded");
@@ -53,7 +89,9 @@ export default class EntityIndex extends Core {
 		}
 
 		this._indexMobileResize = async () => {
-			const toolsNav = document.querySelector("nav[data-nav='tools']");
+			const toolsNav = document.querySelector<HTMLElement>(
+				"nav[data-nav='tools']",
+			);
 			if (this.mobile) await this._createDropdown();
 			await withTransition(
 				() => {
@@ -62,7 +100,7 @@ export default class EntityIndex extends Core {
 						this._setMobileControlsDropdownOpen(false);
 						toolsNav?.removeAttribute("style");
 					} else {
-						if (tools) this.getComponent(tools).deactivate(false);
+						if (tools) this.getComponent(tools)?.deactivate(false);
 						if (toolsNav) toolsNav.style.display = "none";
 					}
 					table.widgets.TableSorting?.reset();
@@ -89,8 +127,10 @@ export default class EntityIndex extends Core {
 		await this._renderDefaultTool(tools);
 	}
 
-	_click(e) {
-		const toolsTrigger = e.target.closest("[data-role='tools-dropdown']");
+	_click(e: MouseEvent) {
+		const { target } = e;
+		if (!(target instanceof Element)) return;
+		const toolsTrigger = target.closest("[data-role='tools-dropdown']");
 		if (this.mobile && toolsTrigger && !this.dropdown) {
 			e.preventDefault();
 			e.stopPropagation();
@@ -103,14 +143,14 @@ export default class EntityIndex extends Core {
 			return;
 		}
 
-		const tableControls = e.target.closest(
+		const tableControls = target.closest(
 			"button[lp-show='table:MobileTableControls']",
 		);
 		if (this.mobile && tableControls) {
 			this.dropdown?.hidePanel();
 			this._setMobileControlsDropdownOpen(false);
 
-			const tools = this.elt.querySelector("#tools");
+			const tools = this.elt.querySelector<HTMLElement>("#tools");
 			if (tools?.dataset.visible === "true") {
 				this.getComponent(tools)?.deactivate(false);
 			}
@@ -123,7 +163,9 @@ export default class EntityIndex extends Core {
 		return this.querySlug(this.queryParam("tool"));
 	}
 
-	_defaultToolTarget(tools) {
+	_defaultToolTarget(
+		tools: HTMLElement,
+	): { componentId: string; widgetName?: string } | null {
 		const tool = this._defaultToolSlug();
 		if (!tool) return null;
 
@@ -132,6 +174,7 @@ export default class EntityIndex extends Core {
 		);
 		for (const button of buttons) {
 			const attribute = button.getAttribute("lp-show");
+			if (!attribute) continue;
 			const [componentId, widgetName] = attribute.split(":");
 			const candidates = [
 				componentId,
@@ -145,9 +188,9 @@ export default class EntityIndex extends Core {
 			}
 		}
 
-		const widget = Array.from(tools.querySelectorAll("[data-widget]")).find(
-			(elt) => this.querySlug(elt.dataset.widget) === tool,
-		);
+		const widget = Array.from(
+			tools.querySelectorAll<HTMLElement>("[data-widget]"),
+		).find((elt) => this.querySlug(elt.dataset.widget) === tool);
 		if (!widget) return null;
 
 		return {
@@ -156,7 +199,7 @@ export default class EntityIndex extends Core {
 		};
 	}
 
-	async _renderDefaultTool(tools) {
+	async _renderDefaultTool(tools: HTMLElement) {
 		const target = this._defaultToolTarget(tools);
 		if (!target) return;
 
@@ -175,7 +218,7 @@ export default class EntityIndex extends Core {
 		);
 	}
 
-	_setMobileControlsDropdownOpen(open) {
+	_setMobileControlsDropdownOpen(open: boolean) {
 		const mobileControls = this.elt.querySelector("#mobile-controls");
 		if (!mobileControls) return;
 
@@ -183,11 +226,13 @@ export default class EntityIndex extends Core {
 		mobileControls.classList.toggle("pointer-events-none", open);
 	}
 
-	async _createDropdown() {
+	async _createDropdown(): Promise<Dropdown | null | undefined> {
 		if (this.dropdown) return;
 		if (this._dropdownPromise) return this._dropdownPromise;
 
-		const trigger = this.elt.querySelector("[data-role='tools-dropdown']");
+		const trigger = this.elt.querySelector<HTMLElement>(
+			"[data-role='tools-dropdown']",
+		);
 		if (!trigger) return;
 		this._dropdownPromise = Promise.all([
 			import("../../elements/combobox/dropdown.ts"),
@@ -196,10 +241,10 @@ export default class EntityIndex extends Core {
 			.then(([{ Dropdown }, { STYLES }]) => {
 				if (this._destroyed || !this.mobile) return null;
 
-				const items = [];
+				const items: DropdownItem[] = [];
 
-				const createOption = (button) => {
-					const option = button.cloneNode(true);
+				const createOption = (button: HTMLButtonElement) => {
+					const option = button.cloneNode(true) as HTMLButtonElement;
 					option.setAttribute("role", "option");
 					option.removeAttribute("data-selected");
 					option.className = STYLES.index.tools.dropdown.toggle;
@@ -207,14 +252,14 @@ export default class EntityIndex extends Core {
 				};
 
 				document
-					.querySelectorAll("nav[data-nav='tools'] button")
+					.querySelectorAll<HTMLButtonElement>("nav[data-nav='tools'] button")
 					.forEach((button) => {
 						if (button.dataset.visible === "false") return;
 						items.push({
 							html: createOption(button),
 							onClick: () => {
 								const mobileControls =
-									this.elt.querySelector("#mobile-controls");
+									this.elt.querySelector<HTMLElement>("#mobile-controls");
 								const table = this.getComponent(
 									this.elt.querySelector("#table"),
 								);
@@ -253,7 +298,8 @@ export default class EntityIndex extends Core {
 	}
 
 	destroy() {
-		this.elt.removeEventListener("mobile-resize", this._indexMobileResize);
+		if (this._indexMobileResize)
+			this.elt.removeEventListener("mobile-resize", this._indexMobileResize);
 		super.destroy();
 		this._setMobileControlsDropdownOpen(false);
 		this.dropdown?.destroy();

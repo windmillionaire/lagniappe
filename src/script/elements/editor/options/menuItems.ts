@@ -1,8 +1,29 @@
+import type { CanCommands } from "@tiptap/core";
 import { STYLES } from "../../../generated/styles.mjs";
 import { setIcon } from "../../../shared/icons.ts";
 
+import type { ComboboxOptionElement } from "../../combobox/combobox.ts";
+import type {
+	ToolArgument,
+	ToolbarFormCommand,
+	ToolSettings,
+} from "../config.ts";
+import type { Toolbar } from "../toolbar.ts";
+import { runToolCommand } from "./toolbarButtons.ts";
+
 class ToolbarMenuItem {
-	constructor(toolbar) {
+	declare onClick: ToolbarMenuItem["_onClick"];
+	declare toolbar: Toolbar;
+	declare active: boolean;
+	declare button: HTMLElement;
+	declare command: ToolSettings["command"];
+	declare args: ToolArgument;
+	declare title: string;
+	declare icon: string;
+	declare name?: string;
+	declare form?: boolean;
+
+	constructor(toolbar: Toolbar) {
 		this.toolbar = toolbar;
 		this.active = false;
 		this.button = document.createElement("button");
@@ -13,13 +34,13 @@ class ToolbarMenuItem {
 		return this.button.outerHTML;
 	}
 
-	_buttonIcon(icon) {
+	_buttonIcon(icon: string) {
 		const iconElement = document.createElement("span");
 		setIcon(iconElement, icon, STYLES.dropdown.icon);
 		return iconElement.outerHTML;
 	}
 
-	_buttonText(text) {
+	_buttonText(text: string) {
 		const textElement = document.createElement("span");
 		textElement.textContent = text;
 		return textElement.outerHTML;
@@ -40,10 +61,10 @@ class ToolbarMenuItem {
 		return checkContainer.outerHTML;
 	}
 
-	init(settings) {
+	init(settings: ToolSettings) {
 		Object.assign(this, settings);
 		this.button.role = "option";
-		this.button.type = "button";
+		(this.button as HTMLButtonElement).type = "button";
 		this.button.dataset.active = "false";
 		this.button.className = `${STYLES.dropdown.option.action} group`;
 
@@ -54,13 +75,13 @@ class ToolbarMenuItem {
 		].join("");
 	}
 
-	_onClick(option) {
+	_onClick(option: ComboboxOptionElement) {
 		this.button = option;
 		const editor = this.toolbar.editor;
 		const chain = editor.chain().focus();
 		if (
 			editor.isEmpty &&
-			["bulletList", "orderedList", "taskList"].includes(this.name)
+			["bulletList", "orderedList", "taskList"].includes(this.name || "")
 		) {
 			chain.setTextSelection(1);
 		}
@@ -83,20 +104,14 @@ class ToolbarMenuItem {
 				chain.toggleCodeBlock().run();
 			} else if (this.command === "toggleBlockquote") {
 				chain.lift("blockquote").run();
-			} else if (this.args === undefined) {
-				chain[this.command]().run();
 			} else {
-				chain[this.command](this.args).run();
+				runToolCommand(chain, this.command, this.args);
 			}
 			this.disable();
 			return;
 		}
 
-		if (this.args === undefined) {
-			chain[this.command]().run();
-		} else {
-			chain[this.command](this.args).run();
-		}
+		runToolCommand(chain, this.command, this.args);
 		if (this.name) this.enable();
 	}
 
@@ -117,26 +132,29 @@ class TableMenuItem extends ToolbarMenuItem {
 		if (editor.isDestroyed || !editor.isEditable) return false;
 		const inTable = editor.isActive("table");
 		if (this.command === "insertTable" ? inTable : !inTable) return false;
-		return editor.can()[this.command](this.args);
+		const command = editor.can()[this.command as keyof CanCommands] as (
+			arg: ToolArgument,
+		) => boolean;
+		return command(this.args);
 	}
 
-	_onClick(option) {
+	_onClick(option: ComboboxOptionElement) {
 		if (!this.isAvailable()) return;
 		super._onClick(option);
 	}
 }
 
 class ClearFormatMenuItem extends ToolbarMenuItem {
-	_onClick(option) {
+	_onClick(option: ComboboxOptionElement) {
 		this.button = option;
 		this.toolbar.editor.chain().focus().clearNodes().unsetAllMarks().run();
 	}
 }
 
 class FormMenuItem extends ToolbarMenuItem {
-	_onClick(option) {
+	_onClick(option: ComboboxOptionElement) {
 		this.button = option;
-		this.toolbar.toggleForm(this.command);
+		this.toolbar.toggleForm(this.command as ToolbarFormCommand);
 	}
 }
 

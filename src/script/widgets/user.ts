@@ -1,9 +1,14 @@
 import { FacetedSearchElement } from "../elements/facetedSearch.ts";
 import { InputElement } from "../elements/input.ts";
 import { RadioElement } from "../elements/radio.ts";
-import { FormWidget } from "./base/formWidget.ts";
+import type { RequestResult } from "../types/api";
+import type ViewComponent from "../views/base/component.ts";
+import { FormWidget, type FormWidgetSettings } from "./base/formWidget.ts";
 
 export class CreateUser extends FormWidget {
+	declare nameElement: InputElement;
+	declare _focusNameAfterReconcile?: boolean;
+
 	init() {
 		this.messages = {
 			submit: "Create User",
@@ -11,7 +16,7 @@ export class CreateUser extends FormWidget {
 			submitted: "User Created",
 		};
 
-		super.init();
+		void super.init();
 	}
 
 	get html() {
@@ -19,16 +24,16 @@ export class CreateUser extends FormWidget {
 		details.className = "flex flex-col gap-4 sm:flex-row";
 
 		this.nameElement = new InputElement(this, {
-			name: "name",
+			id: "name",
 			required: true,
-			type: "text",
+			input: "text",
 			label: "Name",
 		});
 		this.nameElement.edit.classList.add("w-full", "sm:basis-1/2");
 		details.appendChild(this.nameElement.edit);
 
 		const email = new InputElement(this, {
-			name: "email",
+			id: "email",
 			required: true,
 			input: "email",
 			label: "Email",
@@ -36,23 +41,25 @@ export class CreateUser extends FormWidget {
 		email.edit.classList.add("w-full", "sm:basis-1/2");
 		details.appendChild(email.edit);
 
-		const page = new FacetedSearchElement(this, {
-			name: "page",
+		const pageOptions = {
+			id: "page",
 			kind: "page",
 			label: "Attach to Existing Page",
 			placeholder: "select a page...",
 			index: "page",
 			creatable: true,
-		});
+		};
+		const page = new FacetedSearchElement(this, pageOptions);
 
-		const group = new FacetedSearchElement(this, {
-			name: "group",
+		const groupOptions = {
+			id: "group",
 			kind: "user",
 			label: "User Group(s)",
 			placeholder: "select user group(s)...",
 			index: "group",
 			multiple: true,
-		});
+		};
+		const group = new FacetedSearchElement(this, groupOptions);
 
 		this.destroyables.push(page, group);
 
@@ -61,7 +68,7 @@ export class CreateUser extends FormWidget {
 				? new RadioElement(
 						this,
 						{
-							name: "ai_access",
+							id: "ai_access",
 							label: "AI Access",
 							required: true,
 							layout: "row",
@@ -75,7 +82,7 @@ export class CreateUser extends FormWidget {
 					).edit
 				: null;
 
-		return [details, aiAccess, page.edit, group.edit].filter(Boolean);
+		return [details, aiAccess, page.edit, group.edit];
 	}
 
 	async prereconcile() {
@@ -102,7 +109,11 @@ export class CreateUser extends FormWidget {
 }
 
 export class CreateUserGroup extends FormWidget {
-	constructor(attributes) {
+	declare component: ViewComponent | null | undefined;
+	declare _newGroupSelector: HTMLButtonElement | null | undefined;
+	declare _newGroupForm: HTMLFormElement | null | undefined;
+
+	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.messages = {
 			submit: "Create User Group",
@@ -115,9 +126,9 @@ export class CreateUserGroup extends FormWidget {
 
 	get html() {
 		const name = new InputElement(this, {
-			name: "name",
+			id: "name",
 			required: true,
-			type: "text",
+			input: "text",
 			label: "Group Name",
 		});
 
@@ -125,16 +136,17 @@ export class CreateUserGroup extends FormWidget {
 	}
 
 	get selectors() {
-		return this.component.elt.querySelector("[data-role='group-selectors']");
+		return this.component?.elt.querySelector("[data-role='group-selectors']");
 	}
 
-	async created(response) {
-		this._newGroupSelector = response.html?.body.querySelector(
+	async created(response?: RequestResult) {
+		const html = response?.html || null;
+		this._newGroupSelector = html?.body.querySelector<HTMLButtonElement>(
 			"button[lp-show]:not([lp-control])",
 		);
 
-		this._newGroupForm = response.html?.body.querySelector("form");
-		if (this._newGroupForm) {
+		this._newGroupForm = html?.body.querySelector("form");
+		if (this._newGroupForm && this.component) {
 			this._newGroupForm.dataset.visible = "false";
 			this.component.elt.appendChild(this._newGroupForm);
 			const newGroupWidget = this._newGroupForm.dataset.widget;
@@ -151,9 +163,9 @@ export class CreateUserGroup extends FormWidget {
 		if (this._newGroupSelector) {
 			this.commitReset();
 			this.target.dataset.visible = "false";
-			this.selectors.appendChild(this._newGroupSelector);
+			this.selectors?.appendChild(this._newGroupSelector);
 			this._newGroupSelector = null;
-			this.component.nav = null;
+			if (this.component) this.component.nav = null;
 		}
 	}
 }

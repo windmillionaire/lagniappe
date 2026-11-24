@@ -1,10 +1,26 @@
+import type { OfflineQueue } from "../../shared/offlineQueue.ts";
+import type Core from "./core.ts";
+
+type ReplayView = Pick<
+	Core,
+	| "_destroyed"
+	| "ensureOfflineQueue"
+	| "online"
+	| "refresh"
+	| "reportStartupError"
+	| "elt"
+>;
+
 /**
  * Replay persisted mutations outside the Core startup closure. The queue owns
  * mounted-form polling; the broad refresh covers collection consumers after
  * successful writes.
  *
  */
-export const replayOfflineQueue = async (view, existingQueue = null) => {
+export const replayOfflineQueue = async (
+	view: ReplayView,
+	existingQueue: OfflineQueue | null = null,
+): Promise<number> => {
 	try {
 		if (view._destroyed) return 0;
 		const queue = existingQueue || (await view.ensureOfflineQueue());

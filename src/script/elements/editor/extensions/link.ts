@@ -5,17 +5,46 @@ import {
 	offset,
 	shift,
 } from "@floating-ui/dom";
-import { getMarkRange, Mark } from "@tiptap/core";
-import { isAllowedUri, Link } from "@tiptap/extension-link";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
+import {
+	type Attribute,
+	type Editor,
+	getMarkRange,
+	Mark,
+	type Range,
+} from "@tiptap/core";
+import { isAllowedUri, Link, type LinkOptions } from "@tiptap/extension-link";
+import type { MarkType } from "@tiptap/pm/model";
+import { Plugin, PluginKey, type Transaction } from "@tiptap/pm/state";
 import { ENDPOINTS } from "../../../shared/endpoints.ts";
 import { request } from "../../../shared/request.ts";
 import { normalizeLinkAttributes } from "./linkAttributes.ts";
 
 const LINK_EDIT_EVENT = "editor-link-edit";
-const ACTIONS = new Set(["open", "edit", "remove"]);
+type LinkAction = "open" | "edit" | "remove";
 
-const equalLinkAttributes = (left = {}, right = {}) => {
+interface LinkPreview {
+	title?: string;
+	display_url?: string;
+	url?: string;
+	description?: string;
+}
+
+interface LinkStorage {
+	popover: LinkPopover | null;
+}
+
+declare global {
+	interface HTMLElementEventMap {
+		"editor-link-edit": CustomEvent<{ range: Range }>;
+	}
+}
+
+const ACTIONS = new Set<string>(["open", "edit", "remove"]);
+
+const equalLinkAttributes = (
+	left: Record<string, unknown> = {},
+	right: Record<string, unknown> = {},
+) => {
 	const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
 	for (const key of keys) {
 		if ((left[key] ?? null) !== (right[key] ?? null)) return false;
@@ -23,14 +52,17 @@ const equalLinkAttributes = (left = {}, right = {}) => {
 	return true;
 };
 
-const linkAttributesAllowed = (extension, href) =>
+const linkAttributesAllowed = (
+	extension: { options: LinkOptions },
+	href: string,
+) =>
 	extension.options.isAllowedUri(href, {
 		defaultValidate: (url) => !!isAllowedUri(url, extension.options.protocols),
 		protocols: extension.options.protocols,
 		defaultProtocol: extension.options.defaultProtocol,
 	});
 
-const normalizeLinkMarks = (type) =>
+const normalizeLinkMarks = (type: MarkType) =>
 	new Plugin({
 		key: new PluginKey("normalizeLinkMarks"),
 		appendTransaction: (transactions, _oldState, newState) => {
@@ -38,7 +70,7 @@ const normalizeLinkMarks = (type) =>
 				return null;
 			}
 
-			let tr = null;
+			let tr: Transaction | null = null;
 			newState.doc.descendants((node, pos) => {
 				if (!node.isText) return true;
 
@@ -62,8 +94,8 @@ const normalizeLinkMarks = (type) =>
 		},
 	});
 
-const linkFromEvent = (editor, event) => {
-	const target = event.target;
+const linkFromEvent = (editor: Editor, event: MouseEvent) => {
+	const target = event.target as Node | null;
 	const AnchorElement = globalThis.HTMLAnchorElement;
 	const Element = globalThis.Element;
 	const targetElement =
@@ -78,12 +110,12 @@ const linkFromEvent = (editor, event) => {
 	return link;
 };
 
-const opensInCurrentTab = (href) =>
+const opensInCurrentTab = (href: string | null | undefined) =>
 	Boolean(href) &&
 	!String(href).startsWith("//") &&
 	!/^[a-z][a-z0-9+.-]*:/i.test(String(href));
 
-const displayUrl = (href) => {
+const displayUrl = (href: string | null | undefined) => {
 	const value = String(href || "").trim();
 	if (!value) return "";
 
@@ -98,7 +130,7 @@ const displayUrl = (href) => {
 	}
 };
 
-const linkRangeFromDom = (editor, link) => {
+const linkRangeFromDom = (editor: Editor, link: HTMLAnchorElement) => {
 	try {
 		const from = editor.view.posAtDOM(link, 0);
 		const to = editor.view.posAtDOM(link, link.childNodes.length);
@@ -112,7 +144,11 @@ const linkRangeFromDom = (editor, link) => {
 	return null;
 };
 
-const rangeMatchesLink = (editor, range, href) => {
+const rangeMatchesLink = (
+	editor: Editor,
+	range: Range,
+	href: string | null | undefined,
+) => {
 	const linkType = editor.state.schema.marks.link;
 	let matched = false;
 
@@ -130,7 +166,11 @@ const rangeMatchesLink = (editor, range, href) => {
 	return matched;
 };
 
-const linkRangeFromPosition = (editor, pos, link) => {
+const linkRangeFromPosition = (
+	editor: Editor,
+	pos: number,
+	link: HTMLAnchorElement,
+) => {
 	const linkType = editor.state.schema.marks.link;
 	if (!linkType) return null;
 
@@ -151,7 +191,12 @@ const linkRangeFromPosition = (editor, pos, link) => {
 	return null;
 };
 
-const linkRangeFromClick = (editor, pos, event, link) => {
+const linkRangeFromClick = (
+	editor: Editor,
+	pos: number,
+	event: MouseEvent,
+	link: HTMLAnchorElement,
+) => {
 	const directRange = linkRangeFromPosition(editor, pos, link);
 	if (directRange) return directRange;
 
@@ -167,7 +212,7 @@ const linkRangeFromClick = (editor, pos, event, link) => {
 	return linkRangeFromDom(editor, link);
 };
 
-const navigateLink = (link) => {
+const navigateLink = (link: HTMLAnchorElement) => {
 	const attributes = normalizeLinkAttributes({
 		href: link.getAttribute("href"),
 		target: link.getAttribute("target"),
@@ -189,11 +234,11 @@ const navigateLink = (link) => {
 	return true;
 };
 
-const editableMentionClickGuard = (editor) =>
+const editableMentionClickGuard = (editor: Editor) =>
 	new Plugin({
 		key: new PluginKey("editableMentionClickGuard"),
 		view: (view) => {
-			const preventNavigation = (event) => {
+			const preventNavigation = (event: MouseEvent) => {
 				if (!editor.isEditable || event.button !== 0) return;
 				const link = linkFromEvent(editor, event);
 				if (link?.matches('[data-type="lagniappe-mention"]')) {
@@ -209,7 +254,17 @@ const editableMentionClickGuard = (editor) =>
 	});
 
 class LinkPopover {
-	constructor(editor) {
+	declare editor: Editor;
+	declare requestId: number;
+	declare panel: HTMLDivElement | null;
+	declare link: HTMLAnchorElement | null;
+	declare range: Range | null;
+	declare cleanup: (() => void) | null;
+	declare observer: IntersectionObserver | null;
+	declare isMention: boolean;
+	declare href: string | null;
+
+	constructor(editor: Editor) {
 		this.editor = editor;
 		this.panel = null;
 		this.link = null;
@@ -224,7 +279,7 @@ class LinkPopover {
 		this._handleIntersection = this._handleIntersection.bind(this);
 	}
 
-	show(link, range) {
+	show(link: HTMLAnchorElement, range: Range | null) {
 		const attrs = normalizeLinkAttributes({
 			href: link.getAttribute("href"),
 			target: link.getAttribute("target"),
@@ -247,7 +302,7 @@ class LinkPopover {
 		return true;
 	}
 
-	_createPanel(title) {
+	_createPanel(title: string) {
 		const panel = document.createElement("div");
 		panel.dataset.role = "editor-link-popover";
 		panel.dataset.linkType = this.isMention ? "mention" : "link";
@@ -287,7 +342,7 @@ class LinkPopover {
 		return panel;
 	}
 
-	_button(action, text, extraClass = "text-kind-default") {
+	_button(action: LinkAction, text: string, extraClass = "text-kind-default") {
 		const button = document.createElement("button");
 		button.type = "button";
 		button.dataset.action = action;
@@ -297,7 +352,7 @@ class LinkPopover {
 	}
 
 	_addHandlers() {
-		this.panel.addEventListener("click", this._panelClick);
+		this.panel?.addEventListener("click", this._panelClick);
 		document.addEventListener("pointerdown", this._documentPointerDown, {
 			capture: true,
 		});
@@ -319,8 +374,10 @@ class LinkPopover {
 	}
 
 	_startAutoUpdate() {
-		this.cleanup = autoUpdate(this.link, this.panel, () => {
-			computePosition(this.link, this.panel, {
+		const { link, panel } = this;
+		if (!link || !panel) return;
+		this.cleanup = autoUpdate(link, panel, () => {
+			computePosition(link, panel, {
 				placement: "top-start",
 				middleware: [offset(8), shift({ padding: 5 }), flip({ padding: 5 })],
 			}).then(({ x, y, placement }) => {
@@ -342,6 +399,7 @@ class LinkPopover {
 	}
 
 	_startObserver() {
+		if (!this.link) return;
 		this.observer = new IntersectionObserver(this._handleIntersection, {
 			threshold: 0,
 		});
@@ -355,13 +413,13 @@ class LinkPopover {
 		}
 	}
 
-	_handleIntersection(entries) {
+	_handleIntersection(entries: IntersectionObserverEntry[]) {
 		if (entries.some((entry) => !entry.isIntersecting)) {
 			this.close();
 		}
 	}
 
-	_updatePreview(data) {
+	_updatePreview(data: LinkPreview) {
 		if (!this.panel || !data) return;
 
 		const title = this.panel.querySelector("[data-role='link-preview-title']");
@@ -370,31 +428,37 @@ class LinkPopover {
 			"[data-role='link-preview-description']",
 		);
 
-		if (data.title) title.textContent = data.title;
-		if (data.display_url || data.url) {
+		if (title && data.title) title.textContent = data.title;
+		if (url && (data.display_url || data.url)) {
 			url.textContent = data.display_url || displayUrl(data.url);
 		}
-		if (data.description) {
+		if (description && data.description) {
 			description.textContent = data.description;
 			description.classList.remove("hidden");
 		}
 	}
 
 	async _loadPreview() {
+		if (!this.href) return;
 		const requestId = ++this.requestId;
 		const params = new URLSearchParams();
 		params.set("url", this.href);
 
-		const response = await request.get(ENDPOINTS.linkPreview, params);
+		const response = await request.get<LinkPreview>(
+			ENDPOINTS.linkPreview,
+			params,
+		);
 		if (requestId !== this.requestId || !this.panel || !response?.ok) return;
 
 		this._updatePreview(response);
 	}
 
-	_panelClick(event) {
-		const button = event.target.closest("[data-action]");
+	_panelClick(event: MouseEvent) {
+		const button = (event.target as Element | null)?.closest<HTMLElement>(
+			"[data-action]",
+		);
 		const action = button?.dataset.action;
-		if (!ACTIONS.has(action)) return;
+		if (!action || !ACTIONS.has(action)) return;
 
 		event.preventDefault();
 		event.stopPropagation();
@@ -446,18 +510,18 @@ class LinkPopover {
 		this.close();
 	}
 
-	_documentPointerDown(event) {
+	_documentPointerDown(event: PointerEvent) {
 		if (!this.panel) return;
 		if (
-			this.panel.contains(event.target) ||
-			this.link?.contains(event.target)
+			this.panel.contains(event.target as Node | null) ||
+			this.link?.contains(event.target as Node | null)
 		) {
 			return;
 		}
 		this.close();
 	}
 
-	_documentKeydown(event) {
+	_documentKeydown(event: KeyboardEvent) {
 		if (event.key === "Escape") {
 			event.preventDefault();
 			this.close();
@@ -478,7 +542,10 @@ class LinkPopover {
 	}
 }
 
-export const CustomLink = Link.extend({
+export const CustomLink: Mark<LinkOptions, LinkStorage> = Link.extend<
+	LinkOptions,
+	LinkStorage
+>({
 	addStorage() {
 		return {
 			...(this.parent?.() ?? {}),
@@ -487,12 +554,12 @@ export const CustomLink = Link.extend({
 	},
 
 	addAttributes() {
-		const attributes = this.parent?.() ?? {};
+		const attributes: Record<string, Attribute> = this.parent?.() ?? {};
 
 		return {
 			...attributes,
 			href: {
-				...attributes.href,
+				...attributes?.href,
 				parseHTML: (element) =>
 					normalizeLinkAttributes({
 						href: element.getAttribute("href"),
@@ -500,7 +567,7 @@ export const CustomLink = Link.extend({
 					}).href,
 			},
 			target: {
-				...attributes.target,
+				...attributes?.target,
 				parseHTML: (element) =>
 					normalizeLinkAttributes({
 						href: element.getAttribute("href"),
@@ -508,7 +575,7 @@ export const CustomLink = Link.extend({
 					}).target,
 			},
 			rel: {
-				...attributes.rel,
+				...attributes?.rel,
 				parseHTML: (element) =>
 					normalizeLinkAttributes({
 						href: element.getAttribute("href"),
@@ -516,7 +583,7 @@ export const CustomLink = Link.extend({
 					}).rel,
 			},
 			class: {
-				...attributes.class,
+				...attributes?.class,
 				parseHTML: (element) =>
 					normalizeLinkAttributes({
 						href: element.getAttribute("href"),
@@ -526,8 +593,11 @@ export const CustomLink = Link.extend({
 		};
 	},
 
-	renderHTML({ HTMLAttributes }) {
-		return this.parent?.({
+	renderHTML({ mark, HTMLAttributes }) {
+		if (!this.parent)
+			throw new Error("Link rendering requires the parent extension");
+		return this.parent({
+			mark,
 			HTMLAttributes: normalizeLinkAttributes(HTMLAttributes),
 		});
 	},
@@ -570,7 +640,7 @@ export const CustomLink = Link.extend({
 	addKeyboardShortcuts() {
 		return {
 			...(this.parent?.() ?? {}),
-			Space: () => Mark.handleExit({ editor: this.editor, mark: this }),
+			Space: () => Mark.handleExit({ editor: this.editor, mark: CustomLink }),
 		};
 	},
 

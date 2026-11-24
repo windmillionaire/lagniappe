@@ -5,15 +5,16 @@ import { primitives } from "./primitives.ts";
 
 export class InputElement extends BaseElement {
 	get value() {
-		const input = this.elt?.matches?.("input")
-			? this.elt
-			: this.elt?.querySelector("input");
+		const input =
+			this.elt instanceof HTMLInputElement
+				? this.elt
+				: this.elt?.querySelector("input");
 		if (input) return input.value;
 		if (this.submission === null || this.submission === undefined) return null;
 		return String(this.submission);
 	}
 
-	changed(value) {
+	changed(value: unknown) {
 		if (this.value === String(value ?? "")) return false;
 		return true;
 	}
@@ -35,14 +36,30 @@ export class InputElement extends BaseElement {
 		this._read = document.createElement("p");
 		this._read.className = STYLES.form.submission.default;
 
-		if (this.submission && this.schema.input === "date") {
-			this._read.textContent = formatting.date(this.submission) || "";
-		} else if (this.submission && this.schema.input === "time") {
-			this._read.textContent = formatting.time(this.submission);
-		} else if (this.submission && this.schema.input === "tel") {
-			this._read.textContent = formatting.tel(this.submission);
-		} else if (this.submission && this.schema.input === "email") {
-			this._read.appendChild(formatting.email(this.submission));
+		const submission = this.submission;
+		if (
+			(typeof submission === "string" || submission instanceof Date) &&
+			this.schema.input === "date"
+		) {
+			this._read.textContent = formatting.date(submission) || "";
+		} else if (
+			typeof submission === "string" &&
+			submission &&
+			this.schema.input === "time"
+		) {
+			this._read.textContent = formatting.time(submission);
+		} else if (
+			typeof submission === "string" &&
+			submission &&
+			this.schema.input === "tel"
+		) {
+			this._read.textContent = formatting.tel(submission);
+		} else if (
+			typeof submission === "string" &&
+			submission &&
+			this.schema.input === "email"
+		) {
+			this._read.appendChild(formatting.email(submission));
 		} else {
 			this._read.textContent = this.hasSubmission
 				? String(this.submission)
