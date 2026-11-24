@@ -842,15 +842,18 @@ def _default_validate_redis(settings: Mapping[str, object]) -> None:
 
 
 def _default_deploy(draft: SettingsDraft) -> bool:
+    from config import SETTINGS
     from installer import deploy, gcloud, monitoring, upgrade
     from installer import FORMATTER
 
+    _sync_settings_singleton(draft, SETTINGS)
     f = FORMATTER.initialize()
     record_step("deploy application")
     deploy.deploy_to_app_engine(print_final_summary=False, first_install=True)
     if not upgrade._configure_deferred_job_recovery(f, gcloud):
         return False
     monitoring.reconcile_memory_alert()
+    _sync_settings_singleton(SETTINGS, draft)
     return True
 
 
@@ -1167,6 +1170,10 @@ def run_agent_install(
     _populate_generated_documents(active_draft)
     record_step("persist generated configuration")
     active_draft.save()
+    if draft is None:
+        from config import SETTINGS
+
+        _sync_settings_singleton(active_draft, SETTINGS)
 
     leaked = find_leaked_secret_keys(File.APP_SETTINGS_YAML.load())
     if leaked:

@@ -104,7 +104,10 @@ strictly:
    the credential page (Google Auth Platform Branding + Web OAuth JSON, Gmail
    App Password, Redis Cloud CLI command), invite them to ask questions if
    anything looks unfamiliar, share the localhost vault link if needed, and wait
-   until setup finishes.
+   until setup finishes. For Google Auth Platform, Lagniappe only requests basic
+   sign-in scopes (`email`/`profile`), so do not tell the user to maintain a
+   test-user list — just pick **External** audience (and optionally click
+   **Publish app** under **Audience** if invited users will sign in with Google).
 7. **Verify and finish:** After setup completes, confirm `./setup.sh doctor`
    exits with `0`, confirm no secrets exist in
    `config/files/lagniappe_settings.yaml`, and give the user their live

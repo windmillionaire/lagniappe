@@ -503,3 +503,72 @@ def test_secret_manager_publish_retries_transient_403_propagation(monkeypatch):
     )
     assert store.publish({"SECRET_KEY": "abc"}) == "1"
     assert calls >= 5
+
+
+def test_default_deploy_syncs_post_vault_draft_into_settings_singleton(monkeypatch):
+    import config
+    from installer import deploy as installer_deploy
+    from installer import monitoring as installer_monitoring
+    from installer import upgrade as installer_upgrade
+
+    stale_settings = SimpleNamespace(
+        APP={"APP_NAME": "Demo", "GOOGLE_CLOUD_PROJECT": "demo-proj"},
+        DEPLOY={},
+        DEV={},
+        GCLOUD_CONFIG={"PROJECT": "demo-proj"},
+        DEV_CONFIG={},
+        TEST_CONFIG={},
+        INDEX={},
+        MANIFEST={},
+    )
+    post_vault_draft = SimpleNamespace(
+        APP={
+            "APP_NAME": "Demo",
+            "GOOGLE_CLOUD_PROJECT": "demo-proj",
+            "REDIS_HOST": "redis.cloud.example",
+            "REDIS_PORT": 12345,
+            "REDIS_PASSWORD": "secret-redis-password",
+            "GOOGLE_CLIENT_ID": "12345.apps.googleusercontent.com",
+            "AUTH_EMAIL_CONFIG": {"host": "smtp.gmail.com", "password": "app-password"},
+        },
+        DEPLOY={"service_account": "demo@demo-proj.iam.gserviceaccount.com"},
+        DEV={},
+        GCLOUD_CONFIG={"PROJECT": "demo-proj"},
+        DEV_CONFIG={},
+        TEST_CONFIG={},
+        INDEX={"indexes": []},
+        MANIFEST={"name": "Demo"},
+    )
+
+    seen_during_deploy: dict[str, object] = {}
+
+    def _fake_deploy(*, print_final_summary=True, first_install=False):
+        seen_during_deploy["REDIS_HOST"] = config.SETTINGS.APP.get("REDIS_HOST")
+        seen_during_deploy["REDIS_PORT"] = config.SETTINGS.APP.get("REDIS_PORT")
+        seen_during_deploy["GOOGLE_CLIENT_ID"] = config.SETTINGS.APP.get(
+            "GOOGLE_CLIENT_ID"
+        )
+        seen_during_deploy["AUTH_EMAIL_CONFIG"] = config.SETTINGS.APP.get(
+            "AUTH_EMAIL_CONFIG"
+        )
+
+    monkeypatch.setattr(config, "SETTINGS", stale_settings)
+    monkeypatch.setattr(installer_deploy, "deploy_to_app_engine", _fake_deploy)
+    monkeypatch.setattr(
+        installer_upgrade,
+        "_configure_deferred_job_recovery",
+        lambda _f, _g: True,
+    )
+    monkeypatch.setattr(
+        installer_monitoring,
+        "reconcile_memory_alert",
+        lambda: None,
+    )
+
+    assert agent_mode._default_deploy(post_vault_draft) is True  # type: ignore[arg-type]
+    assert seen_during_deploy == {
+        "REDIS_HOST": "redis.cloud.example",
+        "REDIS_PORT": 12345,
+        "GOOGLE_CLIENT_ID": "12345.apps.googleusercontent.com",
+        "AUTH_EMAIL_CONFIG": {"host": "smtp.gmail.com", "password": "app-password"},
+    }
