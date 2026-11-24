@@ -1,5 +1,21 @@
-export const Submitter = (Combobox) =>
-	class extends Combobox {
+import type {
+	Combobox,
+	ComboboxOption,
+	ComboboxOptionElement,
+} from "./combobox.ts";
+import type { Results } from "./results.ts";
+
+type ComboboxConstructor = abstract new (element: HTMLElement) => Combobox;
+
+export const Submitter = <Base extends ComboboxConstructor>(
+	BaseClass: Base,
+) => {
+	const ComboboxBase: ComboboxConstructor = BaseClass;
+	abstract class SubmittingCombobox extends ComboboxBase {
+		declare create?: boolean;
+		declare results: Results;
+		declare select?: HTMLSelectElement;
+
 		init() {
 			this.multiple ??= JSON.parse(this.parent.dataset.multiple || "false");
 			this.create = !!this.create;
@@ -8,10 +24,11 @@ export const Submitter = (Combobox) =>
 				this.element.removeAttribute("name");
 			}
 
-			let preload = JSON.parse(this.preload || "[]");
-			preload = Array.isArray(preload) ? preload : [preload];
+			const preload: ComboboxOption | ComboboxOption[] = JSON.parse(
+				this.preload || "[]",
+			);
 
-			preload.forEach((option) => {
+			(Array.isArray(preload) ? preload : [preload]).forEach((option) => {
 				this.addOption(option, true);
 			});
 			this.updatePanel(this.results.create(this.items || []));
@@ -27,20 +44,22 @@ export const Submitter = (Combobox) =>
 			} else {
 				this.select = document.createElement("select");
 				this.element.after(this.select);
-				this.select.multiple = this.multiple;
-				this.select.name = this.name;
+				this.select.multiple = Boolean(this.multiple);
+				this.select.name = String(this.name);
 				this.select.style.display = "none";
 			}
 		}
 
 		updateSelect(preloading = false) {
 			this.setupSelect();
+			const select = this.select;
+			if (!select) return;
 
 			this.values.forEach((value) => {
 				const option = document.createElement("option");
 				option.value = value;
 				option.selected = true;
-				this.select.appendChild(option);
+				select.appendChild(option);
 			});
 
 			if (this.options.length > 0) {
@@ -59,17 +78,17 @@ export const Submitter = (Combobox) =>
 					name: this.name,
 					options: Object.fromEntries(
 						this.options
-							.filter((o) => this.values.has(o.id))
+							.filter((o) => o.id !== undefined && this.values.has(o.id))
 							.map((o) => [o.id, o]),
 					),
 				},
 			});
 			this.element.dispatchEvent(event);
-			this.select.dispatchEvent(new Event("change", { bubbles: true }));
+			this.select?.dispatchEvent(new Event("change", { bubbles: true }));
 		}
 
 		updatePlaceholder() {
-			let displaySet;
+			let displaySet: Set<string | undefined>;
 			const focusedOption = this.focusedOption();
 			if (focusedOption && !this.multiple) {
 				displaySet = new Set([focusedOption.dataset.id]);
@@ -90,7 +109,7 @@ export const Submitter = (Combobox) =>
 
 			const options = Array.from(displaySet)
 				.map((id) => this.options.find((o) => o.id === id))
-				.filter(Boolean);
+				.filter((option) => option !== undefined);
 
 			const names = options.map((o) => o.name).join(", ");
 			const kinds = new Set(
@@ -105,18 +124,19 @@ export const Submitter = (Combobox) =>
 			this.element.placeholder = names || this.placeholder;
 		}
 
-		focusOption(option) {
-			super.focusOption(option);
+		focusOption(index: number) {
+			super.focusOption(index);
 			this.updatePlaceholder();
 		}
 
-		unfocusOption(option) {
+		unfocusOption(option?: ComboboxOptionElement | null) {
 			super.unfocusOption(option);
 			this.updatePlaceholder();
 		}
 
-		selectOption(option) {
+		selectOption(option: ComboboxOptionElement) {
 			const key = option.dataset.id;
+			if (key === undefined) return;
 
 			if (!this.multiple) {
 				this.values.clear();
@@ -125,16 +145,16 @@ export const Submitter = (Combobox) =>
 			} else if (this.values.has(key)) {
 				this.values.delete(key);
 				this.unfocusOption(option);
-				option._checkbox.checked = false;
+				if (option._checkbox) option._checkbox.checked = false;
 			} else {
 				this.values.add(key);
-				option._checkbox.checked = true;
+				if (option._checkbox) option._checkbox.checked = true;
 			}
 
 			this.updateSelect();
 		}
 
-		elementKeydown(event) {
+		elementKeydown(event: KeyboardEvent) {
 			super.elementKeydown(event);
 			if (event.defaultPrevented) return;
 
@@ -165,19 +185,19 @@ export const Submitter = (Combobox) =>
 			this.updatePlaceholder();
 		}
 
-		addValue(value, preloading = false) {
+		addValue(value: string, preloading = false) {
 			this.values.add(value);
 			this.updateSelect(preloading);
 		}
 
-		addOption(option = {}, preloading = false) {
+		addOption(option: ComboboxOption = {}, preloading = false) {
 			if (Object.keys(option).length === 0) return;
 
 			if (option.id && !this.options.some((o) => o.id === option.id)) {
 				this.options.unshift(option);
 			}
 			this.results.add(option);
-			this.addValue(option.id, preloading);
+			if (option.id !== undefined) this.addValue(option.id, preloading);
 		}
 
 		clear({ notify = true } = {}) {
@@ -189,4 +209,17 @@ export const Submitter = (Combobox) =>
 			this.hidePanel();
 			this.updateSelect(!notify);
 		}
-	};
+	}
+
+	// The runtime subclass retains the original constructor and instance members.
+	type Instance = InstanceType<Base> & SubmittingCombobox;
+	type Args = ConstructorParameters<Base>;
+	type SubmittingConstructor = Base extends typeof Combobox
+		? new (
+				...args: Args
+			) => Instance
+		: abstract new (
+				...args: Args
+			) => Instance;
+	return SubmittingCombobox as SubmittingConstructor;
+};

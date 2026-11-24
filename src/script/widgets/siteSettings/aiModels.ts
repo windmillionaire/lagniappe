@@ -1,11 +1,52 @@
 import { buttons } from "../../elements/buttons.mjs";
 import { SelectBox } from "../../elements/combobox/index.ts";
+import type { ENDPOINTS } from "../../shared/endpoints.ts";
 import { request } from "../../shared/index.ts";
 import { withTransition } from "../../shared/transitions.ts";
-import { SiteSetting } from "./base.ts";
+import {
+	type SiteActiveButton,
+	type SiteSelectHost,
+	SiteSetting,
+	type SiteSettingAttributes,
+} from "./base.ts";
 
-export class SiteAiModels extends SiteSetting {
-	constructor(attributes) {
+type AiEndpoints = ReturnType<typeof ENDPOINTS.SiteAiModels>;
+type AiModelField = "AI_MODEL" | "AI_UTILITY_MODEL" | "AI_IMAGE_MODEL";
+
+type AiSettings = Partial<Record<AiModelField | "AI_LOCATION", string>> & {
+	AI_AUTO_EXECUTE?: boolean;
+};
+
+interface AiModelDetails {
+	description?: string;
+	kind?: string;
+	source?: string;
+}
+
+interface AiModel extends AiModelDetails {
+	id: string;
+	label: string;
+}
+
+interface AiModelOptions {
+	text?: AiModel[];
+	image?: AiModel[];
+	pricing_url?: string;
+}
+
+interface AiSettingsResponse {
+	ai_settings?: AiSettings;
+	ai_model_options?: AiModelOptions;
+}
+
+export class SiteAiModels extends SiteSetting<AiEndpoints> {
+	declare _aiSettings: AiSettings | null | undefined;
+	declare _aiModelOptions: AiModelOptions | null | undefined;
+	declare _aiSelectsInitialized: boolean;
+	declare aiForm: HTMLFormElement | null;
+	declare aiButton?: SiteActiveButton;
+
+	constructor(attributes: SiteSettingAttributes<AiEndpoints>) {
 		super(attributes);
 		this._aiSettings = null;
 		this._aiModelOptions = null;
@@ -14,7 +55,9 @@ export class SiteAiModels extends SiteSetting {
 	}
 
 	init() {
-		this.aiForm = this.target.querySelector("[data-role='ai-settings']");
+		this.aiForm = this.target.querySelector<HTMLFormElement>(
+			"[data-role='ai-settings']",
+		);
 		if (!this.aiForm) return;
 
 		this.aiButton = buttons.active({
@@ -29,7 +72,7 @@ export class SiteAiModels extends SiteSetting {
 		this.aiForm.addEventListener("submit", this._saveAiSettings);
 	}
 
-	updated(response) {
+	updated(response: AiSettingsResponse) {
 		this._aiSettings = response.ai_settings;
 		this._aiModelOptions = response.ai_model_options;
 	}
@@ -40,7 +83,10 @@ export class SiteAiModels extends SiteSetting {
 		}
 	}
 
-	_renderAiSettings(settings, modelOptions) {
+	_renderAiSettings(
+		settings: AiSettings | null | undefined,
+		modelOptions: AiModelOptions | null | undefined,
+	) {
 		if (!this.aiForm || !settings) return;
 
 		this._initAiSelectBoxes();
@@ -52,12 +98,16 @@ export class SiteAiModels extends SiteSetting {
 		this._setAiField("AI_UTILITY_MODEL", settings.AI_UTILITY_MODEL);
 		this._setAiField("AI_IMAGE_MODEL", settings.AI_IMAGE_MODEL);
 		this._setAiField("AI_LOCATION", settings.AI_LOCATION || "global");
-		const autoExecute = this.aiForm.querySelector("[name='AI_AUTO_EXECUTE']");
+		const autoExecute = this.aiForm.querySelector<HTMLInputElement>(
+			"[name='AI_AUTO_EXECUTE']",
+		);
 		if (autoExecute) {
 			autoExecute.checked = settings.AI_AUTO_EXECUTE === true;
 		}
 
-		const pricing = this.aiForm.querySelector("[data-role='ai-pricing-link']");
+		const pricing = this.aiForm.querySelector<HTMLAnchorElement>(
+			"[data-role='ai-pricing-link']",
+		);
 		if (pricing && modelOptions?.pricing_url) {
 			pricing.href = modelOptions.pricing_url;
 		}
@@ -69,8 +119,10 @@ export class SiteAiModels extends SiteSetting {
 		);
 	}
 
-	_populateAiModelSelect(name, options) {
-		const select = this.aiForm?.querySelector(`[name='${name}']`);
+	_populateAiModelSelect(name: AiModelField, options: AiModel[]) {
+		const select = this.aiForm?.querySelector<HTMLSelectElement>(
+			`[name='${name}']`,
+		);
 		if (!select) return;
 
 		select.replaceChildren();
@@ -90,9 +142,10 @@ export class SiteAiModels extends SiteSetting {
 	}
 
 	_initAiSelectBoxes() {
+		if (!this.aiForm) return;
 		if (this._aiSelectsInitialized) {
 			this.aiForm
-				?.querySelectorAll("[data-role='ai-select'] select")
+				.querySelectorAll<HTMLSelectElement>("[data-role='ai-select'] select")
 				.forEach((select) => {
 					this._refreshSelectBox(select);
 				});
@@ -101,7 +154,7 @@ export class SiteAiModels extends SiteSetting {
 
 		this._aiSelectsInitialized = true;
 		this.aiForm
-			.querySelectorAll("[data-role='ai-select']")
+			.querySelectorAll<HTMLElement>("[data-role='ai-select']")
 			.forEach((element) => {
 				const select = new SelectBox(element);
 				select.init();
@@ -109,64 +162,76 @@ export class SiteAiModels extends SiteSetting {
 			});
 	}
 
-	_refreshSelectBox(select) {
-		const combobox = select.closest("[lp-select]")?._lp_combobox;
+	_refreshSelectBox(select: HTMLSelectElement) {
+		const combobox =
+			select.closest<SiteSelectHost>("[lp-select]")?._lp_combobox;
 		if (!combobox) return;
 
 		const options = Array.from(select.querySelectorAll("option"));
 		combobox.items = options.map((option) => ({
 			id: option.value,
-			name: option.textContent,
+			name: option.textContent ?? "",
 			kind: option.dataset.kind || "default",
-			...JSON.parse(option.dataset.details || "{}"),
+			...(JSON.parse(option.dataset.details || "{}") as AiModelDetails),
 		}));
 		combobox.updatePanel(combobox.results.create(combobox.items));
 		this.syncSelectBox(select, select.value);
 	}
 
-	_setAiField(name, value) {
-		const field = this.aiForm?.querySelector(`[name='${name}']`);
+	_setAiField(name: AiModelField | "AI_LOCATION", value?: string) {
+		const field = this.aiForm?.querySelector<
+			HTMLInputElement | HTMLSelectElement
+		>(`[name='${name}']`);
 		if (!field) return;
 		field.value = value || "";
-		if (field.matches("select")) this.syncSelectBox(field, value);
+		if (field instanceof HTMLSelectElement) this.syncSelectBox(field, value);
 	}
 
-	_showAiError(message) {
-		const error = this.aiForm?.querySelector("[data-role='ai-error']");
+	_showAiError(message: string) {
+		const error = this.aiForm?.querySelector<HTMLElement>(
+			"[data-role='ai-error']",
+		);
 		if (!error) return;
 		error.textContent = message || "";
 		error.dataset.visible = message ? "true" : "false";
 	}
 
 	_aiSettingsFormData() {
-		const data = new FormData(this.aiForm);
-		this.aiForm
-			.querySelectorAll("[data-role='ai-select'] select")
+		const form = this.aiForm;
+		const data = new FormData(form ?? undefined);
+		if (!form) return data;
+		form
+			.querySelectorAll<HTMLSelectElement>("[data-role='ai-select'] select")
 			.forEach((select) => {
-				const combobox = select.closest("[lp-select]")?._lp_combobox;
+				const combobox =
+					select.closest<SiteSelectHost>("[lp-select]")?._lp_combobox;
 				const selected = combobox?.values?.values().next().value;
 				data.set(select.name, selected ?? select.value ?? "");
 			});
-		const autoExecute = this.aiForm.querySelector?.("[name='AI_AUTO_EXECUTE']");
+		const autoExecute = form.querySelector<HTMLInputElement>(
+			"[name='AI_AUTO_EXECUTE']",
+		);
 		if (autoExecute) {
 			data.set("AI_AUTO_EXECUTE", autoExecute.checked ? "true" : "false");
 		}
 		return data;
 	}
 
-	async _saveAiSettings(event) {
+	async _saveAiSettings(event: SubmitEvent) {
 		event.preventDefault();
 		event.stopPropagation();
+		const button = this.aiButton;
+		if (!button) return;
 
 		this._showAiError("");
-		this.aiButton.activate();
-		const response = await request.post(
+		button.activate();
+		const response = await request.post<AiSettingsResponse>(
 			this.endpoints.setAiSettings,
 			this._aiSettingsFormData(),
 		);
-		if (!response.ok) {
-			this._showAiError(response.error || "Unable to save AI model settings.");
-			this.aiButton.deactivate("Save AI Model Settings");
+		if (!response?.ok) {
+			this._showAiError(response?.error || "Unable to save AI model settings.");
+			button.deactivate("Save AI Model Settings");
 			return;
 		}
 
@@ -175,7 +240,7 @@ export class SiteAiModels extends SiteSetting {
 		await withTransition(
 			() => {
 				this._renderAiSettings(response.ai_settings, response.ai_model_options);
-				this.aiButton.deactivate();
+				button.deactivate();
 			},
 			{ label: "site-settings:save-ai-models" },
 		);

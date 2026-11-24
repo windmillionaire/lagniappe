@@ -1,13 +1,40 @@
 import { FacetsBox } from "../../elements/combobox/index.ts";
+import type { ENDPOINTS } from "../../shared/endpoints.ts";
 import { Modal, request } from "../../shared/index.ts";
-import { SiteSetting } from "./base.ts";
+import { SiteSetting, type SiteSettingAttributes } from "./base.ts";
+
+type AdministratorEndpoints = ReturnType<typeof ENDPOINTS.SiteAdministrators>;
+
+interface Administrator {
+	key: string | null;
+	name: string;
+	email: string;
+	last_login: string | null;
+	awaiting_first_sign_in: boolean;
+	is_owner: boolean;
+}
+
+interface AdministratorResponse {
+	administrators?: Administrator[];
+	administrator_candidates?: Administrator[];
+	can_manage_administrators?: boolean;
+}
 
 /**
  * Renders the primary Owner and additional-Administrator roster.
  *
  */
-export class SiteAdministrators extends SiteSetting {
-	constructor(attributes) {
+export class SiteAdministrators extends SiteSetting<AdministratorEndpoints> {
+	declare _administrators: Administrator[];
+	declare _candidates: Administrator[];
+	declare _canManage: boolean;
+	declare _demotionModal: Modal | null;
+	declare form: HTMLFormElement | null;
+	declare list: HTMLElement | null;
+	declare error: HTMLElement | null;
+	declare selector?: FacetsBox;
+
+	constructor(attributes: SiteSettingAttributes<AdministratorEndpoints>) {
 		super(attributes);
 		this._administrators = [];
 		this._candidates = [];
@@ -18,18 +45,26 @@ export class SiteAdministrators extends SiteSetting {
 	}
 
 	init() {
-		this.form = this.target.querySelector("[data-role='administrator-form']");
-		this.list = this.target.querySelector("[data-role='administrator-list']");
-		this.error = this.target.querySelector("[data-role='administrator-error']");
-		this.selector = new FacetsBox(
-			this.form.querySelector("input[name='user_key']"),
+		this.form = this.target.querySelector<HTMLFormElement>(
+			"[data-role='administrator-form']",
 		);
+		this.list = this.target.querySelector<HTMLElement>(
+			"[data-role='administrator-list']",
+		);
+		this.error = this.target.querySelector<HTMLElement>(
+			"[data-role='administrator-error']",
+		);
+		const input = this.form?.querySelector<HTMLInputElement>(
+			"input[name='user_key']",
+		);
+		if (!input) return;
+		this.selector = new FacetsBox(input);
 		this.selector.init();
 		this.form?.addEventListener("submit", this._submit);
 		this.list?.addEventListener("click", this._click);
 	}
 
-	updated(response) {
+	updated(response: AdministratorResponse) {
 		this._administrators = response.administrators || [];
 		this._candidates = response.administrator_candidates || [];
 		this._canManage = response.can_manage_administrators === true;
@@ -47,16 +82,17 @@ export class SiteAdministrators extends SiteSetting {
 			),
 		);
 
-		this.selector.clear({ notify: false });
-		this.selector.updatePanel("");
+		this.selector?.clear({ notify: false });
+		this.selector?.updatePanel("");
 		this.form.dataset.visible = this._canManage ? "true" : "false";
-		this.form.querySelector("button").disabled = !this._candidates.length;
+		const submit = this.form.querySelector("button");
+		if (submit) submit.disabled = !this._candidates.length;
 		this.updateSummary(
 			`${this._administrators.length} ${this._administrators.length === 1 ? "administrator" : "administrators"}`,
 		);
 	}
 
-	_administratorRow(administrator) {
+	_administratorRow(administrator: Administrator) {
 		const item = document.createElement("li");
 		item.dataset.role = "administrator";
 		item.dataset.owner = administrator.is_owner ? "true" : "false";
@@ -81,7 +117,7 @@ export class SiteAdministrators extends SiteSetting {
 		details.append(name, email, status);
 		item.append(details);
 
-		if (this._canManage && !administrator.is_owner) {
+		if (this._canManage && !administrator.is_owner && administrator.key) {
 			const button = document.createElement("button");
 			button.type = "button";
 			button.dataset.role = "demote-administrator";
@@ -96,47 +132,55 @@ export class SiteAdministrators extends SiteSetting {
 		return item;
 	}
 
-	async _submit(event) {
+	async _submit(event: SubmitEvent) {
 		event.preventDefault();
-		const select = this.form.querySelector("select[name='user_key']");
-		if (!select.value) return;
+		const select = this.form?.querySelector<HTMLSelectElement>(
+			"select[name='user_key']",
+		);
+		if (!select?.value) return;
 		this._showError();
-		const response = await request.post(this.endpoints.promote, {
-			user_key: select.value,
-		});
-		if (!response.ok) return this._showError(response.error);
+		const response = await request.post<AdministratorResponse>(
+			this.endpoints.promote,
+			{ user_key: select.value },
+		);
+		if (!response?.ok) return this._showError(response?.error);
 		this.updated(response);
 		this._render();
 	}
 
-	async _click(event) {
-		const button = event.target.closest("[data-role='demote-administrator']");
-		if (!button || !this.list.contains(button)) return;
+	async _click(event: MouseEvent) {
+		const target = event.target;
+		if (!(target instanceof Element)) return;
+		const button = target.closest<HTMLButtonElement>(
+			"[data-role='demote-administrator']",
+		);
+		if (!button?.dataset.key || !this.list?.contains(button)) return;
+		const route = this.endpoints.demote(button.dataset.key);
 		this._showError();
 		this._demotionModal?.destroy();
 		const modal = new Modal(this.view, button);
 		this._demotionModal = modal;
-		await modal.load(this.endpoints.demote(button.dataset.key));
+		await modal.load(route);
 		if (this._demotionModal !== modal || !modal.modal) return;
 
-		const confirm = modal.modal.querySelector("[data-role='delete']");
+		const confirm = modal.modal.querySelector<HTMLButtonElement>(
+			"[data-role='delete']",
+		);
 		if (!confirm) return;
 		let submitting = false;
 		confirm.addEventListener("click", async () => {
 			if (submitting) return;
 			submitting = true;
 			confirm.disabled = true;
-			const spinner = confirm.querySelector("#spinner");
+			const spinner = confirm.querySelector<HTMLElement>("#spinner");
 			if (spinner) spinner.dataset.visible = "true";
 
-			const response = await request.delete(
-				this.endpoints.demote(button.dataset.key),
-			);
-			if (!response.ok) {
+			const response = await request.delete<AdministratorResponse>(route);
+			if (!response?.ok) {
 				submitting = false;
 				confirm.disabled = false;
 				if (spinner) spinner.dataset.visible = "false";
-				this._showError(response.error);
+				this._showError(response?.error);
 				return;
 			}
 

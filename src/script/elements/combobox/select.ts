@@ -1,28 +1,41 @@
-import { Combobox } from "./combobox.ts";
-import { Results } from "./results.ts";
+import {
+	Combobox,
+	type ComboboxOption,
+	type ComboboxOptionElement,
+} from "./combobox.ts";
+import { type ResultDetails, Results } from "./results.ts";
 import { Submitter } from "./submitter.ts";
 
 export class SelectBox extends Submitter(Combobox) {
-	constructor(element) {
+	declare select: HTMLSelectElement;
+	declare items: ResultDetails[];
+
+	constructor(element: HTMLElement) {
 		super(element);
 		this.results = new Results();
 		this.items = [];
 	}
 
 	init() {
-		this.select = this.parent.querySelector("select");
-		this.multiple = JSON.parse(this.select.dataset.multiple || "false");
-		this.select.name = this.name;
-		this.select.multiple = this.multiple;
+		const select = this.parent.querySelector("select");
+		if (!select) throw new Error("SelectBox requires a native select element");
+		this.select = select;
+		const multiple: boolean = JSON.parse(
+			this.select.dataset.multiple || "false",
+		);
+		this.multiple = multiple;
+		this.select.name = String(this.name);
+		this.select.multiple = multiple;
 		this.select.style.display = "none";
 
-		this.element = document.createElement("input");
-		this.select.after(this.element);
+		const input = document.createElement("input");
+		this.element = input;
+		this.select.after(input);
 
-		this.element.className = `${this.select.className}`;
-		this.element.dataset.mode = "select";
-		this.element.readOnly = true;
-		this.element.setAttribute("inputmode", "none");
+		input.className = `${this.select.className}`;
+		input.dataset.mode = "select";
+		input.readOnly = true;
+		input.setAttribute("inputmode", "none");
 
 		this._createItems();
 
@@ -50,32 +63,39 @@ export class SelectBox extends Submitter(Combobox) {
 
 		this.items = Array.from(this.select.options)
 			.filter((option) => option.value)
-			.map((option) => ({
-				id: option.value,
-				name: option.textContent,
-				kind: this.select.dataset.kind || "default",
-				...JSON.parse(option.dataset.details || "{}"),
-				disabled: option.disabled || option.parentElement?.disabled || false,
-			}));
+			.map((option) => {
+				const details: ResultDetails = JSON.parse(
+					option.dataset.details || "{}",
+				);
+				return {
+					id: option.value,
+					name: option.textContent ?? "",
+					kind: this.select.dataset.kind || "default",
+					...details,
+					disabled:
+						option.disabled ||
+						(option.parentElement?.hasAttribute("disabled") ?? false),
+				};
+			});
 	}
 
-	selectOption(option) {
+	selectOption(option: ComboboxOptionElement) {
 		if (option.getAttribute("aria-disabled") === "true") return;
 		super.selectOption(option);
 	}
 
-	elementClick(event) {
+	elementClick(event: MouseEvent) {
 		event.stopPropagation();
 
 		this.panelOpen ? this.hidePanel() : void this.showPanel();
 	}
 
-	addOption(option) {
+	addOption(option: ComboboxOption) {
 		if (!this.items) this._createItems();
-		this.values.add(option.id);
+		if (option.id !== undefined) this.values.add(option.id);
 	}
 
-	hidePanel() {
+	hidePanel(): undefined {
 		super.hidePanel();
 		this.element.blur();
 	}

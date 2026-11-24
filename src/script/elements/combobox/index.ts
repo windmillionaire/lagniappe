@@ -1,4 +1,4 @@
-export { Dropdown } from "./dropdown.ts";
+export { Dropdown, type DropdownItem, type DropdownMenu } from "./dropdown.ts";
 export { FacetsBox } from "./facets.ts";
 export { LocationBox } from "./location.ts";
 export { RemoteQueryCombobox } from "./remote.ts";

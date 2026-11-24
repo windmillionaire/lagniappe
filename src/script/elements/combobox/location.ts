@@ -3,10 +3,49 @@ import { ENDPOINTS } from "../../shared/endpoints.ts";
 import { setIcon } from "../../shared/icons.ts";
 import { request } from "../../shared/request.ts";
 import { updateUserLocation } from "../../shared/user.ts";
-import { RemoteQueryCombobox } from "./remote.ts";
+import type { ComboboxOptionElement } from "./combobox.ts";
+import {
+	type ComboboxQueryResponse,
+	type RemoteInputEvent,
+	RemoteQueryCombobox,
+} from "./remote.ts";
+
+type LocationSelection = {
+	id?: string;
+	name?: string;
+	address?: string;
+	address2?: string;
+};
+
+type LocationSource = {
+	[Field in keyof LocationSelection | "place_id"]?: unknown;
+};
+
+type SelectionOptions = { notify?: boolean };
+
+type LocationBoxOptions = {
+	name?: string | null;
+	onSelect?:
+		| ((
+				location: LocationSelection | null,
+				options: { notify: boolean },
+		  ) => void)
+		| null;
+};
 
 export class LocationBox extends RemoteQueryCombobox {
-	constructor(element, { name = null, onSelect = null } = {}) {
+	declare element: HTMLInputElement;
+	declare fieldName: string | undefined;
+	declare location: LocationSelection | null;
+	declare onSelect: LocationBoxOptions["onSelect"];
+	declare endpoint: string;
+	declare basePlaceholder?: string;
+	declare hiddenInput?: HTMLInputElement;
+
+	constructor(
+		element: HTMLElement,
+		{ name = null, onSelect = null }: LocationBoxOptions = {},
+	) {
 		super(element);
 		this.index = "location";
 		this.fieldName = name || this.name;
@@ -25,11 +64,11 @@ export class LocationBox extends RemoteQueryCombobox {
 		this.element.removeAttribute("name");
 		this.basePlaceholder = this.element.placeholder;
 		this._createHiddenInput();
-		this.element.autocomplete = "bork";
+		this.element.setAttribute("autocomplete", "bork");
 		void updateUserLocation();
 	}
 
-	_input(event) {
+	_input(event: RemoteInputEvent) {
 		const query = event.target.value.trim();
 		if (query.length > 2) {
 			return this._search(query);
@@ -37,12 +76,12 @@ export class LocationBox extends RemoteQueryCombobox {
 		this.settleQueryInput({ clear: true });
 	}
 
-	elementClick(event) {
+	elementClick(event: MouseEvent) {
 		void updateUserLocation();
 		super.elementClick(event, false);
 	}
 
-	_search(query) {
+	_search(query: string) {
 		const params = new URLSearchParams();
 		params.set("q", query);
 		return this.runQuery(
@@ -50,7 +89,9 @@ export class LocationBox extends RemoteQueryCombobox {
 			async (token) => {
 				await updateUserLocation();
 				if (token.signal?.aborted) return null;
-				return request.get(this.endpoint, params, { signal: token.signal });
+				return request.get<ComboboxQueryResponse>(this.endpoint, params, {
+					signal: token.signal,
+				});
 			},
 			(response) => {
 				this.clearQueryResults();
@@ -62,7 +103,7 @@ export class LocationBox extends RemoteQueryCombobox {
 		);
 	}
 
-	_setManualAddress(text, notify = true) {
+	_setManualAddress(text: string | undefined, notify = true) {
 		const address = this._cleanText(text);
 		if (!address) return;
 
@@ -71,7 +112,7 @@ export class LocationBox extends RemoteQueryCombobox {
 		this.hidePanel();
 	}
 
-	selectOption(option) {
+	selectOption(option: ComboboxOptionElement) {
 		if (option.dataset.manual === "true") {
 			this._setManualAddress(option.dataset.address);
 			return;
@@ -79,13 +120,13 @@ export class LocationBox extends RemoteQueryCombobox {
 
 		if (!option.dataset.details) return;
 
-		const details = JSON.parse(option.dataset.details);
+		const details: unknown = JSON.parse(option.dataset.details);
 		this._selectLocation(details);
 		this.element.value = "";
 		this.hidePanel();
 	}
 
-	elementKeydown(event) {
+	elementKeydown(event: KeyboardEvent) {
 		super.elementKeydown(event);
 		if (event.defaultPrevented) return;
 
@@ -107,13 +148,13 @@ export class LocationBox extends RemoteQueryCombobox {
 		}
 	}
 
-	addOption(option = {}, notify = true) {
+	addOption(option: LocationSource = {}, notify = true) {
 		if (Object.keys(option).length === 0) return;
 
 		this._selectLocation(option, { notify });
 	}
 
-	clear({ notify = true } = {}) {
+	clear({ notify = true }: SelectionOptions = {}) {
 		this.values.clear();
 		this.location = null;
 		this.focusedIndex = -1;
@@ -126,7 +167,7 @@ export class LocationBox extends RemoteQueryCombobox {
 		if (notify && !this.onSelect) this._dispatchChange();
 	}
 
-	_appendManualOption(query) {
+	_appendManualOption(query: string) {
 		const address = this._cleanText(query);
 		if (!this.panel || !address) return;
 
@@ -138,7 +179,7 @@ export class LocationBox extends RemoteQueryCombobox {
 		option.dataset.id = `manual:${address}`;
 		option.dataset.name = `Use "${address}"`;
 		option.dataset.details = JSON.stringify({ address, name: address });
-		option.dataset.index = this.options.length;
+		option.dataset.index = String(this.options.length);
 		option.id = `${this.panel.id}-manual`;
 
 		const row = option.appendChild(document.createElement("p"));
@@ -160,7 +201,7 @@ export class LocationBox extends RemoteQueryCombobox {
 		});
 	}
 
-	_selectLocation(location, { notify = true } = {}) {
+	_selectLocation(location: unknown, { notify = true }: SelectionOptions = {}) {
 		const selected = this._normalizeLocation(location);
 		if (!selected) return;
 
@@ -188,21 +229,22 @@ export class LocationBox extends RemoteQueryCombobox {
 		this.element.after(this.hiddenInput);
 	}
 
-	_cleanText(value) {
+	_cleanText(value: unknown) {
 		if (value === null || value === undefined) return null;
 		const text = String(value).trim();
 		return text || null;
 	}
 
-	_normalizeLocation(location) {
+	_normalizeLocation(location: unknown) {
 		if (!location || typeof location !== "object") return null;
 
-		const id = this._cleanText(location.id || location.place_id);
-		const address = this._cleanText(location.address);
-		const name = this._cleanText(location.name) || address;
-		const address2 = this._cleanText(location.address2);
+		const details = location as LocationSource;
+		const id = this._cleanText(details.id || details.place_id);
+		const address = this._cleanText(details.address);
+		const name = this._cleanText(details.name) || address;
+		const address2 = this._cleanText(details.address2);
 
-		const normalized = {};
+		const normalized: LocationSelection = {};
 		if (id) normalized.id = id;
 		if (name) normalized.name = name;
 		if (address) normalized.address = address;
@@ -211,7 +253,7 @@ export class LocationBox extends RemoteQueryCombobox {
 		return Object.keys(normalized).length > 0 ? normalized : null;
 	}
 
-	_displayText(location) {
+	_displayText(location: LocationSelection) {
 		return (
 			this._cleanText(location?.name) ||
 			this._cleanText(location?.address) ||

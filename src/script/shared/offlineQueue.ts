@@ -64,7 +64,7 @@ interface OfflineSubmissionContext {
 	widget: QueueWidget;
 }
 
-interface QueueContext {
+export interface QueueContext {
 	phase: "queued" | "conflict" | "replayed" | "cancelled";
 	queue: OfflineQueue;
 	record: OfflineMutationRecord;

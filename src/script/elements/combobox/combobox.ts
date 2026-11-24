@@ -3,6 +3,8 @@ import {
 	computePosition,
 	flip,
 	offset,
+	type Placement,
+	type ReferenceElement,
 	shift,
 } from "@floating-ui/dom";
 import { STYLES } from "../../generated/styles.mjs";
@@ -10,11 +12,72 @@ import { captureError } from "../../shared/errors.ts";
 import { generateElementId } from "../../shared/utilities.ts";
 import { primitives } from "../primitives.mjs";
 
-export class Combobox {
-	constructor(element) {
+export interface ComboboxOption {
+	id?: string;
+	name?: string;
+	kind?: string;
+	hash?: string;
+	[key: string]: unknown;
+}
+
+export interface ComboboxOptionElement extends HTMLElement {
+	_checkbox?: HTMLInputElement | null;
+}
+
+export interface ComboboxTrigger extends HTMLElement {
+	autocomplete?: string;
+	name?: string;
+	placeholder?: string;
+	value?: string;
+}
+
+interface ComboboxHost extends HTMLElement {
+	_lp_combobox?: Combobox<unknown[]>;
+}
+
+export abstract class Combobox<InitArguments extends unknown[] = []> {
+	declare _destroyed: boolean;
+	declare parent: ComboboxHost;
+	declare element: ComboboxTrigger;
+	declare mobile: boolean;
+	declare options: ComboboxOption[];
+	declare items?: ComboboxOption[];
+	declare values: Set<string>;
+	declare focusedIndex: number;
+	declare panel: HTMLDivElement | null;
+	declare panelOpen: boolean;
+	declare panelReady: Promise<boolean>;
+	declare popupRole: string;
+	declare optionRole: string;
+	declare triggerRole: string | null | undefined;
+	declare positionReference: ReferenceElement | null | undefined;
+	declare matchReferenceWidth: boolean;
+	declare placement: Placement;
+	declare styles: { panel: string };
+	declare index?: string;
+	declare kind: string;
+	declare placeholder?: string;
+	declare preload?: string;
+	declare multiple?: boolean;
+	declare creatable?: string;
+	declare formType?: string;
+	declare includeUsers?: string;
+	declare permission?: string;
+	declare name?: string;
+	declare id: string;
+	declare cleanup?: (() => void) | null;
+	declare _elementHandlersAdded?: boolean;
+	declare _documentHandlersAdded?: boolean;
+	declare _panelHandlersAdded?: boolean;
+	declare _observer?: IntersectionObserver | null;
+
+	constructor(element: HTMLElement) {
 		this._destroyed = false;
 		this.parent = element;
-		this.element = this.parent.querySelector("select, input") || element;
+		this.element =
+			this.parent.querySelector<HTMLInputElement | HTMLSelectElement>(
+				"select, input",
+			) || element;
 		this.mobile = window.matchMedia("(max-width: 768px)").matches;
 		this.options = [];
 		this.values = new Set();
@@ -50,7 +113,9 @@ export class Combobox {
 		this.placeholder = data.placeholder;
 		this.preload = data.preload;
 		this.multiple =
-			data.multiple === undefined ? undefined : JSON.parse(data.multiple);
+			data.multiple === undefined
+				? undefined
+				: (JSON.parse(data.multiple) as boolean);
 		this.creatable = data.creatable;
 		this.formType = data.formType;
 		this.includeUsers = data.includeUsers;
@@ -60,6 +125,8 @@ export class Combobox {
 		this.id = this.element?.id || generateElementId("combobox");
 	}
 
+	// Derived controls can require configuration before the shared DOM setup.
+	init(...args: InitArguments): void;
 	init() {
 		if (this._destroyed) return;
 		if (!this.element) throw new Error("Element not found");
@@ -134,7 +201,7 @@ export class Combobox {
 		this._observer.observe(this.element);
 	}
 
-	_handleIntersection(entries) {
+	_handleIntersection(entries: IntersectionObserverEntry[]) {
 		entries.forEach((entry) => {
 			if (!entry.isIntersecting && this.panelOpen) {
 				this.hidePanel();
@@ -143,7 +210,7 @@ export class Combobox {
 	}
 
 	_addPanelHandlers() {
-		if (this._panelHandlersAdded) return;
+		if (this._panelHandlersAdded || !this.panel) return;
 
 		this.panel.addEventListener("pointermove", this._panelPointerMove);
 		this.panel.addEventListener("pointerdown", this._panelPointerDown);
@@ -154,9 +221,9 @@ export class Combobox {
 	_removePanelHandlers() {
 		if (!this._panelHandlersAdded) return;
 
-		this.panel.removeEventListener("pointermove", this._panelPointerMove);
-		this.panel.removeEventListener("pointerdown", this._panelPointerDown);
-		this.panel.removeEventListener("click", this._optionClick);
+		this.panel?.removeEventListener("pointermove", this._panelPointerMove);
+		this.panel?.removeEventListener("pointerdown", this._panelPointerDown);
+		this.panel?.removeEventListener("click", this._optionClick);
 		this._panelHandlersAdded = false;
 	}
 
@@ -185,13 +252,13 @@ export class Combobox {
 		let active = true;
 		let positionRequest = 0;
 		let readySettled = false;
-		let resolveReady;
-		let rejectReady;
-		const ready = new Promise((resolve, reject) => {
+		let resolveReady: (positioned: boolean) => void;
+		let rejectReady: (error: unknown) => void;
+		const ready = new Promise<boolean>((resolve, reject) => {
 			resolveReady = resolve;
 			rejectReady = reject;
 		});
-		const settleReady = (positioned, error = null) => {
+		const settleReady = (positioned: boolean, error: unknown = null) => {
 			if (readySettled) {
 				if (error) captureError(error, panel);
 				return;
@@ -235,7 +302,7 @@ export class Combobox {
 					});
 					settleReady(true);
 				})
-				.catch((error) => {
+				.catch((error: unknown) => {
 					if (!active || this._destroyed || this.panel !== panel) {
 						settleReady(false);
 						return;
@@ -259,9 +326,10 @@ export class Combobox {
 		}
 	}
 
-	_addCheckbox(option) {
+	_addCheckbox(option: ComboboxOptionElement) {
+		const id = option.dataset.id;
 		const checkboxElement = primitives.checkbox({
-			checked: this.values.has(option.dataset.id),
+			checked: id !== undefined && this.values.has(id),
 			kind: this.kind,
 			label: false,
 		});
@@ -273,31 +341,36 @@ export class Combobox {
 		option._checkbox = checkboxElement.querySelector("input");
 	}
 
-	updatePanel(html) {
+	updatePanel(html: string | null | undefined) {
 		if (this._destroyed) return false;
 		if (!this.panel) this._createPanel();
-		if (!this.panel) return false;
+		const panel = this.panel;
+		if (!panel) return false;
 		this.options = [];
 		this.focusedIndex = -1;
 		this.element.removeAttribute("aria-activedescendant");
-		this.panel.innerHTML = html || "";
+		panel.innerHTML = html || "";
 		if (!html) {
 			this.hidePanel();
 			return;
 		}
 
-		this.panel
-			.querySelectorAll(`[role='${this.optionRole}']`)
+		panel
+			.querySelectorAll<ComboboxOptionElement>(`[role='${this.optionRole}']`)
 			.forEach((optionElt, index) => {
-				optionElt.dataset.index = index;
-				if (!optionElt.id) optionElt.id = `${this.panel.id}-opt-${index}`;
+				optionElt.dataset.index = String(index);
+				if (!optionElt.id) optionElt.id = `${panel.id}-opt-${index}`;
 				if (this.items) {
 					this.items[index].id = optionElt.id;
 					this.options.push(this.items[index]);
 				} else {
+					// Server-rendered rows serialize their option details in this attribute.
+					const details = JSON.parse(
+						optionElt.dataset.details || "{}",
+					) as ComboboxOption;
 					const option = {
 						...optionElt.dataset,
-						...JSON.parse(optionElt.dataset.details || "{}"),
+						...details,
 					};
 					this.options.push(option);
 				}
@@ -311,21 +384,19 @@ export class Combobox {
 		}
 	}
 
-	showPanel() {
+	showPanel(): Promise<boolean> {
 		if (this._destroyed) return Promise.resolve(false);
-		const renderedOptions =
-			this.panel?.querySelectorAll(`[role='${this.optionRole}']`).length || 0;
-		if (renderedOptions === 0) {
+		const panel = this.panel;
+		if (!panel?.querySelector(`[role='${this.optionRole}']`)) {
 			this.hidePanel();
 			return Promise.resolve(false);
 		}
 		if (this.panelOpen) return this.panelReady;
 
-		const panel = this.panel;
 		this.panelOpen = true;
-		this.panel.classList.remove("hidden");
-		this.panel.dataset.visible = "true";
-		this.panel.dataset.positioned = "false";
+		panel.classList.remove("hidden");
+		panel.dataset.visible = "true";
+		panel.dataset.positioned = "false";
 		this.element.setAttribute("aria-expanded", "true");
 		this.element.dataset.panel = "open";
 
@@ -345,14 +416,16 @@ export class Combobox {
 
 				panel.dataset.positioned = "true";
 
-				document.querySelectorAll("[data-combobox-id]").forEach((combobox) => {
-					if (combobox._lp_combobox && combobox._lp_combobox !== this) {
-						combobox._lp_combobox.hidePanel();
-					}
-				});
+				document
+					.querySelectorAll<ComboboxHost>("[data-combobox-id]")
+					.forEach((combobox) => {
+						if (combobox._lp_combobox && combobox._lp_combobox !== this) {
+							combobox._lp_combobox.hidePanel();
+						}
+					});
 				return true;
 			})
-			.catch((error) => {
+			.catch((error: unknown) => {
 				if (this.panelReady === panelReady && this.panel === panel) {
 					this.hidePanel();
 				}
@@ -363,7 +436,7 @@ export class Combobox {
 		return panelReady;
 	}
 
-	hidePanel() {
+	hidePanel(): boolean | undefined {
 		const wasOpen = this.panelOpen;
 
 		this.panelOpen = false;
@@ -383,7 +456,7 @@ export class Combobox {
 		if (wasOpen) return true;
 	}
 
-	elementClick(event, hidePanel = true) {
+	elementClick(event: MouseEvent, hidePanel = true) {
 		event.stopPropagation();
 
 		if (this.panelOpen && hidePanel) {
@@ -393,7 +466,7 @@ export class Combobox {
 		this.element.focus();
 	}
 
-	elementKeydown(event) {
+	elementKeydown(event: KeyboardEvent) {
 		const count = this.options.length;
 		const next = () =>
 			this.focusedIndex >= count - 1 ? 0 : this.focusedIndex + 1;
@@ -430,24 +503,31 @@ export class Combobox {
 		}
 	}
 
-	focusedOption() {
+	focusedOption(): ComboboxOptionElement | null {
 		if (this.focusedIndex < 0) return null;
-		return this.panel.querySelector(`[data-index="${this.focusedIndex}"]`);
+		return (
+			this.panel?.querySelector<ComboboxOptionElement>(
+				`[data-index="${this.focusedIndex}"]`,
+			) ?? null
+		);
 	}
 
-	focusOption(index) {
+	focusOption(index: number) {
 		const currentOption = this.focusedOption();
 		if (currentOption) {
 			this.unfocusOption(currentOption);
 		}
-		const option = this.panel.querySelector(`[data-index="${index}"]`);
+		const option = this.panel?.querySelector<ComboboxOptionElement>(
+			`[data-index="${index}"]`,
+		);
+		if (!option) return;
 		option.setAttribute("aria-selected", "true");
 		option.scrollIntoView({ block: "nearest" });
-		this.focusedIndex = parseInt(option.dataset.index, 10);
+		this.focusedIndex = Number.parseInt(option.dataset.index ?? "", 10);
 		this.element.setAttribute("aria-activedescendant", option.id);
 	}
 
-	unfocusOption(option) {
+	unfocusOption(option?: ComboboxOptionElement | null) {
 		const currentOption = option || this.focusedOption();
 		if (!currentOption) return;
 
@@ -456,45 +536,57 @@ export class Combobox {
 		this.element.removeAttribute("aria-activedescendant");
 	}
 
-	_panelPointerDown(event) {
+	_panelPointerDown(event: PointerEvent) {
 		// Keep DOM focus on the trigger so aria-activedescendant keeps working
 		// and the input doesn't lose focus when the user clicks an option.
 		event.preventDefault();
 	}
 
-	_documentClick(e) {
+	_documentClick(event: MouseEvent) {
 		if (
 			this.panelOpen &&
-			!this.element.contains(e.target) &&
-			!this.panel.contains(e.target)
+			event.target instanceof Node &&
+			!this.element.contains(event.target) &&
+			!this.panel?.contains(event.target)
 		) {
 			this.deactivate();
 		}
 	}
 
-	_documentKeydown(event) {
+	_documentKeydown(event: KeyboardEvent) {
 		if (this.panelOpen && event.key === "Escape") {
 			this.deactivate();
 		}
 	}
 
-	_panelPointerMove(event) {
-		const option = event.target.closest(`[role="${this.optionRole}"]`);
+	_panelPointerMove(event: PointerEvent) {
+		if (!(event.target instanceof Element)) return;
+		const option = event.target.closest<ComboboxOptionElement>(
+			`[role="${this.optionRole}"]`,
+		);
 		if (!option) return;
 
-		const index = parseInt(option.dataset.index, 10);
+		const index = Number.parseInt(option.dataset.index ?? "", 10);
 		if (index === this.focusedIndex) return;
 
 		this.focusOption(index);
 	}
 
-	_optionClick(event) {
-		const option = event.target.closest(`[role="${this.optionRole}"]`);
+	_optionClick(event: MouseEvent) {
+		if (!(event.target instanceof Element)) return;
+		const option = event.target.closest<ComboboxOptionElement>(
+			`[role="${this.optionRole}"]`,
+		);
 		if (option) {
 			event.stopPropagation();
 			this.selectOption(option, event);
 		}
 	}
+
+	abstract selectOption(
+		option: ComboboxOptionElement,
+		event?: MouseEvent | null,
+	): void;
 
 	show() {
 		this.element.focus();

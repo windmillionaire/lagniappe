@@ -1,9 +1,50 @@
+import type { Placement, ReferenceElement } from "@floating-ui/dom";
 import { STYLES } from "../../generated/styles.mjs";
 import { setIcon } from "../../shared/icons.ts";
-import { Combobox } from "./combobox.ts";
+import {
+	Combobox,
+	type ComboboxOption,
+	type ComboboxOptionElement,
+} from "./combobox.ts";
 
-export class Dropdown extends Combobox {
-	init(menu) {
+type DropdownOptionHandler<Result> = (
+	option: ComboboxOptionElement,
+	event: MouseEvent | null,
+) => Result;
+
+export interface DropdownItem extends ComboboxOption {
+	icon?: string;
+	html?: string;
+	closeOnClick?: boolean | DropdownOptionHandler<boolean>;
+	onClick?: DropdownOptionHandler<void>;
+}
+
+type DropdownLoader = () =>
+	| DropdownItem[]
+	| undefined
+	| Promise<DropdownItem[] | undefined>;
+
+export interface DropdownMenu {
+	placement?: Placement;
+	items?: DropdownItem[];
+	styles?: Partial<Combobox["styles"]>;
+	popupRole?: string;
+	optionRole?: string;
+	positionReference?: ReferenceElement | null;
+	matchReferenceWidth?: boolean;
+	triggerRole?: string | null;
+	loadOptions?: DropdownLoader;
+	onShow?: () => void;
+	onHide?: () => void;
+}
+
+export class Dropdown extends Combobox<[menu: DropdownMenu]> {
+	declare items: DropdownItem[];
+	declare _loadOptions: DropdownLoader;
+	declare onShow: (() => void) | null;
+	declare onHide: (() => void) | null;
+
+	init(menu: DropdownMenu): this {
 		this.placement = menu.placement ?? "bottom-start";
 		this.items = menu.items || [];
 		this.styles = { ...this.styles, ...(menu.styles || {}) };
@@ -19,12 +60,12 @@ export class Dropdown extends Combobox {
 		this.onShow = menu.onShow || null;
 		this.onHide = menu.onHide || null;
 
-		super.init();
+		super.init(menu);
 
 		return this;
 	}
 
-	_createDropdownButton(item) {
+	_createDropdownButton(item: DropdownItem) {
 		const itemButton = document.createElement("button");
 		itemButton.className = STYLES.dropdown.option.action;
 		itemButton.type = "button";
@@ -38,7 +79,7 @@ export class Dropdown extends Combobox {
 		}
 
 		const text = document.createElement("span");
-		text.textContent = item.name;
+		text.textContent = item.name ?? null;
 		itemButton.appendChild(text);
 
 		return itemButton.outerHTML;
@@ -67,8 +108,8 @@ export class Dropdown extends Combobox {
 		return opened;
 	}
 
-	selectOption(option, event = null) {
-		const item = this.items[parseInt(option.dataset.index, 10)];
+	selectOption(option: ComboboxOptionElement, event: MouseEvent | null = null) {
+		const item = this.items[Number.parseInt(option.dataset.index ?? "", 10)];
 		const closeOnClick =
 			typeof item?.closeOnClick === "function"
 				? item.closeOnClick(option, event)
@@ -79,18 +120,18 @@ export class Dropdown extends Combobox {
 		}
 	}
 
-	addOption(option) {
+	addOption(option: DropdownItem) {
 		this.items.splice(0, 0, option);
 		this._renderOptions();
 	}
 
-	removeOptions(identifiers) {
+	removeOptions(identifiers: readonly (string | undefined)[]) {
 		this.hidePanel();
 		this.items = this.items.filter((item) => !identifiers.includes(item.id));
 		this._renderOptions();
 	}
 
-	updateOptions(options = []) {
+	updateOptions(options: DropdownItem[] = []) {
 		this.items = Array.isArray(options) ? options : [];
 		this._renderOptions();
 
@@ -104,14 +145,14 @@ export class Dropdown extends Combobox {
 		}
 	}
 
-	elementClick(event) {
+	elementClick(event: MouseEvent) {
 		event.stopPropagation();
 		event.preventDefault();
 
 		this.panelOpen ? this.hidePanel() : void this.showPanel();
 	}
 
-	hidePanel() {
+	hidePanel(): undefined {
 		const hidden = super.hidePanel();
 		if (hidden) this.onHide?.();
 		this.element.blur();

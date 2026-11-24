@@ -134,7 +134,7 @@ function renderedCategory(ToolReportList, dataset) {
 	f.add("report", dataset.outputKind, dataset.status);
 	f.widget._renderFilters();
 	const populated = f.buttons.filter(
-		(button) => button.count.textContent === 1,
+		(button) => button.count.textContent === "1",
 	);
 	assert.equal(populated.length, 1);
 	return populated[0].dataset.filter;
@@ -209,7 +209,7 @@ test("test_report_filters_count_hidden_categories_and_empty_selections", async (
 	assert.equal(answer.hidden, false);
 	assert.deepEqual(
 		f.buttons.map((button) => button.count.textContent),
-		[1, 1, 1],
+		["1", "1", "1"],
 	);
 	assert.equal(f.clear.hidden, true);
 	for (const selection of [
@@ -248,7 +248,7 @@ test("test_report_filters_count_hidden_categories_and_empty_selections", async (
 	assert.equal(ready.hidden, false);
 	assert.deepEqual(
 		f.buttons.map((button) => button.count.textContent),
-		[0, 1, 1],
+		["0", "1", "1"],
 	);
 	const html = new DOMParser().parseFromString(
 		'<ul><li lp-entity data-kind="report" data-key="new" data-output-kind="answer" data-status="pending"></li></ul>',

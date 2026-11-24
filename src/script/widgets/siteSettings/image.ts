@@ -1,21 +1,33 @@
 import { BaseUpload } from "../../elements/base/baseUpload.ts";
 import { UploadMenu, uploadElement } from "../../elements/upload.mjs";
+import type { ENDPOINTS } from "../../shared/endpoints.ts";
 import { setIcon } from "../../shared/icons.ts";
 import { request } from "../../shared/index.ts";
 import { withTransition } from "../../shared/transitions.ts";
-import { SiteSetting } from "./base.ts";
+import { SiteSetting, type SiteSettingAttributes } from "./base.ts";
 
 const SPLASH_PREFIX = "splash-";
 
-export class SiteImage extends SiteSetting {
-	constructor(attributes) {
+type ImageEndpoints = ReturnType<typeof ENDPOINTS.SiteImage>;
+type SiteImageFiles = Record<string, string>;
+
+interface SiteImageResponse {
+	site_image?: SiteImageFiles | null;
+}
+
+export class SiteImage extends SiteSetting<ImageEndpoints> {
+	declare _siteImage: SiteImageResponse["site_image"];
+	declare _uploadInitialization: Promise<void> | null;
+	declare upload?: BaseUpload;
+
+	constructor(attributes: SiteSettingAttributes<ImageEndpoints>) {
 		super(attributes);
 		this._siteImage = null;
 		this._uploadInitialization = null;
 		this._uploadImage = this._uploadImage.bind(this);
 	}
 
-	updated(response) {
+	updated(response: SiteImageResponse) {
 		this._siteImage = response.site_image;
 	}
 
@@ -37,7 +49,7 @@ export class SiteImage extends SiteSetting {
 	}
 
 	async _initUpload() {
-		const uploadForm = this.target.querySelector(
+		const uploadForm = this.target.querySelector<HTMLFormElement>(
 			"[data-role='upload-site-image']",
 		);
 		if (!uploadForm) return;
@@ -46,9 +58,9 @@ export class SiteImage extends SiteSetting {
 			text: "Drop image here, click to upload, or tap to choose camera/files",
 		});
 
-		this.upload = new BaseUpload({
+		const upload = new BaseUpload({
 			target: uploadForm,
-			dropzone: dropzone,
+			dropzone,
 			submitButton: uploadForm.querySelector("button[type='submit']"),
 			inputName: "site-image",
 			uploadType: "image",
@@ -61,42 +73,46 @@ export class SiteImage extends SiteSetting {
 			html: [dropzone.element],
 		});
 
-		this.upload.uploadMenu = new UploadMenu(this.upload);
-		await this.upload.init();
-		this.destroyables.push(this.upload);
+		this.upload = upload;
+		upload.uploadMenu = new UploadMenu(upload);
+		await upload.init();
+		this.destroyables.push(upload);
 
 		uploadForm.addEventListener("submit", this._uploadImage);
 	}
 
-	async _uploadImage(event) {
+	async _uploadImage(event: SubmitEvent) {
 		event.preventDefault();
 		event.stopPropagation();
+		const upload = this.upload;
+		if (!upload) return;
 
-		const prepared = await this.upload.prepareSubmit({
+		const prepared = await upload.prepareSubmit({
 			route: this.endpoints.setSiteImage,
 		});
 		if (!prepared) return;
 
-		const response = await request.post(
+		const response = await request.post<SiteImageResponse>(
 			this.endpoints.setSiteImage,
-			this.upload.formData,
+			upload.formData,
 		);
-		if (!response.ok) {
-			if (response.error) this.upload.showError(response.error);
-			this.upload.form?.resetSubmitButton();
+		if (!response?.ok) {
+			if (response?.error) upload.showError(response.error);
+			upload.form?.resetSubmitButton();
 			return;
 		}
 
-		this.upload.form?.success();
-		if (response.site_image) {
-			this._siteImage = response.site_image;
+		upload.form?.success();
+		const image = response.site_image;
+		if (image) {
+			this._siteImage = image;
 			withTransition(() => {
-				this._renderSiteImage(response.site_image);
+				this._renderSiteImage(image);
 			});
 		}
 	}
 
-	_renderSiteImage(imageData) {
+	_renderSiteImage(imageData: SiteImageFiles) {
 		const container = this.target.querySelector("[data-role='site-image']");
 		if (!container || !imageData) return;
 
