@@ -1,9 +1,10 @@
+import type { EntityRevision, RequestResult } from "../types/api.d.ts";
 import { captureNetworkError } from "./errors.ts";
 import { applyNotificationStateHeader } from "./notificationState.ts";
 import { handleUpstreamResponse } from "./upstreamUnavailable.ts";
 
 const PARSER = new DOMParser();
-const TOKEN_REQUEST = {
+const TOKEN_REQUEST: RequestInit = {
 	credentials: "include",
 	headers: { "X-Lagniappe-Request": "true" },
 };
@@ -17,18 +18,63 @@ const CSRF_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const UPSTREAM_UPLOAD_OVERLOAD_ERROR = "Upload fewer files?";
 const UPSTREAM_RESET_PATTERN =
 	/upstream connect error|disconnect\/reset before headers|connection termination/i;
-let _tokenRefresh = null;
+type ResponseJson = Omit<Partial<RequestResult>, "html" | "modal"> & {
+	html?: string | null;
+	modal?: string;
+};
+type RequestUrl = string | URL;
+type RequestBody = object | string | number | boolean | null;
+type QueryParams =
+	| string
+	| URLSearchParams
+	| FormData
+	| string[][]
+	| Record<string, string | number | boolean>;
+type RequestOptions = {
+	keepalive?: boolean;
+	requestHeaders?: Record<string, string>;
+	acknowledgeEntities?: boolean;
+	replaceErrorPage?: boolean;
+	signal?: AbortSignal;
+	retryUpstream?: boolean;
+};
+type PostOptions = Pick<
+	RequestOptions,
+	"keepalive" | "signal" | "replaceErrorPage"
+> & { headers?: Record<string, string> };
 
-const csrfFailed = (response) =>
+let _tokenRefresh: Promise<string | null> | null = null;
+
+const csrfFailed = (response: Pick<Response, "status" | "headers">) =>
 	response.status === 400 &&
 	response.headers.get(CSRF_FAILURE_HEADER)?.toLowerCase() === "invalid";
 
-const _getToken = () => document.getElementById("token")?.value;
+const _tokenInput = () => document.querySelector<HTMLInputElement>("#token");
+
+const _parseHtml = (html: string | null) =>
+	html === "" || html === null
+		? html
+		: PARSER.parseFromString(html, "text/html");
+
+const _isEntityRevision = (revision: unknown): revision is EntityRevision =>
+	Boolean(
+		revision &&
+			typeof revision === "object" &&
+			"key" in revision &&
+			"fingerprint" in revision &&
+			typeof revision.key === "string" &&
+			revision.key &&
+			typeof revision.fingerprint === "string" &&
+			revision.fingerprint &&
+			(!("modified" in revision) ||
+				revision.modified === null ||
+				typeof revision.modified === "string"),
+	);
 
 const _formatResponse = async (
-	response,
+	response: Response,
 	{ acknowledgeEntities = true } = {},
-) => {
+): Promise<RequestResult> => {
 	applyNotificationStateHeader(response.headers);
 	if (response.status === 304) {
 		return {
@@ -38,55 +84,54 @@ const _formatResponse = async (
 		};
 	}
 	const contentType = response.headers.get("content-type");
-	let result = null;
-	if (contentType?.includes("application/json")) {
-		const data = (await response.json()) || {};
-		result = {
-			ok: response.ok,
-			...data,
-		};
-	} else {
-		result = {
-			ok: response.ok,
-			html: (await response.text()) || "",
-		};
-	}
-	result.updated = response.headers.get(UPDATED_HEADER) !== "false";
-	result.etag = response.headers.get("ETag");
-	result.pollChannel = response.headers.get(POLL_CHANNEL_HEADER);
-	result.pollRevision = response.headers.get(POLL_REVISION_HEADER);
-	result.reload =
-		Boolean(result.reload) || response.headers.has(INVALIDATE_CACHE_HEADER);
-	const revisions = new Map();
+	const json: ResponseJson | null = contentType?.includes("application/json")
+		? await response.json()
+		: { html: (await response.text()) || "" };
+	const { html, modal, ...data } = json ?? {};
+	const revisions = new Map<string, EntityRevision>();
 	const revisionHeader = response.headers.get(ENTITY_REVISIONS_HEADER);
 	if (revisionHeader) {
 		try {
-			for (const revision of JSON.parse(revisionHeader)) {
-				if (revision?.key && revision?.fingerprint) {
-					revisions.set(revision.key, revision);
+			const parsed: unknown = JSON.parse(revisionHeader);
+			if (Array.isArray(parsed)) {
+				for (const revision of parsed) {
+					if (_isEntityRevision(revision))
+						revisions.set(revision.key, revision);
 				}
 			}
 		} catch {
 			// Ignore a malformed optional acknowledgement header.
 		}
 	}
-	result.entities = Array.from(revisions.values());
+	const entities = Array.from(revisions.values());
 	if (acknowledgeEntities) {
-		for (const entity of result.entities) {
+		for (const entity of entities) {
 			window.dispatchEvent(
 				new CustomEvent("entity-updated", { detail: entity }),
 			);
 		}
 	}
-	if (result.html) {
-		result.html = PARSER.parseFromString(result.html, "text/html");
-	} else if (result.modal) {
-		result.modal = PARSER.parseFromString(result.modal, "text/html");
-	}
-	return result;
+	return {
+		ok: response.ok,
+		...data,
+		updated: response.headers.get(UPDATED_HEADER) !== "false",
+		etag: response.headers.get("ETag"),
+		pollChannel: response.headers.get(POLL_CHANNEL_HEADER),
+		pollRevision: response.headers.get(POLL_REVISION_HEADER),
+		reload:
+			Boolean(data.reload) || response.headers.has(INVALIDATE_CACHE_HEADER),
+		entities,
+		...(html !== undefined ? { html: _parseHtml(html) } : {}),
+		...(modal !== undefined
+			? {
+					modal:
+						modal && !html ? PARSER.parseFromString(modal, "text/html") : modal,
+				}
+			: {}),
+	};
 };
 
-const _isUploadBody = (body) => {
+const _isUploadBody = (body: RequestBody) => {
 	if (!(body instanceof FormData)) return false;
 	if (typeof body.has === "function" && body.has("direct_uploads")) return true;
 	if (typeof body.has === "function" && body.has("assets")) return true;
@@ -99,33 +144,47 @@ const _isUploadBody = (body) => {
 	return false;
 };
 
-const _friendlyError = (message, { body = null } = {}) => {
-	if (_isUploadBody(body) && UPSTREAM_RESET_PATTERN.test(message || "")) {
+const _friendlyError = (message: string, body: RequestBody) => {
+	if (
+		_isUploadBody(body) &&
+		UPSTREAM_RESET_PATTERN.test(String(message || ""))
+	) {
 		return UPSTREAM_UPLOAD_OVERLOAD_ERROR;
 	}
 	return message;
 };
 
 const _formatError = async (
-	response,
-	{ replaceErrorPage = true, ...context } = {},
-) => {
+	response: Response,
+	{
+		replaceErrorPage = true,
+		body = null,
+	}: {
+		replaceErrorPage?: boolean;
+		body?: RequestBody;
+	} = {},
+): Promise<RequestResult> => {
 	const contentType = response.headers.get("content-type");
 	if (contentType?.includes("application/json")) {
 		const text = await response.text();
 		try {
-			const data = JSON.parse(text);
+			const parsed: ResponseJson | null = JSON.parse(text);
+			if (parsed === null) {
+				return { ok: false, error: _friendlyError(text, body) };
+			}
+			const { html, ...data } = parsed;
 			if (data.error) {
-				data.error = _friendlyError(data.error, context);
+				data.error = _friendlyError(data.error, body);
 			}
 			// Conflict responses carry the same replacement HTML as successful
 			// form responses, even though their HTTP status is not successful.
-			if (typeof data.html === "string" && data.html) {
-				data.html = PARSER.parseFromString(data.html, "text/html");
-			}
-			return { ok: false, ...data };
+			return {
+				ok: false,
+				...data,
+				...(html !== undefined ? { html: _parseHtml(html) } : {}),
+			};
 		} catch {
-			return { ok: false, error: _friendlyError(text, context) };
+			return { ok: false, error: _friendlyError(text, body) };
 		}
 	}
 
@@ -133,7 +192,7 @@ const _formatError = async (
 	const title = response.headers.get("X-Lagniappe-Error");
 	const fallback =
 		text.trim() || title || response.statusText || "Network request failed";
-	const error = _friendlyError(fallback, context);
+	const error = _friendlyError(fallback, body);
 
 	if (!contentType?.includes("text/html")) {
 		return {
@@ -152,7 +211,7 @@ const _formatError = async (
 	if (!replaceErrorPage) {
 		return {
 			ok: false,
-			error: _friendlyError(title || response.statusText || fallback, context),
+			error: _friendlyError(title || response.statusText || fallback, body),
 		};
 	}
 
@@ -160,13 +219,14 @@ const _formatError = async (
 		document.documentElement.innerHTML = text;
 		document.title = response.statusText;
 	} else {
-		document.querySelector("main").innerHTML = text;
+		const main = document.querySelector("main");
+		if (main) main.innerHTML = text;
 		document.title = title;
 	}
 
 	return {
 		ok: false,
-		error: _friendlyError(title || response.statusText || fallback, context),
+		error: _friendlyError(title || response.statusText || fallback, body),
 	};
 };
 
@@ -180,7 +240,7 @@ const _refreshToken = async () => {
 		if (!newToken) {
 			throw new Error("Failed to refresh token: empty response");
 		}
-		const tokenElt = document.getElementById("token");
+		const tokenElt = _tokenInput();
 		if (tokenElt) {
 			tokenElt.value = newToken;
 		}
@@ -202,12 +262,12 @@ const refreshToken = async () => {
 	return _tokenRefresh;
 };
 
-const postRequest = async (
-	url,
-	body,
-	{ keepalive = false, headers = {}, signal = undefined } = {},
+const postRequest = async <T extends object = Record<never, never>>(
+	url: RequestUrl,
+	body?: RequestBody,
+	{ keepalive = false, headers = {}, signal = undefined }: PostOptions = {},
 ) => {
-	return _request(url, {
+	return _request<T>(url, {
 		method: "POST",
 		body,
 		keepalive,
@@ -216,25 +276,61 @@ const postRequest = async (
 	});
 };
 
-const patchRequest = async (url, body) => {
-	return _request(url, { method: "PATCH", body });
+const patchRequest = async <T extends object = Record<never, never>>(
+	url: RequestUrl,
+	body?: RequestBody,
+) => _request<T>(url, { method: "PATCH", body });
+
+const deleteRequest = async <T extends object = Record<never, never>>(
+	url: RequestUrl,
+	body?: RequestBody,
+) => _request<T>(url, { method: "DELETE", body });
+
+const getRequest = async <T extends object = Record<never, never>>(
+	url: RequestUrl,
+	params: QueryParams | null = null,
+	options: RequestOptions = {},
+) => {
+	if (params) {
+		let query: URLSearchParams;
+		if (
+			typeof params === "string" ||
+			params instanceof URLSearchParams ||
+			Array.isArray(params)
+		) {
+			query = new URLSearchParams(params);
+		} else {
+			const entries: Iterable<[string, unknown]> =
+				params instanceof FormData ? params.entries() : Object.entries(params);
+			query = new URLSearchParams(
+				Array.from(entries, ([key, value]) => [key, String(value)]),
+			);
+		}
+		url = `${url}?${query}`;
+	}
+	return _request<T>(url, { method: "GET", ...options });
 };
 
-const deleteRequest = async (url, body) => {
-	return _request(url, { method: "DELETE", body });
+const putRequest = async <T extends object = Record<never, never>>(
+	url: RequestUrl,
+	body?: RequestBody,
+	options: RequestOptions = {},
+) => _request<T>(url, { method: "PUT", body, ...options });
+
+type TransportOptions = RequestOptions & {
+	method?: string;
+	body?: RequestBody;
 };
 
-const getRequest = async (url, params = null, options = {}) => {
-	url = params ? `${url}?${new URLSearchParams(params).toString()}` : url;
-	return _request(url, { method: "GET", ...options });
-};
+const _request = <T extends object>(
+	url: RequestUrl,
+	options: TransportOptions,
+): Promise<RequestResult<T> | undefined> =>
+	// Route-specific fields are supplied by the caller's endpoint contract.
+	_requestResponse(url, options) as Promise<RequestResult<T> | undefined>;
 
-const putRequest = async (url, body, options = {}) => {
-	return _request(url, { method: "PUT", body, ...options });
-};
-
-const _request = async (
-	url,
+const _requestResponse = async (
+	url: RequestUrl,
 	{
 		method = "POST",
 		body = null,
@@ -244,18 +340,18 @@ const _request = async (
 		replaceErrorPage = true,
 		signal = undefined,
 		retryUpstream = true,
-	} = {},
-) => {
+	}: TransportOptions,
+): Promise<RequestResult | undefined> => {
 	method = method.toUpperCase();
-	const token = _getToken();
-	const headers = {
+	const token = _tokenInput()?.value;
+	const headers: Record<string, string> = {
 		"Content-Type": "application/json",
-		"X-CSRFToken": token,
+		"X-CSRFToken": String(token),
 		"X-Lagniappe-Request": "true",
 		...requestHeaders,
 	};
 
-	const config = {
+	const config: RequestInit = {
 		method,
 		headers,
 		credentials: "include",
@@ -275,20 +371,20 @@ const _request = async (
 	if (!CSRF_METHODS.has(method)) {
 		delete headers["X-CSRFToken"];
 	}
-	const classifyUpstream = (response, allowRetry = retryUpstream) =>
+	const classifyUpstream = (response: Response, allowRetry = retryUpstream) =>
 		handleUpstreamResponse(response, {
 			method,
 			url,
 			retryUpstream: allowRetry,
 			fetchResponse: () => fetch(url, config),
 			retryCurrent: () =>
-				_request(window.location.pathname, {
+				_requestResponse(window.location.pathname, {
 					method: "GET",
 					replaceErrorPage: false,
 					retryUpstream: false,
 				}),
 			retryOriginal: () =>
-				_request(url, {
+				_requestResponse(url, {
 					method: "GET",
 					requestHeaders,
 					acknowledgeEntities: false,
@@ -300,7 +396,7 @@ const _request = async (
 	try {
 		let response = await fetch(url, config);
 		let upstream = await classifyUpstream(response);
-		if (upstream.result) return upstream.result;
+		if ("result" in upstream) return upstream.result;
 		response = upstream.response;
 
 		if (CSRF_METHODS.has(method) && csrfFailed(response)) {
@@ -311,21 +407,16 @@ const _request = async (
 					error: "Failed to refresh authentication token",
 				};
 			}
-			config.headers["X-CSRFToken"] = newToken;
+			headers["X-CSRFToken"] = newToken;
 			response = await fetch(url, config);
 			upstream = await classifyUpstream(response, false);
-			if (upstream.result) return upstream.result;
+			if ("result" in upstream) return upstream.result;
 			response = upstream.response;
 		}
 
 		if (response.status === 422) {
 			return {
-				...(await _formatError(response, {
-					body,
-					method,
-					url,
-					replaceErrorPage: false,
-				})),
+				...(await _formatError(response, { body, replaceErrorPage: false })),
 				status: response.status,
 			};
 		}
@@ -337,12 +428,19 @@ const _request = async (
 
 		return response.ok || response.status === 304
 			? _formatResponse(response, { acknowledgeEntities })
-			: _formatError(response, { body, method, url, replaceErrorPage });
+			: _formatError(response, { body, replaceErrorPage });
 	} catch (error) {
 		captureNetworkError(error, url, { method, body, ...config });
 		return {
 			ok: false,
-			error: error.message || "Network request failed",
+			error:
+				error &&
+				typeof error === "object" &&
+				"message" in error &&
+				typeof error.message === "string" &&
+				error.message
+					? error.message
+					: "Network request failed",
 		};
 	}
 };

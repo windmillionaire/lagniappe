@@ -1,3 +1,4 @@
+import type { NotificationState } from "../types/api.d.ts";
 import { captureError } from "./errors.ts";
 
 export const NOTIFICATION_STATE_HEADER = "X-Lagniappe-Notification-State";
@@ -9,9 +10,11 @@ let invalidStateReported = false;
  * one DOM commit.
  *
  */
-export const renderNotificationBadge = (count) => {
+export const renderNotificationBadge = (count: unknown) => {
 	const normalized = Number.isInteger(Number(count)) ? Number(count) : 0;
-	const button = document.querySelector("[data-role='notifications']");
+	const button = document.querySelector<HTMLButtonElement>(
+		"[data-role='notifications']",
+	);
 	const countElement = document.querySelector(
 		"[data-role='notification-count']",
 	);
@@ -26,7 +29,7 @@ export const renderNotificationBadge = (count) => {
 	return normalized;
 };
 
-const _normalized = (raw) => {
+const _normalized = (raw: unknown): NotificationState | null => {
 	if (typeof raw === "string") {
 		try {
 			raw = JSON.parse(raw);
@@ -34,15 +37,24 @@ const _normalized = (raw) => {
 			return null;
 		}
 	}
-	if (!raw || typeof raw !== "object") return null;
+	if (
+		!raw ||
+		typeof raw !== "object" ||
+		!("generation" in raw) ||
+		!("revision" in raw) ||
+		!("count" in raw)
+	)
+		return null;
 	if (raw.generation === null && raw.revision === null && raw.count === null) {
 		return { generation: null, revision: null, count: null, miss: true };
 	}
 	if (
 		typeof raw.generation !== "string" ||
 		!raw.generation ||
+		typeof raw.revision !== "number" ||
 		!Number.isInteger(raw.revision) ||
 		raw.revision < 0 ||
+		typeof raw.count !== "number" ||
 		!Number.isInteger(raw.count) ||
 		raw.count < 0
 	) {
@@ -60,7 +72,7 @@ const _normalized = (raw) => {
  * Publish compact notification state before the lazy menu module is loaded.
  *
  */
-export const applyNotificationState = (raw) => {
+export const applyNotificationState = (raw: unknown) => {
 	const state = _normalized(raw);
 	if (!state) {
 		if (raw !== null && raw !== undefined && !invalidStateReported) {
@@ -87,7 +99,9 @@ export const applyNotificationState = (raw) => {
 	return state;
 };
 
-export const applyNotificationStateHeader = (headers) => {
+export const applyNotificationStateHeader = (
+	headers?: Pick<Headers, "get"> | null,
+) => {
 	const raw = headers?.get?.(NOTIFICATION_STATE_HEADER);
 	return raw ? applyNotificationState(raw) : null;
 };

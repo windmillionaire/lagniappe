@@ -1,5 +1,30 @@
-const getElementContext = (element) => {
-	const context = {};
+import type {
+	BrowserOptions,
+	Contexts,
+	Event,
+	EventHint,
+	RequestEventData,
+} from "@sentry/browser";
+
+type MonitoredEvent = Omit<Event, "type"> & {
+	type?: Event["type"] | "generic";
+	culprit?: string;
+	metadata?: { title?: string };
+};
+
+type ErrorDetails = { name?: unknown; message?: unknown; target?: unknown };
+type NetworkErrorOptions = {
+	method?: string;
+	forceReport?: boolean;
+} & Record<string, unknown>;
+
+const getErrorDetails = (error: unknown): ErrorDetails | undefined =>
+	error && (typeof error === "object" || typeof error === "function")
+		? error
+		: undefined;
+
+const getElementContext = (element: unknown) => {
+	const context: Contexts = {};
 	if (!(element instanceof Element)) return context;
 
 	// Element's own info
@@ -7,23 +32,23 @@ const getElementContext = (element) => {
 		tagName: element.tagName?.toLowerCase(),
 		id: element.id || undefined,
 		className: element.className || undefined,
-		dataset: { ...element.dataset },
+		dataset: { ...(element as HTMLElement | SVGElement).dataset },
 	};
 
 	// Closest widget
-	const widget = element.closest("[data-widget]");
+	const widget = element.closest<HTMLElement>("[data-widget]");
 	if (widget && widget !== element) {
 		context.widget = widget.dataset;
 	}
 
 	// Closest lp-component
-	const component = element.closest("[lp-component]");
+	const component = element.closest<HTMLElement>("[lp-component]");
 	if (component && component !== element) {
 		context.component = component.dataset;
 	}
 
 	// Closest lp-view
-	const view = element.closest("[lp-view]");
+	const view = element.closest<HTMLElement>("[lp-view]");
 	if (view && view !== element) {
 		context.view = view.dataset;
 	}
@@ -36,7 +61,7 @@ const getElementContext = (element) => {
 	return context;
 };
 
-const sanitizedObjectContext = (value) =>
+const sanitizedObjectContext = (value: object): Record<string, unknown> =>
 	Object.fromEntries(
 		Object.entries(value).filter(([, child]) => {
 			return (
@@ -47,7 +72,9 @@ const sanitizedObjectContext = (value) =>
 		}),
 	);
 
-const normalizeContextValue = (value) => {
+const normalizeContextValue = (
+	value: unknown,
+): Record<string, unknown> | null => {
 	if (
 		value === undefined ||
 		typeof value === "function" ||
@@ -60,20 +87,24 @@ const normalizeContextValue = (value) => {
 	return { value };
 };
 
-const normalizeContext = (context) => {
+const normalizeContext = (context: unknown): Contexts => {
 	if (!(context instanceof Object)) return {};
 
 	return Object.fromEntries(
-		Object.entries(context)
-			.map(([key, value]) => [key, normalizeContextValue(value)])
-			.filter(([, value]) => value && Object.keys(value).length > 0),
+		Object.entries(context).flatMap(([key, value]) => {
+			const normalized = normalizeContextValue(value);
+			return normalized && Object.keys(normalized).length
+				? [[key, normalized]]
+				: [];
+		}),
 	);
 };
 
-const getErrorText = (error) => {
+const getErrorText = (error: unknown) => {
 	if (!error) return "";
 	if (typeof error === "string") return error;
-	return `${error.name || ""} ${error.message || ""} ${String(error)}`.trim();
+	const details = getErrorDetails(error);
+	return `${details?.name || ""} ${details?.message || ""} ${String(error)}`.trim();
 };
 
 /**
@@ -81,7 +112,7 @@ const getErrorText = (error) => {
  * transitions, and cross-document transitions. They should not be reported.
  *
  */
-export const isSkippedViewTransitionError = (error) => {
+export const isSkippedViewTransitionError = (error: unknown) => {
 	if (!error) return false;
 
 	if (error instanceof DOMException && /transition/i.test(error.message)) {
@@ -93,7 +124,8 @@ export const isSkippedViewTransitionError = (error) => {
 
 	return (
 		/transition was (skipped|aborted)/i.test(text) ||
-		(error.name === "InvalidStateError" && /transition/i.test(text))
+		(getErrorDetails(error)?.name === "InvalidStateError" &&
+			/transition/i.test(text))
 	);
 };
 
@@ -188,14 +220,14 @@ const SENTRY_AUTH_VALUE_PATTERN = /\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi;
 const SENTRY_JWT_PATTERN =
 	/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 
-const _normalizedSentryKey = (key) =>
+const _normalizedSentryKey = (key: string) =>
 	String(key)
 		.replace(/([a-z0-9])([A-Z])/g, "$1_$2")
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "_")
 		.replace(/^_+|_+$/g, "");
 
-const _isSensitiveSentryKey = (key) => {
+const _isSensitiveSentryKey = (key: string) => {
 	const normalized = _normalizedSentryKey(key);
 	if (SENTRY_SENSITIVE_KEYS.has(normalized)) return true;
 
@@ -225,7 +257,7 @@ const _isSensitiveSentryKey = (key) => {
 	);
 };
 
-const _sanitizeSentryText = (value) => {
+const _sanitizeSentryText = (value: unknown) => {
 	let text = String(value);
 	if (
 		text.toUpperCase().includes("-----BEGIN") &&
@@ -246,10 +278,26 @@ const _sanitizeSentryText = (value) => {
 		: text;
 };
 
-const _sanitizeSentryValue = (value, key = null, depth = 0) => {
+type SanitizedValue =
+	| string
+	| number
+	| boolean
+	| null
+	| SanitizedValue[]
+	| { [key: string]: SanitizedValue };
+
+const _sanitizeSentryValue = (
+	value: unknown,
+	key: string | null = null,
+	depth = 0,
+): SanitizedValue => {
 	if (key !== null && _isSensitiveSentryKey(key)) return SENTRY_REDACTED;
 	if (depth >= SENTRY_MAX_CONTEXT_DEPTH) return "[MAX DEPTH]";
-	if (value === null || ["boolean", "number"].includes(typeof value)) {
+	if (
+		value === null ||
+		typeof value === "boolean" ||
+		typeof value === "number"
+	) {
 		return value;
 	}
 	if (typeof value === "string") return _sanitizeSentryText(value);
@@ -271,10 +319,10 @@ const _sanitizeSentryValue = (value, key = null, depth = 0) => {
 	return `<${typeof value}>`;
 };
 
-const _sanitizeSentryRequest = (request) => {
+const _sanitizeSentryRequest = (request: RequestEventData | undefined) => {
 	if (!request || typeof request !== "object") return undefined;
 
-	const sanitized = {};
+	const sanitized: RequestEventData = {};
 	if (request.method) sanitized.method = _sanitizeSentryText(request.method);
 	if (request.headers && typeof request.headers === "object") {
 		const headers = Object.fromEntries(
@@ -287,15 +335,29 @@ const _sanitizeSentryRequest = (request) => {
 	return Object.keys(sanitized).length > 0 ? sanitized : undefined;
 };
 
-const _invalidSentryTraceContext = (trace) => {
+const _invalidSentryTraceContext = (
+	trace: SanitizedValue | Contexts["trace"] | undefined,
+) => {
 	if (!trace) return false;
 	return (
-		!SENTRY_TRACE_ID_PATTERN.test(String(trace.trace_id || "")) ||
-		!SENTRY_SPAN_ID_PATTERN.test(String(trace.span_id || ""))
+		!SENTRY_TRACE_ID_PATTERN.test(
+			String(
+				typeof trace === "object" && "trace_id" in trace
+					? trace.trace_id || ""
+					: "",
+			),
+		) ||
+		!SENTRY_SPAN_ID_PATTERN.test(
+			String(
+				typeof trace === "object" && "span_id" in trace
+					? trace.span_id || ""
+					: "",
+			),
+		)
 	);
 };
 
-const _isNotificationTransaction = (event) => {
+const _isNotificationTransaction = (event: MonitoredEvent) => {
 	const values = [
 		event?.transaction,
 		event?.culprit,
@@ -308,7 +370,7 @@ const _isNotificationTransaction = (event) => {
 	);
 };
 
-const _isMalformedBlockingOperationWarning = (event) => {
+const _isMalformedBlockingOperationWarning = (event: MonitoredEvent) => {
 	return (
 		event?.type === "generic" &&
 		event?.level === "warning" &&
@@ -318,12 +380,28 @@ const _isMalformedBlockingOperationWarning = (event) => {
 	);
 };
 
-const _sanitizeSentryEvent = (event) => {
+const SANITIZED_SENTRY_FIELDS = [
+	"breadcrumbs",
+	"contexts",
+	"exception",
+	"extra",
+	"fingerprint",
+	"logentry",
+	"message",
+	"spans",
+	"tags",
+	"threads",
+] as const;
+
+type SanitizedSentryField = (typeof SANITIZED_SENTRY_FIELDS)[number];
+
+const _sanitizeSentryEvent = <T extends MonitoredEvent>(event: T): T | null => {
 	if (!event) return event;
 	if (_isMalformedBlockingOperationWarning(event)) return null;
-	const sanitized = {
+	const sanitized: Omit<MonitoredEvent, SanitizedSentryField> &
+		Partial<Record<SanitizedSentryField, SanitizedValue>> = {
 		...event,
-	};
+	} as Omit<MonitoredEvent, SanitizedSentryField>;
 	delete sanitized.user;
 
 	const request = _sanitizeSentryRequest(event.request);
@@ -334,39 +412,37 @@ const _sanitizeSentryEvent = (event) => {
 		delete sanitized.breadcrumbs;
 	}
 
-	for (const key of [
-		"breadcrumbs",
-		"contexts",
-		"exception",
-		"extra",
-		"fingerprint",
-		"logentry",
-		"message",
-		"spans",
-		"tags",
-		"threads",
-	]) {
+	for (const key of SANITIZED_SENTRY_FIELDS) {
 		if (key in sanitized) {
-			sanitized[key] = _sanitizeSentryValue(sanitized[key]);
+			sanitized[key] = _sanitizeSentryValue(event[key]);
 		}
 	}
 
-	if (_invalidSentryTraceContext(sanitized.contexts?.trace)) {
-		const contexts = { ...sanitized.contexts };
-		delete contexts.trace;
+	const sanitizedContexts = sanitized.contexts;
+	if (
+		sanitizedContexts &&
+		typeof sanitizedContexts === "object" &&
+		"trace" in sanitizedContexts &&
+		_invalidSentryTraceContext(sanitizedContexts.trace)
+	) {
+		const { trace, ...contexts } = sanitizedContexts;
 		sanitized.contexts =
 			Object.keys(contexts).length > 0 ? contexts : undefined;
 	}
-	return sanitized;
+	// The SDK callback receives the original event type with its reportable
+	// values redacted, bounded, or removed.
+	return sanitized as T;
 };
 
-const _filterNotificationBlockingSpans = (event) => {
+const _filterNotificationBlockingSpans = <T extends MonitoredEvent>(
+	event: T,
+): T => {
 	if (!_isNotificationTransaction(event) || !Array.isArray(event?.spans)) {
 		return event;
 	}
 
 	const spans = event.spans.filter(
-		(span) => !SENTRY_BLOCKING_SPAN_OPS.has(span?.op),
+		(span) => !SENTRY_BLOCKING_SPAN_OPS.has(span?.op ?? ""),
 	);
 	return spans.length === event.spans.length ? event : { ...event, spans };
 };
@@ -382,35 +458,44 @@ export const configureSentry = () => {
 
 	const dsn =
 		typeof document !== "undefined"
-			? document.querySelector('meta[name="sentry-dsn"]')?.content?.trim() ||
-				null
+			? document
+					.querySelector<HTMLMetaElement>('meta[name="sentry-dsn"]')
+					?.content?.trim() || null
 			: null;
 	if (!dsn) return;
 
 	Sentry.addEventProcessor?.(_sanitizeSentryEvent);
 
-	const filterTransitionNoise = (_event, hint) => {
+	const filterTransitionNoise = <T>(event: T, hint: EventHint) => {
 		if (isSkippedViewTransitionError(hint?.originalException)) return null;
-		return _event;
+		return event;
 	};
 
-	const beforeSend = (prior) => (event, hint) => {
-		const transitionFiltered = filterTransitionNoise(event, hint);
-		if (transitionFiltered === null) return null;
+	type BeforeSend = NonNullable<BrowserOptions["beforeSend"]>;
+	type BeforeSendTransaction = NonNullable<
+		BrowserOptions["beforeSendTransaction"]
+	>;
+	const beforeSend =
+		(prior?: BeforeSend): BeforeSend =>
+		(event, hint) => {
+			const transitionFiltered = filterTransitionNoise(event, hint);
+			if (transitionFiltered === null) return null;
 
-		const sanitized = _sanitizeSentryEvent(transitionFiltered);
-		if (sanitized === null) return null;
+			const sanitized = _sanitizeSentryEvent(transitionFiltered);
+			if (sanitized === null) return null;
 
-		return prior ? prior(sanitized, hint) : sanitized;
-	};
+			return prior ? prior(sanitized, hint) : sanitized;
+		};
 
-	const beforeSendTransaction = (prior) => (event, hint) => {
-		const sanitized = _sanitizeSentryEvent(event);
-		if (sanitized === null) return null;
+	const beforeSendTransaction =
+		(prior?: BeforeSendTransaction): BeforeSendTransaction =>
+		(event, hint) => {
+			const sanitized = _sanitizeSentryEvent(event);
+			if (sanitized === null) return null;
 
-		const filtered = _filterNotificationBlockingSpans(sanitized);
-		return prior ? prior(filtered, hint) : filtered;
-	};
+			const filtered = _filterNotificationBlockingSpans(sanitized);
+			return prior ? prior(filtered, hint) : filtered;
+		};
 
 	const client = Sentry.getClient?.();
 	if (client) {
@@ -426,13 +511,15 @@ export const configureSentry = () => {
 		return;
 	}
 
-	Sentry.init?.({
+	// Preserve the setting consumed by existing integrations alongside SDK options.
+	const options: BrowserOptions & { sendDefaultPii: false } = {
 		dsn,
 		sendDefaultPii: false,
 		ignoreErrors: SENTRY_IGNORED_TRANSITION_ERRORS,
 		beforeSend: beforeSend(),
 		beforeSendTransaction: beforeSendTransaction(),
-	});
+	};
+	Sentry.init?.(options);
 };
 
 /**
@@ -440,9 +527,9 @@ export const configureSentry = () => {
  * Not useful as a Sentry exception — noise on mobile especially.
  *
  */
-export const isTransientNetworkError = (error) => {
+export const isTransientNetworkError = (error: unknown) => {
 	if (!error) return false;
-	if (error.name === "AbortError") return true;
+	if (getErrorDetails(error)?.name === "AbortError") return true;
 	if (error instanceof TypeError) {
 		const msg = error.message || "";
 		return (
@@ -454,18 +541,22 @@ export const isTransientNetworkError = (error) => {
 	return false;
 };
 
-export const captureError = (error, element, context) => {
+export const captureError = (
+	error: unknown,
+	element?: unknown,
+	context?: object | null,
+) => {
 	if (isSkippedViewTransitionError(error)) {
 		return;
 	}
-	context = normalizeContext({
-		...getElementContext(element || error?.target),
+	const normalized = normalizeContext({
+		...getElementContext(element || getErrorDetails(error)?.target),
 		...(context || {}),
 	});
 
 	if (typeof window !== "undefined" && window.Sentry) {
 		const captureContext =
-			Object.keys(context).length > 0 ? { contexts: context } : undefined;
+			Object.keys(normalized).length > 0 ? { contexts: normalized } : undefined;
 
 		if (error instanceof Error) {
 			window.Sentry.captureException(error, captureContext);
@@ -477,12 +568,16 @@ export const captureError = (error, element, context) => {
 		}
 	}
 
-	const hasContext = Object.keys(context).length > 0;
+	const hasContext = Object.keys(normalized).length > 0;
 	console.error("[ERROR]", error);
-	if (hasContext) console.error("Context:", context);
+	if (hasContext) console.error("Context:", normalized);
 };
 
-export const captureNetworkError = (error, url, options = {}) => {
+export const captureNetworkError = (
+	error: unknown,
+	url: string | URL,
+	options: NetworkErrorOptions = {},
+) => {
 	if (!options.forceReport && isTransientNetworkError(error)) {
 		return;
 	}

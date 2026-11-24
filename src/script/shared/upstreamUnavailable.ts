@@ -1,6 +1,8 @@
+import type { RequestResult, UpstreamRetryOutcome } from "../types/api.d.ts";
 import {
 	BROWSER_PROTOCOL_ID,
 	BROWSER_PROTOCOL_VERSION,
+	validateUpstreamUnavailableState,
 	WORKER_MESSAGES,
 } from "./protocol.ts";
 
@@ -34,33 +36,45 @@ const ROUTE_CLASSES = new Set([
 	"users",
 ]);
 
-const _reported = new Map();
-let _retry = null;
+type Retry = () => Promise<unknown>;
+
+interface BannerState {
+	stale: boolean;
+	outcomeUncertain: boolean;
+}
+
+interface UpstreamResponseOptions {
+	method: string;
+	url: string | URL;
+	retryUpstream?: boolean;
+	fetchResponse: () => Promise<Response>;
+	retryCurrent: Retry;
+	retryOriginal: Retry;
+}
+
+interface UpstreamDiagnostics {
+	status: unknown;
+	method: string;
+	route_class: string;
+	server: string;
+	trace_header_present: boolean;
+	timestamp: string;
+	online: boolean;
+	service_worker: "controlled" | "uncontrolled";
+	stale: boolean;
+	retry_outcome: UpstreamRetryOutcome;
+	build: string;
+	release: string;
+}
+
+type UpstreamResult = { response: Response } | { result: RequestResult };
+
+const _reported = new Map<string, number>();
+let _retry: Retry | null = null;
 let _retrying = false;
 let _clientInstalled = false;
 
-function _validWorkerDetails(details) {
-	return Boolean(
-		details &&
-			UPSTREAM_STATUSES.has(Number(details.status)) &&
-			["GET", "POST", "PUT", "PATCH", "DELETE"].includes(details.method) &&
-			typeof details.route_class === "string" &&
-			/^[a-z-]{1,32}$/.test(details.route_class) &&
-			typeof details.server === "string" &&
-			details.server.length <= 128 &&
-			typeof details.trace_header_present === "boolean" &&
-			typeof details.timestamp === "string" &&
-			typeof details.online === "boolean" &&
-			["controlled", "uncontrolled"].includes(details.service_worker) &&
-			typeof details.stale === "boolean" &&
-			typeof details.outcome_uncertain === "boolean" &&
-			["not_attempted", "failed", "recovered", "service_worker"].includes(
-				details.retry_outcome,
-			),
-	);
-}
-
-function _sameOrigin(url) {
+function _sameOrigin(url: string | URL) {
 	try {
 		const base = window.location.href || `${window.location.origin}/`;
 		return new URL(url, base).origin === window.location.origin;
@@ -69,7 +83,7 @@ function _sameOrigin(url) {
 	}
 }
 
-export function upstreamRouteClass(url) {
+export function upstreamRouteClass(url: string | URL) {
 	try {
 		const base = window.location.href || `${window.location.origin}/`;
 		const pathname = new URL(url, base).pathname;
@@ -82,7 +96,10 @@ export function upstreamRouteClass(url) {
 	}
 }
 
-export function isUpstreamUnavailableResponse(response, url) {
+export function isUpstreamUnavailableResponse(
+	response: Response | null | undefined,
+	url: string | URL,
+) {
 	if (response?.headers?.get(UPSTREAM_UNAVAILABLE_HEADER) === "true") {
 		return true;
 	}
@@ -96,7 +113,7 @@ export function isUpstreamUnavailableResponse(response, url) {
 }
 
 export async function handleUpstreamResponse(
-	response,
+	response: Response,
 	{
 		method,
 		url,
@@ -104,19 +121,19 @@ export async function handleUpstreamResponse(
 		fetchResponse,
 		retryCurrent,
 		retryOriginal,
-	},
-) {
+	}: UpstreamResponseOptions,
+): Promise<UpstreamResult> {
 	let upstreamFailure = isUpstreamUnavailableResponse(response, url)
 		? response
 		: null;
-	let retryOutcome = "not_attempted";
+	let retryOutcome: UpstreamRetryOutcome = "not_attempted";
 	if (!upstreamFailure) {
 		if (response.ok || response.status === 304) noteFreshApplicationResponse();
 		return { response };
 	}
 
 	if (method === "GET" && retryUpstream) {
-		await new Promise((resolve) =>
+		await new Promise<void>((resolve) =>
 			setTimeout(resolve, UPSTREAM_RETRY_DELAY_MS),
 		);
 		response = await fetchResponse();
@@ -164,14 +181,16 @@ export async function handleUpstreamResponse(
 	};
 }
 
-function _boundedServer(value) {
+function _boundedServer(value: unknown) {
 	return String(value || "")
 		.replace(/[^\x20-\x7E]/g, "")
 		.slice(0, MAX_SERVER_LENGTH);
 }
 
 function _releaseMetadata() {
-	const banner = document.querySelector("[data-role='upstream-unavailable']");
+	const banner = document.querySelector<HTMLElement>(
+		"[data-role='upstream-unavailable']",
+	);
 	return {
 		build: String(banner?.dataset.build || "").slice(0, 64),
 		release: String(banner?.dataset.release || "").slice(0, 64),
@@ -179,14 +198,19 @@ function _releaseMetadata() {
 }
 
 export function upstreamUnavailableDetails(
-	response,
+	response: Response,
 	{
 		method = "GET",
 		url = "/",
 		stale = null,
 		retryOutcome = "not_attempted",
+	}: {
+		method?: string;
+		url?: string | URL;
+		stale?: boolean | null;
+		retryOutcome?: UpstreamRetryOutcome;
 	} = {},
-) {
+): UpstreamDiagnostics & { status: number } {
 	const originalStatus = Number(
 		response.headers.get(UPSTREAM_STATUS_HEADER) || response.status,
 	);
@@ -215,7 +239,7 @@ export function upstreamUnavailableDetails(
 	};
 }
 
-export function reportUpstreamUnavailable(details) {
+export function reportUpstreamUnavailable(details: UpstreamDiagnostics) {
 	const diagnostic = {
 		status: UPSTREAM_STATUSES.has(Number(details.status))
 			? Number(details.status)
@@ -270,8 +294,10 @@ export function reportUpstreamUnavailable(details) {
 	return true;
 }
 
-function _renderBanner(details) {
-	const banner = document.querySelector("[data-role='upstream-unavailable']");
+function _renderBanner(details: BannerState) {
+	const banner = document.querySelector<HTMLElement>(
+		"[data-role='upstream-unavailable']",
+	);
 	if (!banner) return;
 	const message = banner.querySelector(
 		"[data-role='upstream-unavailable-message']",
@@ -291,7 +317,10 @@ function _renderBanner(details) {
 	banner.setAttribute("aria-hidden", "false");
 }
 
-export function showUpstreamUnavailable(details, retry = null) {
+export function showUpstreamUnavailable(
+	details: BannerState,
+	retry: Retry | null = null,
+) {
 	_retry = typeof retry === "function" ? retry : null;
 	_renderBanner(details);
 }
@@ -301,7 +330,9 @@ export function showUpstreamUnavailable(details, retry = null) {
  *
  */
 export function noteFreshApplicationResponse() {
-	const banner = document.querySelector("[data-role='upstream-unavailable']");
+	const banner = document.querySelector<HTMLElement>(
+		"[data-role='upstream-unavailable']",
+	);
 	if (!banner) return;
 	_retry = null;
 	banner.dataset.visible = "false";
@@ -310,8 +341,11 @@ export function noteFreshApplicationResponse() {
 	banner.setAttribute("aria-hidden", "true");
 }
 
-export function receiveUpstreamUnavailable(details, retry = null) {
-	if (!_validWorkerDetails(details)) return false;
+export function receiveUpstreamUnavailable(
+	details: unknown,
+	retry: Retry | null = null,
+) {
+	if (!validateUpstreamUnavailableState(details)) return false;
 	reportUpstreamUnavailable({ ...details, ..._releaseMetadata() });
 	showUpstreamUnavailable(
 		{
@@ -323,8 +357,9 @@ export function receiveUpstreamUnavailable(details, retry = null) {
 	return true;
 }
 
-export function receiveUpstreamUnavailableMessage(message) {
-	if (!_validWorkerDetails(message?.state)) return false;
+export function receiveUpstreamUnavailableMessage(message: unknown) {
+	if (!message || typeof message !== "object" || !("state" in message))
+		return false;
 	return receiveUpstreamUnavailable(message.state, async () => {
 		const { request } = await import("./request.ts");
 		return request.get(window.location.pathname, null, {
@@ -338,10 +373,15 @@ export function installUpstreamUnavailableBanner() {
 	if (!_clientInstalled) {
 		_clientInstalled = true;
 		navigator.serviceWorker?.addEventListener?.("message", (event) => {
-			const data = event.data;
+			const data: unknown = event.data;
 			if (
-				data?.protocol === BROWSER_PROTOCOL_ID &&
+				data &&
+				typeof data === "object" &&
+				"protocol" in data &&
+				data.protocol === BROWSER_PROTOCOL_ID &&
+				"protocol_version" in data &&
 				Number(data.protocol_version) === BROWSER_PROTOCOL_VERSION &&
+				"type" in data &&
 				data.type === WORKER_MESSAGES.UPSTREAM_UNAVAILABLE
 			) {
 				receiveUpstreamUnavailableMessage(data);
@@ -354,7 +394,7 @@ export function installUpstreamUnavailableBanner() {
 			};
 		}
 	}
-	const button = document.querySelector(
+	const button = document.querySelector<HTMLButtonElement>(
 		"[data-role='upstream-unavailable-retry']",
 	);
 	if (!button || button.dataset.initialized === "true") return;

@@ -1,9 +1,88 @@
-import { renderReviewBar } from "../forms/reviewBar.mjs";
+import { renderReviewBar as renderReviewBarJs } from "../forms/reviewBar.mjs";
+import type { DeferredOperationStatus } from "../types/api.d.ts";
 import { captureError } from "./errors.ts";
 import { createIcon } from "./icons.ts";
+import type { PollingCoordinator } from "./polling.ts";
 import { withTransition } from "./transitions.ts";
 
-function operationRevision(value) {
+type RevisionInput = number | string | null | undefined;
+type DisplayStatus = Pick<
+	DeferredOperationStatus,
+	| "key"
+	| "status"
+	| "phase"
+	| "phase_label"
+	| "elapsed_seconds"
+	| "recovering"
+	| "terminal"
+> &
+	Partial<Omit<DeferredOperationStatus, "revision">> & {
+		revision: RevisionInput;
+	};
+
+interface ReviewState {
+	operation?: DisplayStatus | null;
+	reviews?: readonly { operation: string }[];
+	stale_autofill?: unknown;
+}
+
+interface DeferredOperationWidget {
+	visible?: boolean;
+	target?: HTMLElement | null;
+	component?: { active?: DeferredOperationWidget | null };
+	_reviewedOperations?: ReadonlySet<string>;
+	reviewState?: ReviewState | null;
+}
+
+interface DeferredOperationNode extends HTMLElement {
+	_lp_widget?: DeferredOperationWidget;
+}
+
+interface DeferredCompletion {
+	type: "deferred-complete";
+	key: string | null;
+	source_widget: string | null;
+	destination: string | null;
+	deferred_revision: string;
+}
+
+interface EditWatcher {
+	expectDeferredCompletion?: (key: string | null, operation: string) => void;
+}
+
+interface DeferredOperationView {
+	elt?: HTMLElement | null;
+	PollingCoordinator?: Pick<
+		PollingCoordinator,
+		"subscribe" | "trigger" | "reschedule" | "blur"
+	> | null;
+	hidden?: boolean;
+	blurred?: boolean;
+	blurredAt?: number | null;
+	EditWatcher?: EditWatcher | null;
+	ensureEditWatcher?: () => Promise<EditWatcher | null | undefined>;
+	reconcileChange?: (change: DeferredCompletion) => unknown;
+}
+
+interface TrackOptions {
+	revision?: RevisionInput;
+	node?: DeferredOperationNode | null;
+	immediate?: boolean;
+	status?: DisplayStatus | null;
+}
+
+type TrackedOperation = { revision: number | string } & (
+	| { status: DisplayStatus; receivedAt: number }
+	| { status?: undefined; receivedAt?: undefined }
+);
+
+// The shared JS review bar accepts the same status projection as its widget's markup.
+const renderReviewBar = renderReviewBarJs as (
+	widget: DeferredOperationWidget,
+	status?: DisplayStatus | null,
+) => void;
+
+function operationRevision<T extends RevisionInput>(value: T): T | number {
 	if (typeof value === "number") return value;
 	if (typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value)) {
 		return Number(value);
@@ -11,8 +90,12 @@ function operationRevision(value) {
 	return value;
 }
 
-function elapsedLabel(seconds) {
-	seconds = Math.max(Number(seconds) || 0, 0);
+function isInteger(value: unknown): value is number {
+	return Number.isInteger(value);
+}
+
+function elapsedLabel(value: unknown) {
+	const seconds = Math.max(Number(value) || 0, 0);
 	if (seconds < 10) return "just now";
 	if (seconds < 60) return `${Math.floor(seconds)} seconds`;
 	const minutes = Math.floor(seconds / 60);
@@ -21,20 +104,23 @@ function elapsedLabel(seconds) {
 	return `${hours} hr ${minutes % 60} min`;
 }
 
-function operationNodes(key) {
-	return Array.from(document.querySelectorAll("[data-operation]")).filter(
-		(node) => node.dataset.operation === key,
-	);
+function operationNodes(key: string) {
+	return Array.from(
+		document.querySelectorAll<DeferredOperationNode>("[data-operation]"),
+	).filter((node) => node.dataset.operation === key);
 }
 
-function operationNodeVisible(node) {
+function operationNodeVisible(node: DeferredOperationNode) {
 	if (!node || node.isConnected === false) return false;
 	if (node.closest?.("[hidden], .hidden, [data-visible='false']")) return false;
 	const rects = node.getClientRects?.();
 	return rects ? rects.length > 0 : true;
 }
 
-function completedAutofillInMarkup(node, status) {
+function completedAutofillInMarkup(
+	node: DeferredOperationNode,
+	status: DisplayStatus | null,
+) {
 	if (
 		node.dataset.widget !== "TaskForm" ||
 		!node.dataset.operationBootstrap ||
@@ -44,7 +130,7 @@ function completedAutofillInMarkup(node, status) {
 	)
 		return false;
 	try {
-		const state = JSON.parse(node.dataset.formState);
+		const state: ReviewState = JSON.parse(node.dataset.formState);
 		return (
 			state.operation?.key === status.key &&
 			state.operation?.revision === status.revision &&
@@ -61,7 +147,13 @@ function completedAutofillInMarkup(node, status) {
  *
  */
 export class DeferredOperationManager {
-	constructor(view) {
+	declare readonly view: DeferredOperationView;
+	declare readonly operations: Map<string, TrackedOperation>;
+	declare destroyed: boolean;
+	declare readonly ignored: Set<string>;
+	declare readonly unsubscribers: Map<string, () => void>;
+
+	constructor(view: DeferredOperationView) {
 		this.view = view;
 		this.operations = new Map();
 		this.destroyed = false;
@@ -74,11 +166,14 @@ export class DeferredOperationManager {
 		return this;
 	}
 
-	scan(root = document) {
-		const nodes = Array.from(root.querySelectorAll?.("[data-operation]") || []);
-		if (root.matches?.("[data-operation]")) nodes.unshift(root);
-		const terminalKeys = new Set();
-		const scannedKeys = new Set();
+	scan(root: Document | DeferredOperationNode = document) {
+		const nodes = Array.from(
+			root.querySelectorAll?.<DeferredOperationNode>("[data-operation]") || [],
+		);
+		if ("matches" in root && root.matches?.("[data-operation]"))
+			nodes.unshift(root);
+		const terminalKeys = new Set<string>();
+		const scannedKeys = new Set<string>();
 		for (const node of nodes) {
 			// Task forms in the page's initial HTML are cold until opened. Their
 			// operation state is already rendered, and opening the form scans it.
@@ -88,12 +183,14 @@ export class DeferredOperationManager {
 				node._lp_widget?.visible !== true
 			)
 				continue;
+			const key = node.dataset.operation;
+			if (!key) continue;
 			const revision = operationRevision(node.dataset.operationRevision);
-			const status = node.dataset.operationBootstrap
+			const status: DisplayStatus | null = node.dataset.operationBootstrap
 				? JSON.parse(node.dataset.operationBootstrap)
 				: node.dataset.operationStatus
 					? {
-							key: node.dataset.operation,
+							key,
 							revision,
 							status: node.dataset.operationStatus,
 							phase: node.dataset.operationPhase || "unknown",
@@ -110,14 +207,14 @@ export class DeferredOperationManager {
 			// Re-polling it would initialize closed task forms and refresh every
 			// collection without adding any state the reader needs.
 			if (completedAutofillInMarkup(node, status)) continue;
-			const tracked = this.track(node.dataset.operation, {
+			const tracked = this.track(key, {
 				revision,
 				node,
 				immediate: false,
 				status,
 			});
 			if (tracked) {
-				scannedKeys.add(node.dataset.operation);
+				scannedKeys.add(key);
 				if (status?.terminal) terminalKeys.add(status.key);
 			}
 		}
@@ -133,16 +230,20 @@ export class DeferredOperationManager {
 		}
 	}
 
-	resumeTaskForm(node) {
+	resumeTaskForm(node: DeferredOperationNode | null | undefined) {
 		if (node?.dataset.widget !== "TaskForm") return;
 		this.scan(node);
 		const key = node.dataset.operation;
-		if (this.operations.has(key) && node.dataset.operationTerminal !== "true") {
+		if (
+			key &&
+			this.operations.has(key) &&
+			node.dataset.operationTerminal !== "true"
+		) {
 			this.view.PollingCoordinator?.trigger(`operation:${key}`);
 		}
 	}
 
-	suspendTaskForm(node) {
+	suspendTaskForm(node: DeferredOperationNode | null | undefined) {
 		if (node?.dataset.widget !== "TaskForm") return;
 		const key = node.dataset.operation;
 		if (
@@ -158,8 +259,13 @@ export class DeferredOperationManager {
 	}
 
 	track(
-		key,
-		{ revision = 0, node = null, immediate = true, status = null } = {},
+		key: string,
+		{
+			revision = 0,
+			node = null,
+			immediate = true,
+			status = null,
+		}: TrackOptions = {},
 	) {
 		if (this.destroyed || !key || this.ignored.has(key)) return false;
 		const decorationNode =
@@ -189,19 +295,17 @@ export class DeferredOperationManager {
 		const incomingRevision = operationRevision(
 			revision ?? current?.revision ?? 0,
 		);
-		const resolvedRevision = Number.isInteger(incomingRevision)
+		const resolvedRevision = isInteger(incomingRevision)
 			? Math.max(
-					Number.isInteger(current?.revision) ? current.revision : 0,
+					isInteger(current?.revision) ? current.revision : 0,
 					incomingRevision,
 				)
 			: incomingRevision;
-		this.operations.set(key, {
-			...current,
-			revision: resolvedRevision,
-			...(status && (!current?.status || incomingRevision > current.revision)
+		const latest =
+			status && (!current?.status || incomingRevision > current.revision)
 				? { status: { ...status }, receivedAt: Date.now() }
-				: {}),
-		});
+				: current;
+		this.operations.set(key, { ...latest, revision: resolvedRevision });
 		const polling = this.view.PollingCoordinator;
 		if (this.view.hidden && this.view.blurred) {
 			polling?.blur(this.view.blurredAt ?? Date.now());
@@ -215,9 +319,10 @@ export class DeferredOperationManager {
 					key,
 					// A terminal HTML seed is not an acknowledgement of destination
 					// reconciliation. Keep its cursor behind until receive succeeds.
+					// The poll contract also checks cursors read from markup.
 					revision: status?.terminal
-						? Math.max(resolvedRevision - 1, 0)
-						: resolvedRevision,
+						? Math.max(Number(resolvedRevision) - 1, 0)
+						: (resolvedRevision as number),
 				},
 				{
 					mode: "periodic",
@@ -249,13 +354,13 @@ export class DeferredOperationManager {
 		return true;
 	}
 
-	visible(key) {
+	visible(key: string) {
 		return (
 			this.operations.has(key) && operationNodes(key).some(operationNodeVisible)
 		);
 	}
 
-	decorate(node, key) {
+	decorate(node: DeferredOperationNode, key: string) {
 		if (!node || !key) return;
 		node.dataset.operation = key;
 		if (
@@ -268,9 +373,12 @@ export class DeferredOperationManager {
 		const formLocked = node.dataset.deferredLock === "form";
 		if (formLocked) {
 			node.setAttribute("aria-busy", "true");
-			for (const control of node.querySelectorAll(
-				"input, textarea, select, button",
-			)) {
+			for (const control of node.querySelectorAll<
+				| HTMLInputElement
+				| HTMLTextAreaElement
+				| HTMLSelectElement
+				| HTMLButtonElement
+			>("input, textarea, select, button")) {
 				control.disabled = true;
 			}
 		}
@@ -314,7 +422,7 @@ export class DeferredOperationManager {
 		}
 	}
 
-	nudge(key, revision = null) {
+	nudge(key: string | null | undefined, revision: RevisionInput = null) {
 		const current = key ? this.operations.get(key) : null;
 		const incomingRevision =
 			revision === null || revision === undefined
@@ -322,8 +430,8 @@ export class DeferredOperationManager {
 				: operationRevision(revision);
 		if (
 			current &&
-			Number.isInteger(incomingRevision) &&
-			Number.isInteger(current.revision) &&
+			isInteger(incomingRevision) &&
+			isInteger(current.revision) &&
 			incomingRevision < current.revision
 		)
 			return false;
@@ -338,12 +446,12 @@ export class DeferredOperationManager {
 		);
 	}
 
-	async receive(status) {
+	async receive(status: DeferredOperationStatus | null | undefined) {
 		if (this.destroyed || !status?.key || !this.operations.has(status.key))
 			return false;
 		const current = this.operations.get(status.key);
 		const revision = operationRevision(status.revision);
-		if (!Number.isInteger(revision) || revision < 0) {
+		if (!isInteger(revision) || revision < 0) {
 			captureError(
 				new TypeError("Invalid deferred operation revision."),
 				this.view.elt,
@@ -354,8 +462,7 @@ export class DeferredOperationManager {
 			return false;
 		}
 		const previousRevision = current?.revision;
-		if (!Number.isInteger(previousRevision) || previousRevision < 0)
-			return false;
+		if (!isInteger(previousRevision) || previousRevision < 0) return false;
 		if (revision < previousRevision) return false;
 		this.operations.set(status.key, {
 			revision,
@@ -413,7 +520,7 @@ export class DeferredOperationManager {
 		return true;
 	}
 
-	_render(status, elapsedSeconds = status.elapsed_seconds) {
+	_render(status: DisplayStatus, elapsedSeconds = status.elapsed_seconds) {
 		for (const node of operationNodes(status.key)) {
 			if (status.type === "autofill" && node._lp_widget) {
 				renderReviewBar(node._lp_widget, {
@@ -444,7 +551,9 @@ export class DeferredOperationManager {
 		}
 	}
 
-	_refreshCachedStatuses(keys = Array.from(this.operations.keys())) {
+	_refreshCachedStatuses(
+		keys: Iterable<string> = Array.from(this.operations.keys()),
+	) {
 		for (const key of keys) {
 			const operation = this.operations.get(key);
 			if (!operation?.status) continue;
@@ -455,7 +564,9 @@ export class DeferredOperationManager {
 		}
 	}
 
-	_renderStatusDelay(keys = Array.from(this.operations.keys())) {
+	_renderStatusDelay(
+		keys: Iterable<string> = Array.from(this.operations.keys()),
+	) {
 		for (const key of keys) {
 			for (const node of operationNodes(key)) {
 				const phase = node.querySelector("[data-role='deferred-phase']");
@@ -464,11 +575,12 @@ export class DeferredOperationManager {
 		}
 	}
 
-	_ignore(key) {
+	_ignore(key: string) {
 		if (!key) return;
 		this.ignored.add(key);
 		if (this.ignored.size > 100) {
-			this.ignored.delete(this.ignored.values().next().value);
+			const oldest = this.ignored.values().next();
+			if (!oldest.done) this.ignored.delete(oldest.value);
 		}
 	}
 
