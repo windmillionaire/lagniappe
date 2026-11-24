@@ -96,12 +96,15 @@ strictly:
    non-secret field(s) reported in `missing_fields` (for example, choosing
    between multiple open billing accounts), update `answers.json`, and rerun the
    exact same command.
-6. **Guide browser steps:** `setup.sh` automatically creates the GCP project,
-   links billing, opens Google sign-in, and opens the one-shot `127.0.0.1`
-   credential vault in the browser (and prints the clickable vault URL to
-   `stderr` even under `--json`). Tell the user when their browser needs
-   attention, share the localhost vault link if needed, and wait until setup
-   finishes.
+6. **Guide browser steps warmly and clearly:** `setup.sh` automatically creates
+   the GCP project, links billing, opens Google sign-in, and opens the one-shot
+   `127.0.0.1` credential vault in the browser (and prints the clickable vault
+   URL to `stderr` even under `--json`). Be friendly and helpful — tell the user
+   when their browser needs attention, briefly explain what they'll set up on
+   the credential page (Google Auth Platform Branding + Web OAuth JSON, Gmail
+   App Password, Redis Cloud CLI command), invite them to ask questions if
+   anything looks unfamiliar, share the localhost vault link if needed, and wait
+   until setup finishes.
 7. **Verify and finish:** After setup completes, confirm `./setup.sh doctor`
    exits with `0`, confirm no secrets exist in
    `config/files/lagniappe_settings.yaml`, and give the user their live

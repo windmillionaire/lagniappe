@@ -81,7 +81,7 @@ _SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
     ("Pragma", "no-cache"),
     ("X-Content-Type-Options", "nosniff"),
     ("X-Frame-Options", "DENY"),
-    ("Referrer-Policy", "no-referrer"),
+    ("Referrer-Policy", "same-origin"),
     (
         "Content-Security-Policy",
         "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; "
@@ -353,7 +353,7 @@ class OneShotSecretVault:
             def _validate_origin(self) -> bool:
                 expected_origin = f"http://{self._expected_host()}"
                 origin = self.headers.get("Origin")
-                if origin is not None:
+                if origin is not None and origin.strip().casefold() != "null":
                     return hmac.compare_digest(origin.strip(), expected_origin)
                 referer = self.headers.get("Referer")
                 if referer is not None:
@@ -556,36 +556,25 @@ def build_install_vault_sections(
                 section_id="google_oauth",
                 title="Google Sign-In OAuth Web Client",
                 description=(
-                    f"Create a Web application OAuth client for origin {app_origin or '(your app URL)'} "
-                    f"and redirect URI {redirect_uri or '(your login callback)'}. "
-                    "Paste the downloaded JSON or enter the Client ID and Client Secret below."
+                    "In Google Auth Platform, finish the one-time Branding / Audience "
+                    "(External) setup if prompted, then create a Web application OAuth "
+                    f"client with Authorized JavaScript origin {app_origin or '(your app URL)'} "
+                    f"and Authorized redirect URI {redirect_uri or '(your login callback)'}. "
+                    "Download the client JSON and paste its contents below."
                 ),
                 links=(VaultLink("Open Google Auth Platform Clients", clients_url),),
                 fields=(
                     VaultField(
                         name="oauth_credentials_json",
-                        label="OAuth Client JSON (optional — or use ID + Secret below)",
+                        label="OAuth Web Client JSON",
                         secret=True,
-                        required=False,
+                        required=True,
                         multiline=True,
                         placeholder='{"web": {"client_id": "...", "client_secret": "..."}}',
-                        help_text="Paste the downloaded Google OAuth Web client JSON, or leave blank and enter Client ID + Secret.",
-                    ),
-                    VaultField(
-                        name="oauth_client_id",
-                        label="OAuth Client ID",
-                        secret=False,
-                        required=False,
-                        placeholder="1234567890-abc.apps.googleusercontent.com",
-                        default=str(settings.get("GOOGLE_CLIENT_ID") or ""),
-                    ),
-                    VaultField(
-                        name="oauth_client_secret",
-                        label="OAuth Client Secret",
-                        secret=True,
-                        required=False,
-                        placeholder="GOCSPX-...",
-                        help_text="Sent directly to Identity Platform and never stored in Lagniappe files.",
+                        help_text=(
+                            "Paste the full downloaded JSON from Google Auth Platform. "
+                            "The Client Secret is sent directly to Identity Platform and never stored in Lagniappe files."
+                        ),
                     ),
                 ),
             )
@@ -643,37 +632,18 @@ def build_install_vault_sections(
                 title="Redis Cloud Connection",
                 description=(
                     "Create a Redis Cloud database on Google Cloud in the same region "
-                    "with data eviction policy set to volatile-ttl, then paste the copied "
-                    "Redis CLI command (or enter host, port, and password)."
+                    "with data eviction policy set to volatile-ttl, click Connect → "
+                    "Redis CLI, and paste the copied command below."
                 ),
                 links=(VaultLink("Open Redis Cloud Console", "https://cloud.redis.io/"),),
                 fields=(
                     VaultField(
                         name="redis_cli_command",
-                        label="Copied Redis CLI Command or URI (optional if entering fields below)",
+                        label="Redis CLI Command",
                         secret=True,
-                        required=False,
+                        required=True,
                         placeholder="redis-cli -u redis://default:PASSWORD@HOST:PORT",
-                    ),
-                    VaultField(
-                        name="redis_host",
-                        label="Redis Host",
-                        secret=False,
-                        required=False,
-                        default=str(settings.get("REDIS_HOST") or ""),
-                    ),
-                    VaultField(
-                        name="redis_port",
-                        label="Redis Port",
-                        secret=False,
-                        required=False,
-                        default=str(settings.get("REDIS_PORT") or ""),
-                    ),
-                    VaultField(
-                        name="redis_password",
-                        label="Redis Password",
-                        secret=True,
-                        required=False,
+                        help_text="Tested live before saving; host, port, and password are parsed automatically.",
                     ),
                 ),
             )

@@ -75,6 +75,9 @@ def test_vault_enforces_token_host_origin_csrf_retry_and_one_shot_shutdown(capsy
         assert page.status_code == 200
         assert "https://cloud.redis.io/" in page.text
         assert "no-store" in page.headers["Cache-Control"]
+        # Same-origin Referrer-Policy is required so browsers send Origin on POST
+        # (no-referrer causes Chromium to send Origin: null and fail CSRF checks).
+        assert page.headers["Referrer-Policy"] == "same-origin"
         assert "default-src 'none'" in page.headers["Content-Security-Policy"]
         csrf = _extract_csrf(page.text)
 
@@ -197,6 +200,10 @@ def test_build_install_vault_sections_and_oauth_json_parser():
         "sentry",
     ]
     assert "project=pilot-project-1" in sections[0].links[0].url
+    assert [f.name for f in sections[0].fields] == ["oauth_credentials_json"]
+    assert sections[0].fields[0].required is True
+    assert [f.name for f in sections[2].fields] == ["redis_cli_command"]
+    assert sections[2].fields[0].required is True
 
     client_id, client_secret = parse_oauth_vault_inputs(
         {

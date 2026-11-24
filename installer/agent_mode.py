@@ -887,7 +887,7 @@ def build_vault_submit_handler(
                 return VaultSubmitResult(
                     ok=False,
                     error="Google OAuth validation failed.",
-                    field_errors={"oauth_client_id": str(error)},
+                    field_errors={"oauth_credentials_json": str(error)},
                 )
             oauth_pair = (client_id, client_secret)
             pending_updates["GOOGLE_CLIENT_ID"] = client_id
@@ -978,8 +978,8 @@ def build_vault_submit_handler(
             except Exception:
                 return VaultSubmitResult(
                     ok=False,
-                    error="Redis connection test failed. Check the host, port, and password.",
-                    field_errors={"redis_password": "Could not connect to Redis with these credentials."},
+                    error="Redis connection test failed. Check the CLI command and try again.",
+                    field_errors={"redis_cli_command": "Could not connect to Redis with these credentials."},
                 )
             pending_updates["REDIS_HOST"] = host
             pending_updates["REDIS_PORT"] = port
