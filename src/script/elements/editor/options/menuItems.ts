@@ -80,7 +80,7 @@ class ToolbarMenuItem {
 			} else if (this.command === "toggleSubscript") {
 				chain.unsetSubscript().run();
 			} else if (this.command === "toggleCodeBlock") {
-				chain.unsetCodeBlock().run();
+				chain.toggleCodeBlock().run();
 			} else if (this.command === "toggleBlockquote") {
 				chain.lift("blockquote").run();
 			} else if (this.args === undefined) {
