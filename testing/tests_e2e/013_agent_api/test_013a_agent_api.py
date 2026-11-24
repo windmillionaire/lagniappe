@@ -10,6 +10,7 @@ import pytest
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import AI
+from lagniappe.core.definitions.asset import FileAsset
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.ai.reporting import uploads as report_uploads
 from lagniappe.core.tools.ai import external_api
@@ -79,10 +80,11 @@ class Actor:
 
 def _authenticated_client(monkeypatch, actor):
     client = app.test_client()
+    monkeypatch.setattr(Entities, "USER", Actor)
     monkeypatch.setattr(
         app.login_manager,
         "_user_callback",
-        lambda _identifier: actor,
+        lambda identifier: actor if identifier == actor.get_id() else None,
     )
     with client.session_transaction() as client_session:
         client_session["_user_id"] = actor.get_id()
@@ -1169,7 +1171,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         key = "downloadable-file-key"
         entity_kind = "file"
         properties = SimpleNamespace(
-            file=SimpleNamespace(value=SimpleNamespace(path="private/person.vcf")),
+            file=SimpleNamespace(value=FileAsset({"path": "private/person.vcf"})),
             get=lambda _name: None,
         )
 
