@@ -58,9 +58,11 @@ export class SearchBox extends RemoteQueryCombobox {
 	 * @template nav.html::search_results
 	 */
 	selectOption(option) {
+		const { url } = option.dataset;
+		if (!url) return;
 		this.results.save(option);
 		this.hidePanel();
-		window.location.href = option.dataset.url;
+		window.location.href = url;
 	}
 
 	elementKeydown(event) {

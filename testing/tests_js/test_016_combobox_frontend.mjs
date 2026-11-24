@@ -72,6 +72,29 @@ function interactionEvent(options = {}) {
 	};
 }
 
+test("test_search_combobox_enter_only_follows_rows_with_a_destination", async (t) => {
+	installBrowserBoundaries(t, { html: "<label><input></label>" });
+	const { SearchBox } = await import(
+		"../../src/script/elements/combobox/search.ts"
+	);
+	const box = new SearchBox(document.querySelector("label"));
+	const location = { href: "" };
+	replace(t, globalThis, "window", { location });
+
+	const choose = (markup) => {
+		box.updatePanel(markup);
+		box.panel.querySelector('[role="option"]').scrollIntoView = () => {};
+		box.panelOpen = true;
+		box.elementKeydown(interactionEvent({ key: "ArrowDown" }));
+		box.elementKeydown(interactionEvent({ key: "Enter" }));
+	};
+	choose('<div role="option" class="pointer-events-none">No Results</div>');
+	assert.equal(location.href, "");
+
+	choose('<div role="option" data-url="/search?q=notes">All Results</div>');
+	assert.equal(location.href, "/search?q=notes");
+});
+
 async function setupFloating(t) {
 	installBrowserBoundaries(t);
 	const autoUpdateCalls = [];
