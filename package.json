@@ -32,6 +32,7 @@
     "@tailwindcss/postcss": "^4.3.4",
     "chokidar-cli": "^3.0.0",
     "cssnano": "^9.9.0",
+    "esbuild": "0.28.1",
     "esmock": "^3.0.0",
     "fake-indexeddb": "^6.2.7",
     "js-yaml": "^5.5.0",

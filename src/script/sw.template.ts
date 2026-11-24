@@ -1,21 +1,48 @@
+/// <reference lib="webworker" />
+
+import type BrowserProtocol from "../../config/browser_protocol.json";
+import type { ConnectivitySnapshot } from "./shared/connectivity.ts";
+
+declare const self: ServiceWorkerGlobalScope & {
+	Sentry?: {
+		captureException(error: Error, context: Record<string, unknown>): void;
+		captureMessage(message: unknown, context: Record<string, unknown>): void;
+	};
+};
+
+declare const __PRECACHE_URLS__: string[];
+declare const __BROWSER_PROTOCOL__: typeof BrowserProtocol;
+declare const __BUILD_ID__: string;
+
+interface CacheConfirmation {
+	cacheCleared: boolean;
+	responseCacheCleared: boolean;
+	cacheGeneration: number;
+}
+
+type CacheRevision = string | null;
+type ValidationConfirmation = CacheConfirmation & {
+	cacheRevision: CacheRevision;
+};
+
 // biome-ignore lint/correctness/noUnusedVariables: build input replaced with the release build ID
-const SW_VERSION = "__BUILD_ID__";
+const SW_VERSION = __BUILD_ID__;
 const CACHE = `static-cache`;
 const RESPONSE_CACHE = `response-cache`;
-const PRECACHE_URLS = /* __PRECACHE_URLS__ */ [];
+const PRECACHE_URLS = __PRECACHE_URLS__;
 const UPDATED_HEADER = "X-Lagniappe-Updated";
 const UPSTREAM_UNAVAILABLE_HEADER = "X-Lagniappe-Upstream-Unavailable";
 const UPSTREAM_STATUS_HEADER = "X-Lagniappe-Upstream-Status";
 const STALE_CACHE_HEADER = "X-Lagniappe-Stale-Cache";
 const UPSTREAM_STATUSES = new Set([500, 502, 503, 504]);
 const STATIC_RETRY_DELAYS_MS = [250, 750];
-const BROWSER_PROTOCOL = /* __BROWSER_PROTOCOL__ */ null;
-const TOKEN_REQUEST = {
+const BROWSER_PROTOCOL = __BROWSER_PROTOCOL__;
+const TOKEN_REQUEST: RequestInit = {
 	credentials: "include",
 	headers: { "X-Lagniappe-Request": "true" },
 };
 
-function captureError(error, context = {}) {
+function captureError(error: unknown, context: Record<string, unknown> = {}) {
 	if (typeof self.Sentry !== "undefined" && self.Sentry) {
 		if (error instanceof Error) {
 			self.Sentry.captureException(error, context);
@@ -49,17 +76,20 @@ async function precacheStaticAssets() {
 	);
 }
 
-async function fetchStaticAsset(request) {
+async function fetchStaticAsset(request: Request) {
 	let currentRequest = request;
 	for (let attempt = 0; ; attempt += 1) {
-		let response;
+		let response: Response | undefined;
 		try {
 			response = await fetch(currentRequest);
 		} catch (error) {
 			if (
 				request.method !== "GET" ||
 				request.signal.aborted ||
-				error?.name === "AbortError" ||
+				(error != null &&
+					(typeof error === "object" || typeof error === "function") &&
+					"name" in error &&
+					error.name === "AbortError") ||
 				attempt === STATIC_RETRY_DELAYS_MS.length
 			) {
 				throw error;
@@ -86,8 +116,10 @@ async function fetchStaticAsset(request) {
 	}
 }
 
-const _validateUser = async (cacheConfirmation = {}) => {
-	const failed = (stage, status = null) => {
+const _validateUser = async (
+	cacheConfirmation: Partial<ValidationConfirmation> = {},
+) => {
+	const failed = (stage: string, status: number | null = null) => {
 		captureError(new Error("User validation acknowledgement failed."), {
 			context: "validate_user",
 			stage,
@@ -96,7 +128,7 @@ const _validateUser = async (cacheConfirmation = {}) => {
 		return false;
 	};
 
-	let tokenResponse;
+	let tokenResponse: Response;
 	try {
 		tokenResponse = await fetch("/l/token", TOKEN_REQUEST);
 	} catch {
@@ -105,7 +137,7 @@ const _validateUser = async (cacheConfirmation = {}) => {
 	if (!tokenResponse?.ok)
 		return failed("token-response", tokenResponse?.status);
 
-	let newToken;
+	let newToken: string;
 	try {
 		newToken = (await tokenResponse.text()).trim();
 	} catch {
@@ -113,7 +145,7 @@ const _validateUser = async (cacheConfirmation = {}) => {
 	}
 	if (!newToken) return failed("token-empty", tokenResponse.status);
 
-	let validationResponse;
+	let validationResponse: Response;
 	try {
 		validationResponse = await fetch("/l/validate-user", {
 			method: "POST",
@@ -137,67 +169,71 @@ const _validateUser = async (cacheConfirmation = {}) => {
 		return failed("validation-response", validationResponse?.status);
 	}
 
-	let acknowledgement;
+	let acknowledgement: unknown;
 	try {
 		acknowledgement = await validationResponse.json();
 	} catch {
 		return failed("validation-body", validationResponse.status);
 	}
-	if (acknowledgement?.cacheCleared !== true) {
+	if (!isRecord(acknowledgement) || acknowledgement.cacheCleared !== true) {
 		// A newer permission mutation can legitimately supersede this clear.
-		if (acknowledgement?.retry === true) return false;
+		if (isRecord(acknowledgement) && acknowledgement.retry === true)
+			return false;
 		return failed("validation-acknowledgement", validationResponse.status);
 	}
 	return true;
 };
 
 let _cacheGeneration = 0;
-const _cacheInvalidations = new Map();
-const _validateUserRequests = new Map();
+const _cacheInvalidations = new Map<
+	CacheRevision,
+	Promise<CacheConfirmation>
+>();
+const _validateUserRequests = new Map<CacheRevision, Promise<boolean>>();
 
-function responseInvalidatesCache(response) {
+function responseInvalidatesCache(response: Response) {
 	return response.headers.get("X-Lagniappe-Invalidate-Cache");
 }
 
-async function clearClientCache(cacheRevision = null) {
-	if (!_cacheInvalidations.has(cacheRevision)) {
-		const cacheGeneration = _cacheGeneration + 1;
-		_cacheGeneration = cacheGeneration;
-		const pending = (async () => {
-			await caches.delete(RESPONSE_CACHE);
-			const responseCacheCleared =
-				typeof caches.has === "function"
-					? !(await caches.has(RESPONSE_CACHE))
-					: true;
-			return {
-				cacheCleared: responseCacheCleared,
-				responseCacheCleared,
-				cacheGeneration,
-			};
-		})().finally(() => {
-			_cacheInvalidations.delete(cacheRevision);
-		});
-		_cacheInvalidations.set(cacheRevision, pending);
-	}
-
-	return _cacheInvalidations.get(cacheRevision);
+async function clearClientCache(cacheRevision: CacheRevision = null) {
+	const current = _cacheInvalidations.get(cacheRevision);
+	if (current) return current;
+	const cacheGeneration = _cacheGeneration + 1;
+	_cacheGeneration = cacheGeneration;
+	const pending = (async () => {
+		await caches.delete(RESPONSE_CACHE);
+		const responseCacheCleared =
+			typeof caches.has === "function"
+				? !(await caches.has(RESPONSE_CACHE))
+				: true;
+		return {
+			cacheCleared: responseCacheCleared,
+			responseCacheCleared,
+			cacheGeneration,
+		};
+	})().finally(() => {
+		_cacheInvalidations.delete(cacheRevision);
+	});
+	_cacheInvalidations.set(cacheRevision, pending);
+	return pending;
 }
 
-function validateUserOnce(cacheConfirmation) {
+function validateUserOnce(cacheConfirmation: ValidationConfirmation) {
 	if (!cacheConfirmation.cacheCleared) return null;
 	const revision = cacheConfirmation.cacheRevision;
-	if (!_validateUserRequests.has(revision)) {
-		_validateUserRequests.set(
-			revision,
-			_validateUser(cacheConfirmation).finally(() => {
-				_validateUserRequests.delete(revision);
-			}),
-		);
-	}
-	return _validateUserRequests.get(revision);
+	const current = _validateUserRequests.get(revision);
+	if (current) return current;
+	const pending = _validateUser(cacheConfirmation).finally(() => {
+		_validateUserRequests.delete(revision);
+	});
+	_validateUserRequests.set(revision, pending);
+	return pending;
 }
 
-async function checkForCacheInvalidation(response, options = {}) {
+async function checkForCacheInvalidation(
+	response: Response,
+	options: { validate?: boolean } = {},
+) {
 	if (!responseInvalidatesCache(response)) return { invalidated: false };
 	const cacheRevision = response.headers.get("X-Lagniappe-Cache-Revision");
 	const confirmation = {
@@ -213,7 +249,12 @@ async function checkForCacheInvalidation(response, options = {}) {
 	};
 }
 
-async function clearSiblingCacheEntries(newETag, storedETag, url, pathname) {
+async function clearSiblingCacheEntries(
+	newETag: string | null,
+	storedETag: string | null | undefined,
+	url: string,
+	pathname: string,
+) {
 	if (storedETag && newETag && storedETag === newETag) return;
 	const shouldClear =
 		pathname === "/" ||
@@ -233,7 +274,7 @@ async function clearSiblingCacheEntries(newETag, storedETag, url, pathname) {
 	}
 }
 
-function responsePreventsStorage(response) {
+function responsePreventsStorage(response: Response) {
 	if (responseInvalidatesCache(response)) return true;
 	if (response.redirected || response.type === "opaqueredirect") return true;
 
@@ -246,16 +287,16 @@ function responsePreventsStorage(response) {
 	);
 }
 
-async function discardCachedResponse(cache, request) {
+async function discardCachedResponse(cache: Cache, request: Request) {
 	await cache.delete(request, { ignoreVary: true });
 }
 
 async function handleUncacheableResponse(
-	event,
-	cache,
-	request,
-	response,
-	options = {},
+	event: FetchEvent,
+	cache: Cache,
+	request: Request,
+	response: Response,
+	options: { awaitDiscard?: boolean } = {},
 ) {
 	if (!responsePreventsStorage(response)) return false;
 	const discard = discardCachedResponse(cache, request);
@@ -300,34 +341,46 @@ async function maybeEvictForQuota() {
 	}
 }
 
-let _connectivity = {
+let _connectivity: ConnectivitySnapshot = {
 	browser: navigator.onLine === false ? "offline" : "online",
 	server: "unknown",
 	visibility: "visible",
 	controller: "uncontrolled",
 };
 
-function receiveConnectivityMessage(data) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isConnectivitySnapshot(
+	state: Record<string, unknown>,
+): state is Record<string, unknown> & ConnectivitySnapshot {
+	return Object.entries(BROWSER_PROTOCOL.connectivity).every(
+		([field, values]) => {
+			const value = state[field];
+			return typeof value === "string" && values.includes(value);
+		},
+	);
+}
+
+function receiveConnectivityMessage(data: unknown) {
 	if (
-		data?.protocol !== BROWSER_PROTOCOL.id ||
-		Number(data?.protocol_version) !== BROWSER_PROTOCOL.version ||
-		data?.type !== BROWSER_PROTOCOL.messages.CONNECTIVITY
+		!isRecord(data) ||
+		data.protocol !== BROWSER_PROTOCOL.id ||
+		Number(data.protocol_version) !== BROWSER_PROTOCOL.version ||
+		data.type !== BROWSER_PROTOCOL.messages.CONNECTIVITY
 	) {
 		return false;
 	}
 
 	const state = data.state;
-	if (!state || typeof state !== "object" || Array.isArray(state)) return false;
-	const valid = Object.entries(BROWSER_PROTOCOL.connectivity).every(
-		([field, values]) => values.includes(state[field]),
-	);
-	if (!valid) return false;
+	if (!isRecord(state) || !isConnectivitySnapshot(state)) return false;
 
 	_connectivity = { ...state };
 	return true;
 }
 
-function isUpstreamUnavailableResponse(response) {
+function isUpstreamUnavailableResponse(response: Response | null | undefined) {
 	return Boolean(
 		response &&
 			UPSTREAM_STATUSES.has(response.status) &&
@@ -336,7 +389,7 @@ function isUpstreamUnavailableResponse(response) {
 	);
 }
 
-function upstreamRouteClass(pathname) {
+function upstreamRouteClass(pathname: string) {
 	if (pathname === "/") return "root";
 	const segment = pathname.split("/").filter(Boolean)[0] || "root";
 	if (segment === "l") return "internal";
@@ -362,15 +415,15 @@ function upstreamRouteClass(pathname) {
 	return allowed.has(segment) ? segment : "other";
 }
 
-function boundedServer(response) {
+function boundedServer(response: Response) {
 	return String(response.headers.get("Server") || "")
 		.replace(/[^\x20-\x7E]/g, "")
 		.slice(0, 128);
 }
 
 async function notifyUpstreamUnavailable(
-	request,
-	response,
+	request: Request,
+	response: Response,
 	{ stale = false } = {},
 ) {
 	const pathname = new URL(request.url).pathname;
@@ -404,7 +457,7 @@ async function notifyUpstreamUnavailable(
 }
 
 function upstreamHeaders(
-	response,
+	response: Response,
 	{ stale = false, originalResponse = response } = {},
 ) {
 	const headers = new Headers(response?.headers || {});
@@ -421,7 +474,7 @@ function upstreamHeaders(
 	return headers;
 }
 
-function markedStaleResponse(cached, upstream) {
+function markedStaleResponse(cached: Response, upstream: Response) {
 	return new Response(cached.body, {
 		status: cached.status,
 		statusText: cached.statusText,
@@ -432,7 +485,7 @@ function markedStaleResponse(cached, upstream) {
 	});
 }
 
-function brandedUpstreamResponse(request, upstream) {
+function brandedUpstreamResponse(request: Request, upstream: Response) {
 	const headers = upstreamHeaders(upstream);
 	if (request.mode === "navigate") {
 		headers.set("Content-Type", "text/html; charset=utf-8");
@@ -472,7 +525,12 @@ function brandedUpstreamResponse(request, upstream) {
 	);
 }
 
-function handleUpstreamUnavailable(event, request, response, cached = null) {
+function handleUpstreamUnavailable(
+	event: FetchEvent,
+	request: Request,
+	response: Response,
+	cached?: Response | null,
+) {
 	event.waitUntil(
 		notifyUpstreamUnavailable(request, response, { stale: Boolean(cached) }),
 	);
@@ -499,7 +557,7 @@ self.addEventListener("activate", (event) => {
 	);
 });
 
-function isStatic(pathname) {
+function isStatic(pathname: string) {
 	return (
 		pathname.startsWith("/fonts/") ||
 		pathname.startsWith("/images/") ||
@@ -533,7 +591,7 @@ self.addEventListener("fetch", (event) => {
 	event.respondWith(handleRequest(event, pathname));
 });
 
-async function handleStatic(event) {
+async function handleStatic(event: FetchEvent) {
 	const cache = await caches.open(CACHE);
 	const cached = await cache.match(event.request, { ignoreVary: true });
 
@@ -569,7 +627,7 @@ async function offlineFallback() {
 	return new Response("Offline", { status: 503, statusText: "Offline" });
 }
 
-async function unavailableResponse(request) {
+async function unavailableResponse(request: Request) {
 	if (request.mode === "navigate") return offlineFallback();
 
 	if (request.headers.get("X-Lagniappe-Request") === "true") {
@@ -594,7 +652,10 @@ async function unavailableResponse(request) {
 	});
 }
 
-function networkRequest(request, { etag, cache } = {}) {
+function networkRequest(
+	request: Request,
+	{ etag, cache }: { etag?: string | null; cache?: RequestCache } = {},
+) {
 	const headers = new Headers(request.headers);
 	if (cache === "reload") {
 		headers.delete("If-None-Match");
@@ -605,12 +666,12 @@ function networkRequest(request, { etag, cache } = {}) {
 		headers.delete("If-Modified-Since");
 	}
 
-	const options = { headers };
+	const options: RequestInit = { headers };
 	if (cache) options.cache = cache;
 	return new Request(request, options);
 }
 
-function markResponseNotUpdated(response) {
+function markResponseNotUpdated(response: Response) {
 	const headers = new Headers(response.headers);
 	headers.set(UPDATED_HEADER, "false");
 	return new Response(response.body, {
@@ -620,7 +681,7 @@ function markResponseNotUpdated(response) {
 	});
 }
 
-async function handleNetworkOnlyGet(event) {
+async function handleNetworkOnlyGet(event: FetchEvent) {
 	const { request } = event;
 	const cache = await caches.open(RESPONSE_CACHE);
 	try {
@@ -640,13 +701,15 @@ async function handleNetworkOnlyGet(event) {
 	}
 }
 
-async function handleCacheable(event, pathname) {
+async function handleCacheable(event: FetchEvent, pathname: string) {
 	const { request } = event;
 	const url = request.url;
 	const requestCacheGeneration = _cacheGeneration;
 	const cache = await caches.open(RESPONSE_CACHE);
 
-	let cachedResponse = await cache.match(request, { ignoreVary: true });
+	let cachedResponse: Response | null | undefined = await cache.match(request, {
+		ignoreVary: true,
+	});
 	const storedInvalidation =
 		cachedResponse && responseInvalidatesCache(cachedResponse);
 	if (cachedResponse && responsePreventsStorage(cachedResponse)) {
@@ -762,7 +825,7 @@ async function handleCacheable(event, pathname) {
 	return unavailableResponse(request);
 }
 
-async function handleRequest(event, pathname) {
+async function handleRequest(event: FetchEvent, pathname: string) {
 	const request = event.request;
 	try {
 		const response = await fetch(request);

@@ -180,8 +180,8 @@ The custom plugins in `build/utility.mjs` enforce one artifact contract:
 
 - `versionChunkImports(buildId)` adds the build query to generated imports
   without renaming files.
-- `updateServiceWorker(buildId)` injects the browser protocol, dynamic precache
-  URLs, and build ID into `sw.template.mjs`, then writes `sw.js` atomically.
+- `updateServiceWorker(buildId)` compiles `sw.template.ts` with the browser
+  protocol, dynamic precache URLs, and build ID, then writes `sw.js` atomically.
 - `recordBuildArtifacts(...)` collects every Rollup output across all entry
   configurations. The build wrapper validates that inventory and publishes the
   completion marker last.

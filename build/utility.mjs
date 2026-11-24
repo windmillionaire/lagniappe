@@ -12,6 +12,7 @@ import {
 import { posix as path } from "node:path";
 import * as yaml from "js-yaml";
 import MagicString from "magic-string";
+import { renderServiceWorker } from "./serviceWorker.mjs";
 
 const STYLE_PIPELINE = JSON.parse(
 	readFileSync("./src/style/pipeline.json", "utf8"),
@@ -29,7 +30,6 @@ const rawStylesYaml = yaml.load(
 	readFileSync(`./${STYLE_PIPELINE.registry.styles}`, "utf8"),
 );
 const constantsPath = "./config/constants.py";
-const browserProtocolPath = "./config/browser_protocol.json";
 const BOOT_CONNECTIVITY_MODULE = "shared/connectivity.mjs";
 const INTERACTION_FOUNDATION_MODULES = new Set([
 	"shared/storage.mjs",
@@ -697,22 +697,10 @@ const updateServiceWorker = (buildId) => {
 	return {
 		name: "update-service-worker",
 		writeBundle(_options, bundle) {
-			let swContent = readFileSync("./src/script/sw.template.ts", "utf8");
-			const browserProtocol = JSON.parse(
-				readFileSync(browserProtocolPath, "utf8"),
+			atomicWriteFileSync(
+				"./lagniappe/web/static/sw.js",
+				renderServiceWorker(buildId, precacheUrls(bundle, buildId)),
 			);
-
-			swContent = swContent.replaceAll("__BUILD_ID__", buildId);
-			swContent = swContent.replace(
-				"/* __BROWSER_PROTOCOL__ */ null",
-				JSON.stringify(browserProtocol, null, "\t"),
-			);
-			swContent = swContent.replace(
-				"/* __PRECACHE_URLS__ */ []",
-				JSON.stringify(precacheUrls(bundle, buildId), null, "\t"),
-			);
-
-			atomicWriteFileSync("./lagniappe/web/static/sw.js", swContent);
 		},
 	};
 };

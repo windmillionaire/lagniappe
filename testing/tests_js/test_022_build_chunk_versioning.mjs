@@ -117,17 +117,20 @@ test("test_service_worker_records_the_build_identity", () => {
 		writeFileSync(
 			"src/script/sw.template.ts",
 			[
-				'const BUILD_ID = "__BUILD_ID__";',
-				"const PROTOCOL = /* __BROWSER_PROTOCOL__ */ null;",
-				"const PRECACHE = /* __PRECACHE_URLS__ */ [];",
+				"declare const __BUILD_ID__: string;",
+				"const BUILD_ID: string = __BUILD_ID__;",
+				"const PROTOCOL = __BROWSER_PROTOCOL__;",
+				"const PRECACHE = __PRECACHE_URLS__;",
 			].join("\n"),
 		);
 		writeFileSync("config/browser_protocol.json", '{"version": 1}\n');
 
 		updateServiceWorker("b1234567").writeBundle({}, {});
-		assert.match(
-			readFileSync("lagniappe/web/static/sw.js", "utf8"),
-			/b1234567/,
+		const output = readFileSync("lagniappe/web/static/sw.js", "utf8");
+		assert.match(output, /b1234567/);
+		assert.doesNotMatch(
+			output,
+			/__BUILD_ID__|__BROWSER_PROTOCOL__|__PRECACHE_URLS__|: string/,
 		);
 	} finally {
 		process.chdir(originalDirectory);
