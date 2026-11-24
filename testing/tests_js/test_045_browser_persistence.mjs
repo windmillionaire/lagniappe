@@ -82,7 +82,7 @@ async function waitForRequests(tx, count) {
 
 test("test_indexeddb_operations_resolve_only_after_transaction_commit", async (t) => {
 	const { db, state } = createIndexedDB(t);
-	const offline = await import("../../src/script/shared/offline.mjs");
+	const offline = await import("../../src/script/shared/offline.ts");
 	let writeSettled = false;
 	const write = offline.setOfflineMutation({ id: "mutation-1" }).then(() => {
 		writeSettled = true;
@@ -134,7 +134,7 @@ test("test_indexeddb_operations_resolve_only_after_transaction_commit", async (t
 test("test_indexeddb_abort_and_errors_reject_once_and_close_the_database", async (t) => {
 	{
 		const { state } = createIndexedDB(t);
-		const offline = await import("../../src/script/shared/offline.mjs");
+		const offline = await import("../../src/script/shared/offline.ts");
 		const aborted = new Error("commit aborted");
 		const pending = offline.setOfflineMutation({ id: "mutation-1" });
 		const tx = await waitForTransaction(state);
@@ -154,7 +154,7 @@ test("test_indexeddb_abort_and_errors_reject_once_and_close_the_database", async
 	}
 	{
 		const { state } = createIndexedDB(t);
-		const offline = await import("../../src/script/shared/offline.mjs");
+		const offline = await import("../../src/script/shared/offline.ts");
 		const requestError = new Error("request failed");
 		const pending = offline.setOfflineMutation({ id: "mutation-2" });
 		const tx = await waitForTransaction(state);
@@ -175,7 +175,7 @@ test("test_indexeddb_abort_and_errors_reject_once_and_close_the_database", async
 	}
 	{
 		const { db, state } = createIndexedDB(t);
-		const offline = await import("../../src/script/shared/offline.mjs");
+		const offline = await import("../../src/script/shared/offline.ts");
 		const pending = offline.getOfflineMutations();
 		await waitForTransaction(state);
 		db.onclose?.();
@@ -191,7 +191,7 @@ test("test_indexeddb_abort_and_errors_reject_once_and_close_the_database", async
 test("test_indexeddb_executor_failures_abort_and_preserve_the_original_error", async (t) => {
 	for (const operation of ["set", "get"]) {
 		const { state } = createIndexedDB(t);
-		const offline = await import("../../src/script/shared/offline.mjs");
+		const offline = await import("../../src/script/shared/offline.ts");
 		const original = new Error(`${operation} executor`);
 		state.executorError = original;
 		const pending =
@@ -234,12 +234,12 @@ async function setupEditor(t) {
 					message: "message",
 				},
 			},
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw new Error(`Unexpected capture: ${error.message}`);
 				},
 			},
-			"../../src/script/shared/request.mjs": { request },
+			"../../src/script/shared/request.ts": { request },
 			"../../src/script/elements/editor/editor.mjs": {
 				independentEditor() {
 					throw new Error("Editor factory was not stubbed");
@@ -297,10 +297,10 @@ async function setupEditor(t) {
 async function loadToolbar() {
 	return await esmock.strict("../../src/script/elements/editor/toolbar.mjs", {
 		"../../src/script/generated/styles.mjs": { STYLES: {} },
-		"../../src/script/shared/transitions.mjs": {
+		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
-		"../../src/script/shared/utilities.mjs": {
+		"../../src/script/shared/utilities.ts": {
 			debounce: (callback) => Object.assign(callback, { cancel() {} }),
 		},
 		"../../src/script/elements/editor/config.mjs": {
@@ -496,8 +496,8 @@ async function loadBuilder(connectivity) {
 			SearchBox: emptyClass(),
 		},
 		"../../src/script/elements/entityMenu.mjs": { EntityMenu: emptyClass() },
-		"../../src/script/shared/directUpload.mjs": { directUpload() {} },
-		"../../src/script/shared/index.mjs": {
+		"../../src/script/shared/directUpload.ts": { directUpload() {} },
+		"../../src/script/shared/index.ts": {
 			captureError() {},
 			connectivity,
 			DeleteModal: emptyClass(),
@@ -506,7 +506,7 @@ async function loadBuilder(connectivity) {
 			OfflineModal: emptyClass(),
 			request: {},
 		},
-		"../../src/script/shared/transitions.mjs": {
+		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
 		"../../src/script/views/builder/changeStatus.mjs": {

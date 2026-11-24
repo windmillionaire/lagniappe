@@ -1,8 +1,8 @@
 import { BaseList } from "../elements/base/baseList.mjs";
 import { InputElement } from "../elements/input.mjs";
 import { SectionToggle } from "../elements/sectionToggle.mjs";
-import { request } from "../shared/index.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { request } from "../shared/index.ts";
+import { withTransition } from "../shared/transitions.ts";
 import { FormWidget } from "./base/formWidget.mjs";
 
 class ModelTask extends FormWidget {

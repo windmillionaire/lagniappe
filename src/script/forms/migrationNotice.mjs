@@ -1,5 +1,5 @@
 import { STYLES } from "../generated/styles.mjs";
-import { Modal } from "../shared/modal.mjs";
+import { Modal } from "../shared/modal.ts";
 
 export function installMigrationNotice(widget) {
 	widget._migrationNotice?.destroy();

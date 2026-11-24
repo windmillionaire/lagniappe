@@ -25,7 +25,7 @@ async function loadUserSettings({
 		"../../src/script/elements/input.mjs": { InputElement: class {} },
 		"../../src/script/elements/radio.mjs": { RadioElement: class {} },
 		"../../src/script/elements/sectionToggle.mjs": { SectionToggle: {} },
-		"../../src/script/shared/index.mjs": {
+		"../../src/script/shared/index.ts": {
 			captureError,
 			Modal,
 			request,

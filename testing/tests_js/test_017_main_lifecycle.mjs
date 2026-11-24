@@ -149,12 +149,12 @@ async function setupMain(t, { activeNavigationTransition = false } = {}) {
 		});
 	};
 	const module = await esmock.strict.p("../../src/script/main.mjs", {
-		"../../src/script/shared/connectivity.mjs": { connectivity },
-		"../../src/script/shared/notificationState.mjs": {
+		"../../src/script/shared/connectivity.ts": { connectivity },
+		"../../src/script/shared/notificationState.ts": {
 			applyNotificationStateHeader() {},
 		},
-		"../../src/script/shared/protocol.mjs": { connectivityMessage },
-		"../../src/script/shared/upstreamUnavailable.mjs": {
+		"../../src/script/shared/protocol.ts": { connectivityMessage },
+		"../../src/script/shared/upstreamUnavailable.ts": {
 			installUpstreamUnavailableBanner,
 			receiveUpstreamUnavailable() {},
 			receiveUpstreamUnavailableMessage(data) {
@@ -164,20 +164,20 @@ async function setupMain(t, { activeNavigationTransition = false } = {}) {
 		"../../src/script/viewRegistry.mjs": {
 			loadView: (...args) => viewLoader(...args),
 		},
-		"../../src/script/shared/errors.mjs": errorBoundary,
-		"../../src/script/shared/analytics.mjs": {
+		"../../src/script/shared/errors.ts": errorBoundary,
+		"../../src/script/shared/analytics.ts": {
 			analytics: { view: () => analyticsCalls.push("analytics") },
 		},
-		"../../src/script/shared/logout.mjs": {
+		"../../src/script/shared/logout.ts": {
 			initializeLogoutForms: () => authenticatedCalls.push("logout"),
 		},
-		"../../src/script/shared/user.mjs": {
+		"../../src/script/shared/user.ts": {
 			updateUserData: () => authenticatedCalls.push("user"),
 		},
-		"../../src/script/shared/storage.mjs": {
+		"../../src/script/shared/storage.ts": {
 			clearRecentSearchResults: () => recentSearchCleanup(),
 		},
-		"../../src/script/shared/request.mjs": {
+		"../../src/script/shared/request.ts": {
 			request: { get: async () => ({ ok: true }) },
 		},
 	});

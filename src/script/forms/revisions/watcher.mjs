@@ -1,4 +1,4 @@
-import { captureError } from "../../shared/errors.mjs";
+import { captureError } from "../../shared/errors.ts";
 import { EditReconciler } from "./reconciler.mjs";
 
 /**

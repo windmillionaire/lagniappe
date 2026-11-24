@@ -30,14 +30,14 @@ async function loadImportData({ request = {} } = {}) {
 				SelectBox: class {},
 			},
 			"../../src/script/elements/primitives.mjs": { primitives: {} },
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/shared/index.ts": {
 				captureError(error) {
 					throw error;
 				},
 				Modal: class {},
 				request,
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 		},

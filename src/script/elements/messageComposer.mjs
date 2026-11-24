@@ -1,6 +1,6 @@
 import { STYLES } from "../generated/styles.mjs";
-import { createIcon } from "../shared/icons.mjs";
-import { ENDPOINTS, Modal, request } from "../shared/index.mjs";
+import { createIcon } from "../shared/icons.ts";
+import { ENDPOINTS, Modal, request } from "../shared/index.ts";
 import { FacetsBox } from "./combobox/index.mjs";
 
 class ComposerModal extends Modal {

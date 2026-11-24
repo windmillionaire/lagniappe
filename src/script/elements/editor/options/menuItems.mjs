@@ -1,5 +1,5 @@
 import { STYLES } from "../../../generated/styles.mjs";
-import { setIcon } from "../../../shared/icons.mjs";
+import { setIcon } from "../../../shared/icons.ts";
 
 class ToolbarMenuItem {
 	constructor(toolbar) {

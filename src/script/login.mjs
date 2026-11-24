@@ -10,10 +10,10 @@ import {
 	VerifyEmailForm,
 } from "./login/forms.mjs";
 import { IdentityPlatformClient } from "./login/identity.mjs";
-import { initializeLogoutForms } from "./shared/logout.mjs";
-import { request } from "./shared/request.mjs";
-import { withTransition } from "./shared/transitions.mjs";
-import { installUpstreamUnavailableBanner } from "./shared/upstreamUnavailable.mjs";
+import { initializeLogoutForms } from "./shared/logout.ts";
+import { request } from "./shared/request.ts";
+import { withTransition } from "./shared/transitions.ts";
+import { installUpstreamUnavailableBanner } from "./shared/upstreamUnavailable.ts";
 
 initializeLogoutForms();
 installUpstreamUnavailableBanner();

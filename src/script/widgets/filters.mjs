@@ -2,8 +2,8 @@ import { BaseList } from "../elements/base/baseList.mjs";
 import { buttons } from "../elements/buttons.mjs";
 import { FacetsBox, SelectBox } from "../elements/combobox/index.mjs";
 import { primitives } from "../elements/primitives.mjs";
-import { request } from "../shared/index.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { request } from "../shared/index.ts";
+import { withTransition } from "../shared/transitions.ts";
 
 export class Filters {
 	constructor(attributes) {

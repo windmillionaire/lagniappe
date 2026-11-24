@@ -1,4 +1,4 @@
-import { withTransition } from "./transitions.mjs";
+import { withTransition } from "./transitions.ts";
 
 export const simpleHash = (str) => {
 	let hash = 0;

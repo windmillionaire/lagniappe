@@ -36,9 +36,9 @@ test("test_manual_dropdown_loads_only_in_mobile_mode", async (t) => {
 	const { default: Manual } = await esmock.strict(
 		"../../src/script/views/manual.mjs",
 		{
-			"../../src/script/shared/endpoints.mjs": { ENDPOINTS: { manual: {} } },
-			"../../src/script/shared/request.mjs": { request: {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/endpoints.ts": { ENDPOINTS: { manual: {} } },
+			"../../src/script/shared/request.ts": { request: {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 			"../../src/script/views/base/shell.mjs": { default: ShellView },
@@ -117,7 +117,7 @@ test("test_command_copy_falls_back_when_clipboard_is_unavailable", async (t) => 
 	const { default: ShellView } = await esmock.strict(
 		"../../src/script/views/base/shell.mjs",
 		{
-			"../../src/script/shared/connectivity.mjs": {
+			"../../src/script/shared/connectivity.ts": {
 				connectivity: { online: true, hidden: false },
 			},
 		},
@@ -236,8 +236,8 @@ test("test_page_photo_initializes_only_when_selected_or_visible", async (t) => {
 	const { default: Page } = await esmock.strict(
 		"../../src/script/views/page.mjs",
 		{
-			"../../src/script/shared/icons.mjs": { setIcon() {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/icons.ts": { setIcon() {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 			"../../src/script/views/base/entity.mjs": { default: Entity },
@@ -297,12 +297,12 @@ test("test_report_loads_base_form_only_for_present_forms_and_in_parallel", async
 	const { default: Report } = await esmock.strict.p(
 		"../../src/script/views/report.mjs",
 		{
-			"../../src/script/shared/icons.mjs": {
+			"../../src/script/shared/icons.ts": {
 				createIcon() {},
 				setIcon() {},
 			},
-			"../../src/script/shared/request.mjs": { request: {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/request.ts": { request: {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 			"../../src/script/views/base/core.mjs": { default: Core },

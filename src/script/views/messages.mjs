@@ -1,7 +1,7 @@
 import { ensureMessageComposer } from "../elements/messageComposer.mjs";
 import { STYLES } from "../generated/styles.mjs";
-import { createIcon } from "../shared/icons.mjs";
-import { ENDPOINTS, request } from "../shared/index.mjs";
+import { createIcon } from "../shared/icons.ts";
+import { ENDPOINTS, request } from "../shared/index.ts";
 import Core from "./base/core.mjs";
 
 const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";

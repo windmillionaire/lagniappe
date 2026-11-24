@@ -1,8 +1,8 @@
 import { buttons } from "../../elements/buttons.mjs";
 import { STYLES } from "../../generated/styles.mjs";
-import { Modal } from "../../shared/modal.mjs";
-import { request } from "../../shared/request.mjs";
-import { areEqual } from "../../shared/utilities.mjs";
+import { Modal } from "../../shared/modal.ts";
+import { request } from "../../shared/request.ts";
+import { areEqual } from "../../shared/utilities.ts";
 import { compatibleField } from "../representation.mjs";
 import { renderReviewBar } from "../reviewBar.mjs";
 import { loadRevisionPreview } from "./preview.mjs";

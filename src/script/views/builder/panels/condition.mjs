@@ -1,4 +1,4 @@
-import { withTransition } from "../../../shared/transitions.mjs";
+import { withTransition } from "../../../shared/transitions.ts";
 
 export class ConditionPanel {
 	constructor(builder) {

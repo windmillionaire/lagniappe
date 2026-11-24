@@ -1,6 +1,6 @@
 import { NavElement } from "../../elements/nav.mjs";
-import { captureError } from "../../shared/errors.mjs";
-import { withTransition } from "../../shared/transitions.mjs";
+import { captureError } from "../../shared/errors.ts";
+import { withTransition } from "../../shared/transitions.ts";
 import { loadWidget } from "../../widgets/loader.mjs";
 
 export default class ViewComponent {

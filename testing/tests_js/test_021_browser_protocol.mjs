@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ConnectivityState } from "../../src/script/shared/connectivity.mjs";
+import { ConnectivityState } from "../../src/script/shared/connectivity.ts";
 import {
 	connectivityMessage,
 	upstreamUnavailableMessage,
 	validateConnectivityState,
 	validateUpstreamUnavailableState,
 	WORKER_MESSAGES,
-} from "../../src/script/shared/protocol.mjs";
+} from "../../src/script/shared/protocol.ts";
 
 test("test_browser_protocol_contains_versioned_worker_messages", () => {
 	const details = `Unexpected worker protocol: ${JSON.stringify(WORKER_MESSAGES)}`;

@@ -6,7 +6,7 @@ import { createBrowser, installIndexedDB } from "../utility/js/environment.mjs";
 async function setup(t, options = {}) {
 	const dom = createBrowser(t, { formData: "native", ...options });
 	installIndexedDB(t, dom.window);
-	const storage = await import("../../src/script/shared/offline.mjs");
+	const storage = await import("../../src/script/shared/offline.ts");
 	let respond = () => ({ ok: true });
 	let handle = () => {};
 	const sent = [];
@@ -20,9 +20,9 @@ async function setup(t, options = {}) {
 		return respond(route, data);
 	});
 	const { OfflineQueue } = await esmock.strict(
-		"../../src/script/shared/offlineQueue.mjs",
+		"../../src/script/shared/offlineQueue.ts",
 		{
-			"../../src/script/shared/request.mjs": {
+			"../../src/script/shared/request.ts": {
 				request: { post: send, put: send, delete: send },
 			},
 		},

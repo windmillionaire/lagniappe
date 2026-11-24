@@ -1,6 +1,6 @@
 import { STYLES } from "../generated/styles.mjs";
-import { iconDefinition, setIcon } from "../shared/icons.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { iconDefinition, setIcon } from "../shared/icons.ts";
+import { withTransition } from "../shared/transitions.ts";
 import { FacetsBox } from "./combobox/facets.mjs";
 import { DueDate } from "./dueDate.mjs";
 import { formatting } from "./formatting.mjs";

@@ -1,6 +1,6 @@
 import { buttons } from "../../elements/buttons.mjs";
 import { SelectBox } from "../../elements/combobox/index.mjs";
-import { request } from "../../shared/index.mjs";
+import { request } from "../../shared/index.ts";
 import { SiteSetting } from "./base.mjs";
 
 const INSTANCE_CLASSES = {

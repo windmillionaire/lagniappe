@@ -39,7 +39,7 @@ test("test_indexeddb_commits_binary_payloads_and_aborts_changes", async (t) => {
 	createBrowser(t, { formData: "native" });
 	const factory = installIndexedDB(t);
 	assert.equal(window.indexedDB, factory);
-	const storage = await import("../../src/script/shared/offline.mjs");
+	const storage = await import("../../src/script/shared/offline.ts");
 	const file = new File(["payload"], "upload.txt", { type: "text/plain" });
 	await storage.setOfflineMutation({
 		id: "kept",
@@ -106,7 +106,7 @@ test("test_request_parses_server_html_through_mocked_fetch", async (t) => {
 			});
 		}
 	});
-	const { request } = await import("../../src/script/shared/request.mjs");
+	const { request } = await import("../../src/script/shared/request.ts");
 	const response = await request.get("/example");
 	assert.equal(response.ok, true);
 	assert.equal(response.html.querySelector("p").textContent, "Saved");
@@ -127,7 +127,7 @@ test("test_unmocked_queue_graph_imports_with_browser_environment", async (t) => 
 	createBrowser(t);
 	installIndexedDB(t);
 	const { OfflineQueue } = await import(
-		"../../src/script/shared/offlineQueue.mjs"
+		"../../src/script/shared/offlineQueue.ts"
 	);
 	const queue = new OfflineQueue({ online: false, components: {} });
 	await queue.init();

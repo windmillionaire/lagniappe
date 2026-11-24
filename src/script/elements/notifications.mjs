@@ -1,8 +1,8 @@
 import { STYLES } from "../generated/styles.mjs";
-import { createIcon } from "../shared/icons.mjs";
-import { ENDPOINTS, request } from "../shared/index.mjs";
-import { renderNotificationBadge } from "../shared/notificationState.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { createIcon } from "../shared/icons.ts";
+import { ENDPOINTS, request } from "../shared/index.ts";
+import { renderNotificationBadge } from "../shared/notificationState.ts";
+import { withTransition } from "../shared/transitions.ts";
 import { Dropdown } from "./combobox/dropdown.mjs";
 
 const CLEAR_ALL_KEY = "__clear_all_notifications__";

@@ -1,9 +1,9 @@
 import { getFormElement } from "../../elements/loader.mjs";
-import { captureError } from "../../shared/errors.mjs";
-import { setIcon } from "../../shared/icons.mjs";
-import { QueryLifecycle } from "../../shared/queryLifecycle.mjs";
-import { request } from "../../shared/request.mjs";
-import { withTransition } from "../../shared/transitions.mjs";
+import { captureError } from "../../shared/errors.ts";
+import { setIcon } from "../../shared/icons.ts";
+import { QueryLifecycle } from "../../shared/queryLifecycle.ts";
+import { request } from "../../shared/request.ts";
+import { withTransition } from "../../shared/transitions.ts";
 
 const SAVED_STATE_MS = 1200;
 

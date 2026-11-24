@@ -1,4 +1,4 @@
-import { captureError, ENDPOINTS, request } from "../shared/index.mjs";
+import { captureError, ENDPOINTS, request } from "../shared/index.ts";
 import { BaseElement } from "./base/baseElement.mjs";
 
 export class HtmlElement extends BaseElement {

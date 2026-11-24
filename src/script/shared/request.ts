@@ -1,6 +1,6 @@
-import { captureNetworkError } from "./errors.mjs";
-import { applyNotificationStateHeader } from "./notificationState.mjs";
-import { handleUpstreamResponse } from "./upstreamUnavailable.mjs";
+import { captureNetworkError } from "./errors.ts";
+import { applyNotificationStateHeader } from "./notificationState.ts";
+import { handleUpstreamResponse } from "./upstreamUnavailable.ts";
 
 const PARSER = new DOMParser();
 const TOKEN_REQUEST = {

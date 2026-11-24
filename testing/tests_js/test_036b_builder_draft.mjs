@@ -398,7 +398,7 @@ test("test_builder_option_and_column_labels_keep_ids", async () => {
 	class Condition {}
 	const boundaries = {
 		"../../src/script/elements/primitives.mjs": { primitives: {} },
-		"../../src/script/shared/utilities.mjs": {
+		"../../src/script/shared/utilities.ts": {
 			generateElementId: (prefix) => `${prefix}-${++nextId}`,
 		},
 		"../../src/script/views/builder/conditions/base.mjs": { Condition },
@@ -459,7 +459,7 @@ async function loadFormSettings({ request, FormController = class {} }) {
 		"../../src/script/views/builder/panels/formSettings.mjs",
 		{
 			"../../src/script/forms/controller.mjs": { FormController },
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/shared/index.ts": {
 				captureError() {},
 				ENDPOINTS: { createSchema: "/generate" },
 				request,
@@ -491,7 +491,7 @@ test("test_builder_generation_rejects_stale_cancelled_and_destroyed_responses", 
 	const { ConditionPanel } = await esmock.strict(
 		"../../src/script/views/builder/panels/condition.mjs",
 		{
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 		},
@@ -628,8 +628,8 @@ async function loadBuilder({
 			SearchBox: emptyClass(),
 		},
 		"../../src/script/elements/entityMenu.mjs": { EntityMenu: emptyClass() },
-		"../../src/script/shared/directUpload.mjs": { directUpload() {} },
-		"../../src/script/shared/index.mjs": {
+		"../../src/script/shared/directUpload.ts": { directUpload() {} },
+		"../../src/script/shared/index.ts": {
 			captureError() {},
 			connectivity,
 			DeleteModal: emptyClass(),
@@ -638,7 +638,7 @@ async function loadBuilder({
 			OfflineModal: emptyClass(),
 			request: {},
 		},
-		"../../src/script/shared/transitions.mjs": {
+		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
 		"../../src/script/views/builder/changeStatus.mjs": {
@@ -756,8 +756,8 @@ test("test_builder_save_restores_unsubmitted_condition_buffer", async (t) => {
 				},
 			},
 			"../../src/script/generated/styles.mjs": { STYLES: {} },
-			"../../src/script/shared/icons.mjs": { setIcon() {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/icons.ts": { setIcon() {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 		},
@@ -856,7 +856,7 @@ test("test_builder_html_flush_stays_local_and_empty_preview_does_not_fetch", asy
 	const { HtmlElement } = await esmock.strict(
 		"../../src/script/elements/html.mjs",
 		{
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/shared/index.ts": {
 				captureError() {},
 				ENDPOINTS: {},
 				request: {
@@ -877,8 +877,8 @@ test("test_builder_html_flush_stays_local_and_empty_preview_does_not_fetch", asy
 		"../../src/script/elements/editor/independent.mjs",
 		{
 			"../../src/script/generated/styles.mjs": { STYLES: {} },
-			"../../src/script/shared/errors.mjs": { captureError() {} },
-			"../../src/script/shared/request.mjs": { request: {} },
+			"../../src/script/shared/errors.ts": { captureError() {} },
+			"../../src/script/shared/request.ts": { request: {} },
 			"../../src/script/elements/editor/editor.mjs": {
 				independentEditor: () => null,
 			},
@@ -1011,13 +1011,13 @@ test("test_stale_generation_retry_label_survives_base_form_error_transition", as
 		"../../src/script/forms/controller.mjs",
 		{
 			"../../src/script/elements/primitives.mjs": { primitives: {} },
-			"../../src/script/shared/icons.mjs": {
+			"../../src/script/shared/icons.ts": {
 				createIcon: (name) => ({ dataset: { icon: name } }),
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: transitionBoundary,
 			},
-			"../../src/script/shared/utilities.mjs": {
+			"../../src/script/shared/utilities.ts": {
 				showBriefly(wrapper, content) {
 					wrapper.replaceChildren(content);
 				},
@@ -1210,7 +1210,7 @@ test("test_saved_controls_refresh_without_replacing_draft_inputs", async (t) => 
 		{
 			"../../src/script/elements/primitives.mjs": { primitives: {} },
 			"../../src/script/generated/styles.mjs": { STYLES: {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 			"../../src/script/views/builder/config.mjs": { CONFIG: {} },
@@ -1221,7 +1221,7 @@ test("test_saved_controls_refresh_without_replacing_draft_inputs", async (t) => 
 		{
 			"../../src/script/elements/combobox/index.mjs": { SelectBox: class {} },
 			"../../src/script/elements/primitives.mjs": { primitives: {} },
-			"../../src/script/shared/utilities.mjs": {
+			"../../src/script/shared/utilities.ts": {
 				generateElementId: () => "column-1",
 			},
 			"../../src/script/views/builder/config.mjs": { CONFIG: {} },

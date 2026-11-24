@@ -1,4 +1,4 @@
-import { captureError } from "../shared/errors.mjs";
+import { captureError } from "../shared/errors.ts";
 
 export function currentReviewOperation(widget, incoming) {
 	const current = widget.reviewState?.operation;
@@ -140,7 +140,7 @@ export function installReviewBar(widget) {
 				if (!operation?.can_cancel) return;
 				const data = new FormData();
 				data.set("operation-id", operation.operation_id);
-				const { request } = await import("../shared/request.mjs");
+				const { request } = await import("../shared/request.ts");
 				const response = await request.post(
 					`/tools/operations/${encodeURIComponent(operation.key)}/cancel`,
 					data,

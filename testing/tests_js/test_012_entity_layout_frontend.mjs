@@ -108,8 +108,8 @@ async function setupEntityLayout(t) {
 		"../../src/script/views/base/entity.mjs",
 		{
 			"../../src/script/elements/nav.mjs": { NavElement },
-			"../../src/script/shared/transitions.mjs": { withTransition },
-			"../../src/script/shared/utilities.mjs": {
+			"../../src/script/shared/transitions.ts": { withTransition },
+			"../../src/script/shared/utilities.ts": {
 				debounce: (callback) => callback,
 			},
 			"../../src/script/views/base/core.mjs": { default: FakeCore },

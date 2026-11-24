@@ -1,6 +1,6 @@
 import { SelectBox } from "../../../elements/combobox/index.mjs";
 import { primitives } from "../../../elements/primitives.mjs";
-import { generateElementId } from "../../../shared/utilities.mjs";
+import { generateElementId } from "../../../shared/utilities.ts";
 import { CONFIG } from "../config.mjs";
 import { fieldKind } from "../migrations.mjs";
 import { Condition } from "./base.mjs";

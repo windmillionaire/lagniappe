@@ -2,8 +2,8 @@ import { InputElement } from "../elements/input.mjs";
 import { sections } from "../elements/sections.mjs";
 import { SectionToggle } from "../elements/sectionToggle.mjs";
 import { TextareaElement } from "../elements/textarea.mjs";
-import { captureError, request } from "../shared/index.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { captureError, request } from "../shared/index.ts";
+import { withTransition } from "../shared/transitions.ts";
 import { FormWidget } from "./base/formWidget.mjs";
 
 export class PageForm extends FormWidget {

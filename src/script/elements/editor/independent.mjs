@@ -1,6 +1,6 @@
 import { STYLES } from "../../generated/styles.mjs";
-import { captureError } from "../../shared/errors.mjs";
-import { request } from "../../shared/request.mjs";
+import { captureError } from "../../shared/errors.ts";
+import { request } from "../../shared/request.ts";
 import { independentEditor } from "./editor.mjs";
 import { Toolbar } from "./toolbar.mjs";
 

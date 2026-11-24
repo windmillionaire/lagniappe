@@ -1,8 +1,8 @@
 import { STYLES } from "../../generated/styles.mjs";
-import { ENDPOINTS } from "../../shared/endpoints.mjs";
-import { setIcon } from "../../shared/icons.mjs";
-import { request } from "../../shared/request.mjs";
-import { updateUserLocation } from "../../shared/user.mjs";
+import { ENDPOINTS } from "../../shared/endpoints.ts";
+import { setIcon } from "../../shared/icons.ts";
+import { request } from "../../shared/request.ts";
+import { updateUserLocation } from "../../shared/user.ts";
 import { RemoteQueryCombobox } from "./remote.mjs";
 
 export class LocationBox extends RemoteQueryCombobox {

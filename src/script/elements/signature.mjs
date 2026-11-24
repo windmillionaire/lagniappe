@@ -1,7 +1,7 @@
 import { STYLES } from "../generated/styles.mjs";
-import { setIcon } from "../shared/icons.mjs";
-import { debounce } from "../shared/index.mjs";
-import { areEqual } from "../shared/utilities.mjs";
+import { setIcon } from "../shared/icons.ts";
+import { debounce } from "../shared/index.ts";
+import { areEqual } from "../shared/utilities.ts";
 import { BaseElement } from "./base/baseElement.mjs";
 import { primitives } from "./primitives.mjs";
 

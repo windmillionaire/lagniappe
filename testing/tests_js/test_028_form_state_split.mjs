@@ -28,13 +28,13 @@ async function loadOfflineQueue({
 	setOfflineMutation = async () => {},
 	request = {},
 } = {}) {
-	return await esmock.strict("../../src/script/shared/offlineQueue.mjs", {
-		"../../src/script/shared/offline.mjs": {
+	return await esmock.strict("../../src/script/shared/offlineQueue.ts", {
+		"../../src/script/shared/offline.ts": {
 			deleteOfflineMutations,
 			getOfflineMutations,
 			setOfflineMutation,
 		},
-		"../../src/script/shared/request.mjs": { request },
+		"../../src/script/shared/request.ts": { request },
 	});
 }
 
@@ -42,16 +42,16 @@ async function loadEditOwners({ loadRevisionPreview, request = {} } = {}) {
 	const { EditReconciler } = await esmock.strict(
 		"../../src/script/forms/revisions/reconciler.mjs",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
 				},
 			},
-			"../../src/script/shared/request.mjs": { request },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/request.ts": { request },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
-			"../../src/script/shared/utilities.mjs": {
+			"../../src/script/shared/utilities.ts": {
 				areEqual: (left, right) =>
 					JSON.stringify(left) === JSON.stringify(right),
 			},
@@ -66,7 +66,7 @@ async function loadEditOwners({ loadRevisionPreview, request = {} } = {}) {
 	const { EditWatcher } = await esmock.strict(
 		"../../src/script/forms/revisions/watcher.mjs",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
 				},
@@ -94,15 +94,15 @@ async function loadCore(connectivity = { online: true, hidden: true }) {
 	const { default: Core } = await esmock.strict(
 		"../../src/script/views/base/core.mjs",
 		{
-			"../../src/script/shared/connectivity.mjs": { connectivity },
-			"../../src/script/shared/endpoints.mjs": { ENDPOINTS: {} },
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/connectivity.ts": { connectivity },
+			"../../src/script/shared/endpoints.ts": { ENDPOINTS: {} },
+			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
 				},
 			},
-			"../../src/script/shared/request.mjs": { request: {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/request.ts": { request: {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
 			"../../src/script/views/base/component.mjs": { default: class {} },
@@ -152,7 +152,7 @@ test("test_migration_notice_survives_form_replacement_and_discard", async (t) =>
 	}
 	const { installMigrationNotice } = await esmock.strict(
 		"../../src/script/forms/migrationNotice.mjs",
-		{ "../../src/script/shared/modal.mjs": { Modal } },
+		{ "../../src/script/shared/modal.ts": { Modal } },
 	);
 	class FormController {
 		async init() {}
@@ -228,7 +228,7 @@ test("test_offline_database_upgrade_discards_legacy_activity_records", async (t)
 	});
 	legacy.close();
 	const { getOfflineMutations } = await import(
-		"../../src/script/shared/offline.mjs"
+		"../../src/script/shared/offline.ts"
 	);
 	assert.deepEqual(await getOfflineMutations(), []);
 	const upgraded = await new Promise((resolve, reject) => {

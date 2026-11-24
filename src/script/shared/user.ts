@@ -1,4 +1,4 @@
-import { request } from "./request.mjs";
+import { request } from "./request.ts";
 
 let userDataUpdate = null;
 let userLocationUpdate = null;

@@ -20,7 +20,7 @@ async function loadToolReportList() {
 	const { ToolReportList } = await esmock.strict(
 		"../../src/script/widgets/home/lists.mjs",
 		{
-			"../../src/script/shared/storage.mjs": {
+			"../../src/script/shared/storage.ts": {
 				localStore: {
 					getJSON: () => stored,
 					setJSON: (_key, value) => {
@@ -28,7 +28,7 @@ async function loadToolReportList() {
 					},
 				},
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (commit) => await commit(),
 			},
 		},
@@ -279,7 +279,7 @@ test("test_paginated_report_list_clarifies_page_scoped_empty_and_delete_labels",
 
 test("test_bulk_delete_recovers_from_partial_and_network_failures", async (t) => {
 	replaceGlobal(t, "DOMParser", class {});
-	const { request } = await import("../../src/script/shared/request.mjs");
+	const { request } = await import("../../src/script/shared/request.ts");
 	const originalDelete = request.delete;
 	t.after(() => {
 		request.delete = originalDelete;

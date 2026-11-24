@@ -1,7 +1,7 @@
 import { STYLES } from "../../../generated/styles.mjs";
-import { ENDPOINTS } from "../../../shared/endpoints.mjs";
-import { request } from "../../../shared/request.mjs";
-import { generateElementId } from "../../../shared/utilities.mjs";
+import { ENDPOINTS } from "../../../shared/endpoints.ts";
+import { request } from "../../../shared/request.ts";
+import { generateElementId } from "../../../shared/utilities.ts";
 import { buttons } from "../../buttons.mjs";
 
 /**

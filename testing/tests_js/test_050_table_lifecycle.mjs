@@ -70,7 +70,7 @@ async function setup(t, { load, patch, transition, expectedErrors = [] } = {}) {
 				return element;
 			},
 		},
-		"../../src/script/shared/request.mjs": {
+		"../../src/script/shared/request.ts": {
 			request: {
 				patch: (route, payload) => {
 					requests.push({ route, payload });
@@ -79,12 +79,12 @@ async function setup(t, { load, patch, transition, expectedErrors = [] } = {}) {
 				},
 			},
 		},
-		"../../src/script/shared/errors.mjs": {
+		"../../src/script/shared/errors.ts": {
 			captureError: (error) => errors.push(error),
 		},
 	};
 	if (transition) {
-		mocks["../../src/script/shared/transitions.mjs"] = {
+		mocks["../../src/script/shared/transitions.ts"] = {
 			withTransition: transition,
 		};
 	}
@@ -550,7 +550,7 @@ test("test_table_sorting_destroy_removes_controls_and_rejects_queued_toggles", a
 	const { TableSorting } = await esmock.strict(
 		"../../src/script/widgets/tables/sorting.mjs",
 		{
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (commit) => {
 					const gate = deferred();
 					queued.push(() => {

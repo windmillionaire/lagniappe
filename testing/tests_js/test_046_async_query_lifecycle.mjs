@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
-import { QueryLifecycle } from "../../src/script/shared/queryLifecycle.mjs";
+import { QueryLifecycle } from "../../src/script/shared/queryLifecycle.ts";
 import { BuilderDraft } from "../../src/script/views/builder/draft.mjs";
 import { createBrowser } from "../utility/js/environment.mjs";
 
@@ -179,13 +179,13 @@ test("test_remote_combobox_invalidates_before_debounce_and_on_destroy", async ()
 	const { RemoteQueryCombobox } = await esmock.strict(
 		"../../src/script/elements/combobox/remote.mjs",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError: (error) => {
 					throw error;
 				},
 			},
-			"../../src/script/shared/queryLifecycle.mjs": { QueryLifecycle },
-			"../../src/script/shared/utilities.mjs": { debounce },
+			"../../src/script/shared/queryLifecycle.ts": { QueryLifecycle },
+			"../../src/script/shared/utilities.ts": { debounce },
 			"../../src/script/elements/combobox/combobox.mjs": { Combobox },
 		},
 	);
@@ -262,10 +262,10 @@ test("test_search_threshold_settles_stale_work_and_restores_recent_results", asy
 			"../../src/script/generated/styles.mjs": {
 				STYLES: { dropdown: { panel: "panel" } },
 			},
-			"../../src/script/shared/endpoints.mjs": {
+			"../../src/script/shared/endpoints.ts": {
 				ENDPOINTS: { search: { bar: "/l/search-bar", page: "/l/search-page" } },
 			},
-			"../../src/script/shared/request.mjs": { request: {} },
+			"../../src/script/shared/request.ts": { request: {} },
 			"../../src/script/elements/combobox/remote.mjs": { RemoteQueryCombobox },
 			"../../src/script/elements/combobox/results.mjs": { Results },
 		},
@@ -299,7 +299,7 @@ test("test_modal_owns_exact_node_and_rejects_late_attachment", async (t) => {
 	});
 	let resolveLoad;
 	const { Modal, OfflineModal } = await esmock.strict(
-		"../../src/script/shared/modal.mjs",
+		"../../src/script/shared/modal.ts",
 		{
 			"../../src/script/generated/styles.mjs": {
 				STYLES: {
@@ -307,15 +307,15 @@ test("test_modal_owns_exact_node_and_rejects_late_attachment", async (t) => {
 					button: { close: "" },
 				},
 			},
-			"../../src/script/shared/endpoints.mjs": {
+			"../../src/script/shared/endpoints.ts": {
 				ENDPOINTS: { delete: () => "", help: () => "" },
 			},
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError: (error) => {
 					throw error;
 				},
 			},
-			"../../src/script/shared/request.mjs": {
+			"../../src/script/shared/request.ts": {
 				request: {
 					get: () =>
 						new Promise((resolve) => {
@@ -323,7 +323,7 @@ test("test_modal_owns_exact_node_and_rejects_late_attachment", async (t) => {
 						}),
 				},
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => {
 					callback();
 					return true;
@@ -457,8 +457,8 @@ test("test_builder_destroys_owned_search_modal_and_panels_during_startup", async
 		{
 			"../../src/script/elements/combobox/search.mjs": { SearchBox },
 			"../../src/script/elements/entityMenu.mjs": { EntityMenu },
-			"../../src/script/shared/directUpload.mjs": { directUpload: {} },
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/shared/directUpload.ts": { directUpload: {} },
+			"../../src/script/shared/index.ts": {
 				captureError: (error) => {
 					throw error;
 				},
@@ -469,7 +469,7 @@ test("test_builder_destroys_owned_search_modal_and_panels_during_startup", async
 				OfflineModal,
 				request: {},
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
 			"../../src/script/views/builder/changeStatus.mjs": {

@@ -238,18 +238,18 @@ test("test_templates_preload_registered_view_and_interaction_foundations", () =>
 test("test_interaction_preloads_have_stable_manual_chunks", () => {
 	const root = "/checkout/src/script/";
 	for (const module of [
-		"shared/endpoints.mjs",
-		"shared/errors.mjs",
-		"shared/notificationState.mjs",
-		"shared/request.mjs",
-		"shared/transitions.mjs",
-		"shared/utilities.mjs",
+		"shared/endpoints.ts",
+		"shared/errors.ts",
+		"shared/notificationState.ts",
+		"shared/request.ts",
+		"shared/transitions.ts",
+		"shared/utilities.ts",
 		"views/base/shell.mjs",
 	]) {
 		assert.equal(interactionFoundationChunk(`${root}${module}`), "foundation");
 	}
 	assert.equal(
-		interactionFoundationChunk(`${root}shared/connectivity.mjs`),
+		interactionFoundationChunk(`${root}shared/connectivity.ts`),
 		"connectivity",
 	);
 	assert.equal(
@@ -336,7 +336,7 @@ test("test_interaction_preloads_have_stable_manual_chunks", () => {
 		"uploads",
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}shared/directUpload.mjs`),
+		interactionFoundationChunk(`${root}shared/directUpload.ts`),
 		undefined,
 	);
 	assert.equal(

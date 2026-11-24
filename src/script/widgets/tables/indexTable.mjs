@@ -1,5 +1,5 @@
 import { BaseTable } from "../../elements/base/baseTable.mjs";
-import { captureError } from "../../shared/errors.mjs";
+import { captureError } from "../../shared/errors.ts";
 
 export class IndexTable extends BaseTable {
 	constructor(attributes) {

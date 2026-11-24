@@ -1,6 +1,6 @@
 import { sections } from "../elements/sections.mjs";
 import { FormController } from "../forms/controller.mjs";
-import { captureError, request } from "../shared/index.mjs";
+import { captureError, request } from "../shared/index.ts";
 import { FormWidget } from "./base/formWidget.mjs";
 
 async function renderOriginalSubmission(response, key) {

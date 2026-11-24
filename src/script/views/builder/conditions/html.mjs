@@ -1,4 +1,4 @@
-import { ENDPOINTS } from "../../../shared/endpoints.mjs";
+import { ENDPOINTS } from "../../../shared/endpoints.ts";
 import { DraftDocument } from "../draftDocument.mjs";
 import { Condition } from "./base.mjs";
 

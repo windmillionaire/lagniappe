@@ -1,6 +1,6 @@
 import { SearchBox } from "../../elements/combobox/search.mjs";
 import { EntityMenu } from "../../elements/entityMenu.mjs";
-import { directUpload } from "../../shared/directUpload.mjs";
+import { directUpload } from "../../shared/directUpload.ts";
 import {
 	captureError,
 	connectivity,
@@ -9,8 +9,8 @@ import {
 	HelpModal,
 	OfflineModal,
 	request,
-} from "../../shared/index.mjs";
-import { withTransition } from "../../shared/transitions.mjs";
+} from "../../shared/index.ts";
+import { withTransition } from "../../shared/transitions.ts";
 import { FormChangeStatus } from "./changeStatus.mjs";
 import { loadCondition } from "./conditions/loader.mjs";
 import { BuilderDraft } from "./draft.mjs";

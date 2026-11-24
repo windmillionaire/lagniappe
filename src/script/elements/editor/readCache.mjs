@@ -2,7 +2,7 @@ import { mergeUpdates } from "yjs";
 import {
 	base64ToUint8Array,
 	uint8ArrayToBase64,
-} from "../../shared/utilities.mjs";
+} from "../../shared/utilities.ts";
 
 /**
  * Retain server document reads separately from pending offline edits. Sharing

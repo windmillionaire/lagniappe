@@ -24,10 +24,10 @@ test("test_user_mode_switch_loads_all_pages_and_preserves_current_mode_on_failur
 		"../../src/script/views/user.mjs",
 		{
 			"../../src/script/views/base/index.mjs": { default: class {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (commit) => commit(),
 			},
-			"../../src/script/shared/request.mjs": {
+			"../../src/script/shared/request.ts": {
 				request: {
 					async get(route) {
 						requests.push(route);
@@ -90,8 +90,8 @@ test("test_user_mode_switch_loads_all_pages_and_preserves_current_mode_on_failur
 async function loadPage() {
 	return (
 		await esmock.strict("../../src/script/views/page.mjs", {
-			"../../src/script/shared/icons.mjs": { setIcon() {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/icons.ts": { setIcon() {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
 			"../../src/script/views/base/entity.mjs": { default: EntityBoundary },
@@ -165,7 +165,7 @@ test("test_page_task_subscription_survives_list_loading_before_polling_service",
 					markPerformance() {},
 					whenIdle: async () => {},
 				},
-				"../../src/script/shared/polling.mjs": { PollingCoordinator },
+				"../../src/script/shared/polling.ts": { PollingCoordinator },
 			},
 		);
 		const page = new Page();
@@ -206,7 +206,7 @@ test("test_collection_manifests_include_hash_and_fingerprint", async () => {
 		}),
 		esmock.strict("../../src/script/widgets/pageTaskList.mjs", {
 			"../../src/script/elements/base/baseList.mjs": { BaseList: Base },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
 		}),
@@ -485,13 +485,13 @@ test("test_core_refresh_batches_supported_widgets_and_falls_back_per_target", as
 	const { reconcileChange, refreshCollectionComponents } = await esmock.strict(
 		"../../src/script/views/base/reconciliation.mjs",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
 				},
 			},
-			"../../src/script/shared/request.mjs": { request },
-			"../../src/script/shared/storage.mjs": {
+			"../../src/script/shared/request.ts": { request },
+			"../../src/script/shared/storage.ts": {
 				clearRecentSearchResults() {},
 			},
 		},

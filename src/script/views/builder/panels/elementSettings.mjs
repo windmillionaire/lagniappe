@@ -1,6 +1,6 @@
 import { primitives } from "../../../elements/primitives.mjs";
 import { STYLES } from "../../../generated/styles.mjs";
-import { withTransition } from "../../../shared/transitions.mjs";
+import { withTransition } from "../../../shared/transitions.ts";
 import { CONFIG } from "../config.mjs";
 
 const _section = (name, elements) => {

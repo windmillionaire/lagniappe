@@ -1,8 +1,8 @@
-import { connectivity } from "../../shared/connectivity.mjs";
-import { ENDPOINTS } from "../../shared/endpoints.mjs";
-import { captureError } from "../../shared/errors.mjs";
-import { request } from "../../shared/request.mjs";
-import { withTransition } from "../../shared/transitions.mjs";
+import { connectivity } from "../../shared/connectivity.ts";
+import { ENDPOINTS } from "../../shared/endpoints.ts";
+import { captureError } from "../../shared/errors.ts";
+import { request } from "../../shared/request.ts";
+import { withTransition } from "../../shared/transitions.ts";
 import ViewComponent from "./component.mjs";
 import {
 	collectRefreshTargets,

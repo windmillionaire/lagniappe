@@ -30,12 +30,12 @@ async function loadEditOwners({
 	const { EditReconciler } = await esmock.strict(
 		"../../src/script/forms/revisions/reconciler.mjs",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError,
 			},
-			"../../src/script/shared/request.mjs": { request },
-			"../../src/script/shared/transitions.mjs": { withTransition },
-			"../../src/script/shared/utilities.mjs": { areEqual },
+			"../../src/script/shared/request.ts": { request },
+			"../../src/script/shared/transitions.ts": { withTransition },
+			"../../src/script/shared/utilities.ts": { areEqual },
 			"../../src/script/forms/representation.mjs": { incompatibleSchema },
 			"../../src/script/forms/revisions/modals.mjs": {
 				FormRevisionModal: class {},
@@ -49,7 +49,7 @@ async function loadEditOwners({
 	const { EditWatcher } = await esmock.strict(
 		"../../src/script/forms/revisions/watcher.mjs",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError,
 			},
 			"../../src/script/forms/revisions/reconciler.mjs": { EditReconciler },
@@ -85,11 +85,11 @@ test("test_base_form_tracks_unsaved_state_without_sync", async () => {
 			"../../src/script/elements/primitives.mjs": {
 				primitives: { error: () => ({}) },
 			},
-			"../../src/script/shared/icons.mjs": { createIcon: () => ({}) },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/icons.ts": { createIcon: () => ({}) },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
-			"../../src/script/shared/utilities.mjs": { showBriefly() {} },
+			"../../src/script/shared/utilities.ts": { showBriefly() {} },
 			"../../src/script/forms/controls/loader.mjs": {
 				initFormControls: async () => [],
 			},
@@ -145,7 +145,7 @@ test("test_form_revision_snapshot_is_canonical_and_memory_only", async () => {
 			"../../src/script/forms/representation.mjs": {
 				compatibleField: () => true,
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
 		},

@@ -1,8 +1,8 @@
 import { BaseList } from "../../elements/base/baseList.mjs";
 import { STYLES } from "../../generated/styles.mjs";
-import { setIcon } from "../../shared/icons.mjs";
-import { request } from "../../shared/index.mjs";
-import { withTransition } from "../../shared/transitions.mjs";
+import { setIcon } from "../../shared/icons.ts";
+import { request } from "../../shared/index.ts";
+import { withTransition } from "../../shared/transitions.ts";
 
 export class HomeActivityList extends BaseList {
 	constructor(attributes) {

@@ -1,5 +1,5 @@
 import { FacetsBox } from "../../elements/combobox/index.mjs";
-import { Modal, request } from "../../shared/index.mjs";
+import { Modal, request } from "../../shared/index.ts";
 import { SiteSetting } from "./base.mjs";
 
 /**

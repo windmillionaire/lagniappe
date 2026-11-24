@@ -1,7 +1,7 @@
 import { primitives } from "../elements/primitives.mjs";
-import { createIcon } from "../shared/icons.mjs";
-import { withTransition } from "../shared/transitions.mjs";
-import { showBriefly } from "../shared/utilities.mjs";
+import { createIcon } from "../shared/icons.ts";
+import { withTransition } from "../shared/transitions.ts";
+import { showBriefly } from "../shared/utilities.ts";
 import { initFormControls } from "./controls/loader.mjs";
 import { FormRenderer } from "./renderer.mjs";
 

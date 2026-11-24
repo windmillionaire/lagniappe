@@ -8,9 +8,9 @@ async function setupTransitions(t, { skipped = () => false } = {}) {
 	const capturedErrors = [];
 	const captureError = t.mock.fn((...args) => capturedErrors.push(args));
 	const { withTransition } = await esmock.strict(
-		"../../src/script/shared/transitions.mjs",
+		"../../src/script/shared/transitions.ts",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError,
 				isSkippedViewTransitionError: skipped,
 			},

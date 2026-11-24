@@ -11,8 +11,8 @@
  * - destroy(): Cleanup listeners
  */
 
-import { ENDPOINTS } from "../shared/endpoints.mjs";
-import { captureError } from "../shared/errors.mjs";
+import { ENDPOINTS } from "../shared/endpoints.ts";
+import { captureError } from "../shared/errors.ts";
 
 const WIDGETS = {
 	BaseList: () => import("../elements/base/baseList.mjs"),

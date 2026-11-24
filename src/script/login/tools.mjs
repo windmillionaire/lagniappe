@@ -1,5 +1,5 @@
-import { analytics } from "../shared/analytics.mjs";
-import { request } from "../shared/request.mjs";
+import { analytics } from "../shared/analytics.ts";
+import { request } from "../shared/request.ts";
 
 async function getUserStatus(email) {
 	const response = await fetch(

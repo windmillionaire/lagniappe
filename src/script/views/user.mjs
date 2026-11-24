@@ -1,5 +1,5 @@
-import { request } from "../shared/request.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { request } from "../shared/request.ts";
+import { withTransition } from "../shared/transitions.ts";
 import EntityIndex from "./base/index.mjs";
 
 export default class Users extends EntityIndex {

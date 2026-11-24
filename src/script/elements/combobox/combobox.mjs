@@ -6,8 +6,8 @@ import {
 	shift,
 } from "@floating-ui/dom";
 import { STYLES } from "../../generated/styles.mjs";
-import { captureError } from "../../shared/errors.mjs";
-import { generateElementId } from "../../shared/utilities.mjs";
+import { captureError } from "../../shared/errors.ts";
+import { generateElementId } from "../../shared/utilities.ts";
 import { primitives } from "../primitives.mjs";
 
 export class Combobox {

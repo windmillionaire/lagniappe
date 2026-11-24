@@ -2,8 +2,8 @@ import {
 	deleteOfflineMutations,
 	getOfflineMutations,
 	setOfflineMutation,
-} from "./offline.mjs";
-import { request } from "./request.mjs";
+} from "./offline.ts";
+import { request } from "./request.ts";
 
 const REPLAY_RESULT = Object.freeze({
 	BLOCKED: "blocked",

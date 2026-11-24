@@ -1,7 +1,7 @@
 import * as Y from "yjs";
 import { STYLES } from "../../generated/styles.mjs";
-import { request } from "../../shared/request.mjs";
-import { base64ToUint8Array } from "../../shared/utilities.mjs";
+import { request } from "../../shared/request.ts";
+import { base64ToUint8Array } from "../../shared/utilities.ts";
 import { previewEditor } from "./editor.mjs";
 
 export function incomingReplacements(ydoc, remote, offline = null) {

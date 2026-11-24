@@ -2,7 +2,7 @@ import {
 	BROWSER_PROTOCOL_ID,
 	BROWSER_PROTOCOL_VERSION,
 	WORKER_MESSAGES,
-} from "./protocol.mjs";
+} from "./protocol.ts";
 
 const UPSTREAM_STATUSES = new Set([500, 502, 503, 504]);
 const UPSTREAM_ERROR_HEADER = "X-Lagniappe-Error";
@@ -326,7 +326,7 @@ export function receiveUpstreamUnavailable(details, retry = null) {
 export function receiveUpstreamUnavailableMessage(message) {
 	if (!_validWorkerDetails(message?.state)) return false;
 	return receiveUpstreamUnavailable(message.state, async () => {
-		const { request } = await import("./request.mjs");
+		const { request } = await import("./request.ts");
 		return request.get(window.location.pathname, null, {
 			replaceErrorPage: false,
 			retryUpstream: false,
@@ -349,7 +349,7 @@ export function installUpstreamUnavailableBanner() {
 		});
 		if (window.__TESTING__) {
 			window.__TEST_UPSTREAM_UNAVAILABLE__ = async () => {
-				const { request } = await import("./request.mjs");
+				const { request } = await import("./request.ts");
 				return request.get("/testing/upstream-unavailable");
 			};
 		}

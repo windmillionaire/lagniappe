@@ -1,4 +1,4 @@
-import { initializePublicSharing } from "./shared/publicShare.mjs";
+import { initializePublicSharing } from "./shared/publicShare.ts";
 
 export function startPublicPage() {
 	initializePublicSharing();

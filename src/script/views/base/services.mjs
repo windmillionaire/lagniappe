@@ -24,7 +24,7 @@ const loadOnce = (view, promiseKey, handleKey, loader) => {
 
 export const ensureOfflineQueue = (view) =>
 	loadOnce(view, "_offlineQueuePromise", "offlineQueue", async () => {
-		const { OfflineQueue } = await import("../../shared/offlineQueue.mjs");
+		const { OfflineQueue } = await import("../../shared/offlineQueue.ts");
 		if (view._destroyed) return null;
 		const queue = new OfflineQueue(view);
 		await queue.init();
@@ -33,7 +33,7 @@ export const ensureOfflineQueue = (view) =>
 
 export const ensurePollingCoordinator = (view) =>
 	loadOnce(view, "_pollingPromise", "PollingCoordinator", async () => {
-		const { PollingCoordinator } = await import("../../shared/polling.mjs");
+		const { PollingCoordinator } = await import("../../shared/polling.ts");
 		if (view._destroyed) return null;
 		const coordinator = new PollingCoordinator(view).init();
 		view.PollingCoordinator = coordinator;
@@ -47,7 +47,7 @@ export const ensurePollingCoordinator = (view) =>
 export const ensureSyncManager = (view) =>
 	loadOnce(view, "_syncPromise", "SyncManager", async () => {
 		await ensurePollingCoordinator(view);
-		const { SyncManager } = await import("../../shared/sync.mjs");
+		const { SyncManager } = await import("../../shared/sync.ts");
 		if (view._destroyed) return null;
 		const manager = new SyncManager(view);
 		manager.init();
@@ -72,7 +72,7 @@ export const ensureDeferredOperations = (view) =>
 		async () => {
 			await ensurePollingCoordinator(view);
 			const { DeferredOperationManager } = await import(
-				"../../shared/deferredOperations.mjs"
+				"../../shared/deferredOperations.ts"
 			);
 			if (view._destroyed) return null;
 			return new DeferredOperationManager(view).init();
@@ -117,7 +117,7 @@ export const ensureSubmissionManager = (view) =>
 export const ensureOfflineModal = (view) =>
 	loadOnce(view, "_offlineModalPromise", "offlineModal", async () => {
 		if (!view.offlineIndicator) return null;
-		const { OfflineModal } = await import("../../shared/modal.mjs");
+		const { OfflineModal } = await import("../../shared/modal.ts");
 		if (view._destroyed) return null;
 		const modal = new OfflineModal(view, view.offlineIndicator);
 		modal.enable();
@@ -127,7 +127,7 @@ export const ensureOfflineModal = (view) =>
 export const ensureModalClasses = (view) =>
 	loadOnce(view, "_modalClassesPromise", "ModalClasses", async () => {
 		const { DeleteModal, HelpModal, Modal } = await import(
-			"../../shared/modal.mjs"
+			"../../shared/modal.ts"
 		);
 		if (view._destroyed) return null;
 		return { DeleteModal, HelpModal, Modal };
@@ -160,7 +160,7 @@ export const initializeCoreServices = (view) => {
 	view._serviceStart = start;
 	const idle = start.then(() => whenIdle());
 	const offlineWork = idle.then(async () => {
-		const { inspectOfflineWork } = await import("../../shared/offlineWork.mjs");
+		const { inspectOfflineWork } = await import("../../shared/offlineWork.ts");
 		return inspectOfflineWork(view);
 	});
 	view.offlineQueueReady = offlineWork.then(({ mutations }) =>

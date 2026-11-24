@@ -1,6 +1,6 @@
 import { FormRenderer } from "../../../forms/renderer.mjs";
-import { areEqual, captureError, request } from "../../../shared/index.mjs";
-import { withTransition } from "../../../shared/transitions.mjs";
+import { areEqual, captureError, request } from "../../../shared/index.ts";
+import { withTransition } from "../../../shared/transitions.ts";
 
 export class Header {
 	constructor(builder) {

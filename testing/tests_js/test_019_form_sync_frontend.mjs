@@ -28,7 +28,7 @@ test("test_site_deployment_caps_workers_only_for_f2_and_b2", async () => {
 			"../../src/script/elements/combobox/index.mjs": {
 				SelectBox: EmptySelectBox,
 			},
-			"../../src/script/shared/index.mjs": { request: emptyRequest },
+			"../../src/script/shared/index.ts": { request: emptyRequest },
 			"../../src/script/widgets/siteSettings/base.mjs": {
 				SiteSetting: EmptySiteSetting,
 			},
@@ -156,7 +156,7 @@ test("test_site_settings_coordinates_section_widgets", async (t) => {
 	const { SiteSettings } = await esmock.strict(
 		"../../src/script/widgets/siteSettings.mjs",
 		{
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => await callback(),
 			},
 			"../../src/script/widgets/siteSettings/publicPages.mjs": {
@@ -232,8 +232,8 @@ async function loadAiModels() {
 			"../../src/script/elements/combobox/index.mjs": {
 				SelectBox: EmptySelectBox,
 			},
-			"../../src/script/shared/index.mjs": { request: emptyRequest },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/index.ts": { request: emptyRequest },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => await callback(),
 			},
 			"../../src/script/widgets/siteSettings/base.mjs": {
@@ -355,15 +355,15 @@ test("test_renderer_visibility_requires_canonical_condition_lists", async () => 
 			"../../src/script/elements/loader.mjs": {
 				getFormElement: async () => null,
 			},
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
 				},
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => await callback(),
 			},
-			"../../src/script/shared/utilities.mjs": {
+			"../../src/script/shared/utilities.ts": {
 				generateElementId: () => "renderer-test",
 			},
 		},
@@ -584,11 +584,11 @@ async function loadMaintenance({
 		{
 			"../../src/script/elements/buttons.mjs": { buttons },
 			"../../src/script/generated/styles.mjs": { STYLES: maintenanceStyles },
-			"../../src/script/shared/index.mjs": { Modal: class {}, request },
-			"../../src/script/shared/storage.mjs": {
+			"../../src/script/shared/index.ts": { Modal: class {}, request },
+			"../../src/script/shared/storage.ts": {
 				clearRecentSearchResults: clear,
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => await callback(),
 			},
 			"../../src/script/widgets/siteSettings/base.mjs": {

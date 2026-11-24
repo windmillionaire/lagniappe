@@ -1,5 +1,5 @@
 import { STYLES } from "../generated/styles.mjs";
-import { createIcon, setIcon } from "../shared/icons.mjs";
+import { createIcon, setIcon } from "../shared/icons.ts";
 import { formatting } from "./formatting.mjs";
 
 const buttonContents = (icon, text) => {

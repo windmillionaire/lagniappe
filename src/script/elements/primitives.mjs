@@ -1,5 +1,5 @@
 import { STYLES } from "../generated/styles.mjs";
-import { setIcon } from "../shared/icons.mjs";
+import { setIcon } from "../shared/icons.ts";
 
 const setAttributes = (elt, attributes) => {
 	if (attributes.name) elt.name = attributes.name;

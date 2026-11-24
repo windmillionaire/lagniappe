@@ -1,7 +1,7 @@
-import { captureError } from "../../shared/errors.mjs";
-import { request } from "../../shared/request.mjs";
-import { withTransition } from "../../shared/transitions.mjs";
-import { areEqual } from "../../shared/utilities.mjs";
+import { captureError } from "../../shared/errors.ts";
+import { request } from "../../shared/request.ts";
+import { withTransition } from "../../shared/transitions.ts";
+import { areEqual } from "../../shared/utilities.ts";
 import { incompatibleSchema } from "../representation.mjs";
 import { currentReviewOperation, renderReviewBar } from "../reviewBar.mjs";
 import { FormRevisionModal, WholeFormRevisionModal } from "./modals.mjs";

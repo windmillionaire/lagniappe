@@ -1,8 +1,8 @@
 import { STYLES } from "../generated/styles.mjs";
-import { ENDPOINTS } from "./endpoints.mjs";
-import { captureError } from "./errors.mjs";
-import { request } from "./request.mjs";
-import { withTransition } from "./transitions.mjs";
+import { ENDPOINTS } from "./endpoints.ts";
+import { captureError } from "./errors.ts";
+import { request } from "./request.ts";
+import { withTransition } from "./transitions.ts";
 
 export class Modal {
 	constructor(view, trigger) {

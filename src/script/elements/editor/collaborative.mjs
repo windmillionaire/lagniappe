@@ -4,7 +4,7 @@ import {
 	base64ToUint8Array,
 	uint8ArrayToBase64,
 	waitForAttribute,
-} from "../../shared/utilities.mjs";
+} from "../../shared/utilities.ts";
 import { collaborativeEditor } from "./editor.mjs";
 import { MentionSuggestions } from "./extensions/index.mjs";
 import { DocumentReadCache } from "./readCache.mjs";

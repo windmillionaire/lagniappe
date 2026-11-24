@@ -7,10 +7,10 @@ import {
 } from "@floating-ui/dom";
 import { mergeAttributes, Node } from "@tiptap/core";
 import { STYLES } from "../../../generated/styles.mjs";
-import { captureError } from "../../../shared/errors.mjs";
-import { QueryLifecycle } from "../../../shared/queryLifecycle.mjs";
-import { request } from "../../../shared/request.mjs";
-import { debounce, generateElementId } from "../../../shared/utilities.mjs";
+import { captureError } from "../../../shared/errors.ts";
+import { QueryLifecycle } from "../../../shared/queryLifecycle.ts";
+import { request } from "../../../shared/request.ts";
+import { debounce, generateElementId } from "../../../shared/utilities.ts";
 
 export const LagniappeMention = Node.create({
 	name: "lagniappeMention",

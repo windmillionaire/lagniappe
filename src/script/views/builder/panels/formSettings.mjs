@@ -1,5 +1,5 @@
 import { FormController } from "../../../forms/controller.mjs";
-import { captureError, ENDPOINTS, request } from "../../../shared/index.mjs";
+import { captureError, ENDPOINTS, request } from "../../../shared/index.ts";
 
 export class FormSettings {
 	constructor(builder) {

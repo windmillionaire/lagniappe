@@ -1,7 +1,7 @@
 import { renderReviewBar } from "../forms/reviewBar.mjs";
-import { captureError } from "./errors.mjs";
-import { createIcon } from "./icons.mjs";
-import { withTransition } from "./transitions.mjs";
+import { captureError } from "./errors.ts";
+import { createIcon } from "./icons.ts";
+import { withTransition } from "./transitions.ts";
 
 function operationRevision(value) {
 	if (typeof value === "number") return value;

@@ -5,12 +5,12 @@ import {
 	clearRecentSearchResults,
 	localStore,
 	sessionStore,
-} from "../../src/script/shared/storage.mjs";
+} from "../../src/script/shared/storage.ts";
 import {
 	areEqual,
 	debounce,
 	waitForAttribute,
-} from "../../src/script/shared/utilities.mjs";
+} from "../../src/script/shared/utilities.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 function replace(t, target, name, value) {
@@ -50,8 +50,8 @@ async function setupUser(t) {
 		posts.push(args);
 		return postImplementation(...args);
 	});
-	const user = await esmock.strict("../../src/script/shared/user.mjs", {
-		"../../src/script/shared/request.mjs": { request: { post } },
+	const user = await esmock.strict("../../src/script/shared/user.ts", {
+		"../../src/script/shared/request.ts": { request: { post } },
 	});
 
 	return {

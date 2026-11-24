@@ -1,5 +1,5 @@
 import { primitives } from "../../../elements/primitives.mjs";
-import { generateElementId } from "../../../shared/utilities.mjs";
+import { generateElementId } from "../../../shared/utilities.ts";
 import { Condition } from "./base.mjs";
 
 export default class Options extends Condition {

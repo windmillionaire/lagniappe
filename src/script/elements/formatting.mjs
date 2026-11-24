@@ -1,5 +1,5 @@
 import { STYLES } from "../generated/styles.mjs";
-import { createIcon, iconDefinition, setIcon } from "../shared/icons.mjs";
+import { createIcon, iconDefinition, setIcon } from "../shared/icons.ts";
 
 const ROUTES = {
 	task: "pages",

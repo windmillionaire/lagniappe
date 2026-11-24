@@ -1,6 +1,6 @@
-import { ENDPOINTS } from "./endpoints.mjs";
-import { captureError } from "./errors.mjs";
-import { request } from "./request.mjs";
+import { ENDPOINTS } from "./endpoints.ts";
+import { captureError } from "./errors.ts";
+import { request } from "./request.ts";
 
 const POLL_PROTOCOL_VERSION = 1;
 const MAX_SUBSCRIPTIONS_PER_REQUEST = 64;

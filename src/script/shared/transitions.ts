@@ -1,4 +1,4 @@
-import { captureError, isSkippedViewTransitionError } from "./errors.mjs";
+import { captureError, isSkippedViewTransitionError } from "./errors.ts";
 
 const runWithoutTransition = async (callback, label = "unlabeled") => {
 	try {

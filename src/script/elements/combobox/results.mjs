@@ -1,6 +1,6 @@
 import { STYLES } from "../../generated/styles.mjs";
-import { setIcon } from "../../shared/icons.mjs";
-import { localStore } from "../../shared/storage.mjs";
+import { setIcon } from "../../shared/icons.ts";
+import { localStore } from "../../shared/storage.ts";
 import { formatting } from "../formatting.mjs";
 
 const SEARCH_ENTITY_PATTERN = /&(#(?:x[0-9a-f]+|\d+)|amp|apos|gt|lt|quot);/gi;

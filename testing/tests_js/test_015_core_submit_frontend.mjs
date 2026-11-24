@@ -19,9 +19,9 @@ async function setupSubmissionManager(t) {
 	const { SubmissionManager } = await esmock.strict(
 		"../../src/script/views/base/submission.mjs",
 		{
-			"../../src/script/shared/errors.mjs": { captureError },
-			"../../src/script/shared/request.mjs": { request },
-			"../../src/script/shared/transitions.mjs": { withTransition },
+			"../../src/script/shared/errors.ts": { captureError },
+			"../../src/script/shared/request.ts": { request },
+			"../../src/script/shared/transitions.ts": { withTransition },
 		},
 	);
 	return { capturedErrors, SubmissionManager, request };

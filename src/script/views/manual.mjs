@@ -1,6 +1,6 @@
-import { ENDPOINTS } from "../shared/endpoints.mjs";
-import { request } from "../shared/request.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { ENDPOINTS } from "../shared/endpoints.ts";
+import { request } from "../shared/request.ts";
+import { withTransition } from "../shared/transitions.ts";
 import ShellView from "./base/shell.mjs";
 
 export default class Manual extends ShellView {

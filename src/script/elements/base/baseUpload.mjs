@@ -1,5 +1,5 @@
 import { FormController } from "../../forms/controller.mjs";
-import { directUpload } from "../../shared/directUpload.mjs";
+import { directUpload } from "../../shared/directUpload.ts";
 import { uploadElement } from "../upload.mjs";
 
 const PASTE_ERROR =

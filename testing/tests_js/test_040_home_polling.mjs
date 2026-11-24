@@ -21,7 +21,7 @@ test("test_home_polling_subscribes_loaded_widgets_and_refreshes_only_owner", asy
 	const { default: Home } = await esmock.strict(
 		"../../src/script/views/home.mjs",
 		{
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 			"../../src/script/views/base/core.mjs": { default: Core },

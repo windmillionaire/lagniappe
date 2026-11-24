@@ -25,13 +25,13 @@ async function loadManager() {
 	const createIcon = () => document.createElement("span");
 	const withTransition = (callback) => callback();
 	const { DeferredOperationManager } = await esmock.strict(
-		"../../src/script/shared/deferredOperations.mjs",
+		"../../src/script/shared/deferredOperations.ts",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError: (...args) => capturedErrors.push(args),
 			},
-			"../../src/script/shared/icons.mjs": { createIcon },
-			"../../src/script/shared/transitions.mjs": { withTransition },
+			"../../src/script/shared/icons.ts": { createIcon },
+			"../../src/script/shared/transitions.ts": { withTransition },
 		},
 	);
 	return { capturedErrors, DeferredOperationManager };

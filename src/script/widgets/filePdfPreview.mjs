@@ -1,7 +1,7 @@
 import * as pdfjs from "pdfjs-dist";
 import { primitives } from "../elements/primitives.mjs";
 import { STYLES } from "../generated/styles.mjs";
-import { setIcon } from "../shared/icons.mjs";
+import { setIcon } from "../shared/icons.ts";
 
 const MAX_DEVICE_SCALE = 2;
 const MAX_PAGE_WIDTH = 896;

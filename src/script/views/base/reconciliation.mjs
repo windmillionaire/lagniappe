@@ -1,6 +1,6 @@
-import { captureError } from "../../shared/errors.mjs";
-import { request } from "../../shared/request.mjs";
-import { clearRecentSearchResults } from "../../shared/storage.mjs";
+import { captureError } from "../../shared/errors.ts";
+import { request } from "../../shared/request.ts";
+import { clearRecentSearchResults } from "../../shared/storage.ts";
 
 const COLLECTION_ONLY_CHANGE_TYPES = new Set(["delete", "star", "unstar"]);
 const FORM_ALREADY_RECONCILED_CHANGE_TYPES = new Set([

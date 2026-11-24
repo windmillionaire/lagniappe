@@ -1,7 +1,7 @@
 import { getFormElement } from "../elements/loader.mjs";
-import { captureError } from "../shared/errors.mjs";
-import { withTransition } from "../shared/transitions.mjs";
-import { generateElementId } from "../shared/utilities.mjs";
+import { captureError } from "../shared/errors.ts";
+import { withTransition } from "../shared/transitions.ts";
+import { generateElementId } from "../shared/utilities.ts";
 
 export class FormRenderer {
 	constructor(form) {

@@ -1,4 +1,4 @@
-import { createIcon } from "../shared/icons.mjs";
+import { createIcon } from "../shared/icons.ts";
 import { captureLoginError } from "./error.mjs";
 import {
 	checkUserStatus,

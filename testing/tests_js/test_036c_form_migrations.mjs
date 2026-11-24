@@ -23,7 +23,7 @@ test("test_delete_element_commits_panel_and_model_changes_in_one_transition", as
 	const { default: Modify } = await esmock.strict(
 		"../../src/script/views/builder/conditions/modify.mjs",
 		{
-			"../../src/script/shared/transitions.mjs": { withTransition },
+			"../../src/script/shared/transitions.ts": { withTransition },
 		},
 	);
 	const change = (name) => {
@@ -172,30 +172,30 @@ test("test_builder_resumes_migration_polling_and_clears_completed_status", async
 			},
 		};
 		const { PollingCoordinator } = await esmock.strict(
-			"../../src/script/shared/polling.mjs",
+			"../../src/script/shared/polling.ts",
 			{
-				"../../src/script/shared/endpoints.mjs": {
+				"../../src/script/shared/endpoints.ts": {
 					ENDPOINTS: { poll: "/l/poll" },
 				},
-				"../../src/script/shared/errors.mjs": {
+				"../../src/script/shared/errors.ts": {
 					captureError(error) {
 						throw error;
 					},
 				},
-				"../../src/script/shared/request.mjs": { request },
+				"../../src/script/shared/request.ts": { request },
 			},
 		);
 		const { FormChangeStatus } = await esmock.strict(
 			"../../src/script/views/builder/changeStatus.mjs",
 			{
-				"../../src/script/shared/polling.mjs": { PollingCoordinator },
-				"../../src/script/shared/request.mjs": { request },
+				"../../src/script/shared/polling.ts": { PollingCoordinator },
+				"../../src/script/shared/request.ts": { request },
 			},
 		);
 		const { default: FormBuilder } = await esmock.strict(
 			"../../src/script/views/builder/builder.mjs",
 			{
-				"../../src/script/shared/index.mjs": {
+				"../../src/script/shared/index.ts": {
 					captureError(error) {
 						throw error;
 					},
@@ -413,8 +413,8 @@ test("test_migration_status_uses_notification_and_keeps_save_disabled", async (t
 	const { FormChangeStatus } = await esmock.strict(
 		"../../src/script/views/builder/changeStatus.mjs",
 		{
-			"../../src/script/shared/polling.mjs": { PollingCoordinator },
-			"../../src/script/shared/request.mjs": { request: {} },
+			"../../src/script/shared/polling.ts": { PollingCoordinator },
+			"../../src/script/shared/request.ts": { request: {} },
 		},
 	);
 	const builder = { draft: { dirty: true }, key: "form-1" };
@@ -554,7 +554,7 @@ test("test_projected_matching_values_do_not_discard_incompatible_drafts", async 
 					destroy() {},
 				}),
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (commit) => commit(),
 			},
 		},

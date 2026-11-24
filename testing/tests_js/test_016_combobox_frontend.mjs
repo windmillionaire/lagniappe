@@ -130,7 +130,7 @@ test("test_location_combobox_starts_location_sync_on_init", async (t) => {
 	const { LocationBox } = await esmock.strict(
 		"../../src/script/elements/combobox/location.mjs",
 		{
-			"../../src/script/shared/user.mjs": { updateUserLocation },
+			"../../src/script/shared/user.ts": { updateUserLocation },
 		},
 	);
 	const element = document.querySelector("input");
@@ -165,8 +165,8 @@ test("test_location_combobox_waits_for_session_sync_before_search", async (t) =>
 	const { LocationBox } = await esmock.strict(
 		"../../src/script/elements/combobox/location.mjs",
 		{
-			"../../src/script/shared/request.mjs": { request: { get } },
-			"../../src/script/shared/user.mjs": { updateUserLocation },
+			"../../src/script/shared/request.ts": { request: { get } },
+			"../../src/script/shared/user.ts": { updateUserLocation },
 		},
 	);
 	const element = document.querySelector("input");

@@ -1,7 +1,7 @@
 import { InputElement } from "../elements/input.mjs";
 import { RadioElement } from "../elements/radio.mjs";
 import { SectionToggle } from "../elements/sectionToggle.mjs";
-import { captureError, Modal, request } from "../shared/index.mjs";
+import { captureError, Modal, request } from "../shared/index.ts";
 import { FormWidget } from "./base/formWidget.mjs";
 
 export class UserSettings extends FormWidget {

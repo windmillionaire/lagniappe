@@ -1,6 +1,6 @@
-import { createIcon, setIcon } from "../shared/icons.mjs";
-import { request } from "../shared/request.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { createIcon, setIcon } from "../shared/icons.ts";
+import { request } from "../shared/request.ts";
+import { withTransition } from "../shared/transitions.ts";
 import Core from "./base/core.mjs";
 
 const REPORT_FORM_SELECTOR =

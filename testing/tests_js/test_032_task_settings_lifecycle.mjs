@@ -21,7 +21,7 @@ async function loadTaskSettings({ FormWidget, SectionToggle = {} }) {
 		"../../src/script/elements/input.mjs": { InputElement: class {} },
 		"../../src/script/elements/sectionToggle.mjs": { SectionToggle },
 		"../../src/script/elements/textarea.mjs": { TextareaElement: class {} },
-		"../../src/script/shared/transitions.mjs": {
+		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
 		"../../src/script/widgets/base/formWidget.mjs": { FormWidget },
@@ -92,12 +92,12 @@ test("test_closed_task_errors_persist_while_waiting_and_retrying", async (t) => 
 		"../../src/script/views/base/component.mjs",
 		{
 			"../../src/script/elements/nav.mjs": { NavElement: class {} },
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
 				},
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
 			"../../src/script/widgets/loader.mjs": {
@@ -163,7 +163,7 @@ test("test_task_history_fill_reports_incompatible_values_and_ignores_stale_respo
 		{
 			"../../src/script/elements/sections.mjs": { sections: {} },
 			"../../src/script/forms/controller.mjs": { FormController: class {} },
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/shared/index.ts": {
 				captureError() {
 					throw new Error("unexpected request error");
 				},
@@ -251,7 +251,7 @@ test("test_history_fill_waits_without_overwriting_new_input", async (t) => {
 			"../../src/script/generated/styles.mjs": {
 				STYLES: { form: { icon: "icon" } },
 			},
-			"../../src/script/shared/icons.mjs": { setIcon() {} },
+			"../../src/script/shared/icons.ts": { setIcon() {} },
 			"../../src/script/elements/primitives.mjs": { primitives: {} },
 		},
 	);
@@ -312,26 +312,26 @@ test("test_task_completion_replaces_closed_row_in_one_transition", async () => {
 		"../../src/script/views/base/component.mjs",
 		{
 			"../../src/script/elements/nav.mjs": { NavElement: class {} },
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
 				},
 			},
-			"../../src/script/shared/transitions.mjs": { withTransition },
+			"../../src/script/shared/transitions.ts": { withTransition },
 			"../../src/script/widgets/loader.mjs": {
 				loadWidget: async () => null,
 			},
 		},
 	);
 	const { Task } = await esmock.strict("../../src/script/views/base/task.mjs", {
-		"../../src/script/shared/transitions.mjs": { withTransition },
+		"../../src/script/shared/transitions.ts": { withTransition },
 		"../../src/script/views/base/component.mjs": { default: ViewComponent },
 	});
 	const { PageTaskList } = await esmock.strict(
 		"../../src/script/widgets/pageTaskList.mjs",
 		{
 			"../../src/script/elements/base/baseList.mjs": { BaseList: class {} },
-			"../../src/script/shared/transitions.mjs": { withTransition },
+			"../../src/script/shared/transitions.ts": { withTransition },
 		},
 	);
 
@@ -619,7 +619,7 @@ test("test_form_response_metadata_stays_with_renderer_widget", async () => {
 			"../../src/script/forms/representation.mjs": {
 				compatibleField: () => true,
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 		},

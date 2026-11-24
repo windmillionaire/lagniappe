@@ -1,4 +1,4 @@
-import { connectivity } from "../../shared/connectivity.mjs";
+import { connectivity } from "../../shared/connectivity.ts";
 
 const MOBILE_QUERY = "(max-width: 640px)";
 
@@ -110,7 +110,7 @@ export default class ShellView {
 			"_pollingPromise",
 			"PollingCoordinator",
 			async () => {
-				const { PollingCoordinator } = await import("../../shared/polling.mjs");
+				const { PollingCoordinator } = await import("../../shared/polling.ts");
 				return this._destroyed ? null : new PollingCoordinator(this).init();
 			},
 		);
@@ -181,7 +181,7 @@ export default class ShellView {
 	}
 
 	reportStartupError(error, element = this.elt, context = "lazy-control") {
-		void import("../../shared/errors.mjs")
+		void import("../../shared/errors.ts")
 			.then(({ captureError }) => {
 				captureError(error, element, { context });
 			})

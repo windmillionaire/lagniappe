@@ -6,7 +6,7 @@ import {
 	installReviewBar,
 	renderReviewBar,
 } from "../../forms/reviewBar.mjs";
-import { withTransition } from "../../shared/transitions.mjs";
+import { withTransition } from "../../shared/transitions.ts";
 
 export class FormWidget {
 	constructor(attributes) {

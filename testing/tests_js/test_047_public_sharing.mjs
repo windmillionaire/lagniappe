@@ -58,7 +58,7 @@ function setupSharingBrowser(t) {
 test("test_public_share_entry_initializes_once", async (t) => {
 	const initializePublicSharing = t.mock.fn();
 	await esmock.strict("../../src/script/public.mjs", {
-		"../../src/script/shared/publicShare.mjs": { initializePublicSharing },
+		"../../src/script/shared/publicShare.ts": { initializePublicSharing },
 	});
 	assert.equal(
 		initializePublicSharing.mock.callCount(),
@@ -70,7 +70,7 @@ test("test_public_share_entry_initializes_once", async (t) => {
 test("test_public_share_uses_native_api_and_clipboard_fallbacks", async (t) => {
 	const env = setupSharingBrowser(t);
 	const { sharePublicPage } = await import(
-		"../../src/script/shared/publicShare.mjs"
+		"../../src/script/shared/publicShare.ts"
 	);
 	let legacy = 0;
 	replace(t, document, "execCommand", () => {
@@ -148,7 +148,7 @@ test("test_public_share_uses_native_api_and_clipboard_fallbacks", async (t) => {
 test("test_public_share_initialization_binds_one_click_handler", async (t) => {
 	const env = setupSharingBrowser(t);
 	const { initializePublicSharing } = await import(
-		"../../src/script/shared/publicShare.mjs"
+		"../../src/script/shared/publicShare.ts"
 	);
 	initializePublicSharing(document);
 	initializePublicSharing(document);

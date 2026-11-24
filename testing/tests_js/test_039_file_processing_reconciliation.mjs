@@ -42,7 +42,7 @@ test("test_file_info_extract_completion_requests_one_reload_notice", async (t) =
 			"../../src/script/generated/styles.mjs": {
 				STYLES: { label: { default: "" } },
 			},
-			"../../src/script/shared/icons.mjs": { setIcon() {} },
+			"../../src/script/shared/icons.ts": { setIcon() {} },
 			"../../src/script/widgets/base/formWidget.mjs": { FormWidget },
 		},
 	);

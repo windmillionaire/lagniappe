@@ -1,4 +1,4 @@
-import { withTransition } from "./transitions.mjs";
+import { withTransition } from "./transitions.ts";
 
 function legacyCopy(url, documentRef) {
 	const textarea = documentRef.createElement("textarea");

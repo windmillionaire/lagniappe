@@ -1,6 +1,6 @@
 import { primitives } from "../../elements/primitives.mjs";
-import { sessionStore } from "../../shared/storage.mjs";
-import { withTransition } from "../../shared/transitions.mjs";
+import { sessionStore } from "../../shared/storage.ts";
+import { withTransition } from "../../shared/transitions.ts";
 
 export class TableSorting {
 	constructor(attributes) {

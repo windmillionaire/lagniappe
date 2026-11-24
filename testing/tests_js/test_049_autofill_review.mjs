@@ -170,7 +170,7 @@ test("test_schema_notice_is_readonly_and_independent_of_value_review", async (t)
 	const { installMigrationNotice } = await esmock.strict(
 		"../../src/script/forms/migrationNotice.mjs",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(root) {
 						this.root = root;
@@ -437,7 +437,7 @@ test("test_review_button_shows_feedback_while_refreshing_latest_values", async (
 	const { EditReconciler } = await esmock.strict(
 		"../../src/script/forms/revisions/reconciler.mjs",
 		{
-			"../../src/script/shared/request.mjs": {
+			"../../src/script/shared/request.ts": {
 				request: {
 					get: () => {
 						gets += 1;
@@ -497,7 +497,7 @@ test("test_stale_update_review_fetches_latest_values_before_opening", async (t) 
 	const { EditReconciler } = await esmock.strict(
 		"../../src/script/forms/revisions/reconciler.mjs",
 		{
-			"../../src/script/shared/request.mjs": {
+			"../../src/script/shared/request.ts": {
 				request: {
 					get: async (route) => {
 						fetched.push(route);
@@ -684,7 +684,7 @@ test("test_review_chooser_calls_blank_values_empty_without_changing_zero", async
 	const { FormRevisionModal } = await esmock.strict(
 		"../../src/script/forms/revisions/modals.mjs",
 		{
-			"../../src/script/shared/modal.mjs": { Modal: class {} },
+			"../../src/script/shared/modal.ts": { Modal: class {} },
 		},
 	);
 	const widget = widgetFixture();
@@ -714,7 +714,7 @@ test("test_prestart_conflict_chooser_says_autofill_did_not_start", async (t) => 
 	const { FormRevisionModal } = await esmock.strict(
 		"../../src/script/forms/revisions/modals.mjs",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(node) {
 						document.body.append(node);
@@ -781,7 +781,7 @@ test("test_review_modal_keeps_incompatible_old_values_and_selects_ai_collection"
 	const { FormRevisionModal } = await esmock.strict(
 		"../../src/script/forms/revisions/modals.mjs",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(node) {
 						document.body.append(node);
@@ -944,7 +944,7 @@ test("test_review_modal_shows_applied_autofill_changes_without_duplicate_saved_v
 	const { FormRevisionModal } = await esmock.strict(
 		"../../src/script/forms/revisions/modals.mjs",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(node) {
 						document.body.append(node);
@@ -1086,7 +1086,7 @@ test("test_review_modal_prefers_ai_unless_saved_value_changed_after_launch", asy
 	const { FormRevisionModal } = await esmock.strict(
 		"../../src/script/forms/revisions/modals.mjs",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(node) {
 						document.body.append(node);
@@ -1238,7 +1238,7 @@ test("test_review_modal_deduplicates_unchanged_ai_context_after_concurrent_save"
 	const { FormRevisionModal } = await esmock.strict(
 		"../../src/script/forms/revisions/modals.mjs",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(node) {
 						document.body.append(node);
@@ -1360,7 +1360,7 @@ test("test_review_modal_explains_when_autofill_suggested_no_new_values", async (
 	const { FormRevisionModal } = await esmock.strict(
 		"../../src/script/forms/revisions/modals.mjs",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(node) {
 						document.body.append(node);

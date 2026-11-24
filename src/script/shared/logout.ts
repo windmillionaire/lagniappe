@@ -1,4 +1,4 @@
-import { request } from "./request.mjs";
+import { request } from "./request.ts";
 
 const LOGOUT_BUTTON_SELECTOR = "[data-action='logout'][data-route]";
 

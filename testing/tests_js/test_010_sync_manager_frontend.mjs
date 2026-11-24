@@ -114,17 +114,17 @@ test("test_sync_manager_uses_polling_subscriptions", async (t) => {
 		removeEventListener() {},
 	});
 	const { SyncManager } = await esmock.strict(
-		"../../src/script/shared/sync.mjs",
+		"../../src/script/shared/sync.ts",
 		{
 			"../../src/script/elements/editor/headless.mjs": {
 				loadHeadlessWidget: (settings) => headlessFactory(settings),
 			},
-			"../../src/script/shared/endpoints.mjs": {
+			"../../src/script/shared/endpoints.ts": {
 				ENDPOINTS: { sync: "/l/sync" },
 			},
-			"../../src/script/shared/offline.mjs": offline,
-			"../../src/script/shared/request.mjs": { request },
-			"../../src/script/shared/utilities.mjs": {
+			"../../src/script/shared/offline.ts": offline,
+			"../../src/script/shared/request.ts": { request },
+			"../../src/script/shared/utilities.ts": {
 				waitForAttribute: async () => undefined,
 			},
 		},

@@ -1,10 +1,10 @@
 import { STYLES } from "../generated/styles.mjs";
-import { ENDPOINTS } from "../shared/endpoints.mjs";
-import { captureError } from "../shared/errors.mjs";
-import { setIcon } from "../shared/icons.mjs";
-import { request } from "../shared/request.mjs";
-import { withTransition } from "../shared/transitions.mjs";
-import { areEqual } from "../shared/utilities.mjs";
+import { ENDPOINTS } from "../shared/endpoints.ts";
+import { captureError } from "../shared/errors.ts";
+import { setIcon } from "../shared/icons.ts";
+import { request } from "../shared/request.ts";
+import { withTransition } from "../shared/transitions.ts";
+import { areEqual } from "../shared/utilities.ts";
 import { BaseElement } from "./base/baseElement.mjs";
 import { CheckboxElement } from "./checkbox.mjs";
 import { InputElement } from "./input.mjs";

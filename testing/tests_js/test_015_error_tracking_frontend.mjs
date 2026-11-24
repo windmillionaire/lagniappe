@@ -4,7 +4,7 @@ import esmock from "esmock";
 import {
 	captureError,
 	configureSentry,
-} from "../../src/script/shared/errors.mjs";
+} from "../../src/script/shared/errors.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 function setupErrorTracking(
@@ -61,7 +61,7 @@ test("test_login_error_delegates_to_shared_capture", async (t) => {
 	const { captureLoginError } = await esmock.strict(
 		"../../src/script/login/error.mjs",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError: captureErrorBoundary,
 			},
 		},

@@ -80,7 +80,7 @@ async function loadShellView(connectivity = { online: true, hidden: false }) {
 	const { default: ShellView } = await esmock.strict(
 		"../../src/script/views/base/shell.mjs",
 		{
-			"../../src/script/shared/connectivity.mjs": { connectivity },
+			"../../src/script/shared/connectivity.ts": { connectivity },
 		},
 	);
 	return ShellView;
@@ -323,11 +323,11 @@ async function loadCore(connectivity = { online: true }) {
 	const { default: Core } = await esmock.strict(
 		"../../src/script/views/base/core.mjs",
 		{
-			"../../src/script/shared/connectivity.mjs": { connectivity },
-			"../../src/script/shared/endpoints.mjs": { ENDPOINTS: {} },
-			"../../src/script/shared/errors.mjs": { captureError() {} },
-			"../../src/script/shared/request.mjs": { request: {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/connectivity.ts": { connectivity },
+			"../../src/script/shared/endpoints.ts": { ENDPOINTS: {} },
+			"../../src/script/shared/errors.ts": { captureError() {} },
+			"../../src/script/shared/request.ts": { request: {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
 			"../../src/script/views/base/component.mjs": { default: class {} },
@@ -630,8 +630,8 @@ async function loadViewComponent() {
 		"../../src/script/views/base/component.mjs",
 		{
 			"../../src/script/elements/nav.mjs": { NavElement: class {} },
-			"../../src/script/shared/errors.mjs": { captureError() {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/errors.ts": { captureError() {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
 			"../../src/script/widgets/loader.mjs": {
@@ -747,7 +747,7 @@ test("test_offline_queue_does_not_block_initial_form_render", async () => {
 			"../../src/script/forms/representation.mjs": {
 				compatibleField: () => true,
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 		},
@@ -811,7 +811,7 @@ async function loadCollaborativeDocument({
 			"../../src/script/generated/styles.mjs": {
 				STYLES: { editor: { container: "editor-container" } },
 			},
-			"../../src/script/shared/utilities.mjs": {
+			"../../src/script/shared/utilities.ts": {
 				base64ToUint8Array: () => null,
 				uint8ArrayToBase64: () => "",
 				waitForAttribute,

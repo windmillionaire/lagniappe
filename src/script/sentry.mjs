@@ -5,7 +5,7 @@ import {
 	getClient,
 	init,
 } from "@sentry/browser";
-import { configureSentry } from "./shared/errors.mjs";
+import { configureSentry } from "./shared/errors.ts";
 
 if (typeof window !== "undefined") {
 	window.Sentry = {

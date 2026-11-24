@@ -1,6 +1,6 @@
-import { captureError } from "../../shared/errors.mjs";
-import { QueryLifecycle } from "../../shared/queryLifecycle.mjs";
-import { debounce } from "../../shared/utilities.mjs";
+import { captureError } from "../../shared/errors.ts";
+import { QueryLifecycle } from "../../shared/queryLifecycle.ts";
+import { debounce } from "../../shared/utilities.ts";
 import { Combobox } from "./combobox.mjs";
 
 /**

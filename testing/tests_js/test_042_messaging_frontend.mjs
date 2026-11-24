@@ -40,13 +40,13 @@ test("test_mention_node_collection_insertion_and_keyboard_contract", async () =>
 					shift: () => null,
 				},
 				"../../src/script/generated/styles.mjs": { STYLES: { dropdown: {} } },
-				"../../src/script/shared/errors.mjs": {
+				"../../src/script/shared/errors.ts": {
 					captureError(error) {
 						throw error;
 					},
 				},
-				"../../src/script/shared/queryLifecycle.mjs": { QueryLifecycle },
-				"../../src/script/shared/request.mjs": {
+				"../../src/script/shared/queryLifecycle.ts": { QueryLifecycle },
+				"../../src/script/shared/request.ts": {
 					request: {
 						async get(endpoint, params) {
 							searches.push([endpoint, params.get("q")]);
@@ -54,7 +54,7 @@ test("test_mention_node_collection_insertion_and_keyboard_contract", async () =>
 						},
 					},
 				},
-				"../../src/script/shared/utilities.mjs": {
+				"../../src/script/shared/utilities.ts": {
 					debounce(callback) {
 						const debounced = (...args) => callback(...args);
 						debounced.cancel = () => {};
@@ -292,10 +292,10 @@ test("test_message_composer_prefills_peer_and_reuses_operation_on_submit", async
 					textarea: "",
 				},
 			},
-			"../../src/script/shared/icons.mjs": {
+			"../../src/script/shared/icons.ts": {
 				createIcon: () => ({ outerHTML: "" }),
 			},
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/shared/index.ts": {
 				ENDPOINTS: { messages: { send: "/l/messages" } },
 				Modal: class {},
 				request: {
@@ -375,17 +375,17 @@ async function loadNotifications({
 		"../../src/script/generated/styles.mjs": {
 			STYLES: { dropdown: { panel: "", option: { action: "" }, icon: "" } },
 		},
-		"../../src/script/shared/icons.mjs": {
+		"../../src/script/shared/icons.ts": {
 			createIcon: () => ({ outerHTML: "" }),
 		},
-		"../../src/script/shared/index.mjs": {
+		"../../src/script/shared/index.ts": {
 			ENDPOINTS: { notifications: "/l/notifications" },
 			request,
 		},
-		"../../src/script/shared/notificationState.mjs": {
+		"../../src/script/shared/notificationState.ts": {
 			renderNotificationBadge,
 		},
-		"../../src/script/shared/transitions.mjs": {
+		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
 		"../../src/script/elements/combobox/dropdown.mjs": { Dropdown: class {} },
@@ -545,10 +545,10 @@ test("test_messages_view_refreshes_read_races_and_uses_delete_modal", async (t) 
 			"../../src/script/generated/styles.mjs": {
 				STYLES: { list: { itemHeader: "item-header" } },
 			},
-			"../../src/script/shared/icons.mjs": {
+			"../../src/script/shared/icons.ts": {
 				createIcon: () => ({ outerHTML: "" }),
 			},
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/shared/index.ts": {
 				ENDPOINTS: {
 					messages: {
 						clearModal: (key) => `/clear/${key}`,

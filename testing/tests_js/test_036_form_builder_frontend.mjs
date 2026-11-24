@@ -110,12 +110,12 @@ test("test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
 		"../../src/script/views/builder/panels/header.mjs",
 		{
 			"../../src/script/forms/renderer.mjs": { FormRenderer: class {} },
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/shared/index.ts": {
 				areEqual: (a, b) => JSON.stringify(a) === JSON.stringify(b),
 				captureError() {},
 				request,
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 		},
@@ -382,7 +382,7 @@ async function loadFormSettings({ request }) {
 		"../../src/script/views/builder/panels/formSettings.mjs",
 		{
 			"../../src/script/forms/controller.mjs": { FormController: class {} },
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/shared/index.ts": {
 				captureError() {},
 				ENDPOINTS: { createSchema: "/forms/create-schema" },
 				Modal: class {},
@@ -489,8 +489,8 @@ async function loadBuilder({ connectivity, generateElementId, ModelElement }) {
 			SearchBox: emptyClass(),
 		},
 		"../../src/script/elements/entityMenu.mjs": { EntityMenu: emptyClass() },
-		"../../src/script/shared/directUpload.mjs": { directUpload() {} },
-		"../../src/script/shared/index.mjs": {
+		"../../src/script/shared/directUpload.ts": { directUpload() {} },
+		"../../src/script/shared/index.ts": {
 			captureError() {},
 			connectivity,
 			DeleteModal: emptyClass(),
@@ -499,7 +499,7 @@ async function loadBuilder({ connectivity, generateElementId, ModelElement }) {
 			OfflineModal: emptyClass(),
 			request: {},
 		},
-		"../../src/script/shared/transitions.mjs": {
+		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
 		"../../src/script/views/builder/changeStatus.mjs": {
@@ -683,7 +683,7 @@ test("test_builder_schema_lists_use_button_surfaces_and_centered_actions", async
 		{
 			"../../src/script/elements/primitives.mjs": { primitives },
 			"../../src/script/generated/styles.mjs": { STYLES: styles },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 			"../../src/script/views/builder/config.mjs": {

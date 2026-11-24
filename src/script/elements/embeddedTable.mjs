@@ -1,8 +1,8 @@
 import { STYLES } from "../generated/styles.mjs";
-import { ENDPOINTS } from "../shared/endpoints.mjs";
-import { setIcon } from "../shared/icons.mjs";
-import { request } from "../shared/request.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { ENDPOINTS } from "../shared/endpoints.ts";
+import { setIcon } from "../shared/icons.ts";
+import { request } from "../shared/request.ts";
+import { withTransition } from "../shared/transitions.ts";
 import { primitives } from "./primitives.mjs";
 import { TableElement } from "./table.mjs";
 

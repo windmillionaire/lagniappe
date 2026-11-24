@@ -1,5 +1,5 @@
 import { STYLES } from "../generated/styles.mjs";
-import { createIcon } from "../shared/icons.mjs";
+import { createIcon } from "../shared/icons.ts";
 import { buttons } from "./buttons.mjs";
 import { Dropdown } from "./combobox/dropdown.mjs";
 import { primitives } from "./primitives.mjs";

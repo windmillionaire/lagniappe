@@ -50,9 +50,9 @@ async function setupDirectUpload(t) {
 	t.mock.method(globalThis, "fetch", fetchImpl);
 	t.mock.method(window, "fetch", fetchImpl);
 	const { directUpload } = await esmock.strict(
-		"../../src/script/shared/directUpload.mjs",
+		"../../src/script/shared/directUpload.ts",
 		{
-			"../../src/script/shared/request.mjs": {
+			"../../src/script/shared/request.ts": {
 				request: {
 					post: (...args) => post(...args),
 				},
@@ -79,7 +79,7 @@ async function setupBaseUpload(t) {
 			"../../src/script/forms/controller.mjs": {
 				FormController: class {},
 			},
-			"../../src/script/shared/directUpload.mjs": { directUpload },
+			"../../src/script/shared/directUpload.ts": { directUpload },
 			"../../src/script/elements/upload.mjs": { uploadElement: {} },
 		},
 	);

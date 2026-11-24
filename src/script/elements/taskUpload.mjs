@@ -1,7 +1,7 @@
 import { STYLES } from "../generated/styles.mjs";
-import { createIcon, setIcon } from "../shared/icons.mjs";
-import { ENDPOINTS, request } from "../shared/index.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { createIcon, setIcon } from "../shared/icons.ts";
+import { ENDPOINTS, request } from "../shared/index.ts";
+import { withTransition } from "../shared/transitions.ts";
 import { BaseUpload } from "./base/baseUpload.mjs";
 import { UploadMenu, uploadElement } from "./upload.mjs";
 

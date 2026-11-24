@@ -1,8 +1,8 @@
 import { buttons } from "../elements/buttons.mjs";
 import { FacetsBox, SelectBox } from "../elements/combobox/index.mjs";
 import { primitives } from "../elements/primitives.mjs";
-import { captureError, Modal, request } from "../shared/index.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { captureError, Modal, request } from "../shared/index.ts";
+import { withTransition } from "../shared/transitions.ts";
 
 export class ImportData {
 	constructor(attributes) {

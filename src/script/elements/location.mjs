@@ -1,5 +1,5 @@
 import { STYLES } from "../generated/styles.mjs";
-import { setIcon } from "../shared/icons.mjs";
+import { setIcon } from "../shared/icons.ts";
 import { BaseElement } from "./base/baseElement.mjs";
 import { LocationBox } from "./combobox/index.mjs";
 import { primitives } from "./primitives.mjs";

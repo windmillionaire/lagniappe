@@ -1,5 +1,5 @@
 import { STYLES } from "../generated/styles.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { withTransition } from "../shared/transitions.ts";
 import { buttons } from "./buttons.mjs";
 import { primitives } from "./primitives.mjs";
 

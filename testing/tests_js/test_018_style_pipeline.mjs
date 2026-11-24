@@ -291,7 +291,7 @@ test("test_active_action_buttons_preserve_full_width_icon_slots", async (t) => {
 
 test("test_frontend_icon_helpers_render_structured_material_symbols", async (t) => {
 	createBrowser(t);
-	const module = await bundle("./src/script/shared/icons.mjs");
+	const module = await bundle("./src/script/shared/icons.ts");
 
 	const project = module.createIcon("project", "text-project-default");
 	assert.equal(project.textContent, "flowsheet");

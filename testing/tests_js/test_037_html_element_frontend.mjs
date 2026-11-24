@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
-import { ENDPOINTS } from "../../src/script/shared/endpoints.mjs";
+import { ENDPOINTS } from "../../src/script/shared/endpoints.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 test("test_html_element_reports_request_failure_without_masking_original", async (t) => {
@@ -15,7 +15,7 @@ test("test_html_element_reports_request_failure_without_masking_original", async
 	const { HtmlElement } = await esmock.strict(
 		"../../src/script/elements/html.mjs",
 		{
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/shared/index.ts": {
 				captureError,
 				ENDPOINTS,
 				request: { get },

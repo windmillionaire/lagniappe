@@ -1,4 +1,4 @@
-import { request } from "./request.mjs";
+import { request } from "./request.ts";
 
 const meta = (name) =>
 	document.querySelector(`meta[name="${name}"]`)?.getAttribute("content") || "";

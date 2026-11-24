@@ -2,8 +2,8 @@ import { SelectBox } from "../../../elements/combobox/index.mjs";
 import { primitives } from "../../../elements/primitives.mjs";
 import { FormController } from "../../../forms/controller.mjs";
 import { STYLES } from "../../../generated/styles.mjs";
-import { setIcon } from "../../../shared/icons.mjs";
-import { withTransition } from "../../../shared/transitions.mjs";
+import { setIcon } from "../../../shared/icons.ts";
+import { withTransition } from "../../../shared/transitions.ts";
 
 export class Condition {
 	constructor(builder) {

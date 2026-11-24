@@ -1,5 +1,5 @@
-import { setIcon } from "../shared/icons.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { setIcon } from "../shared/icons.ts";
+import { withTransition } from "../shared/transitions.ts";
 import Entity from "./base/entity.mjs";
 
 export default class Page extends Entity {

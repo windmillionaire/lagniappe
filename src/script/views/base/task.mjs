@@ -1,4 +1,4 @@
-import { withTransition } from "../../shared/transitions.mjs";
+import { withTransition } from "../../shared/transitions.ts";
 import ViewComponent from "./component.mjs";
 
 const ISOLATED_TASK_ACTIONS = new Set(["TaskMove", "TaskCombine"]);

@@ -70,13 +70,13 @@ async function setupPolling(
 	}
 	const request = { post };
 	const { PollingCoordinator } = await esmock.strict(
-		"../../src/script/shared/polling.mjs",
+		"../../src/script/shared/polling.ts",
 		{
-			"../../src/script/shared/endpoints.mjs": {
+			"../../src/script/shared/endpoints.ts": {
 				ENDPOINTS: { poll: "/l/poll" },
 			},
-			"../../src/script/shared/errors.mjs": { captureError },
-			"../../src/script/shared/request.mjs": { request },
+			"../../src/script/shared/errors.ts": { captureError },
+			"../../src/script/shared/request.ts": { request },
 		},
 	);
 	return {

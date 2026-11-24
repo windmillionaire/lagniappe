@@ -1,4 +1,4 @@
-import { withTransition } from "../shared/transitions.mjs";
+import { withTransition } from "../shared/transitions.ts";
 import { AutofillUpload } from "./autofill.mjs";
 import { buttons } from "./buttons.mjs";
 import { primitives } from "./primitives.mjs";

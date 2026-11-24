@@ -1,6 +1,6 @@
 import { STYLES } from "../../generated/styles.mjs";
-import { withTransition } from "../../shared/transitions.mjs";
-import { debounce } from "../../shared/utilities.mjs";
+import { withTransition } from "../../shared/transitions.ts";
+import { debounce } from "../../shared/utilities.ts";
 import { TOOLBAR_MENUS, TOOLBAR_TOOLS } from "./config.mjs";
 import { toolbarDropdown } from "./dropdowns.mjs";
 import { MarkdownPastePrompt } from "./options/markdownPaste.mjs";

@@ -1,5 +1,5 @@
 import { BaseList } from "../elements/base/baseList.mjs";
-import { withTransition } from "../shared/transitions.mjs";
+import { withTransition } from "../shared/transitions.ts";
 
 export class PageTaskList extends BaseList {
 	constructor(attributes) {

@@ -246,18 +246,18 @@ async function setupRequest(t, { pathname = "/home" } = {}) {
 	t.mock.method(globalThis, "fetch", fetchImpl);
 	t.mock.method(window, "fetch", fetchImpl);
 	const upstream = await import(
-		"../../src/script/shared/upstreamUnavailable.mjs"
+		"../../src/script/shared/upstreamUnavailable.ts"
 	);
 	const { request } = await esmock.strict(
-		"../../src/script/shared/request.mjs",
+		"../../src/script/shared/request.ts",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureNetworkError: (...args) => networkErrors.push(args),
 			},
-			"../../src/script/shared/notificationState.mjs": {
+			"../../src/script/shared/notificationState.ts": {
 				applyNotificationStateHeader: () => null,
 			},
-			"../../src/script/shared/upstreamUnavailable.mjs": {
+			"../../src/script/shared/upstreamUnavailable.ts": {
 				handleUpstreamResponse: upstream.handleUpstreamResponse,
 			},
 		},
@@ -295,7 +295,7 @@ test("test_analytics_skips_internal_requests", async (t) => {
 	};
 	t.mock.method(globalThis, "fetch", fetchImpl);
 	t.mock.method(window, "fetch", fetchImpl);
-	const { analytics } = await import("../../src/script/shared/analytics.mjs");
+	const { analytics } = await import("../../src/script/shared/analytics.ts");
 	for (const action of ["view", "public_view", "create", "update", "delete"]) {
 		for (const path of [
 			"/api",
@@ -700,9 +700,9 @@ test("test_logout_button_posts_without_hidden_form", async (t) => {
 		Sentry: window.Sentry,
 	});
 	const { initializeLogoutForms } = await esmock.strict(
-		"../../src/script/shared/logout.mjs",
+		"../../src/script/shared/logout.ts",
 		{
-			"../../src/script/shared/request.mjs": { request: context.request },
+			"../../src/script/shared/request.ts": { request: context.request },
 		},
 	);
 	const listeners = {};
@@ -796,14 +796,14 @@ test("test_login_handoff_refreshes_csrf_before_submit_and_retries_once", async (
 	const { handleIdentityUser } = await esmock.strict(
 		"../../src/script/login/tools.mjs",
 		{
-			"../../src/script/shared/analytics.mjs": {
+			"../../src/script/shared/analytics.ts": {
 				analytics: {
 					tag(name, data) {
 						calls.push({ type: "analytics", name, data });
 					},
 				},
 			},
-			"../../src/script/shared/request.mjs": { request },
+			"../../src/script/shared/request.ts": { request },
 		},
 	);
 	const user = {
@@ -869,10 +869,10 @@ test("test_login_verification_email_reuses_refreshed_csrf", async (t) => {
 	const { handleIdentityUser } = await esmock.strict(
 		"../../src/script/login/tools.mjs",
 		{
-			"../../src/script/shared/analytics.mjs": {
+			"../../src/script/shared/analytics.ts": {
 				analytics: { tag() {} },
 			},
-			"../../src/script/shared/request.mjs": { request },
+			"../../src/script/shared/request.ts": { request },
 		},
 	);
 	const user = {

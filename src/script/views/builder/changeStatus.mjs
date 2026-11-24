@@ -1,5 +1,5 @@
-import { PollingCoordinator } from "../../shared/polling.mjs";
-import { request } from "../../shared/request.mjs";
+import { PollingCoordinator } from "../../shared/polling.ts";
+import { request } from "../../shared/request.ts";
 
 export class FormChangeStatus {
 	constructor(builder) {
