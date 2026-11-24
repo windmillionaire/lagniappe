@@ -2,8 +2,12 @@
 
 JavaScript behavior tests live in `testing/tests_js/`. New tests are ordinary
 `test_*.mjs` modules using `node:test` and `node:assert/strict`. Pytest discovers
-each named case and runs it in a fresh Node process. Continue using the repo
-runner for selection, failures, reports and recorded outcomes.
+each named case, batches selected cases per file across a bounded Node worker
+pool (`LAGNIAPPE_JS_WORKERS`, default `min(8, cpu_count)`), and automatically
+falls back to an isolated per-case Node process whenever a file batch fails,
+misses a case, or hits a hook/runtime error (set `LAGNIAPPE_JS_BATCH=0` to force
+per-case execution directly). Continue using the repo runner for selection,
+failures, reports and recorded outcomes.
 
 Read [writing tests](TESTING_WRITING_TESTS.md) before adding or reshaping
 a test. `testing/tests_js/test_045_offline_queue.mjs` contains native cases.

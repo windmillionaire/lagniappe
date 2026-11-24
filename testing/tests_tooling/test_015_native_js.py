@@ -151,3 +151,70 @@ def test_native_reporter_requires_one_result_and_rejects_late_failures():
         native_js.interpret_result(
             json.dumps(passed), "process exited unexpectedly", 1, "test_example"
         )
+
+
+def test_interpret_file_results_verifies_clean_batches_and_flags_fallback_cases():
+    pass_a = {"type": "test:pass", "name": "test_a", "nesting": 0}
+    pass_b = {"type": "test:pass", "name": "test_b", "nesting": 0}
+    fail_b = {"type": "test:fail", "name": "test_b", "nesting": 0, "error": "boom"}
+    hook_fail = {"type": "test:fail", "name": "bootstrap.mjs", "nesting": 0, "error": "hook"}
+
+    # Clean multi-case batch needs zero fallbacks.
+    verified, fallback = native_js.interpret_file_results(
+        "\n".join(json.dumps(row) for row in (pass_a, pass_b)),
+        "",
+        0,
+        ["test_a", "test_b"],
+    )
+    assert verified == {"test_a": pass_a, "test_b": pass_b}
+    assert fallback == set()
+
+    # Single attributed case failure keeps passing sibling and falls back only the failing case.
+    verified, fallback = native_js.interpret_file_results(
+        "\n".join(json.dumps(row) for row in (pass_a, fail_b)),
+        "",
+        1,
+        ["test_a", "test_b"],
+    )
+    assert verified == {"test_a": pass_a}
+    assert fallback == {"test_b"}
+
+    # Missing case (e.g. process.exit(0) mid-file) falls back the missing case.
+    verified, fallback = native_js.interpret_file_results(
+        json.dumps(pass_a),
+        "",
+        0,
+        ["test_a", "test_b"],
+    )
+    assert verified == {"test_a": pass_a}
+    assert fallback == {"test_b"}
+
+    # Hook/file-level failure, invalid JSON, or unattributed non-zero exit fall back the full file.
+    for output, returncode in (
+        ("\n".join(json.dumps(row) for row in (pass_a, pass_b, hook_fail)), 1),
+        ("not json", 0),
+        ("\n".join(json.dumps(row) for row in (pass_a, pass_b)), 1),
+    ):
+        verified, fallback = native_js.interpret_file_results(
+            output, "", returncode, ["test_a", "test_b"]
+        )
+        assert verified == {}
+        assert fallback == {"test_a", "test_b"}
+
+
+def test_native_js_worker_and_batch_environment_overrides(monkeypatch):
+    monkeypatch.delenv("LAGNIAPPE_JS_WORKERS", raising=False)
+    monkeypatch.delenv("LAGNIAPPE_JS_BATCH", raising=False)
+    assert 1 <= native_js.worker_count() <= native_js.DEFAULT_MAX_WORKERS
+    assert native_js.batch_enabled() is True
+
+    monkeypatch.setenv("LAGNIAPPE_JS_WORKERS", "3")
+    assert native_js.worker_count() == 3
+    monkeypatch.setenv("LAGNIAPPE_JS_WORKERS", "invalid")
+    with pytest.raises(ValueError, match="LAGNIAPPE_JS_WORKERS"):
+        native_js.worker_count()
+
+    monkeypatch.setenv("LAGNIAPPE_JS_BATCH", "0")
+    assert native_js.batch_enabled() is False
+    monkeypatch.setenv("LAGNIAPPE_JS_BATCH", "false")
+    assert native_js.batch_enabled() is False

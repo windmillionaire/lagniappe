@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { after } from "node:test";
+import { after, afterEach } from "node:test";
 
 export const unexpectedRequests = [];
 export function unexpectedFetch(input) {
@@ -8,6 +8,10 @@ export function unexpectedFetch(input) {
 	return Promise.reject(new Error(message));
 }
 globalThis.fetch = unexpectedFetch;
-after(() =>
-	assert.deepEqual(unexpectedRequests, [], "Unaccounted network requests"),
-);
+function assertNoUnexpectedRequests() {
+	if (unexpectedRequests.length === 0) return;
+	const found = unexpectedRequests.splice(0, unexpectedRequests.length);
+	assert.deepEqual(found, [], "Unaccounted network requests");
+}
+afterEach(assertNoUnexpectedRequests);
+after(assertNoUnexpectedRequests);
