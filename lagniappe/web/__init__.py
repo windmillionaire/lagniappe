@@ -136,6 +136,8 @@ DEMO_GUEST_ALLOWED_WRITE_ENDPOINTS = frozenset(
         "users.logout",
         "internal.update_session",
         "internal.validate_user",
+        "internal.poll",
+        "internal.refresh",
     }
 )
 

@@ -244,6 +244,34 @@ def test_demo_guest_login_enforces_read_only_guard_and_clean_logout(
     assert session_update.status_code == 200
     assert session_update.json == {"userHash": "demo-guest-hash"}
 
+    # Read-only browser POST endpoints (/l/poll, /l/refresh) pass the demo-guest guard,
+    # while document mutations (/l/sync) remain blocked with 403.
+    poll_response = http_client.post(
+        "/l/poll",
+        headers={"X-CSRFToken": token, "X-Lagniappe-Request": "true"},
+        json={"version": 1, "client_id": "demo-client", "subscriptions": []},
+    )
+    assert poll_response.status_code == 422
+    assert (poll_response.json or {}).get("code") == "invalid_poll_contract"
+
+    refresh_response = http_client.post(
+        "/l/refresh",
+        headers={"X-CSRFToken": token, "X-Lagniappe-Request": "true"},
+        json={"view": {}, "targets": []},
+    )
+    assert refresh_response.status_code != 403
+
+    sync_blocked = http_client.post(
+        "/l/sync",
+        headers={"X-CSRFToken": token, "X-Lagniappe-Request": "true"},
+        json={"updates": []},
+    )
+    assert sync_blocked.status_code == 403
+    assert sync_blocked.json == {
+        "success": False,
+        "error": "Demo accounts are read-only.",
+    }
+
     # Even after _load_request_context falls back and re-seeds the session, the demo flag stays set.
     with http_client.session_transaction() as client_session:
         assert client_session.get(CONFIG.LOGIN_DEMO_GUEST_KEY) is True
@@ -343,3 +371,113 @@ def test_public_directory_places_ordered_group_before_manual(
     html = response.get_data(as_text=True)
     assert html.index("Public Pages") < html.index("Manual") < html.index("Zebra")
     assert html.index("Why Lagniappe?") < html.index("About")
+
+
+def test_readonly_page_and_project_templates_hide_empty_document_tab(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from types import SimpleNamespace
+
+    from flask import g, render_template
+
+    from lagniappe.core.definitions import Action, Resource
+
+    def _fake_entity(kind: str, *, can_edit: bool, has_document: bool):
+        return SimpleNamespace(
+            urlsafe_key=f"fake-{kind}-key",
+            key=f"fake-{kind}-key",
+            fingerprint="fp-1",
+            hash="hash12345678",
+            name=f"Sample {kind.title()}",
+            description="",
+            modified=SimpleNamespace(isoformat=lambda: "2026-11-24T00:00:00+00:00"),
+            readonly=not can_edit,
+            image=None,
+            user=None,
+            form=None,
+            has_notes=False,
+            properties=SimpleNamespace(filters=SimpleNamespace(preload=[])),
+            categories=[],
+            model=SimpleNamespace(name="Samples"),
+            is_public=False,
+            public_id=None,
+            db={},
+            sync_ids={
+                "document": {
+                    "id": "hash12345678:document",
+                    "fingerprint": "doc-fp" if has_document else None,
+                }
+            },
+            allowed=lambda action, **_kw: can_edit if action == Action.EDIT else False,
+            get_asset=lambda name: {"path": "doc.html"} if (has_document and name == "document") else None,
+        )
+
+    fake_user = SimpleNamespace(
+        page=SimpleNamespace(key="other-user-page"),
+        is_public=False,
+        is_owner=False,
+        is_admin=False,
+        is_authenticated=True,
+        is_active=True,
+        is_anonymous=False,
+        hash="viewer-hash",
+        authorization_fingerprint="auth-fp",
+        properties=SimpleNamespace(
+            starred=SimpleNamespace(keys=set()),
+            restrictions=SimpleNamespace(user_assign_restrictions=False),
+        ),
+        access=lambda _tier: False,
+    )
+    monkeypatch.setattr(Resource, "allowed", lambda self, _action, **_kw: False)
+    monkeypatch.setitem(app.jinja_env.globals, "owner_allows_assignments", lambda: False)
+    monkeypatch.setitem(
+        app.jinja_env.globals,
+        "form_state",
+        lambda *_a, **_k: SimpleNamespace(
+            is_locked=False,
+            review=None,
+            active_job=None,
+            failed_job=None,
+            has_review=False,
+            banner_state=None,
+        ),
+    )
+
+    with app.test_request_context("/"):
+        g._login_user = fake_user
+        for template_name, var_name, kind in (
+            ("pages/page.html", "page", "page"),
+            ("projects/project.html", "project", "project"),
+        ):
+            empty_ro = render_template(
+                template_name,
+                **{
+                    var_name: _fake_entity(kind, can_edit=False, has_document=False),
+                    "focus_task": None,
+                    "public_context": None,
+                },
+            )
+            assert 'lp-show="document:active"' not in empty_ro
+            assert 'data-widget="CollaborativeDocument"' not in empty_ro
+
+            populated_ro = render_template(
+                template_name,
+                **{
+                    var_name: _fake_entity(kind, can_edit=False, has_document=True),
+                    "focus_task": None,
+                    "public_context": None,
+                },
+            )
+            assert 'lp-show="document:active"' in populated_ro
+            assert 'data-widget="CollaborativeDocument"' in populated_ro
+
+            empty_editable = render_template(
+                template_name,
+                **{
+                    var_name: _fake_entity(kind, can_edit=True, has_document=False),
+                    "focus_task": None,
+                    "public_context": None,
+                },
+            )
+            assert 'lp-show="document:active"' in empty_editable
+            assert 'data-widget="CollaborativeDocument"' in empty_editable

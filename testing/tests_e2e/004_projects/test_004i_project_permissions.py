@@ -107,8 +107,8 @@ def test_project_viewer_can_read_document_content(get_admin, get_user):
     viewer = get_user(Users.general_models_view_only)
     viewer.go(empty_project)
 
-    expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).to_be_visible()
-    expect(viewer.locate(Tabs.DOCUMENT_TAB)).to_be_attached()
+    expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).not_to_be_attached()
+    expect(viewer.locate(Tabs.DOCUMENT_TAB)).not_to_be_attached()
 
     marker = "Readonly project document content marker"
     if marker not in (content_project.entity.properties.document.html or ""):

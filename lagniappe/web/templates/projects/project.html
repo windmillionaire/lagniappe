@@ -6,6 +6,8 @@
 {% from 'projects/document.html' import document_tab %}
 {% from 'projects/info.html' import info_tab %}
 {% from 'projects/model_tasks.html' import create_model_task, model_task_list %}
+{% set can_edit_project = project.allowed(Action.EDIT) %}
+{% set render_document = project.get_asset('document') or can_edit_project %}
 {% macro view_header(project) %}
   <nav class="{{ styles.layout.view.title }}" data-nav="view">
     <div>
@@ -31,10 +33,12 @@
               data-kind="model-task"
               class="{{ styles.entity.tabIcon }} sm:hidden">{{ render_icon("model") }}</button>
     {% endif %}
-    <button type="button"
-            lp-show="document:active"
-            data-kind="project"
-            class="{{ styles.entity.tabIcon }}">{{ render_icon("document") }}</button>
+    {% if render_document %}
+      <button type="button"
+              lp-show="document:active"
+              data-kind="project"
+              class="{{ styles.entity.tabIcon }}">{{ render_icon("document") }}</button>
+    {% endif %}
     <button type="button"
             lp-show="info:active"
             data-kind="project"
@@ -131,7 +135,7 @@
           {{ toggles('tabs') }}
         </div>
         {{ info_tab(project) }}
-        {{ document_tab(project) }}
+        {% if render_document %}{{ document_tab(project) }}{% endif %}
         {{ task_filters(project) }}
       </div>
     </div>
@@ -149,6 +153,8 @@
 {% block extras %}
   <link rel="modulepreload"
         href="/chunks/project-tools.js?v={{ CONFIG.BUILD_ID }}">
-  <link rel="modulepreload"
-        href="/chunks/document.js?v={{ CONFIG.BUILD_ID }}">
+  {% if render_document %}
+    <link rel="modulepreload"
+          href="/chunks/document.js?v={{ CONFIG.BUILD_ID }}">
+  {% endif %}
 {% endblock extras %}
