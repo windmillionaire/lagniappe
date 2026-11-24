@@ -250,7 +250,9 @@ def _start_tool_report(
 
     # Starting the adapter may replace its report instance while recording the
     # operation. Render that saved state for an already-open homepage list too.
-    report = Entities.fetch_one(report, request=Fetch.direct()) or report
+    current = Entities.fetch_one(report.key, request=Fetch.direct())
+    if isinstance(current, Entities.REPORT):
+        report = current
     return responses.deferred_tool_report(report, notification, job=job)
 
 

@@ -757,9 +757,13 @@ def test_create_tool_starts_pending_report(get_admin, get_user, cold_list):
     form = user.locate(home.CREATE_TOOL_REPORT_FORM)
     form.locator("textarea[name='instructions']").fill(instructions)
 
-    with user.page.expect_response("**/tools/ai"):
+    with expect_successful_response(user.page, method="POST", path="/tools/ai") as created:
         form.get_by_role("button", name="Start").click()
 
+    payload = created.value.json()
+    operation = payload["operation"]
+    assert isinstance(operation, str) and operation
+    assert f'data-operation="{operation}"' in payload["html"]
     report_list = List(user.locate(home.TOOL_REPORT_LIST))
     report_name = f"{instructions[:80]}..."
     item = report_list.new_item(report_name, flash=False)
@@ -767,7 +771,7 @@ def test_create_tool_starts_pending_report(get_admin, get_user, cold_list):
         "aria-pressed", "true"
     )
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal pending")
-    expect(item).to_have_attribute("data-operation", re.compile(".+"))
+    expect(item).to_have_attribute("data-operation", operation)
     expect(item.locator("[data-role='deferred-phase']")).to_have_text(
         "Waiting to start"
     )
