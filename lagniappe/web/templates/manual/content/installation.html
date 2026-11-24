@@ -11,6 +11,18 @@
       explains each choice and opens the right provider pages along the way.
       The steps below cover what to have ready before you begin.
     {% endcall %}
+    {% call callout("note", False) %}
+      <strong>Installing with a local AI assistant?</strong> Lagniappe also
+      supports a guided, non-interactive agent install mode
+      (<code>./setup.sh --agent</code>) with a localhost-only browser Secret
+      Vault so credentials never enter chat history. See
+      {% if CONFIG.SOURCE_URL %}
+        {{ link(CONFIG.SOURCE_URL.rstrip("/") ~ "/blob/main/documentation/INSTALL_WITH_AI.md", "INSTALL_WITH_AI.md") }}
+      {% else %}
+        <code>documentation/INSTALL_WITH_AI.md</code>
+      {% endif %}
+      for that workflow.
+    {% endcall %}
   {% endcall %}
   {{ heading("Services Used") }}
   {% call card() %}
@@ -34,8 +46,7 @@
         <strong>Vertex AI</strong> for optional AI features.
       </li>
       <li>
-        <strong>Google Identity Platform</strong> for sign-in and adaptive
-        polling for live updates.
+        <strong>Google Identity Platform</strong> for sign-in.
       </li>
       <li>
         <strong>Google Places</strong> for address autocomplete and verified
@@ -115,7 +126,7 @@
       </li>
       <li>
         <strong>Cloudflare, optional:</strong> an account and temporary API
-        token if you want automatic custom-domain setup
+        token if you want automatic custom-domain setup.
       </li>
     </ul>
     {{ subheading("Install Git and Google Cloud CLI") }}
@@ -817,9 +828,12 @@
     <p class="text-base-medium mb-3">
       Setup writes your installation settings to
       <code>config/files/lagniappe_settings.yaml</code> inside your Lagniappe
-      checkout. This file contains secrets and provider configuration, so keep
-      it private and do not commit it to a public repository. Git ignores it,
-      but you should still keep a secure backup.
+      checkout. By default this file contains secrets and provider
+      configuration, so keep it private and do not commit it to a public
+      repository. Git ignores it, but you should still keep a secure backup.
+      You can also move runtime secrets into Google Cloud Secret Manager with
+      <code>./setup.sh secrets migrate</code> so local YAML holds only
+      non-secret configuration.
     </p>
     <p class="text-base-medium">
       Alongside a fresh copy of the Lagniappe source code, this is the one

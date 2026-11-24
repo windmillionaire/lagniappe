@@ -4,7 +4,7 @@
     <p class="text-base-medium">
       After installation, most personalization happens from the Administrator
       <strong>Admin</strong> page in <strong>Settings</strong>: site images,
-      deployment preferences, and
+      public-page discovery, deployment preferences, AI models, and
       links out to the service-provider dashboards. A custom domain still uses
       the setup script because it has to coordinate App Engine, DNS, and auth
       settings.
@@ -64,10 +64,13 @@
       description, and any document preview image with that audience in mind.
     </p>
     <p class="text-base-medium">
-      Search discovery is a separate site setting: it lets eligible public
-      pages appear in the public directory and sitemap. Turning discovery off
-      keeps a published link available; make the page private to stop access
-      through that link. Individual pages can opt out of discovery too.
+      Search discovery is a separate site setting under
+      <strong>Admin / Site Settings / Public Pages</strong>: it lets search
+      engines discover eligible public pages through <code>robots.txt</code>
+      and <code>sitemap.xml</code>. Turning search discovery off keeps
+      published links and the <code>/public/</code> directory working; make a
+      page private to stop access through its link. Individual pages can opt
+      out of search indexing too.
     </p>
   {% endcall %}
   {{ heading("Custom Domain") }}
@@ -168,8 +171,8 @@
       <code>./setup.sh upgrade</code> instead to fetch the latest source from
       <code>origin/main</code>, reconcile configuration, and optionally deploy.
       The upgrade warns before replacing tracked local changes. If you maintain
-      a fork, merge the release yourself and use <code>-update</code> so setup
-      does not replace your worktree.
+      a fork, merge the release yourself and use <code>./setup.sh update</code>
+      so setup does not replace your worktree.
     </p>
     {% call callout("tip", False) %}
       If you start editing the application code itself, you are effectively

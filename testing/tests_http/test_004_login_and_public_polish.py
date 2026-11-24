@@ -264,3 +264,32 @@ def test_demo_guest_login_enforces_read_only_guard_and_clean_logout(
     with http_client.session_transaction() as client_session:
         assert client_session.get("_user_id") is None
         assert client_session.get(CONFIG.LOGIN_DEMO_GUEST_KEY) is None
+
+
+def test_public_manual_sections_render_cleanly_including_all_mcp_clients(
+    monkeypatch: pytest.MonkeyPatch,
+    http_client,
+):
+    from lagniappe.core.definitions.manual import MANUAL_SECTIONS
+
+    monkeypatch.setattr(CONFIG, "PUBLIC_MANUAL", True)
+    for section in MANUAL_SECTIONS:
+        response = http_client.get(f"/manual/section/{section['key']}")
+        assert response.status_code == 200, f"Failed rendering manual section {section['key']}"
+        html = response.get_data(as_text=True)
+        if section["key"] == "ai":
+            for role in (
+                "external-ai-chatgpt-setup",
+                "external-ai-codex-setup",
+                "external-ai-claude-setup",
+                "external-ai-antigravity-setup",
+                "external-ai-pi-setup",
+            ):
+                assert f'data-role="{role}"' in html
+            assert "My Page / User Settings / Manage AI connections" in html
+            assert "developers.openai.com/plugins" not in html
+        elif section["key"] == "under-the-hood":
+            assert "cloud APIs, OAuth rules, cloud APIs" not in html
+        elif section["key"] == "personalization":
+            assert "<code>-update</code>" not in html
+            assert "./setup.sh update" in html

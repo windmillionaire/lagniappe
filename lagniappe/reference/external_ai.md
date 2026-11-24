@@ -17,6 +17,6 @@ Connection addresses appear below this help when your account can use them. The 
 
 ## Questions and proposals
 
-Ordinary questions can be answered directly without creating a saved Plan. A Plan is needed when you request a saved answer or proposed workspace changes. Review and execute those changes in Lagniappe.
+Ordinary questions can be answered directly without creating a saved Plan. A Plan is needed when you request a saved answer or proposed workspace changes. By default, review and execute those changes in Lagniappe; when an Administrator enables automatic plan execution and you opt in under **My Page / User Settings**, safe plans can run automatically while form schema changes, deletes, review items, and flagged issues still pause for browser review.
 
 External access is independent of your None/Ask/Create tier for the installation's configured provider. Record permissions still apply. Revoke keys or AI connections through their account controls when a client no longer needs access.

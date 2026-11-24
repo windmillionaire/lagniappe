@@ -41,6 +41,14 @@
       supporting evidence; say when they should not be filed onto a page or task.
     </p>
     <p class="text-base-medium mb-3">
+      When an Administrator enables <strong>Allow automatic plan execution</strong>
+      under <strong>Admin / Site Settings / AI Models</strong>, individual users
+      can opt in under <strong>My Page / User Settings</strong> to automatically
+      run safe on-site, API, and MCP plans without waiting for manual approval.
+      Plans that include form schema changes, deletes, review items, or flagged
+      issues—and all inbound AI emails—still pause for browser review.
+    </p>
+    <p class="text-base-medium mb-3">
       On the homepage, combine the Active, Executed, and Answers filters to choose
       which saved reports to show. Active includes proposals that are ready,
       still processing, or need attention. Executed contains completed
@@ -142,40 +150,36 @@
           {% set mcp_url = CONFIG.MCP_RESOURCE if show_connection_details else 'https://MCP-ENDPOINT/mcp' %}
           {% set mcp_name = CONFIG.MCP_NAME if show_connection_details else 'lagniappe-remote' %}
           <div data-role="external-ai-chatgpt-setup" class="space-y-3">
-            <h3 class="font-semibold text-page-default">Connect ChatGPT: app or web plugin</h3>
-            <p>You can add this installation as a custom plugin in the ChatGPT
+            <h3 class="font-semibold text-page-default">Connect ChatGPT</h3>
+            <p>You can add this installation as a custom MCP connector in the ChatGPT
               desktop app or on the web. No Codex CLI or Lagniappe API key is needed.</p>
             <ol class="list-decimal pl-5 space-y-2">
-              <li>In ChatGPT, open <strong>Settings / Security and login</strong>
+              <li>In ChatGPT, open <strong>Settings / Apps &amp; Connectors / Advanced settings</strong>
                 and enable <strong>Developer mode</strong>. Availability depends
-                on your ChatGPT account and workspace policy.</li>
-              <li>Open <strong>Plugins</strong> and select the <strong>+</strong>
-                button to add a connection. Enter <code>{{ mcp_name }}</code>
-                as the name and a description such as “Connect to my Lagniappe workspace.”</li>
-              <li>Under <strong>Connection</strong>, enter the MCP server URL:
+                on your ChatGPT plan and workspace policy.</li>
+              <li>Open <strong>Apps &amp; Connectors</strong> and choose
+                <strong>Create</strong> to add a custom connector. Enter
+                <code>{{ mcp_name }}</code> as the name and a short description
+                such as “Connect to my Lagniappe workspace.”</li>
+              <li>Enter the MCP server URL:
                 <code>{{ mcp_url }}</code>.
                 {% if not show_connection_details %}
                   Obtain the connection name and full MCP URL from the installation
                   Owner and replace these examples.
                 {% endif %}
-                Choose <strong>OAuth</strong> if asked for an authentication method,
-                then create the connection.</li>
+                Choose <strong>OAuth</strong> for authentication, then create the
+                connector.</li>
               <li>Follow the sign-in prompt, sign in to your invited Lagniappe
                 account, check the account shown, and choose <strong>Allow</strong>.
-                ChatGPT may ask you to connect during setup or the first use.</li>
-              <li>Start a new chat, select the plugin from the tools menu, and
+                ChatGPT may ask you to connect during setup or on first use.</li>
+              <li>Start a new chat, enable the connector from the tools menu, and
                 ask ChatGPT which Lagniappe account it is using. Then ask it to
                 find a page you know you can access.</li>
             </ol>
             <p>If ChatGPT asks you to reconnect later, use its
               <strong>Reconnect</strong> action and authorize again.
-              Manage or remove the plugin from <strong>Plugins</strong>.
               To revoke its Lagniappe access, open
-              <strong>Settings / Manage AI connections</strong> in Lagniappe.</p>
-            <p class="text-sm">See OpenAI's
-              {{ link('https://developers.openai.com/plugins/deploy/connect-chatgpt', 'connection instructions') }}
-              and {{ link('https://learn.chatgpt.com/docs/plugins', 'plugin guide') }}
-              for current ChatGPT controls.</p>
+              <strong>My Page / User Settings / Manage AI connections</strong> in Lagniappe.</p>
           </div>
           <div data-role="external-ai-codex-setup" class="space-y-3">
             <h3 class="font-semibold text-page-default">Connect Codex CLI</h3>
@@ -195,10 +199,10 @@
               completion tab. Restart any existing Codex sessions to load the
               connection, then ask Codex to check which Lagniappe account it is using.</p>
             <p>Codex in the ChatGPT desktop app shares this local MCP configuration.
-              Restart it after setup. ChatGPT web uses the plugin connection above.</p>
+              Restart it after setup. ChatGPT web uses the custom connector above.</p>
             <p>To switch accounts, sign in to the intended account in Lagniappe
               first, then run the login command again and restart Codex.
-              To revoke a connection, open <strong>Settings / Manage AI connections</strong>
+              To revoke a connection, open <strong>My Page / User Settings / Manage AI connections</strong>
               in Lagniappe.</p>
           </div>
           <div data-role="external-ai-claude-setup" class="space-y-3">
@@ -216,7 +220,16 @@
             </ol>
             {{ code('claude mcp add --transport http ' ~ mcp_name ~ ' ' ~ mcp_url) }}
             <p>To revoke Claude or Claude Code access, open
-              <strong>Settings / Manage AI connections</strong> in Lagniappe.</p>
+              <strong>My Page / User Settings / Manage AI connections</strong> in Lagniappe.</p>
+          </div>
+          <div data-role="external-ai-antigravity-setup" class="space-y-3">
+            <h3 class="font-semibold text-page-default">Connect Antigravity</h3>
+            <p>Add the remote MCP server URL <code>{{ mcp_url }}</code> in your
+              Antigravity MCP configuration without an API key; Antigravity
+              discovers OAuth automatically via its client metadata document and
+              opens your browser to sign in and choose <strong>Allow</strong>.</p>
+            <p>To revoke Antigravity access, open
+              <strong>My Page / User Settings / Manage AI connections</strong> in Lagniappe.</p>
           </div>
           <div data-role="external-ai-pi-setup" class="space-y-3">
             <h3 class="font-semibold text-page-default">Connect Pi</h3>
@@ -226,7 +239,7 @@
               OAuth automatically via its client metadata document and opens your
               browser to sign in and choose <strong>Allow</strong>.</p>
             <p>To revoke Pi access, open
-              <strong>Settings / Manage AI connections</strong> in Lagniappe.</p>
+              <strong>My Page / User Settings / Manage AI connections</strong> in Lagniappe.</p>
           </div>
         {% endif %}
         <p>Every connected client uses the user's normal workspace permissions and the

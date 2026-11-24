@@ -44,11 +44,11 @@ See the [release history](documentation/releases/) for version notes.
 
 ## AI Integration
 
-AI integration can be fully disabled at installation time. If enabled you'll see the option anywhere it has been integrated, if not those options won't appear. If enabled it can be used inside the app itself, accessed via email when configured, and can optionally also be used in ChatGPT as a plugin and via an MCP or as a skill using a user-linked API key in harnesses like Pi or Codex. 
+AI integration can be fully disabled at installation time. If enabled you'll see the option anywhere it has been integrated, if not those options won't appear. If enabled it can be used inside the app itself, accessed via email when configured, and can optionally also be used over remote MCP with OAuth (ChatGPT, Codex CLI, Claude, Claude Code, Antigravity, and Pi) or as a client skill using a user-linked API key.
 
-Both on-site and email invocations use a flavor of Gemini that you can specify, while external clients use their own model. Since these uses are billed directly to the site owner, invited users must be explicitly given access to those modes. 
+Both on-site and email invocations use a flavor of Gemini that you can specify, while external clients use their own model. Since these uses are billed directly to the site owner, invited users must be explicitly given access to those modes.
 
-AI is only able to retrieve site data that the invoking user can view, and cannot modify the site without explicit user action. Models invoked remotely (such as via MCP or email) submit plans which the user must execute on the application itself. Permitted context is still sent to the model provider, which is worth keeping in mind especially if you enable the MCP. More on how that all works [here](https://lagniappe.site/pages/public/9a10ae4c).
+AI is only able to retrieve site data that the invoking user can view. By default, proposed workspace changes pause for explicit user review and execution in Lagniappe; installations can optionally enable opt-in automatic execution for safe on-site, API, and MCP plans while keeping form schema changes, deletes, review items, and all inbound email behind browser review. Permitted context is still sent to the model provider, which is worth keeping in mind especially if you enable the MCP. More on how that all works [here](https://lagniappe.site/pages/public/9a10ae4c).
 
 ## Installation
 
@@ -81,7 +81,7 @@ To customize the code or work on Lagniappe itself, complete the ordinary guided 
 
 Development workflows support Linux, macOS, and WSL2; use WSL2 when developing on Windows. Start with the [development setup](documentation/INFRA_SETUP_DEVELOPMENT.md), [testing guide](documentation/TESTING.md), and the [documentation index](documentation/OVERVIEW.md).
 
-The backend is Flask on Google Cloud Platform. The frontend is vanilla ES modules bundled with Rollup and styled with Tailwind CSS.
+The backend is Flask on Google Cloud Platform. The frontend is strict TypeScript modules bundled with Rollup and styled with Tailwind CSS (with no single-page-app framework).
 
 ## Security
 
