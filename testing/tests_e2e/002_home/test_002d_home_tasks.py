@@ -10,8 +10,8 @@ Related Files:
         - lagniappe/web/routes/home/main.py: Home route and task-related responses
         - lagniappe/web/templates/home/tasks.html: CreateUserTask, HomeTaskList
         - src/script/widgets/home/tasks.ts: HomeTaskList
-        - src/script/widgets/taskSettings.mjs: CreateUserTask (BaseTaskSettings)
-        - src/script/views/home.mjs: Task initialization
+        - src/script/widgets/taskSettings.ts: CreateUserTask (BaseTaskSettings)
+        - src/script/views/home.ts: Task initialization
 
     Core Entity:
         - lagniappe/core/entities/task.py: Task entity

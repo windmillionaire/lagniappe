@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { Editor } from "@tiptap/core";
+import { StarterKit } from "@tiptap/starter-kit";
 import {
 	toggleCode,
+	toggleCodeBlock,
 	toggleUnderline,
-} from "../../src/script/elements/editor/options/menuItems.mjs";
+} from "../../src/script/elements/editor/options/menuItems.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 test("test_editor_menu_item_serializes_current_active_state", (t) => {
@@ -69,4 +72,31 @@ test("test_editor_inline_code_menu_item_toggles_from_local_active_state", (t) =>
 	assert.deepEqual(calls, ["focus", "unsetCode", "run"]);
 	assert.equal(item.active, false);
 	assert.equal(item.button.dataset.active, "false");
+});
+
+test("test_editor_code_block_menu_item_restores_a_paragraph", (t) => {
+	createBrowser(t);
+	const editor = new Editor({
+		element: document.body.appendChild(document.createElement("div")),
+		extensions: [StarterKit],
+		content: "<pre><code>example</code></pre>",
+	});
+	try {
+		const item = new toggleCodeBlock({ editor });
+		item.init({
+			command: "toggleCodeBlock",
+			title: "Code Block",
+			icon: "code",
+			name: "language:null",
+		});
+		assert.equal(editor.isActive("codeBlock"), true);
+		item.enable();
+
+		item.onClick(item.button);
+
+		assert.equal(editor.getHTML(), "<p>example</p>");
+		assert.equal(item.active, false);
+	} finally {
+		editor.destroy();
+	}
 });

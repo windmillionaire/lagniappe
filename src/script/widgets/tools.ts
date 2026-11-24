@@ -1,5 +1,5 @@
 import { BaseUpload } from "../elements/base/baseUpload.ts";
-import { UploadMenu, uploadElement } from "../elements/upload.mjs";
+import { UploadMenu, uploadElement } from "../elements/upload.ts";
 import type { FormSubmitOptions } from "../forms/controller.ts";
 
 const AI_DROPZONE_TEXT =

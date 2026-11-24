@@ -1,4 +1,4 @@
-import { loadHeadlessWidget } from "../elements/editor/headless.mjs";
+import { loadHeadlessWidget } from "../elements/editor/headless.ts";
 import type { RequestResult } from "../types/api.d.ts";
 import type {
 	DocumentCursor,

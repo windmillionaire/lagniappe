@@ -7,8 +7,8 @@ view is mounted, read
 
 ## Startup boundaries
 
-`main.mjs` finds `[lp-view]`, imports the matching stable entry from
-`viewRegistry.mjs`, constructs it, and calls `init()`.
+`main.ts` finds `[lp-view]`, imports the matching stable entry from
+`viewRegistry.ts`, constructs it, and calls `init()`.
 
 ```text
 DOMContentLoaded

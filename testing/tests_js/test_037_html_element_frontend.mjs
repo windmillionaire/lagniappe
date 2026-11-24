@@ -13,7 +13,7 @@ test("test_html_element_reports_request_failure_without_masking_original", async
 		throw original;
 	});
 	const { HtmlElement } = await esmock.strict(
-		"../../src/script/elements/html.mjs",
+		"../../src/script/elements/html.ts",
 		{
 			"../../src/script/shared/index.ts": {
 				captureError,

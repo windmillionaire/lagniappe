@@ -4,7 +4,7 @@ Tests for project info tab functionality.
 Tests project info editing.
 Verified against:
 - lagniappe/web/templates/projects/info.html
-- src/script/widgets/projectInfo.mjs (ProjectInfo)
+- src/script/widgets/projectInfo.ts (ProjectInfo)
 - lagniappe/web/routes/projects/main.py
 """
 

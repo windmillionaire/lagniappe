@@ -122,7 +122,7 @@ export default class Core {
 """,
     )
     write_file(
-        tmp_path / "src/script/elements/sections.mjs",
+        tmp_path / "src/script/elements/sections.ts",
         """
 target.querySelector('[data-role="generate"]');
 target.querySelector("button[data-role='manual']");
@@ -630,7 +630,7 @@ def test_template_contract_counts_resource_property_evidence(tmp_path):
 """,
     )
     write_file(
-        tmp_path / "src/script/widgets/projectInfo.mjs",
+        tmp_path / "src/script/widgets/projectInfo.ts",
         "export class ProjectInfo {}\n",
     )
     write_file(

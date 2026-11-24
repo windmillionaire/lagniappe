@@ -1,4 +1,4 @@
-import { buttons } from "../../elements/buttons.mjs";
+import { buttons } from "../../elements/buttons.ts";
 import { STYLES } from "../../generated/styles.mjs";
 import type { ENDPOINTS } from "../../shared/endpoints.ts";
 import { Modal, request } from "../../shared/index.ts";

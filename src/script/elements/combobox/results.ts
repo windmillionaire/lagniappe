@@ -1,7 +1,7 @@
 import { STYLES } from "../../generated/styles.mjs";
 import { setIcon } from "../../shared/icons.ts";
 import { localStore } from "../../shared/storage.ts";
-import { formatting } from "../formatting.mjs";
+import { formatting } from "../formatting.ts";
 import type { ComboboxOption } from "./combobox.ts";
 
 export type ResultDetails = ComboboxOption & {

@@ -26,6 +26,11 @@ export interface FieldOption {
 export interface FieldCondition {
 	id?: string;
 	value?: unknown;
+	type?: FieldType;
+	name?: string;
+	label?: string;
+	checked?: boolean;
+	text?: string;
 }
 
 /** Canonical field definition rendered by FormRenderer. */
@@ -34,10 +39,13 @@ export interface FormFieldSchema {
 	type: FieldType;
 	title?: string;
 	label?: string;
+	name?: string;
 	input?: InputType;
 	location?: "out" | "in";
 	multiple?: boolean;
 	required?: boolean;
+	checked?: boolean;
+	layout?: "column" | "row";
 	placeholder?: string | null;
 	options?: FieldOption[];
 	columns?: FormFieldSchema[];

@@ -225,7 +225,7 @@ async function setupEditor(t) {
 		put: (...args) => put(...args),
 	};
 	const { IndependentDocument } = await esmock.strict(
-		"../../src/script/elements/editor/independent.mjs",
+		"../../src/script/elements/editor/independent.ts",
 		{
 			"../../src/script/generated/styles.mjs": {
 				STYLES: {
@@ -240,12 +240,12 @@ async function setupEditor(t) {
 				},
 			},
 			"../../src/script/shared/request.ts": { request },
-			"../../src/script/elements/editor/editor.mjs": {
+			"../../src/script/elements/editor/editor.ts": {
 				independentEditor() {
 					throw new Error("Editor factory was not stubbed");
 				},
 			},
-			"../../src/script/elements/editor/toolbar.mjs": { Toolbar: class {} },
+			"../../src/script/elements/editor/toolbar.ts": { Toolbar: class {} },
 		},
 	);
 	const statusElement = () => {
@@ -295,7 +295,7 @@ async function setupEditor(t) {
 }
 
 async function loadToolbar() {
-	return await esmock.strict("../../src/script/elements/editor/toolbar.mjs", {
+	return await esmock.strict("../../src/script/elements/editor/toolbar.ts", {
 		"../../src/script/generated/styles.mjs": { STYLES: {} },
 		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
@@ -303,21 +303,21 @@ async function loadToolbar() {
 		"../../src/script/shared/utilities.ts": {
 			debounce: (callback) => Object.assign(callback, { cancel() {} }),
 		},
-		"../../src/script/elements/editor/config.mjs": {
+		"../../src/script/elements/editor/config.ts": {
 			TOOLBAR_MENUS: {},
 			TOOLBAR_TOOLS: [],
 		},
-		"../../src/script/elements/editor/dropdowns.mjs": {
+		"../../src/script/elements/editor/dropdowns.ts": {
 			toolbarDropdown() {},
 		},
-		"../../src/script/elements/editor/options/markdownPaste.mjs": {
+		"../../src/script/elements/editor/options/markdownPaste.ts": {
 			MarkdownPastePrompt: class {},
 		},
-		"../../src/script/elements/editor/options/registry.mjs": {
+		"../../src/script/elements/editor/options/registry.ts": {
 			FORM_REGISTRY: {},
 			OPTION_REGISTRY: {},
 		},
-		"../../src/script/elements/editor/users.mjs": { UserManager: class {} },
+		"../../src/script/elements/editor/users.ts": { UserManager: class {} },
 	});
 }
 
@@ -491,11 +491,11 @@ function emptyClass() {
 }
 
 async function loadBuilder(connectivity) {
-	return await esmock.strict("../../src/script/views/builder/builder.mjs", {
+	return await esmock.strict("../../src/script/views/builder/builder.ts", {
 		"../../src/script/elements/combobox/search.ts": {
 			SearchBox: emptyClass(),
 		},
-		"../../src/script/elements/entityMenu.mjs": { EntityMenu: emptyClass() },
+		"../../src/script/elements/entityMenu.ts": { EntityMenu: emptyClass() },
 		"../../src/script/shared/directUpload.ts": { directUpload() {} },
 		"../../src/script/shared/index.ts": {
 			captureError() {},
@@ -509,34 +509,34 @@ async function loadBuilder(connectivity) {
 		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
-		"../../src/script/views/builder/changeStatus.mjs": {
+		"../../src/script/views/builder/changeStatus.ts": {
 			FormChangeStatus: emptyClass(),
 		},
-		"../../src/script/views/builder/conditions/loader.mjs": {
+		"../../src/script/views/builder/conditions/loader.ts": {
 			loadCondition: async () => null,
 		},
-		"../../src/script/views/builder/draft.mjs": { BuilderDraft: emptyClass() },
-		"../../src/script/views/builder/migrations.mjs": {
+		"../../src/script/views/builder/draft.ts": { BuilderDraft: emptyClass() },
+		"../../src/script/views/builder/migrations.ts": {
 			fieldKind: () => null,
 			needsMigration: () => false,
 			repairConditions() {},
 		},
-		"../../src/script/views/builder/panels/components.mjs": {
+		"../../src/script/views/builder/panels/components.ts": {
 			ComponentsPanel: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/condition.mjs": {
+		"../../src/script/views/builder/panels/condition.ts": {
 			ConditionPanel: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/elementSettings.mjs": {
+		"../../src/script/views/builder/panels/elementSettings.ts": {
 			ElementSettings: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/formSettings.mjs": {
+		"../../src/script/views/builder/panels/formSettings.ts": {
 			FormSettings: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/header.mjs": {
+		"../../src/script/views/builder/panels/header.ts": {
 			Header: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/model.mjs": {
+		"../../src/script/views/builder/panels/model.ts": {
 			ModelElement: {},
 			ModelPanel: emptyClass(),
 		},

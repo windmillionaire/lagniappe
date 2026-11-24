@@ -86,12 +86,12 @@ apparently complete marker; the next managed build repairs it.
 
 | Entry point | Output | Responsibility |
 | --- | --- | --- |
-| `src/script/main.mjs` | `script.js` and chunks | Private application and interactive public pages. |
-| `src/script/public.mjs` | `chunks/views/public.js` | Minimal native-share behavior for anonymous public documents. |
-| `src/script/login.mjs` | `login.js` | Identity Platform REST client and login forms. |
-| `src/script/sentry.mjs` | `sentry.js` | Conditional local browser monitoring SDK. |
+| `src/script/main.ts` | `script.js` and chunks | Private application and interactive public pages. |
+| `src/script/public.ts` | `chunks/views/public.js` | Minimal native-share behavior for anonymous public documents. |
+| `src/script/login.ts` | `login.js` | Identity Platform REST client and login forms. |
+| `src/script/sentry.ts` | `sentry.js` | Conditional local browser monitoring SDK. |
 
-`src/script/viewRegistry.mjs` is the source of runtime view selection and
+`src/script/viewRegistry.ts` is the source of runtime view selection and
 stable named entries under `chunks/views/`. Rollup derives feature chunks from
 module boundaries. Editor, PDF, modal, combobox, offline, sync, notification,
 and similar code stay lazy until their owning surface requests them.
@@ -180,8 +180,8 @@ The custom plugins in `build/utility.mjs` enforce one artifact contract:
 
 - `versionChunkImports(buildId)` adds the build query to generated imports
   without renaming files.
-- `updateServiceWorker(buildId)` injects the browser protocol, dynamic precache
-  URLs, and build ID into `sw.template.mjs`, then writes `sw.js` atomically.
+- `updateServiceWorker(buildId)` compiles `sw.template.ts` with the browser
+  protocol, dynamic precache URLs, and build ID, then writes `sw.js` atomically.
 - `recordBuildArtifacts(...)` collects every Rollup output across all entry
   configurations. The build wrapper validates that inventory and publishes the
   completion marker last.

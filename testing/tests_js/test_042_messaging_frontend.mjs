@@ -30,7 +30,7 @@ test("test_mention_node_collection_insertion_and_keyboard_contract", async () =>
 	}
 	const { LagniappeMention, MentionSuggestions, collectMentions } =
 		await esmock.strict(
-			"../../src/script/elements/editor/extensions/mention.mjs",
+			"../../src/script/elements/editor/extensions/mention.ts",
 			{
 				"@floating-ui/dom": {
 					autoUpdate: () => () => {},
@@ -282,7 +282,7 @@ test("test_message_composer_prefills_peer_and_reuses_operation_on_submit", async
 		createElement: () => ({ dataset: {}, setAttribute() {} }),
 	});
 	const { MessageComposer } = await esmock.strict(
-		"../../src/script/elements/messageComposer.mjs",
+		"../../src/script/elements/messageComposer.ts",
 		{
 			"../../src/script/generated/styles.mjs": {
 				STYLES: {
@@ -371,7 +371,7 @@ async function loadNotifications({
 	renderNotificationBadge,
 	composer,
 }) {
-	return await esmock.strict.p("../../src/script/elements/notifications.mjs", {
+	return await esmock.strict.p("../../src/script/elements/notifications.ts", {
 		"../../src/script/generated/styles.mjs": {
 			STYLES: { dropdown: { panel: "", option: { action: "" }, icon: "" } },
 		},
@@ -389,7 +389,7 @@ async function loadNotifications({
 			withTransition: (callback) => callback(),
 		},
 		"../../src/script/elements/combobox/dropdown.ts": { Dropdown: class {} },
-		"../../src/script/elements/messageComposer.mjs": {
+		"../../src/script/elements/messageComposer.ts": {
 			ensureMessageComposer: composer,
 		},
 	});
@@ -537,9 +537,9 @@ test("test_messages_view_refreshes_read_races_and_uses_delete_modal", async (t) 
 		}
 	}
 	const { default: Messages } = await esmock.strict(
-		"../../src/script/views/messages.mjs",
+		"../../src/script/views/messages.ts",
 		{
-			"../../src/script/elements/messageComposer.mjs": {
+			"../../src/script/elements/messageComposer.ts": {
 				ensureMessageComposer: () => {},
 			},
 			"../../src/script/generated/styles.mjs": {

@@ -529,7 +529,7 @@ def _write_release_build(tmp_path):
         "lagniappe/web/static/script.js": "export const main = true;\n",
         "lagniappe/web/static/sw.js": 'const BUILD_ID = "b1234567";\n',
         "package.json": '{"version": "1.2.3"}\n',
-        "src/script/main.mjs": "export const main = true;\n",
+        "src/script/main.ts": "export const main = true;\n",
     }
     for relative, content in files.items():
         path = tmp_path / relative
@@ -538,7 +538,7 @@ def _write_release_build(tmp_path):
     source_paths = [
         "build/publication.json",
         "package.json",
-        "src/script/main.mjs",
+        "src/script/main.ts",
     ]
     source_digest = hashlib.sha256(b"frontend-source-v1\0")
     for relative in source_paths:

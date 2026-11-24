@@ -1,6 +1,6 @@
 {
 	"schema_version": 4,
-	"frontend_entry": "src/script/main.mjs",
+	"frontend_entry": "src/script/main.ts",
 	"registry": {
 		"styles": "src/style/styles.yaml",
 		"schema": "src/style/registry.schema.json",

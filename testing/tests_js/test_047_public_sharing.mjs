@@ -57,7 +57,7 @@ function setupSharingBrowser(t) {
 
 test("test_public_share_entry_initializes_once", async (t) => {
 	const initializePublicSharing = t.mock.fn();
-	await esmock.strict("../../src/script/public.mjs", {
+	await esmock.strict("../../src/script/public.ts", {
 		"../../src/script/shared/publicShare.ts": { initializePublicSharing },
 	});
 	assert.equal(

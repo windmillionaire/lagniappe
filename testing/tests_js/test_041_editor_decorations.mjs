@@ -3,12 +3,12 @@ import { test } from "node:test";
 import { getSchema } from "@tiptap/core";
 import { EditorState, TextSelection } from "@tiptap/pm/state";
 import { StarterKit } from "@tiptap/starter-kit";
-import { SelectionHighlight } from "../../src/script/elements/editor/extensions/highlight.mjs";
-import { FlashRemoteChanges } from "../../src/script/elements/editor/extensions/remote.mjs";
+import { SelectionHighlight } from "../../src/script/elements/editor/extensions/highlight.ts";
+import { FlashRemoteChanges } from "../../src/script/elements/editor/extensions/remote.ts";
 import {
 	setTrackedRangeInTransaction,
 	TrackedRanges,
-} from "../../src/script/elements/editor/extensions/trackedRanges.mjs";
+} from "../../src/script/elements/editor/extensions/trackedRanges.ts";
 
 test("test_selection_highlight_decorations_and_range_mapping", () => {
 	const schema = getSchema([StarterKit]);

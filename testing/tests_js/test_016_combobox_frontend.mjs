@@ -681,7 +681,7 @@ test("test_entity_title_menu_anchors_to_the_title_bottom_left", async (t) => {
 		}
 	}
 	const { EntityMenu } = await esmock.strict(
-		"../../src/script/elements/entityMenu.mjs",
+		"../../src/script/elements/entityMenu.ts",
 		{
 			"../../src/script/elements/combobox/dropdown.ts": {
 				Dropdown: FakeDropdown,

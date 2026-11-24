@@ -5,7 +5,7 @@ import { createBrowser } from "../utility/js/environment.mjs";
 
 async function loadPreview(t, getDocument = t.mock.fn()) {
 	class PDFDataRangeTransport {}
-	return await esmock.strict("../../src/script/widgets/filePdfPreview.mjs", {
+	return await esmock.strict("../../src/script/widgets/filePdfPreview.ts", {
 		"pdfjs-dist": {
 			getDocument,
 			GlobalWorkerOptions: {},

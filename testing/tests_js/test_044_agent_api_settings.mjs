@@ -21,10 +21,10 @@ async function loadUserSettings({
 	captureError = () => {},
 	request = {},
 }) {
-	return await esmock.strict("../../src/script/widgets/userSettings.mjs", {
-		"../../src/script/elements/input.mjs": { InputElement: class {} },
-		"../../src/script/elements/radio.mjs": { RadioElement: class {} },
-		"../../src/script/elements/sectionToggle.mjs": { SectionToggle: {} },
+	return await esmock.strict("../../src/script/widgets/userSettings.ts", {
+		"../../src/script/elements/input.ts": { InputElement: class {} },
+		"../../src/script/elements/radio.ts": { RadioElement: class {} },
+		"../../src/script/elements/sectionToggle.ts": { SectionToggle: {} },
 		"../../src/script/shared/index.ts": {
 			captureError,
 			Modal,

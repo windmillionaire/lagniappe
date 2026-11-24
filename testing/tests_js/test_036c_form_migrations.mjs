@@ -8,7 +8,7 @@ import {
 import {
 	needsMigration,
 	repairConditions,
-} from "../../src/script/views/builder/migrations.mjs";
+} from "../../src/script/views/builder/migrations.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 test("test_delete_element_commits_panel_and_model_changes_in_one_transition", async (t) => {
@@ -21,7 +21,7 @@ test("test_delete_element_commits_panel_and_model_changes_in_one_transition", as
 		else commits.push(commit);
 	};
 	const { default: Modify } = await esmock.strict(
-		"../../src/script/views/builder/conditions/modify.mjs",
+		"../../src/script/views/builder/conditions/modify.ts",
 		{
 			"../../src/script/shared/transitions.ts": { withTransition },
 		},
@@ -94,7 +94,7 @@ test("test_delete_element_commits_panel_and_model_changes_in_one_transition", as
 test("test_builder_resumes_migration_polling_and_clears_completed_status", async (t) => {
 	createBrowser(t);
 	const { Header } = await import(
-		"../../src/script/views/builder/panels/header.mjs"
+		"../../src/script/views/builder/panels/header.ts"
 	);
 	let activeClock = null;
 	for (const target of [globalThis, window]) {
@@ -186,14 +186,14 @@ test("test_builder_resumes_migration_polling_and_clears_completed_status", async
 			},
 		);
 		const { FormChangeStatus } = await esmock.strict(
-			"../../src/script/views/builder/changeStatus.mjs",
+			"../../src/script/views/builder/changeStatus.ts",
 			{
 				"../../src/script/shared/polling.ts": { PollingCoordinator },
 				"../../src/script/shared/request.ts": { request },
 			},
 		);
 		const { default: FormBuilder } = await esmock.strict(
-			"../../src/script/views/builder/builder.mjs",
+			"../../src/script/views/builder/builder.ts",
 			{
 				"../../src/script/shared/index.ts": {
 					captureError(error) {
@@ -206,7 +206,7 @@ test("test_builder_resumes_migration_polling_and_clears_completed_status", async
 					OfflineModal: class {},
 					request,
 				},
-				"../../src/script/views/builder/changeStatus.mjs": {
+				"../../src/script/views/builder/changeStatus.ts": {
 					FormChangeStatus,
 				},
 			},
@@ -233,15 +233,10 @@ test("test_builder_resumes_migration_polling_and_clears_completed_status", async
 				this.header.saved();
 			},
 		});
-		for (const name of [
-			"settings",
-			"conditions",
-			"components",
-			"model",
-			"formSettings",
-		]) {
+		for (const name of ["settings", "conditions", "components", "model"]) {
 			builder[name] = { panel: document.createElement("div") };
 		}
+		builder.formSettings = { column: document.createElement("div") };
 		const saveButton = document.createElement("button");
 		const notification = document.createElement("div");
 		document.body.append(notification);
@@ -334,15 +329,10 @@ test("test_builder_resumes_migration_polling_and_clears_completed_status", async
 		assert.equal(restored, 1, suspension);
 		assert.equal(notification.textContent, "Form update finished.", suspension);
 		assert.equal(polling.subscriptions.size, 0, suspension);
-		for (const name of [
-			"settings",
-			"conditions",
-			"components",
-			"model",
-			"formSettings",
-		]) {
+		for (const name of ["settings", "conditions", "components", "model"]) {
 			assert.equal(builder[name].panel.inert, false, `${suspension}:${name}`);
 		}
+		assert.equal(builder.formSettings.column.inert, false, suspension);
 		builder.draft.dirty = true;
 		builder.header.unsaved();
 		assert.equal(saveButton.getAttribute("aria-disabled"), "false", suspension);
@@ -397,7 +387,7 @@ test("test_builder_resumes_migration_polling_and_clears_completed_status", async
 test("test_migration_status_uses_notification_and_keeps_save_disabled", async (t) => {
 	createBrowser(t);
 	const { Header } = await import(
-		"../../src/script/views/builder/panels/header.mjs"
+		"../../src/script/views/builder/panels/header.ts"
 	);
 	class PollingCoordinator {
 		init() {
@@ -411,22 +401,17 @@ test("test_migration_status_uses_notification_and_keeps_save_disabled", async (t
 		destroy() {}
 	}
 	const { FormChangeStatus } = await esmock.strict(
-		"../../src/script/views/builder/changeStatus.mjs",
+		"../../src/script/views/builder/changeStatus.ts",
 		{
 			"../../src/script/shared/polling.ts": { PollingCoordinator },
 			"../../src/script/shared/request.ts": { request: {} },
 		},
 	);
 	const builder = { draft: { dirty: true }, key: "form-1" };
-	for (const name of [
-		"settings",
-		"conditions",
-		"components",
-		"model",
-		"formSettings",
-	]) {
+	for (const name of ["settings", "conditions", "components", "model"]) {
 		builder[name] = { panel: document.createElement("div") };
 	}
+	builder.formSettings = { column: document.createElement("div") };
 	const saveButton = document.createElement("button");
 	const notification = document.createElement("div");
 	document.body.append(notification);
@@ -446,6 +431,7 @@ test("test_migration_status_uses_notification_and_keeps_save_disabled", async (t
 		can_cancel: true,
 	};
 	status.show(running);
+	assert.equal(builder.formSettings.column.inert, true);
 	assert.equal(header.notification.children[0], status.node);
 	assert.equal(
 		header.notification.textContent,
@@ -485,6 +471,7 @@ test("test_migration_status_uses_notification_and_keeps_save_disabled", async (t
 	status.show({ ...running, status: "failed" });
 	assert.ok(!status.node.textContent.includes("Checklist"));
 	status.show(null);
+	assert.equal(builder.formSettings.column.inert, false);
 	header.unsaved();
 	assert.equal(header.notification.dataset.visible, "false");
 	assert.equal(header.saveButton.getAttribute("aria-disabled"), "false");

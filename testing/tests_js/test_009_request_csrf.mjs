@@ -796,7 +796,7 @@ test("test_login_handoff_refreshes_csrf_before_submit_and_retries_once", async (
 	};
 	replace(t, globalThis, "fetch", fetchImpl);
 	const { handleIdentityUser } = await esmock.strict(
-		"../../src/script/login/tools.mjs",
+		"../../src/script/login/tools.ts",
 		{
 			"../../src/script/shared/analytics.ts": {
 				analytics: {
@@ -869,7 +869,7 @@ test("test_login_verification_email_reuses_refreshed_csrf", async (t) => {
 		token: async () => "fresh-verification-token",
 	};
 	const { handleIdentityUser } = await esmock.strict(
-		"../../src/script/login/tools.mjs",
+		"../../src/script/login/tools.ts",
 		{
 			"../../src/script/shared/analytics.ts": {
 				analytics: { tag() {} },

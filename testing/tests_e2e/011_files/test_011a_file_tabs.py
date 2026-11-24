@@ -5,8 +5,8 @@ Verified against:
 - lagniappe/web/templates/files/file.html
 - lagniappe/web/templates/files/preview.html
 - lagniappe/web/templates/files/text.html
-- src/script/views/file.mjs
-- src/script/widgets/fileInfo.mjs
+- src/script/views/file.ts
+- src/script/widgets/fileInfo.ts
 """
 
 import re

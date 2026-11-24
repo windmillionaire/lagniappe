@@ -12,8 +12,8 @@ Related Files:
         - lagniappe/web/routes/tasks/main.py: Task routes (create, update, personal)
         - lagniappe/web/templates/pages/tasks.html: Page task tab templates
         - lagniappe/web/templates/home/tasks.html: CreateUserTask / HomeTaskList
-        - src/script/views/page.mjs: Page task components
-        - src/script/widgets/taskSettings.mjs: CreateUserTask, BaseTaskSettings
+        - src/script/views/page.ts: Page task components
+        - src/script/widgets/taskSettings.ts: CreateUserTask, BaseTaskSettings
 
     Test Framework:
         - testing/definitions/tasks.py: Tasks enum using this resource

@@ -3,12 +3,12 @@ import { test } from "node:test";
 import { getSchema } from "@tiptap/core";
 import { EditorState, TextSelection } from "@tiptap/pm/state";
 import { StarterKit } from "@tiptap/starter-kit";
-import { MarkdownSource } from "../../src/script/elements/editor/extensions/markdownSource.mjs";
+import { MarkdownSource } from "../../src/script/elements/editor/extensions/markdownSource.ts";
 import {
 	insertMarkdownSource,
 	looksLikeConvertibleMarkup,
-} from "../../src/script/elements/editor/extensions/paste.mjs";
-import { TrackedRanges } from "../../src/script/elements/editor/extensions/trackedRanges.mjs";
+} from "../../src/script/elements/editor/extensions/paste.ts";
+import { TrackedRanges } from "../../src/script/elements/editor/extensions/trackedRanges.ts";
 
 test("test_markdown_detection_is_conservative", () => {
 	for (const source of [

@@ -256,7 +256,7 @@ test("test_style_pipeline_contract_names_authored_inputs_and_outputs", async () 
 // @style button.submit
 test("test_active_action_buttons_preserve_full_width_icon_slots", async (t) => {
 	createBrowser(t);
-	const module = await bundle("./src/script/elements/buttons.mjs");
+	const module = await bundle("./src/script/elements/buttons.ts");
 	const button = document.createElement("button");
 	button.textContent = "Refresh Cache";
 	const action = module.buttons.active({

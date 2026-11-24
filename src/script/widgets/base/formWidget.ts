@@ -14,6 +14,7 @@ import type { DeferredOperationManager } from "../../shared/deferredOperations.t
 import type { Modal } from "../../shared/modal.ts";
 import type { OfflineQueue } from "../../shared/offlineQueue.ts";
 import { withTransition } from "../../shared/transitions.ts";
+import type { RequestResult } from "../../types/api";
 import type {
 	CapturedFormState,
 	FormReviewOperation,
@@ -133,7 +134,7 @@ interface PreparedReset {
 	version?: number;
 }
 
-interface FormResetOptions<Widget extends FormWidget> {
+export interface FormResetOptions<Widget extends FormWidget> {
 	nextTarget?: HTMLElement;
 	staged?: Partial<ResetState>;
 	beforeInit?: ((widget: Widget) => void | Promise<void>) | null;
@@ -153,15 +154,16 @@ export class FormWidget {
 	declare loaded?: boolean;
 	declare headless?: boolean;
 	declare revisionPreview?: boolean;
-	declare historyFillEnabled?: boolean;
-	declare html?: FormWidgetSettings["html"];
-	declare prepend?: FormWidgetSettings["prepend"];
-	declare append?: FormWidgetSettings["append"];
 	declare htmlFields?: FormWidgetSettings["htmlFields"];
 	declare icon?: FormWidgetSettings["icon"];
 	declare error?: FormWidgetSettings["error"];
-	declare handleOfflineQueue?: FormQueueWidget["handleOfflineQueue"];
-	declare offline?: FormQueueWidget["offline"];
+	// Settings and subclasses can supply hooks used by offline submission.
+	offline?(
+		...args: Parameters<NonNullable<FormQueueWidget["offline"]>>
+	): ReturnType<NonNullable<FormQueueWidget["offline"]>>;
+	handleOfflineQueue?(
+		...args: Parameters<NonNullable<FormQueueWidget["handleOfflineQueue"]>>
+	): ReturnType<NonNullable<FormQueueWidget["handleOfflineQueue"]>>;
 	declare reviewState?: FormReviewState | null;
 	declare _reviewedOperations?: Set<string>;
 	declare _usedAutofillOperations?: Set<string>;
@@ -512,6 +514,7 @@ export class FormWidget {
 		this.unsavedState = false;
 	}
 
+	init(): void | Promise<void>;
 	async init() {
 		if (
 			this.target?.hasAttribute("lp-load") &&
@@ -879,6 +882,7 @@ export class FormWidget {
 			pageDescription.textContent = description;
 	}
 
+	created(response?: RequestResult): void;
 	created() {
 		this._created = true;
 	}

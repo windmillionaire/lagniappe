@@ -1,0 +1,85 @@
+import { FONT_MENU } from "../config.ts";
+
+import type { Toolbar } from "../toolbar.ts";
+
+class FontFamilyPicker {
+	declare toggles: Map<string, { active: boolean; button: HTMLButtonElement }>;
+	declare toolbar: Toolbar;
+	declare name: "setFontFamily";
+	declare usedWithEditor: boolean;
+	declare active: boolean;
+	constructor(toolbar: Toolbar) {
+		this.toolbar = toolbar;
+		this.name = "setFontFamily";
+		this.usedWithEditor = true;
+		this.active = false;
+		this.toggles = new Map();
+	}
+
+	_fontToggle(style: string, name: string) {
+		const fontButton = document.createElement("button");
+		fontButton.className = `cursor-pointer rounded bg-slate-200 px-3 py-1.5 text-base transition-transform hover:scale-110 hover:bg-slate-300 data-[active=true]:bg-slate-300 sm:text-sm`;
+		fontButton.textContent = name;
+		fontButton.dataset.style = style;
+		fontButton.title = name;
+		fontButton.dataset.active = "false";
+		return fontButton;
+	}
+
+	setActiveFontStyle(activeFont: string | null | undefined) {
+		this.toggles.forEach((toggle, style) => {
+			const isActive = style === activeFont;
+			if (isActive !== toggle.active) {
+				toggle.button.dataset.active = isActive ? "true" : "false";
+				toggle.active = isActive;
+			}
+		});
+	}
+
+	init() {
+		const fontOptions = this.toolbar.element.appendChild(
+			document.createElement("div"),
+		);
+		fontOptions.dataset.option = this.name;
+		fontOptions.className = `group mt-4 hidden flex-row flex-wrap items-center gap-2 group-data-[open-form="setFontFamily"]/toolbar:flex`;
+
+		FONT_MENU.forEach(({ style, name }) => {
+			const fontButton = this._fontToggle(style, name);
+			this.toggles.set(style, { active: false, button: fontButton });
+		});
+
+		fontOptions.append(
+			...Array.from(this.toggles.values()).map((toggle) => toggle.button),
+		);
+		this.active = true;
+
+		fontOptions.addEventListener("click", (e) => {
+			const fontButton = (e.target as Element | null)?.closest("button");
+			if (!fontButton) return;
+
+			const style = fontButton.dataset.style;
+			if (!style) return;
+			const toggle = this.toggles.get(style);
+			if (!toggle) return;
+
+			const currentActive = Array.from(this.toggles.values()).find(
+				(t) => t.active && t !== toggle,
+			);
+			if (currentActive) {
+				currentActive.active = false;
+				currentActive.button.dataset.active = "false";
+			}
+
+			toggle.active = !toggle.active;
+			fontButton.dataset.active = toggle.active ? "true" : "false";
+
+			if (toggle.active) {
+				this.toolbar.editor.chain().focus().setFontFamily(style).run();
+			} else {
+				this.toolbar.editor.chain().focus().unsetFontFamily().run();
+			}
+		});
+	}
+}
+
+export { FontFamilyPicker as setFontFamily };

@@ -47,9 +47,9 @@ test("test_user_mode_switch_loads_all_pages_and_preserves_current_mode_on_failur
 	let failContinuation = true;
 	const requests = [];
 	const { default: Users } = await esmock.strict(
-		"../../src/script/views/user.mjs",
+		"../../src/script/views/user.ts",
 		{
-			"../../src/script/views/base/index.mjs": { default: class {} },
+			"../../src/script/views/base/index.ts": { default: class {} },
 			"../../src/script/shared/transitions.ts": {
 				withTransition: async (commit) => commit(),
 			},
@@ -115,12 +115,12 @@ test("test_user_mode_switch_loads_all_pages_and_preserves_current_mode_on_failur
 
 async function loadPage() {
 	return (
-		await esmock.strict("../../src/script/views/page.mjs", {
+		await esmock.strict("../../src/script/views/page.ts", {
 			"../../src/script/shared/icons.ts": { setIcon() {} },
 			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
-			"../../src/script/views/base/entity.mjs": { default: EntityBoundary },
+			"../../src/script/views/base/entity.ts": { default: EntityBoundary },
 		})
 	).default;
 }
@@ -185,9 +185,9 @@ test("test_page_task_subscription_survives_list_loading_before_polling_service",
 			}
 		}
 		const { ensurePollingCoordinator } = await esmock.p(
-			"../../src/script/views/base/services.mjs",
+			"../../src/script/views/base/services.ts",
 			{
-				"../../src/script/views/base/shell.mjs": {
+				"../../src/script/views/base/shell.ts": {
 					markPerformance() {},
 					whenIdle: async () => {},
 				},
@@ -227,10 +227,10 @@ test("test_page_task_subscription_survives_list_loading_before_polling_service",
 test("test_collection_manifests_include_hash_and_fingerprint", async () => {
 	class Base {}
 	const [{ IndexTable }, { PageTaskList }] = await Promise.all([
-		esmock.strict("../../src/script/widgets/tables/indexTable.mjs", {
-			"../../src/script/elements/base/baseTable.mjs": { BaseTable: Base },
+		esmock.strict("../../src/script/widgets/tables/indexTable.ts", {
+			"../../src/script/elements/base/baseTable.ts": { BaseTable: Base },
 		}),
-		esmock.strict("../../src/script/widgets/pageTaskList.mjs", {
+		esmock.strict("../../src/script/widgets/pageTaskList.ts", {
 			"../../src/script/elements/base/baseList.ts": { BaseList: Base },
 			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
@@ -269,8 +269,8 @@ test("test_index_table_row_updates_rebuild_active_sort", async (t) => {
 	createBrowser(t);
 	class BaseTable {}
 	const { IndexTable } = await esmock.strict(
-		"../../src/script/widgets/tables/indexTable.mjs",
-		{ "../../src/script/elements/base/baseTable.mjs": { BaseTable } },
+		"../../src/script/widgets/tables/indexTable.ts",
+		{ "../../src/script/elements/base/baseTable.ts": { BaseTable } },
 	);
 	const row = (key, modified) => {
 		const element = document.createElement("tr");
@@ -331,8 +331,8 @@ async function deltaTable(t, html) {
 	createBrowser(t, { html: `<table><tbody>${html}</tbody></table>` });
 	class BaseTable {}
 	const { IndexTable } = await esmock.strict(
-		"../../src/script/widgets/tables/indexTable.mjs",
-		{ "../../src/script/elements/base/baseTable.mjs": { BaseTable } },
+		"../../src/script/widgets/tables/indexTable.ts",
+		{ "../../src/script/elements/base/baseTable.ts": { BaseTable } },
 	);
 	const target = document.querySelector("tbody");
 	const released = [];
@@ -340,7 +340,7 @@ async function deltaTable(t, html) {
 	const table = Object.create(IndexTable.prototype);
 	Object.assign(table, {
 		target,
-		view: { mobile: false, addFlash: (...rows) => flashed.push(...rows) },
+		view: { mobile: false, addFlash: (row) => flashed.push(row) },
 		component: {
 			widgets: {
 				TableEditor: {
@@ -397,6 +397,21 @@ test("test_index_delta_preserves_unchanged_rows_and_focus", async (t) => {
 		observer.takeRecords(),
 		[],
 		"An unchanged order must not detach rows",
+	);
+});
+
+test("test_index_delta_flashes_each_new_row", async (t) => {
+	const { table, flashed } = await deltaTable(t, "");
+	table.refreshDelta({
+		upsert: [
+			{ key: "a", html: '<tr lp-entity data-key="a"><td>Alpha</td></tr>' },
+			{ key: "b", html: '<tr lp-entity data-key="b"><td>Bravo</td></tr>' },
+		],
+		order: ["a", "b"],
+	});
+	assert.deepEqual(
+		flashed.map((row) => row.dataset.key),
+		["a", "b"],
 	);
 });
 
@@ -509,7 +524,7 @@ test("test_core_refresh_batches_supported_widgets_and_falls_back_per_target", as
 		},
 	};
 	const { reconcileChange, refreshCollectionComponents } = await esmock.strict(
-		"../../src/script/views/base/reconciliation.mjs",
+		"../../src/script/views/base/reconciliation.ts",
 		{
 			"../../src/script/shared/errors.ts": {
 				captureError(error) {

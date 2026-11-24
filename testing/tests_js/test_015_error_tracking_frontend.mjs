@@ -59,7 +59,7 @@ test("test_login_error_delegates_to_shared_capture", async (t) => {
 	const calls = [];
 	const captureErrorBoundary = t.mock.fn((...args) => calls.push(args));
 	const { captureLoginError } = await esmock.strict(
-		"../../src/script/login/error.mjs",
+		"../../src/script/login/error.ts",
 		{
 			"../../src/script/shared/errors.ts": {
 				captureError: captureErrorBoundary,

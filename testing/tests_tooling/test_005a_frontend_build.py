@@ -37,7 +37,7 @@ def _write_completed_build(root, *, mode="production", version="1.2.3"):
     sources = {
         "build/publication.json": f"{json.dumps(contract, sort_keys=True)}\n",
         "package.json": f'{{"version": "{version}"}}\n',
-        "src/script/main.mjs": "export const current = true;\n",
+        "src/script/main.ts": "export const current = true;\n",
     }
     artifacts = {
         "lagniappe/web/static/chunks/shared.js": "export const shared = true;\n",

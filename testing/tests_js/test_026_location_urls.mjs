@@ -5,7 +5,7 @@ import { createBrowser } from "../utility/js/environment.mjs";
 async function setup(t) {
 	createBrowser(t);
 	const [{ LocationElement }, { STYLES }] = await Promise.all([
-		import("../../src/script/elements/location.mjs"),
+		import("../../src/script/elements/location.ts"),
 		import("../../src/script/generated/styles.mjs"),
 	]);
 	const render = (submission) => new LocationElement({}, {}, submission).read;

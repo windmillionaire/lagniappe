@@ -287,7 +287,7 @@ button:
         json.dumps(
             {
                 "schema_version": 4,
-                "frontend_entry": "src/script/main.mjs",
+                "frontend_entry": "src/script/main.ts",
                 "registry": {
                     "styles": "src/style/styles.yaml",
                     "schema": "src/style/registry.schema.json",
@@ -346,7 +346,7 @@ button:
     )
     write_file(tmp_path / "src/style/components.css", ".button { display: flex; }\n")
     write_file(
-        tmp_path / "src/script/main.mjs",
+        tmp_path / "src/script/main.ts",
         'import "../style/main.css";\nconst icon = createIcon("dueDate");\n',
     )
     write_file(

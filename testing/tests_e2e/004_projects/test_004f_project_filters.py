@@ -15,8 +15,8 @@ Application:
     - Routes: lagniappe/web/routes/filters/main.py (condition, options, test, save)
     - Templates: lagniappe/web/templates/filters.html (condition macros by type)
     - Templates: lagniappe/web/templates/projects/filters.html (project wiring)
-    - Frontend: src/script/widgets/filters.mjs (Filters widget)
-    - Frontend: src/script/widgets/filterResults.mjs (FilterResults widget)
+    - Frontend: src/script/widgets/filters.ts (Filters widget)
+    - Frontend: src/script/widgets/filterResults.ts (FilterResults widget)
     - Cache: lagniappe/core/tools/filters/cache.py (FilterCache)
 
 Test Framework:

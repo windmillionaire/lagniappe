@@ -4,7 +4,7 @@ import { createBrowser } from "../utility/js/environment.mjs";
 
 test("test_table_validation_uses_form_key_for_detached_preview", async (t) => {
 	createBrowser(t);
-	const { TableElement } = await import("../../src/script/elements/table.mjs");
+	const { TableElement } = await import("../../src/script/elements/table.ts");
 	const renderer = {
 		form: {
 			key: "page-key",
@@ -55,7 +55,7 @@ test("test_table_touch_movement_threshold_distinguishes_tap_from_swipe", async (
 		}
 		return removeEventListener(type, handler, options);
 	});
-	const { TableElement } = await import("../../src/script/elements/table.mjs");
+	const { TableElement } = await import("../../src/script/elements/table.ts");
 	const renderer = { form: { key: "page-key" }, readonly: false };
 	const table = new TableElement(renderer, { id: "contacts" }, null);
 	table._edit = document.querySelector("#table-edit");

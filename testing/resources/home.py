@@ -16,7 +16,7 @@ Related Files:
         - lagniappe/web/templates/home/starred.html: Starred component
         - lagniappe/web/templates/home/notes.html: Notes component
         - lagniappe/web/templates/home/tools.html: Tools component
-        - src/script/views/home.mjs: View initialization
+        - src/script/views/home.ts: View initialization
         - src/script/widgets/home/: Home list, activity, and task widget classes
 
     Core Entity:

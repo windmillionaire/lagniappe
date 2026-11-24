@@ -4,7 +4,7 @@ The frontend lives in `src/` and is split into two concerns: JavaScript applicat
 
 ## Entry Points
 
-### `main.mjs` (app and public pages)
+### `main.ts` (app and public pages)
 
 The primary entry point for logged-in users, and for public pages that need
 shared infrastructure such as analytics. On DOM ready it:
@@ -27,7 +27,7 @@ health and force view sync. `Core.sync()` schedules offline replay, re-registers
 document/widget polling ownership, and runs one shared catch-up. Only changed
 entity/collection results invoke their focused probe or refresh route.
 
-### `login.mjs` (unauthenticated)
+### `login.ts` (unauthenticated)
 
 A separate bundle for the login page. It initializes the focused Identity
 Platform REST client, selects the server-rendered login form, and coordinates
@@ -36,7 +36,7 @@ Auth SDK. The client/server trust boundary, Google button iframe and CSP,
 verification delivery, account states, and recovery behavior are documented in
 [AUTHENTICATION.md](AUTHENTICATION.md).
 
-### `sentry.mjs` (conditional production monitoring)
+### `sentry.ts` (conditional production monitoring)
 
 A separate local bundle for `@sentry/browser`. Production templates load it
 only when error reporting is enabled and a browser DSN is configured. It loads
@@ -52,7 +52,7 @@ integrations or the sanitizer.
 
 ## View registry
 
-`src/script/viewRegistry.mjs` maps `data-kind` values to lazy-loaded view
+`src/script/viewRegistry.ts` maps `data-kind` values to lazy-loaded view
 modules:
 
 ```
@@ -118,12 +118,11 @@ See [Frontend Forms](FRONTEND_FORMS.md) for ownership and service contracts.
 
 Run `npm run typecheck` with the Node version in `.nvmrc` after `npm ci`.
 The compiler strictly checks native TypeScript in `src/script/` without emitting
-files. The shared modules, forms engine, core form, list, upload, and view base
-classes, home widgets, comboboxes, tools widget, and six site settings panels
-use `.ts`. Shared declarations live in `src/script/types/`.
-Unconverted `.mjs` modules still resolve normally. Use explicit extensions on
-relative runtime imports and `import type` for type-only imports. Keep syntax
-erasable so the repository's Node tests can load TypeScript directly.
+files. The authored frontend modules use `.ts`. Shared declarations live in
+`src/script/types/`, and style and icon generation still emits `.mjs` files.
+Use explicit extensions on relative runtime imports and `import type` for
+type-only imports. Keep syntax erasable so the repository's Node tests can
+load TypeScript directly.
 
 ## Styles and build output
 
@@ -141,10 +140,10 @@ service-worker generation, and release output.
 ```
 src/
 ├── script/
-│   ├── main.mjs              # App entry point
-│   ├── login.mjs             # Login entry point
-│   ├── sentry.mjs            # Conditional local browser monitoring
-│   ├── sw.template.mjs        # Service worker template
+│   ├── main.ts              # App entry point
+│   ├── login.ts             # Login entry point
+│   ├── sentry.ts            # Conditional local browser monitoring
+│   ├── sw.template.ts        # Service worker template
 │   ├── config/                # Editor configuration
 │   ├── elements/              # Form elements (see FRONTEND_ELEMENTS.md)
 │   ├── forms/                 # Form controllers, controls, and revisions (see FRONTEND_FORMS.md)

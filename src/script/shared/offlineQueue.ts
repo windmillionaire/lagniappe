@@ -93,10 +93,10 @@ interface QueueWidget {
 interface QueueComponent {
 	name: string;
 	elt: HTMLElement;
-	active?: QueueWidget | null;
+	active?: QueueWidget | { standalone: boolean; target?: never } | null;
 	formData?: FormData | null;
 	widgets: Partial<Record<string, QueueWidget>>;
-	loadWidget(name: string): Promise<QueueWidget | undefined>;
+	loadWidget(name: string): Promise<QueueWidget | null | undefined>;
 }
 
 interface QueueWatcher {
@@ -342,7 +342,12 @@ export class OfflineQueue {
 	) {
 		const widget = component.active;
 		const target = widget?.target;
-		if (!widget || !target?.hasAttribute("lp-offline")) return null;
+		if (
+			!widget ||
+			"standalone" in widget ||
+			!target?.hasAttribute("lp-offline")
+		)
+			return null;
 		if (typeof widget.offline !== "function") return null;
 
 		await this._destinationWidget(component);

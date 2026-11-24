@@ -37,13 +37,13 @@ test("test_create_user_focuses_on_open_and_reset_without_stealing_live_field_foc
 		}
 	}
 	const { CreateUser } = await esmock.strict(
-		"../../src/script/widgets/user.mjs",
+		"../../src/script/widgets/user.ts",
 		{
-			"../../src/script/elements/facetedSearch.mjs": {
+			"../../src/script/elements/facetedSearch.ts": {
 				FacetedSearchElement: class {},
 			},
-			"../../src/script/elements/input.mjs": { InputElement: class {} },
-			"../../src/script/elements/radio.mjs": { RadioElement: class {} },
+			"../../src/script/elements/input.ts": { InputElement: class {} },
+			"../../src/script/elements/radio.ts": { RadioElement: class {} },
 			"../../src/script/widgets/base/formWidget.ts": { FormWidget },
 		},
 	);
@@ -173,7 +173,7 @@ test("test_group_permissions_tracks_rename_draft_after_target_rebuild", async ()
 		}
 	}
 	const { GroupPermissions } = await esmock.strict(
-		"../../src/script/widgets/userPermissions.mjs",
+		"../../src/script/widgets/userPermissions.ts",
 		{
 			"../../src/script/widgets/base/formWidget.ts": { FormWidget },
 		},

@@ -10,7 +10,7 @@ Related Files:
         - lagniappe/web/templates/home/categories.html: Category component template
         - lagniappe/web/templates/categories/: Category page templates
         - src/script/widgets/home/lists.ts: HomeCategoryList widget
-        - src/script/views/home.mjs: Category initialization
+        - src/script/views/home.ts: Category initialization
 
     Core Entity:
         - lagniappe/core/entities/category.py: Category entity

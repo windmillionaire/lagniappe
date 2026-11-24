@@ -5,7 +5,7 @@ import { createBrowser } from "../utility/js/environment.mjs";
 async function setup(t) {
 	createBrowser(t, { url: "https://example.test/" });
 	const [{ formatting }, { Results }, { STYLES }] = await Promise.all([
-		import("../../src/script/elements/formatting.mjs"),
+		import("../../src/script/elements/formatting.ts"),
 		import("../../src/script/elements/combobox/results.ts"),
 		import("../../src/script/generated/styles.mjs"),
 	]);

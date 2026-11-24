@@ -1,0 +1,41 @@
+import { STYLES } from "../../generated/styles.mjs";
+import { setIcon } from "../../shared/icons.ts";
+import { Dropdown } from "../combobox/dropdown.ts";
+import type { ToolbarOption } from "./toolbar.ts";
+
+export const createMenuButton = (settings: { title: string; icon: string }) => {
+	const button = document.createElement("button");
+	button.title = settings.title;
+	button.type = "button";
+	button.setAttribute("aria-label", settings.title);
+	button.className = `${STYLES.editor.toolbar.menu}`;
+
+	const icon = button.appendChild(document.createElement("span"));
+	setIcon(icon, settings.icon, STYLES.editor.toolbar.menuIcon);
+
+	const chevron = button.appendChild(document.createElement("span"));
+	setIcon(chevron, "menu", STYLES.editor.toolbar.caret);
+	return button;
+};
+
+export const toolbarDropdown = (
+	menu: { title: string; icon: string },
+	items: ToolbarOption[],
+	beforeOpen?: () => void | Promise<void>,
+) => {
+	const menuButton = createMenuButton(menu);
+
+	const dropdown = new Dropdown(menuButton);
+	dropdown.init({
+		items,
+		loadOptions: async () => {
+			await beforeOpen?.();
+			return items.filter((item) => item.isAvailable?.() ?? true);
+		},
+		styles: {
+			panel: `${STYLES.dropdown.menu} ${STYLES.editor.toolbar.portalIconContext} w-max max-w-[calc(100vw-0.625rem)]`,
+		},
+	});
+
+	return menuButton;
+};

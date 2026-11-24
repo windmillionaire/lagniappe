@@ -78,7 +78,7 @@ function installShellEnvironment(t, mode) {
 
 async function loadShellView(connectivity = { online: true, hidden: false }) {
 	const { default: ShellView } = await esmock.strict(
-		"../../src/script/views/base/shell.mjs",
+		"../../src/script/views/base/shell.ts",
 		{
 			"../../src/script/shared/connectivity.ts": { connectivity },
 		},
@@ -330,13 +330,13 @@ async function loadCore(connectivity = { online: true }) {
 			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
-			"../../src/script/views/base/component.mjs": { default: class {} },
-			"../../src/script/views/base/reconciliation.mjs": {
+			"../../src/script/views/base/component.ts": { default: class {} },
+			"../../src/script/views/base/reconciliation.ts": {
 				collectRefreshTargets: () => [],
 				reconcileChange() {},
 				refreshCollectionComponents() {},
 			},
-			"../../src/script/views/base/services.mjs": {
+			"../../src/script/views/base/services.ts": {
 				ensureDeferredOperations: emptyService,
 				ensureEditWatcher: emptyService,
 				ensureEntityMenu: emptyService,
@@ -350,8 +350,8 @@ async function loadCore(connectivity = { online: true }) {
 				ensureSyncManager: emptyService,
 				initializeCoreServices() {},
 			},
-			"../../src/script/views/base/shell.mjs": { default: ShellView },
-			"../../src/script/views/base/task.mjs": { Task: class {} },
+			"../../src/script/views/base/shell.ts": { default: ShellView },
+			"../../src/script/views/base/task.ts": { Task: class {} },
 		},
 	);
 	return Core;
@@ -627,14 +627,14 @@ test("test_core_sync_distinguishes_visible_blur_from_hard_suspension", async () 
 
 async function loadViewComponent() {
 	const { default: ViewComponent } = await esmock.strict(
-		"../../src/script/views/base/component.mjs",
+		"../../src/script/views/base/component.ts",
 		{
-			"../../src/script/elements/nav.mjs": { NavElement: class {} },
+			"../../src/script/elements/nav.ts": { NavElement: class {} },
 			"../../src/script/shared/errors.ts": { captureError() {} },
 			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
-			"../../src/script/widgets/loader.mjs": {
+			"../../src/script/widgets/loader.ts": {
 				loadWidget: async () => null,
 			},
 		},
@@ -642,7 +642,7 @@ async function loadViewComponent() {
 	return ViewComponent;
 }
 
-/** @covers src/script/views/base/component.mjs::ViewComponent.activate */
+/** @covers src/script/views/base/component.ts::ViewComponent.activate */
 test("test_static_component_without_default_widget_activates", async () => {
 	const ViewComponent = await loadViewComponent();
 	const component = Object.create(ViewComponent.prototype);
@@ -805,7 +805,7 @@ async function loadCollaborativeDocument({
 		mergeUpdates: () => null,
 	};
 	const { CollaborativeDocument } = await esmock.strict(
-		"../../src/script/elements/editor/collaborative.mjs",
+		"../../src/script/elements/editor/collaborative.ts",
 		{
 			yjs: Y,
 			"../../src/script/generated/styles.mjs": {
@@ -816,14 +816,14 @@ async function loadCollaborativeDocument({
 				uint8ArrayToBase64: () => "",
 				waitForAttribute,
 			},
-			"../../src/script/elements/editor/editor.mjs": {
+			"../../src/script/elements/editor/editor.ts": {
 				collaborativeEditor: () => editor,
 			},
-			"../../src/script/elements/editor/extensions/index.mjs": {
+			"../../src/script/elements/editor/extensions/index.ts": {
 				MentionSuggestions: class {},
 			},
-			"../../src/script/elements/editor/toolbar.mjs": { Toolbar: class {} },
-			"../../src/script/elements/editor/versions.mjs": {
+			"../../src/script/elements/editor/toolbar.ts": { Toolbar: class {} },
+			"../../src/script/elements/editor/versions.ts": {
 				DocumentVersions: class {
 					beforeSync() {
 						return true;

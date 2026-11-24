@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as Y from "yjs";
-import { DocumentReadCache } from "../../src/script/elements/editor/readCache.mjs";
+import { DocumentReadCache } from "../../src/script/elements/editor/readCache.ts";
 
 function cacheStorage(t) {
 	const previous = { caches: globalThis.caches, location: globalThis.location };

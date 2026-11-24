@@ -10,8 +10,8 @@ Related Files:
         - lagniappe/web/routes/files/ingress.py: Ingress upload and progress routes
         - lagniappe/web/templates/home/ingress.html: Import component template
         - lagniappe/web/templates/delete/ingress.html: Delete confirmation modal
-        - src/script/widgets/ingressUpload.mjs: Import upload widget
-        - src/script/elements/upload.mjs: Shared upload element
+        - src/script/widgets/ingressUpload.ts: Import upload widget
+        - src/script/elements/upload.ts: Shared upload element
 
     Core:
         - lagniappe/core/properties/file_ingress.py: File ingress processing

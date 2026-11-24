@@ -263,7 +263,7 @@ is not migrated by public rendering.
 
 The toolbar is shared between both document types. It creates tool buttons and dropdown menus, manages toolbar forms (color picker, image settings, link insertion), and tracks the active editor state.
 
-Feature configuration lives beside the toolbar in `elements/editor/config.mjs`:
+Feature configuration lives beside the toolbar in `elements/editor/config.ts`:
 `TOOLBAR_TOOLS`, `TOOLBAR_MENUS`, `IMAGE_GROUPS`, `COLOR_MENU`, `FONT_MENU`, and
 `USER_COLORS`. This module contains only configuration data. Toolbar options
 remain lazy through the literal registries in `options/registry.mjs`.

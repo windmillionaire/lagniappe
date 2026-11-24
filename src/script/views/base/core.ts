@@ -1,6 +1,6 @@
 import type { SearchBox } from "../../elements/combobox/search.ts";
-import type { EntityMenu } from "../../elements/entityMenu.mjs";
-import type { Notifications } from "../../elements/notifications.mjs";
+import type { EntityMenu } from "../../elements/entityMenu.ts";
+import type { Notifications } from "../../elements/notifications.ts";
 import type { EditWatcher } from "../../forms/revisions/watcher.ts";
 import { connectivity } from "../../shared/connectivity.ts";
 import type { DeferredOperationManager } from "../../shared/deferredOperations.ts";
@@ -21,13 +21,12 @@ import { request } from "../../shared/request.ts";
 import type { SyncManager } from "../../shared/sync.ts";
 import { withTransition } from "../../shared/transitions.ts";
 import type { RequestResult } from "../../types/api";
-import type { SyncWidget } from "../../types/sync";
-import ViewComponent from "./component.mjs";
+import ViewComponent from "./component.ts";
 import {
 	collectRefreshTargets,
 	reconcileChange,
 	refreshCollectionComponents,
-} from "./reconciliation.mjs";
+} from "./reconciliation.ts";
 import {
 	ensureDeferredOperations,
 	ensureEditWatcher,
@@ -41,10 +40,10 @@ import {
 	ensureSubmissionManager,
 	ensureSyncManager,
 	initializeCoreServices,
-} from "./services.mjs";
-import ShellView from "./shell.mjs";
-import type { SubmissionManager } from "./submission.mjs";
-import { Task } from "./task.mjs";
+} from "./services.ts";
+import ShellView, { type ViewRoot, type ViewSyncOptions } from "./shell.ts";
+import type { SubmissionManager } from "./submission.ts";
+import { Task } from "./task.ts";
 
 type PollChannel = PollDescriptor<"channel">["channel"];
 
@@ -64,7 +63,7 @@ const isRootCollectionChannel = (
 ): channel is PollChannel =>
 	Boolean(channel && ROOT_COLLECTION_CHANNELS.has(channel));
 
-interface ReconcileChange {
+export interface ReconcileChange {
 	type?: string;
 	key?: string | null;
 	starred?: boolean;
@@ -73,60 +72,32 @@ interface ReconcileChange {
 	deferred_revision?: string;
 }
 
-interface RefreshOptions {
+export interface RefreshOptions {
 	fingerprint?: string | null;
 	deferCommit?: boolean;
 	beforeCommit?: (() => void) | null;
 }
 
-type CoreWidget = (SyncWidget | { syncId?: null }) & {
-	component?: CoreComponent | null;
-	name: string;
-	key?: string | null;
-	target?: HTMLElement | null;
-	visible?: boolean;
-	refresh?(response: RequestResult | undefined): unknown;
-	syncPollingSubscription?(): unknown;
-};
+export type ComponentElement = HTMLElement & { _lp_component?: ViewComponent };
 
-// ViewComponent and its widget registry are still implemented in JavaScript.
-type CoreComponent = Omit<
-	ViewComponent,
-	"elt" | "name" | "active" | "widgets" | "route" | "activate" | "prepareRender"
-> & {
-	elt: HTMLElement;
-	name: string;
-	active: CoreWidget | null;
-	widgets: Record<string, CoreWidget>;
-	readonly route: string | undefined;
-	activate(name?: string | null): Promise<boolean>;
-	prepareRender(visible?: boolean): Promise<void>;
-};
-
-type ComponentElement = HTMLElement & { _lp_component?: CoreComponent };
-
-interface CollectionRefreshTarget {
-	descriptor: {
-		id: string;
-		rows: { key?: string; hash: string; fingerprint: string }[];
-	};
-	widget: CoreWidget;
-}
-
-type ModalClasses = {
+export type ModalClasses = {
 	DeleteModal: typeof DeleteModal;
 	HelpModal: typeof HelpModal;
 	Modal: typeof Modal;
 };
 
-type ViewNotifications = Notifications & {
+export type ViewNotifications = Notifications & {
 	notify?(message: string): unknown;
 };
 
-type CoreServicesReady =
+export type EssentialService = Awaited<
+	ReturnType<Core["ensurePollingCoordinator"]> | ReturnType<Core["prefetch"]>
+>;
+
+export type CoreServicesReady =
 	| []
 	| [
-			essential: PromiseSettledResult<PollingCoordinator | null | undefined>[],
+			essential: PromiseSettledResult<EssentialService>[],
 			optional: PromiseSettledResult<
 				ViewNotifications | DeferredOperationManager | EditWatcher | null
 			>[],
@@ -135,44 +106,33 @@ type CoreServicesReady =
 			initialReplayCount: number,
 	  ];
 
-interface SyncOptions {
-	hidden?: boolean;
-	blurred?: boolean;
-	blurredAt?: number | null;
-	force?: boolean;
-}
-
 export default class Core extends ShellView {
-	declare elt: HTMLElement;
-	declare kind: string | undefined;
-	declare hash: string | undefined;
-	declare key: string | undefined;
-	declare _publishedReady: Promise<this>;
 	declare servicesReady: Promise<this | CoreServicesReady>;
-	declare components: Record<string, CoreComponent>;
-	declare runColdAction: <Loaded, Result>(
-		owner: Element | null | undefined,
-		load: () => Loaded,
-		activate: (value: Awaited<Loaded>) => Result,
-		busyOwner?: Element | null,
-	) => Promise<Awaited<Result> | null>;
 
 	declare offlineIndicator: HTMLElement | null;
 	declare offlineModal: OfflineModal | null;
 	declare Notifications: ViewNotifications | null;
 	declare offlineQueue: OfflineQueue | null;
-	declare PollingCoordinator: PollingCoordinator | null;
 	declare DeferredOperations: DeferredOperationManager | null;
 	declare SyncManager: SyncManager | null;
 	declare EditWatcher: EditWatcher | null;
 	declare SubmissionManager: SubmissionManager | null;
-	declare SearchBox: SearchBox | null;
 	declare EntityMenu: EntityMenu | null;
 	declare ModalClasses: ModalClasses | null;
 	declare offlineQueueReady: Promise<OfflineQueue | null>;
 	declare syncReady: Promise<SyncManager | null>;
 	declare initialReplayReady: Promise<number>;
 	declare replayReady: Promise<number>;
+	declare _offlineQueuePromise?: Promise<OfflineQueue | null> | null;
+	declare _syncPromise?: Promise<SyncManager | null> | null;
+	declare _editWatcherPromise?: Promise<EditWatcher | null> | null;
+	declare _deferredOperationsPromise?: Promise<DeferredOperationManager | null> | null;
+	declare _entityMenuPromise?: Promise<EntityMenu | null> | null;
+	declare _submissionPromise?: Promise<SubmissionManager | null> | null;
+	declare _offlineModalPromise?: Promise<OfflineModal | null> | null;
+	declare _modalClassesPromise?: Promise<ModalClasses | null> | null;
+	declare _servicesInitialized?: boolean;
+	declare _serviceStart?: Promise<this>;
 	declare connectivityGeneration: number;
 	declare blurred: boolean;
 	declare blurredAt: number | null;
@@ -185,7 +145,7 @@ export default class Core extends ShellView {
 	declare private _offlineReplayTask: Promise<number> | null;
 	declare private _coldControlListener: EventListener | null;
 
-	constructor(node: HTMLElement) {
+	constructor(node: ViewRoot) {
 		super(node);
 		this.hasDeferredServices = true;
 		this.offlineIndicator = document.querySelector<HTMLElement>(
@@ -243,6 +203,7 @@ export default class Core extends ShellView {
 		);
 	}
 
+	init(): Promise<this> | Promise<void>;
 	async init() {
 		await super.init();
 		initializeCoreServices(this);
@@ -387,13 +348,17 @@ export default class Core extends ShellView {
 	 * handled by the next iteration.
 	 *
 	 */
-	reconcileChange(change: ReconcileChange = {}): Promise<void> {
+	reconcileChange(
+		change: ReconcileChange = {},
+	): Promise<void> | Promise<boolean> {
 		return reconcileChange(this, change);
 	}
 
 	async refreshSupplementalCollections(_changes: ReconcileChange[]) {}
 
-	async afterReconcileChange(_change: ReconcileChange) {}
+	afterReconcileChange(_change: ReconcileChange): void | Promise<void> {
+		return Promise.resolve();
+	}
 
 	_applyStarState({ key, starred, type }: ReconcileChange = {}) {
 		if (!key) return;
@@ -474,7 +439,7 @@ export default class Core extends ShellView {
 		blurred = false,
 		blurredAt = null,
 		force = false,
-	}: SyncOptions = {}) {
+	}: ViewSyncOptions = {}) {
 		const online = connectivity.online;
 		const visibleBlur = Boolean(hidden && blurred);
 
@@ -536,7 +501,7 @@ export default class Core extends ShellView {
 	 */
 	scheduleOfflineReplay(): Promise<number> {
 		if (this._offlineReplayTask) return this._offlineReplayTask;
-		const replay: Promise<number> = import("./offlineReplay.mjs").then(
+		const replay: Promise<number> = import("./offlineReplay.ts").then(
 			({ replayOfflineQueue }) => replayOfflineQueue(this),
 		);
 		this._offlineReplayTask = replay;
@@ -614,14 +579,12 @@ export default class Core extends ShellView {
 		);
 	}
 
-	_collectRefreshTargets(
-		components: CoreComponent[],
-	): Map<string, CollectionRefreshTarget> {
+	_collectRefreshTargets(components: ViewComponent[]) {
 		return collectRefreshTargets(this, components);
 	}
 
 	async _refreshCollectionComponents(
-		components: CoreComponent[],
+		components: ViewComponent[],
 		options: RefreshOptions = {},
 	) {
 		return refreshCollectionComponents(this, components, options);
@@ -646,6 +609,10 @@ export default class Core extends ShellView {
 		}
 	}
 
+	refresh(
+		navigation?: boolean,
+		options?: RefreshOptions,
+	): Promise<void> | Promise<boolean>;
 	async refresh(navigation = false, options: RefreshOptions = {}) {
 		return this.refreshCollections(navigation, options);
 	}
@@ -715,7 +682,7 @@ export default class Core extends ShellView {
 		const target = e?.target;
 		if (!e || !(target instanceof Element)) return;
 		const menuTrigger = target.closest("[data-role='menu-trigger']");
-		const menu = menuTrigger?.closest("[lp-menu]");
+		const menu = menuTrigger?.closest<HTMLElement>("[lp-menu]");
 		if (menu && this.elt.contains(menu)) {
 			e.preventDefault();
 			e.stopPropagation();
@@ -820,7 +787,7 @@ export default class Core extends ShellView {
 		);
 	}
 
-	getComponent(itemElt?: Element | null): CoreComponent | null {
+	getComponent(itemElt?: Element | null): ViewComponent | null {
 		const target = itemElt?.closest<ComponentElement>("[lp-component]");
 		if (target?._lp_component) return target._lp_component;
 
@@ -832,7 +799,7 @@ export default class Core extends ShellView {
 			)
 				? Task
 				: ViewComponent;
-			const component: CoreComponent = new ComponentClass(target, this);
+			const component = new ComponentClass(target, this);
 			this.components[id] = component;
 			target._lp_component = component;
 			target.setAttribute("initialized", "");
@@ -874,7 +841,7 @@ export default class Core extends ShellView {
 	}
 
 	async update(
-		component: CoreComponent,
+		component: ViewComponent,
 		data: FormData,
 		route: string | URL | undefined = component.route,
 	): Promise<void> {
@@ -883,7 +850,7 @@ export default class Core extends ShellView {
 	}
 
 	async create(
-		component: CoreComponent,
+		component: ViewComponent,
 		data: FormData,
 		route: string | URL | undefined = component.route,
 	): Promise<void> {
@@ -892,7 +859,7 @@ export default class Core extends ShellView {
 	}
 
 	async load(
-		component: CoreComponent,
+		component: ViewComponent,
 		route?: string | URL | null,
 	): Promise<RequestResult | null> {
 		if (!route) return null;
@@ -906,7 +873,7 @@ export default class Core extends ShellView {
 
 	_setLoadingTrigger(
 		trigger: HTMLElement,
-		component: CoreComponent,
+		component: ViewComponent,
 		widgetName: string,
 	) {
 		const target = component.elt.querySelector(`[data-widget="${widgetName}"]`);
@@ -960,7 +927,9 @@ export default class Core extends ShellView {
 		const showActiveWidget = widgetName === "active" && component.active;
 
 		if (toggleWidget || toggleComponent) {
-			widgetName = component.active?.visible ? null : activeWidget;
+			const active = component.active;
+			widgetName =
+				active && "visible" in active && active.visible ? null : activeWidget;
 		} else if (showActiveWidget) {
 			widgetName = activeWidget;
 		}

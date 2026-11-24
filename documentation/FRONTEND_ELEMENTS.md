@@ -37,7 +37,7 @@ field and renderer listener.
 
 ## Loader and base element
 
-`elements/loader.mjs` imports a field class by `schema.type`; unknown types are
+`elements/loader.ts` imports a field class by `schema.type`; unknown types are
 errors. `BaseElement` receives the renderer, schema, and submission and lazily
 creates its DOM.
 
@@ -163,7 +163,7 @@ clearer dependencies alone do not establish a smaller bundle.
 
 ## Primitives
 
-`elements/primitives.mjs` owns DOM factories for inputs, labels, badges,
+`elements/primitives.ts` owns DOM factories for inputs, labels, badges,
 toggles, icons, loading states, and submit/explain buttons. Pass semantic style
 and icon IDs rather than raw duplicated class sets or Material glyph names.
 

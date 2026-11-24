@@ -8,7 +8,7 @@ that editor option changes persist after reload.
 Related Files:
     Application:
         - src/script/elements/editor/options/: Editor option implementations
-        - src/script/elements/editor/toolbar.mjs: Toolbar and menus
+        - src/script/elements/editor/toolbar.ts: Toolbar and menus
 
     Test Framework:
         - testing/elements/editor.py: Editor class, option enums, and form helpers

@@ -1,6 +1,6 @@
 import { FormController } from "../../forms/controller.ts";
 import { directUpload } from "../../shared/directUpload.ts";
-import { uploadElement } from "../upload.mjs";
+import { uploadElement } from "../upload.ts";
 
 const PASTE_ERROR =
 	"File detected in clipboard but not accessible. Try pressing Cmd+V (Mac) or Ctrl+V (Windows/Linux) to paste instead.";
@@ -170,7 +170,7 @@ export class BaseUpload {
 	declare route?: UploadAttributes["route"];
 	declare endpoints?: UploadAttributes["endpoints"];
 	declare maxFileSize?: number;
-	declare uploadImage?: (file: File, context: UploadContext) => unknown;
+	uploadImage?(file: File, context: UploadContext): unknown;
 
 	// Created by init() on the interactive upload path.
 	declare form: FormController;

@@ -23,7 +23,7 @@ Read the focused guides for lifecycle and server-state behavior:
 
 ## ShellView
 
-`views/base/shell.mjs` installs the synchronous page shell. Before awaiting
+`views/base/shell.ts` installs the synchronous page shell. Before awaiting
 feature code, storage, or network work, it installs delegated click, submit,
 pointer, responsive-breakpoint, and cold-control handlers and publishes
 `data-interactive="true"`.
@@ -74,7 +74,7 @@ Core switch.
 
 ## Entity views
 
-`views/base/entity.mjs` extends Core for Page, Project, and File detail pages.
+`views/base/entity.ts` extends Core for Page, Project, and File detail pages.
 It owns:
 
 - tab components marked `data-tab="true"`;
@@ -90,19 +90,19 @@ saved documents retain the document surface.
 
 ## Entity indexes
 
-`views/base/index.mjs` extends Core for User, Form, Category, and Task indexes.
+`views/base/index.ts` extends Core for User, Form, Category, and Task indexes.
 It owns the tools component, inline table editing, and mobile controls.
 
 `widgets/tables/` owns `IndexTable` and its sorting, editing, visibility, and
 mobile controls. Each has a focused module loaded through the existing widget
-registry names. `widgets/taskHistory.mjs` and `widgets/filterResults.mjs` own
+registry names. `widgets/taskHistory.ts` and `widgets/filterResults.ts` own
 their feature-specific embedded tables; both reuse `EmbeddedTable` from
-`elements/base/baseTable.mjs`, which also owns the shared `BaseTable`.
+`elements/base/baseTable.ts`, which also owns the shared `BaseTable`.
 
 Large tables have two readiness stages. `TableVisibilityState` applies saved
 column visibility before first paint. The interactive checkbox panel and
 sorting controls remain lazy; sorting appears only after chained row loading
-and `TableSorting` initialization complete. `widgets/tables/visibilityState.mjs`
+and `TableSorting` initialization complete. `widgets/tables/visibilityState.ts`
 stays in the build's `index-foundation` chunk and is imported directly by the
 index view and the lazy visibility panel, which shares the view's state instance.
 
@@ -161,7 +161,7 @@ Desktop retains its server-rendered image while the view initializes.
 
 ## ViewComponent
 
-`views/base/component.mjs` manages one `[lp-component]` element.
+`views/base/component.ts` manages one `[lp-component]` element.
 
 | State | Meaning |
 | --- | --- |
@@ -188,21 +188,21 @@ generic collection refresh targets.
 
 ## Widget contract
 
-`widgets/loader.mjs` maps `data-widget` names to lazy imports and caches one
+`widgets/loader.ts` maps `data-widget` names to lazy imports and caches one
 instance per component. Unknown names receive `DefaultWidget`, which provides
 only visibility and configuration for simple show/hide targets.
 
 Specialized construction belongs to its consuming feature:
 `forms/revisions/preview.ts` builds detached form comparison widgets through
-`loadWidget()`, and `elements/editor/headless.mjs` owns the headless registry and
+`loadWidget()`, and `elements/editor/headless.ts` owns the headless registry and
 lazy document construction used by offline replay. The generic loader does not
 import either adapter.
 
-`widgets/userSettings.mjs` owns `UserSettings`, including user groups, Page
+`widgets/userSettings.ts` owns `UserSettings`, including user groups, Page
 associations, notification preferences, and API-key controls. It and
 `PagePermissions` independently extend `FormWidget`; their shared restriction
 control is declared in HTML and owned by `FormController`.
-`widgets/pageInfo.mjs` owns Page information and creation.
+`widgets/pageInfo.ts` owns Page information and creation.
 
 The loader provides `enable()`, `disable()`, and synchronous `reconcile()`.
 Widgets implement only the members they need:

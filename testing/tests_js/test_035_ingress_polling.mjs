@@ -22,14 +22,14 @@ const buttons = {
 
 async function loadImportData({ request = {} } = {}) {
 	const { ImportData } = await esmock.strict(
-		"../../src/script/widgets/ingress.mjs",
+		"../../src/script/widgets/ingress.ts",
 		{
-			"../../src/script/elements/buttons.mjs": { buttons },
+			"../../src/script/elements/buttons.ts": { buttons },
 			"../../src/script/elements/combobox/index.ts": {
 				FacetsBox: class {},
 				SelectBox: class {},
 			},
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
+			"../../src/script/elements/primitives.ts": { primitives: {} },
 			"../../src/script/shared/index.ts": {
 				captureError(error) {
 					throw error;

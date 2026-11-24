@@ -9,9 +9,9 @@ function snapshot(doc) {
 }
 
 async function versions(request = {}) {
-	return esmock.strict("../../src/script/elements/editor/versions.mjs", {
+	return esmock.strict("../../src/script/elements/editor/versions.ts", {
 		"../../src/script/shared/request.ts": { request },
-		"../../src/script/elements/editor/editor.mjs": { previewEditor() {} },
+		"../../src/script/elements/editor/editor.ts": { previewEditor() {} },
 	});
 }
 

@@ -53,7 +53,7 @@ test("test_ai_email_address_selection_and_copy_controls", async (t) => {
 			"../../src/script/elements/base/baseUpload.ts": {
 				BaseUpload: class {},
 			},
-			"../../src/script/elements/upload.mjs": {
+			"../../src/script/elements/upload.ts": {
 				UploadMenu: class {},
 				uploadElement: {},
 			},
@@ -110,7 +110,7 @@ test("test_create_tool_report_preserves_and_resets_auto_execute_control", async 
 					reset() {}
 				},
 			},
-			"../../src/script/elements/upload.mjs": {
+			"../../src/script/elements/upload.ts": {
 				UploadMenu: class {},
 				uploadElement: {
 					contextUpload: () => ({

@@ -19,7 +19,7 @@ FormBuilder
 
 The builder is a standalone view -- it does not use the Core/Component/Widget system. It manages its own click handler, element selection, and schema state.
 
-`views/builder/config.mjs` owns the dependency-free `CONFIG` export used by the
+`views/builder/config.ts` owns the dependency-free `CONFIG` export used by the
 palette, model, field settings, and condition controls. It defines available
 components, input and table-column choices, links, and presentation/settings
 defaults. Leaf controls import ID and endpoint helpers directly from their

@@ -40,7 +40,7 @@ export class BaseList {
 	declare loaded?: boolean;
 	declare refreshScope: "collection";
 	declare _created: HTMLLIElement[];
-	declare _updated: HTMLElement | null;
+	declare _updated: HTMLElement | HTMLElement[] | null;
 	declare _itemCount: number;
 	declare _isEmpty: boolean;
 
@@ -95,7 +95,7 @@ export class BaseList {
 	}
 
 	updateTarget() {
-		if (!this._updated) return;
+		if (!this._updated || Array.isArray(this._updated)) return;
 		this.target.replaceWith(this._updated);
 		this.target = this._updated;
 		this._updated = null;

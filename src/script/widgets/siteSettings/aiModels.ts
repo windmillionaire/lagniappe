@@ -1,4 +1,4 @@
-import { buttons } from "../../elements/buttons.mjs";
+import { buttons } from "../../elements/buttons.ts";
 import { SelectBox } from "../../elements/combobox/index.ts";
 import type { ENDPOINTS } from "../../shared/endpoints.ts";
 import { request } from "../../shared/index.ts";

@@ -1,6 +1,6 @@
 # Frontend Service Worker
 
-The service worker (`src/script/sw.template.mjs`) handles offline support,
+The service worker (`src/script/sw.template.ts`) handles offline support,
 caching, and connectivity state. It is a template file -- the build process
 replaces `__BUILD_ID__` placeholders with the current build cache ID before
 writing it to `lagniappe/web/static/sw.js`.
@@ -180,7 +180,7 @@ deletes prior static-cache entries and warms only the current build. Because the
 query string is part of both the Cache API and HTTP-cache key, App Engine can
 serve `/chunks/*.js` with a long-lived immutable policy. The layout templates
 keep owning the versioned `/script.js?v=...` entrypoint. The `controllerchange`
-listener in `main.mjs` clears cached recent search results, publishes the
+listener in `main.ts` clears cached recent search results, publishes the
 current connectivity state to the replacement controller, and runs
 `syncView()` when the new service worker takes control.
 
@@ -192,7 +192,7 @@ fetches. Initial module preloads can start before a newly registered worker
 controls the page, so this policy does not guarantee recovery of first-visit
 bootstrap downloads. It does not reload the page or replay application writes.
 
-`main.mjs` sends the worker a versioned `connectivity-state` message with four
+`main.ts` sends the worker a versioned `connectivity-state` message with four
 independent fields: browser link state, application-server reachability,
 document visibility, and controller availability. The worker validates the
 protocol/version and all four field values before using browser/server state to
