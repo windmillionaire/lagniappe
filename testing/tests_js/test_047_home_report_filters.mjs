@@ -45,6 +45,7 @@ async function loadToolReportList() {
 
 function fixture(ToolReportList) {
 	const items = [];
+	const flashed = [];
 	const buttons = ["active", "executed", "answers"].map((filter) => ({
 		dataset: { filter },
 		count: {},
@@ -86,7 +87,9 @@ function fixture(ToolReportList) {
 		},
 	};
 	const view = {
-		addFlash() {},
+		addFlash(row) {
+			flashed.push(row.dataset.key);
+		},
 		async _refreshHomeWidget() {},
 	};
 	const widget = new ToolReportList({
@@ -107,8 +110,24 @@ function fixture(ToolReportList) {
 		items.push(item);
 		return item;
 	}
-	return { widget, items, buttons, empty, clear, result, add, target };
+	return { widget, items, flashed, buttons, empty, clear, result, add, target };
 }
+
+test("test_report_list_flashes_each_new_row_in_a_batch", async (t) => {
+	createBrowser(t);
+	const { ToolReportList } = await loadToolReportList();
+	const f = fixture(ToolReportList);
+	const html = new DOMParser().parseFromString(
+		`<ul>
+			<li lp-entity data-kind="report" data-key="first" data-output-kind="answer" data-status="complete"></li>
+			<li lp-entity data-kind="report" data-key="second" data-output-kind="answer" data-status="complete"></li>
+		</ul>`,
+		"text/html",
+	);
+	f.widget.created({ html });
+	f.widget.postreconcile();
+	assert.deepEqual(new Set(f.flashed), new Set(["first", "second"]));
+});
 
 function renderedCategory(ToolReportList, dataset) {
 	const f = fixture(ToolReportList);

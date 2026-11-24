@@ -224,7 +224,7 @@ export class ToolReportList extends BaseList {
 			this.target
 				.querySelector("[data-role='report-items']")
 				?.prepend(...created);
-			this.view.addFlash(...created);
+			for (const item of created) this.view.addFlash(item);
 		}
 		this.target.dataset.visible = Boolean(
 			this.visible || this.component.active === this,
