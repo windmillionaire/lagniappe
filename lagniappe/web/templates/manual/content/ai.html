@@ -154,13 +154,15 @@
             <p>You can add this installation as a custom MCP connector in the ChatGPT
               desktop app or on the web. No Codex CLI or Lagniappe API key is needed.</p>
             <ol class="list-decimal pl-5 space-y-2">
-              <li>In ChatGPT, open <strong>Settings / Apps &amp; Connectors / Advanced settings</strong>
-                and enable <strong>Developer mode</strong>. Availability depends
-                on your ChatGPT plan and workspace policy.</li>
-              <li>Open <strong>Apps &amp; Connectors</strong> and choose
-                <strong>Create</strong> to add a custom connector. Enter
-                <code>{{ mcp_name }}</code> as the name and a short description
-                such as “Connect to my Lagniappe workspace.”</li>
+              <li>In ChatGPT, enable <strong>Developer mode</strong> in
+                <strong>Settings</strong> (under <strong>Security and sign-in</strong>
+                or <strong>Plugins / Connectors &rarr; Advanced</strong>).
+                Availability depends on your ChatGPT plan and workspace policy.</li>
+              <li>Open <strong>Plugins</strong> (or <strong>Connectors</strong>)
+                and choose <strong>Add</strong> / <strong>Create</strong> to add
+                a custom MCP server. Enter <code>{{ mcp_name }}</code> as the
+                name and a short description such as “Connect to my Lagniappe
+                workspace.”</li>
               <li>Enter the MCP server URL:
                 <code>{{ mcp_url }}</code>.
                 {% if not show_connection_details %}
@@ -168,13 +170,13 @@
                   Owner and replace these examples.
                 {% endif %}
                 Choose <strong>OAuth</strong> for authentication, then create the
-                connector.</li>
+                connection.</li>
               <li>Follow the sign-in prompt, sign in to your invited Lagniappe
                 account, check the account shown, and choose <strong>Allow</strong>.
                 ChatGPT may ask you to connect during setup or on first use.</li>
-              <li>Start a new chat, enable the connector from the tools menu, and
-                ask ChatGPT which Lagniappe account it is using. Then ask it to
-                find a page you know you can access.</li>
+              <li>Start a new chat, enable the plugin or connector from the tools
+                menu, and ask ChatGPT which Lagniappe account it is using. Then
+                ask it to find a page you know you can access.</li>
             </ol>
             <p>If ChatGPT asks you to reconnect later, use its
               <strong>Reconnect</strong> action and authorize again.
@@ -225,9 +227,11 @@
           <div data-role="external-ai-antigravity-setup" class="space-y-3">
             <h3 class="font-semibold text-page-default">Connect Antigravity</h3>
             <p>Add the remote MCP server URL <code>{{ mcp_url }}</code> in your
-              Antigravity MCP configuration without an API key; Antigravity
-              discovers OAuth automatically via its client metadata document and
-              opens your browser to sign in and choose <strong>Allow</strong>.</p>
+              Antigravity MCP configuration (or via the Antigravity CLI) without
+              an API key; Antigravity discovers OAuth automatically via its
+              client metadata document and opens your browser to sign in and
+              choose <strong>Allow</strong>.</p>
+            {{ code('agy mcp add ' ~ mcp_name ~ ' ' ~ mcp_url) }}
             <p>To revoke Antigravity access, open
               <strong>My Page / User Settings / Manage AI connections</strong> in Lagniappe.</p>
           </div>
