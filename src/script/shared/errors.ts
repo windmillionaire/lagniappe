@@ -335,25 +335,15 @@ const _sanitizeSentryRequest = (request: RequestEventData | undefined) => {
 	return Object.keys(sanitized).length > 0 ? sanitized : undefined;
 };
 
-const _invalidSentryTraceContext = (
-	trace: SanitizedValue | Contexts["trace"] | undefined,
-) => {
+const _invalidSentryTraceContext = (trace: unknown) => {
 	if (!trace) return false;
+	const traceId =
+		typeof trace === "object" && "trace_id" in trace ? trace.trace_id : null;
+	const spanId =
+		typeof trace === "object" && "span_id" in trace ? trace.span_id : null;
 	return (
-		!SENTRY_TRACE_ID_PATTERN.test(
-			String(
-				typeof trace === "object" && "trace_id" in trace
-					? trace.trace_id || ""
-					: "",
-			),
-		) ||
-		!SENTRY_SPAN_ID_PATTERN.test(
-			String(
-				typeof trace === "object" && "span_id" in trace
-					? trace.span_id || ""
-					: "",
-			),
-		)
+		!SENTRY_TRACE_ID_PATTERN.test(String(traceId || "")) ||
+		!SENTRY_SPAN_ID_PATTERN.test(String(spanId || ""))
 	);
 };
 
@@ -399,9 +389,9 @@ const _sanitizeSentryEvent = <T extends MonitoredEvent>(event: T): T | null => {
 	if (!event) return event;
 	if (_isMalformedBlockingOperationWarning(event)) return null;
 	const sanitized: Omit<MonitoredEvent, SanitizedSentryField> &
-		Partial<Record<SanitizedSentryField, SanitizedValue>> = {
+		Partial<Record<SanitizedSentryField, unknown>> = {
 		...event,
-	} as Omit<MonitoredEvent, SanitizedSentryField>;
+	};
 	delete sanitized.user;
 
 	const request = _sanitizeSentryRequest(event.request);
@@ -511,7 +501,7 @@ export const configureSentry = () => {
 		return;
 	}
 
-	// Preserve the setting consumed by existing integrations alongside SDK options.
+	// Preserve the existing initialization setting alongside the SDK's options.
 	const options: BrowserOptions & { sendDefaultPii: false } = {
 		dsn,
 		sendDefaultPii: false,

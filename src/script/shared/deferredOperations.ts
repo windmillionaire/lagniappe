@@ -319,10 +319,11 @@ export class DeferredOperationManager {
 					key,
 					// A terminal HTML seed is not an acknowledgement of destination
 					// reconciliation. Keep its cursor behind until receive succeeds.
-					// The poll contract also checks cursors read from markup.
 					revision: status?.terminal
 						? Math.max(Number(resolvedRevision) - 1, 0)
-						: (resolvedRevision as number),
+						: typeof resolvedRevision === "number"
+							? resolvedRevision
+							: NaN,
 				},
 				{
 					mode: "periodic",
