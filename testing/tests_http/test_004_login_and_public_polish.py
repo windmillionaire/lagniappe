@@ -323,7 +323,9 @@ def test_public_manual_sections_render_cleanly_including_all_mcp_clients(
             assert "./setup.sh update" in html
         elif section["key"] == "installation":
             assert 'data-role="ai-assisted-install"' in html
-            assert "./setup.sh --agent --answers answers.json --json" in html
+            assert "./setup.sh --agent" in html
+            assert "documentation/INSTALL_WITH_AI.md" in html
+            assert "Assistant Playbook" in html
 
 
 def test_public_directory_places_ordered_group_before_manual(

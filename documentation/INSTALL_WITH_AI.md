@@ -48,45 +48,64 @@ Before starting, have:
   Essentials/Flex/Pro plan for production/TLS) — the browser vault includes a
   direct link to open Redis Cloud when you reach that step.
 
-## Copy-Paste Prompt for Your AI Assistant
+## Quick-Start Prompt for Your AI Assistant
 
-Open a fresh conversation in your local desktop/IDE AI assistant and paste the
-prompt below:
+Open a fresh conversation in your local desktop or IDE AI assistant and paste
+this short prompt:
 
 ```text
-Help me install and deploy Lagniappe to my own Google Cloud project using
-Lagniappe's built-in agent-assisted installer. Follow these rules strictly:
-
-1. Clone https://github.com/windmillionaire/lagniappe into a clean local folder
-   we agree on, and check that Git, Python 3.14, and gcloud are installed.
-2. NEVER ask me to paste any password, API key, OAuth client secret, Redis
-   password, Sentry DSN, or JSON credential file in chat.
-3. NEVER write any secret into answers.json, shell arguments, or workspace
-   files, and NEVER hand-craft raw gcloud provisioning commands when setup.sh
-   owns that step.
-4. Keep chat short and conversational — DO NOT ask a long questionnaire. Ask me
-   in ONE brief message for just 3 things:
-   (a) a short workspace name,
-   (b) my name and Google email (permanent Owner), and
-   (c) whether to create a new GCP project (suggest a clean ID) or use an
-       existing project ID.
-   Use sensible defaults for everything else (us-central/us-central1, Google
-   Sign-In on, Gmail App Password, built-in AI on, external MCP off, Sentry
-   off, analytics on, deploy automatically) unless I ask to change something.
-   Write ONLY those non-secret choices to answers.json and run:
-     ./setup.sh --agent --answers answers.json --json
-5. If setup returns exit code 3 ("status": "needs_input"), ask me only the
-   specific missing non-secret field(s) listed in missing_fields (such as
-   choosing between multiple billing accounts), update answers.json, and rerun
-   the same command.
-6. Setup automatically creates the GCP project, links billing, opens Google
-   sign-in, and opens the localhost browser credential vault (and prints the
-   vault link to stderr even under --json). Tell me when my browser needs
-   attention and wait until setup finishes.
-7. After setup completes, confirm `./setup.sh doctor` exits with 0, confirm no
-   secrets exist in config/files/lagniappe_settings.yaml, and give me my live
-   Lagniappe URL.
+Help me install and deploy Lagniappe to my own Google Cloud project. Clone
+https://github.com/windmillionaire/lagniappe into a local folder, read
+documentation/INSTALL_WITH_AI.md, and follow the Assistant Playbook to walk me
+through the install. Never ask me to paste passwords or API keys in chat.
 ```
+
+## Assistant Playbook (Instructions for the AI)
+
+If the user asked you to install Lagniappe using this guide, follow these rules
+strictly:
+
+1. **Workspace & prerequisites:** Agree on a clean local folder (or use the
+   cloned checkout you are already in) and verify that `git`, Python 3.14, and
+   `gcloud` are installed. If any tool is missing, link the user to its official
+   installer and wait until it is available.
+2. **Never handle secrets in chat or files:** NEVER ask the user to paste any
+   password, API key, OAuth client secret, Redis password, Sentry DSN, or JSON
+   credential file in chat. NEVER write any secret into `answers.json`, shell
+   arguments, or workspace files, and NEVER hand-craft raw `gcloud` provisioning
+   commands when `setup.sh` owns that step.
+3. **Ask only 3 things in ONE short message — no questionnaires:** Do NOT ask a
+   long numbered list of optional settings. Ask in one brief, conversational
+   message for just:
+   - a short **workspace name**,
+   - the permanent Owner's **name and Google email**, and
+   - whether to **create a new GCP project** (suggest a clean project ID) or use
+     an **existing project ID**.
+
+   Use sensible defaults for everything else (`us-central` / `us-central1`,
+   Google Sign-In on, Gmail App Password, built-in AI on, external MCP off,
+   Sentry off, analytics on, deploy automatically) unless the user asks to
+   change something.
+4. **Run the agent installer:** Write ONLY those non-secret choices to
+   `answers.json` (see the schema below) and run:
+   ```bash
+   ./setup.sh --agent --answers answers.json --json
+   ```
+5. **Handle `needs_input` cleanly:** If `setup.sh` exits with code `3`
+   (`"status": "needs_input"`), ask the user ONLY for the specific missing
+   non-secret field(s) reported in `missing_fields` (for example, choosing
+   between multiple open billing accounts), update `answers.json`, and rerun the
+   exact same command.
+6. **Guide browser steps:** `setup.sh` automatically creates the GCP project,
+   links billing, opens Google sign-in, and opens the one-shot `127.0.0.1`
+   credential vault in the browser (and prints the clickable vault URL to
+   `stderr` even under `--json`). Tell the user when their browser needs
+   attention, share the localhost vault link if needed, and wait until setup
+   finishes.
+7. **Verify and finish:** After setup completes, confirm `./setup.sh doctor`
+   exits with `0`, confirm no secrets exist in
+   `config/files/lagniappe_settings.yaml`, and give the user their live
+   Lagniappe URL.
 
 ## Non-Secret `answers.json` Reference
 
