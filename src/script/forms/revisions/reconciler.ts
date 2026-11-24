@@ -1,7 +1,23 @@
+import type { DeferredOperationManager } from "../../shared/deferredOperations.ts";
 import { captureError } from "../../shared/errors.ts";
+import type {
+	OfflineMutationRecord,
+	OfflineQueue,
+} from "../../shared/offlineQueue.ts";
 import { request } from "../../shared/request.ts";
 import { withTransition } from "../../shared/transitions.ts";
 import { areEqual } from "../../shared/utilities.ts";
+import type {
+	FormRevisionChoice,
+	FormRevisionConflict,
+	FormRevisionFields,
+	FormRevisionResponse,
+	FormRevisionReviewOptions,
+} from "../../types/forms";
+import type {
+	FormWidget,
+	LocalRevisionOptions,
+} from "../../widgets/base/formWidget.ts";
 import { incompatibleSchema } from "../representation.ts";
 import { currentReviewOperation, renderReviewBar } from "../reviewBar.ts";
 import { FormRevisionModal, WholeFormRevisionModal } from "./modals.ts";
@@ -16,19 +32,94 @@ const ACTION_LABELS = {
 	dismiss: "Dismiss",
 };
 
+type RevisionMode = keyof typeof ACTION_LABELS;
+
+export interface MarkerRevision {
+	fingerprint: string | null;
+	modified: string | null;
+}
+
+type ProbedRevision = MarkerRevision & { fingerprint: string };
+
+type QueuedRevision = OfflineMutationRecord &
+	NonNullable<Parameters<FormWidget["buildLocalRevision"]>[1]>;
+
+interface StagedRevision extends MarkerRevision {
+	record: QueuedRevision | null;
+	remoteSnapshot: string | null;
+	schemaChanged: boolean;
+	submissionChoice: boolean;
+}
+
+export interface FormRevisionState extends StagedRevision {
+	mode: RevisionMode;
+	response: FormRevisionResponse | null;
+	token: object | null;
+	probePromise: Promise<void> | null;
+	probeRevision: ProbedRevision | null;
+	pendingProbe: ProbedRevision | null;
+	conflictPromise: Promise<boolean> | null;
+}
+
+export type RevisionMarker = HTMLElement & {
+	_lp_edited_state?: FormRevisionState;
+};
+
+export type RevisionForm = HTMLFormElement & {
+	_lp_widget?: FormWidget;
+};
+
+export interface DeferredCompletion {
+	key: string;
+	operation: string;
+}
+
+type DeferredOperations = Pick<DeferredOperationManager, "track">;
+
+export interface ReconcilerView {
+	_destroyed?: boolean;
+	dataset?: DOMStringMap;
+	kind?: string | null;
+	addFlash?(marker: RevisionMarker): void;
+	reconcileChange?(change: {
+		type: "poll" | "delete";
+		key: string | null;
+	}): unknown;
+	offlineQueue?: Pick<
+		OfflineQueue,
+		"cancel" | "rebaseSubmit" | "replay"
+	> | null;
+	DeferredOperations?: DeferredOperations | null;
+	ensureDeferredOperations?(): Promise<DeferredOperations | null | undefined>;
+}
+
+interface ReconcilerCallbacks {
+	recordMarkerRevision(marker: RevisionMarker, revision: MarkerRevision): void;
+	ownedDeferredCompletion(
+		marker: RevisionMarker,
+		widget?: FormWidget,
+	): DeferredCompletion | null;
+	forgetDeferredCompletion(completion: DeferredCompletion | null): void;
+}
+
 /**
  * Per-marker authoritative revision probing, comparison, and resolution for
  * forms discovered by EditWatcher.
  *
  */
 export class EditReconciler {
+	declare readonly view: ReconcilerView;
+	declare readonly recordMarkerRevision: ReconcilerCallbacks["recordMarkerRevision"];
+	declare readonly ownedDeferredCompletion: ReconcilerCallbacks["ownedDeferredCompletion"];
+	declare readonly forgetDeferredCompletion: ReconcilerCallbacks["forgetDeferredCompletion"];
+
 	constructor(
-		view,
+		view: ReconcilerView,
 		{
 			recordMarkerRevision = () => {},
 			ownedDeferredCompletion = () => null,
 			forgetDeferredCompletion = () => {},
-		} = {},
+		}: Partial<ReconcilerCallbacks> = {},
 	) {
 		this.view = view;
 		this.recordMarkerRevision = recordMarkerRevision;
@@ -36,7 +127,7 @@ export class EditReconciler {
 		this.forgetDeferredCompletion = forgetDeferredCompletion;
 	}
 
-	_state(marker) {
+	_state(marker: RevisionMarker) {
 		marker._lp_edited_state ??= {
 			mode: "reset",
 			response: null,
@@ -55,28 +146,38 @@ export class EditReconciler {
 		return marker._lp_edited_state;
 	}
 
-	async _prepareRevision(widget, response) {
+	async _prepareRevision(widget: FormWidget, response: FormRevisionResponse) {
 		if (widget.prepareRevision) return await widget.prepareRevision(response);
 		return () => {
 			const result = widget.applyRevision(response);
-			if (result?.then) void result.catch(captureError);
+			if (typeof result?.then === "function") void result.catch(captureError);
 		};
 	}
 
-	async _prepareLocalRevision(widget, response, options) {
+	async _prepareLocalRevision(
+		widget: FormWidget,
+		response: FormRevisionResponse,
+		options: LocalRevisionOptions,
+	) {
 		if (widget.prepareLocalRevision) {
 			return await widget.prepareLocalRevision(response, options);
 		}
 		return () => {
 			const result = widget.applyLocalRevision(response, options);
-			if (result?.then) void result.catch(captureError);
+			if (typeof result?.then === "function") void result.catch(captureError);
 		};
 	}
 
-	_setAction(marker, mode, message = null) {
+	_setAction(
+		marker: RevisionMarker,
+		mode: RevisionMode,
+		message: string | null = null,
+	) {
 		const state = this._state(marker);
 		state.mode = mode;
-		const button = marker.querySelector("[data-role='edited-reset']");
+		const button = marker.querySelector<HTMLButtonElement>(
+			"[data-role='edited-reset']",
+		);
 		if (button && !button.dataset?.reviewPending)
 			button.textContent = ACTION_LABELS[mode] ?? "Review update";
 		const copy = marker.querySelector("[data-role='edited-message']");
@@ -84,7 +185,7 @@ export class EditReconciler {
 		if (button) button.hidden = false;
 	}
 
-	_hide(marker) {
+	_hide(marker: RevisionMarker | null | undefined) {
 		if (!marker) return;
 		marker.dataset.visible = "false";
 		const state = this._state(marker);
@@ -96,17 +197,18 @@ export class EditReconciler {
 		state.schemaChanged = false;
 		state.submissionChoice = false;
 		this._setAction(marker, "reset");
-		const widget = marker.closest?.("form[data-widget]")?._lp_widget;
+		const widget =
+			marker.closest?.<RevisionForm>("form[data-widget]")?._lp_widget;
 		if (widget?.target?.dataset?.formState) renderReviewBar(widget);
 	}
 
-	_show(marker) {
+	_show(marker: RevisionMarker) {
 		const wasVisible = marker.dataset.visible === "true";
 		marker.dataset.visible = "true";
 		if (!wasVisible) this.view.addFlash?.(marker);
 	}
 
-	fallback(marker, error = null) {
+	fallback(marker: RevisionMarker, error: unknown = null) {
 		const state = this._state(marker);
 		state.response = null;
 		this._setAction(marker, "reload");
@@ -114,8 +216,8 @@ export class EditReconciler {
 		if (error) captureError(error, marker);
 	}
 
-	_rendererCapable(widget, response) {
-		const objectSubmission = (submission) =>
+	_rendererCapable(widget: FormWidget, response: FormRevisionResponse) {
+		const objectSubmission = (submission: unknown) =>
 			Boolean(submission) &&
 			typeof submission === "object" &&
 			!Array.isArray(submission);
@@ -130,7 +232,10 @@ export class EditReconciler {
 		);
 	}
 
-	_rendererValuesDiffer(response, localResponse) {
+	_rendererValuesDiffer(
+		response: FormRevisionResponse,
+		localResponse: FormRevisionResponse,
+	) {
 		const saved = response.submission ?? {};
 		const local = localResponse.submission ?? {};
 		return (response.schema ?? []).some(
@@ -141,8 +246,8 @@ export class EditReconciler {
 	}
 
 	_storeRevision(
-		marker,
-		response,
+		marker: RevisionMarker,
+		response: FormRevisionResponse,
 		{
 			fingerprint,
 			modified,
@@ -150,7 +255,7 @@ export class EditReconciler {
 			remoteSnapshot,
 			schemaChanged,
 			submissionChoice,
-		},
+		}: StagedRevision,
 	) {
 		const next = this._state(marker);
 		next.response = response;
@@ -164,13 +269,19 @@ export class EditReconciler {
 	}
 
 	async _stageRevision(
-		marker,
-		widget,
-		response,
-		{ fingerprint = null, modified = null, record = null } = {},
+		marker: RevisionMarker,
+		widget: FormWidget,
+		response: FormRevisionResponse,
+		{
+			fingerprint = null,
+			modified = null,
+			record: incomingRecord = null,
+		}: Partial<MarkerRevision> & { record?: OfflineMutationRecord | null } = {},
 	) {
 		const state = this._state(marker);
-		record ??= state.record;
+		// The queue keeps its optional renderer data opaque. Form projection uses
+		// the schema, submission and combobox selections captured when it was queued.
+		const record = (incomingRecord ?? state.record) as QueuedRevision | null;
 		if (response.form_state) {
 			const operation = currentReviewOperation(
 				widget,
@@ -207,7 +318,7 @@ export class EditReconciler {
 			),
 		);
 		const token = state.token;
-		const anchor = marker.closest?.("[lp-entity]");
+		const anchor = marker.closest?.<HTMLElement>("[lp-entity]");
 		const baselineFingerprint =
 			record?.fingerprint ?? anchor?.dataset?.fingerprint ?? null;
 		const baselineModified =
@@ -280,7 +391,9 @@ export class EditReconciler {
 				() => {
 					commitRevision();
 					this._hide(
-						widget.target?.querySelector("[lp-edited-marker]") ?? marker,
+						widget.target?.querySelector<RevisionMarker>(
+							"[lp-edited-marker]",
+						) ?? marker,
 					);
 				},
 				{ label: "edit-reconcile:apply-remote" },
@@ -329,7 +442,9 @@ export class EditReconciler {
 				() => {
 					commitRevision();
 					this._hide(
-						widget.target?.querySelector("[lp-edited-marker]") ?? marker,
+						widget.target?.querySelector<RevisionMarker>(
+							"[lp-edited-marker]",
+						) ?? marker,
 					);
 				},
 				{ label: "edit-reconcile:accept-matching" },
@@ -373,7 +488,9 @@ export class EditReconciler {
 			await withTransition(
 				() => {
 					commitRevision();
-					marker = widget.target.querySelector("[lp-edited-marker]") ?? marker;
+					marker =
+						widget.target.querySelector<RevisionMarker>("[lp-edited-marker]") ??
+						marker;
 					this._hide(marker);
 				},
 				{ label: "edit-reconcile:rebase-schema" },
@@ -400,7 +517,9 @@ export class EditReconciler {
 			await withTransition(
 				() => {
 					commitRevision();
-					marker = widget.target.querySelector("[lp-edited-marker]") ?? marker;
+					marker =
+						widget.target.querySelector<RevisionMarker>("[lp-edited-marker]") ??
+						marker;
 					this._hide(marker);
 				},
 				{ label: "edit-reconcile:rebase-values" },
@@ -434,22 +553,29 @@ export class EditReconciler {
 		this._show(marker);
 	}
 
-	async _installUninitialized(marker, response) {
-		const form = marker.closest("form[data-widget]");
+	async _installUninitialized(
+		marker: RevisionMarker,
+		response: FormRevisionResponse,
+	) {
+		const form = marker.closest<RevisionForm>("form[data-widget]");
 		const name = form?.dataset.widget;
-		const replacement = name
-			? response.html?.querySelector(`[data-widget='${name}']`)
-			: null;
+		const replacement =
+			name && response.html
+				? response.html.querySelector<HTMLElement>(`[data-widget='${name}']`)
+				: null;
 		if (!form || !replacement) return false;
 
 		const visible = form.dataset.visible;
-		const fresh = replacement.cloneNode(true);
+		const fresh = replacement.cloneNode(true) as HTMLElement;
 		if (visible !== undefined) fresh.dataset.visible = visible;
 		await withTransition(() => form.replaceWith(fresh));
 		return true;
 	}
 
-	_sameProbeRevision(left, right) {
+	_sameProbeRevision(
+		left: ProbedRevision | null,
+		right: ProbedRevision | null,
+	) {
 		return Boolean(
 			left &&
 				right &&
@@ -458,7 +584,11 @@ export class EditReconciler {
 		);
 	}
 
-	probe(marker, fingerprint, modified = null) {
+	probe(
+		marker: RevisionMarker,
+		fingerprint: string,
+		modified: string | null = null,
+	): Promise<void> {
 		const state = this._state(marker);
 		const requested = { fingerprint, modified };
 		if (state.conflictPromise) {
@@ -482,7 +612,7 @@ export class EditReconciler {
 		if (state.probePromise) return state.probePromise;
 
 		const drain = async () => {
-			let processed = null;
+			let processed: ProbedRevision | null = null;
 			while (state.pendingProbe) {
 				const next = state.pendingProbe;
 				state.pendingProbe = null;
@@ -501,7 +631,11 @@ export class EditReconciler {
 		return promise;
 	}
 
-	async _runProbe(marker, fingerprint, modified = null) {
+	async _runProbe(
+		marker: RevisionMarker,
+		fingerprint: string,
+		modified: string | null = null,
+	) {
 		if (!marker?.isConnected && marker?.isConnected !== undefined) return;
 		const state = this._state(marker);
 		const token = {};
@@ -516,12 +650,12 @@ export class EditReconciler {
 		}
 
 		try {
-			const response = await request.get(route, null, {
+			const response = await request.get<FormRevisionFields>(route, null, {
 				acknowledgeEntities: false,
 				replaceErrorPage: false,
 			});
 			if (state.token !== token) return;
-			const form = marker.closest("form[data-widget]");
+			const form = marker.closest<RevisionForm>("form[data-widget]");
 			const widget = form?._lp_widget;
 			const completion = this.ownedDeferredCompletion(marker, widget);
 			if (response?.unchanged) {
@@ -555,8 +689,12 @@ export class EditReconciler {
 		}
 	}
 
-	async stageConflict(widget, { record, response } = {}) {
-		const marker = widget?.target?.querySelector?.("[lp-edited-marker]");
+	async stageConflict(
+		widget: FormWidget,
+		{ record, response }: FormRevisionConflict = {},
+	) {
+		const marker =
+			widget?.target?.querySelector?.<RevisionMarker>("[lp-edited-marker]");
 		if (!marker || !response) return false;
 		const revision = (response.entities || []).find(
 			(entity) => entity.key === (record?.target_key ?? widget.key),
@@ -587,12 +725,20 @@ export class EditReconciler {
 		}
 	}
 
-	async openConflictReview(widget, { blockedAction = null } = {}) {
-		const marker = widget?.target?.querySelector?.("[lp-edited-marker]");
-		const state = marker ? this._state(marker) : null;
-		if (!state || !["review", "whole-review"].includes(state.mode))
+	async openConflictReview(
+		widget: FormWidget,
+		{ blockedAction = null }: FormRevisionReviewOptions = {},
+	) {
+		const marker =
+			widget?.target?.querySelector?.<RevisionMarker>("[lp-edited-marker]");
+		if (
+			!marker ||
+			!["review", "whole-review"].includes(this._state(marker).mode)
+		)
 			return false;
-		const button = marker.querySelector("[data-role='edited-reset']");
+		const button = marker.querySelector<HTMLButtonElement>(
+			"[data-role='edited-reset']",
+		);
 		if (!button || button.disabled) return false;
 		await this._activateAction(marker, button, {
 			refresh: true,
@@ -601,19 +747,20 @@ export class EditReconciler {
 		return true;
 	}
 
-	async resolveRevision(marker, choice) {
+	async resolveRevision(marker: RevisionMarker, choice: FormRevisionChoice) {
 		const state = this._state(marker);
-		const widget = marker.closest("form[data-widget]")?._lp_widget;
+		const widget =
+			marker.closest<RevisionForm>("form[data-widget]")?._lp_widget;
 		if (!widget || !state.response) {
 			this.fallback(marker);
 			return false;
 		}
 
-		const fieldSelection =
-			choice && typeof choice === "object" ? (choice.selections ?? {}) : null;
+		const fieldChoice = choice && typeof choice === "object" ? choice : null;
+		const fieldSelection = fieldChoice ? (fieldChoice.selections ?? {}) : null;
 		const localSelected = fieldSelection
 			? Object.values(fieldSelection).some((source) => source !== "server") ||
-				(!!choice.selectedSubmission && !state.record)
+				(!!fieldChoice?.selectedSubmission && !state.record)
 			: choice === "local";
 
 		if (!localSelected) {
@@ -626,10 +773,10 @@ export class EditReconciler {
 				label: "edit-reconcile:resolve-server",
 			});
 		} else {
-			let selectedSubmission = choice?.selectedSubmission;
+			let selectedSubmission = fieldChoice?.selectedSubmission;
 			if (fieldSelection && selectedSubmission === undefined) {
 				selectedSubmission = structuredClone(state.response.submission ?? {});
-				const localSubmission = choice.localResponse?.submission ?? {};
+				const localSubmission = fieldChoice?.localResponse?.submission ?? {};
 				for (const [id, source] of Object.entries(fieldSelection)) {
 					if (source !== "local") continue;
 					if (Object.hasOwn(localSubmission, id)) {
@@ -665,7 +812,8 @@ export class EditReconciler {
 		}
 
 		const currentMarker =
-			widget.target?.querySelector("[lp-edited-marker]") ?? marker;
+			widget.target?.querySelector<RevisionMarker>("[lp-edited-marker]") ??
+			marker;
 		if (!state.record && state.response.form_state?.reviews?.length) {
 			widget._reviewedOperations ??= new Set();
 			widget._usedAutofillOperations ??= new Set();
@@ -681,18 +829,23 @@ export class EditReconciler {
 		return true;
 	}
 
-	async handleClick(event) {
-		const button = event.target.closest("[data-role='edited-reset']");
+	async handleClick(event: MouseEvent) {
+		const button = (
+			event.target as Element | null
+		)?.closest?.<HTMLButtonElement>("[data-role='edited-reset']");
 		if (!button) return;
-		const marker = button.closest("[lp-edited-marker]");
+		const marker = button.closest<RevisionMarker>("[lp-edited-marker]");
 		if (!marker) return;
 		await this._activateAction(marker, button);
 	}
 
 	async _activateAction(
-		marker,
-		button,
-		{ refresh = false, blockedAction = null } = {},
+		marker: RevisionMarker,
+		button: HTMLButtonElement,
+		{
+			refresh = false,
+			blockedAction = null,
+		}: FormRevisionReviewOptions & { refresh?: boolean } = {},
 	) {
 		const state = marker ? this._state(marker) : null;
 		if (!state) return;
@@ -706,7 +859,8 @@ export class EditReconciler {
 			return;
 		}
 		if (button.disabled) return;
-		const widget = marker.closest("form[data-widget]")?._lp_widget;
+		const widget =
+			marker.closest<RevisionForm>("form[data-widget]")?._lp_widget;
 		const reviewPending = ["review", "whole-review"].includes(state.mode);
 		const originalLabel = button.textContent;
 		button.disabled = true;
@@ -721,15 +875,22 @@ export class EditReconciler {
 			if ((refresh || widget?.target?.dataset?.formState) && !state.record) {
 				// Completion can arrive before the revision probe finishes. Refresh on
 				// opening, including cold loads with no staged response yet.
-				const response = await request.get(marker.dataset.editedRoute, null, {
-					acknowledgeEntities: false,
-					replaceErrorPage: false,
-				});
+				const route = marker.dataset.editedRoute;
+				const response = route
+					? await request.get<FormRevisionFields>(route, null, {
+							acknowledgeEntities: false,
+							replaceErrorPage: false,
+						})
+					: null;
 				if (!response?.ok)
 					throw new Error(
 						"Could not load the latest form values. Please try Review again.",
 					);
 				if (!response.unchanged) {
+					if (!widget) {
+						this.fallback(marker);
+						return;
+					}
 					state.token = {};
 					await this._stageRevision(marker, widget, response);
 				}
@@ -762,7 +923,8 @@ export class EditReconciler {
 			}
 		} catch (error) {
 			this.fallback(
-				widget.target?.querySelector("[lp-edited-marker]") ?? marker,
+				widget?.target?.querySelector<RevisionMarker>("[lp-edited-marker]") ??
+					marker,
 				error,
 			);
 		} finally {

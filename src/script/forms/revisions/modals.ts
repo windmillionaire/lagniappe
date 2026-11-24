@@ -3,19 +3,86 @@ import { STYLES } from "../../generated/styles.mjs";
 import { Modal } from "../../shared/modal.ts";
 import { request } from "../../shared/request.ts";
 import { areEqual } from "../../shared/utilities.ts";
+import type { RequestResult } from "../../types/api.d.ts";
+import type {
+	FormFieldSchema,
+	FormReviewOperation,
+	FormRevisionResponse,
+	FormRevisionReviewOptions,
+	FormRevisionSource,
+	FormSchema,
+	FormSubmission,
+} from "../../types/forms.d.ts";
+import type { FormWidget } from "../../widgets/base/formWidget.ts";
 import { compatibleField } from "../representation.ts";
 import { renderReviewBar } from "../reviewBar.ts";
 import { loadRevisionPreview } from "./preview.ts";
+import type {
+	EditReconciler,
+	FormRevisionState,
+	RevisionMarker,
+} from "./reconciler.ts";
+
+interface ReviewSource {
+	id: FormRevisionSource;
+	label: string;
+	schema?: FormSchema | null;
+	submission: FormSubmission;
+	fields?: string[];
+	baseline?: FormSubmission | null;
+}
+
+interface ReviewChoice {
+	source: FormRevisionSource;
+	label: string;
+	compatible: boolean;
+	value: HTMLElement;
+}
+
+interface ReviewDifference {
+	id: string;
+	label: string;
+	choices: ReviewChoice[];
+}
+
+interface ReviewElement {
+	elt?: HTMLElement | null;
+	hasSubmission?: boolean;
+}
+
+type AutofillRefineResponse = Omit<
+	RequestResult<{
+		message: string;
+		operation: string;
+		revision: number;
+		scope: string;
+		blocks_edit: boolean;
+	}>,
+	"status"
+> & { status?: number | FormReviewOperation | null };
 
 export class FormRevisionModal extends Modal {
+	declare reconciler: EditReconciler;
+	declare marker: RevisionMarker;
+	declare widget: FormWidget;
+	declare state: FormRevisionState;
+	declare blockedAction: FormRevisionReviewOptions["blockedAction"];
+	declare selections: Map<string, FormRevisionSource>;
+	declare sources: [ReviewSource, ReviewSource, ...ReviewSource[]];
+	declare openReview: ReturnType<FormRevisionModal["_reviewSnapshot"]>;
+	declare openSnapshot: string;
+
 	constructor(
-		reconciler,
-		marker,
-		widget,
-		state,
-		{ blockedAction = null } = {},
+		reconciler: EditReconciler,
+		marker: RevisionMarker,
+		widget: FormWidget,
+		state: FormRevisionState,
+		{ blockedAction = null }: FormRevisionReviewOptions = {},
 	) {
-		super(reconciler.view, marker.querySelector("[data-role='edited-reset']"));
+		super(
+			reconciler.view,
+			marker.querySelector<HTMLButtonElement>("[data-role='edited-reset']"),
+		);
 		this.reconciler = reconciler;
 		this.marker = marker;
 		this.widget = widget;
@@ -68,9 +135,9 @@ export class FormRevisionModal extends Modal {
 		return parts.length ? `Schema update: ${parts.join(", ")}.` : null;
 	}
 
-	_value(element) {
-		const rendered = element?.elt?.cloneNode(true);
-		if (!rendered || element.hasSubmission === false) {
+	_value(element?: ReviewElement) {
+		const rendered = element?.elt?.cloneNode(true) as HTMLElement | undefined;
+		if (!rendered || element?.hasSubmission === false) {
 			const empty = document.createElement("p");
 			empty.className = "text-sm italic text-base-medium";
 			empty.textContent = "Empty";
@@ -90,14 +157,18 @@ export class FormRevisionModal extends Modal {
 		});
 		for (const node of [
 			rendered,
-			...rendered.querySelectorAll("[data-visible]"),
+			...rendered.querySelectorAll<HTMLElement>("[data-visible]"),
 		]) {
 			node.dataset.visible = "true";
 		}
 		return rendered;
 	}
 
-	async _differences(localResponse) {
+	async _differences(
+		localResponse: FormRevisionResponse,
+	): Promise<ReviewDifference[]> {
+		const response = this.state.response;
+		if (!response) return [];
 		const localSnapshot = this.state.record
 			? (this.state.record.renderer_submission ?? {})
 			: (this.widget.captureFormState().renderer_submission ?? {});
@@ -105,7 +176,7 @@ export class FormRevisionModal extends Modal {
 			...localResponse.submission,
 			...localSnapshot,
 		};
-		const state = this.state.response.form_state ?? {};
+		const state = response.form_state ?? {};
 		this.sources = [
 			{
 				id: "local",
@@ -116,21 +187,23 @@ export class FormRevisionModal extends Modal {
 			{
 				id: "server",
 				label: "Latest saved value",
-				schema: this.state.response.schema,
-				submission: this.state.response.submission ?? {},
+				schema: response.schema,
+				submission: response.submission ?? {},
 			},
-			...(state.reviews ?? []).map((review) => ({
-				id: `ai:${review.operation}`,
-				label: review.private ? "Revised suggestion" : "Autofill suggestion",
-				...review,
-			})),
+			...(state.reviews ?? []).map(
+				(review): ReviewSource => ({
+					id: `ai:${review.operation}`,
+					label: review.private ? "Revised suggestion" : "Autofill suggestion",
+					...review,
+				}),
+			),
 		];
 		const previews = await Promise.all(
 			this.sources.map((source) =>
 				loadRevisionPreview(
 					this.widget,
 					{
-						...this.state.response,
+						...response,
 						schema: source.schema,
 						submission: source.submission,
 					},
@@ -139,15 +212,14 @@ export class FormRevisionModal extends Modal {
 			),
 		);
 		try {
-			if (previews.some((preview) => !preview))
-				throw new Error("Could not render form review values");
-			const elements = (preview) =>
-				new Map(
+			const rendered = previews.map((preview) => {
+				if (!preview) throw new Error("Could not render form review values");
+				return new Map(
 					Array.from(preview.form?.renderer?.elements?.values?.() ?? []).map(
 						(element) => [element.schema?.id, element],
 					),
 				);
-			const rendered = previews.map(elements);
+			});
 			const fields = [
 				...new Map(
 					this.sources
@@ -156,7 +228,7 @@ export class FormRevisionModal extends Modal {
 				).values(),
 			];
 			const reviews = state.reviews ?? [];
-			const savedChangedSinceLaunch = (field) =>
+			const savedChangedSinceLaunch = (field: FormFieldSchema) =>
 				reviews.some(
 					(review) =>
 						review.saved_baseline &&
@@ -307,7 +379,7 @@ export class FormRevisionModal extends Modal {
 							];
 						})
 						.sort((left, right) => {
-							const rank = (source) => {
+							const rank = (source: FormRevisionSource) => {
 								if (source === "local") return 0;
 								if (source.startsWith("ai:")) return 1;
 								if (source === "server") return 2;
@@ -323,8 +395,12 @@ export class FormRevisionModal extends Modal {
 		}
 	}
 
-	_sameValue(left, right, field = null) {
-		const comparable = (value) => {
+	_sameValue(
+		left: unknown,
+		right: unknown,
+		field: FormFieldSchema | null = null,
+	) {
+		const comparable = (value: unknown) => {
 			if (
 				value == null ||
 				value === "" ||
@@ -334,9 +410,10 @@ export class FormRevisionModal extends Modal {
 			if (
 				typeof value === "object" &&
 				Object.keys(value).length === 1 &&
-				["rows", "items"].some(
-					(key) => Array.isArray(value[key]) && !value[key].length,
-				)
+				(("rows" in value && Array.isArray(value.rows) && !value.rows.length) ||
+					("items" in value &&
+						Array.isArray(value.items) &&
+						!value.items.length))
 			)
 				return null;
 			if (
@@ -351,10 +428,13 @@ export class FormRevisionModal extends Modal {
 		return areEqual(comparable(left), comparable(right));
 	}
 
-	_choice(field, { source, label, compatible, value }) {
+	_choice(
+		field: ReviewDifference,
+		{ source, label, compatible, value }: ReviewChoice,
+	) {
 		const button = document.createElement(compatible ? "button" : "div");
 		if (compatible) {
-			button.type = "button";
+			button.setAttribute("type", "button");
 			button.setAttribute("role", "radio");
 			button.setAttribute(
 				"aria-checked",
@@ -389,22 +469,25 @@ export class FormRevisionModal extends Modal {
 	}
 
 	async init() {
+		const response = this.state.response;
+		if (!response) return false;
 		const local = this.state.record
-			? this.widget.buildLocalRevision(this.state.response, this.state.record)
-			: this.widget.buildLocalRevision(this.state.response);
+			? this.widget.buildLocalRevision(response, this.state.record)
+			: this.widget.buildLocalRevision(response);
 		const differences = await this._differences(local.response);
-		if (!differences.length && !this.state.response.form_state) return false;
+		if (!differences.length && !this.state.response?.form_state) return false;
 		const noNewAutofillValues =
 			!differences.length &&
 			!this.blockedAction &&
 			!this.state.record &&
-			!!this.state.response.form_state?.reviews?.length;
+			!!this.state.response?.form_state?.reviews?.length;
 		const saved = this.sources[1];
 		// An AI value can depend on a different saved field, so a post-launch
 		// context edit makes every proposal opt-in, not only the edited field.
 		const savedContextChanged =
-			this.state.response.form_state?.reviews?.some((review) => {
-				if (!review.saved_baseline) return false;
+			this.state.response?.form_state?.reviews?.some((review) => {
+				const savedBaseline = review.saved_baseline;
+				if (!savedBaseline) return false;
 				const fields = new Map(
 					[...(review.schema ?? []), ...(saved.schema ?? [])]
 						.filter((field) => field?.id)
@@ -414,7 +497,7 @@ export class FormRevisionModal extends Modal {
 					(field) =>
 						!this._sameValue(
 							saved.submission[field.id],
-							review.saved_baseline[field.id],
+							savedBaseline[field.id],
 							field,
 						),
 				);
@@ -436,7 +519,6 @@ export class FormRevisionModal extends Modal {
 					!this._sameValue(
 						this.sources[0].submission[field.id] ?? null,
 						baseline[field.id] ?? null,
-						field,
 					));
 			let defaultSource =
 				aiChoice?.source ?? serverChoice?.source ?? localChoice?.source;
@@ -556,44 +638,43 @@ export class FormRevisionModal extends Modal {
 	}
 
 	_selectedSubmission() {
-		const review = this.state.response.form_state ?? {};
+		const response = this.state.response;
+		if (!response) return {};
+		const review = response.form_state ?? {};
 		const preserveTabDraft = !this.state.record && review.reviews?.length;
 		const submission = structuredClone(
 			preserveTabDraft
 				? this.sources[0].submission
-				: (this.state.response.submission ?? {}),
+				: (response.submission ?? {}),
 		);
 		for (const [id, sourceId] of this.selections) {
 			const source = this.sources.find(
 				(candidate) => candidate.id === sourceId,
 			);
 			if (
+				!source ||
 				!compatibleField(
-					source?.schema?.find((field) => field.id === id),
-					this.state.response.schema?.find((field) => field.id === id),
+					source.schema?.find((field) => field.id === id),
+					response.schema?.find((field) => field.id === id),
 				)
 			)
 				continue;
-			if (Object.hasOwn(source?.submission ?? {}, id))
+			if (Object.hasOwn(source.submission, id))
 				submission[id] = structuredClone(source.submission[id]);
 			else delete submission[id];
 		}
 		const currentIds = new Set(
-			(this.state.response.schema ?? []).map((field) => field.id),
+			(response.schema ?? []).map((field) => field.id),
 		);
 		return Object.fromEntries(
 			Object.entries(submission).filter(([id]) => currentIds.has(id)),
 		);
 	}
 
-	_refinement(body) {
-		const url = this.state.response.form_state?.refine_url;
-		if (
-			!url ||
-			this.state.record ||
-			!this.state.response.form_state?.reviews?.length
-		)
-			return;
+	_refinement(body: HTMLElement) {
+		const review = this.state.response?.form_state;
+		const url = review?.refine_url;
+		if (!url || this.state.record || !review.reviews?.length) return;
 		const section = body.appendChild(document.createElement("section"));
 		section.className = "space-y-2";
 		const label = section.appendChild(document.createElement("label"));
@@ -627,12 +708,21 @@ export class FormRevisionModal extends Modal {
 			}
 			reviseAction.activate();
 			try {
+				const operationId = this.widget.view?.operationId?.();
+				if (!operationId)
+					throw new Error("Could not identify the review operation");
 				const data = new FormData();
 				data.set("autofill-description", prompt.value);
-				data.set("form-revision", this.state.response.form_state.revision);
-				data.set("operation-id", this.widget.view.operationId());
+				data.set(
+					"form-revision",
+					String(this.state.response?.form_state?.revision),
+				);
+				data.set("operation-id", operationId);
 				data.set("submission", JSON.stringify(this._selectedSubmission()));
-				const response = await request.post(url, data);
+				const response: AutofillRefineResponse | undefined = await request.post(
+					url,
+					data,
+				);
 				if (!response?.ok) {
 					message.textContent =
 						response?.message ||
@@ -640,14 +730,17 @@ export class FormRevisionModal extends Modal {
 						"The form changed or suggestions could not be started. Your choices were kept.";
 					return;
 				}
-				this.widget.lockDeferredOperation(response);
-				renderReviewBar(this.widget, response.status);
-				const manager = await this.widget.view.ensureDeferredOperations?.();
-				manager?.track(response.operation, {
-					node: this.widget.target,
-					status: response.status,
-					revision: response.revision,
-				});
+				const status =
+					typeof response.status === "object" ? response.status : undefined;
+				this.widget.lockDeferredOperation({ ...response, status });
+				renderReviewBar(this.widget, status);
+				const manager = await this.widget.view?.ensureDeferredOperations?.();
+				if (response.operation)
+					manager?.track(response.operation, {
+						node: this.widget.target,
+						status,
+						revision: response.revision,
+					});
 				await this.remove();
 			} catch {
 				message.textContent =
@@ -660,8 +753,19 @@ export class FormRevisionModal extends Modal {
 }
 
 export class WholeFormRevisionModal extends Modal {
-	constructor(reconciler, marker, widget) {
-		super(reconciler.view, marker.querySelector("[data-role='edited-reset']"));
+	declare reconciler: EditReconciler;
+	declare marker: RevisionMarker;
+	declare widget: FormWidget;
+
+	constructor(
+		reconciler: EditReconciler,
+		marker: RevisionMarker,
+		widget: FormWidget,
+	) {
+		super(
+			reconciler.view,
+			marker.querySelector<HTMLButtonElement>("[data-role='edited-reset']"),
+		);
 		this.reconciler = reconciler;
 		this.marker = marker;
 		this.widget = widget;

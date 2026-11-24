@@ -1,14 +1,33 @@
 import { STYLES } from "../generated/styles.mjs";
 import { Modal } from "../shared/modal.ts";
+import type { FormMigrationNotice } from "../types/forms.d.ts";
 
-export function installMigrationNotice(widget) {
+type MigrationNoticeWidget = {
+	target?: HTMLElement | null;
+	view?:
+		| (NonNullable<ConstructorParameters<typeof Modal>[0]> & {
+				kind?: string | null;
+		  })
+		| null;
+	component?: { kind?: string | null } | null;
+	kind?: string | null;
+	revisionPreview?: boolean;
+	_migrationNotice?: { destroy(): void } | null;
+};
+
+export function installMigrationNotice(widget: MigrationNoticeWidget) {
 	widget._migrationNotice?.destroy();
-	if (widget.revisionPreview || widget.target?.dataset.completed === "true")
+	const target = widget.target;
+	if (!target || widget.revisionPreview || target.dataset.completed === "true")
 		return;
-	const values = JSON.parse(widget.target?.dataset.migrationNotice || "[]");
+	const values: FormMigrationNotice[] = JSON.parse(
+		target.dataset.migrationNotice || "[]",
+	);
 	if (!values.length) return;
-	let trigger = widget.target.querySelector("[data-role='migration-changes']");
-	let banner = null;
+	let trigger = target.querySelector<HTMLButtonElement>(
+		"[data-role='migration-changes']",
+	);
+	let banner: HTMLParagraphElement | null = null;
 	if (!trigger) {
 		banner = document.createElement("p");
 		banner.dataset.role = "migration-notice";
@@ -18,7 +37,7 @@ export function installMigrationNotice(widget) {
 		trigger.type = "button";
 		trigger.className = "font-semibold underline underline-offset-2";
 		trigger.textContent = "View changes";
-		widget.target.prepend(banner);
+		target.prepend(banner);
 	}
 	const modal = new Modal(widget.view, trigger);
 	widget._migrationNotice = {
@@ -33,7 +52,7 @@ export function installMigrationNotice(widget) {
 		root.id = "modal";
 		root.className = STYLES.modal.wrapper;
 		root.dataset.kind =
-			widget.kind || widget.component?.kind || widget.view.kind || "default";
+			widget.kind || widget.component?.kind || widget.view?.kind || "default";
 		const content = root.appendChild(document.createElement("section"));
 		content.id = "modal-content";
 		content.className = `${STYLES.modal.content} w-full sm:max-w-3xl`;
@@ -66,7 +85,7 @@ export function installMigrationNotice(widget) {
 			title.textContent = value.label;
 			const cells = row.appendChild(document.createElement("div"));
 			cells.className = "grid gap-2 sm:grid-cols-2";
-			for (const key of ["before", "after"]) {
+			for (const key of ["before", "after"] as const) {
 				const cell = cells.appendChild(document.createElement("div"));
 				cell.dataset.role = `migration-${key}`;
 				cell.className =

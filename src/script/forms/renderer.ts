@@ -2,9 +2,58 @@ import { getFormElement } from "../elements/loader.mjs";
 import { captureError } from "../shared/errors.ts";
 import { withTransition } from "../shared/transitions.ts";
 import { generateElementId } from "../shared/utilities.ts";
+import type {
+	FieldCondition,
+	FormFieldSchema,
+	FormSchema,
+	FormSubmission,
+} from "../types/forms.d.ts";
+
+interface FormRendererHost {
+	target: HTMLElement;
+	schema: FormSchema;
+	submission?: FormSubmission | null;
+	key?: string | null;
+	kind?: string | null;
+	readonly?: boolean;
+	showEmptyFields?: boolean;
+	historyFillEnabled?: boolean;
+	htmlFields?: Record<string, string> | null;
+}
+
+export interface RenderedFormElement {
+	id: string;
+	schema: FormFieldSchema;
+	elt: HTMLElement | null;
+	value?: unknown;
+	active?(value: unknown): boolean;
+	addHistoryFill?(value: unknown): boolean;
+	clear?(): void;
+	destroy?(): void;
+}
+
+interface RenderedStatusElement extends RenderedFormElement {
+	update(): void;
+}
+
+interface TriggerCondition extends FieldCondition {
+	id: string;
+}
 
 export class FormRenderer {
-	constructor(form) {
+	declare id: string;
+	declare form: FormRendererHost;
+	declare kind: string;
+	declare elements: Map<string, RenderedFormElement>;
+	declare visibilityTriggers: Map<
+		RenderedFormElement,
+		Set<RenderedFormElement>
+	>;
+	declare visibilityConditions: Map<RenderedFormElement, TriggerCondition[]>;
+	declare statusTriggers: Set<RenderedFormElement>;
+	declare status: RenderedStatusElement | null | undefined;
+
+	constructor(form: FormRendererHost) {
 		this.id = generateElementId("renderer");
 		this.form = form;
 		this.kind = form.kind || form.target.dataset.kind || "form";
@@ -38,7 +87,7 @@ export class FormRenderer {
 
 		const html = Array.from(this.elements.values())
 			.map((element) => element.elt)
-			.filter(Boolean);
+			.filter((element): element is HTMLElement => Boolean(element));
 		this.form.target.replaceChildren(...html);
 
 		this._initStatusTriggers();
@@ -63,7 +112,7 @@ export class FormRenderer {
 		this.statusTriggers.clear();
 	}
 
-	_packageSubmission() {
+	_packageSubmission(): FormSubmission {
 		const result = Object.fromEntries(
 			Array.from(this.elements.values()).map((element) => [
 				element.schema.id,
@@ -74,22 +123,29 @@ export class FormRenderer {
 		return result;
 	}
 
-	_onChange(event) {
-		const trigger = event.target.closest(".form-element");
+	_onChange(event: Event) {
+		const target = event.target;
+		if (
+			!target ||
+			!("closest" in target) ||
+			typeof target.closest !== "function"
+		)
+			return;
+		const trigger: Element | null = target.closest(".form-element");
 		if (!trigger) return;
 
 		const element = this.elements.get(trigger.id);
 		if (!element) return;
 
 		if (this.statusTriggers.has(element)) {
-			this.status.update();
+			this.status?.update();
 		}
 		if (this.visibilityTriggers.has(element)) {
 			this._updateVisibility(element);
 		}
 	}
 
-	addHistoryFillButtons(submission) {
+	addHistoryFillButtons(submission: FormSubmission | null | undefined) {
 		if (!this.historyFillEnabled || !submission) return;
 
 		for (const [fieldId, value] of Object.entries(submission)) {
@@ -101,7 +157,8 @@ export class FormRenderer {
 	async _initStatusTriggers() {
 		this.statusTriggers.clear();
 		this.status = Array.from(this.elements.values()).find(
-			(element) => element.schema.type === "status",
+			(element): element is RenderedStatusElement =>
+				element.schema.type === "status",
 		);
 		if (!this.status) return;
 
@@ -122,13 +179,10 @@ export class FormRenderer {
 		this.visibilityTriggers = new Map();
 		this.visibilityConditions.clear();
 
-		const targets = Array.from(this.elements.values()).filter(
-			(element) => element.schema.visibility && element.elt,
-		);
-
-		for (const target of targets) {
+		for (const target of this.elements.values()) {
+			if (!target.schema.visibility || !target.elt) continue;
 			const conditions = target.schema.visibility.filter(
-				(trigger) => trigger?.id,
+				(trigger): trigger is TriggerCondition => Boolean(trigger?.id),
 			);
 			if (conditions.length === 0) continue;
 			this.visibilityConditions.set(target, conditions);
@@ -151,7 +205,7 @@ export class FormRenderer {
 		});
 	}
 
-	_updateVisibility(trigger) {
+	_updateVisibility(trigger: RenderedFormElement) {
 		const targets = this.visibilityTriggers.get(trigger);
 		if (!targets) return;
 
@@ -160,32 +214,34 @@ export class FormRenderer {
 			visible: this._visibilityConditionsMatch(target),
 		})).filter(
 			({ target, visible }) =>
-				target.elt.dataset.visible !== (visible ? "true" : "false"),
+				target.elt?.dataset.visible !== (visible ? "true" : "false"),
 		);
 		if (!changes.length) return;
 
 		void withTransition(
 			() => {
 				changes.forEach(({ target, visible }) => {
-					target.elt.dataset.visible = visible ? "true" : "false";
+					const { elt } = target;
+					if (elt) elt.dataset.visible = visible ? "true" : "false";
 				});
 			},
 			{ label: "form:conditional-visibility" },
 		);
 	}
 
-	_updateVisibilityTarget(target) {
+	_updateVisibilityTarget(target: RenderedFormElement) {
 		const visible = this._visibilityConditionsMatch(target);
-		target.elt.dataset.visible = visible ? "true" : "false";
+		const { elt } = target;
+		if (elt) elt.dataset.visible = visible ? "true" : "false";
 	}
 
-	_visibilityConditionsMatch(target) {
+	_visibilityConditionsMatch(target: RenderedFormElement) {
 		const conditions = (this.visibilityConditions.get(target) || []).filter(
 			(condition) => condition?.id,
 		);
 		if (conditions.length === 0) return true;
 
-		const groups = new Map();
+		const groups = new Map<string, TriggerCondition[]>();
 
 		for (const condition of conditions) {
 			const group = groups.get(condition.id) || [];
@@ -196,7 +252,13 @@ export class FormRenderer {
 		return Array.from(groups.entries()).every(([triggerId, group]) => {
 			const element = this.elements.get(`${triggerId}-${this.id}`);
 			if (!element) return false;
-			return group.some((condition) => element.active(condition.value));
+			// Canonical conditions only reference checkbox, radio, or select fields.
+			const { active } = element;
+			if (!active)
+				throw new TypeError(
+					`Condition trigger ${triggerId} cannot match a value`,
+				);
+			return group.some((condition) => active.call(element, condition.value));
 		});
 	}
 
@@ -204,7 +266,11 @@ export class FormRenderer {
 		for (const eltSchema of this.form.schema) {
 			const eltSubmission = this.form.submission?.[eltSchema.id];
 			try {
-				const element = await getFormElement(this, eltSchema, eltSubmission);
+				const element: RenderedFormElement = await getFormElement(
+					this,
+					eltSchema,
+					eltSubmission,
+				);
 				this.elements.set(element.id, element);
 			} catch (error) {
 				captureError(error, this.target, {

@@ -1,10 +1,20 @@
 import { FacetsBox } from "../../elements/combobox/facets.mjs";
+import type { FacetsUpdatedEvent, FormControlOptions } from "./loader.ts";
 
 /**
  * Local administrator/group choices shared by Page, User Settings and Builder.
  */
 export default class AccessRestrictions {
-	constructor(root, { readonly = false, onChange = () => {} } = {}) {
+	declare private root: HTMLElement;
+	declare private readonly: boolean;
+	declare private onChange: () => void;
+	declare private select: FacetsBox | null;
+	declare private _destroyed: boolean;
+
+	constructor(
+		root: HTMLElement,
+		{ readonly = false, onChange = () => {} }: FormControlOptions = {},
+	) {
 		this.root = root;
 		this.readonly = readonly;
 		this.onChange = onChange;
@@ -17,9 +27,11 @@ export default class AccessRestrictions {
 
 	async init() {
 		if (this.readonly) return;
-		this.select = new FacetsBox(
-			this.root.querySelector("[data-role='restrict-group-input']"),
+		const input = this.root.querySelector<HTMLInputElement>(
+			"[data-role='restrict-group-input']",
 		);
+		if (!input) throw new Error("Access restriction picker is missing");
+		this.select = new FacetsBox(input);
 		await this.select.init();
 		if (this._destroyed) return;
 		this.root.addEventListener("updated", this._updated);
@@ -28,49 +40,74 @@ export default class AccessRestrictions {
 	}
 
 	get list() {
-		return this.root.querySelector("[data-role='restricted-group-list']");
+		return this.root.querySelector<HTMLUListElement>(
+			"[data-role='restricted-group-list']",
+		);
 	}
 
-	_updated(event) {
-		if (event.target !== this.select.element) return;
-		const options = Object.entries(event.detail.options);
+	_updated(event: Event) {
+		const select = this.select;
+		if (!select || event.target !== select.element) return;
+		const options = Object.entries(
+			(event as FacetsUpdatedEvent).detail.options,
+		);
 		if (!options.length) return;
 		const list = this.list;
-		const template = this.root.querySelector(
+		const template = this.root.querySelector<HTMLTemplateElement>(
 			"[data-role='restriction-template']",
 		);
+		const admin = this.root.querySelector<HTMLInputElement>("[name='admin']");
+		if (!list || !template || !admin)
+			throw new Error("Access restriction fields are missing");
 		const selected = new Set(
 			Array.from(
-				list.querySelectorAll("[name='group-key']"),
+				list.querySelectorAll<HTMLInputElement>("[name='group-key']"),
 				(input) => input.value,
 			),
 		);
-		this.root.querySelector("[name='admin']").checked = false;
+		admin.checked = false;
 		for (const [key, option] of options) {
 			if (selected.has(key)) continue;
-			const item = template.content.firstElementChild.cloneNode(true);
-			item.querySelector("[name='group-key']").value = key;
-			item.querySelector("[data-role='group-name']").textContent = option.name;
-			item.querySelector("button").dataset.key = key;
+			const item = template.content.firstElementChild?.cloneNode(true);
+			if (!(item instanceof Element))
+				throw new Error("Access restriction row template is empty");
+			const input = item.querySelector<HTMLInputElement>("[name='group-key']");
+			const name = item.querySelector("[data-role='group-name']");
+			const button = item.querySelector("button");
+			if (!input || !name || !button)
+				throw new Error("Access restriction row fields are missing");
+			input.value = key;
+			name.textContent = option.name;
+			button.dataset.key = key;
 			list.append(item);
 			selected.add(key);
 		}
-		this.select.clear({ notify: false });
+		select.clear({ notify: false });
 		this.onChange();
 	}
 
-	_change(event) {
-		if (event.target.name !== "admin" || !event.target.checked) return;
-		this.list.replaceChildren();
-		this.select.clear({ notify: false });
+	_change(event: Event) {
+		const input = event.target;
+		if (
+			!(input instanceof HTMLInputElement) ||
+			input.name !== "admin" ||
+			!input.checked
+		)
+			return;
+		const list = this.list;
+		if (!list) throw new Error("Access restriction list is missing");
+		list.replaceChildren();
+		this.select?.clear({ notify: false });
 		this.onChange();
 	}
 
-	_click(event) {
-		const button = event.target.closest("[data-role='remove-restriction']");
+	_click(event: Event) {
+		const target = event.target;
+		if (!(target instanceof Element)) return;
+		const button = target.closest("[data-role='remove-restriction']");
 		if (!button || !this.root.contains(button)) return;
 		event.preventDefault();
-		button.closest("li").remove();
+		button.closest("li")?.remove();
 		this.onChange();
 	}
 

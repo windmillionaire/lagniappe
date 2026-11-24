@@ -2,11 +2,84 @@ import { primitives } from "../elements/primitives.mjs";
 import { createIcon } from "../shared/icons.ts";
 import { withTransition } from "../shared/transitions.ts";
 import { showBriefly } from "../shared/utilities.ts";
+import type { FormSchema, FormSubmission } from "../types/forms.d.ts";
 import { initFormControls } from "./controls/loader.ts";
 import { FormRenderer } from "./renderer.ts";
 
+type FormFragment = Node | string | false | null | undefined;
+type FormMessages = Record<string, string>;
+type SubmitButton = HTMLButtonElement & { __initialized?: boolean };
+
+export interface FormSubmitOptions {
+	route?: string | null;
+	submitter?: HTMLElement | null;
+}
+
+interface FormControllerWidget {
+	target: HTMLElement;
+	key?: string | null;
+	readonly?: boolean;
+	showEmptyFields?: boolean;
+	historyFillEnabled?: boolean;
+	schema?: FormSchema | null;
+	submission?: FormSubmission | null;
+	htmlFields?: Record<string, string> | null;
+	html?: FormFragment[] | null;
+	prepend?: FormFragment[] | null;
+	append?: FormFragment[] | null;
+	submitGroup?: HTMLElement | null;
+	submitButton?: HTMLButtonElement | null;
+	header?: HTMLElement | null;
+	messages?: FormMessages | null;
+	icon?: string | null;
+	error?: HTMLElement | null;
+	view?: { elt?: EventTarget | null; offline?: boolean } | null;
+	offline?: unknown;
+	unsavedState?: boolean;
+	markUnsavedState?(): void;
+	clearUnsavedState?(): void;
+}
+
+interface FormControllerSubForm {
+	submitGroup: HTMLElement | null;
+	submitButton: HTMLButtonElement | null;
+	messages: FormMessages;
+	icon?: string | null;
+	deferred?: boolean;
+	applyDirectUploads?(data: FormData): FormData;
+	prepareSubmit?(options?: FormSubmitOptions): boolean | Promise<boolean>;
+}
+
+interface SubmitButtonAttributes {
+	message: string;
+	icon?: string | null;
+	disabled?: boolean;
+	fade?: boolean;
+}
+
+const presentFragment = (fragment: FormFragment): fragment is Node | string =>
+	Boolean(fragment);
+
 export class FormController {
-	constructor(widget) {
+	declare private _widget: FormControllerWidget;
+	declare _destroyed: boolean;
+	declare private _submitGroup: HTMLElement | null;
+	declare private _submitButton: HTMLButtonElement | null;
+	declare private _header: HTMLElement | null;
+	declare private _messages: FormMessages;
+	declare private _icon: string | null;
+	declare private _error: HTMLElement | null;
+	declare private _editedMarker: HTMLElement | null;
+	declare _subForm: FormControllerSubForm | null;
+	declare renderer: FormRenderer | null;
+	declare destroyables: { destroy?(): void }[];
+	declare private _offlineBlocked: boolean;
+	declare private _offlineListener: EventListener | null;
+	declare private _unsavedStateListener: EventListener | null;
+	declare private _resetListener: EventListener | null;
+	declare _queued: boolean;
+
+	constructor(widget: FormControllerWidget) {
 		this._widget = widget;
 		this._destroyed = false;
 
@@ -17,7 +90,7 @@ export class FormController {
 		this._icon = widget.icon ?? null;
 		this._error = widget.error ?? null;
 		this._editedMarker =
-			widget.target?.querySelector("[lp-edited-marker]") ?? null;
+			widget.target?.querySelector<HTMLElement>("[lp-edited-marker]") ?? null;
 		this._subForm = null;
 
 		this.renderer = null;
@@ -66,11 +139,13 @@ export class FormController {
 		} else if (this._submitGroup) {
 			return this._submitGroup;
 		} else {
-			return this.target.querySelector("[data-role='submit-group']");
+			return this.target.querySelector<HTMLElement>(
+				"[data-role='submit-group']",
+			);
 		}
 	}
 
-	get submitButton() {
+	get submitButton(): SubmitButton | null {
 		if (this.readonly) {
 			return null;
 		} else if (this._subForm) {
@@ -78,9 +153,13 @@ export class FormController {
 		} else if (this._submitButton) {
 			return this._submitButton;
 		} else if (this.submitGroup) {
-			return this.submitGroup.querySelector("button[type='submit']");
+			return this.submitGroup.querySelector<HTMLButtonElement>(
+				"button[type='submit']",
+			);
 		} else {
-			return this.target.querySelector("button[type='submit']");
+			return this.target.querySelector<HTMLButtonElement>(
+				"button[type='submit']",
+			);
 		}
 	}
 
@@ -115,8 +194,8 @@ export class FormController {
 	get error() {
 		const error =
 			this._error ??
-			this.target.querySelector("[data-role='error']") ??
-			primitives.error();
+			this.target.querySelector<HTMLElement>("[data-role='error']") ??
+			primitives.error(undefined);
 
 		if (!this.target.contains(error)) {
 			const anchor = this.submitGroup || this.submitButton;
@@ -152,7 +231,7 @@ export class FormController {
 			this.renderer = new FormRenderer(this);
 			await this.renderer.render();
 		} else if (html.length > 0) {
-			this.target.replaceChildren(...html.filter(Boolean));
+			this.target.replaceChildren(...html.filter(presentFragment));
 		}
 
 		this.target.setAttribute("autocomplete", "off");
@@ -162,12 +241,12 @@ export class FormController {
 		}
 
 		if (Array.isArray(prepend)) {
-			this.target.prepend(...prepend.filter(Boolean));
+			this.target.prepend(...prepend.filter(presentFragment));
 		}
 
 		const submitGroup = this.submitGroup ?? this.submitButton;
 		if (Array.isArray(append)) {
-			this.target.append(...append.filter(Boolean));
+			this.target.append(...append.filter(presentFragment));
 			if (submitGroup) this.target.append(submitGroup);
 		} else if (submitGroup && !this.target.contains(submitGroup)) {
 			this.target.append(submitGroup);
@@ -218,13 +297,14 @@ export class FormController {
 		this.syncOfflineState();
 	}
 
-	markUnsavedState(event = null) {
+	markUnsavedState(event: Event | null = null) {
 		const control = event?.target;
 		if (
 			control &&
-			(typeof control.matches !== "function" ||
+			(!("matches" in control) ||
+				typeof control.matches !== "function" ||
 				!control.matches("input, select, textarea, [contenteditable='true']") ||
-				control.disabled)
+				("disabled" in control && control.disabled))
 		) {
 			return;
 		}
@@ -278,11 +358,13 @@ export class FormController {
 		this.hideError();
 	}
 
-	setSubmitButton(attributes) {
+	setSubmitButton(attributes: SubmitButtonAttributes) {
 		const { submitButton, submitGroup } = this;
 		const { message, icon, disabled, fade = false } = attributes;
 		if (!submitButton) return;
-		let textElement = submitButton.querySelector("span[data-role='text']");
+		let textElement = submitButton.querySelector<HTMLSpanElement>(
+			"span[data-role='text']",
+		);
 		if (!textElement) {
 			textElement = document.createElement("span");
 			textElement.dataset.role = "text";
@@ -290,7 +372,9 @@ export class FormController {
 		}
 		textElement.textContent = this.messages[message] ?? message ?? "";
 
-		let iconWrapper = submitButton.querySelector("span[data-role='icon']");
+		let iconWrapper = submitButton.querySelector<HTMLSpanElement>(
+			"span[data-role='icon']",
+		);
 		if (icon) {
 			if (!iconWrapper) {
 				iconWrapper = document.createElement("span");
@@ -331,7 +415,7 @@ export class FormController {
 		});
 	}
 
-	toggleSubForm(form) {
+	toggleSubForm(form?: FormControllerSubForm | null) {
 		if (form) {
 			this.hideSubmitGroup();
 			this._subForm = form;
@@ -394,7 +478,7 @@ export class FormController {
 		return false;
 	}
 
-	showError(error) {
+	showError(error: string) {
 		const errorElement = this.error;
 		if (!errorElement) return;
 
@@ -446,7 +530,9 @@ export class FormController {
 
 		this.hideError();
 		this.submitGroup.dataset.visible = "false";
-		this.submitButton.disabled = true;
+		const submitButton = this.submitButton;
+		if (!submitButton) throw new TypeError("Submit group has no submit button");
+		submitButton.disabled = true;
 	}
 
 	hideSubmitButton() {

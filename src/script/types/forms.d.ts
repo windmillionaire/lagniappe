@@ -1,3 +1,6 @@
+import type { OfflineMutationRecord } from "../shared/offlineQueue.ts";
+import type { RequestResult } from "./api.d.ts";
+
 export type InputType = "text" | "date" | "time" | "number" | "email" | "tel";
 
 export type FieldType =
@@ -30,6 +33,7 @@ export interface FormFieldSchema {
 	id: string;
 	type: FieldType;
 	title?: string;
+	label?: string;
 	input?: InputType;
 	location?: "out" | "in";
 	multiple?: boolean;
@@ -57,4 +61,80 @@ export interface CapturedFormState {
 	form_controls: FormControlSelection[];
 	renderer_schema: FormSchema | null;
 	renderer_submission: FormSubmission | null;
+}
+
+/** Operation projection used by form controls and HTML bootstrap data. */
+export interface FormReviewOperation {
+	key: string;
+	revision?: number | string | null;
+	type?: string | null;
+	status?: string | null;
+	terminal?: boolean;
+	phase?: string;
+	phase_label?: string;
+	recovering?: boolean;
+	elapsed_seconds?: number;
+	retry_reason?: string | null;
+	error?: string;
+	can_cancel?: boolean;
+	operation_id?: string | null;
+	scope?: string | null;
+	blocks_edit?: boolean;
+}
+
+export interface FormAutofillReview {
+	operation: string;
+	private?: boolean;
+	fields?: string[];
+	schema?: FormSchema | null;
+	submission: FormSubmission;
+	baseline?: FormSubmission | null;
+	saved_baseline?: FormSubmission | null;
+}
+
+export interface FormReviewState {
+	revision?: string;
+	operation?: FormReviewOperation | null;
+	reviews?: FormAutofillReview[];
+	stale_autofill?: boolean;
+	refine_url?: string | null;
+	cancel_url?: string;
+	retry_operation?: string | null;
+}
+
+export interface FormMigrationNotice {
+	label: string;
+	before: string | null;
+	after: string | null;
+	reason: string;
+}
+
+export interface FormRevisionFields {
+	schema: FormSchema | null;
+	submission: FormSubmission | null;
+	form_state: FormReviewState;
+	migration_notice: FormMigrationNotice[] | null;
+	generation: string | null;
+}
+
+export type FormRevisionResponse = RequestResult<FormRevisionFields>;
+
+export interface FormRevisionConflict {
+	record?: OfflineMutationRecord | null;
+	response?: FormRevisionResponse | null;
+}
+
+export type FormRevisionSource = "local" | "server" | `ai:${string}`;
+
+export type FormRevisionChoice =
+	| "local"
+	| "server"
+	| {
+			selections?: Record<string, FormRevisionSource>;
+			selectedSubmission?: FormSubmission;
+			localResponse?: FormRevisionResponse;
+	  };
+
+export interface FormRevisionReviewOptions {
+	blockedAction?: "autofill" | null;
 }

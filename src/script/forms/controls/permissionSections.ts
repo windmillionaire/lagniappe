@@ -1,11 +1,21 @@
 import { FacetsBox } from "../../elements/combobox/facets.mjs";
 import { withTransition } from "../../shared/transitions.ts";
+import type { FacetsUpdatedEvent, FormControlOptions } from "./loader.ts";
 
 /**
  * Enhances server-rendered permission fields without owning a form lifecycle.
  */
 export default class PermissionSections {
-	constructor(root, { readonly = false, onChange = () => {} } = {}) {
+	declare private root: HTMLElement;
+	declare private readonly: boolean;
+	declare private onChange: () => void;
+	declare private selects: Map<HTMLElement, FacetsBox>;
+	declare private _destroyed: boolean;
+
+	constructor(
+		root: HTMLElement,
+		{ readonly = false, onChange = () => {} }: FormControlOptions = {},
+	) {
 		this.root = root;
 		this.readonly = readonly;
 		this.onChange = onChange;
@@ -18,8 +28,12 @@ export default class PermissionSections {
 	async init() {
 		this.setVisibility();
 		if (this.readonly) return;
-		for (const section of this.root.querySelectorAll("[data-section]")) {
-			const input = section.querySelector("[data-role='permission-picker']");
+		for (const section of this.root.querySelectorAll<HTMLElement>(
+			"[data-section]",
+		)) {
+			const input = section.querySelector<HTMLInputElement>(
+				"[data-role='permission-picker']",
+			);
 			if (!input) continue;
 			const select = new FacetsBox(
 				input,
@@ -33,25 +47,37 @@ export default class PermissionSections {
 		this.root.addEventListener("change", this._change);
 	}
 
-	_updated(event) {
-		const section = event.target.closest("[data-section]");
+	_updated(event: Event) {
+		const target = event.target;
+		if (!(target instanceof Element)) return;
+		const section = target.closest<HTMLElement>("[data-section]");
+		if (!section) return;
 		const select = this.selects.get(section);
-		const entry = Object.values(event.detail.options)[0];
-		if (!select || event.target !== select.element || !entry?.id) return;
+		if (!select || target !== select.element) return;
+		const entry = Object.values(
+			(event as FacetsUpdatedEvent).detail.options,
+		)[0];
+		if (!entry?.id) return;
 		void withTransition(
 			() => {
 				if (this._destroyed) return;
 				const list = section.querySelector("[data-role='permission-list']");
+				if (!list) throw new Error("Permission list is missing");
 				const exists = Array.from(
-					list.querySelectorAll("input[type='radio']"),
+					list.querySelectorAll<HTMLInputElement>("input[type='radio']"),
 				).some((input) => input.name === entry.id);
 				if (!exists) {
 					const item = section
 						.querySelector("template")
-						.content.firstElementChild.cloneNode(true);
-					item.querySelector("[data-role='permission-name']").textContent =
-						entry.label || entry.name;
-					for (const input of item.querySelectorAll("input[type='radio']"))
+						?.content.firstElementChild?.cloneNode(true);
+					if (!(item instanceof Element))
+						throw new Error("Permission row template is missing");
+					const name = item.querySelector("[data-role='permission-name']");
+					if (!name) throw new Error("Permission name field is missing");
+					name.textContent = entry.label || entry.name;
+					for (const input of item.querySelectorAll<HTMLInputElement>(
+						"input[type='radio']",
+					))
 						input.name = entry.id;
 					list.append(item);
 					this.onChange();
@@ -63,16 +89,19 @@ export default class PermissionSections {
 		);
 	}
 
-	_change(event) {
-		if (!event.target.closest("[data-section]")) return;
+	_change(event: Event) {
+		const target = event.target;
+		if (!(target instanceof Element) || !target.closest("[data-section]"))
+			return;
 		void withTransition(
 			() => {
 				if (this._destroyed) return;
 				if (
-					event.target.matches("[data-role='remove-permission']") &&
-					!event.target.checked
+					target instanceof HTMLInputElement &&
+					target.matches("[data-role='remove-permission']") &&
+					!target.checked
 				) {
-					event.target.closest("li").remove();
+					target.closest("li")?.remove();
 					this.onChange();
 				}
 				this.setVisibility();
@@ -83,16 +112,20 @@ export default class PermissionSections {
 
 	setVisibility() {
 		const sections = new Map(
-			Array.from(this.root.querySelectorAll("[data-section]"), (section) => [
-				section.dataset.section,
-				section,
-			]),
+			Array.from(
+				this.root.querySelectorAll<HTMLElement>("[data-section]"),
+				(section) => [section.dataset.section ?? "", section],
+			),
 		);
-		const level = (name) =>
-			sections.get(name)?.querySelector("input[type='radio']:checked")?.value;
+		const level = (name: string) =>
+			sections
+				.get(name)
+				?.querySelector<HTMLInputElement>("input[type='radio']:checked")?.value;
 		const publicOff = level("public") === "FALSE";
-		const models = level("models") && level("models") !== "NONE";
-		const users = level("users") && !["NONE", "VIEW"].includes(level("users"));
+		const modelLevel = level("models");
+		const userLevel = level("users");
+		const models = modelLevel && modelLevel !== "NONE";
+		const users = userLevel && !["NONE", "VIEW"].includes(userLevel);
 		const groups = !!sections
 			.get("groups")
 			?.querySelector("[data-role='permission-list'] li");

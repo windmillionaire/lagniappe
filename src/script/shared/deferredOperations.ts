@@ -1,37 +1,17 @@
-import { renderReviewBar as renderReviewBarJs } from "../forms/reviewBar.ts";
+import { type ReviewBarWidget, renderReviewBar } from "../forms/reviewBar.ts";
 import type { DeferredOperationStatus } from "../types/api.d.ts";
+import type { FormReviewOperation, FormReviewState } from "../types/forms.d.ts";
 import { captureError } from "./errors.ts";
 import { createIcon } from "./icons.ts";
 import type { PollingCoordinator } from "./polling.ts";
 import { withTransition } from "./transitions.ts";
 
 type RevisionInput = number | string | null | undefined;
-type DisplayStatus = Pick<
-	DeferredOperationStatus,
-	| "key"
-	| "status"
-	| "phase"
-	| "phase_label"
-	| "elapsed_seconds"
-	| "recovering"
-	| "terminal"
-> &
-	Partial<Omit<DeferredOperationStatus, "revision">> & {
-		revision: RevisionInput;
-	};
-
-interface ReviewState {
-	operation?: DisplayStatus | null;
-	reviews?: readonly { operation: string }[];
-	stale_autofill?: unknown;
-}
-
-interface DeferredOperationWidget {
+interface DeferredOperationWidget extends ReviewBarWidget {
 	visible?: boolean;
-	target?: HTMLElement | null;
-	component?: { active?: DeferredOperationWidget | null };
-	_reviewedOperations?: ReadonlySet<string>;
-	reviewState?: ReviewState | null;
+	component?:
+		| (NonNullable<ReviewBarWidget["component"]> & { active?: unknown })
+		| null;
 }
 
 interface DeferredOperationNode extends HTMLElement {
@@ -68,19 +48,13 @@ interface TrackOptions {
 	revision?: RevisionInput;
 	node?: DeferredOperationNode | null;
 	immediate?: boolean;
-	status?: DisplayStatus | null;
+	status?: FormReviewOperation | null;
 }
 
 type TrackedOperation = { revision: number | string } & (
-	| { status: DisplayStatus; receivedAt: number }
+	| { status: FormReviewOperation; receivedAt: number }
 	| { status?: undefined; receivedAt?: undefined }
 );
-
-// The shared JS review bar accepts the same status projection as its widget's markup.
-const renderReviewBar = renderReviewBarJs as (
-	widget: DeferredOperationWidget,
-	status?: DisplayStatus | null,
-) => void;
 
 function operationRevision<T extends RevisionInput>(value: T): T | number {
 	if (typeof value === "number") return value;
@@ -119,7 +93,7 @@ function operationNodeVisible(node: DeferredOperationNode) {
 
 function completedAutofillInMarkup(
 	node: DeferredOperationNode,
-	status: DisplayStatus | null,
+	status: FormReviewOperation | null,
 ) {
 	if (
 		node.dataset.widget !== "TaskForm" ||
@@ -130,7 +104,7 @@ function completedAutofillInMarkup(
 	)
 		return false;
 	try {
-		const state: ReviewState = JSON.parse(node.dataset.formState);
+		const state: FormReviewState = JSON.parse(node.dataset.formState);
 		return (
 			state.operation?.key === status.key &&
 			state.operation?.revision === status.revision &&
@@ -186,7 +160,7 @@ export class DeferredOperationManager {
 			const key = node.dataset.operation;
 			if (!key) continue;
 			const revision = operationRevision(node.dataset.operationRevision);
-			const status: DisplayStatus | null = node.dataset.operationBootstrap
+			const status: FormReviewOperation | null = node.dataset.operationBootstrap
 				? JSON.parse(node.dataset.operationBootstrap)
 				: node.dataset.operationStatus
 					? {
@@ -521,7 +495,10 @@ export class DeferredOperationManager {
 		return true;
 	}
 
-	_render(status: DisplayStatus, elapsedSeconds = status.elapsed_seconds) {
+	_render(
+		status: FormReviewOperation,
+		elapsedSeconds = status.elapsed_seconds,
+	) {
 		for (const node of operationNodes(status.key)) {
 			if (status.type === "autofill" && node._lp_widget) {
 				renderReviewBar(node._lp_widget, {
@@ -545,7 +522,7 @@ export class DeferredOperationManager {
 					? `${status.phase_label}: ${status.error}`
 					: status.recovering
 						? `${status.phase_label}. Taking longer than expected.`
-						: status.phase_label;
+						: (status.phase_label ?? null);
 			}
 			const elapsed = node.querySelector("[data-role='deferred-elapsed']");
 			if (elapsed) elapsed.textContent = elapsedLabel(elapsedSeconds);

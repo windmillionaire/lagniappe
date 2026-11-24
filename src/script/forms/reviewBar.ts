@@ -1,6 +1,35 @@
+import type { DeferredOperationManager } from "../shared/deferredOperations.ts";
 import { captureError } from "../shared/errors.ts";
+import type { DeferredOperationStatus, RequestResult } from "../types/api.d.ts";
+import type { FormReviewOperation, FormReviewState } from "../types/forms.d.ts";
+import type { RevisionMarker } from "./revisions/reconciler.ts";
 
-export function currentReviewOperation(widget, incoming) {
+export interface ReviewBarView {
+	ensureDeferredOperations?: () => Promise<
+		Pick<DeferredOperationManager, "receive"> | null | undefined
+	>;
+}
+
+export interface ReviewBarWidget {
+	target?: HTMLElement | null;
+	view?: ReviewBarView | null;
+	component?: { showError?: (message: string) => void } | null;
+	revisionPreview?: boolean;
+	reviewState?: FormReviewState | null;
+	_reviewBar?: { destroy(): void } | null;
+	_reviewedOperations?: ReadonlySet<string> | null;
+	_autofillRetryPending?: boolean;
+	_autofillRetry?: string | null;
+}
+
+type AutofillCancelResponse = Omit<RequestResult, "status"> & {
+	status?: number | DeferredOperationStatus | null;
+};
+
+export function currentReviewOperation(
+	widget: Pick<ReviewBarWidget, "reviewState">,
+	incoming?: FormReviewOperation | null,
+) {
 	const current = widget.reviewState?.operation;
 	if (current?.key === incoming?.key)
 		return Number(current?.revision) > Number(incoming?.revision)
@@ -18,15 +47,18 @@ export function currentReviewOperation(widget, incoming) {
 /**
  * One notification surface for operation progress, schema changes, and remote edits.
  */
-export function renderReviewBar(widget, operation = null) {
+export function renderReviewBar(
+	widget: ReviewBarWidget | null | undefined,
+	incoming: FormReviewOperation | null = null,
+) {
 	const target = widget?.target;
-	const marker = target?.querySelector?.("[lp-edited-marker]");
-	if (!marker) return;
-	const state =
+	const marker = target?.querySelector?.<RevisionMarker>("[lp-edited-marker]");
+	if (!widget || !target || !marker) return;
+	const state: FormReviewState =
 		widget.reviewState ?? JSON.parse(target.dataset.formState || "{}");
 	widget.reviewState = state;
-	if (operation) state.operation = operation;
-	operation = state.operation;
+	if (incoming) state.operation = incoming;
+	const operation = state.operation;
 	const running = operation && !operation.terminal;
 	const runningAutofill = running && operation.type === "autofill";
 	const unresolvedReviews = (state.reviews ?? []).filter(
@@ -40,8 +72,10 @@ export function renderReviewBar(widget, operation = null) {
 		!unresolvedReviews.some((review) => review.operation === operation.key);
 	const reviews =
 		runningAutofill || awaitingNewAutofill ? [] : unresolvedReviews;
-	const migration =
-		JSON.parse(target.dataset.migrationNotice || "[]").length > 0;
+	const migrationNotice: unknown[] = JSON.parse(
+		target.dataset.migrationNotice || "[]",
+	);
+	const migration = migrationNotice.length > 0;
 	const remote = marker._lp_edited_state?.response;
 	const messages = [];
 	if (reviews.length) messages.push("Autofill is complete.");
@@ -55,15 +89,19 @@ export function renderReviewBar(widget, operation = null) {
 		!reviews.length &&
 		!marker._lp_edited_state?.schemaChanged;
 	if (remoteNotice) messages.push("Another user has edited this form.");
-	const copy = marker.querySelector("[data-role='edited-message']");
+	const copy = marker.querySelector<HTMLElement>(
+		"[data-role='edited-message']",
+	);
 	if (copy) {
 		copy.textContent = messages.join(" ");
 		copy.hidden = !messages.length;
 	}
-	const progress = marker.querySelector("[data-role='form-operation']");
+	const progress = marker.querySelector<HTMLElement>(
+		"[data-role='form-operation']",
+	);
 	const showTerminal =
 		operation?.terminal &&
-		["failed", "cancelled", "superseded"].includes(operation.status);
+		["failed", "cancelled", "superseded"].includes(operation.status ?? "");
 	const awaitingReview =
 		!state.stale_autofill &&
 		operation?.terminal &&
@@ -85,17 +123,25 @@ export function renderReviewBar(widget, operation = null) {
 					? "Autofill is complete. Loading values to review…"
 					: "";
 	}
-	const review = marker.querySelector("[data-role='edited-reset']");
+	const review = marker.querySelector<HTMLButtonElement>(
+		"[data-role='edited-reset']",
+	);
 	if (review) {
 		review.hidden = !!runningAutofill || (!reviews.length && !remote);
 		if ((reviews.length || remote) && !review.dataset?.reviewPending)
 			review.textContent = "Review values";
 	}
-	const changes = marker.querySelector("[data-role='migration-changes']");
+	const changes = marker.querySelector<HTMLButtonElement>(
+		"[data-role='migration-changes']",
+	);
 	if (changes) changes.hidden = !migration;
-	const cancel = marker.querySelector("[data-role='autofill-cancel']");
+	const cancel = marker.querySelector<HTMLButtonElement>(
+		"[data-role='autofill-cancel']",
+	);
 	if (cancel) cancel.hidden = !running || !operation.can_cancel;
-	const retry = marker.querySelector("[data-role='autofill-retry']");
+	const retry = marker.querySelector<HTMLButtonElement>(
+		"[data-role='autofill-retry']",
+	);
 	if (retry) {
 		retry.hidden = !state.retry_operation || !!running;
 		retry.disabled = !!widget._autofillRetryPending;
@@ -103,7 +149,7 @@ export function renderReviewBar(widget, operation = null) {
 			? "Retrying…"
 			: "Retry autofill";
 	}
-	for (const control of target.querySelectorAll(
+	for (const control of target.querySelectorAll<HTMLButtonElement>(
 		"[data-role='autofill-submit']",
 	)) {
 		control.disabled = !!running;
@@ -114,13 +160,15 @@ export function renderReviewBar(widget, operation = null) {
 			: "false";
 }
 
-export function installReviewBar(widget) {
+export function installReviewBar(widget: ReviewBarWidget) {
 	widget._reviewBar?.destroy();
-	if (widget.revisionPreview || !widget.target?.dataset.formState) return;
-	widget.reviewState = JSON.parse(widget.target.dataset.formState);
+	const target = widget.target;
+	if (widget.revisionPreview || !target?.dataset.formState) return;
+	widget.reviewState = JSON.parse(target.dataset.formState);
 	renderReviewBar(widget);
-	const click = async (event) => {
-		const button = event.target.closest(
+	const click = async (event: MouseEvent) => {
+		if (!(event.target instanceof Element)) return;
+		const button = event.target.closest<HTMLButtonElement>(
 			"[data-role='autofill-cancel'], [data-role='autofill-retry']",
 		);
 		if (!button) return;
@@ -129,7 +177,7 @@ export function installReviewBar(widget) {
 		button.disabled = true;
 		if (button.dataset.role === "autofill-cancel") {
 			button.textContent = "Cancelling…";
-			const progress = widget.target.querySelector(
+			const progress = widget.target?.querySelector(
 				"[data-role='form-operation']",
 			);
 			if (progress) progress.textContent = "Cancellation requested…";
@@ -139,9 +187,9 @@ export function installReviewBar(widget) {
 				const operation = widget.reviewState?.operation;
 				if (!operation?.can_cancel) return;
 				const data = new FormData();
-				data.set("operation-id", operation.operation_id);
+				data.set("operation-id", String(operation.operation_id));
 				const { request } = await import("../shared/request.ts");
-				const response = await request.post(
+				const response: AutofillCancelResponse | undefined = await request.post(
 					`/tools/operations/${encodeURIComponent(operation.key)}/cancel`,
 					data,
 				);
@@ -149,16 +197,16 @@ export function installReviewBar(widget) {
 					throw new Error(
 						response?.error || "Could not cancel autofill. Try again.",
 					);
-				if (response.status) {
+				if (response.status && typeof response.status === "object") {
 					renderReviewBar(widget, response.status);
-					const manager = await widget.view.ensureDeferredOperations?.();
+					const manager = await widget.view?.ensureDeferredOperations?.();
 					await manager?.receive(response.status);
 				}
 			} else {
 				widget._autofillRetryPending = true;
 				renderReviewBar(widget);
 				widget._autofillRetry = widget.reviewState?.retry_operation;
-				widget.target.dispatchEvent(
+				widget.target?.dispatchEvent(
 					new CustomEvent("submit", {
 						bubbles: true,
 						cancelable: true,
@@ -178,7 +226,9 @@ export function installReviewBar(widget) {
 				widget._autofillRetryPending = false;
 				renderReviewBar(widget);
 			}
-			widget.component?.showError?.(error.message);
+			widget.component?.showError?.(
+				error instanceof Error ? error.message : String(error),
+			);
 			captureError(error);
 		} finally {
 			if (button.dataset.role === "autofill-cancel")
@@ -186,8 +236,7 @@ export function installReviewBar(widget) {
 			if (button.dataset.role === "autofill-cancel") button.disabled = false;
 		}
 	};
-	widget.target.addEventListener("click", click);
-	const target = widget.target;
+	target.addEventListener("click", click);
 	widget._reviewBar = {
 		destroy: () => target.removeEventListener("click", click),
 	};

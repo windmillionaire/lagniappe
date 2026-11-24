@@ -1,3 +1,5 @@
+import type { FormRevisionResponse } from "../../types/forms.d.ts";
+import type { FormWidget } from "../../widgets/base/formWidget.ts";
 import { loadWidget } from "../../widgets/loader.mjs";
 
 /**
@@ -7,11 +9,13 @@ import { loadWidget } from "../../widgets/loader.mjs";
  *
  */
 export async function loadRevisionPreview(
-	liveWidget,
-	response,
+	liveWidget: Pick<FormWidget, "key" | "kind" | "name" | "readonly">,
+	response: FormRevisionResponse,
 	{ readonly = liveWidget.readonly } = {},
-) {
-	const responseTarget = response.html?.querySelector(
+): Promise<FormWidget | null> {
+	const html = response.html;
+	if (!html) return null;
+	const responseTarget = html.querySelector(
 		`[data-widget='${liveWidget.name}']`,
 	);
 	if (!responseTarget) return null;
@@ -36,14 +40,14 @@ export async function loadRevisionPreview(
 			return readonly;
 		},
 	};
-	const preview = await loadWidget(component, liveWidget.name, {
+	const preview: FormWidget = await loadWidget(component, liveWidget.name, {
 		revisionPreview: true,
 		schema: response.schema ?? null,
 		submission: response.submission ?? null,
 	});
 	const previewResponse = {
 		...response,
-		html: response.html?.cloneNode(true),
+		html: html.cloneNode(true) as Document,
 	};
 
 	if (preview.updated) await preview.updated(previewResponse);

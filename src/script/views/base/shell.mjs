@@ -57,6 +57,7 @@ export default class ShellView {
 		this._publishedReady = new Promise((resolve) => {
 			this._resolvePublished = resolve;
 		});
+		/** @type {Promise<unknown>} */
 		this.servicesReady = Promise.resolve(this);
 	}
 

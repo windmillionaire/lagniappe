@@ -1,10 +1,14 @@
+import type { FormFieldSchema, FormSchema } from "../types/forms.d.ts";
+
 /**
  * Compare field representations without importing form controllers or UI.
- *
  */
-export const compatibleField = (before, after) => {
+export const compatibleField = (
+	before: FormFieldSchema | null | undefined,
+	after: FormFieldSchema | null | undefined,
+): boolean => {
 	if (!before || !after) return false;
-	const kind = (field) =>
+	const kind = (field: FormFieldSchema) =>
 		field.type === "input"
 			? field.input || "text"
 			: field.type === "link"
@@ -29,7 +33,10 @@ export const compatibleField = (before, after) => {
 			),
 	);
 };
-export const incompatibleSchema = (before, after) =>
+export const incompatibleSchema = (
+	before: FormSchema | null | undefined,
+	after: FormSchema | null | undefined,
+): boolean =>
 	(before || []).some(
 		(field) =>
 			!compatibleField(

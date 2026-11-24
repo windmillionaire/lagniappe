@@ -11,7 +11,7 @@ Related Files:
         - lagniappe/web/templates/home/starred.html: Starred list component
         - lagniappe/web/templates/controls.html: icon-only home star() macro
         - lagniappe/web/templates/menus.html: labeled title-menu star() macro
-        - src/script/views/base/core.mjs: Core._toggleStar() handler
+        - src/script/views/base/core.ts: Core._toggleStar() handler
 
     Core:
         - lagniappe/core/entities/user.py: User.properties.starred

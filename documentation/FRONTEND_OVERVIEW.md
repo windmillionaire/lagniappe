@@ -118,9 +118,9 @@ See [Frontend Forms](FRONTEND_FORMS.md) for ownership and service contracts.
 
 Run `npm run typecheck` with the Node version in `.nvmrc` after `npm ci`.
 The compiler strictly checks native TypeScript in `src/script/` without emitting
-files. The shared modules in `src/script/shared/` use `.ts`, and shared type
-declarations live in `src/script/types/`. Unconverted `.mjs` modules still
-resolve normally. Use explicit extensions on relative runtime imports and
+files. The shared modules, forms engine, and core form, list, upload, and view
+base classes use `.ts`. Shared declarations live in `src/script/types/`.
+Unconverted `.mjs` modules still resolve normally. Use explicit extensions on relative runtime imports and
 `import type` for type-only imports. Keep syntax erasable so the repository's
 Node tests can load TypeScript directly.
 

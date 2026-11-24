@@ -28,7 +28,9 @@ interface MutationState {
 	files?: MutationFile[] | null;
 }
 
-interface OfflineMutationRecord extends StoredOfflineMutation, MutationState {
+export interface OfflineMutationRecord
+	extends StoredOfflineMutation,
+		MutationState {
 	action?: string | null;
 	method?: string | null;
 	route: string;

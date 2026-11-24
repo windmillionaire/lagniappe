@@ -1,8 +1,27 @@
+import type { SearchBox } from "../../elements/combobox/search.mjs";
+import type { EntityMenu } from "../../elements/entityMenu.mjs";
+import type { Notifications } from "../../elements/notifications.mjs";
+import type { EditWatcher } from "../../forms/revisions/watcher.ts";
 import { connectivity } from "../../shared/connectivity.ts";
+import type { DeferredOperationManager } from "../../shared/deferredOperations.ts";
 import { ENDPOINTS } from "../../shared/endpoints.ts";
 import { captureError } from "../../shared/errors.ts";
+import type {
+	DeleteModal,
+	HelpModal,
+	Modal,
+	OfflineModal,
+} from "../../shared/modal.ts";
+import type { OfflineQueue } from "../../shared/offlineQueue.ts";
+import type {
+	PollDescriptor,
+	PollingCoordinator,
+} from "../../shared/polling.ts";
 import { request } from "../../shared/request.ts";
+import type { SyncManager } from "../../shared/sync.ts";
 import { withTransition } from "../../shared/transitions.ts";
+import type { RequestResult } from "../../types/api";
+import type { SyncWidget } from "../../types/sync";
 import ViewComponent from "./component.mjs";
 import {
 	collectRefreshTargets,
@@ -24,13 +43,154 @@ import {
 	initializeCoreServices,
 } from "./services.mjs";
 import ShellView from "./shell.mjs";
+import type { SubmissionManager } from "./submission.mjs";
 import { Task } from "./task.mjs";
 
+type PollChannel = PollDescriptor<"channel">["channel"];
+
+const ROOT_COLLECTION_CHANNELS: ReadonlySet<string> = new Set([
+	"categories",
+	"projects",
+	"pages",
+	"tasks",
+	"forms",
+	"users",
+	"ingress",
+	"home",
+] satisfies PollChannel[]);
+
+const isRootCollectionChannel = (
+	channel: string | null | undefined,
+): channel is PollChannel =>
+	Boolean(channel && ROOT_COLLECTION_CHANNELS.has(channel));
+
+interface ReconcileChange {
+	type?: string;
+	key?: string | null;
+	starred?: boolean;
+	destination?: string | null;
+	source_widget?: string | null;
+	deferred_revision?: string;
+}
+
+interface RefreshOptions {
+	fingerprint?: string | null;
+	deferCommit?: boolean;
+	beforeCommit?: (() => void) | null;
+}
+
+type CoreWidget = (SyncWidget | { syncId?: null }) & {
+	component?: CoreComponent | null;
+	name: string;
+	key?: string | null;
+	target?: HTMLElement | null;
+	visible?: boolean;
+	refresh?(response: RequestResult | undefined): unknown;
+	syncPollingSubscription?(): unknown;
+};
+
+// ViewComponent and its widget registry are still implemented in JavaScript.
+type CoreComponent = Omit<
+	ViewComponent,
+	"elt" | "name" | "active" | "widgets" | "route" | "activate" | "prepareRender"
+> & {
+	elt: HTMLElement;
+	name: string;
+	active: CoreWidget | null;
+	widgets: Record<string, CoreWidget>;
+	readonly route: string | undefined;
+	activate(name?: string | null): Promise<boolean>;
+	prepareRender(visible?: boolean): Promise<void>;
+};
+
+type ComponentElement = HTMLElement & { _lp_component?: CoreComponent };
+
+interface CollectionRefreshTarget {
+	descriptor: {
+		id: string;
+		rows: { key?: string; hash: string; fingerprint: string }[];
+	};
+	widget: CoreWidget;
+}
+
+type ModalClasses = {
+	DeleteModal: typeof DeleteModal;
+	HelpModal: typeof HelpModal;
+	Modal: typeof Modal;
+};
+
+type ViewNotifications = Notifications & {
+	notify?(message: string): unknown;
+};
+
+type CoreServicesReady =
+	| []
+	| [
+			essential: PromiseSettledResult<PollingCoordinator | null | undefined>[],
+			optional: PromiseSettledResult<
+				ViewNotifications | DeferredOperationManager | EditWatcher | null
+			>[],
+			offlineQueue: OfflineQueue | null,
+			syncManager: SyncManager | null,
+			initialReplayCount: number,
+	  ];
+
+interface SyncOptions {
+	hidden?: boolean;
+	blurred?: boolean;
+	blurredAt?: number | null;
+	force?: boolean;
+}
+
 export default class Core extends ShellView {
-	constructor(node) {
+	declare elt: HTMLElement;
+	declare kind: string | undefined;
+	declare hash: string | undefined;
+	declare key: string | undefined;
+	declare _publishedReady: Promise<this>;
+	declare servicesReady: Promise<this | CoreServicesReady>;
+	declare components: Record<string, CoreComponent>;
+	declare runColdAction: <Loaded, Result>(
+		owner: Element | null | undefined,
+		load: () => Loaded,
+		activate: (value: Awaited<Loaded>) => Result,
+		busyOwner?: Element | null,
+	) => Promise<Awaited<Result> | null>;
+
+	declare offlineIndicator: HTMLElement | null;
+	declare offlineModal: OfflineModal | null;
+	declare Notifications: ViewNotifications | null;
+	declare offlineQueue: OfflineQueue | null;
+	declare PollingCoordinator: PollingCoordinator | null;
+	declare DeferredOperations: DeferredOperationManager | null;
+	declare SyncManager: SyncManager | null;
+	declare EditWatcher: EditWatcher | null;
+	declare SubmissionManager: SubmissionManager | null;
+	declare SearchBox: SearchBox | null;
+	declare EntityMenu: EntityMenu | null;
+	declare ModalClasses: ModalClasses | null;
+	declare offlineQueueReady: Promise<OfflineQueue | null>;
+	declare syncReady: Promise<SyncManager | null>;
+	declare initialReplayReady: Promise<number>;
+	declare replayReady: Promise<number>;
+	declare connectivityGeneration: number;
+	declare blurred: boolean;
+	declare blurredAt: number | null;
+
+	declare _pendingChanges: ReconcileChange[];
+	declare _reconcilePromise: Promise<void> | null;
+	declare private _componentActions: Map<HTMLElement, Promise<boolean | null>>;
+	declare private _pollingReconcileTask: Promise<void> | null;
+	declare private _pollingReconcileRequested: boolean;
+	declare private _offlineReplayTask: Promise<number> | null;
+	declare private _coldControlListener: EventListener | null;
+
+	constructor(node: HTMLElement) {
 		super(node);
 		this.hasDeferredServices = true;
-		this.offlineIndicator = document.querySelector('[data-role="offline"]');
+		this.offlineIndicator = document.querySelector<HTMLElement>(
+			'[data-role="offline"]',
+		);
 		this.offlineModal = null;
 
 		this.Notifications = null;
@@ -57,16 +217,17 @@ export default class Core extends ShellView {
 		this._pollingReconcileTask = null;
 		this._pollingReconcileRequested = false;
 		this._offlineReplayTask = null;
+		this._coldControlListener = null;
 		this.blurred = false;
 		this.blurredAt = null;
 	}
 
-	queryParam(name) {
+	queryParam(name: string) {
 		const value = new URLSearchParams(window.location.search).get(name);
 		return value?.trim() || null;
 	}
 
-	querySlug(value) {
+	querySlug(value?: string | null) {
 		return value
 			?.trim()
 			.replace(/([a-z0-9])([A-Z])/g, "$1-$2")
@@ -88,51 +249,55 @@ export default class Core extends ShellView {
 		return this;
 	}
 
-	reportStartupError(error, element = this.elt, context = "lazy-control") {
+	reportStartupError(
+		error: unknown,
+		element: Element | null = this.elt,
+		context = "lazy-control",
+	) {
 		captureError(error, element, { context });
 	}
 
-	ensureOfflineQueue() {
+	ensureOfflineQueue(): Promise<OfflineQueue | null> {
 		return ensureOfflineQueue(this);
 	}
 
-	ensurePollingCoordinator() {
+	ensurePollingCoordinator(): Promise<PollingCoordinator | null> {
 		return ensurePollingCoordinator(this);
 	}
 
-	ensureSyncManager() {
+	ensureSyncManager(): Promise<SyncManager | null> {
 		return ensureSyncManager(this);
 	}
 
-	ensureEditWatcher() {
+	ensureEditWatcher(): Promise<EditWatcher | null> {
 		return ensureEditWatcher(this);
 	}
 
-	ensureDeferredOperations() {
+	ensureDeferredOperations(): Promise<DeferredOperationManager | null> {
 		return ensureDeferredOperations(this);
 	}
 
-	ensureNotifications() {
+	ensureNotifications(): Promise<ViewNotifications | null> {
 		return ensureNotifications(this);
 	}
 
-	ensureSearchBox() {
+	ensureSearchBox(): Promise<SearchBox | null> {
 		return ensureSearchBox(this);
 	}
 
-	ensureEntityMenu() {
+	ensureEntityMenu(): Promise<EntityMenu | null> {
 		return ensureEntityMenu(this);
 	}
 
-	ensureSubmissionManager() {
+	ensureSubmissionManager(): Promise<SubmissionManager | null> {
 		return ensureSubmissionManager(this);
 	}
 
-	ensureOfflineModal() {
+	ensureOfflineModal(): Promise<OfflineModal | null> {
 		return ensureOfflineModal(this);
 	}
 
-	ensureModalClasses() {
+	ensureModalClasses(): Promise<ModalClasses | null> {
 		return ensureModalClasses(this);
 	}
 
@@ -142,7 +307,8 @@ export default class Core extends ShellView {
 	 */
 	_initPollingSubscription() {
 		if (!this.PollingCoordinator) return;
-		const pollChannel = this.elt.dataset.pollChannel;
+		// The coordinator validates server-provided channel names at subscription.
+		const pollChannel = this.elt.dataset.pollChannel as PollChannel | undefined;
 		const entityRevision = this.elt.dataset.pollEntityRevision;
 		if (pollChannel) {
 			this.PollingCoordinator.subscribe(
@@ -162,13 +328,14 @@ export default class Core extends ShellView {
 			);
 			if (!entityRevision) return;
 		}
-		if (this.key) {
-			const id = `view:entity:${this.key}`;
+		const key = this.key;
+		if (key) {
+			const id = `view:entity:${key}`;
 			this.PollingCoordinator.subscribe(
 				{
 					id,
 					type: "entity",
-					key: this.key,
+					key,
 					revision: entityRevision ?? this.elt.dataset.fingerprint ?? null,
 				},
 				{
@@ -178,15 +345,15 @@ export default class Core extends ShellView {
 						const watcher = this.elt.querySelector("[lp-edited-marker]")
 							? await this.ensureEditWatcher()
 							: this.EditWatcher;
-						await watcher?.receiveEntityResult?.(this.key, result);
+						await watcher?.receiveEntityResult?.(key, result);
 						if (result.status === "unavailable") {
-							await this.reconcileChange({ type: "delete", key: this.key });
+							await this.reconcileChange({ type: "delete", key });
 							return;
 						}
 						if (result.status !== "changed") return;
 						await this.reconcileChange({
 							type: "entity-poll",
-							key: this.key,
+							key,
 						});
 					},
 				},
@@ -195,17 +362,7 @@ export default class Core extends ShellView {
 		}
 
 		const channel = this.elt.dataset.index || this.kind;
-		const supported = new Set([
-			"categories",
-			"projects",
-			"pages",
-			"tasks",
-			"forms",
-			"users",
-			"ingress",
-			"home",
-		]);
-		if (!supported.has(channel)) return;
+		if (!isRootCollectionChannel(channel)) return;
 		this.PollingCoordinator.subscribe(
 			{
 				id: `view:channel:${channel}`,
@@ -230,20 +387,22 @@ export default class Core extends ShellView {
 	 * handled by the next iteration.
 	 *
 	 */
-	reconcileChange(change = {}) {
+	reconcileChange(change: ReconcileChange = {}): Promise<void> {
 		return reconcileChange(this, change);
 	}
 
-	async refreshSupplementalCollections() {}
+	async refreshSupplementalCollections(_changes: ReconcileChange[]) {}
 
-	async afterReconcileChange() {}
+	async afterReconcileChange(_change: ReconcileChange) {}
 
-	_applyStarState({ key, starred, type } = {}) {
+	_applyStarState({ key, starred, type }: ReconcileChange = {}) {
 		if (!key) return;
 		const active = starred ?? type === "star";
 		const buttons = new Set([
-			...this.elt.querySelectorAll(`[data-key="${key}"] [lp-control="star"]`),
-			...document.querySelectorAll(
+			...this.elt.querySelectorAll<HTMLElement>(
+				`[data-key="${key}"] [lp-control="star"]`,
+			),
+			...document.querySelectorAll<HTMLElement>(
 				`[data-entity-key="${key}"][lp-control="star"]`,
 			),
 		]);
@@ -257,10 +416,11 @@ export default class Core extends ShellView {
 		}
 	}
 
-	async _toggleStar(button) {
+	async _toggleStar(button: HTMLButtonElement) {
 		if (!this.online) return;
 		const entity =
-			button.closest("[lp-entity]") || button.closest("[data-key]");
+			button.closest<HTMLElement>("[lp-entity]") ||
+			button.closest<HTMLElement>("[data-key]");
 		const key = entity?.id || entity?.dataset.key;
 		if (!key) return;
 
@@ -268,7 +428,9 @@ export default class Core extends ShellView {
 		button.disabled = true;
 		this._applyStarState({ key, starred: !active });
 		try {
-			const response = await request.patch(ENDPOINTS.toggleStar(key));
+			const response = await request.patch<{ starred: boolean }>(
+				ENDPOINTS.toggleStar(key),
+			);
 			if (!response?.ok) throw new Error("Unable to update star");
 			button.disabled = false;
 			await this.reconcileChange({
@@ -312,7 +474,7 @@ export default class Core extends ShellView {
 		blurred = false,
 		blurredAt = null,
 		force = false,
-	} = {}) {
+	}: SyncOptions = {}) {
 		const online = connectivity.online;
 		const visibleBlur = Boolean(hidden && blurred);
 
@@ -336,7 +498,8 @@ export default class Core extends ShellView {
 
 		if (!online || hidden) {
 			this.EditWatcher?.pause();
-			if (visibleBlur) this.PollingCoordinator?.blur(this.blurredAt);
+			if (visibleBlur)
+				this.PollingCoordinator?.blur(this.blurredAt ?? undefined);
 			else this.PollingCoordinator?.pause();
 			await this.SyncManager?.deregister();
 		} else {
@@ -371,9 +534,9 @@ export default class Core extends ShellView {
 	 * itself polls mounted updated forms as each replay succeeds.
 	 *
 	 */
-	scheduleOfflineReplay() {
+	scheduleOfflineReplay(): Promise<number> {
 		if (this._offlineReplayTask) return this._offlineReplayTask;
-		const replay = import("./offlineReplay.mjs").then(
+		const replay: Promise<number> = import("./offlineReplay.mjs").then(
 			({ replayOfflineQueue }) => replayOfflineQueue(this),
 		);
 		this._offlineReplayTask = replay;
@@ -398,7 +561,7 @@ export default class Core extends ShellView {
 		await Promise.all(
 			Object.values(this.components).flatMap((component) =>
 				Object.values(component.widgets).map((widget) =>
-					widget.syncPollingSubscription?.(),
+					widget?.syncPollingSubscription?.(),
 				),
 			),
 		);
@@ -451,15 +614,20 @@ export default class Core extends ShellView {
 		);
 	}
 
-	_collectRefreshTargets(components) {
+	_collectRefreshTargets(
+		components: CoreComponent[],
+	): Map<string, CollectionRefreshTarget> {
 		return collectRefreshTargets(this, components);
 	}
 
-	async _refreshCollectionComponents(components, options = {}) {
+	async _refreshCollectionComponents(
+		components: CoreComponent[],
+		options: RefreshOptions = {},
+	) {
 		return refreshCollectionComponents(this, components, options);
 	}
 
-	async refreshCollections(navigation = false, options = {}) {
+	async refreshCollections(navigation = false, options: RefreshOptions = {}) {
 		const components = Object.values(this.components);
 		const { beforeCommit = null, ...refreshOptions } = options;
 		const commit = await this._refreshCollectionComponents(components, {
@@ -478,32 +646,34 @@ export default class Core extends ShellView {
 		}
 	}
 
-	async refresh(navigation = false, options = {}) {
+	async refresh(navigation = false, options: RefreshOptions = {}) {
 		return this.refreshCollections(navigation, options);
 	}
 
-	async notify(message) {
+	async notify(message: string) {
 		const notifications = await this.ensureNotifications();
 		await notifications?.notify?.(message);
 	}
 
 	_installColdControlListeners() {
-		this._coldControlEvent = this._coldControlEvent.bind(this);
+		this._coldControlListener = this._coldControlEvent.bind(this);
 		for (const type of ["input", "click"]) {
-			document.addEventListener(type, this._coldControlEvent, true);
+			document.addEventListener(type, this._coldControlListener, true);
 		}
 	}
 
 	_removeColdControlListeners() {
-		if (!this._coldControlEvent) return;
+		if (!this._coldControlListener) return;
 		for (const type of ["input", "click"]) {
-			document.removeEventListener(type, this._coldControlEvent, true);
+			document.removeEventListener(type, this._coldControlListener, true);
 		}
-		this._coldControlEvent = null;
+		this._coldControlListener = null;
 	}
 
-	_coldControlEvent(event) {
-		const search = event.target?.closest?.("[lp-search]");
+	_coldControlEvent(event: Event) {
+		const { target } = event;
+		if (!(target instanceof Element)) return;
+		const search = target.closest("[lp-search]");
 		if (search && !this.SearchBox) {
 			this.runColdAction(
 				search,
@@ -514,7 +684,7 @@ export default class Core extends ShellView {
 			return;
 		}
 
-		const offline = event.target?.closest?.("[data-role='offline']");
+		const offline = target.closest("[data-role='offline']");
 		if (offline && !this.offlineModal && event.type === "click") {
 			event.preventDefault();
 			event.stopImmediatePropagation?.();
@@ -527,9 +697,7 @@ export default class Core extends ShellView {
 			return;
 		}
 
-		const notifications = event.target?.closest?.(
-			"[data-role='notifications']",
-		);
+		const notifications = target.closest("[data-role='notifications']");
 		if (!notifications || this.Notifications) return;
 		if (event.type === "click") {
 			event.preventDefault();
@@ -543,8 +711,10 @@ export default class Core extends ShellView {
 		);
 	}
 
-	_click(e) {
-		const menuTrigger = e.target.closest("[data-role='menu-trigger']");
+	_click(e?: MouseEvent) {
+		const target = e?.target;
+		if (!e || !(target instanceof Element)) return;
+		const menuTrigger = target.closest("[data-role='menu-trigger']");
 		const menu = menuTrigger?.closest("[lp-menu]");
 		if (menu && this.elt.contains(menu)) {
 			e.preventDefault();
@@ -558,36 +728,40 @@ export default class Core extends ShellView {
 			return;
 		}
 
-		const button = e.target.closest("button");
+		const button = target.closest("button");
 		const control = button?.getAttribute("lp-control");
 
 		if (button?.matches("[data-role='flipper']")) {
 			e.preventDefault();
-			const flip = button.closest("[data-flipped]");
+			const flip = button.closest<HTMLElement>("[data-flipped]");
+			if (!flip) return;
 			const flipped = flip.dataset.flipped === "false";
 			flip.dataset.flipped = flipped ? "true" : "false";
 			return;
-		} else if (control === "help") {
+		} else if (button && control === "help") {
 			e.preventDefault();
 			e.stopPropagation();
 			void this._showHelpModal(button);
 			return;
-		} else if (control === "star") {
+		} else if (button && control === "star") {
 			e.preventDefault();
 			void this._toggleStar(button);
 			return;
-		} else if (control === "delete") {
+		} else if (button && control === "delete") {
 			e.preventDefault();
 			e.stopPropagation();
 			void this._showDeleteModal(button);
 			return;
-		} else if (["previous", "next"].includes(control)) {
+		} else if (button && (control === "previous" || control === "next")) {
 			e.preventDefault();
 			if (!this.online) return;
-			const widget = e.target.closest("[data-widget]");
+			const widget = target.closest<HTMLElement>("[data-widget]");
+			const widgetName = widget?.dataset.widget;
+			const route = button.dataset.route;
+			if (!widgetName || !route) return;
 			const component = this.getComponent(widget);
-			request.get(button.dataset.route).then((response) => {
-				component.widgets[widget.dataset.widget]?.refresh(response);
+			void request.get(route).then((response) => {
+				component?.widgets[widgetName]?.refresh?.(response);
 			});
 			return;
 		} else if (control || button?.hasAttribute("lp-show")) {
@@ -597,57 +771,57 @@ export default class Core extends ShellView {
 		}
 
 		if (
-			e.target.closest("form") ||
-			e.target.closest("a") ||
-			e.target.closest("input") ||
-			e.target.closest("button")
+			target.closest("form") ||
+			target.closest("a") ||
+			target.closest("input") ||
+			target.closest("button")
 		) {
 			return;
 		}
 
-		const toggle = e.target.closest("[lp-show]");
+		const toggle = target.closest<HTMLElement>("[lp-show]");
 		if (toggle) {
 			e.preventDefault();
 			void this.renderComponent(toggle);
 			return;
 		}
 
-		const link = e.target.closest("[lp-link]");
+		const link = target.closest("[lp-link]");
 		if (link) {
 			const title = link.matches("tr[lp-entity]")
 				? "td[data-column='name'] [data-role='title']"
 				: "[data-role='title']";
-			link.querySelector(title)?.click();
+			link.querySelector<HTMLElement>(title)?.click();
 			return;
 		}
 	}
 
-	async _showDeleteModal(button) {
+	async _showDeleteModal(button: HTMLButtonElement) {
 		return this.runColdAction(
 			button,
 			() => this.ensureModalClasses(),
-			async ({ DeleteModal } = {}) => {
-				if (!DeleteModal) return;
-				const modal = new DeleteModal(this, button);
+			async (classes) => {
+				if (!classes?.DeleteModal) return;
+				const modal = new classes.DeleteModal(this, button);
 				await modal.init();
 			},
 		);
 	}
 
-	async _showHelpModal(button) {
+	async _showHelpModal(button: HTMLButtonElement) {
 		return this.runColdAction(
 			button,
 			() => this.ensureModalClasses(),
-			async ({ HelpModal } = {}) => {
-				if (!HelpModal) return;
-				const modal = new HelpModal(this, button);
+			async (classes) => {
+				if (!classes?.HelpModal) return;
+				const modal = new classes.HelpModal(this, button);
 				await modal.init();
 			},
 		);
 	}
 
-	getComponent(itemElt) {
-		const target = itemElt?.closest("[lp-component]");
+	getComponent(itemElt?: Element | null): CoreComponent | null {
+		const target = itemElt?.closest<ComponentElement>("[lp-component]");
 		if (target?._lp_component) return target._lp_component;
 
 		const id = target?.id || target?.dataset?.key;
@@ -658,7 +832,7 @@ export default class Core extends ShellView {
 			)
 				? Task
 				: ViewComponent;
-			const component = new ComponentClass(target, this);
+			const component: CoreComponent = new ComponentClass(target, this);
 			this.components[id] = component;
 			target._lp_component = component;
 			target.setAttribute("initialized", "");
@@ -668,7 +842,10 @@ export default class Core extends ShellView {
 		return null;
 	}
 
-	successfulResponse(response, component) {
+	successfulResponse(
+		response: RequestResult | null | undefined,
+		component?: { showError?(message: string): unknown } | null,
+	) {
 		if (!response) return false;
 		if (response.reload) {
 			window.location.reload();
@@ -678,37 +855,60 @@ export default class Core extends ShellView {
 			component?.showError?.(response.error);
 			return false;
 		}
-		if (response.modal) {
-			void this.ensureModalClasses().then(({ Modal } = {}) => {
-				if (this._destroyed || !Modal) return;
-				new Modal(this).attach(response.modal, component);
+		const { modal } = response;
+		if (modal) {
+			void this.ensureModalClasses().then((classes) => {
+				if (this._destroyed || !classes?.Modal) return;
+				if (typeof modal === "string") {
+					captureError(
+						new TypeError("Modal markup must be parsed before attachment"),
+						component,
+					);
+					return;
+				}
+				void new classes.Modal(this).attach(modal, component);
 			});
 			return false;
 		}
 		return true;
 	}
 
-	async update(component, data, route = component.route) {
+	async update(
+		component: CoreComponent,
+		data: FormData,
+		route: string | URL | undefined = component.route,
+	): Promise<void> {
 		const manager = await this.ensureSubmissionManager();
 		return manager?.update(component, data, route);
 	}
 
-	async create(component, data, route = component.route) {
+	async create(
+		component: CoreComponent,
+		data: FormData,
+		route: string | URL | undefined = component.route,
+	): Promise<void> {
 		const manager = await this.ensureSubmissionManager();
 		return manager?.create(component, data, route);
 	}
 
-	async load(component, route) {
+	async load(
+		component: CoreComponent,
+		route?: string | URL | null,
+	): Promise<RequestResult | null> {
 		if (!route) return null;
 		const response = await request.get(route);
 
-		if (!this.successfulResponse(response, component)) return null;
+		if (!response || !this.successfulResponse(response, component)) return null;
 		// Ordinary rendering is authoritative and completely independent of
 		// OfflineQueue. Late replay is reconciled through polling/EditWatcher.
 		return response;
 	}
 
-	_setLoadingTrigger(trigger, component, widgetName) {
+	_setLoadingTrigger(
+		trigger: HTMLElement,
+		component: CoreComponent,
+		widgetName: string,
+	) {
 		const target = component.elt.querySelector(`[data-widget="${widgetName}"]`);
 		if (!target || target.hasAttribute("loaded")) return null;
 
@@ -719,13 +919,13 @@ export default class Core extends ShellView {
 		return trigger;
 	}
 
-	_clearLoadingTrigger(trigger) {
+	_clearLoadingTrigger(trigger: HTMLElement | null) {
 		if (!trigger) return;
 		delete trigger.dataset.loading;
 		trigger.removeAttribute("aria-busy");
 	}
 
-	renderComponent(trigger) {
+	renderComponent(trigger?: HTMLElement | null) {
 		if (!trigger) return;
 		if (this._componentActions.has(trigger)) {
 			return this._componentActions.get(trigger);
@@ -734,7 +934,7 @@ export default class Core extends ShellView {
 		const attribute =
 			trigger.getAttribute("lp-show") || trigger.getAttribute("lp-close") || "";
 
-		let [componentId, widgetName] = attribute.split(":");
+		const [componentId, requestedWidget] = attribute.split(":");
 
 		if (!componentId) {
 			captureError(new Error("No component ID found"), trigger);
@@ -749,8 +949,10 @@ export default class Core extends ShellView {
 		}
 
 		const activeWidget = component.active?.name;
-		widgetName =
-			widgetName === "active" && activeWidget ? activeWidget : widgetName;
+		let widgetName: string | null | undefined =
+			requestedWidget === "active" && activeWidget
+				? activeWidget
+				: requestedWidget;
 
 		const toggleWidget =
 			trigger.dataset.toggle === "true" && activeWidget === widgetName;
@@ -809,7 +1011,7 @@ export default class Core extends ShellView {
 		return pending;
 	}
 
-	addFlash(node) {
+	addFlash(node?: Element | null) {
 		if (!node || node.classList.contains("flash")) return;
 
 		node.classList.add("flash");
