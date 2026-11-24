@@ -22,24 +22,53 @@ from testing.utility import (
 pytestmark = pytest.mark.tooling
 
 
-def test_traceability_result_plugin_can_skip_manifest_output(monkeypatch, tmp_path):
+def test_traceability_result_plugin_defaults_to_clean_local_runs_and_supports_opt_in(
+    monkeypatch, tmp_path
+):
     writes = []
+    monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E", raising=False)
+    monkeypatch.delenv("LAGNIAPPE_WRITE_TEST_EVIDENCE", raising=False)
     monkeypatch.setattr(
         evidence_results,
         "_write_manifest",
         lambda *arguments: writes.append(arguments),
     )
-    config = types.SimpleNamespace(
-        rootpath=tmp_path,
-        getoption=lambda name, default=False: name == "no_test_evidence",
-    )
 
-    evidence_results.pytest_sessionfinish(
-        types.SimpleNamespace(config=config),
-        0,
-    )
+    def invoke(*, write_flag=False, skip_flag=False):
+        config = types.SimpleNamespace(
+            rootpath=tmp_path,
+            getoption=lambda name, default=False: {
+                "write_test_evidence": write_flag,
+                "no_test_evidence": skip_flag,
+            }.get(name, default),
+        )
+        evidence_results.pytest_sessionfinish(
+            types.SimpleNamespace(config=config),
+            0,
+        )
 
+    # Ordinary local run leaves tracked testing/evidence/latest.json untouched.
+    invoke()
     assert writes == []
+
+    # Explicit --write-test-evidence opts in.
+    invoke(write_flag=True)
+    assert len(writes) == 1
+
+    # Explicit --no-test-evidence always wins over opt-in flags and hosted env.
+    monkeypatch.setenv("LAGNIAPPE_HOSTED_E2E", "true")
+    invoke(write_flag=True, skip_flag=True)
+    assert len(writes) == 1
+
+    # Hosted E2E writes evidence automatically.
+    invoke()
+    assert len(writes) == 2
+
+    # LAGNIAPPE_WRITE_TEST_EVIDENCE=1 opts in locally.
+    monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E")
+    monkeypatch.setenv("LAGNIAPPE_WRITE_TEST_EVIDENCE", "1")
+    invoke()
+    assert len(writes) == 3
 
 
 @pytest.mark.parametrize("phase", ["setup", "call", "teardown"])
@@ -1164,6 +1193,13 @@ def test_run_py_focused_adapter_uses_only_locked_package_bridge(
     assert calls == [
         "prepare",
         ("adapter", [selector], True),
+    ]
+
+    calls.clear()
+    assert run.run_tests(["--write-test-evidence", selector]) == 0
+    assert calls == [
+        "prepare",
+        ("adapter", ["--write-test-evidence", selector], True),
         ("merge", 0, 0, True),
     ]
 
@@ -1217,7 +1253,7 @@ def test_run_py_unit_partitions_adapter_once_and_merges_results(monkeypatch):
             True,
         )
     ) == 1
-    assert ("merge", 0, 0) in calls
+    assert ("merge", 0, 0) not in calls
     assert calls[0] == "prepare"
 
 

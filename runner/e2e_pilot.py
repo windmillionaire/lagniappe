@@ -167,7 +167,10 @@ def run_pilot(
     from lagniappe.core.entities import Entities
     from runner.test_session import capture_process_identity, load_session_state
     from testing.utility.test_evidence import behavior_snapshot
-    from testing.utility.evidence_results import _write_manifest
+    from testing.utility.evidence_results import (
+        _write_manifest,
+        should_write_test_evidence,
+    )
 
     authority.assert_active()
     Entities.initialize()
@@ -321,7 +324,13 @@ def run_pilot(
                             "exclusive": b.exclusive} for b in batches], "events": events,
                "exit_status": status, "errors": errors}
     (root / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    if not any("Source changed" in error for error in errors):
+    if (
+        not any("Source changed" in error for error in errors)
+        and should_write_test_evidence(
+            write_flag="--write-test-evidence" in command,
+            skip_flag="--no-test-evidence" in command,
+        )
+    ):
         _write_manifest(REPOSITORY_ROOT, command, outcomes, status)
     print(f"Pilot: {sum(row['outcome'] == 'passed' for row in outcomes.values())}/{len(outcomes)} passed; {root}", flush=True)
     for error in errors:

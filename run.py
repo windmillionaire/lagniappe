@@ -312,7 +312,14 @@ def run_tests(test_args: list[str]) -> int:
                     )
                     statuses.append(adapter_status)
                     combined_status = _combine_pytest_exit_statuses(*statuses)
-                    if "--no-test-evidence" not in invocation.pytest_args:
+                    from testing.utility.evidence_results import (
+                        should_write_test_evidence,
+                    )
+
+                    if should_write_test_evidence(
+                        write_flag="--write-test-evidence" in invocation.pytest_args,
+                        skip_flag="--no-test-evidence" in invocation.pytest_args,
+                    ):
                         _merge_mcp_test_evidence(
                             result_path,
                             full_command,

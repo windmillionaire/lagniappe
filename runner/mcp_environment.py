@@ -86,6 +86,9 @@ def capture_results(_repo_root, _command, outcomes, exitstatus):
     os.replace(temporary, result_path)
 
 evidence_results._write_manifest = capture_results
+evidence_results.should_write_test_evidence = (
+    lambda *, write_flag=False, skip_flag=False, environ=None: not skip_flag
+)
 
 import pytest
 raise SystemExit(pytest.main(sys.argv[1:], plugins=[evidence_results]))

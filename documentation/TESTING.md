@@ -208,10 +208,15 @@ Generated artifacts live under `reports/`:
 - hosted bundles: `reports/hosted-e2e/`; and
 - template and style reports at their respective report paths.
 
-`testing/evidence/latest.json` is tracked current evidence, not a run log. It
-keeps one result per exact nodeid and only the newest session invocation
-metadata. Semantic fingerprints ignore comments, documentation, generated
-evidence, GitHub workflow files, and the random build ID while retaining
+`testing/evidence/latest.json` is tracked release/contract evidence, not a local
+run log. Ordinary local `run.py test` runs leave `testing/evidence/latest.json`
+untouched so focused development does not create diff noise or multi-agent merge
+conflicts. Pass `--write-test-evidence` (or set `LAGNIAPPE_WRITE_TEST_EVIDENCE=1`)
+to update it locally; hosted release validation (`LAGNIAPPE_HOSTED_E2E=true`)
+writes it automatically, and `--no-test-evidence` force-skips writing in any mode.
+When written, it keeps one result per exact nodeid and only the newest session
+invocation metadata. Semantic fingerprints ignore comments, documentation,
+generated evidence, GitHub workflow files, and the random build ID while retaining
 behavior-bearing source/template dependencies. Review failed tracebacks before
 commit because diagnostics must not contain credentials or private data.
 

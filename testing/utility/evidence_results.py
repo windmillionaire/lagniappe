@@ -40,13 +40,44 @@ TRACEBACK_TRUNCATION_MARKER = "\n... traceback truncated ...\n"
 PARAMETER_SUFFIX_RE = re.compile(r"\[.*\]$")
 
 
+def should_write_test_evidence(
+    *,
+    write_flag: bool = False,
+    skip_flag: bool = False,
+    environ: Mapping[str, str] | None = None,
+) -> bool:
+    """Return whether pytest should update tracked testing/evidence/latest.json.
+
+    Ordinary local runs leave testing/evidence/latest.json untouched so focused
+    development avoids large manifest diffs and multi-agent merge conflicts.
+    Evidence is written automatically in hosted E2E containers
+    (LAGNIAPPE_HOSTED_E2E) or when opted in via --write-test-evidence or
+    LAGNIAPPE_WRITE_TEST_EVIDENCE. Explicit --no-test-evidence always skips.
+    """
+    if skip_flag:
+        return False
+    if write_flag:
+        return True
+    env = os.environ if environ is None else environ
+    truthy = {"1", "true", "yes"}
+    return (
+        str(env.get("LAGNIAPPE_HOSTED_E2E", "")).strip().casefold() in truthy
+        or str(env.get("LAGNIAPPE_WRITE_TEST_EVIDENCE", "")).strip().casefold() in truthy
+    )
+
+
 def pytest_addoption(parser) -> None:
     """Register validation-only control over tracked test evidence."""
     group = parser.getgroup("lagniappe")
     group.addoption(
+        "--write-test-evidence",
+        action="store_true",
+        help="Update tracked testing/evidence/latest.json with this run's outcomes.",
+    )
+    group.addoption(
         "--no-test-evidence",
         action="store_true",
-        help="Run tests without updating testing/evidence/latest.json.",
+        help="Run tests without updating testing/evidence/latest.json (overrides opt-in/hosted defaults).",
     )
 
 
@@ -115,7 +146,10 @@ def pytest_sessionfinish(session, exitstatus: int) -> None:
         from testing.utility.e2e_worker import write_results
         write_results(session, _OUTCOMES, exitstatus)
         return
-    if session.config.getoption("no_test_evidence", default=False):
+    if not should_write_test_evidence(
+        write_flag=bool(session.config.getoption("write_test_evidence", default=False)),
+        skip_flag=bool(session.config.getoption("no_test_evidence", default=False)),
+    ):
         return
     repo_root = _repo_root(session.config)
     command = os.environ.get("LAGNIAPPE_TEST_COMMAND")
