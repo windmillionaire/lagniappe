@@ -418,3 +418,88 @@ def test_setup_app_engine_provisions_secret_manager_before_saving(monkeypatch):
         "app_engine:confirm=False",
         "save",
     ]
+
+
+def test_populate_generated_documents_fills_index_and_deploy_before_provisioning(
+    isolated_env,
+):
+    _, cfg, _, _ = isolated_env
+    draft = cfg.SettingsDraft()
+    answers = {
+        "app_name": "Fresh Checkout",
+        "project_id": "fresh-checkout-1",
+        "admin_name": "Owner",
+        "admin_email": "owner@example.com",
+    }
+    agent_mode._apply_non_secret_answers(answers, draft)
+    agent_mode._populate_generated_documents(draft)
+
+    assert draft.INDEX.get("indexes")
+    assert draft.DEPLOY.get("service_account") == "fresh-checkout@fresh-checkout-1.iam.gserviceaccount.com"
+    assert draft.MANIFEST.get("name") == "Fresh Checkout"
+    # Saving all generated files succeeds on a fresh checkout (no "Nothing to save").
+    draft.save()
+
+
+def test_secret_manager_publish_retries_transient_403_propagation(monkeypatch):
+    from config import secrets as runtime_secrets
+
+    calls = 0
+
+    class _FlakySession:
+        def __init__(self) -> None:
+            self.headers: dict[str, str] = {}
+            self.versions: dict[str, bytes] = {}
+            self.aliases: dict[str, str] = {}
+
+        def request(self, method, url, *, json=None, params=None, timeout=None, allow_redirects=True):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return SimpleNamespace(ok=False, status_code=403, json=lambda: {})
+            if method == "GET" and url.endswith(":access"):
+                import base64
+
+                ver = url.rsplit("/versions/", 1)[1].removesuffix(":access")
+                raw = self.versions[self.aliases.get(ver, ver)]
+                return SimpleNamespace(
+                    ok=True,
+                    status_code=200,
+                    json=lambda: {
+                        "name": f"projects/p/secrets/s/versions/{ver}",
+                        "payload": {"data": base64.b64encode(raw).decode("ascii")},
+                    },
+                )
+            if method == "GET":
+                return SimpleNamespace(
+                    ok=True,
+                    status_code=200,
+                    json=lambda: {"etag": "e1", "versionAliases": dict(self.aliases)},
+                )
+            if method == "POST" and url.endswith(":addVersion"):
+                import base64
+
+                self.versions["1"] = base64.b64decode(json["payload"]["data"])
+                return SimpleNamespace(
+                    ok=True,
+                    status_code=200,
+                    json=lambda: {"name": "projects/p/secrets/s/versions/1"},
+                )
+            if method == "PATCH":
+                self.aliases = dict(json["versionAliases"])
+                return SimpleNamespace(
+                    ok=True,
+                    status_code=200,
+                    json=lambda: {"versionAliases": dict(self.aliases)},
+                )
+            raise AssertionError(f"Unexpected {method} {url}")
+
+    monkeypatch.setattr(runtime_secrets.time, "sleep", lambda _s: None)
+    store = runtime_secrets.SecretManagerRuntimeStore(
+        "pilot-project-1",
+        access_token="fake-token",
+        session=_FlakySession(),
+        propagation_retry_delays=(0.01, 0.01),
+    )
+    assert store.publish({"SECRET_KEY": "abc"}) == "1"
+    assert calls >= 5

@@ -533,10 +533,50 @@ def _sync_settings_singleton(source: SettingsDraft, target: SettingsDraft) -> No
     """Copy draft mappings into/out of config.SETTINGS when they are distinct objects."""
     if source is target:
         return
-    for attr in ("APP", "DEPLOY", "DEV", "GCLOUD_CONFIG", "DEV_CONFIG", "TEST_CONFIG"):
+    for attr in (
+        "APP",
+        "DEPLOY",
+        "DEV",
+        "GCLOUD_CONFIG",
+        "DEV_CONFIG",
+        "TEST_CONFIG",
+        "INDEX",
+        "MANIFEST",
+    ):
         dest = getattr(target, attr)
         dest.clear()
         dest.update(getattr(source, attr))
+
+
+def _populate_generated_documents(draft: SettingsDraft) -> None:
+    """Build all generated configuration documents on a SettingsDraft in memory."""
+    from installer import config_builders
+
+    version = str(draft.NODE.get("version") or "2.5.0").strip()
+    built_app = config_builders.build_app_settings(
+        draft.APP,
+        draft.GCLOUD_CONFIG,
+        version=version,
+        secret_defaults={},
+    )
+    built_app, deploy_doc = config_builders.build_deploy_yaml(
+        built_app, draft.DEPLOY
+    )
+    dev_cfg, test_cfg = config_builders.build_dev_yaml(
+        draft.DEV_CONFIG, draft.TEST_CONFIG
+    )
+    indexes = config_builders.build_index_yaml(draft.INDEX)
+    manifest = config_builders.build_manifest(built_app, draft.MANIFEST)
+    for target, generated in (
+        (draft.APP, built_app),
+        (draft.DEPLOY, deploy_doc),
+        (draft.DEV_CONFIG, dev_cfg),
+        (draft.TEST_CONFIG, test_cfg),
+        (draft.INDEX, indexes),
+        (draft.MANIFEST, manifest),
+    ):
+        target.clear()
+        target.update(generated)
 
 
 def _ensure_project_and_billing(
@@ -711,6 +751,7 @@ def _default_provision_infrastructure(draft: SettingsDraft) -> None:
     from runner import gcloud as switcher
 
     _sync_settings_singleton(draft, SETTINGS)
+    _populate_generated_documents(SETTINGS)
     app_name = str(SETTINGS.APP["APP_NAME"])
     project_id = str(SETTINGS.APP["GOOGLE_CLOUD_PROJECT"])
     account = str(SETTINGS.GCLOUD_CONFIG["ACCOUNT"])
@@ -1123,24 +1164,7 @@ def run_agent_install(
         vault_summary.extend(outcome.summary)
 
     # Finalize and persist all generated files (secrets strictly in Secret Manager).
-    built_app, deploy_doc = config_builders.build_deploy_yaml(
-        active_draft.APP, active_draft.DEPLOY
-    )
-    dev_cfg, test_cfg = config_builders.build_dev_yaml(
-        active_draft.DEV_CONFIG, active_draft.TEST_CONFIG
-    )
-    indexes = config_builders.build_index_yaml(active_draft.INDEX)
-    manifest = config_builders.build_manifest(built_app, active_draft.MANIFEST)
-    for target, generated in (
-        (active_draft.APP, built_app),
-        (active_draft.DEPLOY, deploy_doc),
-        (active_draft.DEV_CONFIG, dev_cfg),
-        (active_draft.TEST_CONFIG, test_cfg),
-        (active_draft.INDEX, indexes),
-        (active_draft.MANIFEST, manifest),
-    ):
-        target.clear()
-        target.update(generated)
+    _populate_generated_documents(active_draft)
     record_step("persist generated configuration")
     active_draft.save()
 

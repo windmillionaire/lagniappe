@@ -10,6 +10,7 @@ import base64
 import copy
 import json
 import re
+import time
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
@@ -327,6 +328,7 @@ class SecretManagerRuntimeStore:
         *,
         access_token: str | None = None,
         session: requests.Session | None = None,
+        propagation_retry_delays: tuple[float, ...] | None = None,
     ) -> None:
         if not _PROJECT_PATTERN.fullmatch(project_id):
             raise SecretsBackendError("GOOGLE_CLOUD_PROJECT is missing or invalid.")
@@ -342,8 +344,16 @@ class SecretManagerRuntimeStore:
             import requests
 
             self.session = requests.Session()
+            self._propagation_retry_delays = (
+                (3.0, 6.0, 12.0)
+                if propagation_retry_delays is None
+                else propagation_retry_delays
+            )
         else:
             self.session = session
+            self._propagation_retry_delays = (
+                () if propagation_retry_delays is None else propagation_retry_delays
+            )
         token = access_token if access_token is not None else _adc_access_token()
         self.session.headers["Authorization"] = f"Bearer {token}"
 
@@ -354,28 +364,43 @@ class SecretManagerRuntimeStore:
         *,
         json_body: dict[str, Any] | None = None,
         params: dict[str, str] | None = None,
+        retry_propagation: bool = False,
     ) -> dict[str, Any]:
         import requests
 
-        try:
-            response = self.session.request(
-                method,
-                self.url + suffix,
-                json=json_body,
-                params=params,
-                timeout=15,
-                allow_redirects=False,
-            )
-        except requests.RequestException as error:
-            raise SecretsBackendError(
-                "Secret Manager request failed. Check network access and project."
-            ) from error
-        if not response.ok:
+        delays = self._propagation_retry_delays if retry_propagation else ()
+        response = None
+        for attempt in range(len(delays) + 1):
+            try:
+                response = self.session.request(
+                    method,
+                    self.url + suffix,
+                    json=json_body,
+                    params=params,
+                    timeout=15,
+                    allow_redirects=False,
+                )
+            except requests.RequestException as error:
+                if attempt < len(delays):
+                    time.sleep(delays[attempt])
+                    continue
+                raise SecretsBackendError(
+                    "Secret Manager request failed. Check network access and project."
+                ) from error
+            if response.ok:
+                break
+            if (
+                attempt < len(delays)
+                and response.status_code in {403, 429, 500, 502, 503, 504}
+            ):
+                time.sleep(delays[attempt])
+                continue
             raise SecretsBackendError(
                 f"Secret Manager returned HTTP {response.status_code} for "
                 f"{self.secret_name}. Check Secret Manager API, IAM secretAccessor "
                 "binding, and current version."
             )
+        assert response is not None
         try:
             data = response.json()
         except ValueError as error:
@@ -445,7 +470,7 @@ class SecretManagerRuntimeStore:
             envelope, project_id=self.project_id
         )
         envelope["secrets"] = validated_secrets
-        metadata = self._request("GET")
+        metadata = self._request("GET", retry_propagation=True)
         aliases = metadata.get("versionAliases") or {}
         if not isinstance(aliases, dict):
             aliases = {}
@@ -467,7 +492,12 @@ class SecretManagerRuntimeStore:
         crc = _crc32c_value(raw)
         if crc is not None:
             payload["dataCrc32c"] = str(crc)
-        added = self._request("POST", ":addVersion", json_body={"payload": payload})
+        added = self._request(
+            "POST",
+            ":addVersion",
+            json_body={"payload": payload},
+            retry_propagation=True,
+        )
         added_name = added.get("name")
         etag = metadata.get("etag")
         if not isinstance(added_name, str) or not isinstance(etag, str):
@@ -488,6 +518,7 @@ class SecretManagerRuntimeStore:
                 "etag": etag,
                 "versionAliases": {**aliases, DEFAULT_RUNTIME_SECRET_VERSION: version},
             },
+            retry_propagation=True,
         )
         return version
 
