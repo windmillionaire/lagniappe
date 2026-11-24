@@ -409,3 +409,63 @@ def test_installer_secrets_provisioning_probe_and_doctor_leak_check(tmp_path):
     assert "AUTH_EMAIL_CONFIG.password" in joined
     assert "super-secret-redis-pass" not in joined
     assert "super-secret-smtp-password" not in joined
+
+
+def test_doctor_provider_checker_hydrates_secret_manager_settings_in_memory(monkeypatch):
+    from installer import commands, iam, monitoring, recovery
+
+    disk_settings = runtime_secrets.strip_secret_settings(
+        _sample_full_app_settings("secret_manager")
+    )
+    assert "GIBBERISH" not in disk_settings
+    assert "REDIS_PASSWORD" not in disk_settings
+
+    seen_settings: dict[str, object] = {}
+
+    def _fake_verify_recovery_resources(settings, project, *, project_details=None):
+        seen_settings.update(settings)
+        return {"storage-buckets": {"state": "AVAILABLE", "details": None, "error": None}}
+
+    def _fake_gcloud(command, *, check=False):
+        if command[:2] == ["projects", "describe"]:
+            return CompletedProcess(
+                command, 0, stdout=json.dumps({"projectId": "pilot-project-1"}), stderr=""
+            )
+        if command[:2] == ["services", "list"]:
+            from config import constants
+
+            apis = sorted(
+                {*constants.REQUIRED_GOOGLE_CLOUD_APIS, installer_secrets.SECRET_MANAGER_API}
+            )
+            return CompletedProcess(command, 0, stdout="\n".join(apis) + "\n", stderr="")
+        raise AssertionError(f"Unexpected gcloud command: {command}")
+
+    monkeypatch.setattr(commands, "run_gcloud_command", _fake_gcloud)
+    monkeypatch.setattr(
+        runtime_secrets,
+        "load_runtime_secrets",
+        lambda _settings: {
+            "GIBBERISH": "hydrated-gibberish",
+            "REDIS_PASSWORD": "hydrated-redis-pass",
+        },
+    )
+    monkeypatch.setattr(recovery, "verify_recovery_resources", _fake_verify_recovery_resources)
+    monkeypatch.setattr(iam, "inspect_operator_permissions", lambda _project: {})
+    monkeypatch.setattr(
+        installer_secrets,
+        "probe_runtime_secrets_resource",
+        lambda _settings, _project: {"state": "AVAILABLE", "details": None, "error": None},
+    )
+    monkeypatch.setattr(
+        monitoring,
+        "inspect_memory_alert",
+        lambda _settings, _project: {"state": "AVAILABLE", "details": None, "error": None},
+    )
+
+    report = doctor._default_provider_checker(disk_settings, "pilot-project-1")
+    assert seen_settings["GIBBERISH"] == "hydrated-gibberish"
+    assert seen_settings["REDIS_PASSWORD"] == "hydrated-redis-pass"
+    # Raw disk settings mapping was not mutated with secrets.
+    assert "GIBBERISH" not in disk_settings
+    assert "REDIS_PASSWORD" not in disk_settings
+    assert all(entry["state"] == "AVAILABLE" for entry in report.values())

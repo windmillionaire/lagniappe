@@ -229,6 +229,11 @@ def _read_adc_identity(
 
 def _default_provider_checker(settings, project):
     from config import constants
+    from config.secrets import (
+        load_runtime_secrets,
+        merge_secret_settings,
+        uses_secret_manager,
+    )
     from installer.iam import inspect_operator_permissions
     from installer.recovery import verify_recovery_resources
     from installer.commands import run_gcloud_command
@@ -243,8 +248,14 @@ def _default_provider_checker(settings, project):
         project_details = json.loads(result.stdout or "{}")
     except json.JSONDecodeError as error:
         raise RuntimeError("target project returned invalid data") from error
+
+    effective_settings = (
+        merge_secret_settings(settings, load_runtime_secrets(settings))
+        if uses_secret_manager(settings)
+        else settings
+    )
     report = verify_recovery_resources(
-        settings,
+        effective_settings,
         project,
         project_details=project_details,
     )
@@ -271,7 +282,6 @@ def _default_provider_checker(settings, project):
         for value in str(services.stdout or "").splitlines()
         if value.strip()
     }
-    from config.secrets import uses_secret_manager
     from installer.secrets import SECRET_MANAGER_API, probe_runtime_secrets_resource
 
     required_apis = set(constants.REQUIRED_GOOGLE_CLOUD_APIS)
