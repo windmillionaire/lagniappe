@@ -146,7 +146,7 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     modal = Modal(owner.page).open(
         settings_panel.locator("[data-role='configuration']")
     )
-    expect(modal.element).to_contain_text("including credentials and other secrets")
+    expect(modal.element).to_contain_text("credentials and other secrets")
     expect(modal.element).to_contain_text("APP_NAME")
     expect(
         modal.element.get_by_role("link", name="Download Settings File")

@@ -145,7 +145,7 @@ def test_offline_poll_recovers_without_online_event(get_admin, browser_failures)
     user.go(SitePages.HOME)
 
     indicator = user.locate(OFFLINE_INDICATOR)
-    with browser_failures.expect_offline(user):
+    with browser_failures.expect_offline(user, max_ping_count=3):
         user.offline = True
         expect(indicator).to_be_visible()
 
@@ -253,7 +253,7 @@ def test_testing_mode_navigation_resets_offline_state(get_admin, browser_failure
     user = get_admin()
     user.go(SitePages.HOME)
 
-    with browser_failures.expect_offline(user):
+    with browser_failures.expect_offline(user, max_ping_count=3):
         user.offline = True
         indicator = user.locate(OFFLINE_INDICATOR)
         expect(indicator).to_be_visible()

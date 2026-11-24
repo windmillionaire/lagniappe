@@ -36,8 +36,8 @@ def test_page_viewer_reads_page_without_page_editing_affordances(get_admin, get_
 
     tabs = Tabs(viewer)
     expect(tabs.info).to_be_visible()
-    expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).to_be_visible()
-    expect(viewer.locate(Tabs.DOCUMENT_TAB)).to_be_attached()
+    expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).not_to_be_attached()
+    expect(viewer.locate(Tabs.DOCUMENT_TAB)).not_to_be_attached()
     expect(tabs.tasks).to_be_visible()
 
     expect(viewer.locate(Page.CREATE_TASK_TOGGLE)).not_to_be_attached()

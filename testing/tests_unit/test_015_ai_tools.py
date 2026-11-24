@@ -517,6 +517,15 @@ def test_ai_config_combines_search_tools_json_and_thinking_settings():
     prompt.set_thinking_budget(0)
     assert ai_core.GenAI.create_config(prompt).thinking_config.thinking_budget == 0
     assert prompt.thinking_level is None
+    assert (
+        ai_core.GenAI.create_config(
+            prompt, model="gemini-2.5-flash"
+        ).thinking_config.thinking_budget
+        == 0
+    )
+    gemini3_config = ai_core.GenAI.create_config(prompt, model="gemini-3.1-pro-preview")
+    assert gemini3_config.thinking_config.thinking_level == ai_core.types.ThinkingLevel.LOW
+    assert gemini3_config.thinking_config.thinking_budget is None
 
     with pytest.raises(ValueError, match="Service tier"):
         prompt.set_service_tier("fastest")
@@ -635,6 +644,7 @@ def test_ai_runtime_settings_override_deployment_defaults(monkeypatch):
         raising=False,
     )
     monkeypatch.setattr(ai_core.CONFIG, "AI_LOCATION", "global", raising=False)
+    monkeypatch.setattr(ai_core.CONFIG, "AI_AUTO_EXECUTE", False, raising=False)
 
     monkeypatch.setattr(
         runtime_ai_settings_module.site_database,

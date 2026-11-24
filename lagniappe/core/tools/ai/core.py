@@ -169,6 +169,17 @@ def extract_first_json_value(response_text: str) -> str | None:
     return None
 
 
+_THINKING_LEVEL_MODEL_RE = re.compile(
+    r"(?:^|/)gemini-(?:[3-9]|\d{2,})(?:\.|-|$)"
+)
+
+
+def _uses_thinking_level_model(model: str | None) -> bool:
+    if not model:
+        return False
+    return bool(_THINKING_LEVEL_MODEL_RE.search(model.strip().casefold()))
+
+
 class GenAI:
     """Singleton wrapper around the Google GenAI client for Vertex AI."""
 
@@ -228,7 +239,9 @@ class GenAI:
         return result
 
     @staticmethod
-    def create_config(prompt: Prompt, **overrides: object) -> types.GenerateContentConfig:
+    def create_config(
+        prompt: Prompt, *, model: str | None = None, **overrides: object
+    ) -> types.GenerateContentConfig:
         """Build a GenerateContentConfig from a Prompt's settings."""
         execution_control = current_execution_control()
         service_tier_headers = (
@@ -274,9 +287,14 @@ class GenAI:
         if prompt.thinking_level is not None:
             config["thinking_config"] = types.ThinkingConfig.model_validate({"thinking_level": prompt.thinking_level})
         elif prompt.thinking_budget is not None:
-            config["thinking_config"] = types.ThinkingConfig(
-                thinking_budget=prompt.thinking_budget
-            )
+            if _uses_thinking_level_model(model):
+                config["thinking_config"] = types.ThinkingConfig.model_validate(
+                    {"thinking_level": "LOW"}
+                )
+            else:
+                config["thinking_config"] = types.ThinkingConfig(
+                    thinking_budget=prompt.thinking_budget
+                )
 
         output_type = prompt.output_format.get("type") if prompt.output_format else None
         if output_type == "JSON":
@@ -440,7 +458,7 @@ class GenAI:
                 text="Return the complete proposal using this JSON schema:\n"
                 + json.dumps(prompt.response_schema)
             )]))
-        config = GenAI.create_config(prompt)
+        config = GenAI.create_config(prompt, model=model)
         final_config = None
         if (prompt.tools or prompt.search) and output_format == "JSON":
             # Search/tool turns can return empty candidates when combined with
@@ -449,12 +467,14 @@ class GenAI:
             # constrained final pass below.
             config = GenAI.create_config(
                 prompt,
+                model=model,
                 response_mime_type=None,
                 response_schema=None,
             )
             if prompt.response_schema and validator is None:
                 final_config = GenAI.create_config(
                     prompt,
+                    model=model,
                     tools=list(GOOGLE_SEARCH_TOOL) if prompt.search else None,
                 )
         observer = current_observer()
@@ -846,7 +866,7 @@ class GenAI:
         overrides: dict[str, object] = {"response_modalities": IMAGE_RESPONSE_MODALITIES}
         if aspect_ratio:
             overrides["image_config"] = types.ImageConfig(aspect_ratio=aspect_ratio)
-        config = GenAI.create_config(prompt, **overrides)
+        config = GenAI.create_config(prompt, model=model, **overrides)
 
         execution_control = current_execution_control()
         if execution_control is not None:
