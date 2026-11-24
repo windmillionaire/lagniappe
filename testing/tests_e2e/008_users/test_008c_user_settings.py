@@ -15,7 +15,7 @@ from lagniappe.core.definitions import (
     Fetch,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools.ai.runtime_settings import auto_execute_site_enabled
+from lagniappe.core.tools.ai.auto_execute import site_auto_execute_enabled
 from testing.definitions import Categories, Groups, SitePages, Submissions, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.resources import Page
@@ -145,7 +145,7 @@ def test_user_settings_panel_opens_from_my_page(get_admin, get_user, browser_fai
         "user-email",
         "notification-email",
     ]
-    if auto_execute_site_enabled():
+    if site_auto_execute_enabled():
         expected_fields.append("auto-execute-settings")
     expected_fields.append("api-key-settings")
     assert user_settings_field_order(settings_panel) == expected_fields
@@ -256,7 +256,7 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
         "ai-access",
         "notification-email",
     ]
-    if auto_execute_site_enabled():
+    if site_auto_execute_enabled():
         expected_owner_fields.append("auto-execute-settings")
     expected_owner_fields.extend(["api-key-settings", "owner-inbound"])
     assert user_settings_field_order(settings_panel) == expected_owner_fields
