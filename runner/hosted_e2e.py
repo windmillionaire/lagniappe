@@ -430,6 +430,7 @@ def _run_create_preflight(source, *, base_ref=None):
     run_py = APP_DIR / "run.py"
     gates = (
         ("authored frontend source", [NPM_CLI or "npm", "run", "check"]),
+        ("frontend type checking", [NPM_CLI or "npm", "run", "typecheck"]),
         ("Python source", [python, "-m", "ruff", "check", "."]),
         ("Python type checking", [python, "-m", "basedpyright", "--warnings"]),
         (

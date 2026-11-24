@@ -127,7 +127,7 @@ venv/bin/python run.py hosted-e2e create --base origin/main
 `create` requires a clean committed production build. It exports that exact
 commit for both artifacts, never rebuilds, never edits canonical
 `lagniappe.yaml`, and deploys with `--no-promote`. Before gcloud activation or
-provider mutation, it runs npm source checks, Ruff, both Python type checks, tooling tests,
+provider mutation, it runs npm source and type checks, Ruff, both Python type checks, tooling tests,
 template, style and mutation contracts, and the release check against the clean local HEAD.
 Creation does not require current local test evidence; the hosted job produces
 that evidence when it runs the candidate's suites.

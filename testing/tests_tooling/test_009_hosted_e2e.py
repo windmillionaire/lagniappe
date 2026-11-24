@@ -372,29 +372,30 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
 
     command_arguments = [list(map(str, command)) for command, _options in commands]
     assert command_arguments[0] == ["npm", "run", "check"]
-    assert command_arguments[1][1:] == ["-m", "ruff", "check", "."]
-    assert command_arguments[2][1:] == ["-m", "basedpyright", "--warnings"]
-    assert command_arguments[3][1:] == [
+    assert command_arguments[1] == ["npm", "run", "typecheck"]
+    assert command_arguments[2][1:] == ["-m", "ruff", "check", "."]
+    assert command_arguments[3][1:] == ["-m", "basedpyright", "--warnings"]
+    assert command_arguments[4][1:] == [
         "-c", "from runner.mcp_environment import prepare_environment; prepare_environment()",
     ]
-    assert command_arguments[4][1:] == [
+    assert command_arguments[5][1:] == [
         "-m", "basedpyright", "--warnings", "--project", "mcp/pyrightconfig.json",
     ]
-    assert command_arguments[5][2:] == [
+    assert command_arguments[6][2:] == [
         "test",
         "--no-test-evidence",
         "tooling",
     ]
-    assert command_arguments[6][2:] == [
+    assert command_arguments[7][2:] == [
         "template-contracts",
         "--check",
         "--no-report",
     ]
-    assert command_arguments[7][2:] == [
+    assert command_arguments[8][2:] == [
         "style-contracts", "--check", "--no-report", "--no-manifest",
     ]
-    assert command_arguments[8][2:] == ["mutation-contracts", "--check"]
-    assert command_arguments[9][2:] == [
+    assert command_arguments[9][2:] == ["mutation-contracts", "--check"]
+    assert command_arguments[10][2:] == [
         "release-check",
         "--base",
         revision,
@@ -2005,6 +2006,7 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "gh api" in quality_text
     assert "validate-release-evidence" in quality_text
     assert "npm run check" in quality_text
+    assert "npm run typecheck" in quality_text
     assert "ruff check ." in quality_text
     assert "basedpyright --warnings" in quality_text
     assert "--project pyrightconfig.json" in quality_text

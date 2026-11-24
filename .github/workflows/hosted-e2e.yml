@@ -535,6 +535,9 @@ jobs:
       - name: Check authored frontend source
         run: npm run check
 
+      - name: Check frontend types
+        run: npm run typecheck
+
       - name: Check Python source
         run: venv/bin/python -m ruff check .
 
