@@ -253,7 +253,9 @@ const interactionFoundationChunk = (id) => {
 	const marker = "/src/script/";
 	const sourceIndex = normalized.lastIndexOf(marker);
 	if (sourceIndex === -1) return undefined;
-	const relative = normalized.slice(sourceIndex + marker.length);
+	const relative = normalized
+		.slice(sourceIndex + marker.length)
+		.replace(/\.m?ts$/, ".mjs");
 	for (const [chunk, modules] of Object.entries(FEATURE_CHUNK_MODULES)) {
 		if (modules.includes(relative)) return chunk;
 	}

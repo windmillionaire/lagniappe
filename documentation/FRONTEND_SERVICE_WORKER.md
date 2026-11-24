@@ -61,7 +61,7 @@ dynamic GETs wait for conditional network validation. The cached response is
 used only after a 304 or an actual network failure. This prevents slow requests
 from returning stale application state based on an arbitrary deadline while
 preserving ETag storage and offline reuse.
-`shared/request.mjs` exposes the worker marker as `response.updated`; refresh
+`shared/request.ts` exposes the worker marker as `response.updated`; refresh
 consumers skip DOM reconciliation when it is `false`.
 
 `/l/token` is classified as network-only because returning a cached token would be
@@ -224,7 +224,7 @@ connectivity state; it contains no URL, query, response body, or entity data.
 ## Error Handling
 
 The service worker has its own `captureError()` function (separate from the
-app's `shared/errors.mjs`). It forwards errors to Sentry when Sentry is
+app's `shared/errors.ts`). It forwards errors to Sentry when Sentry is
 available.
 
 Navigation errors use the cached offline document when no cached response is

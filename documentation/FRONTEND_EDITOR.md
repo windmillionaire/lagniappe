@@ -59,7 +59,7 @@ Used for entity documents (project documents, page documents). Manages real-time
 **State encoding:** Yjs state vectors and updates are serialized as base64
 strings for transport. Shared helpers `base64ToUint8Array` and
 `uint8ArrayToBase64` handle conversion. The collaborative controller imports
-these and `waitForAttribute` directly from `shared/utilities.mjs`; sync service
+these and `waitForAttribute` directly from `shared/utilities.ts`; sync service
 acquisition remains lazy through the view.
 
 ### IndependentDocument (`independent.mjs`)

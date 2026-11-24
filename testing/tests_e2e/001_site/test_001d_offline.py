@@ -8,7 +8,7 @@ and transition resilience.
 Related Files:
     Application:
         - src/script/views/base/core.mjs: Core.offline() state transitions
-        - src/script/shared/sync.mjs: SyncManager.sendUpdates offline path
+        - src/script/shared/sync.ts: SyncManager.sendUpdates offline path
         - src/script/main.mjs: pingServer, syncView
 
     Test Framework:

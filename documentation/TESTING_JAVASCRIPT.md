@@ -62,7 +62,7 @@ This example can be placed directly in a `test_*.mjs` file:
 ```javascript
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { iconDefinition } from "../../src/script/shared/icons.mjs";
+import { iconDefinition } from "../../src/script/shared/icons.ts";
 
 test("test_page_icon_lookup", () => {
   assert.deepEqual(iconDefinition("page"), { glyph: "draft", fill: 1 });
@@ -70,8 +70,10 @@ test("test_page_icon_lookup", () => {
 });
 ```
 
-Production relative imports include their extension; directory imports name
-`index.mjs`. Styles and icons are normal generated modules. Never restore a
+Production relative imports include the file's extension, including `.ts` for
+converted modules. Name the index file explicitly for directory imports. Node
+strips erasable TypeScript when loading production modules. Styles and icons
+are normal generated modules. Never restore a
 virtual import or create a test-only copy of a production module. Full boot
 entries that import CSS remain build entry points; import the behavior owner
 in module tests and leave bundling checks in the build contract tests.
@@ -134,7 +136,7 @@ test("test_request_parses_server_html", async (t) => {
       });
     }
   });
-  const { request } = await import("../../src/script/shared/request.mjs");
+  const { request } = await import("../../src/script/shared/request.ts");
   const response = await request.get("/example");
   assert.equal(response.ok, true);
   assert.equal(response.html.querySelector("p").textContent, "Saved");
@@ -153,9 +155,9 @@ For consumer tests, import `esmock` and use:
 
 ```javascript
 const { OfflineQueue } = await esmock.strict(
-  "../../src/script/shared/offlineQueue.mjs",
+  "../../src/script/shared/offlineQueue.ts",
   {
-    "../../src/script/shared/request.mjs": {
+    "../../src/script/shared/request.ts": {
       request: { post: t.mock.fn(async () => ({ ok: true })) },
     },
   },

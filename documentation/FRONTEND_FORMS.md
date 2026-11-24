@@ -194,7 +194,7 @@ to an ordinary HTTP submit.
 
 ## Uploads
 
-`shared/directUpload.mjs` owns direct-upload sessions, resumable chunk transfer,
+`shared/directUpload.ts` owns direct-upload sessions, resumable chunk transfer,
 retry recovery, and progress callbacks. `BaseUpload` and the Form Builder import
 that client directly. `elements/upload.mjs` owns upload controls and menus.
 

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { rollup } from "rollup";
+import { stripFrontendTypes } from "../../build/rollup.shared.mjs";
 import {
 	buildStyles,
 	javascriptIconModuleSource,
@@ -17,7 +18,7 @@ import { validateStyleCandidates } from "../utility/style_compile.mjs";
 async function bundle(input) {
 	const build = await rollup({
 		input,
-		plugins: [buildStyles()],
+		plugins: [buildStyles(), stripFrontendTypes()],
 	});
 	try {
 		const { output } = await build.generate({ format: "esm" });

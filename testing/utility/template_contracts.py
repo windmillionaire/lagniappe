@@ -806,7 +806,13 @@ def collect_js_index(repo_root: Path) -> JsIndex:
     submit_contracts: dict[str, list[str]] = defaultdict(list)
     generic_control_handlers: list[str] = []
 
-    for path in sorted((repo_root / "src/script").rglob("*.mjs")):
+    for path in sorted((repo_root / "src/script").rglob("*")):
+        if (
+            path.suffix not in {".mjs", ".ts", ".mts"}
+            or path.name.endswith((".d.ts", ".d.mts"))
+            or not path.is_file()
+        ):
+            continue
         text = path.read_text(encoding="utf-8")
         rel = display_path(path, repo_root)
         for match in CLASS_RE.finditer(text):

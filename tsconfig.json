@@ -1,7 +1,8 @@
 {
 	"compilerOptions": {
+		"allowImportingTsExtensions": true,
 		"allowJs": true,
-		"checkJs": true,
+		"checkJs": false,
 		"erasableSyntaxOnly": true,
 		"lib": ["ES2024", "DOM", "DOM.Iterable"],
 		"module": "ESNext",
@@ -12,9 +13,6 @@
 		"target": "ES2024",
 		"types": []
 	},
-	"include": [
-		"src/script/views/builder/config.mjs",
-		"src/script/types/**/*.d.ts"
-	],
+	"include": ["src/script/**/*.ts", "src/script/**/*.mts"],
 	"exclude": ["testing/"]
 }

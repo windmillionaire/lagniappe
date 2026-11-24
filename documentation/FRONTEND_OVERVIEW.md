@@ -81,29 +81,29 @@ stable root, so AJAX section replacement does not discard its listeners.
 ## Shared Utilities (`shared/`)
 
 Internal modules import shared helpers from their concrete owners. The
-`shared/index.mjs` facade still exposes other shared APIs for application
+`shared/index.ts` facade still exposes other shared APIs for application
 composition; transitions and recent-search cleanup use direct imports only.
 Modules:
 
 | Module | Purpose |
 |---|---|
-| `analytics.mjs` | `analytics.tag()` and `analytics.view()` -- fire-and-forget page-load, login, and public-view tracking using metadata from the current page. |
-| `connectivity.mjs` | `ConnectivityState` and the shared `connectivity` instance -- explicit browser-link, server-reachability, visibility, and service-worker-controller state. |
-| `endpoints.mjs` | API route definitions, organized by widget name. Widget-specific endpoints are functions keyed by widget name (e.g. `ENDPOINTS.Filters(settings)`); global endpoints are static properties. |
-| `polling.mjs` | `PollingCoordinator` -- one adaptive, visibility-aware scheduler with periodic/foreground and immediate/scheduled subscription modes for entity, channel, document, operation, form-lock, and ingress state. Subscription-owned visible-blur eligibility lets rendered deferred operations retain their normal cadence for at most ten minutes without waking other work. Notification state piggybacks on any poll and uses one personal-state-only request after a cold `/l/ping` miss. |
-| `notificationState.mjs` | Parses `X-Lagniappe-Notification-State`, stores the latest generation/revision/count before the lazy menu loads, updates the badge, and publishes state changes to menu/coordinator consumers. |
-| `deferredOperations.mjs` | `DeferredOperationManager` -- owner-authorized operation subscriptions and revision-aware terminal destination reconciliation. |
-| `errors.mjs` | `captureError()`, `captureNetworkError()`, and `configureSentry()` -- collect DOM context from the nearest widget/component/view elements and forward to the configured local Sentry bundle + console. The client initializes only when an installation DSN is rendered. Its event processor removes SDK request payloads and identity context, applies the exact diagnostic-header allowlist, recursively redacts recognized credentials/payloads, and bounds nested context. |
-| `request.mjs` | `request.get/post/put/patch/delete` -- wraps `fetch` with CSRF token injection, targeted retry for responses explicitly identified as CSRF failures, 422 validation error handling, redirect following, and JSON/HTML content-type detection. A service-worker `X-Lagniappe-Updated: false` marker is exposed as `response.updated === false` so refresh consumers can skip unchanged DOM work. |
-| `sync.mjs` | `SyncManager` -- revisioned collaborative-document synchronization through `/l/sync` and shared document polling, including offline document-delta replay. See [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md). |
-| `modal.mjs` | Modal system: `Modal` (base), `DeleteModal`, `HelpModal`, and `OfflineModal`. Handles Escape/click-outside dismissal, load-from-server, and nested view transitions. |
-| `offline.mjs` | IndexedDB primitives for document sync records and explicit offline mutation records. |
-| `offlineQueue.mjs` | `OfflineQueue` -- serializes explicit `lp-offline` mutation commands, restores optimistic overlays, replays commands, and hands conflicts to `EditWatcher`. |
-| `protocol.mjs` | Connectivity worker-message validation and construction. Server state does not cross the service-worker boundary. |
-| `user.mjs` | `updateUserData()` performs the retryable startup timezone update without browser geolocation. `updateUserLocation()` is started by `LocationBox`, requests geolocation on demand, and serializes its session write after the timezone update so client-side session-cookie responses cannot overwrite one another. |
-| `transitions.mjs` | `withTransition()` and its shared queue: batches same-turn DOM commits, joins nested calls, and resolves after the update without waiting for the animation. |
-| `storage.mjs` | Best-effort `localStore` and `sessionStore` adapters; `clearRecentSearchResults()` synchronously removes `recent-` keys from local storage and propagates storage errors. |
-| `utilities.mjs` | `debounce()`, `showBriefly()` (transient feedback using the shared transition scheduler), `waitForAttribute()` (MutationObserver-based attribute wait), `simpleHash()`, `generateElementId()`, `areEqual()` (deep JSON comparison), `base64ToUint8Array()`, `uint8ArrayToBase64()`. |
+| `analytics.ts` | `analytics.tag()` and `analytics.view()` -- fire-and-forget page-load, login, and public-view tracking using metadata from the current page. |
+| `connectivity.ts` | `ConnectivityState` and the shared `connectivity` instance -- explicit browser-link, server-reachability, visibility, and service-worker-controller state. |
+| `endpoints.ts` | API route definitions, organized by widget name. Widget-specific endpoints are functions keyed by widget name (e.g. `ENDPOINTS.Filters(settings)`); global endpoints are static properties. |
+| `polling.ts` | `PollingCoordinator` -- one adaptive, visibility-aware scheduler with periodic/foreground and immediate/scheduled subscription modes for entity, channel, document, operation, form-lock, and ingress state. Subscription-owned visible-blur eligibility lets rendered deferred operations retain their normal cadence for at most ten minutes without waking other work. Notification state piggybacks on any poll and uses one personal-state-only request after a cold `/l/ping` miss. |
+| `notificationState.ts` | Parses `X-Lagniappe-Notification-State`, stores the latest generation/revision/count before the lazy menu loads, updates the badge, and publishes state changes to menu/coordinator consumers. |
+| `deferredOperations.ts` | `DeferredOperationManager` -- owner-authorized operation subscriptions and revision-aware terminal destination reconciliation. |
+| `errors.ts` | `captureError()`, `captureNetworkError()`, and `configureSentry()` -- collect DOM context from the nearest widget/component/view elements and forward to the configured local Sentry bundle + console. The client initializes only when an installation DSN is rendered. Its event processor removes SDK request payloads and identity context, applies the exact diagnostic-header allowlist, recursively redacts recognized credentials/payloads, and bounds nested context. |
+| `request.ts` | `request.get/post/put/patch/delete` -- wraps `fetch` with CSRF token injection, targeted retry for responses explicitly identified as CSRF failures, 422 validation error handling, redirect following, and JSON/HTML content-type detection. A service-worker `X-Lagniappe-Updated: false` marker is exposed as `response.updated === false` so refresh consumers can skip unchanged DOM work. |
+| `sync.ts` | `SyncManager` -- revisioned collaborative-document synchronization through `/l/sync` and shared document polling, including offline document-delta replay. See [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md). |
+| `modal.ts` | Modal system: `Modal` (base), `DeleteModal`, `HelpModal`, and `OfflineModal`. Handles Escape/click-outside dismissal, load-from-server, and nested view transitions. |
+| `offline.ts` | IndexedDB primitives for document sync records and explicit offline mutation records. |
+| `offlineQueue.ts` | `OfflineQueue` -- serializes explicit `lp-offline` mutation commands, restores optimistic overlays, replays commands, and hands conflicts to `EditWatcher`. |
+| `protocol.ts` | Connectivity worker-message validation and construction. Server state does not cross the service-worker boundary. |
+| `user.ts` | `updateUserData()` performs the retryable startup timezone update without browser geolocation. `updateUserLocation()` is started by `LocationBox`, requests geolocation on demand, and serializes its session write after the timezone update so client-side session-cookie responses cannot overwrite one another. |
+| `transitions.ts` | `withTransition()` and its shared queue: batches same-turn DOM commits, joins nested calls, and resolves after the update without waiting for the animation. |
+| `storage.ts` | Best-effort `localStore` and `sessionStore` adapters; `clearRecentSearchResults()` synchronously removes `recent-` keys from local storage and propagates storage errors. |
+| `utilities.ts` | `debounce()`, `showBriefly()` (transient feedback using the shared transition scheduler), `waitForAttribute()` (MutationObserver-based attribute wait), `simpleHash()`, `generateElementId()`, `areEqual()` (deep JSON comparison), `base64ToUint8Array()`, `uint8ArrayToBase64()`. |
 
 ## Forms (`forms/`)
 
@@ -117,15 +117,12 @@ See [Frontend Forms](FRONTEND_FORMS.md) for ownership and service contracts.
 ## Frontend type checking
 
 Run `npm run typecheck` with the Node version in `.nvmrc` after `npm ci`.
-The compiler checks JavaScript without emitting files. The initial config
-checks `views/builder/config.mjs` as a smoke test and reserves
-`src/script/types/` for shared declarations. The JavaScript tests use the
-repository runner separately.
-
-TypeScript checks imported JavaScript as well as the files listed in
-`tsconfig.json` when `checkJs` is enabled. Before expanding the checked scope,
-measure the diagnostics in imported modules. A staged rollout can use
-`// @ts-check` in migrated modules with project-wide `checkJs` disabled.
+The compiler strictly checks native TypeScript in `src/script/` without emitting
+files. The shared modules in `src/script/shared/` use `.ts`, and shared type
+declarations live in `src/script/types/`. Unconverted `.mjs` modules still
+resolve normally. Use explicit extensions on relative runtime imports and
+`import type` for type-only imports. Keep syntax erasable so the repository's
+Node tests can load TypeScript directly.
 
 ## Styles and build output
 

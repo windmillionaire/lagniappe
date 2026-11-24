@@ -24,9 +24,11 @@ BEHAVIOR_SUFFIXES = {
     ".jinja2",
     ".json",
     ".mjs",
+    ".mts",
     ".py",
     ".scss",
     ".toml",
+    ".ts",
     ".yaml",
     ".yml",
 }
@@ -163,7 +165,7 @@ def behavior_file_fingerprint(path: Path) -> str:
                 content,
             )
         content = _python_behavior_bytes(content)
-    elif path.suffix in {".js", ".mjs"}:
+    elif path.suffix in {".js", ".mjs", ".ts", ".mts"}:
         with suppress(UnicodeDecodeError):
             content = _javascript_without_comments(content.decode("utf-8")).encode()
     return hashlib.sha256(content).hexdigest()

@@ -1,5 +1,6 @@
 import json from "@rollup/plugin-json";
 import resolve from "@rollup/plugin-node-resolve";
+import esbuild from "rollup-plugin-esbuild";
 import { VIEW_ENTRIES } from "../src/script/viewRegistry.mjs";
 import { recordBuildArtifacts } from "./publication.mjs";
 import {
@@ -11,13 +12,22 @@ import {
 const thirdPartyLicenseBanner =
 	"/*! Third-party licenses: /third-party-licenses.txt */";
 
+export const stripFrontendTypes = () =>
+	esbuild({
+		include: /\.m?ts$/,
+		loaders: { ".mts": "ts" },
+		target: "esnext",
+		tsconfig: false,
+	});
+
 const browserPlugins = () => [
 	json(),
 	resolve({
 		browser: true,
-		extensions: ["js", ".mjs", ".json"],
+		extensions: [".js", ".mjs", ".json", ".ts", ".mts"],
 		preferBuiltins: false,
 	}),
+	stripFrontendTypes(),
 ];
 
 const onwarn = (warning, warn) => {

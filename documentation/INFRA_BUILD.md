@@ -1,6 +1,6 @@
 # Frontend Build
 
-Rollup bundles authored JavaScript and CSS from `src/` into
+Rollup bundles authored JavaScript, TypeScript, and CSS from `src/` into
 `lagniappe/web/static/`. The build also generates server-side style maps,
 service-worker metadata, and stable cache generations.
 
@@ -16,6 +16,7 @@ For styles, icons, and linting, read
 ```bash
 npm run dev
 npm run build
+npm run typecheck
 ```
 
 Development output is readable and tagged with mode `development`. Production
@@ -28,7 +29,9 @@ version replacements and Sentry releases use that same package version.
 
 `build/rollup.shared.mjs` owns the common login, monitoring, and main bundle
 construction: registry-derived inputs, output names, browser resolution,
-warning handling, chunk versioning, and artifact recording. It creates fresh
+type stripping for `.ts` and `.mts`, warning handling, chunk versioning, and
+artifact recording. Run `npm run typecheck` for compile-time diagnostics.
+The shared config creates fresh
 plugins for each standalone entry. Standalone login and monitoring bundles inline
 dynamic imports to preserve their single-file output when dependencies add lazy
 modules. `rollup.dev.config.mjs` and

@@ -19,7 +19,7 @@ SOURCE_ROOTS = (
     Path("installer"),
     Path("runner"),
 )
-SOURCE_SUFFIXES = {".html", ".mjs", ".py"}
+SOURCE_SUFFIXES = {".html", ".mjs", ".ts", ".mts", ".py"}
 DIRECT_DOTTED_RE = re.compile(
     r"(?<![A-Za-z0-9_/])(?:ICONS|icons)"
     r"(?P<path>(?:\.[A-Za-z][A-Za-z0-9]*)+)"
@@ -67,7 +67,11 @@ def _source_files(repo_root: Path):
         if not root.exists():
             continue
         for path in sorted(root.rglob("*")):
-            if not path.is_file() or path.suffix not in SOURCE_SUFFIXES:
+            if (
+                not path.is_file()
+                or path.suffix not in SOURCE_SUFFIXES
+                or path.name.endswith((".d.ts", ".d.mts"))
+            ):
                 continue
             relative = path.relative_to(repo_root).as_posix()
             if relative.startswith(

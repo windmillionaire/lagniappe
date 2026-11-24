@@ -70,7 +70,7 @@ reference. Title action menus use these options to anchor the panel's
 
 **`hidePanel()`** closes the panel, removes panel handlers, and stops auto-update.
 
-## Remote Query Lifecycle (`remote.mjs`, `shared/queryLifecycle.mjs`)
+## Remote Query Lifecycle (`remote.mjs`, `shared/queryLifecycle.ts`)
 
 `RemoteQueryCombobox` owns the exact input listener, a cancellable 200ms
 debounce, and a `QueryLifecycle`. Raw input invalidates the active epoch and

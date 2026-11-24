@@ -127,11 +127,17 @@ test("test_frontend_entries_and_startup_budget_contract", () => {
 	oversized["script.js"].code = "x".repeat(STARTUP_BUDGETS.main + 1);
 	assert.throws(() => validateStartupBudgets(oversized), /main boot closure/);
 
-	const forbidden = structuredClone(bundle);
-	forbidden["chunks/views/page.js"].modules = {
-		[`/src/script${CORE_FORBIDDEN_MODULES[0]}`]: {},
-	};
-	assert.throws(() => validateStartupBudgets(forbidden), /statically includes/);
+	for (const extension of [".mjs", ".ts", ".mts"]) {
+		const forbidden = structuredClone(bundle);
+		const module = CORE_FORBIDDEN_MODULES[0].replace(/\.mjs$/, extension);
+		forbidden["chunks/views/page.js"].modules = {
+			[`/src/script${module}`]: {},
+		};
+		assert.throws(
+			() => validateStartupBudgets(forbidden),
+			/statically includes/,
+		);
+	}
 
 	for (const module of ["watcher", "reconciler", "modals", "preview"]) {
 		const revisions = structuredClone(bundle);

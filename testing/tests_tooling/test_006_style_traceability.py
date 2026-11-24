@@ -12,9 +12,27 @@ from testing.utility import (
     style_traceability,
     contract_common,
     test_evidence,
+    template_contracts,
 )
 
 pytestmark = pytest.mark.tooling
+
+
+def test_source_contracts_include_native_typescript_modules(tmp_path):
+    scripts = tmp_path / "src/script"
+    scripts.mkdir(parents=True)
+    modules = {scripts / name for name in ("widget.mjs", "widget.ts", "widget.mts")}
+    for path in modules | {scripts / "widget.d.ts", scripts / "widget.d.mts"}:
+        path.write_text('document.querySelector("[data-role=\'action\']");\n', encoding="utf-8")
+
+    expected = {path.relative_to(tmp_path).as_posix() for path in modules}
+    aliases = template_contracts.collect_js_index(tmp_path).role_consumers
+    assert set(aliases["action"]) == expected
+    assert dict(style_candidates.iter_source_files(tmp_path, (scripts,))) == dict.fromkeys(
+        modules, "javascript"
+    )
+    assert {relative for _, relative in icon_traceability._source_files(tmp_path)} == expected
+    assert expected <= test_evidence.behavior_path_fingerprints(tmp_path).keys()
 
 
 def test_icon_registry_schema_enforces_material_symbol_records():
