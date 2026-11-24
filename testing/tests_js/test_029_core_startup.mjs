@@ -261,7 +261,7 @@ test("test_shell_intercepts_interactions_before_deferred_services", async (t) =>
 });
 
 test("test_lazy_search_replays_the_latest_live_input_after_loading", async (t) => {
-	const coreSource = readFileSync("src/script/views/base/core.mjs", "utf8");
+	const coreSource = readFileSync("src/script/views/base/core.ts", "utf8");
 	assert.equal(
 		coreSource.includes("(box) => this._activateSearchBox(box)"),
 		true,
@@ -321,7 +321,7 @@ async function loadCore(connectivity = { online: true }) {
 	class ShellView {}
 	const emptyService = () => null;
 	const { default: Core } = await esmock.strict(
-		"../../src/script/views/base/core.mjs",
+		"../../src/script/views/base/core.ts",
 		{
 			"../../src/script/shared/connectivity.ts": { connectivity },
 			"../../src/script/shared/endpoints.ts": { ENDPOINTS: {} },
@@ -738,13 +738,13 @@ test("test_component_render_does_not_wait_for_polling_reconciliation", async (t)
 
 test("test_offline_queue_does_not_block_initial_form_render", async () => {
 	const { FormWidget } = await esmock.strict(
-		"../../src/script/widgets/base/formWidget.mjs",
+		"../../src/script/widgets/base/formWidget.ts",
 		{
-			"../../src/script/forms/controller.mjs": { FormController: class {} },
-			"../../src/script/forms/migrationNotice.mjs": {
+			"../../src/script/forms/controller.ts": { FormController: class {} },
+			"../../src/script/forms/migrationNotice.ts": {
 				installMigrationNotice: () => null,
 			},
-			"../../src/script/forms/representation.mjs": {
+			"../../src/script/forms/representation.ts": {
 				compatibleField: () => true,
 			},
 			"../../src/script/shared/transitions.ts": {

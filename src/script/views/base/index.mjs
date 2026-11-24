@@ -1,6 +1,6 @@
 import { withTransition } from "../../shared/transitions.ts";
 import { TableVisibilityState } from "../../widgets/tables/visibilityState.mjs";
-import Core from "./core.mjs";
+import Core from "./core.ts";
 
 export default class EntityIndex extends Core {
 	constructor(node) {

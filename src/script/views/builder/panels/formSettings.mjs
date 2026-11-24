@@ -1,4 +1,4 @@
-import { FormController } from "../../../forms/controller.mjs";
+import { FormController } from "../../../forms/controller.ts";
 import { captureError, ENDPOINTS, request } from "../../../shared/index.ts";
 
 export class FormSettings {

@@ -1,7 +1,7 @@
 import { NavElement } from "../../elements/nav.mjs";
 import { withTransition } from "../../shared/transitions.ts";
 import { debounce } from "../../shared/utilities.ts";
-import Core from "./core.mjs";
+import Core from "./core.ts";
 
 export default class Entity extends Core {
 	constructor(node) {

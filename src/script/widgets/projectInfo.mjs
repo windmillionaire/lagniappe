@@ -1,7 +1,7 @@
 import { InputElement } from "../elements/input.mjs";
 import { sections } from "../elements/sections.mjs";
 import { TextareaElement } from "../elements/textarea.mjs";
-import { FormWidget } from "./base/formWidget.mjs";
+import { FormWidget } from "./base/formWidget.ts";
 
 class ProjectForm extends FormWidget {
 	get nameElement() {

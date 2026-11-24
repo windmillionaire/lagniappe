@@ -4,7 +4,7 @@ import esmock from "esmock";
 import {
 	compatibleField,
 	incompatibleSchema,
-} from "../../src/script/forms/representation.mjs";
+} from "../../src/script/forms/representation.ts";
 import {
 	needsMigration,
 	repairConditions,
@@ -543,12 +543,12 @@ test("test_incompatible_local_values_require_review", () => {
 test("test_projected_matching_values_do_not_discard_incompatible_drafts", async (t) => {
 	createBrowser(t);
 	const { FormWidget } = await import(
-		"../../src/script/widgets/base/formWidget.mjs"
+		"../../src/script/widgets/base/formWidget.ts"
 	);
 	const { EditReconciler } = await esmock.strict(
-		"../../src/script/forms/revisions/reconciler.mjs",
+		"../../src/script/forms/revisions/reconciler.ts",
 		{
-			"../../src/script/forms/revisions/preview.mjs": {
+			"../../src/script/forms/revisions/preview.ts": {
 				loadRevisionPreview: async (_widget, response) => ({
 					revisionSnapshot: () => JSON.stringify(response.submission),
 					destroy() {},

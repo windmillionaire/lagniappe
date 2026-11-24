@@ -74,9 +74,9 @@ async function setupBaseUpload(t) {
 	const errors = [];
 	const directUpload = {};
 	const { BaseUpload } = await esmock.strict(
-		"../../src/script/elements/base/baseUpload.mjs",
+		"../../src/script/elements/base/baseUpload.ts",
 		{
-			"../../src/script/forms/controller.mjs": {
+			"../../src/script/forms/controller.ts": {
 				FormController: class {},
 			},
 			"../../src/script/shared/directUpload.ts": { directUpload },

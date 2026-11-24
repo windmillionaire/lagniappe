@@ -43,7 +43,7 @@ test("test_file_info_extract_completion_requests_one_reload_notice", async (t) =
 				STYLES: { label: { default: "" } },
 			},
 			"../../src/script/shared/icons.ts": { setIcon() {} },
-			"../../src/script/widgets/base/formWidget.mjs": { FormWidget },
+			"../../src/script/widgets/base/formWidget.ts": { FormWidget },
 		},
 	);
 	let notices = 0;

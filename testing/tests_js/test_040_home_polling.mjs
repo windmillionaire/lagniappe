@@ -24,7 +24,7 @@ test("test_home_polling_subscribes_loaded_widgets_and_refreshes_only_owner", asy
 			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
-			"../../src/script/views/base/core.mjs": { default: Core },
+			"../../src/script/views/base/core.ts": { default: Core },
 		},
 	);
 	const descriptors = new Map();

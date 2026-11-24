@@ -1,5 +1,5 @@
 import { captureError } from "../../shared/errors.ts";
-import { EditReconciler } from "./reconciler.mjs";
+import { EditReconciler } from "./reconciler.ts";
 
 /**
  * View-scoped detector for committed edits to forms represented by

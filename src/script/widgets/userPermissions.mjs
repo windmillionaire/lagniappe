@@ -1,4 +1,4 @@
-import { FormWidget } from "./base/formWidget.mjs";
+import { FormWidget } from "./base/formWidget.ts";
 
 export class PublicPermissions extends FormWidget {
 	constructor(attributes) {

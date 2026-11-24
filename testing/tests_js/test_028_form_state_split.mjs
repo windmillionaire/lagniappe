@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
-import { incompatibleSchema } from "../../src/script/forms/representation.mjs";
+import { incompatibleSchema } from "../../src/script/forms/representation.ts";
 import { createBrowser, installIndexedDB } from "../utility/js/environment.mjs";
 
 async function loadFormWidget({
@@ -9,15 +9,15 @@ async function loadFormWidget({
 	installMigrationNotice,
 } = {}) {
 	const mocks = {
-		"../../src/script/forms/controller.mjs": { FormController },
+		"../../src/script/forms/controller.ts": { FormController },
 	};
 	if (installMigrationNotice) {
-		mocks["../../src/script/forms/migrationNotice.mjs"] = {
+		mocks["../../src/script/forms/migrationNotice.ts"] = {
 			installMigrationNotice,
 		};
 	}
 	return await esmock.strict(
-		"../../src/script/widgets/base/formWidget.mjs",
+		"../../src/script/widgets/base/formWidget.ts",
 		mocks,
 	);
 }
@@ -40,7 +40,7 @@ async function loadOfflineQueue({
 
 async function loadEditOwners({ loadRevisionPreview, request = {} } = {}) {
 	const { EditReconciler } = await esmock.strict(
-		"../../src/script/forms/revisions/reconciler.mjs",
+		"../../src/script/forms/revisions/reconciler.ts",
 		{
 			"../../src/script/shared/errors.ts": {
 				captureError(error) {
@@ -55,23 +55,23 @@ async function loadEditOwners({ loadRevisionPreview, request = {} } = {}) {
 				areEqual: (left, right) =>
 					JSON.stringify(left) === JSON.stringify(right),
 			},
-			"../../src/script/forms/representation.mjs": { incompatibleSchema },
-			"../../src/script/forms/revisions/modals.mjs": {
+			"../../src/script/forms/representation.ts": { incompatibleSchema },
+			"../../src/script/forms/revisions/modals.ts": {
 				FormRevisionModal: class {},
 				WholeFormRevisionModal: class {},
 			},
-			"../../src/script/forms/revisions/preview.mjs": { loadRevisionPreview },
+			"../../src/script/forms/revisions/preview.ts": { loadRevisionPreview },
 		},
 	);
 	const { EditWatcher } = await esmock.strict(
-		"../../src/script/forms/revisions/watcher.mjs",
+		"../../src/script/forms/revisions/watcher.ts",
 		{
 			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
 				},
 			},
-			"../../src/script/forms/revisions/reconciler.mjs": { EditReconciler },
+			"../../src/script/forms/revisions/reconciler.ts": { EditReconciler },
 		},
 	);
 	return { EditReconciler, EditWatcher };
@@ -92,7 +92,7 @@ async function loadCore(connectivity = { online: true, hidden: true }) {
 	}
 	const service = (name) => (view) => Promise.resolve(view[name] ?? null);
 	const { default: Core } = await esmock.strict(
-		"../../src/script/views/base/core.mjs",
+		"../../src/script/views/base/core.ts",
 		{
 			"../../src/script/shared/connectivity.ts": { connectivity },
 			"../../src/script/shared/endpoints.ts": { ENDPOINTS: {} },
@@ -134,7 +134,7 @@ async function loadCore(connectivity = { online: true, hidden: true }) {
 
 async function loadPageTaskList() {
 	return await esmock.strict("../../src/script/widgets/pageTaskList.mjs", {
-		"../../src/script/elements/base/baseList.mjs": { BaseList: class {} },
+		"../../src/script/elements/base/baseList.ts": { BaseList: class {} },
 	});
 }
 
@@ -151,7 +151,7 @@ test("test_migration_notice_survives_form_replacement_and_discard", async (t) =>
 		}
 	}
 	const { installMigrationNotice } = await esmock.strict(
-		"../../src/script/forms/migrationNotice.mjs",
+		"../../src/script/forms/migrationNotice.ts",
 		{ "../../src/script/shared/modal.ts": { Modal } },
 	);
 	class FormController {

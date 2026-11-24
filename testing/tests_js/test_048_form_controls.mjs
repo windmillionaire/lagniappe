@@ -46,9 +46,9 @@ async function setupFormWidget(t, { name = "Original", loaded = true } = {}) {
 		syncOfflineState() {}
 	}
 	const { FormWidget } = await esmock.strict(
-		"../../src/script/widgets/base/formWidget.mjs",
+		"../../src/script/widgets/base/formWidget.ts",
 		{
-			"../../src/script/forms/controller.mjs": { FormController },
+			"../../src/script/forms/controller.ts": { FormController },
 		},
 	);
 	return {
@@ -337,17 +337,17 @@ test("test_declared_controls_are_lazy_owned_and_cleaned_on_failed_initialization
 		}
 	}
 	const { initFormControls } = await esmock.p(
-		"../../src/script/forms/controls/loader.mjs",
+		"../../src/script/forms/controls/loader.ts",
 		{
-			"../../src/script/forms/controls/accessRestrictions.mjs": {
+			"../../src/script/forms/controls/accessRestrictions.ts": {
 				default: Control,
 			},
 		},
 	);
 	const { FormController } = await esmock.strict(
-		"../../src/script/forms/controller.mjs",
+		"../../src/script/forms/controller.ts",
 		{
-			"../../src/script/forms/controls/loader.mjs": { initFormControls },
+			"../../src/script/forms/controls/loader.ts": { initFormControls },
 		},
 	);
 	function root(marked = false) {
@@ -383,7 +383,7 @@ test("test_declared_controls_are_lazy_owned_and_cleaned_on_failed_initialization
 test("test_form_review_notice_stays_above_expanded_autofill_context", async (t) => {
 	createBrowser(t);
 	const { FormController } = await import(
-		"../../src/script/forms/controller.mjs"
+		"../../src/script/forms/controller.ts"
 	);
 	const target = document.createElement("form");
 	const submitGroup = document.createElement("div");

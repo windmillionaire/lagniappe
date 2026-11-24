@@ -4,7 +4,7 @@ import { SectionToggle } from "../elements/sectionToggle.mjs";
 import { TextareaElement } from "../elements/textarea.mjs";
 import { STYLES } from "../generated/styles.mjs";
 import { setIcon } from "../shared/icons.ts";
-import { FormWidget } from "./base/formWidget.mjs";
+import { FormWidget } from "./base/formWidget.ts";
 
 export class FileInfo extends FormWidget {
 	constructor(attributes) {

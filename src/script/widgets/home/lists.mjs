@@ -1,4 +1,4 @@
-import { BaseList } from "../../elements/base/baseList.mjs";
+import { BaseList } from "../../elements/base/baseList.ts";
 import { localStore } from "../../shared/storage.ts";
 import { withTransition } from "../../shared/transitions.ts";
 

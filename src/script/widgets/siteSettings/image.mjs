@@ -1,4 +1,4 @@
-import { BaseUpload } from "../../elements/base/baseUpload.mjs";
+import { BaseUpload } from "../../elements/base/baseUpload.ts";
 import { UploadMenu, uploadElement } from "../../elements/upload.mjs";
 import { setIcon } from "../../shared/icons.ts";
 import { request } from "../../shared/index.ts";

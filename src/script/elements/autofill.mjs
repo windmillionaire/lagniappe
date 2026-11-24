@@ -1,5 +1,5 @@
 import { withTransition } from "../shared/transitions.ts";
-import { BaseUpload } from "./base/baseUpload.mjs";
+import { BaseUpload } from "./base/baseUpload.ts";
 import { UploadMenu, uploadElement } from "./upload.mjs";
 
 const AUTOFILL_DROPZONE_TEXT = "Click or drop to add a related image or a pdf";

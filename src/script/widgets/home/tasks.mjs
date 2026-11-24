@@ -1,4 +1,4 @@
-import { BaseList } from "../../elements/base/baseList.mjs";
+import { BaseList } from "../../elements/base/baseList.ts";
 import { Dropdown } from "../../elements/combobox/index.mjs";
 import { STYLES } from "../../generated/styles.mjs";
 import { setIcon } from "../../shared/icons.ts";

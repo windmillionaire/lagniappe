@@ -15,7 +15,7 @@ import { ENDPOINTS } from "../shared/endpoints.ts";
 import { captureError } from "../shared/errors.ts";
 
 const WIDGETS = {
-	BaseList: () => import("../elements/base/baseList.mjs"),
+	BaseList: () => import("../elements/base/baseList.ts"),
 	CategoryInfo: () => import("./category.mjs"),
 	CollaborativeDocument: () => import("../elements/editor/collaborative.mjs"),
 	CreateCategory: () => import("./category.mjs"),

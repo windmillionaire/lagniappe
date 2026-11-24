@@ -265,7 +265,7 @@ test("test_interaction_preloads_have_stable_manual_chunks", () => {
 	for (const module of [
 		"elements/nav.mjs",
 		"views/base/component.mjs",
-		"views/base/core.mjs",
+		"views/base/core.ts",
 		"views/base/reconciliation.mjs",
 		"views/base/services.mjs",
 		"views/base/task.mjs",
@@ -317,7 +317,7 @@ test("test_interaction_preloads_have_stable_manual_chunks", () => {
 		"user-tools",
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}forms/controller.mjs`),
+		interactionFoundationChunk(`${root}forms/controller.ts`),
 		"forms",
 	);
 	// Optional editor dialogs and specialized form fields keep their lazy boundary.
@@ -366,11 +366,11 @@ test("test_interaction_preloads_have_stable_manual_chunks", () => {
 		"ui-controls",
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}forms/controls/accessRestrictions.mjs`),
+		interactionFoundationChunk(`${root}forms/controls/accessRestrictions.ts`),
 		"permissions",
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}forms/controls/loader.mjs`),
+		interactionFoundationChunk(`${root}forms/controls/loader.ts`),
 		"forms",
 	);
 	assert.equal(interactionFoundationChunk("\0virtual:styles"), undefined);

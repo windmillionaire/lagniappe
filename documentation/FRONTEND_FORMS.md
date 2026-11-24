@@ -7,7 +7,7 @@ state, and reusable controls. Schema-driven forms additionally use
 
 ## FormWidget
 
-`widgets/base/formWidget.mjs` is the widget base used by PageInfo, TaskSettings,
+`widgets/base/formWidget.ts` is the widget base used by PageInfo, TaskSettings,
 CreateUser, FileInfo, and similar forms. During `init()` it captures the
 server-rendered target, creates `FormController`, renders fields, and installs local
 read/edit and clear interactions.
@@ -69,14 +69,14 @@ model task.
 
 ## FormController initialization
 
-`forms/controller.mjs`:
+`forms/controller.ts`:
 
 1. finds the submit group/button;
 2. creates the FormRenderer when a schema exists;
 3. appends extra HTML and orders Page default fields;
 4. excludes submit feedback when readonly;
 5. restores an `lp-edited-marker` displaced by rendering;
-6. initializes declared controls through `forms/controls/loader.mjs`;
+6. initializes declared controls through `forms/controls/loader.ts`;
 7. configures submit text/icon slots; and
 8. watches editable input/change/reset events for unsaved state.
 
@@ -156,22 +156,22 @@ See [FRONTEND_VIEWS_RECONCILIATION.md](FRONTEND_VIEWS_RECONCILIATION.md).
 
 | Module | Responsibility |
 | --- | --- |
-| `watcher.mjs` | `EditWatcher`: entity/marker discovery, polling subscriptions, acknowledgements, and deferred-operation coordination. |
-| `reconciler.mjs` | `EditReconciler`: focused authoritative probes, draft/queued comparisons, and revision resolution. |
-| `modals.mjs` | `FormRevisionModal` and `WholeFormRevisionModal`: field or whole-form saved/local choices. |
-| `preview.mjs` | `loadRevisionPreview()`: detached form construction through the generic widget loader, using cloned response DOM. |
+| `watcher.ts` | `EditWatcher`: entity/marker discovery, polling subscriptions, acknowledgements, and deferred-operation coordination. |
+| `reconciler.ts` | `EditReconciler`: focused authoritative probes, draft/queued comparisons, and revision resolution. |
+| `modals.ts` | `FormRevisionModal` and `WholeFormRevisionModal`: field or whole-form saved/local choices. |
+| `preview.ts` | `loadRevisionPreview()`: detached form construction through the generic widget loader, using cloned response DOM. |
 
 Views obtain the service through `ensureEditWatcher()` and retain it as
 `view.EditWatcher`. The loader awaits the shared polling coordinator and loads
 the watcher dynamically. Revision coordination stays outside Core's static
 startup closure; there is no forms barrel or shared-facade re-export.
 
-`forms/representation.mjs` provides dependency-free `compatibleField()` and
+`forms/representation.ts` provides dependency-free `compatibleField()` and
 `incompatibleSchema()` comparisons to both FormWidget and revision UI. The
 widget continues to own snapshots, local-state capture/projection, and staged
 replacement; those operations do not import revision coordination.
 
-`forms/migrationNotice.mjs` independently installs the informational notice for
+`forms/migrationNotice.ts` independently installs the informational notice for
 saved values converted, cleared or removed by a schema migration. It binds **View
 changes** in the shared review bar when present. Its dialog is read-only. The
 notice persists through closing/reloading and clears on the next ordinary save/completion.

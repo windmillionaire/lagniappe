@@ -1,5 +1,5 @@
 import { withTransition } from "../shared/transitions.ts";
-import Core from "./base/core.mjs";
+import Core from "./base/core.ts";
 
 const HOME_CHANNELS = Object.freeze({
 	HomeActivityList: "home-notes",

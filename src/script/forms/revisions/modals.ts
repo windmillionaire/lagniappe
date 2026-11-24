@@ -3,9 +3,9 @@ import { STYLES } from "../../generated/styles.mjs";
 import { Modal } from "../../shared/modal.ts";
 import { request } from "../../shared/request.ts";
 import { areEqual } from "../../shared/utilities.ts";
-import { compatibleField } from "../representation.mjs";
-import { renderReviewBar } from "../reviewBar.mjs";
-import { loadRevisionPreview } from "./preview.mjs";
+import { compatibleField } from "../representation.ts";
+import { renderReviewBar } from "../reviewBar.ts";
+import { loadRevisionPreview } from "./preview.ts";
 
 export class FormRevisionModal extends Modal {
 	constructor(

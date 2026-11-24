@@ -1,11 +1,11 @@
-import { FormController } from "../../forms/controller.mjs";
-import { installMigrationNotice } from "../../forms/migrationNotice.mjs";
-import { compatibleField } from "../../forms/representation.mjs";
+import { FormController } from "../../forms/controller.ts";
+import { installMigrationNotice } from "../../forms/migrationNotice.ts";
+import { compatibleField } from "../../forms/representation.ts";
 import {
 	currentReviewOperation,
 	installReviewBar,
 	renderReviewBar,
-} from "../../forms/reviewBar.mjs";
+} from "../../forms/reviewBar.ts";
 import { withTransition } from "../../shared/transitions.ts";
 
 export class FormWidget {

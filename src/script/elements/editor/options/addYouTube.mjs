@@ -1,4 +1,4 @@
-import { FormController } from "../../../forms/controller.mjs";
+import { FormController } from "../../../forms/controller.ts";
 import { buttons } from "../../buttons.mjs";
 import { primitives } from "../../primitives.mjs";
 

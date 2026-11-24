@@ -1,4 +1,4 @@
-import { FormController } from "../../../forms/controller.mjs";
+import { FormController } from "../../../forms/controller.ts";
 import { STYLES } from "../../../generated/styles.mjs";
 import { request } from "../../../shared/request.ts";
 import { buttons } from "../../buttons.mjs";

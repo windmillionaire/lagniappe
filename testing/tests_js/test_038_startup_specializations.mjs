@@ -305,8 +305,8 @@ test("test_report_loads_base_form_only_for_present_forms_and_in_parallel", async
 			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
-			"../../src/script/views/base/core.mjs": { default: Core },
-			"../../src/script/forms/controller.mjs": {
+			"../../src/script/views/base/core.ts": { default: Core },
+			"../../src/script/forms/controller.ts": {
 				FormController: FakeBaseForm,
 			},
 		},

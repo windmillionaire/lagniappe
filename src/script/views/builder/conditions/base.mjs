@@ -1,6 +1,6 @@
 import { SelectBox } from "../../../elements/combobox/index.mjs";
 import { primitives } from "../../../elements/primitives.mjs";
-import { FormController } from "../../../forms/controller.mjs";
+import { FormController } from "../../../forms/controller.ts";
 import { STYLES } from "../../../generated/styles.mjs";
 import { setIcon } from "../../../shared/icons.ts";
 import { withTransition } from "../../../shared/transitions.ts";

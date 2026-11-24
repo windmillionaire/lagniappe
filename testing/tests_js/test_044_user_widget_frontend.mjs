@@ -44,7 +44,7 @@ test("test_create_user_focuses_on_open_and_reset_without_stealing_live_field_foc
 			},
 			"../../src/script/elements/input.mjs": { InputElement: class {} },
 			"../../src/script/elements/radio.mjs": { RadioElement: class {} },
-			"../../src/script/widgets/base/formWidget.mjs": { FormWidget },
+			"../../src/script/widgets/base/formWidget.ts": { FormWidget },
 		},
 	);
 
@@ -175,7 +175,7 @@ test("test_group_permissions_tracks_rename_draft_after_target_rebuild", async ()
 	const { GroupPermissions } = await esmock.strict(
 		"../../src/script/widgets/userPermissions.mjs",
 		{
-			"../../src/script/widgets/base/formWidget.mjs": { FormWidget },
+			"../../src/script/widgets/base/formWidget.ts": { FormWidget },
 		},
 	);
 	const label = { textContent: "Original" };

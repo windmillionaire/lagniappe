@@ -559,7 +559,7 @@ test("test_messages_view_refreshes_read_races_and_uses_delete_modal", async (t) 
 				},
 				request,
 			},
-			"../../src/script/views/base/core.mjs": { default: Core },
+			"../../src/script/views/base/core.ts": { default: Core },
 		},
 	);
 	let pollDescriptor = null;

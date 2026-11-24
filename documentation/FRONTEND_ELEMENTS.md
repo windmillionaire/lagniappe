@@ -17,7 +17,7 @@ Form lifecycle, submit state, revision baselines, and uploads are documented in
 
 ## FormRenderer
 
-`forms/renderer.mjs` receives the schema, submission, target, and entity key.
+`forms/renderer.ts` receives the schema, submission, target, and entity key.
 `render()` creates fields through `getFormElement()`, appends them, and wires:
 
 - read/edit toggling;

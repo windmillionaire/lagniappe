@@ -48,7 +48,7 @@ eligible for normal tracking. Existing historical records are not rewritten.
 
 ## Core
 
-`views/base/core.mjs` adds components and private application services. It owns:
+`views/base/core.ts` adds components and private application services. It owns:
 
 - delegated control and `lp-show` routing;
 - lazy component creation;
@@ -193,7 +193,7 @@ instance per component. Unknown names receive `DefaultWidget`, which provides
 only visibility and configuration for simple show/hide targets.
 
 Specialized construction belongs to its consuming feature:
-`forms/revisions/preview.mjs` builds detached form comparison widgets through
+`forms/revisions/preview.ts` builds detached form comparison widgets through
 `loadWidget()`, and `elements/editor/headless.mjs` owns the headless registry and
 lazy document construction used by offline replay. The generic loader does not
 import either adapter.

@@ -1,4 +1,4 @@
-import { FormRenderer } from "../../../forms/renderer.mjs";
+import { FormRenderer } from "../../../forms/renderer.ts";
 import { areEqual, captureError, request } from "../../../shared/index.ts";
 import { withTransition } from "../../../shared/transitions.ts";
 

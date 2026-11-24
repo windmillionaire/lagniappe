@@ -1,6 +1,6 @@
 const CONTROLS = {
-	"permission-sections": () => import("./permissionSections.mjs"),
-	"access-restrictions": () => import("./accessRestrictions.mjs"),
+	"permission-sections": () => import("./permissionSections.ts"),
+	"access-restrictions": () => import("./accessRestrictions.ts"),
 };
 
 /**

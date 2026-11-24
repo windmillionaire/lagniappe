@@ -2,10 +2,10 @@ import { captureError } from "../../shared/errors.ts";
 import { request } from "../../shared/request.ts";
 import { withTransition } from "../../shared/transitions.ts";
 import { areEqual } from "../../shared/utilities.ts";
-import { incompatibleSchema } from "../representation.mjs";
-import { currentReviewOperation, renderReviewBar } from "../reviewBar.mjs";
-import { FormRevisionModal, WholeFormRevisionModal } from "./modals.mjs";
-import { loadRevisionPreview } from "./preview.mjs";
+import { incompatibleSchema } from "../representation.ts";
+import { currentReviewOperation, renderReviewBar } from "../reviewBar.ts";
+import { FormRevisionModal, WholeFormRevisionModal } from "./modals.ts";
+import { loadRevisionPreview } from "./preview.ts";
 
 const ACTION_LABELS = {
 	reset: "Reset form",

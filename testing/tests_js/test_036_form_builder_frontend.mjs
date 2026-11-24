@@ -109,7 +109,7 @@ test("test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
 	const { Header } = await esmock.strict(
 		"../../src/script/views/builder/panels/header.mjs",
 		{
-			"../../src/script/forms/renderer.mjs": { FormRenderer: class {} },
+			"../../src/script/forms/renderer.ts": { FormRenderer: class {} },
 			"../../src/script/shared/index.ts": {
 				areEqual: (a, b) => JSON.stringify(a) === JSON.stringify(b),
 				captureError() {},
@@ -381,7 +381,7 @@ async function loadFormSettings({ request }) {
 	return await esmock.strict(
 		"../../src/script/views/builder/panels/formSettings.mjs",
 		{
-			"../../src/script/forms/controller.mjs": { FormController: class {} },
+			"../../src/script/forms/controller.ts": { FormController: class {} },
 			"../../src/script/shared/index.ts": {
 				captureError() {},
 				ENDPOINTS: { createSchema: "/forms/create-schema" },

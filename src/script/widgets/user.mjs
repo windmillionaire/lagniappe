@@ -1,7 +1,7 @@
 import { FacetedSearchElement } from "../elements/facetedSearch.mjs";
 import { InputElement } from "../elements/input.mjs";
 import { RadioElement } from "../elements/radio.mjs";
-import { FormWidget } from "./base/formWidget.mjs";
+import { FormWidget } from "./base/formWidget.ts";
 
 export class CreateUser extends FormWidget {
 	init() {

@@ -112,7 +112,7 @@ async function setupEntityLayout(t) {
 			"../../src/script/shared/utilities.ts": {
 				debounce: (callback) => callback,
 			},
-			"../../src/script/views/base/core.mjs": { default: FakeCore },
+			"../../src/script/views/base/core.ts": { default: FakeCore },
 		},
 	);
 	return {

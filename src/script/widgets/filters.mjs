@@ -1,4 +1,4 @@
-import { BaseList } from "../elements/base/baseList.mjs";
+import { BaseList } from "../elements/base/baseList.ts";
 import { buttons } from "../elements/buttons.mjs";
 import { FacetsBox, SelectBox } from "../elements/combobox/index.mjs";
 import { primitives } from "../elements/primitives.mjs";

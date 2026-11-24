@@ -50,7 +50,7 @@ test("test_ai_email_address_selection_and_copy_controls", async (t) => {
 	const { CreateToolReport } = await esmock.strict(
 		"../../src/script/widgets/tools.mjs",
 		{
-			"../../src/script/elements/base/baseUpload.mjs": {
+			"../../src/script/elements/base/baseUpload.ts": {
 				BaseUpload: class {},
 			},
 			"../../src/script/elements/upload.mjs": {
@@ -102,7 +102,7 @@ test("test_create_tool_report_preserves_and_resets_auto_execute_control", async 
 	const { CreateToolReport } = await esmock.strict(
 		"../../src/script/widgets/tools.mjs",
 		{
-			"../../src/script/elements/base/baseUpload.mjs": {
+			"../../src/script/elements/base/baseUpload.ts": {
 				BaseUpload: class {
 					constructor(attributes) {
 						Object.assign(this, attributes);

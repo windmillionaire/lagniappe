@@ -350,7 +350,7 @@ test("test_site_settings_ai_submission_uses_visible_combobox_values", async (t) 
 
 test("test_renderer_visibility_requires_canonical_condition_lists", async () => {
 	const { FormRenderer } = await esmock.strict(
-		"../../src/script/forms/renderer.mjs",
+		"../../src/script/forms/renderer.ts",
 		{
 			"../../src/script/elements/loader.mjs": {
 				getFormElement: async () => null,

@@ -4,7 +4,7 @@ import { SectionToggle } from "../elements/sectionToggle.mjs";
 import { TextareaElement } from "../elements/textarea.mjs";
 import { captureError, request } from "../shared/index.ts";
 import { withTransition } from "../shared/transitions.ts";
-import { FormWidget } from "./base/formWidget.mjs";
+import { FormWidget } from "./base/formWidget.ts";
 
 export class PageForm extends FormWidget {
 	constructor(attributes) {

@@ -458,7 +458,7 @@ async function loadFormSettings({ request, FormController = class {} }) {
 	return await esmock.strict(
 		"../../src/script/views/builder/panels/formSettings.mjs",
 		{
-			"../../src/script/forms/controller.mjs": { FormController },
+			"../../src/script/forms/controller.ts": { FormController },
 			"../../src/script/shared/index.ts": {
 				captureError() {},
 				ENDPOINTS: { createSchema: "/generate" },
@@ -747,7 +747,7 @@ test("test_builder_save_restores_unsubmitted_condition_buffer", async (t) => {
 		{
 			"../../src/script/elements/combobox/index.mjs": { SelectBox: class {} },
 			"../../src/script/elements/primitives.mjs": { primitives: {} },
-			"../../src/script/forms/controller.mjs": {
+			"../../src/script/forms/controller.ts": {
 				FormController: class {
 					constructor(owner) {
 						this.owner = owner;
@@ -1008,7 +1008,7 @@ test("test_stale_generation_retry_label_survives_base_form_error_transition", as
 	replaceGlobal(t, "FormData", FormDataBoundary);
 	const transitionBoundary = (callback) => transitions.push(callback);
 	const { FormController } = await esmock.strict(
-		"../../src/script/forms/controller.mjs",
+		"../../src/script/forms/controller.ts",
 		{
 			"../../src/script/elements/primitives.mjs": { primitives: {} },
 			"../../src/script/shared/icons.ts": {
@@ -1022,10 +1022,10 @@ test("test_stale_generation_retry_label_survives_base_form_error_transition", as
 					wrapper.replaceChildren(content);
 				},
 			},
-			"../../src/script/forms/controls/loader.mjs": {
+			"../../src/script/forms/controls/loader.ts": {
 				initFormControls: async () => {},
 			},
-			"../../src/script/forms/renderer.mjs": { FormRenderer: class {} },
+			"../../src/script/forms/renderer.ts": { FormRenderer: class {} },
 		},
 	);
 	const { FormSettings } = await loadFormSettings({

@@ -24,7 +24,7 @@ async function loadTaskSettings({ FormWidget, SectionToggle = {} }) {
 		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
-		"../../src/script/widgets/base/formWidget.mjs": { FormWidget },
+		"../../src/script/widgets/base/formWidget.ts": { FormWidget },
 	});
 }
 
@@ -162,14 +162,14 @@ test("test_task_history_fill_reports_incompatible_values_and_ignores_stale_respo
 		"../../src/script/widgets/taskForm.mjs",
 		{
 			"../../src/script/elements/sections.mjs": { sections: {} },
-			"../../src/script/forms/controller.mjs": { FormController: class {} },
+			"../../src/script/forms/controller.ts": { FormController: class {} },
 			"../../src/script/shared/index.ts": {
 				captureError() {
 					throw new Error("unexpected request error");
 				},
 				request,
 			},
-			"../../src/script/widgets/base/formWidget.mjs": { FormWidget },
+			"../../src/script/widgets/base/formWidget.ts": { FormWidget },
 		},
 	);
 	const errors = [];
@@ -330,7 +330,7 @@ test("test_task_completion_replaces_closed_row_in_one_transition", async () => {
 	const { PageTaskList } = await esmock.strict(
 		"../../src/script/widgets/pageTaskList.mjs",
 		{
-			"../../src/script/elements/base/baseList.mjs": { BaseList: class {} },
+			"../../src/script/elements/base/baseList.ts": { BaseList: class {} },
 			"../../src/script/shared/transitions.ts": { withTransition },
 		},
 	);
@@ -610,13 +610,13 @@ test("test_task_settings_awaits_action_controls_and_cleans_up", async () => {
 test("test_form_response_metadata_stays_with_renderer_widget", async () => {
 	class FormController {}
 	const { FormWidget } = await esmock.strict(
-		"../../src/script/widgets/base/formWidget.mjs",
+		"../../src/script/widgets/base/formWidget.ts",
 		{
-			"../../src/script/forms/controller.mjs": { FormController },
-			"../../src/script/forms/migrationNotice.mjs": {
+			"../../src/script/forms/controller.ts": { FormController },
+			"../../src/script/forms/migrationNotice.ts": {
 				installMigrationNotice: () => null,
 			},
-			"../../src/script/forms/representation.mjs": {
+			"../../src/script/forms/representation.ts": {
 				compatibleField: () => true,
 			},
 			"../../src/script/shared/transitions.ts": {

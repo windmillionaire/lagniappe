@@ -30,7 +30,7 @@ async function loadUserSettings({
 			Modal,
 			request,
 		},
-		"../../src/script/widgets/base/formWidget.mjs": { FormWidget },
+		"../../src/script/widgets/base/formWidget.ts": { FormWidget },
 	});
 }
 

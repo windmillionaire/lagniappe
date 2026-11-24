@@ -1,7 +1,7 @@
 import { SelectBox } from "../elements/combobox/index.mjs";
 import { primitives } from "../elements/primitives.mjs";
 import { STYLES } from "../generated/styles.mjs";
-import { FormWidget } from "./base/formWidget.mjs";
+import { FormWidget } from "./base/formWidget.ts";
 
 const PUBLIC_DIRECTORY_ROOT = "__public_pages__";
 

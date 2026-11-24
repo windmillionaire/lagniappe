@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
-import { incompatibleSchema } from "../../src/script/forms/representation.mjs";
+import { incompatibleSchema } from "../../src/script/forms/representation.ts";
 
 const areEqual = (left, right) =>
 	JSON.stringify(left) === JSON.stringify(right);
@@ -28,7 +28,7 @@ async function loadEditOwners({
 	},
 } = {}) {
 	const { EditReconciler } = await esmock.strict(
-		"../../src/script/forms/revisions/reconciler.mjs",
+		"../../src/script/forms/revisions/reconciler.ts",
 		{
 			"../../src/script/shared/errors.ts": {
 				captureError,
@@ -36,23 +36,23 @@ async function loadEditOwners({
 			"../../src/script/shared/request.ts": { request },
 			"../../src/script/shared/transitions.ts": { withTransition },
 			"../../src/script/shared/utilities.ts": { areEqual },
-			"../../src/script/forms/representation.mjs": { incompatibleSchema },
-			"../../src/script/forms/revisions/modals.mjs": {
+			"../../src/script/forms/representation.ts": { incompatibleSchema },
+			"../../src/script/forms/revisions/modals.ts": {
 				FormRevisionModal: class {},
 				WholeFormRevisionModal: class {},
 			},
-			"../../src/script/forms/revisions/preview.mjs": {
+			"../../src/script/forms/revisions/preview.ts": {
 				loadRevisionPreview,
 			},
 		},
 	);
 	const { EditWatcher } = await esmock.strict(
-		"../../src/script/forms/revisions/watcher.mjs",
+		"../../src/script/forms/revisions/watcher.ts",
 		{
 			"../../src/script/shared/errors.ts": {
 				captureError,
 			},
-			"../../src/script/forms/revisions/reconciler.mjs": { EditReconciler },
+			"../../src/script/forms/revisions/reconciler.ts": { EditReconciler },
 		},
 	);
 	return { EditReconciler, EditWatcher };
@@ -80,7 +80,7 @@ test("test_base_form_tracks_unsaved_state_without_sync", async () => {
 		unsavedState: false,
 	};
 	const { FormController } = await esmock.strict(
-		"../../src/script/forms/controller.mjs",
+		"../../src/script/forms/controller.ts",
 		{
 			"../../src/script/elements/primitives.mjs": {
 				primitives: { error: () => ({}) },
@@ -90,10 +90,10 @@ test("test_base_form_tracks_unsaved_state_without_sync", async () => {
 				withTransition: (callback) => callback(),
 			},
 			"../../src/script/shared/utilities.ts": { showBriefly() {} },
-			"../../src/script/forms/controls/loader.mjs": {
+			"../../src/script/forms/controls/loader.ts": {
 				initFormControls: async () => [],
 			},
-			"../../src/script/forms/renderer.mjs": { FormRenderer: class {} },
+			"../../src/script/forms/renderer.ts": { FormRenderer: class {} },
 		},
 	);
 	const form = new FormController(widget);
@@ -136,13 +136,13 @@ test("test_form_revision_snapshot_is_canonical_and_memory_only", async () => {
 		setAttribute() {},
 	};
 	const { FormWidget } = await esmock.strict(
-		"../../src/script/widgets/base/formWidget.mjs",
+		"../../src/script/widgets/base/formWidget.ts",
 		{
-			"../../src/script/forms/controller.mjs": { FormController: class {} },
-			"../../src/script/forms/migrationNotice.mjs": {
+			"../../src/script/forms/controller.ts": { FormController: class {} },
+			"../../src/script/forms/migrationNotice.ts": {
 				installMigrationNotice() {},
 			},
-			"../../src/script/forms/representation.mjs": {
+			"../../src/script/forms/representation.ts": {
 				compatibleField: () => true,
 			},
 			"../../src/script/shared/transitions.ts": {

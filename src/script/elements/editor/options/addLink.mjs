@@ -1,5 +1,5 @@
 import { getMarkRange } from "@tiptap/core";
-import { FormController } from "../../../forms/controller.mjs";
+import { FormController } from "../../../forms/controller.ts";
 import { STYLES } from "../../../generated/styles.mjs";
 import { ENDPOINTS } from "../../../shared/endpoints.ts";
 import { request } from "../../../shared/request.ts";

@@ -1,7 +1,7 @@
 import { createIcon, setIcon } from "../shared/icons.ts";
 import { request } from "../shared/request.ts";
 import { withTransition } from "../shared/transitions.ts";
-import Core from "./base/core.mjs";
+import Core from "./base/core.ts";
 
 const REPORT_FORM_SELECTOR =
 	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='revise-report-form']";
@@ -30,7 +30,7 @@ export default class Report extends Core {
 		if (this._reportFormsReady) return Promise.resolve(this);
 		if (this._reportFormsPromise) return this._reportFormsPromise;
 
-		const pending = import("../forms/controller.mjs")
+		const pending = import("../forms/controller.ts")
 			.then(async ({ FormController }) => {
 				if (this._destroyed) return null;
 				await Promise.all([

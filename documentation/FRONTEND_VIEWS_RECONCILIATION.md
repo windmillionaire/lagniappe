@@ -24,9 +24,9 @@ routes continue to own HTML and full data.
 The watcher, reconciler, review modals, and detached preview adapter live in
 `forms/revisions/`. Core loads the watcher through `ensureEditWatcher()`;
 the other modules remain internal to that service. Pure schema compatibility
-comparisons live below them in `forms/representation.mjs`. Page/Task migration,
-remote-edit, and autofill notices share the FormWidget-owned `forms/reviewBar.mjs`;
-`forms/migrationNotice.mjs` owns the independent read-only **View changes** dialog,
+comparisons live below them in `forms/representation.ts`. Page/Task migration,
+remote-edit, and autofill notices share the FormWidget-owned `forms/reviewBar.ts`;
+`forms/migrationNotice.ts` owns the independent read-only **View changes** dialog,
 using the shared bar's action or a fallback banner for forms without review state.
 
 A server-rendered entity anchor carries `data-key`, `data-fingerprint`, and,
@@ -40,7 +40,7 @@ newest observed revision. An inactive form performs no replacement request; on
 activation it compares baselines and catches up once when stale.
 
 For a changed active form, `EditReconciler` uses
-`forms/revisions/preview.mjs::loadRevisionPreview()` to render the focused
+`forms/revisions/preview.ts::loadRevisionPreview()` to render the focused
 response in a detached preview and compares normalized submissions:
 
 - an unchanged saved baseline and schema leave the live form and draft intact;
@@ -219,7 +219,7 @@ A focused remote-form response can also carry an active operation before that
 tab observes a lock change. The reconciler registers this operation for polling
 as well as displaying it, and keeps a newer local operation status if an older
 response arrives later. A progress banner must not outlive its subscription.
-Autofill uses `forms/reviewBar.mjs` inside the existing edited marker, without
+Autofill uses `forms/reviewBar.ts` inside the existing edited marker, without
 disabling inputs or removing Submit. Only schema migration sets `deferredLock`.
 While Autofill runs, the bar shows its progress and Cancel action; the remote-edit
 message and Review values action wait until the run finishes or stops. Pending

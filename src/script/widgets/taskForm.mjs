@@ -1,7 +1,7 @@
 import { sections } from "../elements/sections.mjs";
-import { FormController } from "../forms/controller.mjs";
+import { FormController } from "../forms/controller.ts";
 import { captureError, request } from "../shared/index.ts";
-import { FormWidget } from "./base/formWidget.mjs";
+import { FormWidget } from "./base/formWidget.ts";
 
 async function renderOriginalSubmission(response, key) {
 	const host = document.createElement("div");

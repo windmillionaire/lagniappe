@@ -57,7 +57,7 @@ export const ensureSyncManager = (view) =>
 export const ensureEditWatcher = (view) =>
 	loadOnce(view, "_editWatcherPromise", "EditWatcher", async () => {
 		await ensurePollingCoordinator(view);
-		const { EditWatcher } = await import("../../forms/revisions/watcher.mjs");
+		const { EditWatcher } = await import("../../forms/revisions/watcher.ts");
 		if (view._destroyed) return null;
 		const watcher = new EditWatcher(view);
 		watcher.init();

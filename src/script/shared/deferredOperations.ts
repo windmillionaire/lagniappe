@@ -1,4 +1,4 @@
-import { renderReviewBar as renderReviewBarJs } from "../forms/reviewBar.mjs";
+import { renderReviewBar as renderReviewBarJs } from "../forms/reviewBar.ts";
 import type { DeferredOperationStatus } from "../types/api.d.ts";
 import { captureError } from "./errors.ts";
 import { createIcon } from "./icons.ts";

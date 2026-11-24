@@ -205,7 +205,7 @@ test("test_collection_manifests_include_hash_and_fingerprint", async () => {
 			"../../src/script/elements/base/baseTable.mjs": { BaseTable: Base },
 		}),
 		esmock.strict("../../src/script/widgets/pageTaskList.mjs", {
-			"../../src/script/elements/base/baseList.mjs": { BaseList: Base },
+			"../../src/script/elements/base/baseList.ts": { BaseList: Base },
 			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},

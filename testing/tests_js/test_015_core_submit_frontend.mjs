@@ -157,7 +157,7 @@ test("test_stale_online_update_opens_prepared_review", async (t) => {
 test("test_stale_autofill_start_opens_review_with_prestart_context", async (t) => {
 	const { SubmissionManager, request } = await setupSubmissionManager(t);
 	const { FormController } = await import(
-		"../../src/script/forms/controller.mjs"
+		"../../src/script/forms/controller.ts"
 	);
 	const form = document.body.appendChild(document.createElement("form"));
 	const submitGroup = form.appendChild(document.createElement("div"));

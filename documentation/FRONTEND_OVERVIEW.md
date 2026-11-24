@@ -111,7 +111,7 @@ FormController, FormRenderer, and reusable controls live in `forms/`.
 `forms/revisions/` groups the lazy EditWatcher service, its reconciler, review
 modals, and detached preview adapter. Pure representation comparisons and
 migration notices are separate sibling modules. FormWidget retains the widget
-and replacement lifecycle in `widgets/base/formWidget.mjs`.
+and replacement lifecycle in `widgets/base/formWidget.ts`.
 See [Frontend Forms](FRONTEND_FORMS.md) for ownership and service contracts.
 
 ## Frontend type checking

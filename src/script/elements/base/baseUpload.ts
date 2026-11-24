@@ -1,4 +1,4 @@
-import { FormController } from "../../forms/controller.mjs";
+import { FormController } from "../../forms/controller.ts";
 import { directUpload } from "../../shared/directUpload.ts";
 import { uploadElement } from "../upload.mjs";
 

@@ -1,7 +1,7 @@
 import { Modal } from "../../../shared/modal.ts";
 import { request } from "../../../shared/request.ts";
 import { withTransition } from "../../../shared/transitions.ts";
-import { BaseUpload } from "../../base/baseUpload.mjs";
+import { BaseUpload } from "../../base/baseUpload.ts";
 import { buttons } from "../../buttons.mjs";
 import { UploadMenu, uploadElement } from "../../upload.mjs";
 

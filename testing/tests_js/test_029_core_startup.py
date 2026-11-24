@@ -16,7 +16,7 @@ def test_page_layout_is_visible_in_server_template():
 
 def test_initial_replay_is_scheduled_after_view_readiness():
     services = Path("src/script/views/base/services.mjs").read_text()
-    core = Path("src/script/views/base/core.mjs").read_text()
+    core = Path("src/script/views/base/core.ts").read_text()
     load_body = core.split("\tasync load(component, route) {", 1)[1].split(
         "\n\t/**", 1
     )[0]

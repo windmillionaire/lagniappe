@@ -2,7 +2,7 @@ import { STYLES } from "../generated/styles.mjs";
 import { createIcon, setIcon } from "../shared/icons.ts";
 import { ENDPOINTS, request } from "../shared/index.ts";
 import { withTransition } from "../shared/transitions.ts";
-import { BaseUpload } from "./base/baseUpload.mjs";
+import { BaseUpload } from "./base/baseUpload.ts";
 import { UploadMenu, uploadElement } from "./upload.mjs";
 
 const UPLOAD_DROPZONE_TEXT =
