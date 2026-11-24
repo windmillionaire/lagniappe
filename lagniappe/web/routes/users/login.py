@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, TypedDict
 
 if TYPE_CHECKING:
     from flask.typing import ResponseReturnValue
     from lagniappe.core.entities import types as models
 
 from datetime import datetime, UTC
+import re
 import secrets
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
@@ -34,6 +35,7 @@ from lagniappe.core.tools.services import identity_platform
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
 from lagniappe.web.auth import (
     clear_login_session,
+    is_demo_guest_session,
     login_cache_invalidation_required,
     request_client_cache_invalidation,
     seed_login_session,
@@ -45,6 +47,102 @@ from . import users
 
 REMEMBER_PREFERENCE_COOKIE = "lagniappe_remember"
 AGENT_ACCESS_SCOPE = "agent-login"
+DEMO_LOGIN_SCOPE = "demo-login"
+_LOGIN_NOTICE_MAX_LENGTH = 500
+_LOGIN_NOTICE_LINK_PATTERN = re.compile(
+    r"\[([^\[\]\n]{1,120})\]\(([^()\s]{1,300})\)"
+)
+
+
+class LoginNoticeSegment(TypedDict):
+    kind: Literal["text", "link", "break"]
+    text: str
+    href: str
+    external: bool
+
+
+def _safe_notice_link(url: str) -> tuple[str, bool] | None:
+    """Allow only internal root-relative paths or explicit HTTPS URLs."""
+    candidate = url.strip()
+    if not candidate or any(ord(ch) < 32 for ch in candidate):
+        return None
+    if candidate.startswith("/"):
+        if candidate.startswith(("//", "/\\")):
+            return None
+        return candidate, False
+    parts = urlsplit(candidate)
+    if parts.scheme == "https" and parts.netloc:
+        return candidate, True
+    return None
+
+
+def parse_login_notice(raw: object) -> list[LoginNoticeSegment]:
+    """Parse an optional plain-text login notice with safe inline links."""
+    text = str(raw or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not text:
+        return []
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    if len(text) > _LOGIN_NOTICE_MAX_LENGTH:
+        text = text[:_LOGIN_NOTICE_MAX_LENGTH].rstrip()
+
+    segments: list[LoginNoticeSegment] = []
+
+    def append_plain(chunk: str) -> None:
+        if not chunk:
+            return
+        lines = chunk.split("\n")
+        for index, line in enumerate(lines):
+            if line:
+                segments.append(
+                    {"kind": "text", "text": line, "href": "", "external": False}
+                )
+            if index < len(lines) - 1:
+                segments.append(
+                    {"kind": "break", "text": "", "href": "", "external": False}
+                )
+
+    cursor = 0
+    for match in _LOGIN_NOTICE_LINK_PATTERN.finditer(text):
+        append_plain(text[cursor : match.start()])
+        label = match.group(1).strip()
+        safe = _safe_notice_link(match.group(2)) if label else None
+        if safe is not None:
+            href, external = safe
+            segments.append(
+                {
+                    "kind": "link",
+                    "text": label,
+                    "href": href,
+                    "external": external,
+                }
+            )
+        else:
+            append_plain(match.group(0))
+        cursor = match.end()
+
+    append_plain(text[cursor:])
+    return segments
+
+
+def _demo_guest_email() -> str:
+    return str(getattr(CONFIG, "DEMO_GUEST_EMAIL", "") or "").strip().casefold()
+
+
+def _demo_guest_privileged_email(email: str) -> bool:
+    owner_email = str(getattr(CONFIG, "ADMIN_EMAIL", "") or "").strip().casefold()
+    bootstrap_email = (
+        str(getattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", "") or "").strip().casefold()
+    )
+    return bool(email and email in {owner_email, bootstrap_email})
+
+
+def _demo_guest_enabled(owner_setup: bool) -> bool:
+    demo_email = _demo_guest_email()
+    return bool(
+        demo_email
+        and not owner_setup
+        and not _demo_guest_privileged_email(demo_email)
+    )
 
 
 def _login_and_seed(user, remember=False):
@@ -376,7 +474,54 @@ def login() -> ResponseReturnValue:
         owner_setup=owner_setup,
         owner_email=CONFIG.ADMIN_EMAIL if owner_setup else "",
         auth_error=auth_error,
+        demo_guest_enabled=_demo_guest_enabled(owner_setup),
+        login_notice_segments=parse_login_notice(getattr(CONFIG, "LOGIN_NOTICE", "")),
     )
+
+
+@users.route("/demo-login", methods=["POST"])
+def demo_login() -> ResponseReturnValue:
+    """Sign into the optional read-only demo guest account."""
+    demo_email = _demo_guest_email()
+    if not demo_email or _owner_requires_first_login():
+        abort(404)
+
+    wants_json = _wants_json_response()
+    limited = _enforce_auth_rate_limit(
+        DEMO_LOGIN_SCOPE, 20, 300, json_mode=wants_json
+    )
+    if limited:
+        return limited
+
+    if _demo_guest_privileged_email(demo_email):
+        exceptions.capture(
+            "Refusing demo guest login for privileged account",
+            context={"auth": {"operation": "demo_login"}},
+            level="warning",
+        )
+        abort(403, "Demo guest account is unavailable.")
+
+    exists = database_get.user(demo_email)
+    if not exists:
+        abort(403, "Demo guest account is unavailable.")
+
+    user = Entities.USER(exists)
+    if getattr(user, "is_owner", False) or getattr(user, "is_admin", False):
+        exceptions.capture(
+            "Refusing demo guest login for administrator account",
+            context={"auth": {"operation": "demo_login"}},
+            level="warning",
+        )
+        abort(403, "Demo guest account is unavailable.")
+
+    _login_and_seed(user, remember=False)
+    session[CONFIG.LOGIN_DEMO_GUEST_KEY] = True
+    record_login(user, "demo-guest")
+
+    target = _login_redirect_url()
+    if wants_json:
+        return jsonify({"success": True, "redirect": target})
+    return redirect(target, code=302)
 
 
 @users.route("/agent-login", methods=["GET", "POST"])
@@ -773,7 +918,8 @@ def _mark_logout_cache_invalidation():
 @users.route("/logout", methods=["POST"])
 def logout() -> ResponseReturnValue:
     """Log the user out and return the normal login-page redirect target."""
-    _mark_logout_cache_invalidation()
+    if not is_demo_guest_session():
+        _mark_logout_cache_invalidation()
     logout_user()
     clear_login_session()
     request_client_cache_invalidation()

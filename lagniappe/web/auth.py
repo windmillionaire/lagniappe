@@ -45,7 +45,22 @@ from lagniappe.core.tools.measurements import timed
 LOGIN_USER_KEY = CONFIG.LOGIN_USER_KEY
 LOGIN_USER_PAGE_KEY = CONFIG.LOGIN_USER_PAGE_KEY
 LOGIN_INVALIDATE_CACHE_KEY = CONFIG.LOGIN_INVALIDATE_CACHE_KEY
+LOGIN_DEMO_GUEST_KEY = CONFIG.LOGIN_DEMO_GUEST_KEY
 AUTH_SESSION_CACHE_KEYS = CONFIG.AUTH_SESSION_CACHE_KEYS
+
+
+def is_demo_guest_email(email: object) -> bool:
+    """Return True when ``email`` matches the configured read-only demo guest."""
+    configured = str(getattr(CONFIG, "DEMO_GUEST_EMAIL", "") or "").strip().casefold()
+    candidate = str(email or "").strip().casefold()
+    return bool(configured and candidate and candidate == configured)
+
+
+def is_demo_guest_session() -> bool:
+    """Return True when the active browser session belongs to the read-only demo guest."""
+    if session.get(LOGIN_DEMO_GUEST_KEY):
+        return True
+    return is_demo_guest_email(session.get("_user_id"))
 
 
 class _AuthenticationDecorator(Protocol):
@@ -181,6 +196,8 @@ def seed_login_session(user: models.User, invalidate_cache: bool = False) -> Non
 
     session[LOGIN_USER_KEY] = user.urlsafe_key
     session[LOGIN_USER_PAGE_KEY] = user.page.urlsafe_key
+    if is_demo_guest_email(getattr(user, "email", "")):
+        session[LOGIN_DEMO_GUEST_KEY] = True
     if invalidate_cache or getattr(user, "invalidate_cache", False):
         request_client_cache_invalidation(user)
 

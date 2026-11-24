@@ -47,6 +47,17 @@ def _sample_rate(value, name):
     return normalized
 
 
+def _normalize_login_notice(value: object, *, max_length: int = 500) -> str:
+    """Normalize an optional short login-page notice to bounded plain text."""
+    text = str(value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not text:
+        return ""
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    if len(text) > max_length:
+        text = text[:max_length].rstrip()
+    return text
+
+
 class Config:
     """Application configuration."""
 
@@ -72,6 +83,7 @@ class Config:
     CAPTURE_ERRORS: bool
     CONFIG_KIND: str
     CONFIG_SCHEMA_VERSION: int
+    DEMO_GUEST_EMAIL: str
     DEPLOYER_EMAIL: str
     DEPLOY_IDLE_TIMEOUT: str
     DEPLOY_INSTANCE_CLASS: str
@@ -102,6 +114,8 @@ class Config:
     IDENTITY_PLATFORM_CONFIG: dict[str, str]
     INSTALLER_EMAIL: str
     INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL: str
+    LOGIN_DEMO_GUEST_KEY: str
+    LOGIN_NOTICE: str
     MCP_NAME: str
     MCP_RESOURCE: str
     MCP_SERVICE_ACCOUNT: str
@@ -289,14 +303,22 @@ class Config:
             )
             or ""
         ).strip()
+        self.DEMO_GUEST_EMAIL = str(
+            getattr(self, "DEMO_GUEST_EMAIL", "") or ""
+        ).strip().casefold()
+        self.LOGIN_NOTICE = _normalize_login_notice(
+            getattr(self, "LOGIN_NOTICE", "")
+        )
         self.REDIS_CA_CERT = getattr(self, "REDIS_CA_CERT", None)
         self.LOGIN_USER_KEY = "_lagniappe_user_key"
         self.LOGIN_USER_PAGE_KEY = "_lagniappe_user_page_key"
         self.LOGIN_INVALIDATE_CACHE_KEY = "_lagniappe_invalidate_cache"
+        self.LOGIN_DEMO_GUEST_KEY = "_lagniappe_demo_guest"
         self.AUTH_SESSION_CACHE_KEYS = (
             self.LOGIN_USER_KEY,
             self.LOGIN_USER_PAGE_KEY,
             self.LOGIN_INVALIDATE_CACHE_KEY,
+            self.LOGIN_DEMO_GUEST_KEY,
             "restrictions",
             "belongs_to",
             "assign",

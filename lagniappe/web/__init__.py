@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from flask import Response
+    from flask.typing import ResponseReturnValue
     from lagniappe import Config
 
 from datetime import timedelta
@@ -21,13 +22,14 @@ import os
 import re
 from urllib.parse import urlsplit
 
-from flask import Flask, g, request, session
+from flask import Flask, abort, g, jsonify, request, session
 from flask_wtf.csrf import CSRFProtect
 
 from lagniappe import CONFIG
 from lagniappe.core.exceptions.request import filter_sentry_event, sanitize_sentry_event
 from lagniappe.core.tools import cache
 
+from . import auth
 from .start import initialize_app
 
 
@@ -128,6 +130,16 @@ def _client_cache_invalidation_requested():
     return invalidate
 
 
+DEMO_GUEST_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+DEMO_GUEST_ALLOWED_WRITE_ENDPOINTS = frozenset(
+    {
+        "users.logout",
+        "internal.update_session",
+        "internal.validate_user",
+    }
+)
+
+
 @app.before_request
 def clear_request_notification_state() -> None:
     """Start every request without a stale post-commit projection result."""
@@ -135,9 +147,33 @@ def clear_request_notification_state() -> None:
     cache.clear_request_owner_projection()
 
 
+@app.before_request
+def enforce_demo_guest_read_only() -> ResponseReturnValue | None:
+    """Block mutating HTTP requests while signed in as the read-only demo guest."""
+    if request.method in DEMO_GUEST_SAFE_METHODS:
+        return None
+    if not auth.is_demo_guest_session():
+        return None
+    if request.endpoint in DEMO_GUEST_ALLOWED_WRITE_ENDPOINTS:
+        return None
+
+    message = "Demo accounts are read-only."
+    wants_json = (
+        request.headers.get("X-Lagniappe-Request") == "true"
+        or request.is_json
+        or request.accept_mimetypes["application/json"]
+        > request.accept_mimetypes["text/html"]
+    )
+    if wants_json:
+        return jsonify({"success": False, "error": message}), 403
+    abort(403, message)
+
+
 @app.after_request
 def record_authenticated_site_activity(response: Response) -> Response:
     """Keep a coarse Redis activity hint without adding browser requests."""
+    if auth.is_demo_guest_session():
+        return response
     user_key = session.get(CONFIG.LOGIN_USER_KEY) if session.get("_user_id") else None
     if user_key and request.endpoint != "static":
         from lagniappe.core.tools.email.notifications import presence

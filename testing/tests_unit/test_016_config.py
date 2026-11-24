@@ -171,13 +171,17 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch, email_po
     assert module.CONFIG.SOURCE_URL == "https://example.test/default-source"
     assert module.CONFIG.AI_EMAIL_CONFIG["domain"] == "inbound.example.com"
     assert module.CONFIG.AI_EMAIL_PUBLIC == {"enabled": False, "addresses": {}}
+    assert module.CONFIG.DEMO_GUEST_EMAIL == ""
+    assert module.CONFIG.LOGIN_NOTICE == ""
     assert module.CONFIG.LOGIN_USER_KEY == "_lagniappe_user_key"
     assert module.CONFIG.LOGIN_USER_PAGE_KEY == "_lagniappe_user_page_key"
     assert module.CONFIG.LOGIN_INVALIDATE_CACHE_KEY == "_lagniappe_invalidate_cache"
+    assert module.CONFIG.LOGIN_DEMO_GUEST_KEY == "_lagniappe_demo_guest"
     assert module.CONFIG.AUTH_SESSION_CACHE_KEYS == (
         "_lagniappe_user_key",
         "_lagniappe_user_page_key",
         "_lagniappe_invalidate_cache",
+        "_lagniappe_demo_guest",
         "restrictions",
         "belongs_to",
         "assign",

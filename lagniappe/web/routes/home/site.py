@@ -43,6 +43,7 @@ from lagniappe.web import direct_uploads
 from lagniappe.web.auth import (
     authenticated_user,
     clear_client_cache_invalidation,
+    is_demo_guest_session,
     logged_in,
     owner_only,
     permission,
@@ -567,7 +568,7 @@ def update_session() -> ResponseReturnValue:
     if location is not None:
         session["location"] = json.dumps(location, separators=(",", ":"))
 
-    if save_user:
+    if save_user and not is_demo_guest_session():
         # Startup requests may hold a snapshot from before a permission edit.
         Entities.save_root(authenticated_user(), property_mask=("timezone",))
 
@@ -586,6 +587,9 @@ def validate_user() -> ResponseReturnValue:
     expected = session.get(CONFIG.LOGIN_INVALIDATE_CACHE_KEY)
     if cache_cleared and expected and revision != str(expected):
         cache_cleared = False
+    if cache_cleared and is_demo_guest_session():
+        clear_client_cache_invalidation()
+        return responses.json_response({"cacheCleared": True, "retry": False})
     if cache_cleared and current_user.invalidate_cache:
         prefix = f"user:{current_user.urlsafe_key}:"
         cache_cleared = (
