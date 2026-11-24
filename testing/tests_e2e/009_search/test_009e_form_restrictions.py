@@ -198,24 +198,29 @@ def test_restriction_worker_retries_and_continues(monkeypatch):
     received = []
     queued = []
 
-    def continue_batch(**payload):
-        received.append(payload)
+    def continue_batch(source_key, cursor=None, offset=0, revision=None, owner_keys=None):
+        received.append((source_key, cursor, offset, revision, owner_keys))
         return remaining
 
     monkeypatch.setattr(worker, "reconcile_batch", continue_batch)
     monkeypatch.setattr(worker, "enqueue", queued.append)
     response = client.post("/process/reconcile-restrictions", headers=headers, json=payload)
     assert response.status_code == 200 and response.json == {"success": True}
-    assert received == [payload]
+    assert received == [("form", None, 0, None, ["category"])]
     assert queued == [remaining]
 
-    def unavailable(**payload):
-        raise RuntimeError("Cache unavailable")
+    error = RuntimeError("Cache unavailable")
+    captured = []
+
+    def unavailable(*args, **kwargs):
+        raise error
 
     monkeypatch.setattr(worker, "reconcile_batch", unavailable)
-    monkeypatch.setattr(exceptions, "capture", lambda *args, **kwargs: None)
+    monkeypatch.setattr(exceptions, "capture", lambda exc, **kwargs: captured.append(exc))
     response = client.post("/process/reconcile-restrictions", headers=headers, json={"source_key": "form"})
     assert response.status_code == 503 and response.json == {"success": False, "retry": True}
+    assert captured == [error]
+    assert queued == [remaining]
 
 
 def test_restriction_reconciliation_visits_every_indexed_batch(monkeypatch):
