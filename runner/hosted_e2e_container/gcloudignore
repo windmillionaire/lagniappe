@@ -12,6 +12,10 @@ testing/evidence/
 testing/ai_test_cases/cases/*/artifacts/
 !/testing/ai_test_cases/.gitignore
 config/files/
+# Include the tracked offline fixture while keeping every other settings file private.
+!/testing/fixtures/offline-runtime/config/files/
+/testing/fixtures/offline-runtime/config/files/*
+!/testing/fixtures/offline-runtime/config/files/lagniappe_settings.yaml
 lagniappe.yaml
 index.yaml
 .env

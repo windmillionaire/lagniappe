@@ -1817,6 +1817,8 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         from runner.deploy import deploy as deploy_app
 
         deploy_module = importlib.import_module("runner.deploy")
+        monkeypatch.setattr(deploy_module, "GCLOUD_CLI", None)
+        monkeypatch.setattr(deploy_module, "NPM_CLI", None)
         SETTINGS.DEPLOY["handlers"] = json.loads(
             json.dumps(deployed_constants.APP_HANDLERS)
         )
@@ -1873,7 +1875,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
 
         def fake_run_command(command, **kwargs):
             commands.append((command, kwargs))
-            if command == [deploy_module.NPM_CLI, "run", "build"]:
+            if command == ["npm", "run", "build"]:
                 package_json = json.loads(
                     (app_dir / "package.json").read_text(encoding="utf-8")
                 )
@@ -1906,7 +1908,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         assert commands == [
             (
                 [
-                    deploy_module.GCLOUD_CLI,
+                    "gcloud",
                     "app",
                     "deploy",
                     str(app_dir / "index.yaml"),
@@ -1918,7 +1920,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
             ),
             (
                 [
-                    deploy_module.GCLOUD_CLI,
+                    "gcloud",
                     "app",
                     "deploy",
                     str(app_dir / "lagniappe.yaml"),
@@ -1965,12 +1967,12 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         ]
         assert commands == [
             (
-                [deploy_module.NPM_CLI, "run", "build"],
+                ["npm", "run", "build"],
                 {"check": True, "capture_output": False},
             ),
             (
                 [
-                    deploy_module.GCLOUD_CLI,
+                    "gcloud",
                     "app",
                     "deploy",
                     str(app_dir / "lagniappe.yaml"),
@@ -2010,7 +2012,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         assert commands == [
             (
                 [
-                    deploy_module.GCLOUD_CLI,
+                    "gcloud",
                     "app",
                     "deploy",
                     str(app_dir / "lagniappe.yaml"),
