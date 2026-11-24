@@ -112,6 +112,30 @@ def _local_state(root):
             if path.is_file() and path.stat().st_mode & 0o077:
                 issues.append(f"{relative}: permissions are broader than owner-only")
 
+    app_settings = documents.get("config/files/lagniappe_settings.yaml")
+    if isinstance(app_settings, Mapping):
+        from config.secrets import (
+            SecretsBackendError,
+            find_leaked_secret_keys,
+            normalize_secrets_config,
+            uses_secret_manager,
+        )
+
+        try:
+            normalize_secrets_config(app_settings)
+        except SecretsBackendError as error:
+            issues.append(f"config/files/lagniappe_settings.yaml: {error}")
+        else:
+            if uses_secret_manager(app_settings):
+                leaked = find_leaked_secret_keys(app_settings)
+                if leaked:
+                    issues.append(
+                        "config/files/lagniappe_settings.yaml: secret keys present "
+                        "on disk while SECRETS_BACKEND=secret_manager ("
+                        + ", ".join(leaked)
+                        + ")"
+                    )
+
     return documents, issues
 
 
@@ -247,12 +271,20 @@ def _default_provider_checker(settings, project):
         for value in str(services.stdout or "").splitlines()
         if value.strip()
     }
-    missing_apis = sorted(set(constants.REQUIRED_GOOGLE_CLOUD_APIS) - enabled_apis)
+    from config.secrets import uses_secret_manager
+    from installer.secrets import SECRET_MANAGER_API, probe_runtime_secrets_resource
+
+    required_apis = set(constants.REQUIRED_GOOGLE_CLOUD_APIS)
+    if uses_secret_manager(settings):
+        required_apis.add(SECRET_MANAGER_API)
+    missing_apis = sorted(required_apis - enabled_apis)
     report["required-apis"] = {
         "state": "ABSENT" if missing_apis else "AVAILABLE",
         "details": {"missing": missing_apis},
         "error": None,
     }
+    if uses_secret_manager(settings):
+        report["runtime-secrets"] = probe_runtime_secrets_resource(settings, project)
     from installer.monitoring import inspect_memory_alert
 
     report["app-engine-memory-alert"] = inspect_memory_alert(settings, project)

@@ -168,6 +168,31 @@ excludes `BUILD_ID`, and does not construct a draft. The compatible
 owner/admin access checks and live-setting recovery overlays remain in their
 route and recovery-service owners.
 
+### Runtime secrets backend (`SECRETS_BACKEND`)
+
+Installations default to `SECRETS_BACKEND: local_yaml` (preserving existing
+installations without migration) or may opt into
+`SECRETS_BACKEND: secret_manager` (`config/secrets.py`), which keeps runtime
+secrets out of `config/files/lagniappe_settings.yaml` and stores them in one
+GCP Secret Manager JSON secret (`lagniappe-runtime-secrets`, version alias
+`current`) with least-privilege `roles/secretmanager.secretAccessor` granted to
+`RUNTIME_SERVICE_ACCOUNT_EMAIL` on that secret only.
+
+- **Stored in Secret Manager when `SECRETS_BACKEND: secret_manager`:**
+  top-level `SECRET_KEY`, `GIBBERISH`, `AGENT_ACCESS_CODE`, `REDIS_PASSWORD`,
+  and `SENTRY_DSN`, plus nested `AUTH_EMAIL_CONFIG.password` and
+  `AI_EMAIL_CONFIG.resend.{webhookSecret,inboundApiKey,sendingApiKey}`.
+- **Kept in `config/files/lagniappe_settings.yaml`:** all non-secret settings
+  and non-secret sibling fields (`AUTH_EMAIL_CONFIG` host/port/sender/username,
+  `AI_EMAIL_CONFIG` domain/ids/sender, `IDENTITY_PLATFORM_CONFIG`, `SENTRY_JS_DSN`,
+  and `SECRETS_BACKEND` / `SECRETS_SECRET_NAME` / `SECRETS_VERSION`).
+- **Persistence & hydration boundary:** `SettingsDraft.save()` writes extracted
+  secrets to Secret Manager first and strips them before writing YAML while
+  keeping `SETTINGS.APP` unified in memory; `load_runtime_settings()` hydrates
+  secrets once per process startup into immutable `RuntimeSettings`.
+  `./setup.sh doctor` verifies that no runtime secrets leaked onto disk and
+  probes Secret Manager metadata and IAM without reading secret values.
+
 ## Identity and credentials
 
 Configuration names distinct responsibilities:
