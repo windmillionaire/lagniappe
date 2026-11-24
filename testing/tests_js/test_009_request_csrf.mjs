@@ -419,12 +419,14 @@ test("test_request_can_return_html_error_without_replacing_page", async (t) => {
 	const { request } = await setupRequest(t);
 	document.documentElement.dataset.mounted = "page";
 	const before = document.documentElement.innerHTML;
-	const response = await request.get("/html-error", null, {
-		replaceErrorPage: false,
-	});
-	assert.equal(response.ok, false);
-	assert.equal(response.error, "Internal Server Error");
-	assert.equal(document.documentElement.innerHTML, before);
+	for (const method of ["get", "post"]) {
+		const response = await request[method]("/html-error", null, {
+			replaceErrorPage: false,
+		});
+		assert.equal(response.ok, false, method);
+		assert.equal(response.error, "Internal Server Error", method);
+		assert.equal(document.documentElement.innerHTML, before, method);
+	}
 });
 
 test("test_application_marked_html_error_keeps_existing_behavior", async (t) => {

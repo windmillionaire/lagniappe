@@ -265,7 +265,12 @@ const refreshToken = async () => {
 const postRequest = async <T extends object = Record<never, never>>(
 	url: RequestUrl,
 	body?: RequestBody,
-	{ keepalive = false, headers = {}, signal = undefined }: PostOptions = {},
+	{
+		keepalive = false,
+		headers = {},
+		signal = undefined,
+		replaceErrorPage = true,
+	}: PostOptions = {},
 ) => {
 	return _request<T>(url, {
 		method: "POST",
@@ -273,6 +278,7 @@ const postRequest = async <T extends object = Record<never, never>>(
 		keepalive,
 		requestHeaders: headers,
 		signal,
+		replaceErrorPage,
 	});
 };
 
