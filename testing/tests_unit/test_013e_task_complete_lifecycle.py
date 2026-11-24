@@ -633,12 +633,15 @@ def test_document_history_named_versions_order_and_delete_in_bounded_batches():
 
     assert legacy.name is None
     assert legacy.pinned is False
-    assert DocumentHistory.ordered([legacy, first, automatic, second]) == [
-        second,
-        first,
-        automatic,
-        legacy,
-    ]
+    tied_pin = DocumentHistory(testing=True)
+    tied_pin.name = "Another checkpoint"
+    tied_pin.created = first.created
+    tied_automatic = DocumentHistory(testing=True)
+    tied_automatic.created = automatic.created
+    histories = [legacy, tied_pin, first, automatic, second, tied_automatic]
+    expected = [second, tied_pin, first, automatic, tied_automatic, legacy]
+    assert DocumentHistory.ordered(histories) == expected
+    assert DocumentHistory.ordered(iter(histories)) == expected
 
     deleted_batches = []
     cleared = DocumentHistory.delete_unpinned(

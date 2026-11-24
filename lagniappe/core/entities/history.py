@@ -474,20 +474,12 @@ class DocumentHistory(AssetMixin, Entity):
 
     @classmethod
     def ordered(cls, histories: Iterable[Self]) -> list[Self]:
-        def newest(history: Self) -> datetime:
-            return history.created or datetime.min.replace(tzinfo=UTC)
-
-        pinned = sorted(
-            (history for history in histories if history.pinned),
-            key=newest,
+        oldest = datetime.min.replace(tzinfo=UTC)
+        return sorted(
+            histories,
+            key=lambda history: (history.pinned, history.created or oldest),
             reverse=True,
         )
-        unpinned = sorted(
-            (history for history in histories if not history.pinned),
-            key=newest,
-            reverse=True,
-        )
-        return pinned + unpinned
 
     @classmethod
     def delete_unpinned(cls, histories: Iterable[Entity], *, batch_size: int | None = None, delete: Callable[..., object] | None = None) -> int:
