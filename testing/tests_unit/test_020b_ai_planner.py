@@ -354,3 +354,29 @@ def test_selected_response_schema_keeps_complete_action_values():
     )
     with pytest.raises(ValueError, match="Missing report response schema"):
         report_proposal_response_schema(("invented_action",))
+
+
+@pytest.mark.parametrize(
+    "can_create,uploaded,feedback,correction,expected_level",
+    [
+        (True, False, None, None, "LOW"),
+        (False, False, None, None, "LOW"),
+        (True, True, None, None, None),
+        (False, True, None, None, None),
+        (True, False, "Add another link", None, None),
+        (True, False, None, {"failed_actions": 1}, None),
+    ],
+)
+def test_report_prompt_sets_low_thinking_only_for_fresh_text_only_reports(
+    monkeypatch, can_create, uploaded, feedback, correction, expected_level
+):
+    user = _test_user("thinking-level-scope")
+    monkeypatch.setattr(
+        type(user), "access", lambda self, access: can_create or access == AI.ASK
+    )
+    files = [_test_file("receipt.pdf")] if uploaded else []
+    report = _report(user, instructions="How many ideas have we tried?", input_files=files)
+    if correction is not None:
+        report.db["correction"] = correction
+    prompt = planner.report_prompt(report, user, feedback=feedback)
+    assert prompt.thinking_level == expected_level

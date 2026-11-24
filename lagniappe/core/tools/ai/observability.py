@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextvars import Token
-from typing import TYPE_CHECKING, cast, overload
+from typing import TYPE_CHECKING, Literal, cast, overload
 
 if TYPE_CHECKING:
     from google.genai import types
@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from .prompt import Prompt
 
 from collections import Counter
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, UTC
@@ -23,6 +23,7 @@ import uuid
 if TYPE_CHECKING:
     from lagniappe.core.tools.deferred_jobs.control import DeferredExecutionControl
 
+from .constants import THINKING_LEVELS
 from lagniappe import CONFIG
 from lagniappe.core.tools.database import analytics as analytics_database
 
@@ -32,6 +33,14 @@ TELEMETRY_SCHEMA_VERSION = 1
 RETENTION_DAYS = 30
 PRUNE_LIMIT = 500
 QUERY_LIMIT = 1000
+MAX_TIMED_ROUNDS = 128
+
+type TimingComponent = Literal["provider", "tool", "progress_write", "claim_check", "telemetry_write"]
+_TIMING_COUNTS = {
+    "progress_write": "progress_writes",
+    "claim_check": "claim_checks",
+    "telemetry_write": "telemetry_writes",
+}
 
 KNOWN_TRAFFIC_TYPES = {
     "ON_DEMAND": "on_demand",
@@ -105,6 +114,15 @@ EXCLUDE_FROM_INDEXES = (
     "provider_result_chars",
     "validated_result_chars",
     "duration_ms",
+    "provider_duration_ms",
+    "tool_duration_ms",
+    "progress_write_duration_ms",
+    "claim_check_duration_ms",
+    "telemetry_write_duration_ms",
+    "progress_writes",
+    "claim_checks",
+    "telemetry_writes",
+    "round_timings",
 )
 
 
@@ -155,8 +173,28 @@ def current_execution_control() -> DeferredExecutionControl | None:
     return _EXECUTION_CONTEXT.get().execution_control
 
 
+@dataclass(kw_only=True)
+class GenerationTimings:
+    """Exclusive foreground elapsed time; counts include attempted operations."""
+
+    provider_duration_ms: int = 0
+    tool_duration_ms: int = 0
+    progress_write_duration_ms: int = 0
+    claim_check_duration_ms: int = 0
+    telemetry_write_duration_ms: int = 0
+    progress_writes: int = 0
+    claim_checks: int = 0
+    telemetry_writes: int = 0
+
+
 @dataclass
-class GenerationSummaryV1:
+class RoundTiming(GenerationTimings):
+    provider_stage: str
+    requested_tool_calls: int = 0
+
+
+@dataclass
+class GenerationSummaryV1(GenerationTimings):
     """Exact allowlist for the version-1 persisted summary contract."""
 
     correlation_id: str
@@ -174,6 +212,7 @@ class GenerationSummaryV1:
     state: str = "running"
     active_provider_stage: str = "not_started"
     resolved_model: str = "unknown"
+    requested_thinking_level: str = "unset"
     location: str = "unknown"
     model_tier: str = "primary"
     service_tier: str = "standard"
@@ -187,6 +226,7 @@ class GenerationSummaryV1:
     success: bool = False
     tool_rounds: int = 0
     calls_per_round: list[int] = field(default_factory=list)
+    round_timings: list[RoundTiming] = field(default_factory=list)
     tool_calls: int = 0
     tool_names: list[str] = field(default_factory=list)
     exact_call_cache_hits: int = 0
@@ -325,6 +365,9 @@ class GenerationObserver:
     def __init__(self, prompt: Prompt) -> None:
         self.active = enabled()
         self.started = time.monotonic()
+        self._elapsed_ns: Counter[TimingComponent] = Counter()
+        self._round_start_ns: Counter[TimingComponent] = Counter()
+        self._round: RoundTiming | None = None
         self.validation_started = False
         self.validation_fingerprint = None
         correlation_id = str(uuid.uuid4())
@@ -340,6 +383,9 @@ class GenerationObserver:
             stage=_bounded_contract(contract.get("stage")),
             prompt_contract_id=_bounded_contract(contract.get("id")),
             prompt_contract_version=max(int(contract.get("version") or 1), 1),
+            requested_thinking_level=(
+                level if (level := getattr(prompt, "thinking_level", None)) in THINKING_LEVELS else "unset"
+            ),
             deferred_job_type=_bounded_contract(execution.job_type, None),
             deferred_job_attempt=execution.attempt,
             deferred_contract_version=execution.contract_version,
@@ -374,6 +420,39 @@ class GenerationObserver:
     def reset(token: Token[GenerationObserver | None]) -> None:
         _CURRENT_OBSERVER.reset(token)
 
+    def start_round(self, stage: str) -> None:
+        """A turn starts before provider progress and includes its returned tool batch."""
+        if not self.active:
+            return
+        self._round = None
+        if len(self.summary.round_timings) < MAX_TIMED_ROUNDS:
+            self._round = RoundTiming(stage if stage in KNOWN_PROVIDER_STAGES else "initial")
+            self._round_start_ns = self._elapsed_ns.copy()
+            self.summary.round_timings.append(self._round)
+
+    @contextmanager
+    def measure(self, component: TimingComponent) -> Iterator[None]:
+        """Charge nested lease reads and progress writes independently of their caller."""
+        previous = self._elapsed_ns.total()
+        started = time.monotonic_ns()
+        try:
+            yield
+        finally:
+            elapsed = time.monotonic_ns() - started
+            nested = self._elapsed_ns.total() - previous
+            self._elapsed_ns[component] += elapsed - nested
+            total = self._elapsed_ns[component]
+            duration_field = f"{component}_duration_ms"
+            count_field = _TIMING_COUNTS.get(component)
+            setattr(self.summary, duration_field, total // 1_000_000)
+            if count_field:
+                setattr(self.summary, count_field, getattr(self.summary, count_field) + 1)
+            if self._round is not None:
+                round_ns = total - self._round_start_ns[component]
+                setattr(self._round, duration_field, round_ns // 1_000_000)
+                if count_field:
+                    setattr(self._round, count_field, getattr(self._round, count_field) + 1)
+
     def request(self, stage: str) -> None:
         if self.active:
             self.summary.provider_requests += 1
@@ -388,6 +467,8 @@ class GenerationObserver:
         if not self.active:
             return
         self.summary.provider_responses += 1
+        if self._round is not None:
+            self._round.requested_tool_calls = len(response.function_calls or ())
         self.summary.active_provider_stage = "between_requests"
         usage = getattr(response, "usage_metadata", None)
         if not usage:
@@ -494,7 +575,10 @@ class GenerationObserver:
             int((time.monotonic() - self.started) * 1000),
             0,
         )
-        self.persist(prune=False)
+        # The final snapshot includes the cost of all completed live upserts.
+        # It cannot include its own write or subsequent retention pruning.
+        with self.measure("telemetry_write"):
+            self.persist(prune=False)
 
     def persist(self, *, prune: bool = True) -> None:
         if not self.active:
@@ -515,6 +599,13 @@ class GenerationObserver:
 
 def current_observer() -> GenerationObserver | None:
     return _CURRENT_OBSERVER.get()
+
+
+def generation_timing(component: TimingComponent) -> AbstractContextManager[None]:
+    observer = current_observer()
+    if observer is not None and observer.active:
+        return observer.measure(component)
+    return nullcontext()
 
 
 def mark_outcome(value: str) -> None:

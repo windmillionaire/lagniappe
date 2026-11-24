@@ -234,13 +234,43 @@ or form-completion model call remains.
 `GenAI.cleanup()` removes citation-shaped numeric markers while preserving
 ordinary bracketed text. Add only exact provider syntax to cleanup rules.
 
+In a built-in report conversation, an entity with `same_as_tool_result`
+reuses the exact serialized record at the indicated JSON Pointer in that tool's
+numbered response (starting at 1). The hash, citation URL and available name
+stay alongside the reference. A changed schema, permission or other field
+gets its own representation. The lookup lasts for one report generation.
+Explicit edit reads, dedicated schema reads, autofill and the external tool
+contracts continue to return their ordinary results.
+
+Fresh text-only Reports (no uploaded files, not a revision, and not a
+corrective plan) request `LOW` thinking; filing requests with uploaded files,
+feedback revisions, and corrective plans leave thinking unset so the provider
+uses its default.
+
 ## Observability
 
 When `AI_OBSERVABILITY` is enabled, every text generation writes a bounded
 summary keyed by an opaque correlation ID. Allowed fields include prompt
 contract identity, model/location/tier, call and token counts, tool names and
 counts, cache/file/result sizes, validation outcome, duration, and deferred job
-type/attempt.
+type/attempt. The `requested_thinking_level` field records the explicit level
+or `unset` when the caller leaves the choice to the model.
+
+Run JSON reports exclusive foreground wall time in milliseconds. The
+`provider_duration_ms` and `tool_duration_ms` fields cover provider requests
+and local tool batches, including result serialization. Durable claim reads,
+job progress writes (including projection publication), and live telemetry
+upserts have separate durations and attempted-operation counts. A phase that
+reuses the last progress value performs only a claim check. Other generation
+work, including validation and setup, accounts for the remaining elapsed time.
+
+Each entry in `round_timings` starts at a provider turn and includes the tool
+batch it requests. The final answer turn can have zero calls. Totals cover
+every turn, with details for the first 128. The initial live snapshot precedes
+the first turn. Each snapshot includes previously completed writes, and the
+terminal record includes every live upsert. The terminal write, retention
+pruning, and background heartbeat run outside these measurements. Older run
+exports supply only the combined duration.
 
 The summary excludes prompts, model text, tool arguments/results, files,
 errors, and User/entity/report/job identifiers. Persistence is best effort and

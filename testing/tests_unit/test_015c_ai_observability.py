@@ -13,6 +13,7 @@ from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.database import analytics as analytics_database
+from lagniappe.core.tools.deferred_jobs.control import DeferredExecutionControl
 
 
 pytestmark = pytest.mark.unit
@@ -28,6 +29,15 @@ EXPECTED_SUMMARY_FIELDS = {
     "deferred_job_attempt",
     "deferred_job_type",
     "duration_ms",
+    "provider_duration_ms",
+    "tool_duration_ms",
+    "claim_check_duration_ms",
+    "progress_write_duration_ms",
+    "telemetry_write_duration_ms",
+    "claim_checks",
+    "progress_writes",
+    "telemetry_writes",
+    "round_timings",
     "empty_response_retries",
     "exact_call_cache_hits",
     "location",
@@ -42,6 +52,7 @@ EXPECTED_SUMMARY_FIELDS = {
     "provider_responses",
     "provider_result_chars",
     "resolved_model",
+    "requested_thinking_level",
     "service_tier",
     "stage",
     "state",
@@ -154,6 +165,7 @@ def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
     )
     prompt = Prompt(sentinel, user=SimpleNamespace(), type="ai report")
     prompt.enable_tools("get_file")
+    prompt.set_thinking_level("MEDIUM")
     prompt.set_model_tier("utility")
     prompt.set_service_tier("priority")
     prompt.set_output_format("JSON")
@@ -186,6 +198,7 @@ def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
     assert summary["workflow"] == "reports"
     assert summary["stage"] == "planning"
     assert summary["prompt_contract_id"] == "ai-report"
+    assert summary["requested_thinking_level"] == "MEDIUM"
     assert summary["resolved_model"] == "runtime-utility"
     assert summary["location"] == "us-central1"
     assert summary["model_tier"] == "utility"
@@ -353,6 +366,71 @@ def test_deferred_generation_overwrites_correlated_live_snapshots(monkeypatch):
     assert pruned == [True]
     assert "PRIVATE-PROMPT-CONTENT" not in json.dumps(persisted, default=str)
     assert "PRIVATE-GENERATED-RESULT" not in json.dumps(persisted, default=str)
+
+
+def test_generation_attributes_nested_control_and_live_writes_to_their_own_clocks(monkeypatch):
+    persisted, _ = _capture(monkeypatch)
+    clock_ns = 0
+
+    def spend(ms):
+        nonlocal clock_ns
+        clock_ns += ms * 1_000_000
+        return True
+
+    monkeypatch.setattr(observability, "time", SimpleNamespace(
+        monotonic=lambda: clock_ns / 1_000_000_000,
+        monotonic_ns=lambda: clock_ns,
+    ))
+
+    def write(summary):
+        persisted.append(summary.payload())
+        spend(7)
+
+    monkeypatch.setattr(observability, "_write_summary", write)
+    control = DeferredExecutionControl(
+        deadline_at=datetime.now(UTC) + timedelta(minutes=5),
+        active_check=lambda: spend(3),
+        progress_callback=lambda progress: spend(5),
+    )
+    calls = [SimpleNamespace(name="get_entity", args={"id": key}) for key in ("first", "second")]
+    responses = iter((_response(calls=calls), _response(text="done")))
+
+    class Models:
+        def generate_content(self, **kwargs):
+            control.ensure_active()
+            spend(11)
+            return next(responses)
+
+    def handler(args, user):
+        spend(13)
+        return {"found": True}
+
+    monkeypatch.setitem(ai_functions.HANDLERS, "get_entity", handler)
+    generator = ai_core.GenAI()
+    generator._client = SimpleNamespace(models=Models())
+    prompt = Prompt("measure", user=SimpleNamespace(), type="ai report").set_output_format("TEXT")
+    prompt.enable_tools("get_entity")
+    with observability.ai_execution_context(telemetry_id="timed", execution_control=control):
+        assert generator.generate_content(prompt) == "done"
+
+    summary = persisted[-1]
+    assert summary["provider_duration_ms"] == 22
+    assert summary["tool_duration_ms"] == 26
+    assert (summary["claim_checks"], summary["claim_check_duration_ms"]) == (10, 30)
+    assert (summary["progress_writes"], summary["progress_write_duration_ms"]) == (3, 15)
+    assert (summary["telemetry_writes"], summary["telemetry_write_duration_ms"]) == (6, 42)
+    assert summary["duration_ms"] == 135
+    first, final = summary["round_timings"]
+    assert first == {
+        "provider_stage": "initial", "requested_tool_calls": 2,
+        "provider_duration_ms": 11, "tool_duration_ms": 26,
+        "claim_checks": 7, "claim_check_duration_ms": 21,
+        "progress_writes": 2, "progress_write_duration_ms": 10,
+        "telemetry_writes": 3, "telemetry_write_duration_ms": 21,
+    }
+    assert final["provider_stage"] == "tool"
+    assert final["requested_tool_calls"] == final["tool_duration_ms"] == 0
+    assert final["provider_duration_ms"] == 11
 
 
 @pytest.mark.unit

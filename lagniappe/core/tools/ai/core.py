@@ -37,6 +37,7 @@ from .observability import (
     GenerationObserver,
     current_execution_control,
     current_observer,
+    generation_timing,
     mark_outcome,
 )
 
@@ -415,6 +416,18 @@ class GenAI:
             return session.request(**kwargs)
         return self.client.models.generate_content(**kwargs)
 
+    def _request_text(self, stage: str, **kwargs: Unpack[ContentRequest]) -> types.GenerateContentResponse:
+        observer = current_observer()
+        if observer is not None:
+            observer.start_round(stage)
+        control = current_execution_control()
+        if control is not None:
+            control.before_provider(stage)
+        if observer is not None:
+            observer.request(stage)
+        with generation_timing("provider"):
+            return self._request_content(**kwargs)
+
     def _generate_content_once(self, prompt: Prompt, model: str, validator=None, validation_retries: int = 0):
         """Generate text content from a Prompt, including optional tool-call loops."""
         contents = self._build_contents(prompt)
@@ -447,12 +460,8 @@ class GenAI:
         observer = current_observer()
         execution_control = current_execution_control()
         try:
-            if execution_control is not None:
-                execution_control.before_provider("initial")
-            if observer is not None:
-                observer.request("initial")
-            response = self._request_content(
-                model=model, contents=contents, config=config
+            response = self._request_text(
+                "initial", model=model, contents=contents, config=config
             )
         except Exception as e:
             if execution_control is not None:
@@ -547,6 +556,9 @@ class GenAI:
         context: dict[str, object]
         max_iterations = prompt.max_tool_iterations or MAX_TOOL_ITERATIONS
         model = model or GenAI._model_for_prompt(prompt)
+        from .report_payloads import ReportToolPayloads
+
+        report_payloads = ReportToolPayloads() if getattr(prompt, "prompt_type", None) == "ai report" else None
         tool_cache = {}
         tool_trace = []
         validation_attempts = 0
@@ -622,15 +634,17 @@ class GenAI:
 
                 try:
                     observer = current_observer()
-                    tool_responses, file_parts = execute_function_calls(
-                        response.function_calls,
-                        cast("User", prompt.user),
-                        cache=tool_cache,
-                        debug=debug_enabled(),
-                        trace=iteration_trace["calls"],
-                        max_file_parts=prompt.max_tool_file_parts_per_turn,
-                        execution_control=current_execution_control(),
-                    )
+                    with generation_timing("tool"):
+                        tool_responses, file_parts = execute_function_calls(
+                            response.function_calls,
+                            cast("User", prompt.user),
+                            cache=tool_cache,
+                            report_payloads=report_payloads,
+                            debug=debug_enabled(),
+                            trace=iteration_trace["calls"],
+                            max_file_parts=prompt.max_tool_file_parts_per_turn,
+                            execution_control=execution_control,
+                        )
                 except Exception as e:
                     execution_control = current_execution_control()
                     if execution_control is not None:
@@ -691,12 +705,8 @@ class GenAI:
 
             try:
                 execution_control = current_execution_control()
-                if execution_control is not None:
-                    execution_control.before_provider(provider_stage)
-                if observer is not None:
-                    observer.request(provider_stage)
-                response = self._request_content(
-                    model=model, contents=contents, config=config
+                response = self._request_text(
+                    provider_stage, model=model, contents=contents, config=config
                 )
             except Exception as e:
                 if execution_control is not None:
@@ -785,11 +795,8 @@ class GenAI:
         observer = current_observer()
         execution_control = current_execution_control()
         try:
-            if execution_control is not None:
-                execution_control.before_provider("structured_final")
-            if observer is not None:
-                observer.request("structured_final")
-            response = self._request_content(
+            response = self._request_text(
+                "structured_final",
                 model=model,
                 contents=final_contents,
                 config=config,

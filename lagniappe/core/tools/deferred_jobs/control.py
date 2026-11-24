@@ -5,6 +5,7 @@ from datetime import datetime
 import threading
 
 from lagniappe.core.definitions import DEFERRED_JOB_HEARTBEAT_SECONDS, DeferredJobPhase
+from lagniappe.core.tools.ai.observability import generation_timing
 
 from .common import _utc
 from .errors import (
@@ -57,7 +58,9 @@ class DeferredExecutionControl:
     def ensure_active(self) -> None:
         """Check local stop conditions and fresh durable ownership, without renewal."""
         self._check_local_state()
-        if not self._active_check():
+        with generation_timing("claim_check"):
+            active = self._active_check()
+        if not active:
             self._lost = True
             raise DeferredJobClaimLostError("Deferred job was cancelled or superseded.")
         # A database read can overlap the deadline or a heartbeat failure.
@@ -87,13 +90,14 @@ class DeferredExecutionControl:
             self.ensure_active()
             return
         self.ensure_active()
-        self._progress_callback(
-            {
-                "phase": phase,
-                **bounded,
-                "updated_at": _utc().isoformat(),
-            }
-        )
+        with generation_timing("progress_write"):
+            self._progress_callback(
+                {
+                    "phase": phase,
+                    **bounded,
+                    "updated_at": _utc().isoformat(),
+                }
+            )
         self._phase = phase
         self._details = bounded
 

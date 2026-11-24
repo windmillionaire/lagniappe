@@ -245,6 +245,8 @@ never silently discard a file.
         prompt.add_instructions(
             "Revise the entire response using the feedback. Preserve correct values and exact stored references. An answer can become a proposal and vice versa before execution."
         )
+    if not files and feedback is None and not report.db.get("correction"):
+        prompt.set_thinking_level("LOW")
     return prompt
 
 

@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Literal, Protocol, TypedDict, cast, overload
 
 if TYPE_CHECKING:
     from ...entities.user import User
+    from .report_payloads import ReportToolPayloads
     from ...properties.file_assets import FilePart
     from ..deferred_jobs.control import DeferredExecutionControl
 
@@ -312,6 +313,7 @@ def execute_function_calls(
     trace: list[dict[str, object]] | None = None,
     max_file_parts: int | None = None,
     execution_control: DeferredExecutionControl | None = None,
+    report_payloads: ReportToolPayloads | None = None,
 ) -> tuple[list[types.Part], list[FilePart]]:
     """Execute a list of function calls and return response parts.
 
@@ -385,7 +387,9 @@ def execute_function_calls(
                 result = _mark_file_parts_omitted(result)
 
         trace_record["result"] = _result_summary(result)
-        if not isinstance(result, str):
+        if report_payloads is not None:
+            result = report_payloads.encode(fc.name, result, edit=args.get("view") == "edit")
+        elif not isinstance(result, str):
             result = json.dumps(result, default=str)
         trace_record["result_chars"] = len(result)
         trace_record["file_parts"] = len(allowed_parts)

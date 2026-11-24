@@ -1,5 +1,8 @@
 """Constants for form components, input types, and supported MIME types."""
 
+THINKING_LEVELS = frozenset({"MINIMAL", "LOW", "MEDIUM", "HIGH"})
+
+
 AVAILABLE_COMPONENTS = """
 - `input`
 - `link`
