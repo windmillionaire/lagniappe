@@ -441,8 +441,13 @@ def _project_runtime_settings(app_settings, overrides, environment):
 
 def load_runtime_settings(environment: Environment | str) -> RuntimeSettings:
     """Read saved settings for one process without constructing an installer draft."""
+    from . import secrets as runtime_secrets
+
     environment = Environment(environment)
     app_settings = File.APP_SETTINGS_YAML.load()
+    if runtime_secrets.uses_secret_manager(app_settings):
+        hydrated = runtime_secrets.load_runtime_secrets(app_settings)
+        app_settings = runtime_secrets.merge_secret_settings(app_settings, hydrated)
     overrides = {}
     if environment != Environment.PRODUCTION:
         development = File.DEV_YAML.load()
@@ -455,13 +460,20 @@ def load_runtime_settings(environment: Environment | str) -> RuntimeSettings:
     return _project_runtime_settings(app_settings, overrides, environment)
 
 
-def read_saved_app_settings() -> dict[str, object]:
+def read_saved_app_settings(*, include_secrets: bool = False) -> dict[str, object]:
     """Read canonical persisted values for configuration display and recovery."""
     with open(
         File.APP_SETTINGS_YAML.value, encoding="utf-8", newline=""
     ) as stream:
         data = yaml.safe_load(stream) or {}
     data.pop("BUILD_ID", None)
+    if include_secrets:
+        from . import secrets as runtime_secrets
+
+        decoded = decode_app_settings(data)
+        if runtime_secrets.uses_secret_manager(decoded):
+            hydrated = runtime_secrets.load_runtime_secrets(decoded)
+            data = runtime_secrets.merge_secret_settings(data, hydrated)
     return data
 
 
@@ -478,9 +490,20 @@ class SettingsDraft:
     RECOVERY_MODE: bool
     _SETUP_ENABLED_GOOGLE_CLOUD_APIS: set[str]
 
-    def __init__(self) -> None:
+    def __init__(self, *, hydrate_secrets: bool = True) -> None:
+        from . import secrets as runtime_secrets
+
         self.DEPLOY = File.APP_YAML.load()
         self.APP = File.APP_SETTINGS_YAML.load()
+        if (
+            hydrate_secrets
+            and runtime_secrets.uses_secret_manager(self.APP)
+            and self.APP.get("GOOGLE_CLOUD_PROJECT")
+        ):
+            hydrated = runtime_secrets.load_runtime_secrets(self.APP)
+            merged = runtime_secrets.merge_secret_settings(self.APP, hydrated)
+            self.APP.clear()
+            self.APP.update(merged)
         self.DEV = File.DEV_YAML.load()
         self.NODE = File.PACKAGE_JSON.load()
         self.INDEX = File.INDEX_YAML.load()
@@ -492,6 +515,8 @@ class SettingsDraft:
 
     def save(self, *file_refs: File) -> tuple[str, ...]:
         """Persist only changed selected files, then commit one generation manifest."""
+        from . import secrets as runtime_secrets
+
         selected = tuple(file_refs) or GENERATION_FILES
         invalid = [
             file_ref for file_ref in selected if file_ref not in GENERATION_FILES
@@ -504,9 +529,19 @@ class SettingsDraft:
             self.DEV["dev_settings"] = self.DEV_CONFIG
             self.DEV["test_settings"] = self.TEST_CONFIG
 
+        app_document: Mapping[str, object] = self.APP
+        if File.APP_SETTINGS_YAML in selected and runtime_secrets.uses_secret_manager(
+            self.APP
+        ):
+            runtime_secrets.normalize_secrets_config(self.APP)
+            secret_payload = runtime_secrets.extract_secret_settings(self.APP)
+            if secret_payload:
+                runtime_secrets.save_runtime_secrets(self.APP, secret_payload)
+            app_document = runtime_secrets.strip_secret_settings(self.APP)
+
         documents = {
             File.APP_YAML: self.DEPLOY,
-            File.APP_SETTINGS_YAML: self.APP,
+            File.APP_SETTINGS_YAML: app_document,
             File.DEV_YAML: self.DEV,
             File.PACKAGE_JSON: self.NODE,
             File.INDEX_YAML: self.INDEX,

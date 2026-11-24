@@ -27,6 +27,7 @@ from config import (
 from config.constants import REDIS_CA_CERT_RELATIVE_PATH
 from config.recovery import validate_recovery_document
 from config.redis import redis_tls_enabled
+from config.secrets import uses_secret_manager
 from installer.config_builders import (
     build_deploy_yaml,
     build_index_yaml,
@@ -129,7 +130,7 @@ def validate_bundle(
         if (
             app["GOOGLE_CLOUD_PROJECT"] != project
             or target["PROJECT"] != project
-            or not app.get("SECRET_KEY")
+            or (not uses_secret_manager(app) and not app.get("SECRET_KEY"))
             or not target["ACCOUNT"]
             or not target["NAME"]
             or not all(

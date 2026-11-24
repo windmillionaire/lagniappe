@@ -210,8 +210,20 @@ def validate_recovery_document(settings: Mapping[str, object]) -> dict[str, obje
         normalize_app_engine_location,
         normalize_resource_region,
     )
+    from config.secrets import (
+        SecretsBackendError,
+        normalize_secrets_config,
+        uses_secret_manager,
+    )
 
     recovered = dict(settings)
+    try:
+        secrets_config = normalize_secrets_config(recovered)
+    except SecretsBackendError as error:
+        raise RecoveryConfigurationError(str(error)) from error
+    secret_manager_backend = uses_secret_manager(secrets_config)
+    if secret_manager_backend:
+        recovered.update(secrets_config)
     if recovered.get("CONFIG_KIND") != CONFIG_KIND:
         raise RecoveryConfigurationError(
             f"CONFIG_KIND must be '{CONFIG_KIND}'."
@@ -261,14 +273,16 @@ def validate_recovery_document(settings: Mapping[str, object]) -> dict[str, obje
         app_engine_location
     )
     recovered["RESOURCE_REGION"] = normalize_resource_region(resource_region)
-    for name in (
+    required_fields = [
         "APP_URL",
         "GOOGLE_LOGIN_URI",
-        "GIBBERISH",
         "APP_ENGINE_LOCATION",
         "RESOURCE_REGION",
         "OCR_LOCATION",
-    ):
+    ]
+    if not secret_manager_backend:
+        required_fields.append("GIBBERISH")
+    for name in required_fields:
         if recovered.get(name) in (None, ""):
             raise RecoveryConfigurationError(f"{name} is required for recovery.")
 
@@ -344,7 +358,7 @@ def validate_recovery_document(settings: Mapping[str, object]) -> dict[str, obje
         and 1 <= normalized_auth_email["port"] <= 65535
         and normalized_auth_email["security"] in {"starttls", "ssl"}
         and normalized_auth_email["username"]
-        and normalized_auth_email["password"]
+        and (secret_manager_backend or normalized_auth_email["password"])
         and re.fullmatch(
             r"[^@\s]+@[^@\s]+\.[^@\s]+",
             normalized_auth_email["senderEmail"],
@@ -355,6 +369,8 @@ def validate_recovery_document(settings: Mapping[str, object]) -> dict[str, obje
             "AUTH_EMAIL_CONFIG must contain a complete encrypted SMTP "
             "configuration, verified sender address, and sender name."
         )
+    if secret_manager_backend and not normalized_auth_email["password"]:
+        normalized_auth_email.pop("password", None)
     recovered["AUTH_EMAIL_CONFIG"] = normalized_auth_email
 
     from config.experiments import normalize_experiments_config
@@ -375,14 +391,36 @@ def validate_recovery_document(settings: Mapping[str, object]) -> dict[str, obje
 
     ai_email_value = recovered.get("AI_EMAIL_CONFIG")
     if ai_email_value not in (None, ""):
-        try:
-            recovered["AI_EMAIL_CONFIG"] = normalize_ai_email_config(
-                _mapping(ai_email_value, "AI_EMAIL_CONFIG")
-            )
-        except AIEmailConfigurationError as error:
-            raise RecoveryConfigurationError(
-                f"AI_EMAIL_CONFIG is invalid: {error}"
-            ) from error
+        ai_email_mapping = _mapping(ai_email_value, "AI_EMAIL_CONFIG")
+        if secret_manager_backend and ai_email_mapping.get("enabled"):
+            # Secret Resend keys live in Secret Manager rather than disk YAML.
+            resend_raw = ai_email_mapping.get("resend")
+            if isinstance(resend_raw, Mapping):
+                validation_copy = dict(ai_email_mapping)
+                validation_resend = dict(resend_raw)
+                for key in ("webhookSecret", "inboundApiKey", "sendingApiKey"):
+                    validation_resend.setdefault(key, f"secret-manager-managed-{key}")
+                validation_copy["resend"] = validation_resend
+                try:
+                    normalize_ai_email_config(validation_copy)
+                except AIEmailConfigurationError as error:
+                    raise RecoveryConfigurationError(
+                        f"AI_EMAIL_CONFIG is invalid: {error}"
+                    ) from error
+                recovered["AI_EMAIL_CONFIG"] = ai_email_mapping
+            else:
+                raise RecoveryConfigurationError(
+                    "AI_EMAIL_CONFIG is invalid: AI_EMAIL_CONFIG.resend must be a mapping."
+                )
+        else:
+            try:
+                recovered["AI_EMAIL_CONFIG"] = normalize_ai_email_config(
+                    ai_email_mapping
+                )
+            except AIEmailConfigurationError as error:
+                raise RecoveryConfigurationError(
+                    f"AI_EMAIL_CONFIG is invalid: {error}"
+                ) from error
 
     app_hostname = _hostname(recovered.get("APP_URL"), "APP_URL")
     if not (
@@ -413,10 +451,12 @@ def validate_recovery_document(settings: Mapping[str, object]) -> dict[str, obje
         "OCR_PROCESSOR_ID",
         project_id,
     )
-    redis_values = {
-        name: recovered.get(name)
-        for name in ("REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD")
-    }
+    redis_required = (
+        ("REDIS_HOST", "REDIS_PORT")
+        if secret_manager_backend
+        else ("REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD")
+    )
+    redis_values = {name: recovered.get(name) for name in redis_required}
     if any(value not in (None, "") for value in redis_values.values()) and not all(
         value not in (None, "") for value in redis_values.values()
     ):
