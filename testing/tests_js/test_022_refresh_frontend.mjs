@@ -340,7 +340,7 @@ async function deltaTable(t, html) {
 	const table = Object.create(IndexTable.prototype);
 	Object.assign(table, {
 		target,
-		view: { mobile: false, addFlash: (...rows) => flashed.push(...rows) },
+		view: { mobile: false, addFlash: (row) => flashed.push(row) },
 		component: {
 			widgets: {
 				TableEditor: {
@@ -397,6 +397,21 @@ test("test_index_delta_preserves_unchanged_rows_and_focus", async (t) => {
 		observer.takeRecords(),
 		[],
 		"An unchanged order must not detach rows",
+	);
+});
+
+test("test_index_delta_flashes_each_new_row", async (t) => {
+	const { table, flashed } = await deltaTable(t, "");
+	table.refreshDelta({
+		upsert: [
+			{ key: "a", html: '<tr lp-entity data-key="a"><td>Alpha</td></tr>' },
+			{ key: "b", html: '<tr lp-entity data-key="b"><td>Bravo</td></tr>' },
+		],
+		order: ["a", "b"],
+	});
+	assert.deepEqual(
+		flashed.map((row) => row.dataset.key),
+		["a", "b"],
 	);
 });
 

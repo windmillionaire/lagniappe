@@ -123,7 +123,7 @@ export class IndexTable extends BaseTable {
 				}
 			}
 		}
-		if (added.length) this.view.addFlash(...added);
+		for (const row of added) this.view.addFlash(row);
 
 		let empty = this.target.querySelector("tr[data-role='empty']");
 		if (!order.length && !empty && delta.empty) {
@@ -166,7 +166,7 @@ export class IndexTable extends BaseTable {
 			const anchor = this.target.querySelector("tr[lp-entity]");
 			if (anchor) anchor.before(...prepend);
 			else this.target.append(...prepend);
-			this.view.addFlash(...prepend);
+			for (const row of prepend) this.view.addFlash(row);
 		}
 
 		if (!this.prefetched) {
@@ -198,7 +198,7 @@ export class IndexTable extends BaseTable {
 
 		if (this._created.length > 0) {
 			target.prepend(...this._created);
-			this.view.addFlash(...this._created);
+			for (const row of this._created) this.view.addFlash(row);
 			this._created = [];
 			rowsChanged = true;
 
