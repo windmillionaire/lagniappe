@@ -3,7 +3,7 @@ import { UploadMenu, uploadElement } from "../../elements/upload.mjs";
 import { setIcon } from "../../shared/icons.ts";
 import { request } from "../../shared/index.ts";
 import { withTransition } from "../../shared/transitions.ts";
-import { SiteSetting } from "./base.mjs";
+import { SiteSetting } from "./base.ts";
 
 const SPLASH_PREFIX = "splash-";
 

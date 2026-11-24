@@ -1,5 +1,5 @@
 import { setIcon } from "../../shared/icons.ts";
-import { SiteSetting } from "./base.mjs";
+import { SiteSetting } from "./base.ts";
 
 export class SiteServiceProviders extends SiteSetting {
 	updated(response) {

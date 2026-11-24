@@ -1,6 +1,6 @@
-import { FacetsBox } from "../../elements/combobox/index.mjs";
+import { FacetsBox } from "../../elements/combobox/index.ts";
 import { Modal, request } from "../../shared/index.ts";
-import { SiteSetting } from "./base.mjs";
+import { SiteSetting } from "./base.ts";
 
 /**
  * Renders the primary Owner and additional-Administrator roster.

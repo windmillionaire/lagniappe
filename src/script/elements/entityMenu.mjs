@@ -1,5 +1,5 @@
 import { STYLES } from "../generated/styles.mjs";
-import { Dropdown } from "./combobox/dropdown.mjs";
+import { Dropdown } from "./combobox/dropdown.ts";
 
 /**
  * Adapts template-defined entity actions to the shared Dropdown primitive.

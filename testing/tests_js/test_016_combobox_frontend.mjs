@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
-import { Submitter } from "../../src/script/elements/combobox/submitter.mjs";
+import { Submitter } from "../../src/script/elements/combobox/submitter.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 function replace(t, target, name, value) {
@@ -94,7 +94,7 @@ async function setupFloating(t) {
 	const offset = (value) => ({ name: "offset", value });
 	const shift = (options) => ({ name: "shift", options });
 	const { Combobox } = await esmock.strict(
-		"../../src/script/elements/combobox/combobox.mjs",
+		"../../src/script/elements/combobox/combobox.ts",
 		{
 			"@floating-ui/dom": {
 				autoUpdate,
@@ -106,9 +106,9 @@ async function setupFloating(t) {
 		},
 	);
 	const { Dropdown } = await esmock.strict(
-		"../../src/script/elements/combobox/dropdown.mjs",
+		"../../src/script/elements/combobox/dropdown.ts",
 		{
-			"../../src/script/elements/combobox/combobox.mjs": { Combobox },
+			"../../src/script/elements/combobox/combobox.ts": { Combobox },
 		},
 	);
 	return {
@@ -128,7 +128,7 @@ test("test_location_combobox_starts_location_sync_on_init", async (t) => {
 	});
 	const updateUserLocation = t.mock.fn(async () => true);
 	const { LocationBox } = await esmock.strict(
-		"../../src/script/elements/combobox/location.mjs",
+		"../../src/script/elements/combobox/location.ts",
 		{
 			"../../src/script/shared/user.ts": { updateUserLocation },
 		},
@@ -163,7 +163,7 @@ test("test_location_combobox_waits_for_session_sync_before_search", async (t) =>
 		return { ok: false };
 	});
 	const { LocationBox } = await esmock.strict(
-		"../../src/script/elements/combobox/location.mjs",
+		"../../src/script/elements/combobox/location.ts",
 		{
 			"../../src/script/shared/request.ts": { request: { get } },
 			"../../src/script/shared/user.ts": { updateUserLocation },
@@ -660,7 +660,7 @@ test("test_entity_title_menu_anchors_to_the_title_bottom_left", async (t) => {
 	const { EntityMenu } = await esmock.strict(
 		"../../src/script/elements/entityMenu.mjs",
 		{
-			"../../src/script/elements/combobox/dropdown.mjs": {
+			"../../src/script/elements/combobox/dropdown.ts": {
 				Dropdown: FakeDropdown,
 			},
 		},

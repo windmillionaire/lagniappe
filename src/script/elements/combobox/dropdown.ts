@@ -1,6 +1,6 @@
 import { STYLES } from "../../generated/styles.mjs";
 import { setIcon } from "../../shared/icons.ts";
-import { Combobox } from "./combobox.mjs";
+import { Combobox } from "./combobox.ts";
 
 export class Dropdown extends Combobox {
 	init(menu) {

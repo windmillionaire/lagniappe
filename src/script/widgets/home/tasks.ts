@@ -1,5 +1,5 @@
 import { BaseList } from "../../elements/base/baseList.ts";
-import { Dropdown } from "../../elements/combobox/index.mjs";
+import { Dropdown } from "../../elements/combobox/index.ts";
 import { STYLES } from "../../generated/styles.mjs";
 import { setIcon } from "../../shared/icons.ts";
 import { request } from "../../shared/index.ts";

@@ -1,8 +1,8 @@
 import { ENDPOINTS } from "../../shared/endpoints.ts";
 import { request } from "../../shared/request.ts";
-import { RemoteQueryCombobox } from "./remote.mjs";
-import { Results } from "./results.mjs";
-import { Submitter } from "./submitter.mjs";
+import { RemoteQueryCombobox } from "./remote.ts";
+import { Results } from "./results.ts";
+import { Submitter } from "./submitter.ts";
 
 export class FacetsBox extends Submitter(RemoteQueryCombobox) {
 	constructor(element, args = {}) {

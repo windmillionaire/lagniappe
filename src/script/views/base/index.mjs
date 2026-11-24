@@ -190,7 +190,7 @@ export default class EntityIndex extends Core {
 		const trigger = this.elt.querySelector("[data-role='tools-dropdown']");
 		if (!trigger) return;
 		this._dropdownPromise = Promise.all([
-			import("../../elements/combobox/dropdown.mjs"),
+			import("../../elements/combobox/dropdown.ts"),
 			import("../../generated/styles.mjs"),
 		])
 			.then(([{ Dropdown }, { STYLES }]) => {

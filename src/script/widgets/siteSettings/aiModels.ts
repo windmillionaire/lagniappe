@@ -1,8 +1,8 @@
 import { buttons } from "../../elements/buttons.mjs";
-import { SelectBox } from "../../elements/combobox/index.mjs";
+import { SelectBox } from "../../elements/combobox/index.ts";
 import { request } from "../../shared/index.ts";
 import { withTransition } from "../../shared/transitions.ts";
-import { SiteSetting } from "./base.mjs";
+import { SiteSetting } from "./base.ts";
 
 export class SiteAiModels extends SiteSetting {
 	constructor(attributes) {

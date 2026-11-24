@@ -121,7 +121,7 @@ export default class ShellView {
 		return this._loadShellManager("_searchPromise", "SearchBox", async () => {
 			const search = document.querySelector("[lp-search]");
 			if (!search) return null;
-			const { SearchBox } = await import("../../elements/combobox/search.mjs");
+			const { SearchBox } = await import("../../elements/combobox/search.ts");
 			if (this._destroyed) return null;
 			const box = new SearchBox(search);
 			await box.init();

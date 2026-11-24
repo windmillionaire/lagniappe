@@ -1,4 +1,4 @@
-import { SelectBox } from "../../../elements/combobox/index.mjs";
+import { SelectBox } from "../../../elements/combobox/index.ts";
 import { primitives } from "../../../elements/primitives.mjs";
 import { generateElementId } from "../../../shared/utilities.ts";
 import { CONFIG } from "../config.mjs";

@@ -4,8 +4,8 @@ import { STYLES } from "../../../generated/styles.mjs";
 import { ENDPOINTS } from "../../../shared/endpoints.ts";
 import { request } from "../../../shared/request.ts";
 import { buttons } from "../../buttons.mjs";
-import { RemoteQueryCombobox } from "../../combobox/remote.mjs";
-import { Results } from "../../combobox/results.mjs";
+import { RemoteQueryCombobox } from "../../combobox/remote.ts";
+import { Results } from "../../combobox/results.ts";
 import { primitives } from "../../primitives.mjs";
 import { normalizeLinkAttributes } from "../extensions/linkAttributes.mjs";
 

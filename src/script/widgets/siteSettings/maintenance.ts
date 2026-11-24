@@ -3,7 +3,7 @@ import { STYLES } from "../../generated/styles.mjs";
 import { Modal, request } from "../../shared/index.ts";
 import { clearRecentSearchResults } from "../../shared/storage.ts";
 import { withTransition } from "../../shared/transitions.ts";
-import { SiteSetting } from "./base.mjs";
+import { SiteSetting } from "./base.ts";
 
 export class SiteMaintenance extends SiteSetting {
 	constructor(attributes) {

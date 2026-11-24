@@ -3,7 +3,7 @@ import { ENDPOINTS } from "../../shared/endpoints.ts";
 import { setIcon } from "../../shared/icons.ts";
 import { request } from "../../shared/request.ts";
 import { updateUserLocation } from "../../shared/user.ts";
-import { RemoteQueryCombobox } from "./remote.mjs";
+import { RemoteQueryCombobox } from "./remote.ts";
 
 export class LocationBox extends RemoteQueryCombobox {
 	constructor(element, { name = null, onSelect = null } = {}) {

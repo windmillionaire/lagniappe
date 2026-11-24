@@ -1,7 +1,7 @@
 import { captureError } from "../../shared/errors.ts";
 import { QueryLifecycle } from "../../shared/queryLifecycle.ts";
 import { debounce } from "../../shared/utilities.ts";
-import { Combobox } from "./combobox.mjs";
+import { Combobox } from "./combobox.ts";
 
 /**
  * Shared input, cancellation, publication, and teardown lifecycle for remote

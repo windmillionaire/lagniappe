@@ -1,7 +1,7 @@
 import { STYLES } from "../generated/styles.mjs";
 import { areEqual } from "../shared/utilities.ts";
 import { BaseElement } from "./base/baseElement.mjs";
-import { FacetsBox } from "./combobox/index.mjs";
+import { FacetsBox } from "./combobox/index.ts";
 import { formatting } from "./formatting.mjs";
 import { primitives } from "./primitives.mjs";
 

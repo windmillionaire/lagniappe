@@ -74,7 +74,7 @@ export default class Manual extends ShellView {
 		const mobileNavButton = this.elt.querySelector("#manual-nav-button");
 		if (!mobileNavButton) return null;
 
-		this._mobileDropdownPromise = import("../elements/combobox/dropdown.mjs")
+		this._mobileDropdownPromise = import("../elements/combobox/dropdown.ts")
 			.then(({ Dropdown }) => {
 				if (this._destroyed || !this.mobile) return null;
 				const menu = {

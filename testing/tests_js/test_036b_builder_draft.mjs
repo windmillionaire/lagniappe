@@ -411,7 +411,7 @@ test("test_builder_option_and_column_labels_keep_ids", async () => {
 		"../../src/script/views/builder/conditions/columns.mjs",
 		{
 			...boundaries,
-			"../../src/script/elements/combobox/index.mjs": { SelectBox: class {} },
+			"../../src/script/elements/combobox/index.ts": { SelectBox: class {} },
 			"../../src/script/views/builder/config.mjs": { CONFIG: {} },
 			"../../src/script/views/builder/migrations.mjs": {
 				fieldKind: () => null,
@@ -624,7 +624,7 @@ async function loadBuilder({
 	connectivity = { hidden: false, online: true },
 } = {}) {
 	return await esmock.strict("../../src/script/views/builder/builder.mjs", {
-		"../../src/script/elements/combobox/search.mjs": {
+		"../../src/script/elements/combobox/search.ts": {
 			SearchBox: emptyClass(),
 		},
 		"../../src/script/elements/entityMenu.mjs": { EntityMenu: emptyClass() },
@@ -745,7 +745,7 @@ test("test_builder_save_restores_unsubmitted_condition_buffer", async (t) => {
 	const { Condition } = await esmock.strict(
 		"../../src/script/views/builder/conditions/base.mjs",
 		{
-			"../../src/script/elements/combobox/index.mjs": { SelectBox: class {} },
+			"../../src/script/elements/combobox/index.ts": { SelectBox: class {} },
 			"../../src/script/elements/primitives.mjs": { primitives: {} },
 			"../../src/script/forms/controller.ts": {
 				FormController: class {
@@ -1219,7 +1219,7 @@ test("test_saved_controls_refresh_without_replacing_draft_inputs", async (t) => 
 	const { default: Columns } = await esmock.strict(
 		"../../src/script/views/builder/conditions/columns.mjs",
 		{
-			"../../src/script/elements/combobox/index.mjs": { SelectBox: class {} },
+			"../../src/script/elements/combobox/index.ts": { SelectBox: class {} },
 			"../../src/script/elements/primitives.mjs": { primitives: {} },
 			"../../src/script/shared/utilities.ts": {
 				generateElementId: () => "column-1",

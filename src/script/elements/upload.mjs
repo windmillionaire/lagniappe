@@ -1,7 +1,7 @@
 import { STYLES } from "../generated/styles.mjs";
 import { createIcon } from "../shared/icons.ts";
 import { buttons } from "./buttons.mjs";
-import { Dropdown } from "./combobox/dropdown.mjs";
+import { Dropdown } from "./combobox/dropdown.ts";
 import { primitives } from "./primitives.mjs";
 
 const DEFAULT_DROPZONE_TEXT =

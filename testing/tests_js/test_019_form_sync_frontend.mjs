@@ -22,14 +22,14 @@ class EmptySelectBox {}
 
 test("test_site_deployment_caps_workers_only_for_f2_and_b2", async () => {
 	const { SiteDeployment } = await esmock.strict(
-		"../../src/script/widgets/siteSettings/deployment.mjs",
+		"../../src/script/widgets/siteSettings/deployment.ts",
 		{
 			"../../src/script/elements/buttons.mjs": { buttons: emptyButtons },
-			"../../src/script/elements/combobox/index.mjs": {
+			"../../src/script/elements/combobox/index.ts": {
 				SelectBox: EmptySelectBox,
 			},
 			"../../src/script/shared/index.ts": { request: emptyRequest },
-			"../../src/script/widgets/siteSettings/base.mjs": {
+			"../../src/script/widgets/siteSettings/base.ts": {
 				SiteSetting: EmptySiteSetting,
 			},
 		},
@@ -226,17 +226,17 @@ test("test_site_settings_coordinates_section_widgets", async (t) => {
 
 async function loadAiModels() {
 	return await esmock.strict(
-		"../../src/script/widgets/siteSettings/aiModels.mjs",
+		"../../src/script/widgets/siteSettings/aiModels.ts",
 		{
 			"../../src/script/elements/buttons.mjs": { buttons: emptyButtons },
-			"../../src/script/elements/combobox/index.mjs": {
+			"../../src/script/elements/combobox/index.ts": {
 				SelectBox: EmptySelectBox,
 			},
 			"../../src/script/shared/index.ts": { request: emptyRequest },
 			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => await callback(),
 			},
-			"../../src/script/widgets/siteSettings/base.mjs": {
+			"../../src/script/widgets/siteSettings/base.ts": {
 				SiteSetting: EmptySiteSetting,
 			},
 		},
@@ -580,7 +580,7 @@ async function loadMaintenance({
 	clear = () => {},
 } = {}) {
 	return await esmock.strict(
-		"../../src/script/widgets/siteSettings/maintenance.mjs",
+		"../../src/script/widgets/siteSettings/maintenance.ts",
 		{
 			"../../src/script/elements/buttons.mjs": { buttons },
 			"../../src/script/generated/styles.mjs": { STYLES: maintenanceStyles },
@@ -591,7 +591,7 @@ async function loadMaintenance({
 			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => await callback(),
 			},
-			"../../src/script/widgets/siteSettings/base.mjs": {
+			"../../src/script/widgets/siteSettings/base.ts": {
 				SiteSetting: EmptySiteSetting,
 			},
 		},

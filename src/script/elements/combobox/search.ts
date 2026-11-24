@@ -1,8 +1,8 @@
 import { STYLES } from "../../generated/styles.mjs";
 import { ENDPOINTS } from "../../shared/endpoints.ts";
 import { request } from "../../shared/request.ts";
-import { RemoteQueryCombobox } from "./remote.mjs";
-import { Results } from "./results.mjs";
+import { RemoteQueryCombobox } from "./remote.ts";
+import { Results } from "./results.ts";
 
 export class SearchBox extends RemoteQueryCombobox {
 	constructor(element) {

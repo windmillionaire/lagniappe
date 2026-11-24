@@ -9,7 +9,7 @@ Related Files:
         - lagniappe/web/routes/categories/main.py: Category routes
         - lagniappe/web/templates/home/categories.html: Category component template
         - lagniappe/web/templates/categories/: Category page templates
-        - src/script/widgets/home/lists.mjs: HomeCategoryList widget
+        - src/script/widgets/home/lists.ts: HomeCategoryList widget
         - src/script/views/home.mjs: Category initialization
 
     Core Entity:

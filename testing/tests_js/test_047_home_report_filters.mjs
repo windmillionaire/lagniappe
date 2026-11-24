@@ -19,7 +19,7 @@ function replaceGlobal(t, name, value) {
 async function loadToolReportList() {
 	let stored = null;
 	const { ToolReportList } = await esmock.strict(
-		"../../src/script/widgets/home/lists.mjs",
+		"../../src/script/widgets/home/lists.ts",
 		{
 			"../../src/script/shared/storage.ts": {
 				localStore: {

@@ -1,6 +1,6 @@
-import { Combobox } from "./combobox.mjs";
-import { Results } from "./results.mjs";
-import { Submitter } from "./submitter.mjs";
+import { Combobox } from "./combobox.ts";
+import { Results } from "./results.ts";
+import { Submitter } from "./submitter.ts";
 
 export class SelectBox extends Submitter(Combobox) {
 	constructor(element) {

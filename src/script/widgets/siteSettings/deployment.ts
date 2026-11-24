@@ -1,7 +1,7 @@
 import { buttons } from "../../elements/buttons.mjs";
-import { SelectBox } from "../../elements/combobox/index.mjs";
+import { SelectBox } from "../../elements/combobox/index.ts";
 import { request } from "../../shared/index.ts";
-import { SiteSetting } from "./base.mjs";
+import { SiteSetting } from "./base.ts";
 
 const INSTANCE_CLASSES = {
 	automatic: ["F1", "F2", "F4", "F4_1G"],

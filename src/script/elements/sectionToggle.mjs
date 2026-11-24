@@ -1,7 +1,7 @@
 import { STYLES } from "../generated/styles.mjs";
 import { iconDefinition, setIcon } from "../shared/icons.ts";
 import { withTransition } from "../shared/transitions.ts";
-import { FacetsBox } from "./combobox/facets.mjs";
+import { FacetsBox } from "./combobox/facets.ts";
 import { DueDate } from "./dueDate.mjs";
 import { formatting } from "./formatting.mjs";
 import { TaskUpload } from "./taskUpload.mjs";

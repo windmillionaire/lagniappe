@@ -230,7 +230,7 @@ export default class Messages extends Core {
 			return this.conversationDropdown || this._conversationDropdownPromise;
 		}
 		this._conversationDropdownPromise = import(
-			"../elements/combobox/dropdown.mjs"
+			"../elements/combobox/dropdown.ts"
 		)
 			.then(({ Dropdown }) => {
 				if (this._destroyed || !this.mobile) return null;
