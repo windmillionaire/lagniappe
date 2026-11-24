@@ -52,7 +52,7 @@ integrations or the sanitizer.
 
 ## View registry
 
-`src/script/viewRegistry.mjs` maps `data-kind` values to lazy-loaded view
+`src/script/viewRegistry.ts` maps `data-kind` values to lazy-loaded view
 modules:
 
 ```

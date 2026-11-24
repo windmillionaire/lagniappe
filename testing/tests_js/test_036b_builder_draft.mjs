@@ -3,7 +3,7 @@ import { webcrypto } from "node:crypto";
 import { test } from "node:test";
 import esmock from "esmock";
 
-import { BuilderDraft } from "../../src/script/views/builder/draft.mjs";
+import { BuilderDraft } from "../../src/script/views/builder/draft.ts";
 
 function replaceGlobal(t, name, value) {
 	const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
@@ -397,23 +397,23 @@ test("test_builder_option_and_column_labels_keep_ids", async () => {
 	let nextId = 0;
 	class Condition {}
 	const boundaries = {
-		"../../src/script/elements/primitives.mjs": { primitives: {} },
+		"../../src/script/elements/primitives.ts": { primitives: {} },
 		"../../src/script/shared/utilities.ts": {
 			generateElementId: (prefix) => `${prefix}-${++nextId}`,
 		},
-		"../../src/script/views/builder/conditions/base.mjs": { Condition },
+		"../../src/script/views/builder/conditions/base.ts": { Condition },
 	};
 	const { default: Options } = await esmock.strict(
-		"../../src/script/views/builder/conditions/options.mjs",
+		"../../src/script/views/builder/conditions/options.ts",
 		boundaries,
 	);
 	const { default: Columns } = await esmock.strict(
-		"../../src/script/views/builder/conditions/columns.mjs",
+		"../../src/script/views/builder/conditions/columns.ts",
 		{
 			...boundaries,
 			"../../src/script/elements/combobox/index.ts": { SelectBox: class {} },
-			"../../src/script/views/builder/config.mjs": { CONFIG: {} },
-			"../../src/script/views/builder/migrations.mjs": {
+			"../../src/script/views/builder/config.ts": { CONFIG: {} },
+			"../../src/script/views/builder/migrations.ts": {
 				fieldKind: () => null,
 			},
 		},
@@ -456,7 +456,7 @@ test("test_builder_option_and_column_labels_keep_ids", async () => {
 
 async function loadFormSettings({ request, FormController = class {} }) {
 	return await esmock.strict(
-		"../../src/script/views/builder/panels/formSettings.mjs",
+		"../../src/script/views/builder/panels/formSettings.ts",
 		{
 			"../../src/script/forms/controller.ts": { FormController },
 			"../../src/script/shared/index.ts": {
@@ -489,7 +489,7 @@ test("test_builder_generation_rejects_stale_cancelled_and_destroyed_responses", 
 		},
 	});
 	const { ConditionPanel } = await esmock.strict(
-		"../../src/script/views/builder/panels/condition.mjs",
+		"../../src/script/views/builder/panels/condition.ts",
 		{
 			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
@@ -623,11 +623,11 @@ function emptyClass() {
 async function loadBuilder({
 	connectivity = { hidden: false, online: true },
 } = {}) {
-	return await esmock.strict("../../src/script/views/builder/builder.mjs", {
+	return await esmock.strict("../../src/script/views/builder/builder.ts", {
 		"../../src/script/elements/combobox/search.ts": {
 			SearchBox: emptyClass(),
 		},
-		"../../src/script/elements/entityMenu.mjs": { EntityMenu: emptyClass() },
+		"../../src/script/elements/entityMenu.ts": { EntityMenu: emptyClass() },
 		"../../src/script/shared/directUpload.ts": { directUpload() {} },
 		"../../src/script/shared/index.ts": {
 			captureError() {},
@@ -641,34 +641,34 @@ async function loadBuilder({
 		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
-		"../../src/script/views/builder/changeStatus.mjs": {
+		"../../src/script/views/builder/changeStatus.ts": {
 			FormChangeStatus: emptyClass(),
 		},
-		"../../src/script/views/builder/conditions/loader.mjs": {
+		"../../src/script/views/builder/conditions/loader.ts": {
 			loadCondition: async () => null,
 		},
-		"../../src/script/views/builder/draft.mjs": { BuilderDraft },
-		"../../src/script/views/builder/migrations.mjs": {
+		"../../src/script/views/builder/draft.ts": { BuilderDraft },
+		"../../src/script/views/builder/migrations.ts": {
 			fieldKind: () => null,
 			needsMigration: () => false,
 			repairConditions: () => {},
 		},
-		"../../src/script/views/builder/panels/components.mjs": {
+		"../../src/script/views/builder/panels/components.ts": {
 			ComponentsPanel: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/condition.mjs": {
+		"../../src/script/views/builder/panels/condition.ts": {
 			ConditionPanel: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/elementSettings.mjs": {
+		"../../src/script/views/builder/panels/elementSettings.ts": {
 			ElementSettings: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/formSettings.mjs": {
+		"../../src/script/views/builder/panels/formSettings.ts": {
 			FormSettings: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/header.mjs": {
+		"../../src/script/views/builder/panels/header.ts": {
 			Header: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/model.mjs": {
+		"../../src/script/views/builder/panels/model.ts": {
 			ModelElement: {},
 			ModelPanel: emptyClass(),
 		},
@@ -679,12 +679,12 @@ test("test_builder_deselection_clears_selection_without_editing_form", async (t)
 	replaceGlobal(t, "document", { getElementById: () => ({}) });
 	const { default: FormBuilder } = await loadBuilder();
 	const { ModelPanel } = await esmock.strict(
-		"../../src/script/views/builder/panels/model.mjs",
+		"../../src/script/views/builder/panels/model.ts",
 		{
 			sortablejs: { default: { create: () => ({}) } },
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
+			"../../src/script/elements/primitives.ts": { primitives: {} },
 			"../../src/script/generated/styles.mjs": { STYLES: {} },
-			"../../src/script/views/builder/config.mjs": { CONFIG: {} },
+			"../../src/script/views/builder/config.ts": { CONFIG: {} },
 		},
 	);
 	const state = {
@@ -743,10 +743,10 @@ test("test_builder_save_restores_unsubmitted_condition_buffer", async (t) => {
 	replaceGlobal(t, "document", { activeElement: active });
 	const { default: FormBuilder } = await loadBuilder();
 	const { Condition } = await esmock.strict(
-		"../../src/script/views/builder/conditions/base.mjs",
+		"../../src/script/views/builder/conditions/base.ts",
 		{
 			"../../src/script/elements/combobox/index.ts": { SelectBox: class {} },
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
+			"../../src/script/elements/primitives.ts": { primitives: {} },
 			"../../src/script/forms/controller.ts": {
 				FormController: class {
 					constructor(owner) {
@@ -854,7 +854,7 @@ test("test_builder_html_flush_stays_local_and_empty_preview_does_not_fetch", asy
 		}
 	}
 	const { HtmlElement } = await esmock.strict(
-		"../../src/script/elements/html.mjs",
+		"../../src/script/elements/html.ts",
 		{
 			"../../src/script/shared/index.ts": {
 				captureError() {},
@@ -865,7 +865,7 @@ test("test_builder_html_flush_stays_local_and_empty_preview_does_not_fetch", asy
 					},
 				},
 			},
-			"../../src/script/elements/base/baseElement.mjs": { BaseElement },
+			"../../src/script/elements/base/baseElement.ts": { BaseElement },
 		},
 	);
 	const element = new HtmlElement(
@@ -874,21 +874,21 @@ test("test_builder_html_flush_stays_local_and_empty_preview_does_not_fetch", asy
 	);
 	assert.equal(element.create().innerHTML, "");
 	const { IndependentDocument } = await esmock.strict(
-		"../../src/script/elements/editor/independent.mjs",
+		"../../src/script/elements/editor/independent.ts",
 		{
 			"../../src/script/generated/styles.mjs": { STYLES: {} },
 			"../../src/script/shared/errors.ts": { captureError() {} },
 			"../../src/script/shared/request.ts": { request: {} },
-			"../../src/script/elements/editor/editor.mjs": {
+			"../../src/script/elements/editor/editor.ts": {
 				independentEditor: () => null,
 			},
-			"../../src/script/elements/editor/toolbar.mjs": { Toolbar: class {} },
+			"../../src/script/elements/editor/toolbar.ts": { Toolbar: class {} },
 		},
 	);
 	const { DraftDocument } = await esmock.strict(
-		"../../src/script/views/builder/draftDocument.mjs",
+		"../../src/script/views/builder/draftDocument.ts",
 		{
-			"../../src/script/elements/editor/independent.mjs": {
+			"../../src/script/elements/editor/independent.ts": {
 				IndependentDocument,
 			},
 		},
@@ -1010,7 +1010,7 @@ test("test_stale_generation_retry_label_survives_base_form_error_transition", as
 	const { FormController } = await esmock.strict(
 		"../../src/script/forms/controller.ts",
 		{
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
+			"../../src/script/elements/primitives.ts": { primitives: {} },
 			"../../src/script/shared/icons.ts": {
 				createIcon: (name) => ({ dataset: { icon: name } }),
 			},
@@ -1206,29 +1206,29 @@ test("test_saved_controls_refresh_without_replacing_draft_inputs", async (t) => 
 		}),
 	});
 	const { ElementSettings } = await esmock.strict(
-		"../../src/script/views/builder/panels/elementSettings.mjs",
+		"../../src/script/views/builder/panels/elementSettings.ts",
 		{
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
+			"../../src/script/elements/primitives.ts": { primitives: {} },
 			"../../src/script/generated/styles.mjs": { STYLES: {} },
 			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
-			"../../src/script/views/builder/config.mjs": { CONFIG: {} },
+			"../../src/script/views/builder/config.ts": { CONFIG: {} },
 		},
 	);
 	const { default: Columns } = await esmock.strict(
-		"../../src/script/views/builder/conditions/columns.mjs",
+		"../../src/script/views/builder/conditions/columns.ts",
 		{
 			"../../src/script/elements/combobox/index.ts": { SelectBox: class {} },
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
+			"../../src/script/elements/primitives.ts": { primitives: {} },
 			"../../src/script/shared/utilities.ts": {
 				generateElementId: () => "column-1",
 			},
-			"../../src/script/views/builder/config.mjs": { CONFIG: {} },
-			"../../src/script/views/builder/migrations.mjs": {
+			"../../src/script/views/builder/config.ts": { CONFIG: {} },
+			"../../src/script/views/builder/migrations.ts": {
 				fieldKind: () => null,
 			},
-			"../../src/script/views/builder/conditions/base.mjs": {
+			"../../src/script/views/builder/conditions/base.ts": {
 				Condition: class {},
 			},
 		},

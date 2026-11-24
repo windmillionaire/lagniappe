@@ -246,7 +246,7 @@ All routes are on the `filters` blueprint (`/filters` prefix).
 
 ## Frontend Integration
 
-The `Filters` widget (`src/script/widgets/filters.mjs`) manages the filter builder
+The `Filters` widget (`src/script/widgets/filters.ts`) manages the filter builder
 UI. Server-rendered badges contain explicit condition DTOs; preview/save wraps
 them in one v1 `contract` form value. The test endpoint returns a rendered table
 for preview, while save returns a filter list item. Saved filters can be loaded

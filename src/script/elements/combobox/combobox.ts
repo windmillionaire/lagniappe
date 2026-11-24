@@ -10,7 +10,7 @@ import {
 import { STYLES } from "../../generated/styles.mjs";
 import { captureError } from "../../shared/errors.ts";
 import { generateElementId } from "../../shared/utilities.ts";
-import { primitives } from "../primitives.mjs";
+import { primitives } from "../primitives.ts";
 
 export interface ComboboxOption {
 	id?: string;

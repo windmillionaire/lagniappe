@@ -125,7 +125,7 @@ Most behavior in this system depends on `data-*` values on the active
 | `data-key`, `data-kind` | Entity identity and theme/routing context for widgets and controls. |
 | `data-role` | Local semantic role for widget/template internals. Examples include `title`, `controls`, `expand`, `expandable-cell`, `notifications`, and `notification-count`. Use this for local structure that is not a global `lp-*` behavior hook. Table bodies, page task lists, and site settings sections each own their local `data-role="expand"` behavior. |
 | `data-if-empty` | Switches list widgets to another widget when no items are present. |
-| `data-preload`, `data-schema`, `data-submission`, `data-conditions`, `data-columns`, `data-selected`, `data-options`, `data-attributes` | JSON configuration parsed by `widgets/loader.mjs` and form/table widgets. |
+| `data-preload`, `data-schema`, `data-submission`, `data-conditions`, `data-columns`, `data-selected`, `data-options`, `data-attributes` | JSON configuration parsed by `widgets/loader.ts` and form/table widgets. |
 
 ## Authoring Notes
 

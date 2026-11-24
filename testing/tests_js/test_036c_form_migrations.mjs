@@ -8,7 +8,7 @@ import {
 import {
 	needsMigration,
 	repairConditions,
-} from "../../src/script/views/builder/migrations.mjs";
+} from "../../src/script/views/builder/migrations.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 test("test_delete_element_commits_panel_and_model_changes_in_one_transition", async (t) => {
@@ -21,7 +21,7 @@ test("test_delete_element_commits_panel_and_model_changes_in_one_transition", as
 		else commits.push(commit);
 	};
 	const { default: Modify } = await esmock.strict(
-		"../../src/script/views/builder/conditions/modify.mjs",
+		"../../src/script/views/builder/conditions/modify.ts",
 		{
 			"../../src/script/shared/transitions.ts": { withTransition },
 		},
@@ -94,7 +94,7 @@ test("test_delete_element_commits_panel_and_model_changes_in_one_transition", as
 test("test_builder_resumes_migration_polling_and_clears_completed_status", async (t) => {
 	createBrowser(t);
 	const { Header } = await import(
-		"../../src/script/views/builder/panels/header.mjs"
+		"../../src/script/views/builder/panels/header.ts"
 	);
 	let activeClock = null;
 	for (const target of [globalThis, window]) {
@@ -186,14 +186,14 @@ test("test_builder_resumes_migration_polling_and_clears_completed_status", async
 			},
 		);
 		const { FormChangeStatus } = await esmock.strict(
-			"../../src/script/views/builder/changeStatus.mjs",
+			"../../src/script/views/builder/changeStatus.ts",
 			{
 				"../../src/script/shared/polling.ts": { PollingCoordinator },
 				"../../src/script/shared/request.ts": { request },
 			},
 		);
 		const { default: FormBuilder } = await esmock.strict(
-			"../../src/script/views/builder/builder.mjs",
+			"../../src/script/views/builder/builder.ts",
 			{
 				"../../src/script/shared/index.ts": {
 					captureError(error) {
@@ -206,7 +206,7 @@ test("test_builder_resumes_migration_polling_and_clears_completed_status", async
 					OfflineModal: class {},
 					request,
 				},
-				"../../src/script/views/builder/changeStatus.mjs": {
+				"../../src/script/views/builder/changeStatus.ts": {
 					FormChangeStatus,
 				},
 			},
@@ -397,7 +397,7 @@ test("test_builder_resumes_migration_polling_and_clears_completed_status", async
 test("test_migration_status_uses_notification_and_keeps_save_disabled", async (t) => {
 	createBrowser(t);
 	const { Header } = await import(
-		"../../src/script/views/builder/panels/header.mjs"
+		"../../src/script/views/builder/panels/header.ts"
 	);
 	class PollingCoordinator {
 		init() {
@@ -411,7 +411,7 @@ test("test_migration_status_uses_notification_and_keeps_save_disabled", async (t
 		destroy() {}
 	}
 	const { FormChangeStatus } = await esmock.strict(
-		"../../src/script/views/builder/changeStatus.mjs",
+		"../../src/script/views/builder/changeStatus.ts",
 		{
 			"../../src/script/shared/polling.ts": { PollingCoordinator },
 			"../../src/script/shared/request.ts": { request: {} },

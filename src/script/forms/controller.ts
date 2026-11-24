@@ -1,4 +1,4 @@
-import { primitives } from "../elements/primitives.mjs";
+import { primitives } from "../elements/primitives.ts";
 import { createIcon } from "../shared/icons.ts";
 import { withTransition } from "../shared/transitions.ts";
 import { showBriefly } from "../shared/utilities.ts";

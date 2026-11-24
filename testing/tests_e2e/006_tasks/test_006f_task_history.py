@@ -4,7 +4,7 @@ Tests for task completion history from the page task row.
 Verified against:
 - lagniappe/web/templates/pages/tasks.html
 - lagniappe/web/routes/tasks/main.py
-- src/script/widgets/taskHistory.mjs
+- src/script/widgets/taskHistory.ts
 - lagniappe/core/entities/task.py
 """
 

@@ -3,8 +3,8 @@ Tests for authoritative file reconciliation after processing completes.
 
 Verified against:
 - src/script/forms/revisions/watcher.ts
-- src/script/widgets/fileInfo.mjs
-- src/script/views/file.mjs
+- src/script/widgets/fileInfo.ts
+- src/script/views/file.ts
 - lagniappe/web/routes/files/main.py
 - lagniappe/web/routes/process/main.py
 """

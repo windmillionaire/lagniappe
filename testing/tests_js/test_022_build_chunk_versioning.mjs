@@ -115,7 +115,7 @@ test("test_service_worker_records_the_build_identity", () => {
 		mkdirSync("config", { recursive: true });
 		mkdirSync("lagniappe/web/static", { recursive: true });
 		writeFileSync(
-			"src/script/sw.template.mjs",
+			"src/script/sw.template.ts",
 			[
 				'const BUILD_ID = "__BUILD_ID__";',
 				"const PROTOCOL = /* __BROWSER_PROTOCOL__ */ null;",
@@ -169,7 +169,7 @@ test("test_frontend_publication_records_recursive_artifacts_and_source_identity"
 		);
 		writeAt(
 			outputDirectory,
-			"src/script/main.mjs",
+			"src/script/main.ts",
 			"export const current = true;\n",
 		);
 		writeAt(outputDirectory, "package.json", '{"version":"1.2.3"}\n');
@@ -270,7 +270,7 @@ test("test_frontend_publication_rejects_missing_outputs_and_source_drift", async
 		);
 		writeAt(
 			outputDirectory,
-			"src/script/main.mjs",
+			"src/script/main.ts",
 			"export const current = true;\n",
 		);
 		writeAt(outputDirectory, "package.json", '{"version":"1.2.3"}\n');
@@ -323,7 +323,7 @@ test("test_frontend_publication_rejects_missing_outputs_and_source_drift", async
 
 		writeAt(
 			outputDirectory,
-			"src/script/main.mjs",
+			"src/script/main.ts",
 			"export const current = false;\n",
 		);
 		assert.throws(

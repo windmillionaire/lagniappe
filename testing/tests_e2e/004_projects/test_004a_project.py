@@ -4,8 +4,8 @@ Tests for project view page base functionality.
 Tests project page load, tab navigation, and basic structure.
 Verified against:
 - lagniappe/templates/projects/project.html
-- src/script/views/project.mjs
-- src/script/views/base/entity.mjs
+- src/script/views/project.ts
+- src/script/views/base/entity.ts
 """
 
 from dataclasses import replace

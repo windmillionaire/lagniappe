@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { STYLES } from "../../src/script/generated/styles.mjs";
-import { CONFIG } from "../../src/script/views/builder/config.mjs";
+import { CONFIG } from "../../src/script/views/builder/config.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 async function createTodo(t, overrides = {}) {
 	createBrowser(t);
-	const module = await import("../../src/script/elements/todo.mjs");
+	const module = await import("../../src/script/elements/todo.ts");
 	const todo = new module.TodoElement(
 		{ readonly: false, historyFillEnabled: true },
 		{ id: "checklist", title: "Checklist", type: "todo" },

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { IdentityPlatformClient } from "../../src/script/login/identity.mjs";
+import { IdentityPlatformClient } from "../../src/script/login/identity.ts";
 import { mockFetch } from "../utility/js/environment.mjs";
 
 test("test_identity_platform_rest_client_contract", async (t) => {

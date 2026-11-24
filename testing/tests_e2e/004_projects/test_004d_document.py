@@ -8,7 +8,7 @@ Related Files:
     Application:
         - lagniappe/web/templates/projects/document.html: Document tab template
         - src/script/widgets/document.mjs: Document widget
-        - src/script/elements/editor/collaborative.mjs: Collaborative editor
+        - src/script/elements/editor/collaborative.ts: Collaborative editor
 
     Test Framework:
         - testing/elements/editor.py: Editor class and option enums

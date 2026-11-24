@@ -697,7 +697,7 @@ const updateServiceWorker = (buildId) => {
 	return {
 		name: "update-service-worker",
 		writeBundle(_options, bundle) {
-			let swContent = readFileSync("./src/script/sw.template.mjs", "utf8");
+			let swContent = readFileSync("./src/script/sw.template.ts", "utf8");
 			const browserProtocol = JSON.parse(
 				readFileSync(browserProtocolPath, "utf8"),
 			);

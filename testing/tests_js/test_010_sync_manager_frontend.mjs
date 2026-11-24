@@ -116,7 +116,7 @@ test("test_sync_manager_uses_polling_subscriptions", async (t) => {
 	const { SyncManager } = await esmock.strict(
 		"../../src/script/shared/sync.ts",
 		{
-			"../../src/script/elements/editor/headless.mjs": {
+			"../../src/script/elements/editor/headless.ts": {
 				loadHeadlessWidget: (settings) => headlessFactory(settings),
 			},
 			"../../src/script/shared/endpoints.ts": {

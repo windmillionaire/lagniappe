@@ -9,7 +9,7 @@ Related Files:
         - lagniappe/web/routes/home/main.py: Home route (/)
         - lagniappe/web/templates/home/home.html: Main home template
         - lagniappe/web/templates/home/*.html: Component templates
-        - src/script/views/home.mjs: Client-side initialization
+        - src/script/views/home.ts: Client-side initialization
         - src/script/widgets/home/: List, activity, and task widget classes
 
     Core Entity:
@@ -165,7 +165,7 @@ def test_tasks_prefetch(get_admin, get_user):
     task count replaces the initial loading marker on page load.
 
     Verifies:
-        - src/script/views/home.mjs: Prefetch initialization
+        - src/script/views/home.ts: Prefetch initialization
         - lagniappe/web/templates/home/tasks.html: lp-prefetch attribute
         - Task list shell is replaced after prefetch GET /l/get/tasks
         - Task count element is rendered

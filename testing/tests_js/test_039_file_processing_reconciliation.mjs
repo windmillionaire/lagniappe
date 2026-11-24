@@ -33,12 +33,12 @@ test("test_file_info_extract_completion_requests_one_reload_notice", async (t) =
 		getElementById: (id) => (id === "text" && hasTextTab ? {} : null),
 	});
 	const { FileInfo } = await esmock.strict(
-		"../../src/script/widgets/fileInfo.mjs",
+		"../../src/script/widgets/fileInfo.ts",
 		{
-			"../../src/script/elements/input.mjs": { InputElement: class {} },
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
-			"../../src/script/elements/sectionToggle.mjs": { SectionToggle: {} },
-			"../../src/script/elements/textarea.mjs": { TextareaElement: class {} },
+			"../../src/script/elements/input.ts": { InputElement: class {} },
+			"../../src/script/elements/primitives.ts": { primitives: {} },
+			"../../src/script/elements/sectionToggle.ts": { SectionToggle: {} },
+			"../../src/script/elements/textarea.ts": { TextareaElement: class {} },
 			"../../src/script/generated/styles.mjs": {
 				STYLES: { label: { default: "" } },
 			},
@@ -104,9 +104,9 @@ test("test_file_view_shows_extract_reload_only_for_matching_unmounted_text", asy
 		},
 	});
 	const { default: FileView } = await esmock.strict(
-		"../../src/script/views/file.mjs",
+		"../../src/script/views/file.ts",
 		{
-			"../../src/script/views/base/entity.mjs": { default: class {} },
+			"../../src/script/views/base/entity.ts": { default: class {} },
 		},
 	);
 	const notice = { dataset: { visible: "false" } };

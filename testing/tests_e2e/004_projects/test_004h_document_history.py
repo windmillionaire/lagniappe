@@ -6,7 +6,7 @@ remain restorable, and legacy automatic versions can still be cleared.
 
 Related Files:
     Application:
-        - src/script/elements/editor/options/documentHistory.mjs: History button
+        - src/script/elements/editor/options/documentHistory.ts: History button
         - lagniappe/core/properties/common_assets.py: Document.save current state
         - lagniappe/web/routes/assets/editor.py: History list/restore endpoints
 

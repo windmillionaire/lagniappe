@@ -105,13 +105,13 @@ async function loadCore(connectivity = { online: true, hidden: true }) {
 			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
-			"../../src/script/views/base/component.mjs": { default: class {} },
-			"../../src/script/views/base/reconciliation.mjs": {
+			"../../src/script/views/base/component.ts": { default: class {} },
+			"../../src/script/views/base/reconciliation.ts": {
 				collectRefreshTargets: () => [],
 				reconcileChange() {},
 				refreshCollectionComponents() {},
 			},
-			"../../src/script/views/base/services.mjs": {
+			"../../src/script/views/base/services.ts": {
 				ensureDeferredOperations: service("DeferredOperations"),
 				ensureEditWatcher: service("EditWatcher"),
 				ensureEntityMenu: service("EntityMenu"),
@@ -125,15 +125,15 @@ async function loadCore(connectivity = { online: true, hidden: true }) {
 				ensureSyncManager: service("SyncManager"),
 				initializeCoreServices() {},
 			},
-			"../../src/script/views/base/shell.mjs": { default: ShellView },
-			"../../src/script/views/base/task.mjs": { Task: class {} },
+			"../../src/script/views/base/shell.ts": { default: ShellView },
+			"../../src/script/views/base/task.ts": { Task: class {} },
 		},
 	);
 	return Core;
 }
 
 async function loadPageTaskList() {
-	return await esmock.strict("../../src/script/widgets/pageTaskList.mjs", {
+	return await esmock.strict("../../src/script/widgets/pageTaskList.ts", {
 		"../../src/script/elements/base/baseList.ts": { BaseList: class {} },
 	});
 }
@@ -1097,7 +1097,7 @@ test("test_component_refresh_only_loads_collection_widgets", async (t) => {
 	createBrowser(t);
 	const events = [];
 	const { default: ViewComponent } = await import(
-		"../../src/script/views/base/component.mjs"
+		"../../src/script/views/base/component.ts"
 	);
 	const clean = {
 		route: "/clean",
@@ -1665,7 +1665,7 @@ test("test_task_list_reconciliation_rejects_incomplete_structure", async () => {
 test("test_direct_form_controls_clear_inputs_and_textareas", async (t) => {
 	createBrowser(t);
 	const { BaseElement } = await import(
-		"../../src/script/elements/base/baseElement.mjs"
+		"../../src/script/elements/base/baseElement.ts"
 	);
 	const root = document.createElement("div");
 	const label = document.createElement("label");
@@ -1703,7 +1703,7 @@ test("test_direct_form_controls_clear_inputs_and_textareas", async (t) => {
 	assert.equal(clearCalls, 1);
 
 	const { TextareaElement } = await import(
-		"../../src/script/elements/textarea.mjs"
+		"../../src/script/elements/textarea.ts"
 	);
 	const control = document.createElement("textarea");
 	control.value = "Project description";

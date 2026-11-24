@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getFormElement } from "../../src/script/elements/loader.mjs";
+import { getFormElement } from "../../src/script/elements/loader.ts";
 
 test("test_unknown_form_element_reports_schema_type", async () => {
 	await assert.rejects(

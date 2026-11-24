@@ -105,9 +105,9 @@ async function setupEntityLayout(t) {
 		}
 	}
 	const { default: Entity } = await esmock.strict(
-		"../../src/script/views/base/entity.mjs",
+		"../../src/script/views/base/entity.ts",
 		{
-			"../../src/script/elements/nav.mjs": { NavElement },
+			"../../src/script/elements/nav.ts": { NavElement },
 			"../../src/script/shared/transitions.ts": { withTransition },
 			"../../src/script/shared/utilities.ts": {
 				debounce: (callback) => callback,

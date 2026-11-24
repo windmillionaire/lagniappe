@@ -1,6 +1,6 @@
 import type { FormRevisionResponse } from "../../types/forms.d.ts";
 import type { FormWidget } from "../../widgets/base/formWidget.ts";
-import { loadWidget } from "../../widgets/loader.mjs";
+import { loadWidget } from "../../widgets/loader.ts";
 
 /**
  * Build a fully rendered, detached copy of a form widget for revision

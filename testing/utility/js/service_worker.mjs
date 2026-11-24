@@ -117,7 +117,7 @@ export function createServiceWorkerContext() {
 		readFileSync("config/browser_protocol.json", "utf8"),
 	);
 	const workerSource = readFileSync(
-		"src/script/sw.template.mjs",
+		"src/script/sw.template.ts",
 		"utf8",
 	).replace("/* __BROWSER_PROTOCOL__ */ null", JSON.stringify(browserProtocol));
 	vm.runInContext(workerSource, context);

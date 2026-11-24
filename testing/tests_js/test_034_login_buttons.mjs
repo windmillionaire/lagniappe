@@ -12,7 +12,7 @@ test("test_login_action_button_uses_fixed_icon_and_text_slots", async (t) => {
 		`,
 	});
 	const { setLoginActionButton } = await import(
-		"../../src/script/login/forms.mjs"
+		"../../src/script/login/forms.ts"
 	);
 	const button = document.querySelector("[data-role='signin']");
 	const iconSlot = button.querySelector("[data-role='icon']");
@@ -91,7 +91,7 @@ test("test_owner_setup_supports_password_only_mode", async (t) => {
 			</form>
 		`,
 	});
-	const { OwnerSetupForm } = await import("../../src/script/login/forms.mjs");
+	const { OwnerSetupForm } = await import("../../src/script/login/forms.ts");
 	const form = document.querySelector("[data-role='owner-setup']");
 	const passwordSetup = form.querySelector(
 		"[data-role='owner-password-setup']",

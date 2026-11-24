@@ -142,7 +142,7 @@ class SelectButton:
             element: Parent element containing the select button
 
         See Also:
-            src/script/elements/sectionToggle.mjs: select button behavior
+            src/script/elements/sectionToggle.ts: select button behavior
         """
         expect(self._element).to_be_visible()
         clear_button = self._element.locator(self.CLEAR_BUTTON)

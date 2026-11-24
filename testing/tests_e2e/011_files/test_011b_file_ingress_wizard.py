@@ -6,7 +6,7 @@ Verified against:
 - lagniappe/web/templates/files/ingress.html
 - lagniappe/web/templates/files/status.html
 - lagniappe/web/templates/files/status/*.html
-- src/script/widgets/ingress.mjs
+- src/script/widgets/ingress.ts
 """
 
 import re

@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import esmock from "esmock";
 
-import { BuilderDraft } from "../../src/script/views/builder/draft.mjs";
+import { BuilderDraft } from "../../src/script/views/builder/draft.ts";
 
 function replaceGlobal(t, name, value) {
 	const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
@@ -107,7 +107,7 @@ test("test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
 		},
 	};
 	const { Header } = await esmock.strict(
-		"../../src/script/views/builder/panels/header.mjs",
+		"../../src/script/views/builder/panels/header.ts",
 		{
 			"../../src/script/forms/renderer.ts": { FormRenderer: class {} },
 			"../../src/script/shared/index.ts": {
@@ -379,7 +379,7 @@ test("test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
 
 async function loadFormSettings({ request }) {
 	return await esmock.strict(
-		"../../src/script/views/builder/panels/formSettings.mjs",
+		"../../src/script/views/builder/panels/formSettings.ts",
 		{
 			"../../src/script/forms/controller.ts": { FormController: class {} },
 			"../../src/script/shared/index.ts": {
@@ -484,11 +484,11 @@ function emptyClass() {
 }
 
 async function loadBuilder({ connectivity, generateElementId, ModelElement }) {
-	return await esmock.strict("../../src/script/views/builder/builder.mjs", {
+	return await esmock.strict("../../src/script/views/builder/builder.ts", {
 		"../../src/script/elements/combobox/search.ts": {
 			SearchBox: emptyClass(),
 		},
-		"../../src/script/elements/entityMenu.mjs": { EntityMenu: emptyClass() },
+		"../../src/script/elements/entityMenu.ts": { EntityMenu: emptyClass() },
 		"../../src/script/shared/directUpload.ts": { directUpload() {} },
 		"../../src/script/shared/index.ts": {
 			captureError() {},
@@ -502,34 +502,34 @@ async function loadBuilder({ connectivity, generateElementId, ModelElement }) {
 		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
-		"../../src/script/views/builder/changeStatus.mjs": {
+		"../../src/script/views/builder/changeStatus.ts": {
 			FormChangeStatus: emptyClass(),
 		},
-		"../../src/script/views/builder/conditions/loader.mjs": {
+		"../../src/script/views/builder/conditions/loader.ts": {
 			loadCondition: async () => null,
 		},
-		"../../src/script/views/builder/draft.mjs": { BuilderDraft: emptyClass() },
-		"../../src/script/views/builder/migrations.mjs": {
+		"../../src/script/views/builder/draft.ts": { BuilderDraft: emptyClass() },
+		"../../src/script/views/builder/migrations.ts": {
 			fieldKind: () => null,
 			needsMigration: () => false,
 			repairConditions: () => {},
 		},
-		"../../src/script/views/builder/panels/components.mjs": {
+		"../../src/script/views/builder/panels/components.ts": {
 			ComponentsPanel: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/condition.mjs": {
+		"../../src/script/views/builder/panels/condition.ts": {
 			ConditionPanel: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/elementSettings.mjs": {
+		"../../src/script/views/builder/panels/elementSettings.ts": {
 			ElementSettings: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/formSettings.mjs": {
+		"../../src/script/views/builder/panels/formSettings.ts": {
 			FormSettings: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/header.mjs": {
+		"../../src/script/views/builder/panels/header.ts": {
 			Header: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/model.mjs": {
+		"../../src/script/views/builder/panels/model.ts": {
 			ModelElement,
 			ModelPanel: emptyClass(),
 		},
@@ -679,14 +679,14 @@ test("test_builder_schema_lists_use_button_surfaces_and_centered_actions", async
 		},
 	};
 	const { ElementSettings } = await esmock.strict(
-		"../../src/script/views/builder/panels/elementSettings.mjs",
+		"../../src/script/views/builder/panels/elementSettings.ts",
 		{
-			"../../src/script/elements/primitives.mjs": { primitives },
+			"../../src/script/elements/primitives.ts": { primitives },
 			"../../src/script/generated/styles.mjs": { STYLES: styles },
 			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
-			"../../src/script/views/builder/config.mjs": {
+			"../../src/script/views/builder/config.ts": {
 				CONFIG: {
 					DEFAULT_SETTINGS: {
 						conditional: ["visibility"],

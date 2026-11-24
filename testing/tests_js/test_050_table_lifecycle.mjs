@@ -53,15 +53,15 @@ async function setup(t, { load, patch, transition, expectedErrors = [] } = {}) {
 			"</tbody></table></main>",
 	});
 	const { getFormElement } = await import(
-		"../../src/script/elements/loader.mjs"
+		"../../src/script/elements/loader.ts"
 	);
 	const { IndexTable } = await import(
-		"../../src/script/widgets/tables/indexTable.mjs"
+		"../../src/script/widgets/tables/indexTable.ts"
 	);
 	const fields = [];
 	const requests = [];
 	const mocks = {
-		"../../src/script/elements/loader.mjs": {
+		"../../src/script/elements/loader.ts": {
 			getFormElement: async (...args) => {
 				if (load) await load(...args);
 				const element = await getFormElement(...args);
@@ -89,7 +89,7 @@ async function setup(t, { load, patch, transition, expectedErrors = [] } = {}) {
 		};
 	}
 	const { TableEditor } = await esmock.strict(
-		"../../src/script/widgets/tables/editor.mjs",
+		"../../src/script/widgets/tables/editor.ts",
 		mocks,
 	);
 	const view = {
@@ -548,7 +548,7 @@ test("test_table_sorting_destroy_removes_controls_and_rejects_queued_toggles", a
 	createBrowser(t);
 	const queued = [];
 	const { TableSorting } = await esmock.strict(
-		"../../src/script/widgets/tables/sorting.mjs",
+		"../../src/script/widgets/tables/sorting.ts",
 		{
 			"../../src/script/shared/transitions.ts": {
 				withTransition: (commit) => {

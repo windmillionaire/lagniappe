@@ -7,7 +7,7 @@ Maps to:
 - Entity: lagniappe/core/entities/task.py
 - Routes: lagniappe/web/routes/tasks/
 - Templates: lagniappe/web/templates/pages/tasks.html
-- View: src/script/views/page.mjs (task widget)
+- View: src/script/views/page.ts (task widget)
 """
 
 from dataclasses import dataclass

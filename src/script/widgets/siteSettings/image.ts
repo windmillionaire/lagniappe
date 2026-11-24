@@ -1,5 +1,5 @@
 import { BaseUpload } from "../../elements/base/baseUpload.ts";
-import { UploadMenu, uploadElement } from "../../elements/upload.mjs";
+import { UploadMenu, uploadElement } from "../../elements/upload.ts";
 import type { ENDPOINTS } from "../../shared/endpoints.ts";
 import { setIcon } from "../../shared/icons.ts";
 import { request } from "../../shared/index.ts";

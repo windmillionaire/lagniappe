@@ -1,6 +1,6 @@
 # Frontend Service Worker
 
-The service worker (`src/script/sw.template.mjs`) handles offline support,
+The service worker (`src/script/sw.template.ts`) handles offline support,
 caching, and connectivity state. It is a template file -- the build process
 replaces `__BUILD_ID__` placeholders with the current build cache ID before
 writing it to `lagniappe/web/static/sw.js`.

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
-import ViewComponent from "../../src/script/views/base/component.mjs";
+import ViewComponent from "../../src/script/views/base/component.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 function target(name = "Original", loaded = true) {

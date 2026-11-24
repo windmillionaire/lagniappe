@@ -1,4 +1,4 @@
-import { getFormElement } from "../elements/loader.mjs";
+import { getFormElement } from "../elements/loader.ts";
 import { captureError } from "../shared/errors.ts";
 import { withTransition } from "../shared/transitions.ts";
 import { generateElementId } from "../shared/utilities.ts";

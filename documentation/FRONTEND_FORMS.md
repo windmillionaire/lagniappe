@@ -92,7 +92,7 @@ edit native fields; the enclosing form owns submission and revision state.
 - `permission-sections` enhances the HTML from `users/permissions.html`: facet
   selection, new-row templates, removal, and conditional visibility. Hidden
   sections retain their submitted values. Group/Public permission widgets extend
-  `FormWidget` directly and live in `widgets/userPermissions.mjs`.
+  `FormWidget` directly and live in `widgets/userPermissions.ts`.
 - `access-restrictions` enhances `forms/access_restrictions.html` in Page
   Permissions, User Settings, and the Builder. It manages administrator/group
   mutual exclusion and group rows. Each host keeps its own submission and summary
@@ -196,7 +196,7 @@ to an ordinary HTTP submit.
 
 `shared/directUpload.ts` owns direct-upload sessions, resumable chunk transfer,
 retry recovery, and progress callbacks. `BaseUpload` and the Form Builder import
-that client directly. `elements/upload.mjs` owns upload controls and menus.
+that client directly. `elements/upload.ts` owns upload controls and menus.
 
 `BaseUpload` prefers resumable browser-to-Storage upload and submits signed
 metadata after each object completes. The widget checkpoints successful files

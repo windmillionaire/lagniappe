@@ -1,7 +1,7 @@
 import json from "@rollup/plugin-json";
 import resolve from "@rollup/plugin-node-resolve";
 import esbuild from "rollup-plugin-esbuild";
-import { VIEW_ENTRIES } from "../src/script/viewRegistry.mjs";
+import { VIEW_ENTRIES } from "../src/script/viewRegistry.ts";
 import { recordBuildArtifacts } from "./publication.mjs";
 import {
 	buildStyles,
@@ -59,7 +59,7 @@ export const createRollupConfig = ({
 }) => [
 	// Standalone login and optional browser error-monitoring bundles.
 	...["login", "sentry"].map((name) => ({
-		input: `./src/script/${name}.mjs`,
+		input: `./src/script/${name}.ts`,
 		output: {
 			file: `./lagniappe/web/static/${name}.js`,
 			inlineDynamicImports: true,
@@ -78,8 +78,8 @@ export const createRollupConfig = ({
 	})),
 	{
 		input: {
-			main: "./src/script/main.mjs",
-			public: "./src/script/public.mjs",
+			main: "./src/script/main.ts",
+			public: "./src/script/public.ts",
 			...Object.fromEntries(
 				Object.entries(VIEW_ENTRIES).map(([entry, source]) => [
 					entry,

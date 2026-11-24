@@ -3,7 +3,7 @@ import { test } from "node:test";
 import {
 	toggleCode,
 	toggleUnderline,
-} from "../../src/script/elements/editor/options/menuItems.mjs";
+} from "../../src/script/elements/editor/options/menuItems.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 test("test_editor_menu_item_serializes_current_active_state", (t) => {

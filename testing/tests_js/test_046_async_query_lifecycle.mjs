@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
 import { QueryLifecycle } from "../../src/script/shared/queryLifecycle.ts";
-import { BuilderDraft } from "../../src/script/views/builder/draft.mjs";
+import { BuilderDraft } from "../../src/script/views/builder/draft.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 function deferred() {
@@ -453,10 +453,10 @@ test("test_builder_destroys_owned_search_modal_and_panels_during_startup", async
 		remove(type, callback, options);
 	});
 	const { default: FormBuilder } = await esmock.strict(
-		"../../src/script/views/builder/builder.mjs",
+		"../../src/script/views/builder/builder.ts",
 		{
 			"../../src/script/elements/combobox/search.ts": { SearchBox },
-			"../../src/script/elements/entityMenu.mjs": { EntityMenu },
+			"../../src/script/elements/entityMenu.ts": { EntityMenu },
 			"../../src/script/shared/directUpload.ts": { directUpload: {} },
 			"../../src/script/shared/index.ts": {
 				captureError: (error) => {
@@ -472,30 +472,30 @@ test("test_builder_destroys_owned_search_modal_and_panels_during_startup", async
 			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
-			"../../src/script/views/builder/changeStatus.mjs": {
+			"../../src/script/views/builder/changeStatus.ts": {
 				FormChangeStatus: class {},
 			},
-			"../../src/script/views/builder/conditions/loader.mjs": {
+			"../../src/script/views/builder/conditions/loader.ts": {
 				loadCondition: async () => null,
 			},
-			"../../src/script/views/builder/draft.mjs": { BuilderDraft },
-			"../../src/script/views/builder/migrations.mjs": {
+			"../../src/script/views/builder/draft.ts": { BuilderDraft },
+			"../../src/script/views/builder/migrations.ts": {
 				fieldKind: () => "",
 				needsMigration: () => false,
 				repairConditions: () => {},
 			},
-			"../../src/script/views/builder/panels/components.mjs": {
+			"../../src/script/views/builder/panels/components.ts": {
 				ComponentsPanel,
 			},
-			"../../src/script/views/builder/panels/condition.mjs": { ConditionPanel },
-			"../../src/script/views/builder/panels/elementSettings.mjs": {
+			"../../src/script/views/builder/panels/condition.ts": { ConditionPanel },
+			"../../src/script/views/builder/panels/elementSettings.ts": {
 				ElementSettings,
 			},
-			"../../src/script/views/builder/panels/formSettings.mjs": {
+			"../../src/script/views/builder/panels/formSettings.ts": {
 				FormSettings,
 			},
-			"../../src/script/views/builder/panels/header.mjs": { Header },
-			"../../src/script/views/builder/panels/model.mjs": {
+			"../../src/script/views/builder/panels/header.ts": { Header },
+			"../../src/script/views/builder/panels/model.ts": {
 				ModelElement: {},
 				ModelPanel,
 			},

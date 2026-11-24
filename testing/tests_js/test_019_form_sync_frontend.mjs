@@ -24,7 +24,7 @@ test("test_site_deployment_caps_workers_only_for_f2_and_b2", async () => {
 	const { SiteDeployment } = await esmock.strict(
 		"../../src/script/widgets/siteSettings/deployment.ts",
 		{
-			"../../src/script/elements/buttons.mjs": { buttons: emptyButtons },
+			"../../src/script/elements/buttons.ts": { buttons: emptyButtons },
 			"../../src/script/elements/combobox/index.ts": {
 				SelectBox: EmptySelectBox,
 			},
@@ -154,12 +154,12 @@ test("test_site_settings_coordinates_section_widgets", async (t) => {
 		removeItem: (key) => storage.delete(key),
 	});
 	const { SiteSettings } = await esmock.strict(
-		"../../src/script/widgets/siteSettings.mjs",
+		"../../src/script/widgets/siteSettings.ts",
 		{
 			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => await callback(),
 			},
-			"../../src/script/widgets/siteSettings/publicPages.mjs": {
+			"../../src/script/widgets/siteSettings/publicPages.ts": {
 				SitePublicPages: class {},
 			},
 		},
@@ -228,7 +228,7 @@ async function loadAiModels() {
 	return await esmock.strict(
 		"../../src/script/widgets/siteSettings/aiModels.ts",
 		{
-			"../../src/script/elements/buttons.mjs": { buttons: emptyButtons },
+			"../../src/script/elements/buttons.ts": { buttons: emptyButtons },
 			"../../src/script/elements/combobox/index.ts": {
 				SelectBox: EmptySelectBox,
 			},
@@ -352,7 +352,7 @@ test("test_renderer_visibility_requires_canonical_condition_lists", async () => 
 	const { FormRenderer } = await esmock.strict(
 		"../../src/script/forms/renderer.ts",
 		{
-			"../../src/script/elements/loader.mjs": {
+			"../../src/script/elements/loader.ts": {
 				getFormElement: async () => null,
 			},
 			"../../src/script/shared/errors.ts": {
@@ -433,10 +433,10 @@ test("test_builder_model_defaults_are_presentation_only", async (t) => {
 		getElementById: () => new BuilderNode(),
 	});
 	const { ModelElement } = await esmock.strict(
-		"../../src/script/views/builder/panels/model.mjs",
+		"../../src/script/views/builder/panels/model.ts",
 		{
 			sortablejs: { default: { create: () => ({ destroy() {} }) } },
-			"../../src/script/elements/primitives.mjs": {
+			"../../src/script/elements/primitives.ts": {
 				primitives: {
 					badge: primitive("badge"),
 					checkbox: primitive("checkbox"),
@@ -454,7 +454,7 @@ test("test_builder_model_defaults_are_presentation_only", async (t) => {
 					radio: { fieldset: { column: "" }, label: "" },
 				},
 			},
-			"../../src/script/views/builder/config.mjs": {
+			"../../src/script/views/builder/config.ts": {
 				CONFIG: {
 					PRESENTATION_DEFAULTS: {
 						input: { title: "Input", input: "text" },
@@ -582,7 +582,7 @@ async function loadMaintenance({
 	return await esmock.strict(
 		"../../src/script/widgets/siteSettings/maintenance.ts",
 		{
-			"../../src/script/elements/buttons.mjs": { buttons },
+			"../../src/script/elements/buttons.ts": { buttons },
 			"../../src/script/generated/styles.mjs": { STYLES: maintenanceStyles },
 			"../../src/script/shared/index.ts": { Modal: class {}, request },
 			"../../src/script/shared/storage.ts": {

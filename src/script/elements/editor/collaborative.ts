@@ -1,0 +1,398 @@
+import * as Y from "yjs";
+import { STYLES } from "../../generated/styles.mjs";
+import {
+	base64ToUint8Array,
+	uint8ArrayToBase64,
+	waitForAttribute,
+} from "../../shared/utilities.ts";
+import { collaborativeEditor } from "./editor.ts";
+import { MentionSuggestions } from "./extensions/index.ts";
+import { DocumentReadCache } from "./readCache.ts";
+import { Toolbar } from "./toolbar.ts";
+import { DocumentVersions } from "./versions.ts";
+
+export class CollaborativeDocument {
+	constructor(attributes) {
+		Object.assign(this, attributes);
+		this.ydoc = new Y.Doc();
+		this.versions = new DocumentVersions(this);
+		this.updateQueue = [];
+		this.pendingMentions = new Map();
+		this.syncId = this.target.getAttribute("lp-sync");
+		this.readCache = new DocumentReadCache(
+			this.target.dataset.cacheScope,
+			this.syncId,
+		);
+		this.initialized = false;
+
+		this._applyingRemote = false;
+		this._destroyed = false;
+		this._dirty = false;
+
+		this.update = null;
+		this.offlineRecord = null;
+		this.remote = null;
+		this.snapshot = null;
+		this.initialStateReady = Promise.resolve(null);
+	}
+
+	init() {
+		this._initContainer();
+		if (!this.headless) this._startLoading();
+		this._initEditor();
+		if (!this.headless) this._initToolbar();
+
+		if (!this.headless && this.syncId && !this.remote) {
+			this.initialStateReady = this._loadInitialState();
+		} else {
+			this.container.setAttribute("loaded", "");
+			this.initialStateReady = Promise.resolve(this.remote);
+		}
+	}
+
+	async _loadInitialState() {
+		try {
+			const syncManager = await (this.view?.ensureSyncManager?.() ??
+				this.view?.syncReady ??
+				this.view?.SyncManager);
+			if (!this._destroyed && syncManager) {
+				this.remote = await syncManager.state(this);
+			}
+			if (!this._destroyed && !this.remote && !this.offlineRecord?.ydoc) {
+				this._initialStateError = true;
+			}
+			return this.remote;
+		} catch (error) {
+			this._initialStateError = true;
+			this.view?.reportStartupError?.(
+				error,
+				this.target,
+				"document-initial-state",
+			);
+			return null;
+		} finally {
+			if (!this._destroyed) this.container.setAttribute("loaded", "");
+		}
+	}
+
+	_startLoading() {
+		this.container.inert = true;
+		this.container.setAttribute("aria-busy", "true");
+		this.loadingStatus = document.createElement("div");
+		this.loadingStatus.dataset.role = "document-status";
+		// Overlay the empty editor space so showing/removing the message never
+		// moves the toolbar or changes the document panel's height.
+		this.target.classList.add("relative");
+		this.loadingStatus.className =
+			"absolute inset-x-0 px-6 py-2 text-sm text-base-light";
+		this.loadingStatus.setAttribute("role", "status");
+		this.loadingStatus.hidden = true;
+		this.target.insertBefore(this.loadingStatus, this.container);
+		this._loadingTimer = setTimeout(() => {
+			if (this._destroyed) return;
+			this.loadingStatus.textContent = "Loading document…";
+			this.loadingStatus.hidden = false;
+		}, 150);
+	}
+
+	_finishLoading() {
+		clearTimeout(this._loadingTimer);
+		if (this._destroyed || this.headless) return;
+		this.container.removeAttribute("aria-busy");
+		this.toolbar?.element?.removeAttribute("aria-busy");
+		if (this._initialStateError) {
+			this.loadingStatus.textContent =
+				"Unable to load document. Reload to try again.";
+			this.loadingStatus.hidden = false;
+			return;
+		}
+		this.loadingStatus?.remove();
+		this.container.inert = false;
+		this.container.classList.remove("opacity-50", "pointer-events-none");
+		if (this.toolbar?.element) this.toolbar.element.inert = false;
+	}
+
+	get fingerprint() {
+		return this.target.getAttribute("lp-fingerprint");
+	}
+
+	set fingerprint(value) {
+		if (!value) return;
+		this.target.setAttribute("lp-fingerprint", value);
+	}
+
+	_initContainer() {
+		this.container = document.createElement("div");
+		this.container.dataset.role = "editor";
+		this.container.className = `${STYLES.editor.container} opacity-50 pointer-events-none`;
+		if (this.readonly)
+			this.container.classList.add("border-base-light/50", "border-t");
+		this.target.replaceChildren(this.container);
+	}
+
+	_initEditor() {
+		this.editor = collaborativeEditor(
+			this.container,
+			this.ydoc,
+			!this.readonly,
+		);
+		const mentionDocument = this.component?.key || this.key;
+		if (
+			!this.readonly &&
+			this.target?.dataset.publicLimited !== "true" &&
+			mentionDocument
+		) {
+			this.mentionSuggestions = new MentionSuggestions(this.editor, {
+				documentKey: mentionDocument,
+				onInsert: (mention) =>
+					this.pendingMentions.set(mention.occurrence_id, mention),
+			}).init();
+		}
+
+		this.editor.on("create", async () => {
+			await waitForAttribute(this.container, "loaded");
+			if (this._destroyed) return;
+
+			if (!this.headless) {
+				const hadOfflineChanges = Boolean(
+					this.offlineRecord?.ydoc ||
+						this.offlineRecord?.update ||
+						Object.hasOwn(this.offlineRecord ?? {}, "html"),
+				);
+				try {
+					if ((await this.sync()) === false)
+						throw new Error(
+							"Unable to preserve local document edits. Retry when online.",
+						);
+					await this.waitForRender();
+					if (this._destroyed) return;
+					if (hadOfflineChanges) this._dirty = true;
+					else this._commitInitialBaseline();
+				} catch (error) {
+					this._initialStateError = true;
+					this.view?.reportStartupError?.(
+						error,
+						this.target,
+						"document-initial-render",
+					);
+				}
+			}
+
+			if (this._destroyed) return;
+			this.container.setAttribute("initialized", "");
+			this._finishLoading();
+			this.initialized = true;
+		});
+
+		this.editor.on("blur", async ({ event }) => {
+			await this.waitForRender();
+			const activeElement = event.relatedTarget;
+			if (activeElement?.closest("[data-role='toolbar'], [role='listbox']")) {
+				return;
+			}
+			window.dispatchEvent(new CustomEvent("sync-save"));
+		});
+
+		this.ydoc.on("update", (update, origin) => {
+			if (origin !== "remote" && !this._applyingRemote) {
+				this.updateQueue.push(update);
+				if (this.initialized) this._dirty = true;
+			}
+		});
+	}
+
+	_initToolbar() {
+		if (this.readonly) return;
+
+		this.toolbar = new Toolbar(this);
+		this.toolbar.init();
+		this.target.prepend(this.toolbar.element);
+		this.toolbar.element.inert = true;
+		this.toolbar.element.setAttribute("aria-busy", "true");
+		this.toolbar.element.setAttribute("initialized", "");
+	}
+
+	/**
+	 * Treat the hydrated editor as the initial baseline so Tiptap/Yjs setup
+	 * transactions cannot be mistaken for user-authored empty content.
+	 *
+	 */
+	_commitInitialBaseline() {
+		this.snapshot = this._packageState();
+		this.updateQueue.length = 0;
+		this._dirty = false;
+	}
+
+	/**
+	 * Accept a persisted checkpoint without discarding an edit made while its
+	 * request was in flight. Remote-only changes do not make the document dirty.
+	 *
+	 */
+	commitSavedBaseline(snapshot, mentions = []) {
+		this.snapshot = snapshot;
+		for (const mention of mentions) {
+			this.pendingMentions?.delete(mention.occurrence_id);
+		}
+		if (this.updateQueue.length === 0) this._dirty = false;
+	}
+
+	waitForRender() {
+		// After Y.applyUpdate / setContent, y-prosemirror dispatches a PM
+		// transaction to render the snapshot, but the DOM mutations and layout
+		// aren't guaranteed to be flushed in the same microtask. Waiting two
+		// animation frames lets ProseMirror commit pending transactions (frame
+		// one) and the browser paint the resulting DOM (frame two) so that
+		// anything watching for the "initialized" signal (e.g. e2e tests) sees
+		// the editor in its final, interactive state.
+		return new Promise((resolve) => {
+			requestAnimationFrame(() => requestAnimationFrame(resolve));
+		});
+	}
+
+	_packageUpdates() {
+		if (this.updateQueue.length === 0) return null;
+		const merged = Y.mergeUpdates(this.updateQueue);
+		this.updateQueue.length = 0;
+		return uint8ArrayToBase64(merged);
+	}
+
+	_packageState() {
+		return uint8ArrayToBase64(Y.encodeStateAsUpdate(this.ydoc));
+	}
+
+	get syncData() {
+		if (this._versionBusy) return null;
+		if (
+			!this.initialized ||
+			this._initialStateError ||
+			this.updateQueue.length === 0
+		)
+			return null;
+
+		return {
+			update: this._packageUpdates(),
+			ydoc: this._packageState(),
+		};
+	}
+
+	get saveData() {
+		if (this._versionBusy) return null;
+		if (!this.initialized || this._initialStateError || !this._dirty)
+			return null;
+
+		const ydoc = this._packageState();
+		if (ydoc === this.snapshot) return null;
+
+		let html = this.editor.getHTML();
+		if (html.trim() === "<p></p>" || html.trim() === "<p><br></p>") html = "";
+
+		const update = this._packageUpdates();
+
+		if (html) {
+			this.target.dataset.history = "true";
+			this.toolbar?.toggles?.documentHistory?.show();
+		}
+
+		return {
+			update,
+			ydoc,
+			html,
+			mentions: Array.from(this.pendingMentions?.values?.() || []),
+		};
+	}
+
+	async sync() {
+		if (
+			(this.remote?.ydoc || this.remote?.updates?.length) &&
+			(await this.versions?.beforeSync(this.remote)) === false
+		)
+			return false;
+		this.pendingMentions ||= new Map();
+		for (const mention of this.offlineRecord?.mentions || []) {
+			if (mention?.occurrence_id) {
+				this.pendingMentions.set(mention.occurrence_id, mention);
+			}
+		}
+		if (this.toolbar && this.remote?.users) {
+			const others = this.remote.users.filter(
+				(u) => u.hash !== this.remote.user?.hash,
+			);
+			this.toolbar.userManager.setUsers(others);
+		}
+
+		if (!this.remote) {
+			if (this.offlineRecord?.ydoc) {
+				Y.applyUpdate(
+					this.ydoc,
+					base64ToUint8Array(this.offlineRecord.ydoc),
+					"local",
+				);
+			}
+			this.offlineRecord = null;
+			return;
+		}
+
+		if (this.remote.mode === "snapshot" && this.remote.ydoc) {
+			this.toolbar?.userManager.remoteUpdate(
+				this.remote.user_hash,
+				this.remote.authors?.[this.remote.user_hash],
+			);
+			Y.applyUpdate(this.ydoc, base64ToUint8Array(this.remote.ydoc), "remote");
+			this.snapshot = this.remote.ydoc;
+			this.fingerprint = this.remote.fingerprint;
+		} else if (this.remote.mode === "snapshot") {
+			this._applyingRemote = true;
+			try {
+				this.editor.commands.setContent(this.remote.markup || "", {
+					emitUpdate: false,
+				});
+			} finally {
+				this._applyingRemote = false;
+			}
+			// The HTML fallback can mutate collaborative editor state before the
+			// ProseMirror view repaints, which can leave first-opened seeded
+			// documents blank until focus changes.
+			this.editor.view.updateState(this.editor.state);
+			this.snapshot = this._packageState();
+			this.fingerprint = this.remote.fingerprint;
+		}
+		if (this.offlineRecord?.ydoc) {
+			Y.applyUpdate(
+				this.ydoc,
+				base64ToUint8Array(this.offlineRecord.ydoc),
+				"local",
+			);
+		}
+		this.offlineRecord = null;
+		for (const update of this.remote.updates ?? []) {
+			if (!update?.update) continue;
+			this.toolbar?.userManager.remoteUpdate(
+				update.user_hash,
+				this.remote.authors?.[update.user_hash],
+			);
+			Y.applyUpdate(this.ydoc, base64ToUint8Array(update.update), "remote");
+		}
+		if (this.remote.fingerprint) this.fingerprint = this.remote.fingerprint;
+
+		this.remote = null;
+		// A later successful poll can recover an initial transport failure.
+		if (this.initialized && this._initialStateError) {
+			await this.waitForRender();
+			if (this._destroyed) return;
+			if (!this._dirty) this._commitInitialBaseline();
+			this._initialStateError = false;
+			this._finishLoading();
+		}
+	}
+
+	destroy() {
+		this._destroyed = true;
+		this.versions?.destroy();
+		clearTimeout(this._loadingTimer);
+		this.loadingStatus?.remove();
+		this.mentionSuggestions?.destroy();
+		this.editor?.destroy();
+		this.toolbar?.destroy();
+		this.ydoc?.destroy();
+	}
+}

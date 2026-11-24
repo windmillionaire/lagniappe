@@ -5,13 +5,13 @@ The create form (``CreateTask`` / ``tasks.html`` action buttons) uses facet sear
 project combobox: searching by project name loads matching projects and, when the cache
 expands models, all model tasks for that project. Selecting a model task whose definition
 includes a form should auto-fill the form selector (see ``BaseTaskSettings`` in
-``src/script/widgets/taskSettings.mjs``). Task rows render ``entity_badge`` chips for
+``src/script/widgets/taskSettings.ts``). Task rows render ``entity_badge`` chips for
 linked project, model, assignee, due date, etc.; use ``Badges`` helpers to assert visibility.
 
 Verified against:
 - lagniappe/web/templates/pages/tasks.html (task tab, action_buttons, task_details)
 - lagniappe/web/routes/tasks/ (create / update)
-- src/script/widgets/taskSettings.mjs (CreateTask, entity selects)
+- src/script/widgets/taskSettings.ts (CreateTask, entity selects)
 - lagniappe/core/tools/cache/query.py (``kind_search`` project + model expansion)
 
 Definitions:

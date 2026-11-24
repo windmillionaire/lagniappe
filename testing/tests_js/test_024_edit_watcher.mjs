@@ -82,7 +82,7 @@ test("test_base_form_tracks_unsaved_state_without_sync", async () => {
 	const { FormController } = await esmock.strict(
 		"../../src/script/forms/controller.ts",
 		{
-			"../../src/script/elements/primitives.mjs": {
+			"../../src/script/elements/primitives.ts": {
 				primitives: { error: () => ({}) },
 			},
 			"../../src/script/shared/icons.ts": { createIcon: () => ({}) },

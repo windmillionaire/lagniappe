@@ -1,6 +1,6 @@
 import type { SearchBox } from "../../elements/combobox/search.ts";
-import type { EntityMenu } from "../../elements/entityMenu.mjs";
-import type { Notifications } from "../../elements/notifications.mjs";
+import type { EntityMenu } from "../../elements/entityMenu.ts";
+import type { Notifications } from "../../elements/notifications.ts";
 import type { EditWatcher } from "../../forms/revisions/watcher.ts";
 import { connectivity } from "../../shared/connectivity.ts";
 import type { DeferredOperationManager } from "../../shared/deferredOperations.ts";
@@ -22,12 +22,12 @@ import type { SyncManager } from "../../shared/sync.ts";
 import { withTransition } from "../../shared/transitions.ts";
 import type { RequestResult } from "../../types/api";
 import type { SyncWidget } from "../../types/sync";
-import ViewComponent from "./component.mjs";
+import ViewComponent from "./component.ts";
 import {
 	collectRefreshTargets,
 	reconcileChange,
 	refreshCollectionComponents,
-} from "./reconciliation.mjs";
+} from "./reconciliation.ts";
 import {
 	ensureDeferredOperations,
 	ensureEditWatcher,
@@ -41,10 +41,10 @@ import {
 	ensureSubmissionManager,
 	ensureSyncManager,
 	initializeCoreServices,
-} from "./services.mjs";
-import ShellView from "./shell.mjs";
-import type { SubmissionManager } from "./submission.mjs";
-import { Task } from "./task.mjs";
+} from "./services.ts";
+import ShellView from "./shell.ts";
+import type { SubmissionManager } from "./submission.ts";
+import { Task } from "./task.ts";
 
 type PollChannel = PollDescriptor<"channel">["channel"];
 
@@ -536,7 +536,7 @@ export default class Core extends ShellView {
 	 */
 	scheduleOfflineReplay(): Promise<number> {
 		if (this._offlineReplayTask) return this._offlineReplayTask;
-		const replay: Promise<number> = import("./offlineReplay.mjs").then(
+		const replay: Promise<number> = import("./offlineReplay.ts").then(
 			({ replayOfflineQueue }) => replayOfflineQueue(this),
 		);
 		this._offlineReplayTask = replay;

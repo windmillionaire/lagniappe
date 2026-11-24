@@ -167,7 +167,7 @@ test("test_registry_generation_is_idempotent_and_repairs_missing_outputs", async
 
 test("test_generated_styles_and_icons_render_a_real_button", async (t) => {
 	createBrowser(t);
-	const { buttons } = await import("../../src/script/elements/buttons.mjs");
+	const { buttons } = await import("../../src/script/elements/buttons.ts");
 	const { STYLES } = await import("../../src/script/generated/styles.mjs");
 	const button = buttons.default({ text: "Create page", icon: "page" });
 	assert.equal(button.className, STYLES.button.submit);

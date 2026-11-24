@@ -148,7 +148,7 @@ async function setupMain(t, { activeNavigationTransition = false } = {}) {
 			}
 		});
 	};
-	const module = await esmock.strict.p("../../src/script/main.mjs", {
+	const module = await esmock.strict.p("../../src/script/main.ts", {
 		"../../src/script/shared/connectivity.ts": { connectivity },
 		"../../src/script/shared/notificationState.ts": {
 			applyNotificationStateHeader() {},
@@ -161,7 +161,7 @@ async function setupMain(t, { activeNavigationTransition = false } = {}) {
 				upstreamMessages.push({ data });
 			},
 		},
-		"../../src/script/viewRegistry.mjs": {
+		"../../src/script/viewRegistry.ts": {
 			loadView: (...args) => viewLoader(...args),
 		},
 		"../../src/script/shared/errors.ts": errorBoundary,

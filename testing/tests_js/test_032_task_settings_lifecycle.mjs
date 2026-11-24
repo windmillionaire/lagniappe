@@ -17,10 +17,10 @@ function replaceGlobal(t, name, value) {
 }
 
 async function loadTaskSettings({ FormWidget, SectionToggle = {} }) {
-	return await esmock.strict("../../src/script/widgets/taskSettings.mjs", {
-		"../../src/script/elements/input.mjs": { InputElement: class {} },
-		"../../src/script/elements/sectionToggle.mjs": { SectionToggle },
-		"../../src/script/elements/textarea.mjs": { TextareaElement: class {} },
+	return await esmock.strict("../../src/script/widgets/taskSettings.ts", {
+		"../../src/script/elements/input.ts": { InputElement: class {} },
+		"../../src/script/elements/sectionToggle.ts": { SectionToggle },
+		"../../src/script/elements/textarea.ts": { TextareaElement: class {} },
 		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
@@ -89,9 +89,9 @@ test("test_closed_task_errors_persist_while_waiting_and_retrying", async (t) => 
 	createBrowser(t);
 	t.mock.timers.enable({ apis: ["setTimeout"], now: 0 });
 	const { default: ViewComponent } = await esmock.strict(
-		"../../src/script/views/base/component.mjs",
+		"../../src/script/views/base/component.ts",
 		{
-			"../../src/script/elements/nav.mjs": { NavElement: class {} },
+			"../../src/script/elements/nav.ts": { NavElement: class {} },
 			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
@@ -100,7 +100,7 @@ test("test_closed_task_errors_persist_while_waiting_and_retrying", async (t) => 
 			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
-			"../../src/script/widgets/loader.mjs": {
+			"../../src/script/widgets/loader.ts": {
 				loadWidget: async () => null,
 			},
 		},
@@ -159,9 +159,9 @@ test("test_task_history_fill_reports_incompatible_values_and_ignores_stale_respo
 		get: () => new Promise((resolve) => pending.push(resolve)),
 	};
 	const { TaskForm } = await esmock.strict(
-		"../../src/script/widgets/taskForm.mjs",
+		"../../src/script/widgets/taskForm.ts",
 		{
-			"../../src/script/elements/sections.mjs": { sections: {} },
+			"../../src/script/elements/sections.ts": { sections: {} },
 			"../../src/script/forms/controller.ts": { FormController: class {} },
 			"../../src/script/shared/index.ts": {
 				captureError() {
@@ -246,13 +246,13 @@ test("test_history_fill_waits_without_overwriting_new_input", async (t) => {
 	};
 	replaceGlobal(t, "document", fakeDocument);
 	const { BaseElement } = await esmock.strict(
-		"../../src/script/elements/base/baseElement.mjs",
+		"../../src/script/elements/base/baseElement.ts",
 		{
 			"../../src/script/generated/styles.mjs": {
 				STYLES: { form: { icon: "icon" } },
 			},
 			"../../src/script/shared/icons.ts": { setIcon() {} },
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
+			"../../src/script/elements/primitives.ts": { primitives: {} },
 		},
 	);
 	const filled = [];
@@ -309,26 +309,26 @@ test("test_task_completion_replaces_closed_row_in_one_transition", async () => {
 		}
 	};
 	const { default: ViewComponent } = await esmock.strict(
-		"../../src/script/views/base/component.mjs",
+		"../../src/script/views/base/component.ts",
 		{
-			"../../src/script/elements/nav.mjs": { NavElement: class {} },
+			"../../src/script/elements/nav.ts": { NavElement: class {} },
 			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
 				},
 			},
 			"../../src/script/shared/transitions.ts": { withTransition },
-			"../../src/script/widgets/loader.mjs": {
+			"../../src/script/widgets/loader.ts": {
 				loadWidget: async () => null,
 			},
 		},
 	);
-	const { Task } = await esmock.strict("../../src/script/views/base/task.mjs", {
+	const { Task } = await esmock.strict("../../src/script/views/base/task.ts", {
 		"../../src/script/shared/transitions.ts": { withTransition },
-		"../../src/script/views/base/component.mjs": { default: ViewComponent },
+		"../../src/script/views/base/component.ts": { default: ViewComponent },
 	});
 	const { PageTaskList } = await esmock.strict(
-		"../../src/script/widgets/pageTaskList.mjs",
+		"../../src/script/widgets/pageTaskList.ts",
 		{
 			"../../src/script/elements/base/baseList.ts": { BaseList: class {} },
 			"../../src/script/shared/transitions.ts": { withTransition },
