@@ -1225,7 +1225,9 @@ def setup_app_engine(*, confirm: bool = True) -> None:
     if settings_changed:
         SETTINGS.save()
 
-    application = create_app_engine_app(confirm=confirm)
+    application = (
+        create_app_engine_app() if confirm else create_app_engine_app(confirm=False)
+    )
     location = str(getattr(application, "location_id", "") or "").strip()
     hostname = str(getattr(application, "default_hostname", "") or "").strip()
     if not location or not hostname:

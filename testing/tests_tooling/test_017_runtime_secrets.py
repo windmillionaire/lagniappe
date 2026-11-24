@@ -412,9 +412,10 @@ def test_installer_secrets_provisioning_probe_and_doctor_leak_check(tmp_path):
 
 
 def test_doctor_provider_checker_hydrates_secret_manager_settings_in_memory(monkeypatch):
+    import config.secrets as live_runtime_secrets
     from installer import commands, iam, monitoring, recovery
 
-    disk_settings = runtime_secrets.strip_secret_settings(
+    disk_settings = live_runtime_secrets.strip_secret_settings(
         _sample_full_app_settings("secret_manager")
     )
     assert "GIBBERISH" not in disk_settings
@@ -442,7 +443,7 @@ def test_doctor_provider_checker_hydrates_secret_manager_settings_in_memory(monk
 
     monkeypatch.setattr(commands, "run_gcloud_command", _fake_gcloud)
     monkeypatch.setattr(
-        runtime_secrets,
+        live_runtime_secrets,
         "load_runtime_secrets",
         lambda _settings: {
             "GIBBERISH": "hydrated-gibberish",
