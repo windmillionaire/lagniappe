@@ -23,9 +23,12 @@ from lagniappe.web.auth import authenticated_user
 
 from config.remote_mcp import (
     ANTIGRAVITY_CLIENT_ID,
+    CLAUDE_CLIENT_ID,
+    CLAUDE_CODE_CLIENT_ID,
     CLIENT_ID,
     CODEX_CLIENT_ID,
     PENDING_SECONDS,
+    PI_CLIENT_ID,
     mcp_issuer,
 )
 from lagniappe import CONFIG
@@ -40,6 +43,9 @@ _CLIENT_LABELS = (
     (CLIENT_ID, "ChatGPT"),
     (CODEX_CLIENT_ID, "Codex"),
     (ANTIGRAVITY_CLIENT_ID, "Antigravity"),
+    (CLAUDE_CLIENT_ID, "Claude"),
+    (CLAUDE_CODE_CLIENT_ID, "Claude Code"),
+    (PI_CLIENT_ID, "Pi"),
 )
 _CLIENT_NAME_BY_ID = dict(_CLIENT_LABELS)
 

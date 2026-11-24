@@ -762,6 +762,98 @@ def test_antigravity_cimd_grants_coexist_with_chatgpt_and_codex(oauth, monkeypat
     assert auth.authenticate_access(chatgpt["access_token"])[0] is oauth.actor
 
 
+def test_claude_claude_code_and_pi_cimd_grants_coexist_and_verify_published_redirects(
+    oauth, monkeypatch
+):
+    from config.remote_mcp import (
+        CLAUDE_CLIENT_ID,
+        CLAUDE_CODE_CLIENT_ID,
+        CLAUDE_REDIRECT_URI,
+        PI_CLIENT_ID,
+    )
+
+    documents = {
+        oauth.config["client_id"]: oauth.document,
+        CLAUDE_CLIENT_ID: {
+            "client_id": CLAUDE_CLIENT_ID,
+            "redirect_uris": [CLAUDE_REDIRECT_URI],
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+            "token_endpoint_auth_method": "none",
+        },
+        CLAUDE_CODE_CLIENT_ID: {
+            "client_id": CLAUDE_CODE_CLIENT_ID,
+            "redirect_uris": ["http://localhost/callback", "http://127.0.0.1/callback"],
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+            "token_endpoint_auth_method": "none",
+        },
+        PI_CLIENT_ID: {
+            "client_id": PI_CLIENT_ID,
+            "redirect_uris": ["http://127.0.0.1/callback"],
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+            "token_endpoint_auth_method": "none",
+            "token_endpoint_auth_methods_supported": ["none"],
+        },
+    }
+
+    def fetch(url, policy):
+        oauth.downloads.append((url, policy))
+        return SimpleNamespace(
+            ok=True,
+            http_status=200,
+            redirect_count=0,
+            body=json.dumps(documents[url]).encode(),
+        )
+
+    monkeypatch.setattr(auth, "fetch_user_content", fetch)
+    chatgpt = auth.exchange_token(_code(oauth))
+
+    # Pi's mocked CIMD above omits localhost, so localhost must be rejected while 127.0.0.1 succeeds.
+    with pytest.raises(auth.OAuthError) as missing_localhost:
+        auth.begin_authorization({
+            **oauth.request,
+            "client_id": PI_CLIENT_ID,
+            "redirect_uri": "http://localhost:8765/callback",
+        })
+    assert missing_localhost.value.code == "invalid_client"
+
+    issued = {}
+    for client_id, redirect_uri in (
+        (CLAUDE_CLIENT_ID, CLAUDE_REDIRECT_URI),
+        (CLAUDE_CODE_CLIENT_ID, "http://localhost:54321/callback"),
+        (PI_CLIENT_ID, "http://127.0.0.1:8765/callback"),
+    ):
+        pending = auth.begin_authorization({
+            **oauth.request,
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+        })
+        target, response = auth.consent(pending, oauth.actor, allow=True)
+        assert target == redirect_uri
+        assert response["iss"] == oauth.config["issuer"]
+        tokens = auth.exchange_token({
+            "grant_type": "authorization_code",
+            "client_id": client_id,
+            "redirect_uri": target,
+            "resource": oauth.config["resource"],
+            "code": response["code"],
+            "code_verifier": VERIFIER,
+        })
+        assert auth.authenticate_access(tokens["access_token"])[0] is oauth.actor
+        assert auth.connection_status(oauth.actor, client_id=client_id)["active"]
+        issued[client_id] = tokens
+
+    # Revoking Claude Code leaves ChatGPT, Claude, and Pi active.
+    auth.connection_status(oauth.actor, client_id=CLAUDE_CODE_CLIENT_ID, revoke=True)
+    with pytest.raises(auth.OAuthError):
+        auth.authenticate_access(issued[CLAUDE_CODE_CLIENT_ID]["access_token"])
+    assert auth.authenticate_access(chatgpt["access_token"])[0] is oauth.actor
+    assert auth.authenticate_access(issued[CLAUDE_CLIENT_ID]["access_token"])[0] is oauth.actor
+    assert auth.authenticate_access(issued[PI_CLIENT_ID]["access_token"])[0] is oauth.actor
+
+
 def test_site_policy_blocks_existing_oauth_grants_and_public_users(oauth, monkeypatch):
     tokens = auth.exchange_token(_code(oauth))
     for flag in ("AI_ENABLED", "EXTERNAL_AI_ENABLED"):

@@ -217,8 +217,8 @@ API](AI_EXTERNAL_API.md).
 ## Remote MCP
 
 The optional Cloud Run service uses existing browser login to authorize the
-supported ChatGPT and Antigravity CIMD clients and the pre-registered public
-Codex client.
+supported ChatGPT, Antigravity, Claude, Claude Code, and Pi CIMD clients and
+the pre-registered public Codex client.
 Both site AI policy flags gate authorization and existing grants. Eligible
 active non-public Lagniappe users may connect. There is no actor allowlist in
 installation configuration. The login email need not
@@ -264,15 +264,22 @@ logout or switching the browser user does not revoke either connection.
 The pre-registered public Codex client is `lagniappe-codex`. Its redirect is `http://127.0.0.1/callback`, allowing only
 an optional valid numeric port for Codex's local listener (RFC 8252). Host,
 path, query absence, and the actual callback reused at token exchange remain
-exact. No DNS callback, dynamic registration, client secret, or additional
-metadata fetch is introduced. Authorization responses include `iss`, as
-required by Codex's pre-registered-client flow. OAuth responses also allow the
-loopback callback in their CSP `form-action` directive:
+exact. Claude Code (`https://claude.ai/oauth/claude-code-client-metadata`) and
+Pi (`https://pi.dev/oauth/client.json`) are supported native loopback CIMD
+clients whose published metadata documents authorize `http://127.0.0.1/callback`
+and `http://localhost/callback` with an optional valid RFC 8252 ephemeral port,
+and Claude (`https://claude.ai/oauth/mcp-oauth-client-metadata`) uses its fixed
+HTTPS callback `https://claude.ai/api/mcp/auth_callback`. No dynamic
+registration or client secret is introduced. Authorization responses include
+`iss`, as required by public-client flows. OAuth responses also allow the
+supported client origins and loopback callbacks in their CSP `form-action`
+directive:
 browsers apply that directive to the native consent POST's redirect chain.
 Other pages retain the ordinary same-origin policy. Consent and revocation use
 the shared login button spinner while preserving native POST values and CSRF.
 Client identities and callback rules are application constants, not installation
-settings. Both clients are available when MCP and external AI are configured.
+settings. All supported clients are available when MCP and external AI are
+configured.
 
 Cloud Run authenticates every MCP request through `/api/v1`, including requests
 such as ping that need no domain data. The API requires both the dedicated

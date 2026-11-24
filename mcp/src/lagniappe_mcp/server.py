@@ -507,7 +507,12 @@ def create_app(
         security_settings=TransportSecuritySettings(
             enable_dns_rebinding_protection=True,
             allowed_hosts=[urlsplit(config.origin).netloc],
-            allowed_origins=[config.origin, "https://chatgpt.com"],
+            allowed_origins=[
+                config.origin,
+                "https://chatgpt.com",
+                "https://claude.ai",
+                "https://claude.com",
+            ],
         ),
     )
 

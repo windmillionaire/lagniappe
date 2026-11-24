@@ -1,4 +1,4 @@
-"""ChatGPT and Codex OAuth service, using opaque secrets and current User permissions."""
+"""Remote MCP OAuth service, using opaque secrets and current User permissions."""
 
 from collections.abc import Mapping
 import base64
@@ -23,9 +23,14 @@ from config.remote_mcp import (
     ACCESS_SECONDS,
     ANTIGRAVITY_CLIENT_ID,
     CIMD_CLIENTS,
+    CIMD_LOOPBACK_CLIENTS,
+    CLAUDE_CLIENT_ID,
+    CLAUDE_CODE_CLIENT_ID,
     CODE_SECONDS,
     CODEX_CLIENT_ID,
     CLIENT_ID,
+    PI_CLIENT_ID,
+    loopback_redirect_base,
     mcp_issuer,
     client_allowed,
     redirect_allowed,
@@ -55,7 +60,7 @@ _CLIENT_POLICY = UserFetchPolicy(
     read_timeout=5,
     deadline=10,
 )
-_client_cache: dict[tuple[str, str], tuple[float, dict[str, str]]] | None = {}
+_client_cache: dict[tuple[str, tuple[str, ...]], tuple[float, dict[str, object]]] | None = {}
 _client_lock = threading.Lock()
 _CERTIFICATE_URL = "https://www.googleapis.com/oauth2/v1/certs"
 _CERTIFICATE_POLICY = UserFetchPolicy(
@@ -204,14 +209,17 @@ def _certificate_request(url, method="GET"):
         return SimpleNamespace(status=200, data=body)
 
 
-def client_metadata(client_id: str) -> dict[str, str]:
+def client_metadata(client_id: str) -> dict[str, object]:
     """Fetch only supported CIMD documents, with no DCR or client secret."""
     global _client_cache
     settings()
-    expected_redirect = CIMD_CLIENTS.get(client_id)
-    if expected_redirect is None:
+    if client_id in CIMD_CLIENTS:
+        expected_redirects: tuple[str, ...] = (CIMD_CLIENTS[client_id],)
+    elif client_id in CIMD_LOOPBACK_CLIENTS:
+        expected_redirects = CIMD_LOOPBACK_CLIENTS[client_id]
+    else:
         raise OAuthError("invalid_client")
-    cache_key = (client_id, expected_redirect)
+    cache_key = (client_id, expected_redirects)
     with _client_lock:
         if not isinstance(_client_cache, dict):
             _client_cache = {}
@@ -231,13 +239,18 @@ def client_metadata(client_id: str) -> dict[str, str]:
             redirects = document.get("redirect_uris")
             grants = document.get("grant_types", ["authorization_code"])
             responses = document.get("response_types", ["code"])
+            matched_redirects = (
+                tuple(uri for uri in expected_redirects if uri in redirects)
+                if isinstance(redirects, list)
+                else ()
+            )
             if (
                 document.get("client_id") != client_id
                 or not isinstance(methods, list)
                 or "none" not in methods
                 or not all(isinstance(item, str) for item in methods)
                 or not isinstance(redirects, list)
-                or expected_redirect not in redirects
+                or not matched_redirects
                 or not all(isinstance(item, str) for item in redirects)
                 or not isinstance(grants, list)
                 or "authorization_code" not in grants
@@ -248,7 +261,11 @@ def client_metadata(client_id: str) -> dict[str, str]:
         except (ValueError, TypeError, UnicodeError, RecursionError):
             raise OAuthError("invalid_client") from None
         # Cache only the already validated, minimal public projection.
-        metadata = {"client_id": client_id, "redirect_uri": expected_redirect}
+        metadata: dict[str, object] = {
+            "client_id": client_id,
+            "redirect_uri": matched_redirects[0],
+            "redirect_uris": matched_redirects,
+        }
         _client_cache[cache_key] = (time.monotonic() + 300, metadata)
         return metadata
 
@@ -291,8 +308,17 @@ def begin_authorization(parameters: Mapping[str, str], *, now: datetime | None =
         or any(ord(char) < 32 or ord(char) == 127 for char in state)
     ):
         raise OAuthError("invalid_request")
-    if parameters["client_id"] in CIMD_CLIENTS:
-        client_metadata(parameters["client_id"])
+    if parameters["client_id"] in CIMD_CLIENTS or parameters["client_id"] in CIMD_LOOPBACK_CLIENTS:
+        metadata = client_metadata(parameters["client_id"])
+        published_redirects = metadata.get("redirect_uris")
+        if isinstance(published_redirects, (list, tuple)):
+            expected_base = (
+                loopback_redirect_base(parameters["redirect_uri"], allow_localhost=True)
+                if parameters["client_id"] in CIMD_LOOPBACK_CLIENTS
+                else parameters["redirect_uri"]
+            )
+            if expected_base not in published_redirects:
+                raise OAuthError("invalid_client")
     now = _now(now)
     pending = _secret("p")
     row: dict[str, object] = {key: parameters[key] for key in required}
@@ -352,6 +378,9 @@ def _grant_name(user, client_id: str | None = None) -> str:
     suffix = {
         CODEX_CLIENT_ID: "-codex",
         ANTIGRAVITY_CLIENT_ID: "-antigravity",
+        CLAUDE_CLIENT_ID: "-claude",
+        CLAUDE_CODE_CLIENT_ID: "-claude-code",
+        PI_CLIENT_ID: "-pi",
     }.get(client_id or "", "")
     return "grant-" + credential_id(user) + suffix
 

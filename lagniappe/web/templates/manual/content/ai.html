@@ -201,11 +201,37 @@
               To revoke a connection, open <strong>Settings / Manage AI connections</strong>
               in Lagniappe.</p>
           </div>
+          <div data-role="external-ai-claude-setup" class="space-y-3">
+            <h3 class="font-semibold text-page-default">Connect Claude: web, desktop, or Claude Code</h3>
+            <p>Claude web, Claude Desktop, and Claude Code connect over remote MCP
+              with OAuth metadata discovery. No Lagniappe API key or manual client
+              secret is needed.</p>
+            <ol class="list-decimal pl-5 space-y-2">
+              <li><strong>Claude web or desktop:</strong> open
+                <strong>Settings / Connectors</strong>, add a custom connector named
+                <code>{{ mcp_name }}</code> with server URL <code>{{ mcp_url }}</code>,
+                then follow the sign-in prompt and choose <strong>Allow</strong>.</li>
+              <li><strong>Claude Code CLI:</strong> add the remote HTTP server and
+                complete the browser sign-in prompt:</li>
+            </ol>
+            {{ code('claude mcp add --transport http ' ~ mcp_name ~ ' ' ~ mcp_url) }}
+            <p>To revoke Claude or Claude Code access, open
+              <strong>Settings / Manage AI connections</strong> in Lagniappe.</p>
+          </div>
+          <div data-role="external-ai-pi-setup" class="space-y-3">
+            <h3 class="font-semibold text-page-default">Connect Pi</h3>
+            <p>Add the remote MCP server URL <code>{{ mcp_url }}</code> under
+              <code>mcpServers</code> in <code>~/.pi/agent/mcp.json</code> (or a
+              project <code>.pi/mcp.json</code>) without an API key; Pi discovers
+              OAuth automatically via its client metadata document and opens your
+              browser to sign in and choose <strong>Allow</strong>.</p>
+            <p>To revoke Pi access, open
+              <strong>Settings / Manage AI connections</strong> in Lagniappe.</p>
+          </div>
         {% endif %}
-        <p>Both use the user's normal workspace permissions and the external agent's
-          model provider. Both can answer questions and prepare plans; workspace changes
-          still require review in Lagniappe. Either can be used on its own. If both are
-          installed, tell the agent which one to use to avoid duplicate work.</p>
+        <p>Every connected client uses the user's normal workspace permissions and the
+          external agent's model provider, and each client has its own independent
+          revocation control in Lagniappe.</p>
       </div>
     </details>
   {% endcall %}

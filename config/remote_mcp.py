@@ -11,9 +11,18 @@ CLIENT_ID = "https://chatgpt.com/oauth/client.json"
 REDIRECT_URI = "https://chatgpt.com/connector_platform_oauth_redirect"
 ANTIGRAVITY_CLIENT_ID = "https://antigravity.google/oauth/client-metadata.json"
 ANTIGRAVITY_REDIRECT_URI = "https://antigravity.google/oauth-callback"
+CLAUDE_CLIENT_ID = "https://claude.ai/oauth/mcp-oauth-client-metadata"
+CLAUDE_REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
+CLAUDE_CODE_CLIENT_ID = "https://claude.ai/oauth/claude-code-client-metadata"
+PI_CLIENT_ID = "https://pi.dev/oauth/client.json"
 CIMD_CLIENTS: dict[str, str] = {
     CLIENT_ID: REDIRECT_URI,
     ANTIGRAVITY_CLIENT_ID: ANTIGRAVITY_REDIRECT_URI,
+    CLAUDE_CLIENT_ID: CLAUDE_REDIRECT_URI,
+}
+CIMD_LOOPBACK_CLIENTS: dict[str, tuple[str, ...]] = {
+    CLAUDE_CODE_CLIENT_ID: ("http://localhost/callback", "http://127.0.0.1/callback"),
+    PI_CLIENT_ID: ("http://127.0.0.1/callback", "http://localhost/callback"),
 }
 CODEX_CLIENT_ID = "lagniappe-codex"
 ACCESS_SECONDS = 30 * 60
@@ -84,9 +93,33 @@ def mcp_issuer(settings: Mapping[str, object]) -> str:
     return https_url(issuer.rstrip("/") if isinstance(issuer, str) else issuer, origin=True)
 
 
+def loopback_redirect_base(
+    redirect_uri: object, *, allow_localhost: bool = False
+) -> str | None:
+    """Validate an RFC 8252 loopback callback and return its port-stripped base URI."""
+    pattern = (
+        r"http://(127\.0\.0\.1|localhost)(?::[1-9][0-9]{0,4})?/callback"
+        if allow_localhost
+        else r"http://(127\.0\.0\.1)(?::[1-9][0-9]{0,4})?/callback"
+    )
+    if not isinstance(redirect_uri, str):
+        return None
+    match = re.fullmatch(pattern, redirect_uri)
+    if not match:
+        return None
+    try:
+        if urlsplit(redirect_uri).port == 0:
+            return None
+    except ValueError:
+        return None
+    return f"http://{match.group(1)}/callback"
+
+
 def client_allowed(client_id: object) -> bool:
     return isinstance(client_id, str) and (
-        client_id in CIMD_CLIENTS or client_id == CODEX_CLIENT_ID
+        client_id in CIMD_CLIENTS
+        or client_id in CIMD_LOOPBACK_CLIENTS
+        or client_id == CODEX_CLIENT_ID
     )
 
 
@@ -96,13 +129,9 @@ def redirect_allowed(client_id: object, redirect_uri: object) -> bool:
     assert isinstance(client_id, str)
     if client_id in CIMD_CLIENTS:
         return redirect_uri == CIMD_CLIENTS[client_id]
+    if client_id in CIMD_LOOPBACK_CLIENTS:
+        base = loopback_redirect_base(redirect_uri, allow_localhost=True)
+        return base is not None and base in CIMD_LOOPBACK_CLIENTS[client_id]
     # RFC 8252 native clients bind an ephemeral port. Every other byte of the
     # pre-registered loopback callback stays exact; localhost/DNS is not used.
-    if not isinstance(redirect_uri, str) or not re.fullmatch(
-        r"http://127\.0\.0\.1(?::[1-9][0-9]{0,4})?/callback", redirect_uri
-    ):
-        return False
-    try:
-        return urlsplit(redirect_uri).port != 0
-    except ValueError:
-        return False
+    return loopback_redirect_base(redirect_uri, allow_localhost=False) is not None

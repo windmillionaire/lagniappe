@@ -52,7 +52,8 @@ key and use plans and reads within their workspace permissions,
 regardless of their per-user provider entitlement. That entitlement controls
 Lagniappe's built-in provider calls; an external client uses its own model and
 tokens. Revoking the user's API key stops clients using that key. The optional
-remote MCP service has separately revocable ChatGPT and Codex OAuth grants.
+remote MCP service has separately revocable OAuth grants for ChatGPT, Codex,
+Antigravity, Claude, Claude Code, and Pi.
 
 ## Installation policy and access paths
 
