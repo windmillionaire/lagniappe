@@ -656,7 +656,9 @@ def upgrade_npm_packages(report: UpgradeReport | None = None) -> bool:
                 print(f"  {name}: {package[section][name]} -> {updates[name]}", flush=True)
                 package[section][name] = updates[name]
     if updates:
-        package_json.write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
+        package_json.write_text(
+            json.dumps(package, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
 
     ok = True
     try:

@@ -53,7 +53,6 @@
   "license": "AGPL-3.0-or-later",
   "name": "lagniappe",
   "private": true,
-  "type": "module",
   "scripts": {
     "build": "node build/run-rollup.mjs production",
     "check": "biome check src/script src/style build testing/utility/js testing/tests_js/*.mjs",
@@ -62,5 +61,6 @@
     "typecheck": "tsc --noEmit",
     "watch": "chokidar './src/**/*.{css,js,mjs,ts,mts,yaml}' 'lagniappe/web/templates/*.html' 'lagniappe/web/templates/**/*.html' -c 'node build/run-rollup.mjs development'"
   },
+  "type": "module",
   "version": "2.5.0"
 }

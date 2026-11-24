@@ -181,3 +181,13 @@ def test_authored_frontend_scripts_and_tsconfig_stay_strict_typescript():
 
     package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
     assert package["scripts"]["typecheck"] == "tsc --noEmit"
+
+
+def test_package_json_matches_canonical_config_serialization():
+    package_path = REPO_ROOT / "package.json"
+    raw = package_path.read_text(encoding="utf-8")
+    canonical = f"{json.dumps(json.loads(raw), indent=2, sort_keys=True)}\n"
+    assert raw == canonical, (
+        "package.json must match File.PACKAGE_JSON's sorted JSON serialization "
+        "so setup/upgrade saves do not rewrite it and invalidate build.json."
+    )
