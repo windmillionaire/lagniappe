@@ -21,7 +21,7 @@ export class FormChangeStatus {
 			this.builder.conditions.panel,
 			this.builder.components.panel,
 			this.builder.model.panel,
-			this.builder.formSettings.panel,
+			this.builder.formSettings.column,
 		])
 			if (panel) panel.inert = Boolean(change);
 		this.builder.pendingChange = change;

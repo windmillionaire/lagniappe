@@ -233,15 +233,10 @@ test("test_builder_resumes_migration_polling_and_clears_completed_status", async
 				this.header.saved();
 			},
 		});
-		for (const name of [
-			"settings",
-			"conditions",
-			"components",
-			"model",
-			"formSettings",
-		]) {
+		for (const name of ["settings", "conditions", "components", "model"]) {
 			builder[name] = { panel: document.createElement("div") };
 		}
+		builder.formSettings = { column: document.createElement("div") };
 		const saveButton = document.createElement("button");
 		const notification = document.createElement("div");
 		document.body.append(notification);
@@ -334,15 +329,10 @@ test("test_builder_resumes_migration_polling_and_clears_completed_status", async
 		assert.equal(restored, 1, suspension);
 		assert.equal(notification.textContent, "Form update finished.", suspension);
 		assert.equal(polling.subscriptions.size, 0, suspension);
-		for (const name of [
-			"settings",
-			"conditions",
-			"components",
-			"model",
-			"formSettings",
-		]) {
+		for (const name of ["settings", "conditions", "components", "model"]) {
 			assert.equal(builder[name].panel.inert, false, `${suspension}:${name}`);
 		}
+		assert.equal(builder.formSettings.column.inert, false, suspension);
 		builder.draft.dirty = true;
 		builder.header.unsaved();
 		assert.equal(saveButton.getAttribute("aria-disabled"), "false", suspension);
@@ -418,15 +408,10 @@ test("test_migration_status_uses_notification_and_keeps_save_disabled", async (t
 		},
 	);
 	const builder = { draft: { dirty: true }, key: "form-1" };
-	for (const name of [
-		"settings",
-		"conditions",
-		"components",
-		"model",
-		"formSettings",
-	]) {
+	for (const name of ["settings", "conditions", "components", "model"]) {
 		builder[name] = { panel: document.createElement("div") };
 	}
+	builder.formSettings = { column: document.createElement("div") };
 	const saveButton = document.createElement("button");
 	const notification = document.createElement("div");
 	document.body.append(notification);
@@ -446,6 +431,7 @@ test("test_migration_status_uses_notification_and_keeps_save_disabled", async (t
 		can_cancel: true,
 	};
 	status.show(running);
+	assert.equal(builder.formSettings.column.inert, true);
 	assert.equal(header.notification.children[0], status.node);
 	assert.equal(
 		header.notification.textContent,
@@ -485,6 +471,7 @@ test("test_migration_status_uses_notification_and_keeps_save_disabled", async (t
 	status.show({ ...running, status: "failed" });
 	assert.ok(!status.node.textContent.includes("Checklist"));
 	status.show(null);
+	assert.equal(builder.formSettings.column.inert, false);
 	header.unsaved();
 	assert.equal(header.notification.dataset.visible, "false");
 	assert.equal(header.saveButton.getAttribute("aria-disabled"), "false");
