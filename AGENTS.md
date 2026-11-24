@@ -103,7 +103,7 @@ These instructions apply to the whole repository unless a more specific
 - `lagniappe/core/` contains backend entities, properties, definitions, and
   service logic.
 - `lagniappe/web/` contains Flask routes, templates, and web integration code.
-- `src/script/` contains frontend modules.
+- `src/script/` contains strict TypeScript frontend modules.
 - `installer/` contains interactive install, recovery, repair, and update
   workflows.
 - `runner/` contains repository-local orchestration shared by `run.py` and the
@@ -140,7 +140,11 @@ These instructions apply to the whole repository unless a more specific
 - Run `venv/bin/python -m basedpyright --warnings` for the application.
   After preparing the locked MCP environment, run the same command with
   `--project mcp/pyrightconfig.json` for the adapter.
-- Run `venv/bin/python -m ruff check .` and `npm run check`.
+- Author frontend modules under `src/script/` as strict, erasable `.ts`
+  (explicit relative file extensions on runtime imports, `import type` for
+  type-only imports; only `src/script/generated/*.mjs` remain generated JS).
+- Run `venv/bin/python -m ruff check .`, `npm run typecheck`, and
+  `npm run check`.
 - Check the contracts affected by your changes:
   - `venv/bin/python run.py template-contracts --changed --check` for Jinja and DOM selectors.
   - `venv/bin/python run.py style-contracts --check` for styles, icons and test evidence.

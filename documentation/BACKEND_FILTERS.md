@@ -5,7 +5,7 @@ The filter system lets users create saved filter conditions on categories and pr
 ## Architecture
 
 ```
-Frontend (filters.mjs widget)
+Frontend (filters.ts widget)
   │
   ├── GET  /filters/{key}/condition  → Build condition UI
   ├── GET  /filters/{key}/options    → Get comparator + value inputs

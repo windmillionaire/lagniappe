@@ -24,13 +24,13 @@ palette, model, field settings, and condition controls. It defines available
 components, input and table-column choices, links, and presentation/settings
 defaults. Leaf controls import ID and endpoint helpers directly from their
 shared owners. Condition modules remain lazy through the literal registry in
-`conditions/loader.mjs`.
+`conditions/loader.ts`.
 
 Below the `lg` breakpoint, the builder layout is hidden and the existing
 Desktop Only notice is shown. This prevents the desktop columns from creating
 horizontal overflow behind the notice.
 
-## FormBuilder (`builder.mjs`)
+## FormBuilder (`builder.ts`)
 
 The main controller class. Owns the element map, sortable instances, all panel
 references, the global SearchBox mounted for this standalone view, and its
@@ -192,11 +192,11 @@ loaded condition is destroyed instead of being opened.
 
 ## Panels
 
-### ComponentsPanel (`panels/components.mjs`)
+### ComponentsPanel (`panels/components.ts`)
 
 The left sidebar showing available element types. Elements are draggable into the model panel.
 
-### ModelPanel (`panels/model.mjs`)
+### ModelPanel (`panels/model.ts`)
 
 The center panel showing the current form layout. Each element is rendered as a `ModelElement` -- a simplified visual preview (disabled inputs, labels, badges for table columns).
 
@@ -206,7 +206,7 @@ The center panel showing the current form layout. Each element is rendered as a 
 
 **`focusItem()` / `blurItem()`** -- when editing a condition, the model focuses on just the selected element (hides others) and removes its minimum height so the outline fits that element. On close, all elements and the normal drop area height are restored.
 
-### ElementSettings (`panels/elementSettings.mjs`)
+### ElementSettings (`panels/elementSettings.ts`)
 
 The right sidebar showing settings for the selected element. Settings are
 determined by `CONFIG.DEFAULT_SETTINGS[type]` -- each element type has a list
@@ -246,7 +246,7 @@ two-pixel outline appears only on hover or keyboard focus; their adjacent add,
 reorder, and remove controls use the shared centered icon-button interaction
 style.
 
-### FormSettings (`panels/formSettings.mjs`)
+### FormSettings (`panels/formSettings.ts`)
 
 The form-level settings panel handles AI schema generation and form access
 restrictions.
@@ -278,7 +278,7 @@ submits the complete snapshot in one PUT, using the standard `FormController` sp
 and error state. Adding or removing a group does not autosave. Failed saves keep
 the draft available for retry; duplicate submissions share one pending request.
 
-### ConditionPanel (`panels/condition.mjs`)
+### ConditionPanel (`panels/condition.ts`)
 
 An overlay panel that opens over the model when editing conditions, options, columns, or the HTML editor. Disables drag-and-drop while open and focuses the model on the selected element.
 
@@ -288,7 +288,7 @@ the user explicitly adds an entry.
 
 **Save flow**: validates the condition, pushes/updates the schema property, rebuilds settings, and updates the model preview.
 
-### Header (`panels/header.mjs`)
+### Header (`panels/header.ts`)
 
 Controls for the form name (inline editable), save button, and preview toggle.
 
@@ -340,9 +340,9 @@ notification element.
 
 ## Conditions System
 
-Conditions are property editors that open in the ConditionPanel. Each condition type is lazy-loaded from `conditions/loader.mjs`.
+Conditions are property editors that open in the ConditionPanel. Each condition type is lazy-loaded from `conditions/loader.ts`.
 
-### Base Classes (`conditions/base.mjs`)
+### Base Classes (`conditions/base.ts`)
 
 **`Condition`** -- base class for all condition editors. Creates a target container, header (with help/close buttons), progress section, and submit button. Uses a `FormController` for error display and submit state. Manages a `Map<name, element>` of progressive option inputs and a `destroyables` array for cleanup.
 
@@ -390,7 +390,7 @@ feedback timers; rebuilt column editors replace their exact `updated` handler
 instead of accumulating listeners. Async saves and mutation responses may
 finish, but re-check destruction before changing connected UI or navigating.
 
-## Config (`config.mjs`)
+## Config (`config.ts`)
 
 Static configuration for the builder:
 

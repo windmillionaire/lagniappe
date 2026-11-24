@@ -74,10 +74,10 @@ test("test_page_icon_lookup", () => {
 });
 ```
 
-Production relative imports include the file's extension, including `.ts` for
-converted modules. Name the index file explicitly for directory imports. Node
-strips erasable TypeScript when loading production modules. Styles and icons
-are normal generated modules. Never restore a
+Production relative imports include the file's extension—`.ts` for authored
+frontend modules and `.mjs` for generated style/icon registries. Name the index
+file explicitly for directory imports. Node strips erasable TypeScript when
+loading production modules. Styles and icons are normal generated modules. Never restore a
 virtual import or create a test-only copy of a production module. Full boot
 entries that import CSS remain build entry points; import the behavior owner
 in module tests and leave bundling checks in the build contract tests.

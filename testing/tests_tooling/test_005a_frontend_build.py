@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
 
@@ -13,6 +14,8 @@ from runner.frontend_build import (
 
 
 pytestmark = pytest.mark.tooling
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _sha256(content):
@@ -147,3 +150,34 @@ def test_verify_frontend_build_reports_actionable_failure(tmp_path):
             expected_mode="production",
             expected_version="1.2.3",
         )
+
+
+def test_authored_frontend_scripts_and_tsconfig_stay_strict_typescript():
+    script_root = REPO_ROOT / "src" / "script"
+    allowed_generated_js = {
+        "src/script/generated/icons.mjs",
+        "src/script/generated/styles.mjs",
+    }
+    js_files = sorted(
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in script_root.rglob("*")
+        if path.is_file() and path.suffix in {".js", ".mjs", ".cjs"}
+    )
+    assert set(js_files) <= allowed_generated_js, (
+        "Authored frontend modules under src/script/ must be TypeScript (.ts/.mts); "
+        f"found unexpected JS files: {sorted(set(js_files) - allowed_generated_js)}"
+    )
+
+    tsconfig = json.loads((REPO_ROOT / "tsconfig.json").read_text(encoding="utf-8"))
+    compiler_options = tsconfig["compilerOptions"]
+    assert compiler_options["strict"] is True
+    assert compiler_options["noEmit"] is True
+    assert compiler_options["erasableSyntaxOnly"] is True
+    assert compiler_options["allowImportingTsExtensions"] is True
+    assert compiler_options["allowJs"] is True
+    assert compiler_options["checkJs"] is False
+    assert tsconfig["include"] == ["src/script/**/*.ts", "src/script/**/*.mts"]
+    assert tsconfig["exclude"] == ["testing/"]
+
+    package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
+    assert package["scripts"]["typecheck"] == "tsc --noEmit"

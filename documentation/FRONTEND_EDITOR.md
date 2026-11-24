@@ -19,7 +19,7 @@ Widget (CollaborativeDocument or IndependentDocument)
 
 ## Document Types
 
-### CollaborativeDocument (`collaborative.mjs`)
+### CollaborativeDocument (`collaborative.ts`)
 
 Used for entity documents (project documents, page documents). Manages real-time collaboration via Yjs CRDT and server-side update polling.
 
@@ -50,7 +50,7 @@ Used for entity documents (project documents, page documents). Manages real-time
 - **Saving**: On blur, the editor dispatches `sync-save`. `saveData` includes
   the merged delta, full `ydoc`, and rendered `html`; document HTML persistence
   happens through the `/l/sync` route when `html` is present.
-- **Offline/headless replay**: `headless.mjs` owns `loadHeadlessWidget(...)` and
+- **Offline/headless replay**: `headless.ts` owns `loadHeadlessWidget(...)` and
   its registry. It lazily imports the collaborative controller to construct a
   detached document, allowing an offline record to merge and replay even when
   the widget is not mounted on the current route. `SyncManager` retains
@@ -62,7 +62,7 @@ strings for transport. Shared helpers `base64ToUint8Array` and
 these and `waitForAttribute` directly from `shared/utilities.ts`; sync service
 acquisition remains lazy through the view.
 
-### IndependentDocument (`independent.mjs`)
+### IndependentDocument (`independent.ts`)
 
 Used for standalone rich text fields (e.g. HTML form elements). No collaboration, no Yjs -- just TipTap with history (undo/redo).
 
@@ -111,7 +111,7 @@ final flush ownership to `FormBuilder`. Collaborative documents leave
 visibility and final save behavior to the widget/component lifecycle plus
 `SyncManager`.
 
-## Document versions (`versions.mjs`)
+## Document versions (`versions.ts`)
 
 Collaborative documents own a `DocumentVersions` controller. History selections
 open an isolated read-only editor with **Back to current** and **Restore this
@@ -130,7 +130,7 @@ editors display a dismissible notice linking previous/recovered content. See
 [document sync](SYNC_DOCUMENTS.md#versions-and-recovery) for persistence and
 concurrency details.
 
-## Editor Construction (`editor.mjs`)
+## Editor Construction (`editor.ts`)
 
 Three factory functions create TipTap `Editor` instances with shared extension configuration:
 
@@ -154,7 +154,7 @@ The document editors include: `StarterKit` (with underline; built-in links disab
 
 ## Custom Extensions (`extensions/`)
 
-### CustomLink (`link.mjs`)
+### CustomLink (`link.ts`)
 
 Extends TipTap's `Link` extension to normalize internal application links.
 Same-origin links are saved without the origin, open in the current tab, and
@@ -164,7 +164,7 @@ with `class="text-page"` and no `target`. TipTap's built-in click opener is
 disabled so `CustomLink` can keep internal links in the current tab while
 external links still use a new tab.
 
-### CustomImage (`image.mjs`)
+### CustomImage (`image.ts`)
 
 Extends TipTap's `Image` extension with width, float, and alignment attributes. Renders images with computed inline styles for positioning.
 
@@ -191,7 +191,7 @@ and Form-content sanitizer preserve; raw layout attributes are not exported.
 Both collaborative documents and independent/Form Document fields use this
 serialization.
 
-### FlashRemoteChanges (`remote.mjs`)
+### FlashRemoteChanges (`remote.ts`)
 
 A ProseMirror plugin that briefly highlights text inserted by remote collaborators. When a Yjs update arrives with `y-sync$` metadata, the plugin diffs the old and new document text, finds changed regions, and adds inline decorations with the remote user's color. Decorations are removed after 1 second.
 
@@ -203,7 +203,7 @@ A ProseMirror plugin that briefly highlights text inserted by remote collaborato
 4. Maps through remaining steps to get final positions
 5. Creates inline decorations on the changed text nodes
 
-### SelectionHighlight (`highlight.mjs`)
+### SelectionHighlight (`highlight.ts`)
 
 Preserves the visual selection highlight when focus moves away from the editor
 (e.g. to a toolbar form). Its saved selection uses the shared `TrackedRanges`
@@ -215,7 +215,7 @@ extension so document edits continue to map it correctly. Provides commands:
 | `clearSelectionHighlight()` | Removes the highlight |
 | `getSelectionHighlightRange()` | Returns `{from, to}` if a highlight is active |
 
-### TrackedRanges (`trackedRanges.mjs`)
+### TrackedRanges (`trackedRanges.ts`)
 
 Maintains independently named ProseMirror ranges across local, remote, and
 appended transactions. A range can be registered on the same transaction that
@@ -223,7 +223,7 @@ creates its content, avoiding a selection-position guess after collaborative
 normalization. Selection highlighting, AI insertion, and Markdown paste
 replacement share this range mechanism.
 
-### MarkdownSource and EditorPaste (`markdownSource.mjs`, `paste.mjs`)
+### MarkdownSource and EditorPaste (`markdownSource.ts`, `paste.ts`)
 
 `EditorPaste` conservatively detects Markdown, literal HTML source, and likely
 soft-wrapped prose in plain-text clipboard data. Rich HTML clipboard payloads
@@ -259,14 +259,14 @@ features such as arbitrary styling, external images, mentions as identity
 nodes, controls, YouTube embeds, and other active content. Private Yjs content
 is not migrated by public rendering.
 
-## Toolbar (`toolbar.mjs`)
+## Toolbar (`toolbar.ts`)
 
 The toolbar is shared between both document types. It creates tool buttons and dropdown menus, manages toolbar forms (color picker, image settings, link insertion), and tracks the active editor state.
 
 Feature configuration lives beside the toolbar in `elements/editor/config.ts`:
 `TOOLBAR_TOOLS`, `TOOLBAR_MENUS`, `IMAGE_GROUPS`, `COLOR_MENU`, `FONT_MENU`, and
 `USER_COLORS`. This module contains only configuration data. Toolbar options
-remain lazy through the literal registries in `options/registry.mjs`.
+remain lazy through the literal registries in `options/registry.ts`.
 Editor commands, extensions, and the independent controller import shared
 helpers directly from their endpoint, request, error, query-lifecycle, utility,
 or modal owners.
@@ -283,7 +283,7 @@ or modal owners.
 click-away closes forms like `addLink`; the toolbar checks `Core.isDragging`
 before closing so drag-selection does not immediately dismiss the form.
 
-### Option and Form Registries (`options/registry.mjs`)
+### Option and Form Registries (`options/registry.ts`)
 
 **`OPTION_REGISTRY`** maps command names to lazy-loaded toolbar button/menu item modules. These handle simple toggle commands (bold, italic, lists, undo/redo) and one-shot commands (heading, alignment, horizontal rule).
 
@@ -303,13 +303,13 @@ before closing so drag-selection does not immediately dismiss the form.
 
 On `selectionUpdate`, the toolbar reads the current marks and node attributes from the editor state and enables/disables the corresponding toolbar options. Image selection triggers the `setImage` form.
 
-### Toolbar Dropdowns (`dropdowns.mjs`)
+### Toolbar Dropdowns (`dropdowns.ts`)
 
 `toolbarDropdown(menu, items)` creates a menu button with a `Dropdown` combobox. After creating the dropdown, it queries the rendered `[role="option"]` elements and assigns them back to the toolbar items as `.button` references, so toolbar options can update their own visual state (active/inactive).
 
 `createMenuButton(settings)` is the shared factory for menu trigger buttons (icon + label + chevron). Used by both `toolbarDropdown` and `UserManager`.
 
-## UserManager (`users.mjs`)
+## UserManager (`users.ts`)
 
 Manages the list of active collaborators in a collaborative document. Displays a "Users" dropdown in the toolbar showing each user with a colored dot.
 

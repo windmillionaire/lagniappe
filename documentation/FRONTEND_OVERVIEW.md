@@ -1,6 +1,6 @@
 # Frontend Overview
 
-The frontend lives in `src/` and is split into two concerns: JavaScript application code (`src/script/`) and styles (`src/style/`). Rollup bundles everything into chunks that are served from `lagniappe/web/static/`.
+The frontend lives in `src/` and is split into two concerns: TypeScript application code (`src/script/`) and styles (`src/style/`). Rollup bundles everything into chunks that are served from `lagniappe/web/static/`.
 
 ## Entry Points
 
@@ -118,8 +118,9 @@ See [Frontend Forms](FRONTEND_FORMS.md) for ownership and service contracts.
 
 Run `npm run typecheck` with the Node version in `.nvmrc` after `npm ci`.
 The compiler strictly checks native TypeScript in `src/script/` without emitting
-files. The authored frontend modules use `.ts`. Shared declarations live in
-`src/script/types/`, and style and icon generation still emits `.mjs` files.
+files (`tsconfig.json` keeps `allowJs: true` solely for the generated registries
+under `src/script/generated/`). All authored frontend modules use `.ts`, and
+shared declarations live in `src/script/types/`.
 Use explicit extensions on relative runtime imports and `import type` for
 type-only imports. Keep syntax erasable so the repository's Node tests can
 load TypeScript directly.

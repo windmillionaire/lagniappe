@@ -1,6 +1,6 @@
 # Frontend Build
 
-Rollup bundles authored JavaScript, TypeScript, and CSS from `src/` into
+Rollup bundles authored TypeScript and CSS from `src/` into
 `lagniappe/web/static/`. The build also generates server-side style maps,
 service-worker metadata, and stable cache generations.
 
