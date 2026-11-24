@@ -142,12 +142,29 @@ test("test_offline_replay_returns_the_completed_prefix_and_retries_the_oldest_re
 		}
 		return { ok: true };
 	});
-	const queue = await env.seed([record("first", 1), record("second", 2)]);
+	const queue = await env.seed([
+		{
+			id: "first",
+			route: "/first",
+			files: [
+				{
+					name: "attachment",
+					file: new File(["legacy attachment"], "original.txt"),
+					filename: "queued.txt",
+				},
+			],
+		},
+		record("second", 2),
+	]);
 	assert.equal(await queue.replay(), 1);
 	assert.deepEqual(
 		env.sent.map(({ id }) => id),
 		["first", "second"],
 	);
+	assert.equal(env.sent[0].data.get("offline"), "True");
+	const attachment = env.sent[0].data.get("attachment");
+	assert.equal(attachment.name, "queued.txt");
+	assert.equal(await attachment.text(), "legacy attachment");
 	assert.deepEqual(env.phases, ["replayed:first"]);
 	await remaining(env, queue, ["second"]);
 	assert.equal(await queue.replay(), 1);

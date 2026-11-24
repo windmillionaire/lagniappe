@@ -1,4 +1,15 @@
 import { loadHeadlessWidget } from "../elements/editor/headless.mjs";
+import type { RequestResult } from "../types/api.d.ts";
+import type {
+	DocumentCursor,
+	PersistedSyncRecord,
+	SyncComponent,
+	SyncResponse,
+	SyncSendOptions,
+	SyncUpdate,
+	SyncView,
+	SyncWidget,
+} from "../types/sync.d.ts";
 import { ENDPOINTS } from "./endpoints.ts";
 import {
 	deleteSyncRecord,
@@ -7,15 +18,39 @@ import {
 	getSyncRecord,
 	updateSyncRecord,
 } from "./offline.ts";
+import type { PollDescriptor, PollResult } from "./polling.ts";
 import { request } from "./request.ts";
 import { waitForAttribute } from "./utilities.ts";
+
+type SyncSendResult = RequestResult<SyncResponse> | null | undefined;
+
+// The legacy editor factory accepts replay options with no remote state yet.
+const loadReplayWidget = loadHeadlessWidget as (options: {
+	sync_id: string;
+	offline: PersistedSyncRecord;
+}) => Promise<SyncWidget | null>;
 
 /**
  * Coordinate Yjs document updates through the shared polling protocol.
  *
  */
 export class SyncManager {
-	constructor(view) {
+	declare view: SyncView;
+	declare _initialized: boolean;
+	declare _subscriptions: Map<string, () => void>;
+	declare _cursors: Map<string, DocumentCursor>;
+	declare _checkpointRetries: Set<string>;
+	declare _checkpointPollFirst: Set<string>;
+	declare _pendingParentTouches: Set<string>;
+	declare _activating: Set<string>;
+	declare _offlineReplayAttempts: Map<string, number>;
+	declare _registerPromise: Promise<void> | null;
+	declare _sendPromise: Promise<SyncSendResult> | null;
+	declare _queuedSend: (Required<SyncSendOptions> & { save: boolean }) | null;
+	declare ready: Promise<this> | Promise<void>;
+	declare _syncSave: () => Promise<SyncSendResult>;
+
+	constructor(view: SyncView) {
 		this.view = view;
 		this._initialized = false;
 		this._subscriptions = new Map();
@@ -41,7 +76,7 @@ export class SyncManager {
 	}
 
 	get widgets() {
-		const entries = [];
+		const entries: [string, SyncWidget][] = [];
 		for (const component of Object.values(this.view.components ?? {})) {
 			for (const widget of Object.values(component.widgets ?? {})) {
 				if (widget.syncId) {
@@ -52,17 +87,19 @@ export class SyncManager {
 		return Object.fromEntries(entries);
 	}
 
-	_componentVisible(component) {
+	_componentVisible(component: SyncComponent | null | undefined) {
 		if (component?.visible !== true) return false;
-		let ancestor = component.elt?.parentElement?.closest?.("[lp-component]");
+		let ancestor =
+			component.elt?.parentElement?.closest?.<HTMLElement>("[lp-component]");
 		while (ancestor) {
 			if (ancestor.dataset.visible === "false") return false;
-			ancestor = ancestor.parentElement?.closest?.("[lp-component]");
+			ancestor =
+				ancestor.parentElement?.closest?.<HTMLElement>("[lp-component]");
 		}
 		return true;
 	}
 
-	_widgetVisible(widget) {
+	_widgetVisible(widget: SyncWidget) {
 		return Boolean(
 			widget?.component?.active === widget &&
 				this._componentVisible(widget.component) &&
@@ -70,9 +107,12 @@ export class SyncManager {
 		);
 	}
 
-	_descriptor(widget) {
+	_descriptor(widget: SyncWidget) {
+		const active = this.view.PollingCoordinator?.get(
+			`document:${widget.syncId}`,
+		);
 		const protocol =
-			this.view.PollingCoordinator?.get(`document:${widget.syncId}`) ??
+			(active as PollDescriptor<"document"> | null | undefined) ??
 			this._cursors.get(widget.syncId);
 		return {
 			key: widget.component?.key ?? widget.key,
@@ -83,8 +123,14 @@ export class SyncManager {
 		};
 	}
 
-	_rememberCursor(syncId, patch = null) {
-		const active = this.view.PollingCoordinator?.get(`document:${syncId}`);
+	_rememberCursor(
+		syncId: string,
+		patch: Partial<DocumentCursor> | null = null,
+	) {
+		const active = this.view.PollingCoordinator?.get(`document:${syncId}`) as
+			| PollDescriptor<"document">
+			| null
+			| undefined;
 		const current = this._cursors.get(syncId) ?? {};
 		const source = { ...current, ...active, ...patch };
 		this._cursors.set(syncId, {
@@ -94,18 +140,18 @@ export class SyncManager {
 		});
 	}
 
-	_replayBlocked(syncId) {
+	_replayBlocked(syncId: string) {
 		return (
 			this._offlineReplayAttempts.get(syncId) ===
 			(this.view.connectivityGeneration ?? 0)
 		);
 	}
 
-	_subscribe(widget, { force = false } = {}) {
+	_subscribe(widget: SyncWidget, { force = false } = {}) {
 		if (!widget?.syncId || this._subscriptions.has(widget.syncId)) return;
 		if (!force && !this._widgetVisible(widget)) return;
 		const id = `document:${widget.syncId}`;
-		const descriptor = {
+		const descriptor: PollDescriptor<"document"> = {
 			id,
 			type: "document",
 			...this._descriptor(widget),
@@ -160,7 +206,7 @@ export class SyncManager {
 		}
 	}
 
-	async state(widget) {
+	async state(widget: SyncWidget) {
 		await this.ready;
 		const offline = await getSyncRecord(widget.syncId);
 		if (offline) widget.offlineRecord = offline;
@@ -175,7 +221,8 @@ export class SyncManager {
 				`document:${widget.syncId}`,
 			);
 			const result = results?.find(
-				(result) => result.id === `document:${widget.syncId}`,
+				(result): result is PollResult<"document"> =>
+					result.id === `document:${widget.syncId}`,
 			);
 			if (result?.payload) {
 				await widget.readCache?.accept(result.payload);
@@ -214,7 +261,7 @@ export class SyncManager {
 		return pending;
 	}
 
-	async _register(generation) {
+	async _register(generation: number) {
 		const { sync: allOffline } = await getAllOfflineRecords();
 		const offline = allOffline.filter(
 			({ sync_id }) =>
@@ -286,7 +333,7 @@ export class SyncManager {
 		await this.view.PollingCoordinator?.closeDocuments(syncIds);
 	}
 
-	async _waitForWidgetInitialized(widget) {
+	async _waitForWidgetInitialized(widget: SyncWidget) {
 		if (widget.initialized) return;
 		const target = widget.container ?? widget.target;
 		if (target) await waitForAttribute(target, "initialized");
@@ -296,9 +343,11 @@ export class SyncManager {
 	 * Fetch the authoritative state newer than an offline record's base cursor.
 	 *
 	 */
-	async _pollOfflineState(offline) {
+	async _pollOfflineState(offline: PersistedSyncRecord) {
 		const id = `replay:${offline.sync_id}`;
-		const unsubscribe = this.view.PollingCoordinator?.subscribe(
+		const polling = this.view.PollingCoordinator;
+		if (!polling) return null;
+		const unsubscribe = polling.subscribe(
 			{
 				id,
 				type: "document",
@@ -313,8 +362,10 @@ export class SyncManager {
 		if (!unsubscribe) return null;
 
 		try {
-			const results = await this.view.PollingCoordinator.trigger(id);
-			const result = results?.find((candidate) => candidate.id === id);
+			const results = await polling.trigger(id);
+			const result = results?.find(
+				(candidate): candidate is PollResult<"document"> => candidate.id === id,
+			);
 			if (
 				!result ||
 				!["changed", "unchanged"].includes(result.status) ||
@@ -322,7 +373,7 @@ export class SyncManager {
 			) {
 				return null;
 			}
-			const descriptor = this.view.PollingCoordinator.get(id);
+			const descriptor = polling.get(id) as PollDescriptor<"document"> | null;
 			if (!descriptor?.generation) return null;
 			const cursor = {
 				generation: descriptor.generation,
@@ -334,9 +385,9 @@ export class SyncManager {
 		}
 	}
 
-	async _reconcile(offlineRecords) {
-		const replays = [];
-		const headless = [];
+	async _reconcile(offlineRecords: PersistedSyncRecord[]) {
+		const replays: SyncUpdate[] = [];
+		const headless: SyncWidget[] = [];
 		let unresolved = false;
 		try {
 			for (const offline of offlineRecords) {
@@ -357,9 +408,9 @@ export class SyncManager {
 					});
 					continue;
 				}
-				let widget = this.widgets[offline.sync_id];
+				let widget: SyncWidget | null = this.widgets[offline.sync_id];
 				if (!widget) {
-					widget = await loadHeadlessWidget({
+					widget = await loadReplayWidget({
 						sync_id: offline.sync_id,
 						offline,
 					});
@@ -425,15 +476,19 @@ export class SyncManager {
 		}
 	}
 
-	_collect(save, { touchSyncIds = [] } = {}) {
-		const batch = [];
+	_collect(save: boolean, { touchSyncIds = [] }: SyncSendOptions = {}) {
+		const batch: SyncUpdate[] = [];
 		const touches = new Set(touchSyncIds);
-		const included = new Set();
+		const included = new Set<string>();
 		for (const widget of Object.values(this.widgets)) {
 			if (this._replayBlocked(widget.syncId)) continue;
 			const payload = save ? widget.saveData : widget.syncData;
 			if (!payload) continue;
-			const update = { ...this._descriptor(widget), ...payload, save };
+			const update: SyncUpdate = {
+				...this._descriptor(widget),
+				...payload,
+				save,
+			};
 			if (save && touches.has(widget.syncId)) update.touch_parent = true;
 			batch.push(update);
 			included.add(widget.syncId);
@@ -456,8 +511,8 @@ export class SyncManager {
 
 	async _sendUpdatesNow(
 		save = false,
-		updates = null,
-		{ keepalive = false, touchSyncIds = [] } = {},
+		updates: SyncUpdate[] | null = null,
+		{ keepalive = false, touchSyncIds = [] }: SyncSendOptions = {},
 	) {
 		const batch = updates ?? this._collect(save, { touchSyncIds });
 		if (!batch.length) return null;
@@ -465,7 +520,7 @@ export class SyncManager {
 			for (const update of batch) await updateSyncRecord(update);
 			return null;
 		}
-		const response = await request.post(
+		const response = await request.post<SyncResponse>(
 			ENDPOINTS.sync,
 			{
 				client_id: this.view.PollingCoordinator?.clientId,
@@ -529,7 +584,11 @@ export class SyncManager {
 		return response;
 	}
 
-	async sendUpdates(save = false, updates = null, options = {}) {
+	async sendUpdates(
+		save = false,
+		updates: SyncUpdate[] | null = null,
+		options: SyncSendOptions = {},
+	): Promise<SyncSendResult> {
 		if (this._sendPromise) {
 			if (updates) {
 				await this._sendPromise;

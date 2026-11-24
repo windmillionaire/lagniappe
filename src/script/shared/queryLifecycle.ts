@@ -1,17 +1,32 @@
+type QueryToken<Key> = {
+	epoch: number;
+	key: Key;
+	signal: AbortSignal | undefined;
+};
+
+type QueryOptions = { cancelTransport?: boolean };
+type RunOptions = QueryOptions & { getCurrentKey?: () => unknown };
+
 /**
  * Coordinate an asynchronous read with the UI state that requested it.
  * Epoch checks remain authoritative even when AbortController is unavailable
  * or a transport cannot be cancelled.
- *
  */
 export class QueryLifecycle {
+	declare epoch: number;
+	declare controller: AbortController | null;
+	declare destroyed: boolean;
+
 	constructor() {
 		this.epoch = 0;
 		this.controller = null;
 		this.destroyed = false;
 	}
 
-	begin(key, { cancelTransport = true } = {}) {
+	begin<Key>(
+		key: Key,
+		{ cancelTransport = true }: QueryOptions = {},
+	): QueryToken<Key> | null {
 		if (this.destroyed) return null;
 
 		this.invalidate();
@@ -27,7 +42,10 @@ export class QueryLifecycle {
 		};
 	}
 
-	isCurrent(token, currentKey = token?.key) {
+	isCurrent(
+		token: QueryToken<unknown> | null | undefined,
+		currentKey: unknown = token?.key,
+	) {
 		return Boolean(
 			token &&
 				!this.destroyed &&
@@ -48,12 +66,12 @@ export class QueryLifecycle {
 		this.invalidate();
 	}
 
-	async run(
-		key,
-		loader,
-		publisher,
-		{ getCurrentKey = () => key, cancelTransport = true } = {},
-	) {
+	async run<Key, Result>(
+		key: Key,
+		loader: (token: QueryToken<Key>) => Result | PromiseLike<Result>,
+		publisher: (result: Result, token: QueryToken<Key>) => unknown,
+		{ getCurrentKey = () => key, cancelTransport = true }: RunOptions = {},
+	): Promise<boolean> {
 		const token = this.begin(key, { cancelTransport });
 		if (!token) return false;
 
@@ -63,8 +81,9 @@ export class QueryLifecycle {
 			await publisher(result, token);
 			return this.isCurrent(token, getCurrentKey());
 		} catch (error) {
+			const failure = error as { name?: unknown } | null | undefined;
 			if (
-				error?.name === "AbortError" &&
+				failure?.name === "AbortError" &&
 				!this.isCurrent(token, getCurrentKey())
 			) {
 				return false;

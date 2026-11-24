@@ -1,6 +1,6 @@
 import { withTransition } from "./transitions.ts";
 
-export const simpleHash = (str) => {
+export const simpleHash = (str: string) => {
 	let hash = 0;
 	for (let i = 0; i < str.length; i++) {
 		const char = str.charCodeAt(i);
@@ -9,13 +9,20 @@ export const simpleHash = (str) => {
 	return (hash >>> 0).toString(36).padStart(7, "0");
 };
 
-export const generateElementId = (type) => {
+export const generateElementId = (type: string) => {
 	return `${type}-${crypto.randomUUID().split("-")[0]}`;
 };
 
-const briefMessageTimers = new WeakMap();
+const briefMessageTimers = new WeakMap<
+	HTMLElement,
+	ReturnType<typeof setTimeout>
+>();
 
-export const showBriefly = (element, content, duration = 1500) => {
+export const showBriefly = (
+	element: HTMLElement,
+	content: Node | string,
+	duration = 1500,
+) => {
 	clearTimeout(briefMessageTimers.get(element));
 	void withTransition(
 		() => {
@@ -38,30 +45,37 @@ export const showBriefly = (element, content, duration = 1500) => {
 	briefMessageTimers.set(element, timer);
 };
 
-export const debounce = (func, wait) => {
-	let timeout = null;
-	const debounced = function (...args) {
+export const debounce = <This, Args extends unknown[]>(
+	func: (this: This, ...args: Args) => unknown,
+	wait: number,
+) => {
+	let timeout: ReturnType<typeof setTimeout> | undefined;
+	const debounced = function (this: This, ...args: Args) {
 		clearTimeout(timeout);
 		timeout = setTimeout(() => {
-			timeout = null;
+			timeout = undefined;
 			func.apply(this, args);
 		}, wait);
 	};
 	debounced.cancel = () => {
 		clearTimeout(timeout);
-		timeout = null;
+		timeout = undefined;
 	};
 	return debounced;
 };
 
-export function waitForAttribute(element, attributeName, timeout = 10000) {
+export function waitForAttribute(
+	element: Element,
+	attributeName: string,
+	timeout = 10000,
+): Promise<string | null> {
 	if (element.hasAttribute(attributeName)) {
 		return Promise.resolve(element.getAttribute(attributeName));
 	}
 
 	return new Promise((resolve, reject) => {
-		let observer = null;
-		let timeoutId = null;
+		let observer: MutationObserver | null = null;
+		let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
 		const cleanup = () => {
 			observer?.disconnect();
@@ -87,33 +101,34 @@ export function waitForAttribute(element, attributeName, timeout = 10000) {
 	});
 }
 
-function _sortObject(obj) {
+function _sortObject(obj: unknown): unknown {
 	if (Array.isArray(obj)) {
-		return obj.map((value) => _sortObject(value));
+		return obj.map((value: unknown) => _sortObject(value));
 	}
 	if (obj === null || typeof obj !== "object") {
 		return obj;
 	}
-	return Object.keys(obj)
+	const record = obj as Record<string, unknown>;
+	return Object.keys(record)
 		.sort()
-		.reduce((result, key) => {
-			result[key] = _sortObject(obj[key]);
+		.reduce<Record<string, unknown>>((result, key) => {
+			result[key] = _sortObject(record[key]);
 			return result;
 		}, {});
 }
 
-export const areEqual = (a, b) => {
+export const areEqual = (a: unknown, b: unknown) => {
 	return JSON.stringify(_sortObject(a)) === JSON.stringify(_sortObject(b));
 };
 
-export const base64ToUint8Array = (base64) => {
+export const base64ToUint8Array = (base64: string) => {
 	const bin = atob(base64);
 	const bytes = new Uint8Array(bin.length);
 	for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
 	return bytes;
 };
 
-export const uint8ArrayToBase64 = (bytes) => {
+export const uint8ArrayToBase64 = (bytes: Uint8Array) => {
 	let bin = "";
 	for (let i = 0; i < bytes.byteLength; i++)
 		bin += String.fromCharCode(bytes[i]);

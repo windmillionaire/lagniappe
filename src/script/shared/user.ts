@@ -1,7 +1,13 @@
+import type { SessionUpdateResponse } from "../types/api.d.ts";
 import { request } from "./request.ts";
 
-let userDataUpdate = null;
-let userLocationUpdate = null;
+type SessionUpdatePayload = {
+	timezone?: string;
+	location?: { latitude: number; longitude: number };
+};
+
+let userDataUpdate: Promise<boolean> | null = null;
+let userLocationUpdate: Promise<boolean> | null = null;
 
 export function updateUserData() {
 	if (userDataUpdate) return userDataUpdate;
@@ -38,16 +44,18 @@ async function _syncUserData({ includeLocation = false } = {}) {
 				longitude: position.coords.longitude,
 			}
 		: null;
-	const payload = {};
+	const payload: SessionUpdatePayload = {};
 	if (timezoneChanged) payload.timezone = currentTimezone;
 	if (location) payload.location = location;
 	if (Object.keys(payload).length === 0) {
 		return { retry: false, synced: false };
 	}
 
-	const response = await request.post("/l/update-session", payload, {
-		keepalive: true,
-	});
+	const response = await request.post<SessionUpdateResponse>(
+		"/l/update-session",
+		payload,
+		{ keepalive: true },
+	);
 	if (!response?.ok) return { retry: true, synced: false };
 
 	if (timezoneChanged) {
@@ -60,8 +68,8 @@ async function _syncUserData({ includeLocation = false } = {}) {
 	};
 }
 
-function _getCurrentPosition(options) {
-	return new Promise((resolve) => {
+function _getCurrentPosition(options: PositionOptions) {
+	return new Promise<GeolocationPosition | null>((resolve) => {
 		if (!("geolocation" in navigator)) {
 			resolve(null);
 			return;

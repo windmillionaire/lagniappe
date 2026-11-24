@@ -1,6 +1,19 @@
+import type {
+	DeferredOperationStatus,
+	NotificationState,
+	PollResponse,
+	RequestResult,
+} from "../types/api.d.ts";
+import type { DocumentCursor, DocumentPollPayload } from "../types/sync.d.ts";
 import { ENDPOINTS } from "./endpoints.ts";
 import { captureError } from "./errors.ts";
 import { request } from "./request.ts";
+
+declare global {
+	interface Window {
+		__PING_PENDING__?: Promise<boolean> | null;
+	}
+}
 
 const POLL_PROTOCOL_VERSION = 1;
 const MAX_SUBSCRIPTIONS_PER_REQUEST = 64;
@@ -13,14 +26,17 @@ const MAX_REVISION = Number.MAX_SAFE_INTEGER;
 const CLIENT_ID_KEY = "lagniappe-poll-client";
 const VISIBLE_BLUR_POLLING_MS = 10 * 60 * 1000;
 const ORDINARY_INTERVALS = [15_000, 15_000, 30_000, 30_000, 60_000];
-const TYPE_INTERVALS = Object.freeze({
+const TYPE_INTERVALS: Readonly<
+	Partial<Record<PollType, number>> &
+		Record<"document" | "ingress" | "operation", number>
+> = Object.freeze({
 	document: 2_000,
 	ingress: 2_500,
 	operation: 4_000,
 });
 const SUBSCRIPTION_MODES = new Set(["periodic", "foreground"]);
 const INITIAL_MODES = new Set(["immediate", "scheduled"]);
-const POLL_TYPES = new Set([
+const POLL_TYPES = new Set<PollType>([
 	"entity",
 	"channel",
 	"form-lock",
@@ -41,11 +57,123 @@ const POLL_CHANNELS = new Set([
 	"home-notes",
 	"starred",
 	"tool-reports",
+] as const);
+const POLL_STATUSES = new Set<PollResult["status"]>([
+	"changed",
+	"unchanged",
+	"unavailable",
+	"error",
 ]);
-const POLL_STATUSES = new Set(["changed", "unchanged", "unavailable", "error"]);
+
+type PollChannel =
+	typeof POLL_CHANNELS extends ReadonlySet<infer Channel> ? Channel : never;
+
+interface PollDescriptorFields {
+	entity: { key: string; revision: string | null };
+	channel: { channel: PollChannel; revision: string | null };
+	"form-lock": { key: string; revision: string };
+	document: DocumentCursor & { key: string; sync_id: string };
+	operation: { key: string; revision: number };
+	ingress: { key: string; revision: string | null };
+}
+
+type PollType = keyof PollDescriptorFields;
+
+export type PollDescriptor<T extends PollType = PollType> = {
+	[K in T]: { id: string; type: K } & PollDescriptorFields[K];
+}[T];
+
+interface PollPayloads {
+	entity: { fingerprint: string; modified: string | null };
+	channel: { refresh: true };
+	"form-lock":
+		| { locked: false }
+		| {
+				key: string;
+				locked: true;
+				scope: string | null;
+				operation: string;
+				revision: number;
+		  };
+	document: DocumentPollPayload;
+	operation: DeferredOperationStatus;
+	ingress: { refresh: true };
+}
+
+type PollRevision<T extends PollType> = NonNullable<
+	PollDescriptorFields[T]["revision"]
+>;
+
+export type PollResult<T extends PollType = PollType> = {
+	[K in T]: { id: string; type: K } & (
+		| {
+				status: "changed";
+				revision: PollRevision<K>;
+				payload: PollPayloads[K];
+				poll_after_ms: number;
+		  }
+		| {
+				status: "unchanged";
+				revision: PollRevision<K>;
+				payload?: never;
+				poll_after_ms: number;
+		  }
+		| {
+				status: "unavailable";
+				revision?: never;
+				payload?: never;
+				poll_after_ms: number;
+		  }
+		| {
+				status: "error";
+				revision?: never;
+				payload?: never;
+				poll_after_ms?: number;
+		  }
+	);
+}[T];
+
+type NotificationCursor =
+	| { generation: null; revision: null; seed: true }
+	| { generation: string; revision: number; seed: false };
+
+interface PollRequest {
+	version: typeof POLL_PROTOCOL_VERSION;
+	client_id: string;
+	subscriptions: PollDescriptor[];
+	closed_documents: string[];
+	notification_state?: NotificationCursor;
+}
+
+interface PollView {
+	elt?: HTMLElement | null;
+	online: boolean;
+	hidden: boolean;
+}
+
+interface ScheduleOptions<T extends PollType> {
+	onResult?: ((result: PollResult<T>) => unknown) | null;
+	beforePoll?: (() => unknown) | null;
+	whileBlurred?: (() => boolean) | null;
+	mode?: "periodic" | "foreground";
+	initial?: "immediate" | "scheduled";
+}
+
+interface PollSubscription
+	extends Required<Omit<ScheduleOptions<PollType>, "initial">> {
+	descriptor: PollDescriptor;
+	dueAt: number;
+	quiet: number;
+	errorCount: number;
+	boostedUntil?: number;
+	boostedInterval?: number;
+}
 
 class PollContractError extends TypeError {
-	constructor(path, reason) {
+	declare readonly path: string;
+	declare readonly reason: string;
+
+	constructor(path: string, reason: string) {
 		super(`${path}: ${reason}`);
 		this.name = "PollContractError";
 		this.path = path;
@@ -53,8 +181,17 @@ class PollContractError extends TypeError {
 	}
 }
 
-const exactFields = (value, path, required, optional = []) => {
-	if (!value || typeof value !== "object" || Array.isArray(value)) {
+function isFieldMap(value: unknown): value is Record<string, unknown> {
+	return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+const exactFields = (
+	value: unknown,
+	path: string,
+	required: string[],
+	optional: string[] = [],
+) => {
+	if (!isFieldMap(value)) {
 		throw new PollContractError(path, "type");
 	}
 	const allowed = new Set([...required, ...optional]);
@@ -71,38 +208,54 @@ const exactFields = (value, path, required, optional = []) => {
 	return value;
 };
 
-const boundedString = (value, path, maximum, { nullable = false } = {}) => {
+function boundedString(value: unknown, path: string, maximum: number): string;
+function boundedString(
+	value: unknown,
+	path: string,
+	maximum: number,
+	options: { nullable: boolean },
+): string | null;
+function boundedString(
+	value: unknown,
+	path: string,
+	maximum: number,
+	{ nullable = false } = {},
+) {
 	if (nullable && value === null) return null;
 	if (typeof value !== "string") throw new PollContractError(path, "type");
 	if (!value.trim()) throw new PollContractError(path, "blank");
 	if (value.length > maximum) throw new PollContractError(path, "limit");
 	return value;
-};
+}
 
-const integerRevision = (value, path) => {
-	if (!Number.isInteger(value)) throw new PollContractError(path, "type");
+const integerRevision = (value: unknown, path: string) => {
+	if (typeof value !== "number" || !Number.isInteger(value))
+		throw new PollContractError(path, "type");
 	if (value < 0) throw new PollContractError(path, "state");
 	if (value > MAX_REVISION) throw new PollContractError(path, "limit");
 	return value;
 };
 
-const documentId = (value, path) => {
-	value = boundedString(value, path, MAX_KEY_LENGTH);
+const documentId = (raw: unknown, path: string) => {
+	const value = boundedString(raw, path, MAX_KEY_LENGTH);
 	if (!value.endsWith(":document")) {
 		throw new PollContractError(path, "unsupported");
 	}
 	return value;
 };
 
-const normalizedDescriptor = (raw, path = "descriptor") => {
-	exactFields(
-		raw,
+const normalizedDescriptor = (
+	value: unknown,
+	path = "descriptor",
+): PollDescriptor => {
+	const raw = exactFields(
+		value,
 		path,
 		["id", "type", "revision"],
 		["key", "channel", "sync_id", "generation", "presence_digest"],
 	);
 	const id = boundedString(raw.id, `${path}.id`, MAX_IDENTIFIER_LENGTH);
-	const type = boundedString(raw.type, `${path}.type`, 32);
+	const type = boundedString(raw.type, `${path}.type`, 32) as PollType;
 	if (!POLL_TYPES.has(type)) {
 		throw new PollContractError(`${path}.type`, "unsupported");
 	}
@@ -114,43 +267,82 @@ const normalizedDescriptor = (raw, path = "descriptor") => {
 				? ["key", "sync_id", "generation", "presence_digest"]
 				: ["key"];
 	exactFields(raw, path, ["id", "type", "revision", ...typedFields]);
-	const revision =
-		type === "operation" || type === "document"
-			? integerRevision(raw.revision, `${path}.revision`)
-			: boundedString(raw.revision, `${path}.revision`, MAX_CURSOR_LENGTH, {
-					nullable: type !== "form-lock",
-				});
-	const descriptor = { id, type, revision };
-
-	if (type === "channel") {
-		descriptor.channel = boundedString(raw.channel, `${path}.channel`, 64);
-		if (!POLL_CHANNELS.has(descriptor.channel)) {
-			throw new PollContractError(`${path}.channel`, "unsupported");
+	switch (type) {
+		case "channel": {
+			const revision = boundedString(
+				raw.revision,
+				`${path}.revision`,
+				MAX_CURSOR_LENGTH,
+				{ nullable: true },
+			);
+			const channel = boundedString(
+				raw.channel,
+				`${path}.channel`,
+				64,
+			) as PollChannel;
+			if (!POLL_CHANNELS.has(channel)) {
+				throw new PollContractError(`${path}.channel`, "unsupported");
+			}
+			return { id, type, revision, channel };
 		}
-		return descriptor;
+		case "operation":
+			return {
+				id,
+				type,
+				revision: integerRevision(raw.revision, `${path}.revision`),
+				key: boundedString(raw.key, `${path}.key`, MAX_KEY_LENGTH),
+			};
+		case "document":
+			return {
+				id,
+				type,
+				revision: integerRevision(raw.revision, `${path}.revision`),
+				key: boundedString(raw.key, `${path}.key`, MAX_KEY_LENGTH),
+				sync_id: documentId(raw.sync_id, `${path}.sync_id`),
+				generation: boundedString(
+					raw.generation,
+					`${path}.generation`,
+					MAX_STATE_TOKEN_LENGTH,
+					{ nullable: true },
+				),
+				presence_digest: boundedString(
+					raw.presence_digest,
+					`${path}.presence_digest`,
+					MAX_STATE_TOKEN_LENGTH,
+					{ nullable: true },
+				),
+			};
+		case "form-lock":
+			return {
+				id,
+				type,
+				revision: boundedString(
+					raw.revision,
+					`${path}.revision`,
+					MAX_CURSOR_LENGTH,
+				),
+				key: boundedString(raw.key, `${path}.key`, MAX_KEY_LENGTH),
+			};
+		default:
+			return {
+				id,
+				type,
+				revision: boundedString(
+					raw.revision,
+					`${path}.revision`,
+					MAX_CURSOR_LENGTH,
+					{ nullable: true },
+				),
+				key: boundedString(raw.key, `${path}.key`, MAX_KEY_LENGTH),
+			};
 	}
-
-	descriptor.key = boundedString(raw.key, `${path}.key`, MAX_KEY_LENGTH);
-	if (type === "document") {
-		descriptor.sync_id = documentId(raw.sync_id, `${path}.sync_id`);
-		descriptor.generation = boundedString(
-			raw.generation,
-			`${path}.generation`,
-			MAX_STATE_TOKEN_LENGTH,
-			{ nullable: true },
-		);
-		descriptor.presence_digest = boundedString(
-			raw.presence_digest,
-			`${path}.presence_digest`,
-			MAX_STATE_TOKEN_LENGTH,
-			{ nullable: true },
-		);
-	}
-	return descriptor;
 };
 
-const normalizedNotificationState = (raw, path = "notification_state") => {
-	exactFields(raw, path, ["generation", "revision", "seed"]);
+const normalizedNotificationState = (
+	value: unknown,
+	path = "notification_state",
+): NotificationCursor => {
+	const raw = exactFields(value, path, ["generation", "revision", "seed"]);
 	if (typeof raw.seed !== "boolean") {
 		throw new PollContractError(`${path}.seed`, "type");
 	}
@@ -166,13 +358,14 @@ const normalizedNotificationState = (raw, path = "notification_state") => {
 			: integerRevision(raw.revision, `${path}.revision`);
 	const cold = raw.seed && generation === null && revision === null;
 	const warm = !raw.seed && generation !== null && revision !== null;
-	if (!cold && !warm) throw new PollContractError(path, "state");
-	return { generation, revision, seed: raw.seed };
+	if (cold) return { generation, revision, seed: true };
+	if (warm) return { generation, revision, seed: false };
+	throw new PollContractError(path, "state");
 };
 
-const normalizedRequest = (raw) => {
-	exactFields(
-		raw,
+const normalizedRequest = (value: unknown): PollRequest => {
+	const raw = exactFields(
+		value,
 		"request",
 		["version", "client_id", "subscriptions", "closed_documents"],
 		["notification_state"],
@@ -191,7 +384,7 @@ const normalizedRequest = (raw) => {
 	if (raw.subscriptions.length > MAX_SUBSCRIPTIONS_PER_REQUEST) {
 		throw new PollContractError("request.subscriptions", "limit");
 	}
-	const identifiers = new Set();
+	const identifiers = new Set<string>();
 	const subscriptions = raw.subscriptions.map((descriptor, index) => {
 		const normalized = normalizedDescriptor(
 			descriptor,
@@ -212,7 +405,7 @@ const normalizedRequest = (raw) => {
 	if (raw.closed_documents.length > MAX_SUBSCRIPTIONS_PER_REQUEST) {
 		throw new PollContractError("request.closed_documents", "limit");
 	}
-	const closedIds = new Set();
+	const closedIds = new Set<string>();
 	const closed_documents = raw.closed_documents.map((syncId, index) => {
 		const path = `request.closed_documents[${index}]`;
 		const normalized = documentId(syncId, path);
@@ -222,7 +415,7 @@ const normalizedRequest = (raw) => {
 		closedIds.add(normalized);
 		return normalized;
 	});
-	const requestBody = {
+	const requestBody: PollRequest = {
 		version: POLL_PROTOCOL_VERSION,
 		client_id,
 		subscriptions,
@@ -237,9 +430,13 @@ const normalizedRequest = (raw) => {
 	return requestBody;
 };
 
-const normalizedResult = (raw, descriptor, path) => {
-	exactFields(
-		raw,
+const normalizedResult = (
+	value: unknown,
+	descriptor: PollDescriptor,
+	path: string,
+): PollResult => {
+	const raw = exactFields(
+		value,
 		path,
 		["id", "type", "status", "poll_after_ms"],
 		["revision", "payload"],
@@ -249,25 +446,28 @@ const normalizedResult = (raw, descriptor, path) => {
 	if (raw.type !== descriptor.type) {
 		throw new PollContractError(`${path}.type`, "state");
 	}
-	if (!POLL_STATUSES.has(raw.status)) {
+	const status = raw.status as PollResult["status"];
+	if (!POLL_STATUSES.has(status)) {
 		throw new PollContractError(`${path}.status`, "unsupported");
 	}
-	if (!Number.isSafeInteger(raw.poll_after_ms)) {
+	if (
+		typeof raw.poll_after_ms !== "number" ||
+		!Number.isSafeInteger(raw.poll_after_ms)
+	) {
 		throw new PollContractError(`${path}.poll_after_ms`, "type");
 	}
 	if (raw.poll_after_ms <= 0) {
 		throw new PollContractError(`${path}.poll_after_ms`, "state");
 	}
 
-	const carriesRevision =
-		raw.status === "changed" || raw.status === "unchanged";
+	const carriesRevision = status === "changed" || status === "unchanged";
 	if (carriesRevision && !Object.hasOwn(raw, "revision")) {
 		throw new PollContractError(`${path}.revision`, "missing");
 	}
 	if (!carriesRevision && Object.hasOwn(raw, "revision")) {
 		throw new PollContractError(`${path}.revision`, "unexpected");
 	}
-	let revision;
+	let revision: string | number | undefined;
 	if (carriesRevision) {
 		revision =
 			descriptor.type === "operation" || descriptor.type === "document"
@@ -275,59 +475,59 @@ const normalizedResult = (raw, descriptor, path) => {
 				: boundedString(raw.revision, `${path}.revision`, MAX_CURSOR_LENGTH);
 	}
 
-	if (raw.status === "changed") {
+	let payload: Record<string, unknown> | undefined;
+	if (status === "changed") {
 		if (!Object.hasOwn(raw, "payload")) {
 			throw new PollContractError(`${path}.payload`, "missing");
 		}
-		if (
-			!raw.payload ||
-			typeof raw.payload !== "object" ||
-			Array.isArray(raw.payload)
-		) {
+		if (!isFieldMap(raw.payload)) {
 			throw new PollContractError(`${path}.payload`, "type");
 		}
+		payload = raw.payload;
 	} else if (Object.hasOwn(raw, "payload")) {
 		throw new PollContractError(`${path}.payload`, "unexpected");
 	}
 
-	if (raw.status === "changed" && descriptor.type === "document") {
+	if (payload && descriptor.type === "document") {
 		boundedString(
-			raw.payload.generation,
+			payload.generation,
 			`${path}.payload.generation`,
 			MAX_STATE_TOKEN_LENGTH,
 		);
 		const payloadRevision = integerRevision(
-			raw.payload.revision,
+			payload.revision,
 			`${path}.payload.revision`,
 		);
 		if (payloadRevision !== revision) {
 			throw new PollContractError(`${path}.payload.revision`, "state");
 		}
-		if (Object.hasOwn(raw.payload, "presence_digest")) {
+		if (Object.hasOwn(payload, "presence_digest")) {
 			boundedString(
-				raw.payload.presence_digest,
+				payload.presence_digest,
 				`${path}.payload.presence_digest`,
 				MAX_STATE_TOKEN_LENGTH,
 			);
 		}
 	}
-	if (raw.status === "changed" && descriptor.type === "operation") {
+	if (payload && descriptor.type === "operation") {
 		const payloadRevision = integerRevision(
-			raw.payload.revision,
+			payload.revision,
 			`${path}.payload.revision`,
 		);
-		if (payloadRevision !== revision || raw.payload.key !== descriptor.key) {
+		if (payloadRevision !== revision || payload.key !== descriptor.key) {
 			throw new PollContractError(`${path}.payload`, "state");
 		}
 	}
+	// The checks above enforce the envelope and cursor. The route supplies the
+	// remaining type-specific payload fields.
 	return {
-		id: raw.id,
-		type: raw.type,
-		status: raw.status,
+		id: descriptor.id,
+		type: descriptor.type,
+		status,
 		poll_after_ms: raw.poll_after_ms,
 		...(carriesRevision ? { revision } : {}),
-		...(raw.status === "changed" ? { payload: raw.payload } : {}),
-	};
+		...(status === "changed" ? { payload } : {}),
+	} as PollResult;
 };
 
 function clientId() {
@@ -361,7 +561,7 @@ function clientId() {
 	return value;
 }
 
-function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
+function jitter(delay: number, factor = 0.9 + Math.random() * 0.2) {
 	return Math.max(Math.round(delay * factor), 250);
 }
 
@@ -370,7 +570,25 @@ function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
  *
  */
 export class PollingCoordinator {
-	constructor(view) {
+	declare view: PollView;
+	declare clientId: string;
+	declare subscriptions: Map<string, PollSubscription>;
+	declare protocolFailures: Set<string>;
+	declare timer: number | null;
+	declare activePoll: Promise<PollResult[]> | null;
+	declare activeIds: Set<string>;
+	declare inflight: Promise<RequestResult<PollResponse> | undefined> | null;
+	declare followup: boolean;
+	declare queuedIds: Set<string>;
+	declare destroyed: boolean;
+	declare blurredUntil: number | null;
+	declare notificationSeedPending: boolean;
+	declare notificationSeedDueAt: number;
+	declare notificationSeedErrorCount: number;
+	declare notificationSeedActive: boolean;
+	declare _notificationState: (event: CustomEvent<NotificationState>) => void;
+
+	constructor(view: PollView) {
 		this.view = view;
 		this.clientId = clientId();
 		this.subscriptions = new Map();
@@ -422,9 +640,14 @@ export class PollingCoordinator {
 		return this;
 	}
 
-	_captureContract(error, context, details = {}) {
-		const path = error?.path || "polling";
-		const reason = error?.reason || "state";
+	_captureContract(
+		error: unknown,
+		context: string,
+		details: { subscription_type?: string } = {},
+	) {
+		const contract = error as Partial<PollContractError> | null | undefined;
+		const path = contract?.path || "polling";
+		const reason = contract?.reason || "state";
 		const signature = `${context}:${path}:${reason}:${details.subscription_type || ""}`;
 		if (this.protocolFailures.has(signature)) return;
 		this.protocolFailures.add(signature);
@@ -436,15 +659,15 @@ export class PollingCoordinator {
 		});
 	}
 
-	subscribe(
-		descriptor,
+	subscribe<T extends PollType>(
+		descriptor: PollDescriptor & { type: T },
 		{
 			onResult = null,
 			beforePoll = null,
 			whileBlurred = null,
 			mode = "periodic",
 			initial = "immediate",
-		} = {},
+		}: ScheduleOptions<NoInfer<T>> = {},
 	) {
 		if (this.destroyed) return () => {};
 		if (
@@ -455,7 +678,7 @@ export class PollingCoordinator {
 			throw new TypeError("Invalid polling subscription schedule.");
 		}
 		const existing = this.subscriptions.get(descriptor?.id);
-		let normalized;
+		let normalized: PollDescriptor;
 		try {
 			normalized = normalizedDescriptor(
 				{ ...existing?.descriptor, ...descriptor },
@@ -478,7 +701,11 @@ export class PollingCoordinator {
 		this.subscriptions.set(normalized.id, {
 			...existing,
 			descriptor: normalized,
-			onResult: onResult ?? existing?.onResult ?? null,
+			// A result dispatches to its own ID after its descriptor type is checked.
+			onResult:
+				(onResult as PollSubscription["onResult"]) ??
+				existing?.onResult ??
+				null,
 			beforePoll: beforePoll ?? existing?.beforePoll ?? null,
 			whileBlurred: whileBlurred ?? existing?.whileBlurred ?? null,
 			mode,
@@ -491,7 +718,7 @@ export class PollingCoordinator {
 		return () => this.unsubscribe(normalized.id);
 	}
 
-	unsubscribe(id) {
+	unsubscribe(id: string) {
 		this.subscriptions.delete(id);
 		this.queuedIds.delete(id);
 		if (!this.subscriptions.size && !this.notificationSeedPending)
@@ -499,12 +726,12 @@ export class PollingCoordinator {
 		else this._schedule();
 	}
 
-	get(id) {
+	get(id: string) {
 		const descriptor = this.subscriptions.get(id)?.descriptor;
 		return descriptor ? { ...descriptor } : null;
 	}
 
-	update(id, patch = {}) {
+	update(id: string, patch: Partial<PollDescriptor> = {}) {
 		const subscription = this.subscriptions.get(id);
 		if (!subscription) return;
 		try {
@@ -520,7 +747,7 @@ export class PollingCoordinator {
 	}
 
 	boost(
-		id,
+		id: string,
 		{ durationMs = 60_000, pollAfterMs = TYPE_INTERVALS.document } = {},
 	) {
 		const subscription = this.subscriptions.get(id);
@@ -550,7 +777,7 @@ export class PollingCoordinator {
 		return true;
 	}
 
-	acknowledge(id, revision) {
+	acknowledge(id: string, revision: PollDescriptor["revision"] | undefined) {
 		const subscription = this.subscriptions.get(id);
 		if (!subscription || revision === undefined || revision === null) return;
 		const previous = subscription.descriptor;
@@ -572,7 +799,7 @@ export class PollingCoordinator {
 	 * Mark subscriptions for an immediate cycle without exposing a promise that
 	 * a callback in the active cycle could accidentally await.
 	 */
-	enqueue(ids = null) {
+	enqueue(ids: string | string[] | null = null) {
 		const requested =
 			ids === null
 				? new Set(this.subscriptions.keys())
@@ -590,7 +817,10 @@ export class PollingCoordinator {
 		this._schedule(0);
 	}
 
-	trigger(ids = null, { fresh = false } = {}) {
+	trigger(
+		ids: string | string[] | null = null,
+		{ fresh = false } = {},
+	): Promise<PollResult[]> {
 		const requested =
 			ids === null
 				? new Set(this.subscriptions.keys())
@@ -650,7 +880,7 @@ export class PollingCoordinator {
 		return this.trigger();
 	}
 
-	async closeDocuments(syncIds) {
+	async closeDocuments(syncIds: string[]) {
 		if (!Array.isArray(syncIds)) {
 			this._captureContract(
 				new PollContractError("closed_documents", "type"),
@@ -659,7 +889,7 @@ export class PollingCoordinator {
 			return;
 		}
 		const closed = [];
-		const identifiers = new Set();
+		const identifiers = new Set<string>();
 		for (const [index, raw] of syncIds.entries()) {
 			try {
 				const syncId = documentId(raw, `closed_documents[${index}]`);
@@ -686,7 +916,7 @@ export class PollingCoordinator {
 					offset + MAX_SUBSCRIPTIONS_PER_REQUEST,
 				),
 			});
-			response = await request.post(ENDPOINTS.poll, body, {
+			response = await request.post<PollResponse>(ENDPOINTS.poll, body, {
 				keepalive: true,
 				replaceErrorPage: false,
 			});
@@ -703,7 +933,10 @@ export class PollingCoordinator {
 		return response;
 	}
 
-	_interval(subscription, result) {
+	_interval(
+		subscription: PollSubscription,
+		result: Pick<PollResult, "status" | "poll_after_ms">,
+	) {
 		if (result?.status === "error") {
 			subscription.errorCount += 1;
 			return Math.min(2 ** subscription.errorCount * 2_000, 60_000);
@@ -712,6 +945,7 @@ export class PollingCoordinator {
 		if (result?.status === "changed") subscription.quiet = 0;
 		else subscription.quiet += 1;
 		if (
+			subscription.boostedUntil !== undefined &&
 			subscription.boostedUntil > Date.now() &&
 			subscription.boostedInterval
 		) {
@@ -722,21 +956,20 @@ export class PollingCoordinator {
 			const steps = [4_000, 8_000, 16_000, 30_000];
 			return steps[Math.min(subscription.quiet, steps.length - 1)];
 		}
-		if (TYPE_INTERVALS[subscription.descriptor.type]) {
-			return (
-				result?.poll_after_ms ?? TYPE_INTERVALS[subscription.descriptor.type]
-			);
+		const interval = TYPE_INTERVALS[subscription.descriptor.type];
+		if (interval) {
+			return result?.poll_after_ms ?? interval;
 		}
 		return ORDINARY_INTERVALS[
 			Math.min(subscription.quiet, ORDINARY_INTERVALS.length - 1)
 		];
 	}
 
-	_baseInterval(type) {
+	_baseInterval(type: PollType) {
 		return TYPE_INTERVALS[type] || ORDINARY_INTERVALS[0];
 	}
 
-	_eligible(subscription) {
+	_eligible(subscription: PollSubscription) {
 		if (this.destroyed || !this.view.online) return false;
 		if (!this.view.hidden) return true;
 		if (this.blurredUntil === null || Date.now() >= this.blurredUntil) {
@@ -745,7 +978,9 @@ export class PollingCoordinator {
 		return subscription?.whileBlurred?.() === true;
 	}
 
-	_hasEligible(subscriptions = this.subscriptions.values()) {
+	_hasEligible(
+		subscriptions: Iterable<PollSubscription> = this.subscriptions.values(),
+	) {
 		return Array.from(subscriptions).some((subscription) =>
 			this._eligible(subscription),
 		);
@@ -786,13 +1021,18 @@ export class PollingCoordinator {
 		this.notificationSeedDueAt = Date.now() + jitter(delay);
 	}
 
-	_applyProtocolState(subscription, result) {
-		const patch = {};
+	_applyProtocolState(subscription: PollSubscription, result: PollResult) {
+		const patch: {
+			revision?: string | number;
+			generation?: string;
+			presence_digest?: string;
+		} = {};
 		if (result.revision !== undefined) patch.revision = result.revision;
 		if (subscription.descriptor.type === "document" && result.payload) {
-			patch.generation = result.payload.generation;
-			if (Object.hasOwn(result.payload, "presence_digest")) {
-				patch.presence_digest = result.payload.presence_digest;
+			const document = result.payload as DocumentPollPayload;
+			patch.generation = document.generation;
+			if (Object.hasOwn(document, "presence_digest")) {
+				patch.presence_digest = document.presence_digest;
 			}
 		}
 		subscription.descriptor = normalizedDescriptor(
@@ -811,7 +1051,7 @@ export class PollingCoordinator {
 			.slice(0, MAX_SUBSCRIPTIONS_PER_REQUEST);
 	}
 
-	_poll() {
+	_poll(): Promise<PollResult[]> {
 		if (
 			this.destroyed ||
 			!this.view.online ||
@@ -842,9 +1082,9 @@ export class PollingCoordinator {
 		return cycle;
 	}
 
-	async _runPoll() {
-		let due = [];
-		const results = [];
+	async _runPoll(): Promise<PollResult[]> {
+		let due: PollSubscription[] = [];
+		const results: PollResult[] = [];
 		let seededNotification = false;
 		try {
 			due = this._due();
@@ -857,10 +1097,8 @@ export class PollingCoordinator {
 			for (const { descriptor } of due) {
 				this.queuedIds.delete(descriptor.id);
 			}
-			const hooks = new Set(
-				due.map(({ beforePoll }) => beforePoll).filter(Boolean),
-			);
-			for (const hook of hooks) await hook();
+			const hooks = new Set(due.map(({ beforePoll }) => beforePoll));
+			for (const hook of hooks) if (hook) await hook();
 			await window.__PING_PENDING__;
 			if (this.destroyed || !this.view.online) return [];
 			const notificationState = this._notificationRequest();
@@ -886,7 +1124,7 @@ export class PollingCoordinator {
 			});
 			seededNotification = notificationState?.seed === true;
 			if (seededNotification) this.notificationSeedActive = true;
-			this.inflight = request.post(ENDPOINTS.poll, body, {
+			this.inflight = request.post<PollResponse>(ENDPOINTS.poll, body, {
 				replaceErrorPage: false,
 			});
 			const response = await this.inflight;
@@ -934,14 +1172,15 @@ export class PollingCoordinator {
 				(this.view.hidden && !this._hasEligible(byId.values()))
 			)
 				return [];
-			const acceptedResults = new Map();
-			const invalidIds = new Set();
-			const seenIds = new Set();
-			for (const [index, raw] of response.results.entries()) {
+			const acceptedResults = new Map<string, PollResult>();
+			const invalidIds = new Set<string>();
+			const seenIds = new Set<string>();
+			const rawResults: unknown[] = response.results;
+			for (const [index, raw] of rawResults.entries()) {
 				const path = `response.results[${index}]`;
-				const id = raw?.id;
-				const subscription = byId.get(id);
-				if (!subscription) {
+				const id = isFieldMap(raw) ? raw.id : undefined;
+				const subscription = typeof id === "string" ? byId.get(id) : undefined;
+				if (typeof id !== "string" || !subscription) {
 					this._captureContract(
 						new PollContractError(`${path}.id`, "unsupported"),
 						"polling-response-contract",
@@ -974,7 +1213,7 @@ export class PollingCoordinator {
 
 			const cycleJitter = 0.9 + Math.random() * 0.2;
 			const scheduledAt = Date.now();
-			const resultPriority = ([id]) => {
+			const resultPriority = ([id]: [string, PollSubscription]) => {
 				const result = acceptedResults.get(id);
 				return result?.type === "operation" &&
 					result.status === "changed" &&
@@ -998,7 +1237,7 @@ export class PollingCoordinator {
 							{ subscription_type: subscription.descriptor.type },
 						);
 					}
-					const synthetic = {
+					const synthetic: PollResult = {
 						id,
 						type: subscription.descriptor.type,
 						status: "error",
@@ -1093,7 +1332,7 @@ export class PollingCoordinator {
 		return results;
 	}
 
-	_schedule(delay = null) {
+	_schedule(delay: number | null = null) {
 		if (
 			this.destroyed ||
 			this.timer ||

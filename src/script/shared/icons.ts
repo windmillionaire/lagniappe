@@ -1,15 +1,33 @@
 import { ICONS } from "../generated/icons.mjs";
 
-export const iconDefinition = (name) => {
-	let definition = ICONS;
+interface IconDefinition {
+	glyph: string;
+	fill: number;
+	spin?: boolean;
+	weight?: number;
+}
+
+export const iconDefinition = (name: string | null | undefined) => {
+	let definition: unknown = ICONS;
 	for (const part of String(name || "").split(".")) {
 		if (!part || !definition || typeof definition !== "object") return null;
-		definition = definition[part];
+		definition = (definition as Record<string, unknown>)[part];
 	}
-	return definition?.glyph ? definition : null;
+	if (
+		!definition ||
+		typeof definition !== "object" ||
+		!("glyph" in definition)
+	) {
+		return null;
+	}
+	return definition.glyph ? (definition as IconDefinition) : null;
 };
 
-export const setIcon = (element, name, classes = "") => {
+export const setIcon = <T extends HTMLElement>(
+	element: T,
+	name: string | null | undefined,
+	classes = "",
+): T => {
 	const definition = iconDefinition(name);
 	if (!definition) {
 		element.replaceChildren();
@@ -22,7 +40,7 @@ export const setIcon = (element, name, classes = "") => {
 	if (classes) classNames.push(...String(classes).split(/\s+/).filter(Boolean));
 
 	element.className = classNames.join(" ");
-	element.dataset.icon = name;
+	element.dataset.icon = String(name);
 	element.dataset.fill = String(definition.fill);
 	element.setAttribute("aria-hidden", "true");
 	if (definition.weight) {
@@ -37,6 +55,6 @@ export const setIcon = (element, name, classes = "") => {
 	return element;
 };
 
-export const createIcon = (name, classes = "") => {
+export const createIcon = (name: string, classes = "") => {
 	return setIcon(document.createElement("span"), name, classes);
 };

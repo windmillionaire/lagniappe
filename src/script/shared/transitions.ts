@@ -1,9 +1,28 @@
 import { captureError, isSkippedViewTransitionError } from "./errors.ts";
 
-const runWithoutTransition = async (callback, label = "unlabeled") => {
+type TransitionCommit = () => unknown;
+
+interface TransitionEntry {
+	callback: TransitionCommit;
+	label: string;
+	resolve: (committed: boolean) => void;
+}
+
+interface TransitionBatch {
+	results: boolean[];
+	pending: Promise<unknown> | null;
+}
+
+const hasThen = (result: unknown) =>
+	Boolean((result as { then?: unknown } | null | undefined)?.then);
+
+const runWithoutTransition = async (
+	callback: TransitionCommit,
+	label = "unlabeled",
+) => {
 	try {
 		const result = callback();
-		if (result?.then) {
+		if (hasThen(result)) {
 			captureError(
 				new TypeError(
 					`View transition commit "${label}" returned a promise. Prepare asynchronous work before committing DOM changes.`,
@@ -20,9 +39,9 @@ const runWithoutTransition = async (callback, label = "unlabeled") => {
 
 let transitionQueue = Promise.resolve();
 let transitionDepth = 0;
-let pendingTransitionBatch = null;
+let pendingTransitionBatch: TransitionEntry[] | null = null;
 
-const reportSlowCommit = (label, started) => {
+const reportSlowCommit = (label: string, started: number) => {
 	if (typeof performance === "undefined" || !performance.now) return;
 	if (typeof __BUILD_ID__ !== "undefined") return;
 
@@ -33,14 +52,14 @@ const reportSlowCommit = (label, started) => {
 	);
 };
 
-const runCommit = (callback, label) => {
+const runCommit = (callback: TransitionCommit, label: string) => {
 	const started =
 		typeof performance !== "undefined" && performance.now
 			? performance.now()
 			: null;
 	try {
 		const result = callback();
-		if (!result?.then) {
+		if (!hasThen(result)) {
 			if (started !== null) reportSlowCommit(label, started);
 			return true;
 		}
@@ -66,14 +85,14 @@ const runCommit = (callback, label) => {
 	}
 };
 
-const runTransitionBatch = (entries) => {
-	const results = new Array(entries.length).fill(false);
-	const pending = [];
+const runTransitionBatch = (entries: TransitionEntry[]): TransitionBatch => {
+	const results = new Array<boolean>(entries.length).fill(false);
+	const pending: Promise<void>[] = [];
 
 	transitionDepth += 1;
 	entries.forEach(({ callback, label }, index) => {
 		const result = runCommit(callback, label);
-		if (result?.then) {
+		if (typeof result !== "boolean") {
 			pending.push(
 				result.then((successful) => {
 					results[index] = successful;
@@ -97,16 +116,18 @@ const runTransitionBatch = (entries) => {
 	};
 };
 
-const executeTransition = async (entries) => {
-	let batch = null;
-	let updateStarted = false;
+const executeTransition = async (entries: TransitionEntry[]) => {
+	const updateState: { started: boolean; batch: TransitionBatch | null } = {
+		started: false,
+		batch: null,
+	};
 	const update = () => {
-		updateStarted = true;
-		batch = runTransitionBatch(entries);
-		return batch.pending || undefined;
+		updateState.started = true;
+		updateState.batch = runTransitionBatch(entries);
+		return updateState.batch.pending || undefined;
 	};
 
-	let transition = null;
+	let transition: ViewTransition | null = null;
 	if (document.startViewTransition) {
 		try {
 			transition = document.startViewTransition(update);
@@ -116,15 +137,15 @@ const executeTransition = async (entries) => {
 	}
 
 	if (!transition) {
-		if (!updateStarted) update();
-		if (batch?.pending) await batch.pending;
+		if (!updateState.started) update();
+		if (updateState.batch?.pending) await updateState.batch.pending;
 		entries.forEach((entry, index) => {
-			entry.resolve(batch.results[index]);
+			entry.resolve(updateState.batch?.results[index] ?? false);
 		});
 		return;
 	}
 
-	const observeTransitionError = (error) => {
+	const observeTransitionError = (error: unknown) => {
 		if (!isSkippedViewTransitionError(error)) captureError(error);
 	};
 	void transition.ready?.catch(observeTransitionError);
@@ -140,11 +161,14 @@ const executeTransition = async (entries) => {
 	}
 
 	entries.forEach((entry, index) => {
-		entry.resolve(batch?.results[index] ?? false);
+		entry.resolve(updateState.batch?.results[index] ?? false);
 	});
 };
 
-export const withTransition = (callback, { label = "unlabeled" } = {}) => {
+export const withTransition = (
+	callback: TransitionCommit,
+	{ label = "unlabeled" } = {},
+): Promise<boolean> => {
 	if (transitionDepth > 0) {
 		// Nested callers are already inside the browser's transition update.
 		return runWithoutTransition(callback, label);
@@ -152,9 +176,9 @@ export const withTransition = (callback, { label = "unlabeled" } = {}) => {
 
 	return new Promise((resolve) => {
 		if (!pendingTransitionBatch) {
-			pendingTransitionBatch = [];
+			const entries: TransitionEntry[] = [];
+			pendingTransitionBatch = entries;
 			queueMicrotask(() => {
-				const entries = pendingTransitionBatch;
 				pendingTransitionBatch = null;
 				transitionQueue = transitionQueue
 					.then(() => executeTransition(entries))

@@ -1,6 +1,6 @@
 import { withTransition } from "./transitions.ts";
 
-function legacyCopy(url, documentRef) {
+function legacyCopy(url: string, documentRef: Document) {
 	const textarea = documentRef.createElement("textarea");
 	textarea.value = url;
 	textarea.setAttribute("readonly", "");
@@ -17,7 +17,7 @@ function legacyCopy(url, documentRef) {
 	return copied;
 }
 
-export async function copyPublicUrl(url, root = document) {
+export async function copyPublicUrl(url: string, root = document) {
 	try {
 		if (navigator.clipboard?.writeText) {
 			await navigator.clipboard.writeText(url);
@@ -29,7 +29,7 @@ export async function copyPublicUrl(url, root = document) {
 	return legacyCopy(url, root);
 }
 
-function updateShareLabel(label, text) {
+function updateShareLabel(label: Element | null | undefined, text: string) {
 	if (!label) return;
 	void withTransition(
 		() => {
@@ -39,11 +39,16 @@ function updateShareLabel(label, text) {
 	);
 }
 
-export async function sharePublicPage(button, root = document) {
+export async function sharePublicPage(
+	button: HTMLButtonElement,
+	root = document,
+) {
 	const container = button.closest('[data-role="public-share"]');
 	const status = container?.querySelector('[data-role="share-status"]');
 	const fallback = container?.querySelector('[data-role="share-fallback"]');
-	const input = fallback?.querySelector('[data-role="share-url"]');
+	const input = fallback?.querySelector<HTMLInputElement>(
+		'[data-role="share-url"]',
+	);
 	const label = button.querySelector?.('[data-role="share-label"]');
 	const payload = { url: button.dataset.shareUrl };
 	if (status) status.textContent = "";
@@ -63,7 +68,12 @@ export async function sharePublicPage(button, root = document) {
 				if (status) status.textContent = "Page shared";
 				return;
 			} catch (error) {
-				if (error?.name === "AbortError") {
+				if (
+					error &&
+					typeof error === "object" &&
+					"name" in error &&
+					error.name === "AbortError"
+				) {
 					updateShareLabel(label, "Share");
 					return;
 				}
@@ -71,7 +81,7 @@ export async function sharePublicPage(button, root = document) {
 		}
 	}
 
-	if (await copyPublicUrl(payload.url, root)) {
+	if (payload.url !== undefined && (await copyPublicUrl(payload.url, root))) {
 		updateShareLabel(label, "Copied");
 		if (status) status.textContent = "Link copied";
 		return;
@@ -88,7 +98,9 @@ export async function sharePublicPage(button, root = document) {
 }
 
 export function initializePublicSharing(root = document) {
-	const button = root.querySelector('[data-role="share-button"]');
+	const button = root.querySelector<HTMLButtonElement>(
+		'[data-role="share-button"]',
+	);
 	if (!button || button.dataset.shareInitialized === "true") return;
 	button.dataset.shareInitialized = "true";
 	button.addEventListener("click", () => void sharePublicPage(button, root));

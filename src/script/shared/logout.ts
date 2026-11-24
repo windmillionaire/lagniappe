@@ -4,7 +4,15 @@ const LOGOUT_BUTTON_SELECTOR = "[data-action='logout'][data-route]";
 
 let initialized = false;
 
-const submitLogout = async (route, { submitter = null, state = null } = {}) => {
+type LogoutOptions = {
+	submitter?: HTMLElement | null;
+	state?: HTMLElement | null;
+};
+
+const submitLogout = async (
+	route: string,
+	{ submitter = null, state = null }: LogoutOptions = {},
+) => {
 	state = state || submitter;
 	if (state?.dataset?.submitting === "true") return;
 	if (state?.dataset) state.dataset.submitting = "true";
@@ -25,16 +33,20 @@ const submitLogout = async (route, { submitter = null, state = null } = {}) => {
 	}
 };
 
-export const initializeLogoutForms = (root = document) => {
+export const initializeLogoutForms = (
+	root: Document | HTMLElement = document,
+) => {
 	if (initialized) return;
 	initialized = true;
 
 	root.addEventListener("click", async (event) => {
-		const button = event.target?.closest?.(LOGOUT_BUTTON_SELECTOR);
-		if (!button) return;
+		const target = event.target as Element | null;
+		const button = target?.closest?.<HTMLElement>(LOGOUT_BUTTON_SELECTOR);
+		const route = button?.dataset.route;
+		if (!button || route === undefined) return;
 
 		event.preventDefault();
-		await submitLogout(button.dataset.route, {
+		await submitLogout(route, {
 			submitter: button,
 			state: button,
 		});

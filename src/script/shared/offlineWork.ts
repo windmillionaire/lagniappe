@@ -1,10 +1,15 @@
+interface OfflineWorkView {
+	elt: Element;
+	reportStartupError(error: unknown, element: Element, context: string): void;
+}
+
 /**
  * Inspect persisted offline work without loading either manager into the Core
  * startup closure. Database enumeration avoids opening or creating storage for
  * users who have never used offline behavior.
  *
  */
-export const inspectOfflineWork = async (view) => {
+export const inspectOfflineWork = async (view: OfflineWorkView) => {
 	const fallback = {
 		mutations: Boolean(view.elt.querySelector("[lp-offline]")),
 		sync: Boolean(view.elt.querySelector("[lp-sync]")),

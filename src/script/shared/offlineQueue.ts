@@ -1,9 +1,126 @@
+import type { RequestResult } from "../types/api";
+import type {
+	CapturedFormState,
+	FormControlSelection,
+	FormSchema,
+	FormSubmission,
+} from "../types/forms";
 import {
 	deleteOfflineMutations,
 	getOfflineMutations,
+	type StoredOfflineMutation,
 	setOfflineMutation,
 } from "./offline.ts";
 import { request } from "./request.ts";
+
+type MutationFields = CapturedFormState["fields"];
+type MutationFile = Omit<CapturedFormState["files"][number], "type"> & {
+	type?: string;
+};
+
+interface MutationState {
+	kind?: string | null;
+	client_key?: string | null;
+	target_key?: string | null;
+	fingerprint?: string | null;
+	modified?: string | null;
+	fields?: MutationFields | null;
+	files?: MutationFile[] | null;
+}
+
+interface OfflineMutationRecord extends StoredOfflineMutation, MutationState {
+	action?: string | null;
+	method?: string | null;
+	route: string;
+	created_at?: number | null;
+	// Reconciliation owns interpretation of historical form snapshots.
+	renderer_schema?: unknown;
+	renderer_submission?: unknown;
+	form_controls?: unknown;
+	conflictResponse?: RequestResult;
+}
+
+interface QueueInput extends MutationState {
+	id?: string;
+	action?: string;
+	method?: string;
+	route: string;
+	data?: FormData;
+	created_at?: number;
+	renderer_schema?: FormSchema | null;
+	renderer_submission?: FormSubmission | null;
+	form_controls?: FormControlSelection[] | null;
+}
+
+interface OfflineSubmissionContext {
+	action: "create" | "update";
+	queue: OfflineQueue;
+	component: QueueComponent;
+	data: FormData;
+	method: "POST" | "PUT";
+	route: string;
+	widget: QueueWidget;
+}
+
+interface QueueContext {
+	phase: "queued" | "conflict" | "replayed" | "cancelled";
+	queue: OfflineQueue;
+	record: OfflineMutationRecord;
+	response?: RequestResult;
+}
+
+type Handler = (context: QueueContext) => unknown;
+
+interface QueueWidget {
+	key?: string | null;
+	target?: HTMLElement | null;
+	component?: Pick<QueueComponent, "formData"> | null;
+	formData?: FormData | null;
+	form?: { renderer?: { _packageSubmission?(): FormSubmission } | null } | null;
+	schema?: FormSchema | null;
+	handleOfflineQueue?: Handler;
+	offline?(
+		context: OfflineSubmissionContext,
+	):
+		| Partial<QueueInput>
+		| null
+		| undefined
+		| Promise<Partial<QueueInput> | null | undefined>;
+}
+
+interface QueueComponent {
+	name: string;
+	elt: HTMLElement;
+	active?: QueueWidget | null;
+	formData?: FormData | null;
+	widgets: Partial<Record<string, QueueWidget>>;
+	loadWidget(name: string): Promise<QueueWidget | undefined>;
+}
+
+interface QueueWatcher {
+	invalidate?(key?: string | null): unknown;
+}
+
+interface QueueView {
+	online: boolean;
+	components: Record<string, Pick<QueueComponent, "widgets">>;
+	elt?: HTMLElement | null;
+	getComponent(element: HTMLElement | null): QueueComponent | null;
+	EditWatcher?: QueueWatcher | null;
+	ensureEditWatcher?(): Promise<QueueWatcher | null>;
+}
+
+interface QueuedResponse {
+	ok: boolean;
+	html?: Document;
+	removed?: boolean;
+}
+
+type QueueMatch =
+	| Partial<OfflineMutationRecord>
+	| ((record: OfflineMutationRecord) => boolean)
+	| string
+	| null;
 
 const REPLAY_RESULT = Object.freeze({
 	BLOCKED: "blocked",
@@ -11,12 +128,86 @@ const REPLAY_RESULT = Object.freeze({
 	REBASED: "rebased",
 });
 
+type ReplayResult =
+	| { state: typeof REPLAY_RESULT.BLOCKED | typeof REPLAY_RESULT.COMPLETED }
+	| { state: typeof REPLAY_RESULT.REBASED; record: OfflineMutationRecord };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isOptionalText(value: unknown) {
+	return value === undefined || value === null || typeof value === "string";
+}
+
+function isMutationFile(value: unknown): value is MutationFile {
+	return (
+		isRecord(value) &&
+		typeof value.name === "string" &&
+		value.file instanceof Blob &&
+		typeof value.filename === "string" &&
+		(value.type === undefined || typeof value.type === "string")
+	);
+}
+
+function isOfflineMutation(
+	record: StoredOfflineMutation,
+): record is OfflineMutationRecord {
+	return (
+		isOptionalText(record.action) &&
+		isOptionalText(record.method) &&
+		typeof record.route === "string" &&
+		(record.created_at == null || typeof record.created_at === "number") &&
+		isOptionalText(record.kind) &&
+		isOptionalText(record.client_key) &&
+		isOptionalText(record.target_key) &&
+		isOptionalText(record.fingerprint) &&
+		isOptionalText(record.modified) &&
+		(record.fields == null ||
+			(Array.isArray(record.fields) &&
+				record.fields.every(
+					(value: unknown) =>
+						Array.isArray(value) &&
+						typeof value[0] === "string" &&
+						typeof value[1] === "string",
+				))) &&
+		(record.files == null ||
+			(Array.isArray(record.files) && record.files.every(isMutationFile))) &&
+		record.conflictResponse === undefined
+	);
+}
+
+function selectedFormControl(control: Element): FormControlSelection | null {
+	if (control.closest?.(".form-element") || !("_lp_combobox" in control)) {
+		return null;
+	}
+	const combobox = control._lp_combobox;
+	if (
+		!isRecord(combobox) ||
+		typeof combobox.name !== "string" ||
+		!combobox.name
+	) {
+		return null;
+	}
+	const { name, values } = combobox;
+	const options: unknown[] = Array.isArray(combobox.options)
+		? combobox.options
+		: [];
+	return {
+		name,
+		options: options.filter(
+			(option): option is object =>
+				isRecord(option) && values instanceof Set && values.has(option.id),
+		),
+	};
+}
+
 function createId() {
 	if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
 	return `offline-mutation-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function elementResponse(element) {
+function elementResponse(element?: Node | null): QueuedResponse {
 	const html = document.implementation.createHTMLDocument("");
 	if (element) html.body.appendChild(element);
 	return {
@@ -25,9 +216,9 @@ function elementResponse(element) {
 	};
 }
 
-function serializeFormData(data) {
-	const fields = [];
-	const files = [];
+function serializeFormData(data: FormData) {
+	const fields: MutationFields = [];
+	const files: MutationFile[] = [];
 
 	for (const [name, value] of data.entries()) {
 		if (value instanceof File) {
@@ -47,7 +238,7 @@ function serializeFormData(data) {
 	return { fields, files };
 }
 
-function formDataFromRecord(record) {
+function formDataFromRecord(record: OfflineMutationRecord) {
 	const data = new FormData();
 	for (const [name, value] of record.fields || []) {
 		data.append(name, value);
@@ -64,34 +255,43 @@ function formDataFromRecord(record) {
 	return data;
 }
 
-function field(record, name) {
+function field(record: Pick<MutationState, "fields">, name: string) {
 	return (record.fields || []).find(([key]) => key === name)?.[1] || "";
 }
 
 export class OfflineQueue {
-	constructor(view) {
+	declare view: QueueView;
+	declare records: OfflineMutationRecord[];
+	declare _replaying: boolean;
+
+	constructor(view: QueueView) {
 		this.view = view;
 		this.records = [];
 		this._replaying = false;
 	}
 
 	async init() {
-		this.records = await getOfflineMutations();
+		this.records = (await getOfflineMutations()).filter(isOfflineMutation);
 	}
 
 	get widgets() {
 		return Object.values(this.view.components).flatMap((component) => {
-			return Object.values(component.widgets);
+			return Object.values(component.widgets).filter(
+				(widget) => widget !== undefined,
+			);
 		});
 	}
 
 	get targets() {
 		return this.widgets.filter(
-			(widget) => typeof widget.handleOfflineQueue === "function",
+			(widget) => typeof widget?.handleOfflineQueue === "function",
 		);
 	}
 
-	async _dispatch(context, targets = this.targets) {
+	async _dispatch(
+		context: QueueContext,
+		targets: (QueueWidget | Handler)[] = this.targets,
+	) {
 		return Promise.all(
 			[...new Set(targets)].filter(Boolean).map(async (target) => {
 				if (typeof target === "function") return target(context);
@@ -105,7 +305,7 @@ export class OfflineQueue {
 	 * Give that form the retained record instead of requiring another replay.
 	 *
 	 */
-	async presentFor(target) {
+	async presentFor(target?: QueueWidget | null) {
 		if (!target?.key || typeof target.handleOfflineQueue !== "function") return;
 		const record = this._sortedRecords().find(
 			(candidate) => candidate.target_key === target.key,
@@ -122,16 +322,25 @@ export class OfflineQueue {
 		);
 	}
 
-	_responseFromResults(results) {
-		return results.find((result) => {
-			return result && typeof result === "object" && "ok" in result;
-		});
+	_responseFromResults(results: unknown[]) {
+		return results.find(
+			(result): result is QueuedResponse =>
+				isRecord(result) &&
+				typeof result.ok === "boolean" &&
+				(result.html === undefined || result.html instanceof Document) &&
+				(result.removed === undefined || typeof result.removed === "boolean"),
+		);
 	}
 
-	async queueSubmit(component, data, route, method = "POST") {
+	async queueSubmit(
+		component: QueueComponent,
+		data: FormData,
+		route: string,
+		method: "POST" | "PUT" = "POST",
+	) {
 		const widget = component.active;
 		const target = widget?.target;
-		if (!target?.hasAttribute("lp-offline")) return null;
+		if (!widget || !target?.hasAttribute("lp-offline")) return null;
 		if (typeof widget.offline !== "function") return null;
 
 		await this._destinationWidget(component);
@@ -149,12 +358,12 @@ export class OfflineQueue {
 		if (!partial) return null;
 		const fingerprint =
 			partial.fingerprint ??
-			target.closest?.("[lp-entity]")?.dataset?.fingerprint ??
+			target.closest?.<HTMLElement>("[lp-entity]")?.dataset?.fingerprint ??
 			this.view.elt?.dataset?.fingerprint ??
 			null;
 		const modified =
 			partial.modified ??
-			target.closest?.("[lp-entity]")?.dataset?.modified ??
+			target.closest?.<HTMLElement>("[lp-entity]")?.dataset?.modified ??
 			this.view.elt?.dataset?.modified ??
 			null;
 		const rendererSubmission =
@@ -164,16 +373,8 @@ export class OfflineQueue {
 		const formControls = Array.from(
 			target.querySelectorAll?.("[data-combobox-id]") || [],
 		)
-			.filter((control) => !control.closest?.(".form-element"))
-			.map((control) => {
-				const combobox = control._lp_combobox;
-				if (!combobox?.name) return null;
-				const options = (combobox.options || []).filter((option) =>
-					combobox.values?.has(option.id),
-				);
-				return { name: combobox.name, options };
-			})
-			.filter(Boolean);
+			.map(selectedFormControl)
+			.filter((control) => control !== null);
 
 		const result = await this.queue({
 			action,
@@ -193,7 +394,7 @@ export class OfflineQueue {
 			: { ok: true, queued: true };
 	}
 
-	async _destinationWidget(component) {
+	async _destinationWidget(component: QueueComponent) {
 		const destination = component.active?.target?.dataset.destination;
 		if (!destination) return null;
 
@@ -243,7 +444,7 @@ export class OfflineQueue {
 		return completed;
 	}
 
-	async _replayRecord(record) {
+	async _replayRecord(record: OfflineMutationRecord): Promise<ReplayResult> {
 		const response = await this._send(record);
 		if (response?.conflict) {
 			const attemptedFingerprint = record.fingerprint;
@@ -287,7 +488,7 @@ export class OfflineQueue {
 		return { state: REPLAY_RESULT.COMPLETED };
 	}
 
-	_mountedUpdateTargets(record, targets = this.targets) {
+	_mountedUpdateTargets(record: OfflineMutationRecord, targets = this.targets) {
 		return targets.filter(
 			(target) =>
 				target?.key === record.target_key &&
@@ -296,7 +497,7 @@ export class OfflineQueue {
 	}
 
 	async _pollMountedUpdate(
-		record,
+		record: OfflineMutationRecord,
 		targets = this._mountedUpdateTargets(record),
 	) {
 		if (!targets.length) return;
@@ -305,7 +506,14 @@ export class OfflineQueue {
 		await watcher?.invalidate?.(record.target_key);
 	}
 
-	async rebaseSubmit(record, widget, { fingerprint, modified } = {}) {
+	async rebaseSubmit(
+		record: OfflineMutationRecord | null,
+		widget: QueueWidget | null,
+		{
+			fingerprint,
+			modified,
+		}: Pick<MutationState, "fingerprint" | "modified"> = {},
+	) {
 		if (!record?.id || !widget) return null;
 		const data = widget.component?.formData ?? widget.formData;
 		if (!(data instanceof FormData)) return null;
@@ -340,7 +548,7 @@ export class OfflineQueue {
 		return rebased;
 	}
 
-	async queue(record) {
+	async queue(record: QueueInput) {
 		const queued = this._queuedRecord(record);
 		await this._store(queued);
 		const results = await this._dispatch({
@@ -354,7 +562,7 @@ export class OfflineQueue {
 		};
 	}
 
-	_queuedRecord(record) {
+	_queuedRecord(record: QueueInput): OfflineMutationRecord {
 		const id = record.id || createId();
 		const serialized = record.data
 			? serializeFormData(record.data)
@@ -384,15 +592,21 @@ export class OfflineQueue {
 		};
 	}
 
-	response(element) {
+	response(element?: Node | null) {
 		return elementResponse(element);
 	}
 
-	field(record, name) {
+	field(record: Pick<MutationState, "fields">, name: string) {
 		return field(record, name);
 	}
 
-	recordsFor({ kind = null, action = null } = {}) {
+	recordsFor({
+		kind = null,
+		action = null,
+	}: {
+		kind?: string | null;
+		action?: string | null;
+	} = {}) {
 		return this._sortedRecords().filter((record) => {
 			if (kind && record.kind !== kind) return false;
 			if (action && record.action !== action) return false;
@@ -400,7 +614,7 @@ export class OfflineQueue {
 		});
 	}
 
-	async cancel(match) {
+	async cancel(match?: QueueMatch) {
 		const records = this.records.filter((record) => {
 			return this._recordMatches(record, match);
 		});
@@ -421,7 +635,7 @@ export class OfflineQueue {
 		return records;
 	}
 
-	_recordMatches(record, match) {
+	_recordMatches(record: OfflineMutationRecord, match?: QueueMatch) {
 		if (typeof match === "function") return match(record);
 		if (typeof match === "string") {
 			return [record.id, record.client_key, record.target_key].includes(match);
@@ -431,7 +645,7 @@ export class OfflineQueue {
 		return Object.entries(match).every(([key, value]) => record[key] === value);
 	}
 
-	async _store(record) {
+	async _store(record: OfflineMutationRecord) {
 		await setOfflineMutation(record);
 		this.records = [
 			...this.records.filter((existing) => existing.id !== record.id),
@@ -440,10 +654,12 @@ export class OfflineQueue {
 	}
 
 	_sortedRecords() {
-		return [...this.records].sort((a, b) => a.created_at - b.created_at);
+		return [...this.records].sort(
+			(a, b) => Number(a.created_at) - Number(b.created_at),
+		);
 	}
 
-	async _send(record) {
+	async _send(record: OfflineMutationRecord) {
 		if (record.method === "DELETE") return request.delete(record.route);
 
 		const data = formDataFromRecord(record);
@@ -453,20 +669,24 @@ export class OfflineQueue {
 		return request.post(record.route, data);
 	}
 
-	_finalize(record, response) {
+	_finalize(record: OfflineMutationRecord, response: RequestResult) {
 		const key =
 			record.action === "create" ? record.client_key : record.target_key;
 		if (!key) return;
 		const current = document.querySelector(`[data-key="${key}"]`);
 
 		if (record.action === "create") {
-			const replacement = response.html?.querySelector("li,[lp-entity]");
+			const html = response.html || undefined;
+			const replacement = html?.querySelector("li,[lp-entity]");
 			if (current && replacement) current.replaceWith(replacement);
 			else if (current && response.removed) current.remove();
 			return;
 		}
 
-		if (["complete", "delete"].includes(record.action) && current) {
+		if (
+			(record.action === "complete" || record.action === "delete") &&
+			current
+		) {
 			current.remove();
 		}
 	}

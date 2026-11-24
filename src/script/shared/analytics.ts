@@ -1,15 +1,25 @@
 import { request } from "./request.ts";
 
-const meta = (name) =>
+interface AnalyticsPayload {
+	path?: string;
+	[key: string]: string | undefined;
+}
+
+const meta = (name: string) =>
 	document.querySelector(`meta[name="${name}"]`)?.getAttribute("content") || "";
 
-const token = () => document.getElementById("token")?.value || "";
+const token = () =>
+	document.querySelector<HTMLInputElement>("#token")?.value || "";
 
 const analyticsEnabled = () => meta("analytics") === "true";
 
 const navigationType = () => {
 	const navigation = performance.getEntriesByType?.("navigation")?.[0];
-	return navigation?.type || "";
+	return navigation &&
+		"type" in navigation &&
+		typeof navigation.type === "string"
+		? navigation.type
+		: "";
 };
 
 const pageTitle = () =>
@@ -19,8 +29,8 @@ const pageTitle = () =>
 		?.textContent?.trim() ||
 	document.title.trim();
 
-const viewData = (action) => {
-	const view = document.querySelector("[lp-view]");
+const viewData = (action: string) => {
+	const view = document.querySelector<HTMLElement>("[lp-view]");
 	return {
 		action,
 		path: window.location.pathname,
@@ -45,7 +55,7 @@ class AnalyticsManager {
 		return meta("mode");
 	}
 
-	async tag(action, payload = {}) {
+	async tag(action: string, payload: AnalyticsPayload = {}) {
 		if (!this.enabled) return;
 
 		const path = payload.path || window.location.pathname;

@@ -4,7 +4,9 @@
  *
  */
 class StorageAdapter {
-	constructor(name) {
+	declare readonly name: "localStorage" | "sessionStorage";
+
+	constructor(name: "localStorage" | "sessionStorage") {
 		this.name = name;
 	}
 
@@ -16,7 +18,7 @@ class StorageAdapter {
 		}
 	}
 
-	get(key, fallback = null) {
+	get<T = null>(key: string, fallback: T | null = null) {
 		try {
 			const value = this._storage()?.getItem(key);
 			return value === null || value === undefined ? fallback : value;
@@ -25,7 +27,7 @@ class StorageAdapter {
 		}
 	}
 
-	set(key, value) {
+	set(key: string, value: string) {
 		try {
 			const storage = this._storage();
 			if (!storage) return false;
@@ -36,7 +38,7 @@ class StorageAdapter {
 		}
 	}
 
-	remove(key) {
+	remove(key: string) {
 		try {
 			const storage = this._storage();
 			if (!storage) return false;
@@ -47,7 +49,7 @@ class StorageAdapter {
 		}
 	}
 
-	getJSON(key, fallback = null) {
+	getJSON(key: string, fallback: unknown = null): unknown {
 		const value = this.get(key);
 		if (value === null) return fallback;
 
@@ -59,7 +61,7 @@ class StorageAdapter {
 		}
 	}
 
-	setJSON(key, value) {
+	setJSON(key: string, value: unknown) {
 		try {
 			const serialized = JSON.stringify(value);
 			if (serialized === undefined) return false;
@@ -76,7 +78,7 @@ export const sessionStore = new StorageAdapter("sessionStorage");
 export const clearRecentSearchResults = () => {
 	const recentKeys = Array.from({ length: localStorage.length }, (_, index) =>
 		localStorage.key(index),
-	).filter((key) => key?.startsWith("recent-"));
+	).filter((key): key is string => key?.startsWith("recent-") === true);
 
 	recentKeys.forEach((key) => {
 		localStorage.removeItem(key);

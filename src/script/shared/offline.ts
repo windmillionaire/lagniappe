@@ -1,15 +1,27 @@
+import type {
+	PersistedSyncRecord,
+	SyncMention,
+	SyncUpdate,
+} from "../types/sync";
+
 const DB_NAME = "offline-db";
 const DB_VERSION = 5;
 const SYNC_STORE = "sync";
 const MUTATION_STORE = "mutations";
 
+type StoreName = typeof SYNC_STORE | typeof MUTATION_STORE;
+
+export interface StoredOfflineMutation extends Record<string, unknown> {
+	id: string;
+}
+
 function openDB() {
-	return new Promise((resolve, reject) => {
+	return new Promise<IDBDatabase>((resolve, reject) => {
 		const request = indexedDB.open(DB_NAME, DB_VERSION);
 		request.onerror = () => reject(request.error);
 		request.onsuccess = () => resolve(request.result);
 		request.onupgradeneeded = (event) => {
-			const db = event.target.result;
+			const db = request.result;
 			if (event.oldVersion < 2) {
 				// The store fields were renamed sync_id (snake_case) to match the
 				// wire format; nuke old v1 stores so the keyPath matches records.
@@ -34,15 +46,18 @@ function openDB() {
 	});
 }
 
-function withTransaction(storeNames, mode, executor) {
+function withTransaction<T>(
+	storeNames: StoreName | StoreName[],
+	mode: IDBTransactionMode,
+	executor: (transaction: IDBTransaction) => T | Promise<T>,
+): Promise<T> {
 	return openDB().then(
 		(db) =>
-			new Promise((resolve, reject) => {
-				let tx = null;
-				let operationComplete = false;
+			new Promise<T>((resolve, reject) => {
+				let tx: IDBTransaction | null = null;
 				let transactionComplete = false;
-				let operationResult;
-				let firstError = null;
+				let operationResult: { value: T } | null = null;
+				let firstError: unknown = null;
 				let settled = false;
 				let databaseClosed = false;
 
@@ -52,24 +67,24 @@ function withTransaction(storeNames, mode, executor) {
 					db.onclose = null;
 					db.close();
 				};
-				const rememberError = (error) => {
+				const rememberError = (error: unknown) => {
 					firstError ||=
 						error || tx?.error || new Error("IndexedDB transaction failed");
 					return firstError;
 				};
-				const rejectOnce = (error) => {
+				const rejectOnce = (error: unknown) => {
 					if (settled) return;
 					settled = true;
 					closeDatabase();
 					reject(rememberError(error));
 				};
 				const resolveAfterCommit = () => {
-					if (settled || !operationComplete || !transactionComplete) return;
+					if (settled || !operationResult || !transactionComplete) return;
 					settled = true;
 					closeDatabase();
-					resolve(operationResult);
+					resolve(operationResult.value);
 				};
-				const abortWithError = (error) => {
+				const abortWithError = (error: unknown) => {
 					rememberError(error);
 					try {
 						tx?.abort();
@@ -97,13 +112,15 @@ function withTransaction(storeNames, mode, executor) {
 					resolveAfterCommit();
 				};
 				tx.onerror = (event) => {
-					rejectOnce(event.target?.error || tx.error);
+					const target = event.target;
+					const error = target && "error" in target ? target.error : null;
+					rejectOnce(error || tx?.error);
 				};
 				tx.onabort = () => {
-					rejectOnce(tx.error || new Error("IndexedDB transaction aborted"));
+					rejectOnce(tx?.error || new Error("IndexedDB transaction aborted"));
 				};
 
-				let operation;
+				let operation: T | Promise<T>;
 				try {
 					operation = executor(tx);
 				} catch (e) {
@@ -111,26 +128,72 @@ function withTransaction(storeNames, mode, executor) {
 					return;
 				}
 				Promise.resolve(operation).then((result) => {
-					operationResult = result;
-					operationComplete = true;
+					operationResult = { value: result };
 					resolveAfterCommit();
 				}, abortWithError);
 			}),
 	);
 }
 
-function promisify(request) {
-	return new Promise((resolve, reject) => {
+function promisify<T>(request: IDBRequest<T>): Promise<T> {
+	return new Promise<T>((resolve, reject) => {
 		request.onsuccess = () => resolve(request.result);
 		request.onerror = () => reject(request.error);
 	});
 }
 
-export function updateSyncRecord(record) {
+function isStoredRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isStoredMutation(value: unknown): value is StoredOfflineMutation {
+	return isStoredRecord(value) && typeof value.id === "string";
+}
+
+function isOptionalText(value: unknown) {
+	return value === undefined || value === null || typeof value === "string";
+}
+
+function isStoredMention(value: unknown): value is SyncMention {
+	return (
+		isStoredRecord(value) &&
+		typeof value.occurrence_id === "string" &&
+		typeof value.recipient === "string" &&
+		typeof value.display_name === "string"
+	);
+}
+
+function isStoredSyncRecord(value: unknown): value is PersistedSyncRecord {
+	return (
+		isStoredRecord(value) &&
+		typeof value.sync_id === "string" &&
+		typeof value.key === "string" &&
+		isOptionalText(value.update) &&
+		isOptionalText(value.ydoc) &&
+		isOptionalText(value.html) &&
+		isOptionalText(value.generation) &&
+		isOptionalText(value.presence_digest) &&
+		isOptionalText(value.fingerprint) &&
+		(value.revision === undefined ||
+			value.revision === null ||
+			typeof value.revision === "number") &&
+		(value.mentions === undefined ||
+			value.mentions === null ||
+			(Array.isArray(value.mentions) &&
+				value.mentions.every(isStoredMention))) &&
+		(value.touch_parent === undefined ||
+			typeof value.touch_parent === "boolean") &&
+		(value.save === undefined || typeof value.save === "boolean") &&
+		(value.timestamp === undefined || typeof value.timestamp === "number")
+	);
+}
+
+export function updateSyncRecord(record: SyncUpdate) {
 	const timestamp = Date.now();
 	return withTransaction(SYNC_STORE, "readwrite", async (tx) => {
 		const store = tx.objectStore(SYNC_STORE);
-		const existing = await promisify(store.get(record.sync_id));
+		const stored = await promisify<unknown>(store.get(record.sync_id));
+		const existing = isStoredRecord(stored) ? stored : null;
 		const merged = existing
 			? {
 					...existing,
@@ -145,10 +208,12 @@ export function updateSyncRecord(record) {
 	});
 }
 
-export function getSyncRecord(sync_id) {
+export function getSyncRecord(sync_id: string) {
 	return withTransaction([SYNC_STORE], "readonly", async (tx) => {
-		const record = await promisify(tx.objectStore(SYNC_STORE).get(sync_id));
-		return record ?? null;
+		const record = await promisify<unknown>(
+			tx.objectStore(SYNC_STORE).get(sync_id),
+		);
+		return isStoredSyncRecord(record) ? record : null;
 	});
 }
 
@@ -157,22 +222,27 @@ export function getAllOfflineRecords() {
 		[SYNC_STORE, MUTATION_STORE],
 		"readonly",
 		async (tx) => {
-			const sync = await promisify(tx.objectStore(SYNC_STORE).getAll());
-			const mutations = await promisify(
+			const sync = await promisify<unknown[]>(
+				tx.objectStore(SYNC_STORE).getAll(),
+			);
+			const mutations = await promisify<unknown[]>(
 				tx.objectStore(MUTATION_STORE).getAll(),
 			);
-			return { sync, mutations };
+			return {
+				sync: sync.filter(isStoredSyncRecord),
+				mutations: mutations.filter(isStoredMutation),
+			};
 		},
 	);
 }
 
-export function deleteSyncRecord(sync_id) {
+export function deleteSyncRecord(sync_id: string) {
 	return withTransaction(SYNC_STORE, "readwrite", async (tx) => {
 		await promisify(tx.objectStore(SYNC_STORE).delete(sync_id));
 	});
 }
 
-export function deleteSyncRecords(sync_ids) {
+export function deleteSyncRecords(sync_ids?: readonly string[] | null) {
 	if (!sync_ids?.length) return Promise.resolve();
 	return withTransaction(SYNC_STORE, "readwrite", async (tx) => {
 		const store = tx.objectStore(SYNC_STORE);
@@ -180,7 +250,7 @@ export function deleteSyncRecords(sync_ids) {
 	});
 }
 
-export function setOfflineMutation(record) {
+export function setOfflineMutation<T extends { id: string }>(record: T) {
 	return withTransaction(MUTATION_STORE, "readwrite", async (tx) => {
 		await promisify(tx.objectStore(MUTATION_STORE).put(record));
 	});
@@ -188,11 +258,14 @@ export function setOfflineMutation(record) {
 
 export function getOfflineMutations() {
 	return withTransaction(MUTATION_STORE, "readonly", async (tx) => {
-		return await promisify(tx.objectStore(MUTATION_STORE).getAll());
+		const records = await promisify<unknown[]>(
+			tx.objectStore(MUTATION_STORE).getAll(),
+		);
+		return records.filter(isStoredMutation);
 	});
 }
 
-export function deleteOfflineMutations(ids) {
+export function deleteOfflineMutations(ids?: readonly string[] | null) {
 	if (!ids?.length) return Promise.resolve();
 	return withTransaction(MUTATION_STORE, "readwrite", async (tx) => {
 		const store = tx.objectStore(MUTATION_STORE);

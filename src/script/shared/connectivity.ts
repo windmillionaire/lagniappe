@@ -2,7 +2,16 @@ import BROWSER_PROTOCOL from "../../../config/browser_protocol.json" with {
 	type: "json",
 };
 
-const DEFAULT_STATE = Object.freeze({
+export type ConnectivitySnapshot = Readonly<{
+	browser: "online" | "offline";
+	server: "unknown" | "online" | "offline";
+	visibility: "visible" | "hidden";
+	controller: "controlled" | "uncontrolled";
+}>;
+
+export type ConnectivityPatch = Partial<ConnectivitySnapshot>;
+
+const DEFAULT_STATE: ConnectivitySnapshot = Object.freeze({
 	browser: "online",
 	server: "unknown",
 	visibility: "visible",
@@ -14,10 +23,11 @@ const DEFAULT_STATE = Object.freeze({
  * Server reachability remains authoritative for application requests, while
  * browser link state is a scheduling hint and unknown server state is treated
  * optimistically during startup.
- *
  */
 export class ConnectivityState {
-	constructor(initial = {}) {
+	declare private _state: ConnectivitySnapshot;
+
+	constructor(initial: ConnectivityPatch = {}) {
 		this._state = DEFAULT_STATE;
 		this.transition(initial);
 	}
@@ -34,16 +44,18 @@ export class ConnectivityState {
 		return Object.freeze({ ...this._state });
 	}
 
-	transition(patch = {}) {
-		const next = { ...this._state };
-		for (const [field, value] of Object.entries(patch)) {
-			const allowed = BROWSER_PROTOCOL.connectivity[field];
+	transition(patch: ConnectivityPatch = {}): ConnectivitySnapshot {
+		const next: Record<string, string> = { ...this._state };
+		for (const [field, value] of Object.entries<string>(patch)) {
+			const allowed =
+				BROWSER_PROTOCOL.connectivity[field as keyof ConnectivitySnapshot];
 			if (!allowed?.includes(value)) {
 				throw new TypeError(`Invalid connectivity ${field}: ${value}`);
 			}
 			next[field] = value;
 		}
-		this._state = Object.freeze(next);
+		// The previous snapshot is complete and each changed value was validated.
+		this._state = Object.freeze(next) as ConnectivitySnapshot;
 		return this.snapshot();
 	}
 }

@@ -1,5 +1,7 @@
+type KeyedSettings = { key: string };
+
 export const ENDPOINTS = {
-	CollaborativeDocument: (settings) => {
+	CollaborativeDocument: (settings: KeyedSettings) => {
 		return {
 			sendUpdates: `/assets/${settings.key}/document/update`,
 			saveDocument: `/assets/${settings.key}/document/save`,
@@ -10,7 +12,7 @@ export const ENDPOINTS = {
 			history: `/assets/${settings.key}/document/history`,
 		};
 	},
-	Filters: (settings) => {
+	Filters: (settings: KeyedSettings) => {
 		return {
 			condition: `/filters/${settings.key}/condition`,
 			options: `/filters/${settings.key}/options`,
@@ -19,12 +21,12 @@ export const ENDPOINTS = {
 			get: `/filters/${settings.key}/get`,
 		};
 	},
-	FileInfo: (settings) => {
+	FileInfo: (settings: KeyedSettings) => {
 		return {
 			html: `/files/${settings.key}/html`,
 		};
 	},
-	PagePhoto: (settings) => {
+	PagePhoto: (settings: KeyedSettings) => {
 		return {
 			upload: `/assets/${settings.key}/add-page-image`,
 			generate: `/assets/${settings.key}/generate-page-image`,
@@ -39,7 +41,7 @@ export const ENDPOINTS = {
 	SiteAdministrators: () => {
 		return {
 			promote: "/l/site-administrators",
-			demote: (key) => `/l/site-administrators/${key}`,
+			demote: (key: string) => `/l/site-administrators/${key}`,
 		};
 	},
 	SiteDeployment: () => {
@@ -66,35 +68,35 @@ export const ENDPOINTS = {
 	},
 	HomeTaskList: () => {
 		return {
-			completeTask: (key) => {
+			completeTask: (key: string) => {
 				return `/tasks/${key}/complete`;
 			},
-			changeDueDate: (key) => {
+			changeDueDate: (key: string) => {
 				return `/tasks/${key}/change-due-date`;
 			},
 		};
 	},
-	TaskForm: (settings) => {
+	TaskForm: (settings: KeyedSettings) => {
 		return {
 			latestHistorySubmission: `/tasks/${settings.key}/history/latest-submission`,
 		};
 	},
-	TaskUpload: (settings) => {
+	TaskUpload: (settings: KeyedSettings) => {
 		return {
 			upload: `/tasks/${settings.key}/upload-file`,
-			remove: (fileKey) => `/tasks/${settings.key}/files/${fileKey}`,
+			remove: (fileKey: string) => `/tasks/${settings.key}/files/${fileKey}`,
 		};
 	},
 	ImportData: () => {
 		return {
-			get: (key) => `/files/ingress?key=${key}`,
-			setStage: (key) => `/files/ingress/${key}/stage`,
-			update: (key) => `/files/ingress/${key}/update`,
-			next: (key) => `/files/ingress/${key}/next`,
-			import: (key) => `/files/ingress/${key}/import`,
-			stop: (key) => `/files/ingress/${key}/stop`,
-			deleteImported: (key) => `/files/ingress/${key}/delete-imported`,
-			getPageForm: (key) => `/files/ingress/${key}/get-page-form`,
+			get: (key: string) => `/files/ingress?key=${key}`,
+			setStage: (key: string) => `/files/ingress/${key}/stage`,
+			update: (key: string) => `/files/ingress/${key}/update`,
+			next: (key: string) => `/files/ingress/${key}/next`,
+			import: (key: string) => `/files/ingress/${key}/import`,
+			stop: (key: string) => `/files/ingress/${key}/stop`,
+			deleteImported: (key: string) => `/files/ingress/${key}/delete-imported`,
+			getPageForm: (key: string) => `/files/ingress/${key}/get-page-form`,
 		};
 	},
 	search: {
@@ -104,10 +106,10 @@ export const ENDPOINTS = {
 	linkPreview: "/l/preview",
 	markdown: "/l/markdown",
 	location: "/l/search-location",
-	facet: (index) => {
+	facet: (index: string) => {
 		return `/l/search-index/${index}`;
 	},
-	html: (key, field) => {
+	html: (key: string, field: string) => {
 		return {
 			save: `/assets/${key}/form-html/${field}`,
 			addImage: `/assets/${key}/document/image?field=${field}`,
@@ -116,13 +118,14 @@ export const ENDPOINTS = {
 		};
 	},
 	renderer: {
-		validateRow: (key, table_id) => `/forms/${key}/validate-row/${table_id}`,
-		expandTableCell: (key, table_id) =>
+		validateRow: (key: string, table_id: string) =>
+			`/forms/${key}/validate-row/${table_id}`,
+		expandTableCell: (key: string, table_id: string) =>
 			`/forms/${key}/expand-table-cell/${table_id}`,
-		getSchema: (key) => `/forms/${key}/schema`,
+		getSchema: (key: string) => `/forms/${key}/schema`,
 	},
 	manual: {
-		section: (key) => {
+		section: (key: string) => {
 			return `/manual/section/${key}`;
 		},
 	},
@@ -130,25 +133,25 @@ export const ENDPOINTS = {
 		start: `/collaboration/start`,
 		stop: `/collaboration/stop`,
 	},
-	delete: (key) => `/l/delete/${key}`,
-	toggleStar: (key) => {
+	delete: (key: string) => `/l/delete/${key}`,
+	toggleStar: (key: string) => {
 		return `/l/toggle-star/${key}`;
 	},
-	activity: (key) => `/l/activity/${key}`,
+	activity: (key: string) => `/l/activity/${key}`,
 	poll: "/l/poll",
 	notifications: "/l/notifications",
 	messages: {
 		conversations: "/l/messages/conversations",
-		history: (key) => `/l/messages/conversations/${key}`,
+		history: (key: string) => `/l/messages/conversations/${key}`,
 		send: "/l/messages",
-		read: (key) => `/l/messages/conversations/${key}/read`,
-		remove: (key) => `/l/messages/${key}`,
-		clearModal: (key) => `/l/messages/conversations/${key}/delete`,
+		read: (key: string) => `/l/messages/conversations/${key}/read`,
+		remove: (key: string) => `/l/messages/${key}`,
+		clearModal: (key: string) => `/l/messages/conversations/${key}/delete`,
 	},
-	help: (key) => {
+	help: (key: string) => {
 		return `/reference/section/${key}`;
 	},
 	createSchema: "/forms/create-schema",
-	restrictions: (key) => `/forms/${key}/restrictions`,
+	restrictions: (key: string) => `/forms/${key}/restrictions`,
 	sync: "/l/sync",
 };
