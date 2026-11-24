@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
+import { createBrowser } from "../utility/js/environment.mjs";
 
 function replaceGlobal(t, name, value) {
 	const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
@@ -176,7 +177,8 @@ test("test_report_categories_and_saved_filter_selection", async () => {
 	);
 });
 
-test("test_report_filters_count_hidden_categories_and_empty_selections", async () => {
+test("test_report_filters_count_hidden_categories_and_empty_selections", async (t) => {
+	createBrowser(t);
 	const state = await loadToolReportList();
 	const f = fixture(state.ToolReportList);
 	const ready = f.add("ready", "proposal", "ready");
@@ -229,16 +231,18 @@ test("test_report_filters_count_hidden_categories_and_empty_selections", async (
 		f.buttons.map((button) => button.count.textContent),
 		[0, 1, 1],
 	);
-	const created = {
-		dataset: { key: "new", outputKind: "answer", status: "pending" },
-	};
-	f.widget.created({ html: { querySelectorAll: () => [created] } });
+	const html = new DOMParser().parseFromString(
+		'<ul><li lp-entity data-kind="report" data-key="new" data-output-kind="answer" data-status="pending"></li></ul>',
+		"text/html",
+	);
+	const created = html.querySelector("li");
+	f.widget.created({ html });
 	f.widget.postreconcile();
 	assert.equal(created.hidden, false);
 	assert.deepEqual([...f.widget.filters], ["executed", "answers"]);
 
 	f.widget.filters = new Set(["executed"]);
-	f.widget.created({ html: { querySelectorAll: () => [created] } });
+	f.widget.created({ html });
 	f.widget.postreconcile();
 	assert.equal(f.items.filter((item) => item.dataset.key === "new").length, 1);
 	assert.equal(created.hidden, false);
