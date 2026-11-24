@@ -564,6 +564,11 @@ def test_default_deploy_syncs_post_vault_draft_into_settings_singleton(monkeypat
         "reconcile_memory_alert",
         lambda: None,
     )
+    monkeypatch.setattr(
+        agent_mode,
+        "_verify_live_site_responds",
+        lambda _url: True,
+    )
 
     assert agent_mode._default_deploy(post_vault_draft) is True  # type: ignore[arg-type]
     assert seen_during_deploy == {
@@ -572,3 +577,34 @@ def test_default_deploy_syncs_post_vault_draft_into_settings_singleton(monkeypat
         "GOOGLE_CLIENT_ID": "12345.apps.googleusercontent.com",
         "AUTH_EMAIL_CONFIG": {"host": "smtp.gmail.com", "password": "app-password"},
     }
+
+
+def test_verify_live_site_responds_retries_cold_start_and_fails_on_500():
+    attempts: list[str] = []
+
+    def _warming_get(url, *, timeout=20, allow_redirects=True):
+        attempts.append(url)
+        code = 503 if len(attempts) == 1 else 200
+        return SimpleNamespace(status_code=code)
+
+    assert (
+        agent_mode._verify_live_site_responds(
+            "https://demo.uc.r.appspot.com",
+            request_get=_warming_get,
+            retry_delays=(0.0, 0.0),
+        )
+        is True
+    )
+    assert attempts == [
+        "https://demo.uc.r.appspot.com/users/login",
+        "https://demo.uc.r.appspot.com/users/login",
+    ]
+
+    assert (
+        agent_mode._verify_live_site_responds(
+            "https://demo.uc.r.appspot.com",
+            request_get=lambda url, **_kw: SimpleNamespace(status_code=500),
+            retry_delays=(0.0, 0.0),
+        )
+        is False
+    )

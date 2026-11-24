@@ -841,6 +841,42 @@ def _default_validate_redis(settings: Mapping[str, object]) -> None:
     test_redis_connection(settings, exit_on_failure=True)
 
 
+def _verify_live_site_responds(
+    app_url: str,
+    *,
+    request_get: Callable[..., Any] | None = None,
+    retry_delays: tuple[float, ...] = (0.0, 3.0, 6.0, 12.0),
+) -> bool:
+    """Verify the deployed App Engine service boots and responds without 5xx."""
+    base = str(app_url or "").strip().rstrip("/")
+    if not base.startswith(("http://", "https://")):
+        return True
+    if request_get is None:
+        import requests
+
+        request_get = requests.get
+    probe_url = f"{base}/users/login"
+    last_status: int | str = "unreachable"
+    for delay in retry_delays:
+        if delay:
+            time.sleep(delay)
+        try:
+            response = request_get(probe_url, timeout=20, allow_redirects=True)
+        except Exception as error:
+            last_status = type(error).__name__
+            continue
+        status_code = int(getattr(response, "status_code", 0) or 0)
+        if 200 <= status_code < 400:
+            return True
+        last_status = status_code
+    print(
+        f"Deployed site health check failed for {probe_url} (last result: {last_status}).",
+        file=sys.stderr,
+        flush=True,
+    )
+    return False
+
+
 def _default_deploy(draft: SettingsDraft) -> bool:
     from config import SETTINGS
     from installer import deploy, gcloud, monitoring, upgrade
@@ -854,7 +890,9 @@ def _default_deploy(draft: SettingsDraft) -> bool:
         return False
     monitoring.reconcile_memory_alert()
     _sync_settings_singleton(SETTINGS, draft)
-    return True
+    record_step("verify live site responds")
+    app_url = str(SETTINGS.APP.get("APP_URL") or "").strip()
+    return not app_url or _verify_live_site_responds(app_url)
 
 
 def _default_doctor() -> int:
