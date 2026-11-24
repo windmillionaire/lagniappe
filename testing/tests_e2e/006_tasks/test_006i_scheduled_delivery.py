@@ -7,6 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from lagniappe.core.entities.task import Task
 from lagniappe.web import app
 from lagniappe.web.routes.process import main as process_routes
 
@@ -34,19 +35,19 @@ def test_scheduled_uncompletion_delivery_guards_and_preserves_due_date(monkeypat
         assert key == "task-key"
         if delivery == "missing":
             return None
-        task = SimpleNamespace(**deepcopy(stored))
-        task.properties = SimpleNamespace(schedule=SimpleNamespace(
-            active=None if delivery == "no-schedule" else {"interval": 1, "unit": "day"}
-        ))
+        task = Task(testing=True)
+        task.db.update(deepcopy(stored))
+        if delivery != "no-schedule":
+            task.properties.schedule.value["recurring"] = {"interval": 1, "unit": "day"}
 
         def uncomplete():
             # Core reopening is covered separately; it clears the old due date.
             task.completed = False
             task.due_date = None
-            task.scheduled_uncomplete_token = None
+            task.db.pop("scheduled_uncomplete_token", None)
 
         def save():
-            stored.update({key: getattr(task, key) for key in before})
+            stored.update({key: task.db.get(key) for key in before})
             writes.append(deepcopy(stored))
 
         task.uncomplete = uncomplete
@@ -54,7 +55,7 @@ def test_scheduled_uncompletion_delivery_guards_and_preserves_due_date(monkeypat
         return task
 
     loader = Mock(side_effect=fetch)
-    monkeypatch.setattr(process_routes, "Entities", SimpleNamespace(fetch_one=loader))
+    monkeypatch.setattr(process_routes.Entities, "fetch_one", loader)
     monkeypatch.setattr(process_routes, "CONFIG", SimpleNamespace(
         INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL="tasks@example.test"
     ))

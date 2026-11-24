@@ -29,7 +29,7 @@ def test_document_poll_loads_storage_only_on_cache_miss(
     sync_id = f"{identity}:document"
     client_id = f"{identity}:client"
     viewer = SimpleNamespace(details={"hash": identity, "name": "Poll viewer"})
-    monkeypatch.setattr(poll, "current_user", viewer)
+    monkeypatch.setattr(poll, "authenticated_user", lambda: viewer)
     stored_assets = {
         "document": {"type": "html", "path": "saved.html", "fingerprint": "saved"},
     }
@@ -92,7 +92,7 @@ def test_document_poll_loads_storage_only_on_cache_miss(
 @pytest.mark.parametrize("unavailable", ["missing", "forbidden", "wrong-document", "no-document"])
 def test_document_poll_rejects_unavailable_documents_before_loading_state(monkeypatch, unavailable):
     viewer = SimpleNamespace(details={"hash": "viewer"})
-    monkeypatch.setattr(poll, "current_user", viewer)
+    monkeypatch.setattr(poll, "authenticated_user", lambda: viewer)
     read_cache = Mock(side_effect=AssertionError("Unavailable documents must not read Redis."))
     monkeypatch.setattr(poll.cache, "poll_document", read_cache)
     load_seed = Mock(side_effect=AssertionError("Unavailable documents must not load Storage."))
