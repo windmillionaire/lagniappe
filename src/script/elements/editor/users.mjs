@@ -1,5 +1,5 @@
 import { STYLES } from "../../generated/styles.mjs";
-import { Dropdown } from "../combobox/index.mjs";
+import { Dropdown } from "../combobox/index.ts";
 import { USER_COLORS } from "./config.mjs";
 import { createMenuButton } from "./dropdowns.mjs";
 

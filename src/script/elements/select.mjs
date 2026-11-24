@@ -1,7 +1,7 @@
 import { STYLES } from "../generated/styles.mjs";
 import { areEqual } from "../shared/utilities.ts";
 import { BaseElement } from "./base/baseElement.mjs";
-import { SelectBox } from "./combobox/index.mjs";
+import { SelectBox } from "./combobox/index.ts";
 import { primitives } from "./primitives.mjs";
 
 export class SelectElement extends BaseElement {

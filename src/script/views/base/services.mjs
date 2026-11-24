@@ -93,7 +93,7 @@ export const ensureSearchBox = (view) =>
 	loadOnce(view, "_searchPromise", "SearchBox", async () => {
 		const search = document.querySelector("[lp-search]");
 		if (!search) return null;
-		const { SearchBox } = await import("../../elements/combobox/search.mjs");
+		const { SearchBox } = await import("../../elements/combobox/search.ts");
 		if (view._destroyed) return null;
 		const box = new SearchBox(search);
 		await box.init();

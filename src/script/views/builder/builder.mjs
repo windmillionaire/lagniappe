@@ -1,4 +1,4 @@
-import { SearchBox } from "../../elements/combobox/search.mjs";
+import { SearchBox } from "../../elements/combobox/search.ts";
 import { EntityMenu } from "../../elements/entityMenu.mjs";
 import { directUpload } from "../../shared/directUpload.ts";
 import {

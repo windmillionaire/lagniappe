@@ -1,4 +1,4 @@
-type QueryToken<Key> = {
+export type QueryToken<Key> = {
 	epoch: number;
 	key: Key;
 	signal: AbortSignal | undefined;

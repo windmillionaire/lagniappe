@@ -2,6 +2,27 @@ import { STYLES } from "../../generated/styles.mjs";
 import { setIcon } from "../../shared/icons.ts";
 import { localStore } from "../../shared/storage.ts";
 import { formatting } from "../formatting.mjs";
+import type { ComboboxOption } from "./combobox.ts";
+
+export type ResultDetails = ComboboxOption & {
+	disabled?: boolean;
+	icon?: string;
+	index?: string;
+	type?: string;
+	link?: boolean;
+	parent?: { id?: string; kind?: string; name?: string } | null;
+};
+
+type SearchResult = {
+	id?: string;
+	url?: string;
+	details: ResultDetails;
+	form_field?: string | null;
+	form_value?: unknown;
+	text?: string | null;
+};
+
+type ResultEntry = ResultDetails | SearchResult;
 
 const SEARCH_ENTITY_PATTERN = /&(#(?:x[0-9a-f]+|\d+)|amp|apos|gt|lt|quot);/gi;
 const SEARCH_ENTITIES = Object.freeze({
@@ -12,10 +33,13 @@ const SEARCH_ENTITIES = Object.freeze({
 	quot: '"',
 });
 
-const decodeSearchEntities = (text) =>
-	String(text).replace(SEARCH_ENTITY_PATTERN, (entity, name) => {
+const decodeSearchEntities = (text: string) =>
+	String(text).replace(SEARCH_ENTITY_PATTERN, (entity, name: string) => {
 		if (!name.startsWith("#"))
-			return SEARCH_ENTITIES[name.toLowerCase()] ?? entity;
+			return (
+				SEARCH_ENTITIES[name.toLowerCase() as keyof typeof SEARCH_ENTITIES] ??
+				entity
+			);
 
 		const hexadecimal = name[1]?.toLowerCase() === "x";
 		const value = Number.parseInt(
@@ -39,7 +63,7 @@ const decodeSearchEntities = (text) =>
  * becomes executable DOM.
  *
  */
-const appendHighlightedSearchText = (element, markup) => {
+const appendHighlightedSearchText = (element: HTMLElement, markup: string) => {
 	let target = element;
 	for (const part of String(markup).split(/(<\/?b>)/gi)) {
 		if (part.toLowerCase() === "<b>") {
@@ -53,7 +77,7 @@ const appendHighlightedSearchText = (element, markup) => {
 	}
 };
 
-const option = (details) => {
+const option = (details: ResultDetails) => {
 	const option = document.createElement("div");
 	option.className = STYLES.dropdown.option.flow;
 	option.setAttribute("role", "option");
@@ -66,41 +90,42 @@ const option = (details) => {
 		option.dataset.id = details.id;
 	}
 
-	if (details.icon) {
-		option.appendChild(icon(details));
-	}
+	const decoration = details.icon && icon(details);
+	if (decoration) option.appendChild(decoration);
 
 	option.append(formatting.name(details));
 
 	return option.outerHTML;
 };
 
-const icon = (details) => {
+const icon = (details: ResultDetails) => {
 	const iconType = details.icon || details.kind || details.type;
 	if (iconType) {
 		const container = document.createElement("span");
 		container.className = "text-kind-default";
-		container.dataset.kind = details.kind || details.index;
+		container.dataset.kind = String(details.kind || details.index);
 		const iconElement = container.appendChild(document.createElement("span"));
 		setIcon(iconElement, iconType, STYLES.dropdown.icon);
 		return container;
 	}
 };
 
-const name = (details) => {
+const name = (details: ResultDetails) => {
 	const p1 = document.createElement("p");
 
-	p1.append(...[icon(details), formatting.name(details)].filter(Boolean));
+	const decoration = icon(details);
+	if (decoration) p1.append(decoration);
+	p1.append(formatting.name(details));
 
 	return p1;
 };
 
-const search = (result) => {
+const search = (result: SearchResult) => {
 	const option = document.createElement("div");
 	option.className = STYLES.dropdown.search.link;
 	option.setAttribute("role", "option");
 	option.dataset.result = JSON.stringify(result);
-	option.dataset.url = result.url;
+	option.dataset.url = String(result.url);
 
 	option.appendChild(name(result.details));
 
@@ -131,14 +156,14 @@ const search = (result) => {
 	return option.outerHTML;
 };
 
-const facet = (details) => {
+const facet = (details: ResultDetails) => {
 	const option = document.createElement("div");
 	option.className = `${STYLES.dropdown.search.result}`;
 	option.setAttribute("role", "option");
 	option.dataset.details = JSON.stringify(details);
-	option.dataset.id = details.id;
-	option.dataset.name = details.name;
-	option.dataset.kind = details.kind;
+	option.dataset.id = String(details.id);
+	option.dataset.name = String(details.name);
+	option.dataset.kind = String(details.kind);
 
 	option.appendChild(name(details));
 
@@ -146,7 +171,10 @@ const facet = (details) => {
 };
 
 export class Results {
-	constructor(index) {
+	declare index: string | undefined;
+	declare added: ResultEntry[];
+
+	constructor(index?: string) {
 		this.index = index;
 		this.added = [];
 	}
@@ -154,26 +182,26 @@ export class Results {
 	get options() {
 		const key = `recent-${this.index}`;
 		const recent = localStore.getJSON(key, []);
-		if (Array.isArray(recent)) return recent;
+		if (Array.isArray(recent)) return recent as ResultEntry[];
 		localStore.remove(key);
 		return [];
 	}
 
-	add(option) {
+	add(option: ResultEntry) {
 		this.added.unshift(option);
 	}
 
-	save(option) {
+	save(option: HTMLElement) {
 		const recent = this.options;
-		let filtered;
+		let filtered: ResultEntry[] | undefined;
 		if (this.index === "search" && option.dataset.result) {
 			filtered = recent.filter((o) => o.url !== option.dataset.url);
-			const result = JSON.parse(option.dataset.result);
+			const result: SearchResult = JSON.parse(option.dataset.result);
 			result.url = option.dataset.url;
 			filtered.unshift(result);
 		} else if (option.dataset.id) {
 			filtered = recent.filter((o) => o.id !== option.dataset.id);
-			const details = JSON.parse(option.dataset.details);
+			const details: ResultDetails = JSON.parse(String(option.dataset.details));
 			filtered.unshift(details);
 		}
 		if (Array.isArray(filtered)) {
@@ -181,21 +209,22 @@ export class Results {
 		}
 	}
 
-	unique(options) {
+	unique(options: ResultEntry[]) {
 		return options.filter(
 			(o, index, self) => index === self.findIndex((t) => t.id === o.id),
 		);
 	}
 
-	create(items = []) {
+	create(items: ResultEntry[] = []) {
 		let options = items;
 		if (!items.length) {
 			options = this.unique([...this.added, ...this.options]).slice(0, 10);
 		}
 		if (!options.length) return "";
 
+		// Each index stores entries in the shape of its corresponding renderer.
 		if (this.index === "search") {
-			return options.map(search).join("");
+			return (options as SearchResult[]).map(search).join("");
 		} else if (this.index) {
 			return options.map(facet).join("");
 		} else {

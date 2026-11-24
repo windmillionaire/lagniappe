@@ -309,7 +309,7 @@ test("test_message_composer_prefills_peer_and_reuses_operation_on_submit", async
 					},
 				},
 			},
-			"../../src/script/elements/combobox/index.mjs": { FacetsBox: class {} },
+			"../../src/script/elements/combobox/index.ts": { FacetsBox: class {} },
 		},
 	);
 	const textarea = { value: "hello", focus: () => calls.push("focus-body") };
@@ -388,7 +388,7 @@ async function loadNotifications({
 		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
-		"../../src/script/elements/combobox/dropdown.mjs": { Dropdown: class {} },
+		"../../src/script/elements/combobox/dropdown.ts": { Dropdown: class {} },
 		"../../src/script/elements/messageComposer.mjs": {
 			ensureMessageComposer: composer,
 		},

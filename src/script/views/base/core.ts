@@ -1,4 +1,4 @@
-import type { SearchBox } from "../../elements/combobox/search.mjs";
+import type { SearchBox } from "../../elements/combobox/search.ts";
 import type { EntityMenu } from "../../elements/entityMenu.mjs";
 import type { Notifications } from "../../elements/notifications.mjs";
 import type { EditWatcher } from "../../forms/revisions/watcher.ts";

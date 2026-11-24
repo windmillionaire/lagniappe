@@ -492,7 +492,7 @@ function emptyClass() {
 
 async function loadBuilder(connectivity) {
 	return await esmock.strict("../../src/script/views/builder/builder.mjs", {
-		"../../src/script/elements/combobox/search.mjs": {
+		"../../src/script/elements/combobox/search.ts": {
 			SearchBox: emptyClass(),
 		},
 		"../../src/script/elements/entityMenu.mjs": { EntityMenu: emptyClass() },

@@ -1,5 +1,5 @@
 import { buttons } from "../elements/buttons.mjs";
-import { FacetsBox, SelectBox } from "../elements/combobox/index.mjs";
+import { FacetsBox, SelectBox } from "../elements/combobox/index.ts";
 import { primitives } from "../elements/primitives.mjs";
 import { captureError, Modal, request } from "../shared/index.ts";
 import { withTransition } from "../shared/transitions.ts";

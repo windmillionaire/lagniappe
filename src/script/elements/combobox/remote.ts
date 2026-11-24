@@ -1,15 +1,42 @@
 import { captureError } from "../../shared/errors.ts";
-import { QueryLifecycle } from "../../shared/queryLifecycle.ts";
+import {
+	QueryLifecycle,
+	type QueryToken,
+} from "../../shared/queryLifecycle.ts";
 import { debounce } from "../../shared/utilities.ts";
-import { Combobox } from "./combobox.mjs";
+import { Combobox } from "./combobox.ts";
+
+export type RemoteInputEvent = { target: { value: string } };
+
+export type ComboboxQueryResponse = { results: string };
+
+function hasInputValue(event: Event): event is Event & RemoteInputEvent {
+	const { target } = event;
+	return (
+		target != null && "value" in target && typeof target.value === "string"
+	);
+}
+
+type RemoteQueryOptions = {
+	getCurrentKey?: () => string;
+	cancelTransport?: boolean;
+};
 
 /**
  * Shared input, cancellation, publication, and teardown lifecycle for remote
  * comboboxes. Subclasses implement _input() and their result rendering only.
  *
  */
-export class RemoteQueryCombobox extends Combobox {
-	constructor(element, { queryWait = 200 } = {}) {
+export abstract class RemoteQueryCombobox extends Combobox {
+	// Button-backed facets install their input before calling init().
+	declare element: HTMLInputElement;
+	declare queries: QueryLifecycle;
+	declare _queryPending: boolean;
+	declare _debouncedInput: ReturnType<
+		typeof debounce<RemoteQueryCombobox, [RemoteInputEvent]>
+	>;
+
+	constructor(element: HTMLElement, { queryWait = 200 } = {}) {
 		super(element);
 		this.queries = new QueryLifecycle();
 		this._queryPending = false;
@@ -17,7 +44,7 @@ export class RemoteQueryCombobox extends Combobox {
 		this._debouncedInput = debounce((event) => {
 			const result = this._input(event);
 			if (result?.catch) {
-				result.catch((error) => captureError(error, this.element));
+				result.catch((error: unknown) => captureError(error, this.element));
 			}
 		}, queryWait);
 	}
@@ -29,14 +56,16 @@ export class RemoteQueryCombobox extends Combobox {
 		this.element.setAttribute("aria-busy", "false");
 	}
 
-	_queryInput(event) {
-		if (this._destroyed) return;
-		const inputValue = event.target?.value;
+	abstract _input(event: RemoteInputEvent): Promise<unknown> | undefined;
+
+	_queryInput(event: Event) {
+		if (this._destroyed || !hasInputValue(event)) return;
+		const inputValue = event.target.value;
 		this.queries.invalidate();
 		this._queryPending = true;
 		this.element.setAttribute("aria-busy", "true");
 		super.hidePanel();
-		if (event.target === this.element && typeof inputValue === "string") {
+		if (event.target === this.element) {
 			this.element.value = inputValue;
 		}
 		this._debouncedInput(event);
@@ -61,19 +90,19 @@ export class RemoteQueryCombobox extends Combobox {
 		super.hidePanel();
 	}
 
-	runQuery(
-		key,
-		loader,
-		publisher,
+	runQuery<Result>(
+		key: string,
+		loader: (token: QueryToken<string>) => Result | PromiseLike<Result>,
+		publisher: (result: Result, token: QueryToken<string>) => unknown,
 		{
 			getCurrentKey = () => this.element.value.trim(),
 			cancelTransport = true,
-		} = {},
-	) {
+		}: RemoteQueryOptions = {},
+	): Promise<boolean> {
 		if (this._destroyed) return Promise.resolve(false);
 		this._queryPending = true;
 		this.element.setAttribute("aria-busy", "true");
-		let activeToken = null;
+		let activeToken: QueryToken<string> | null = null;
 		return this.queries
 			.run(
 				key,
@@ -88,7 +117,7 @@ export class RemoteQueryCombobox extends Combobox {
 				},
 				{ getCurrentKey, cancelTransport },
 			)
-			.catch((error) => {
+			.catch((error: unknown) => {
 				if (this.queries.isCurrent(activeToken, getCurrentKey())) {
 					this._queryPending = false;
 					this.element.setAttribute("aria-busy", "false");

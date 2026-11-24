@@ -8,7 +8,7 @@ for semantic review, not automatic rewrites.
 venv/bin/python run.py style-contracts
 venv/bin/python run.py style-contracts --style dropdown.panel
 venv/bin/python run.py style-contracts --style-source src/style/navigation.css
-venv/bin/python run.py style-contracts --style-consumer src/script/widgets/home/tasks.mjs
+venv/bin/python run.py style-contracts --style-consumer src/script/widgets/home/tasks.ts
 ```
 
 The default run writes `reports/style-traceability.md` and the machine-readable

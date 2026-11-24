@@ -1,11 +1,25 @@
-import { BaseList } from "../../elements/base/baseList.ts";
+import { BaseList, type ListAttributes } from "../../elements/base/baseList.ts";
 import { STYLES } from "../../generated/styles.mjs";
 import { setIcon } from "../../shared/icons.ts";
 import { request } from "../../shared/index.ts";
+import type {
+	OfflineMutationRecord,
+	OfflineQueue,
+	QueueContext,
+} from "../../shared/offlineQueue.ts";
 import { withTransition } from "../../shared/transitions.ts";
+import type Core from "../../views/base/core.ts";
+
+type ActivityListAttributes = ListAttributes & {
+	view: Pick<Core, "addFlash" | "offlineQueue" | "ensureOfflineQueue"> & {
+		online: boolean;
+	};
+};
 
 export class HomeActivityList extends BaseList {
-	constructor(attributes) {
+	declare view: ActivityListAttributes["view"];
+
+	constructor(attributes: ActivityListAttributes) {
 		super(attributes);
 		this._click = this._click.bind(this);
 	}
@@ -14,33 +28,39 @@ export class HomeActivityList extends BaseList {
 		this.target.addEventListener("click", this._click);
 	}
 
-	async _click(e) {
-		const button = e.target.closest("[data-action='delete-activity']");
+	async _click(e: Event) {
+		if (!(e.target instanceof Element)) return;
+		const button = e.target.closest<HTMLButtonElement>(
+			"[data-action='delete-activity']",
+		);
 		if (!button) return;
 
 		await this.deleteActivity(button);
 	}
 
-	handleOfflineQueue({ phase, queue, record }) {
+	handleOfflineQueue({ phase, queue, record }: QueueContext) {
 		if (phase === "queued") return this._offlineQueued(record, queue);
 		if (phase === "cancelled") return this._offlineCancelled(record);
 	}
 
-	_offlineQueued(record, queue) {
+	_offlineQueued(record: OfflineMutationRecord, queue: OfflineQueue) {
 		if (record.kind === "note" && record.action === "create") {
-			return queue.response(this._renderNote(record, queue));
+			const key = record.client_key;
+			if (key) return queue.response(this._renderNote(record, queue, key));
 		}
 
 		if (record.action === "delete") return this._removeByKey(record.target_key);
 	}
 
-	_offlineCancelled(record) {
+	_offlineCancelled(record: OfflineMutationRecord) {
 		if (record.action === "create") return this._removeByKey(record.client_key);
 	}
 
-	async deleteActivity(button) {
+	async deleteActivity(button: HTMLButtonElement) {
 		const key = button.dataset.key;
-		const item = button.closest("li[data-key], [lp-entity][data-key]");
+		const item = button.closest<HTMLElement>(
+			"li[data-key], [lp-entity][data-key]",
+		);
 		if (!key || !item) return;
 
 		if (key.startsWith("offline:")) {
@@ -79,13 +99,13 @@ export class HomeActivityList extends BaseList {
 		}
 	}
 
-	_renderNote(record, queue) {
+	_renderNote(record: OfflineMutationRecord, queue: OfflineQueue, key: string) {
 		const body = queue.field(record, "body");
 		const visibility = queue.field(record, "visibility") || "private";
 		const file = record.files?.[0]?.file;
 
 		const item = document.createElement("li");
-		item.dataset.key = record.client_key;
+		item.dataset.key = key;
 		item.dataset.kind = "note";
 		item.dataset.offline = "true";
 		item.className = [STYLES.note.item.home, "opacity-80"].join(" ");
@@ -117,7 +137,7 @@ export class HomeActivityList extends BaseList {
 		const button = document.createElement("button");
 		button.className = STYLES.note.discard;
 		button.dataset.action = "delete-activity";
-		button.dataset.key = record.client_key;
+		button.dataset.key = key;
 		button.type = "button";
 		button.setAttribute("aria-label", "Discard pending note");
 		button.title = "Discard pending note";
@@ -130,14 +150,14 @@ export class HomeActivityList extends BaseList {
 		return item;
 	}
 
-	_itemByKey(root, key) {
+	_itemByKey(root: HTMLElement | null, key?: string | null) {
 		if (!root || !key) return null;
-		return Array.from(root.querySelectorAll("[data-key]")).find((item) => {
-			return item.dataset.key === key;
-		});
+		return Array.from(root.querySelectorAll<HTMLElement>("[data-key]")).find(
+			(item) => item.dataset.key === key,
+		);
 	}
 
-	_removeByKey(key) {
+	_removeByKey(key?: string | null) {
 		const item = this._itemByKey(this.target, key);
 		if (!item) return undefined;
 		return withTransition(() => this._commitRemoveItem(item), {
@@ -145,7 +165,7 @@ export class HomeActivityList extends BaseList {
 		});
 	}
 
-	_commitRemoveItem(item) {
+	_commitRemoveItem(item: HTMLElement) {
 		const list = item.closest("ul");
 		item.remove();
 

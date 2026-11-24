@@ -9,7 +9,7 @@ Related Files:
         - lagniappe/web/routes/projects/main.py: Project routes
         - lagniappe/web/templates/home/projects.html: Project component template
         - lagniappe/web/templates/projects/: Project page templates
-        - src/script/widgets/home/lists.mjs: HomeProjectList widget
+        - src/script/widgets/home/lists.ts: HomeProjectList widget
         - src/script/views/home.mjs: Project initialization
 
     Core Entity:

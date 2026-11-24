@@ -1,7 +1,7 @@
 import { STYLES } from "../../../generated/styles.mjs";
 import { Modal } from "../../../shared/modal.ts";
 import { request } from "../../../shared/request.ts";
-import { Dropdown } from "../../combobox/dropdown.mjs";
+import { Dropdown } from "../../combobox/dropdown.ts";
 import { createMenuButton } from "../dropdowns.mjs";
 
 class DocumentHistoryButton {

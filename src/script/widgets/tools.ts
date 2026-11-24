@@ -1,11 +1,32 @@
 import { BaseUpload } from "../elements/base/baseUpload.ts";
 import { UploadMenu, uploadElement } from "../elements/upload.mjs";
+import type { FormSubmitOptions } from "../forms/controller.ts";
 
 const AI_DROPZONE_TEXT =
 	"Drop files here, click to upload, or paste a screenshot.";
 
 export class CreateToolReport extends BaseUpload {
-	constructor(attributes) {
+	declare messages: Record<string, string>;
+	declare icon: string;
+	declare header: HTMLElement | null;
+	declare submitGroup: HTMLElement | null;
+	declare submitButton: HTMLButtonElement | null;
+	declare emailSubmissions: HTMLElement | null;
+	declare emailAddress: HTMLElement | null;
+	declare emailCopyButton: HTMLButtonElement | null;
+	declare autoExecuteControl: HTMLLabelElement | null;
+	declare context: ReturnType<typeof uploadElement.contextUpload>;
+	declare dropzone: NonNullable<BaseUpload["dropzone"]> & { show(): void };
+	declare menuOptions: string[];
+	declare emailCopyResetTimer?: number;
+	declare createdReport?: boolean;
+	declare visible?: boolean;
+
+	constructor(
+		attributes: ConstructorParameters<typeof BaseUpload>[0] & {
+			target: HTMLElement;
+		},
+	) {
 		super(attributes);
 		this.messages = {
 			submit: "Start",
@@ -17,19 +38,25 @@ export class CreateToolReport extends BaseUpload {
 		this.inputName = "tool-files";
 		this.multiple = true;
 
-		this.header = this.target.querySelector("[data-role='header']");
-		this.submitGroup = this.target.querySelector("[data-role='submit-group']");
-		this.submitButton = this.target.querySelector("[data-role='start-report']");
-		this.emailSubmissions = this.target.querySelector(
+		this.header = this.target.querySelector<HTMLElement>(
+			"[data-role='header']",
+		);
+		this.submitGroup = this.target.querySelector<HTMLElement>(
+			"[data-role='submit-group']",
+		);
+		this.submitButton = this.target.querySelector<HTMLButtonElement>(
+			"[data-role='start-report']",
+		);
+		this.emailSubmissions = this.target.querySelector<HTMLElement>(
 			"[data-role='email-submissions']",
 		);
-		this.emailAddress = this.target.querySelector(
+		this.emailAddress = this.target.querySelector<HTMLElement>(
 			"[data-role='email-address']",
 		);
-		this.emailCopyButton = this.target.querySelector(
+		this.emailCopyButton = this.target.querySelector<HTMLButtonElement>(
 			"[data-role='email-copy']",
 		);
-		this.autoExecuteControl = this.target.querySelector(
+		this.autoExecuteControl = this.target.querySelector<HTMLLabelElement>(
 			"[data-role='auto-execute-control']",
 		);
 		this.context = uploadElement.contextUpload({
@@ -96,12 +123,15 @@ export class CreateToolReport extends BaseUpload {
 		}, 2000);
 	}
 
-	applyDefaultAttachUI(_file, _context) {
+	applyDefaultAttachUI(
+		_file: File,
+		_context: Parameters<BaseUpload["applyDefaultAttachUI"]>[1],
+	) {
 		if (this.dropzone) this.dropzone.setText(this.fileLabel);
 		this.form?.showSubmitButton();
 	}
 
-	async prepareSubmit(options = {}) {
+	async prepareSubmit(options: FormSubmitOptions = {}) {
 		if (!this.context.description?.value?.trim() && !this.fileAttached) {
 			this.showError("Add files or instructions before creating a report.");
 			return false;
@@ -117,7 +147,9 @@ export class CreateToolReport extends BaseUpload {
 	_resetUI() {
 		this.context?.clear();
 		this.dropzone?.show();
-		const autoExecute = this.target.querySelector("[name='auto_execute']");
+		const autoExecute = this.target.querySelector<HTMLInputElement>(
+			"[name='auto_execute']",
+		);
 		if (autoExecute) {
 			autoExecute.checked = autoExecute.dataset.defaultChecked === "true";
 		}

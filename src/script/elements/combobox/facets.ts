@@ -1,13 +1,27 @@
 import { ENDPOINTS } from "../../shared/endpoints.ts";
 import { request } from "../../shared/request.ts";
-import { RemoteQueryCombobox } from "./remote.mjs";
-import { Results } from "./results.mjs";
-import { Submitter } from "./submitter.mjs";
+import type { ComboboxOption, ComboboxOptionElement } from "./combobox.ts";
+import {
+	type ComboboxQueryResponse,
+	type RemoteInputEvent,
+	RemoteQueryCombobox,
+} from "./remote.ts";
+import { Results } from "./results.ts";
+import { Submitter } from "./submitter.ts";
+
+type FacetIndexArgs = Record<string, string | boolean>;
+
+type CreatedFacetResponse = ComboboxQueryResponse & {
+	option?: ComboboxOption & { id: string; name: string; kind: string };
+};
 
 export class FacetsBox extends Submitter(RemoteQueryCombobox) {
-	constructor(element, args = {}) {
+	declare endpoint: string;
+	declare indexArgs: FacetIndexArgs;
+
+	constructor(element: HTMLElement, args: FacetIndexArgs = {}) {
 		super(element);
-		this.endpoint = ENDPOINTS.facet(this.index);
+		this.endpoint = ENDPOINTS.facet(String(this.index));
 		this.indexArgs = args;
 
 		const formType = this.formType;
@@ -30,7 +44,7 @@ export class FacetsBox extends Submitter(RemoteQueryCombobox) {
 		this.results = new Results(index);
 	}
 
-	_input(event) {
+	_input(event: RemoteInputEvent) {
 		const query = event.target.value.trim();
 		if (query) return this._search(query);
 
@@ -39,12 +53,12 @@ export class FacetsBox extends Submitter(RemoteQueryCombobox) {
 		return this.showPanel();
 	}
 
-	elementClick(event) {
+	elementClick(event: MouseEvent) {
 		super.elementClick(event);
 		this.showPanel();
 	}
 
-	selectOption(option) {
+	selectOption(option: ComboboxOptionElement) {
 		if (option.dataset.command === "create") {
 			return this._createOption(option);
 		}
@@ -56,29 +70,30 @@ export class FacetsBox extends Submitter(RemoteQueryCombobox) {
 	}
 
 	get selectedOptions() {
-		return this.options.filter((o) => this.values.has(o.id));
+		return this.options.filter(
+			(o) => o.id !== undefined && this.values.has(o.id),
+		);
 	}
 
-	_search(query) {
-		const selectedHashes = this.options
-			.filter((o) => this.values.has(o.id))
-			.map((o) => o.hash);
-
+	_search(query: string) {
 		const params = new URLSearchParams();
 		params.set("q", query);
 		if (this.creatable === "true") {
 			params.set("creatable", "true");
 		}
 		Object.entries(this.indexArgs).forEach(([key, value]) => {
-			params.set(key, value);
+			params.set(key, String(value));
 		});
-		selectedHashes.forEach((hash) => {
-			params.append("preload", hash);
+		this.selectedOptions.forEach(({ hash }) => {
+			params.append("preload", String(hash));
 		});
 
 		return this.runQuery(
 			query,
-			(token) => request.get(this.endpoint, params, { signal: token.signal }),
+			(token) =>
+				request.get<ComboboxQueryResponse>(this.endpoint, params, {
+					signal: token.signal,
+				}),
 			(response) => {
 				if (response?.ok) {
 					this.updatePanel(response.results || null);
@@ -90,20 +105,20 @@ export class FacetsBox extends Submitter(RemoteQueryCombobox) {
 		);
 	}
 
-	_createOption(option) {
+	_createOption(option: ComboboxOptionElement) {
 		const selectedOptions = this.selectedOptions;
 		const query = this.element.value.trim();
 		this.hidePanel();
 		const data = new FormData();
 		data.set("name", option.dataset.name || query);
 		Object.entries(this.indexArgs).forEach(([key, value]) => {
-			data.set(key, value);
+			data.set(key, String(value));
 		});
 
 		const key = `create:${query}`;
 		return this.runQuery(
 			key,
-			() => request.post(`${this.endpoint}/create`, data),
+			() => request.post<CreatedFacetResponse>(`${this.endpoint}/create`, data),
 			(response) => {
 				if (!response?.ok) return;
 
@@ -119,7 +134,9 @@ export class FacetsBox extends Submitter(RemoteQueryCombobox) {
 
 				this.updatePanel(html);
 				const created = [
-					...(this.panel?.querySelectorAll("[role='option'][data-id]") || []),
+					...(this.panel?.querySelectorAll<ComboboxOptionElement>(
+						"[role='option'][data-id]",
+					) || []),
 				].find((item) => item.dataset.id === response.option?.id);
 				if (!created) return;
 

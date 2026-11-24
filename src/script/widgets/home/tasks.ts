@@ -1,23 +1,63 @@
-import { BaseList } from "../../elements/base/baseList.ts";
-import { Dropdown } from "../../elements/combobox/index.mjs";
+import {
+	BaseList,
+	type ListAttributes,
+	listHtml,
+} from "../../elements/base/baseList.ts";
+import { Dropdown, type DropdownMenu } from "../../elements/combobox/index.ts";
 import { STYLES } from "../../generated/styles.mjs";
+import type { ENDPOINTS } from "../../shared/endpoints.ts";
 import { setIcon } from "../../shared/icons.ts";
 import { request } from "../../shared/index.ts";
+import type {
+	OfflineMutationRecord,
+	OfflineQueue,
+	QueueContext,
+} from "../../shared/offlineQueue.ts";
 import { withTransition } from "../../shared/transitions.ts";
+import type { RequestResult } from "../../types/api.d.ts";
+import type Core from "../../views/base/core.ts";
+
+type TaskListAttributes = ListAttributes & {
+	component: ListAttributes["component"] & { elt: HTMLElement };
+	view: Pick<Core, "addFlash" | "offlineQueue" | "ensureOfflineQueue"> & {
+		online: boolean;
+	};
+	endpoints: ReturnType<typeof ENDPOINTS.HomeTaskList>;
+};
+
+interface HomeTaskResult {
+	count: number;
+}
+
+const WEEKDAY_NAMES = [
+	"sunday",
+	"monday",
+	"tuesday",
+	"wednesday",
+	"thursday",
+	"friday",
+	"saturday",
+] as const;
+type Weekday = (typeof WEEKDAY_NAMES)[number];
+type PostponeValue =
+	| "tomorrow"
+	| `this-week-${Weekday}`
+	| `next-week-${Weekday}`
+	| null;
 
 function _toDateStr(offset = 0) {
 	const d = new Date();
 	d.setDate(d.getDate() + offset);
 	return d.toLocaleDateString("sv-SE");
 }
-function _dateInfo(dateStr) {
+function _dateInfo(dateStr: string) {
 	const today = _toDateStr();
 
 	if (dateStr === today) return { label: "Today", due: "today" };
 	if (dateStr === _toDateStr(1)) return { label: "Tomorrow", due: "future" };
 	if (dateStr === _toDateStr(-1)) return { label: "Yesterday", due: "past" };
 
-	const [year, month, day] = dateStr.split("-");
+	const [year, month, day] = dateStr.split("-").map(Number);
 	const label = new Date(year, month - 1, day).toLocaleDateString(undefined, {
 		day: "numeric",
 		month: "short",
@@ -26,7 +66,7 @@ function _dateInfo(dateStr) {
 	return { label, due: dateStr < today ? "past" : "future" };
 }
 
-function _isWithinHomeTaskWindow(dueDate) {
+function _isWithinHomeTaskWindow(dueDate: string) {
 	if (!dueDate) return false;
 
 	const today = new Date();
@@ -38,11 +78,16 @@ function _isWithinHomeTaskWindow(dueDate) {
 	return due >= today && due <= nextWeek;
 }
 
-function _insertSorted(target, task) {
+function _insertSorted(target: HTMLElement, task: HTMLElement) {
 	const dueDate = task.dataset.dueDate;
 
-	for (const item of target.querySelectorAll("[lp-entity]")) {
-		if (item.dataset.dueDate > dueDate) {
+	for (const item of target.querySelectorAll<HTMLElement>("[lp-entity]")) {
+		const itemDueDate = item.dataset.dueDate;
+		if (
+			itemDueDate !== undefined &&
+			dueDate !== undefined &&
+			itemDueDate > dueDate
+		) {
 			item.before(task);
 			return;
 		}
@@ -50,19 +95,13 @@ function _insertSorted(target, task) {
 	target.append(task);
 }
 
-const _postponeMenu = (button, postponeFn) => {
+const _postponeMenu = (
+	dropdown: Dropdown,
+	postpone: (value: PostponeValue) => void,
+): DropdownMenu => {
 	let showingNextWeek = false;
 	let showingThisWeek = false;
 	let returnFocusIndex = 0;
-	const weekdayNames = [
-		"sunday",
-		"monday",
-		"tuesday",
-		"wednesday",
-		"thursday",
-		"friday",
-		"saturday",
-	];
 	const weekdayFormatter = new Intl.DateTimeFormat(undefined, {
 		weekday: "long",
 	});
@@ -77,7 +116,7 @@ const _postponeMenu = (button, postponeFn) => {
 			name: "Tomorrow",
 			icon: "tomorrow",
 			kind: "task",
-			onClick: () => postponeFn(button, "tomorrow"),
+			onClick: () => postpone("tomorrow"),
 		},
 		...(hasDaysLeftThisWeek
 			? [
@@ -109,15 +148,15 @@ const _postponeMenu = (button, postponeFn) => {
 			name: "No Due Date",
 			icon: "removeDueDate",
 			kind: "task",
-			onClick: () => postponeFn(button, null),
+			onClick: () => postpone(null),
 		},
 	];
 
 	const showPrimary = () => {
 		showingThisWeek = false;
 		showingNextWeek = false;
-		button._lp_combobox.updateOptions(primaryItems);
-		button._lp_combobox.focusOption(returnFocusIndex);
+		dropdown.updateOptions(primaryItems);
+		dropdown.focusOption(returnFocusIndex);
 	};
 
 	const showThisWeek = () => {
@@ -135,19 +174,19 @@ const _postponeMenu = (button, postponeFn) => {
 			...Array.from({ length: daysUntilSunday }, (_, index) => {
 				const date = new Date(today);
 				date.setDate(date.getDate() + index + 1);
-				const weekday = weekdayNames[date.getDay()];
+				const weekday = WEEKDAY_NAMES[date.getDay()];
 				return {
 					name: `${weekdayFormatter.format(date)} · ${dateFormatter.format(date)}`,
 					icon: "date",
 					kind: "task",
-					onClick: () => postponeFn(button, `this-week-${weekday}`),
+					onClick: () => postpone(`this-week-${weekday}`),
 				};
 			}),
 		];
 
 		showingThisWeek = true;
-		button._lp_combobox.updateOptions(items);
-		button._lp_combobox.focusOption(0);
+		dropdown.updateOptions(items);
+		dropdown.focusOption(0);
 	};
 
 	const showNextWeek = () => {
@@ -156,7 +195,7 @@ const _postponeMenu = (button, postponeFn) => {
 		const daysUntilMonday = (8 - monday.getDay()) % 7 || 7;
 		monday.setDate(monday.getDate() + daysUntilMonday);
 
-		const weekdays = weekdayNames.slice(1, 6);
+		const weekdays = WEEKDAY_NAMES.slice(1, 6);
 		const items = [
 			{
 				name: "Back",
@@ -172,14 +211,14 @@ const _postponeMenu = (button, postponeFn) => {
 					name: `${weekdayFormatter.format(date)} · ${dateFormatter.format(date)}`,
 					icon: "date",
 					kind: "task",
-					onClick: () => postponeFn(button, `next-week-${weekday}`),
+					onClick: () => postpone(`next-week-${weekday}`),
 				};
 			}),
 		];
 
 		showingNextWeek = true;
-		button._lp_combobox.updateOptions(items);
-		button._lp_combobox.focusOption(0);
+		dropdown.updateOptions(items);
+		dropdown.focusOption(0);
 	};
 
 	return {
@@ -189,17 +228,23 @@ const _postponeMenu = (button, postponeFn) => {
 			if (!showingThisWeek && !showingNextWeek) return;
 			showingThisWeek = false;
 			showingNextWeek = false;
-			button._lp_combobox.updateOptions(primaryItems);
+			dropdown.updateOptions(primaryItems);
 		},
 	};
 };
 
 export class HomeTaskList extends BaseList {
-	constructor(attributes) {
+	declare component: TaskListAttributes["component"];
+	declare view: TaskListAttributes["view"];
+	declare endpoints: TaskListAttributes["endpoints"];
+	declare dropdowns: Dropdown[];
+	declare _listToggle: HTMLButtonElement | null;
+
+	constructor(attributes: TaskListAttributes) {
 		super(attributes);
 		this.dropdowns = [];
 		this._change = this._change.bind(this);
-		this._listToggle = this.component.elt.querySelector(
+		this._listToggle = this.component.elt.querySelector<HTMLButtonElement>(
 			"[lp-show='tasks:HomeTaskList'][data-toggle]",
 		);
 	}
@@ -208,7 +253,7 @@ export class HomeTaskList extends BaseList {
 		this.target.addEventListener("change", this._change);
 	}
 
-	handleOfflineQueue({ phase, queue, record }) {
+	handleOfflineQueue({ phase, queue, record }: QueueContext) {
 		if (phase === "queued") return this._offlineQueued(record, queue);
 		if (phase === "cancelled") return this._offlineCancelled(record);
 		if (phase === "replayed" && record.kind === "task") {
@@ -218,13 +263,15 @@ export class HomeTaskList extends BaseList {
 		}
 	}
 
-	_offlineQueued(record, queue) {
+	_offlineQueued(record: OfflineMutationRecord, queue: OfflineQueue) {
 		if (record.kind === "task" && record.action === "create") {
+			const key = record.client_key;
+			if (!key) return;
 			this._updateUserTaskCountOffline(1);
 			if (!this._offlineTaskVisible(record, queue)) {
 				return { ok: true, removed: true };
 			}
-			return queue.response(this._renderOfflineTask(record, queue));
+			return queue.response(this._renderOfflineTask(record, queue, key));
 		}
 
 		if (record.kind === "task" && record.action === "complete") {
@@ -239,7 +286,7 @@ export class HomeTaskList extends BaseList {
 		}
 	}
 
-	_offlineCancelled(record) {
+	_offlineCancelled(record: OfflineMutationRecord) {
 		if (record.kind !== "task" || record.action !== "create") return;
 
 		return withTransition(
@@ -252,43 +299,47 @@ export class HomeTaskList extends BaseList {
 		);
 	}
 
-	async _change(e) {
-		const toggle = e.target.closest("[data-role='complete']");
+	async _change(e: Event) {
+		if (!(e.target instanceof Element)) return;
+		const toggle = e.target.closest<HTMLInputElement>("[data-role='complete']");
 		if (!toggle) return;
 
-		const elt = toggle.closest("[lp-entity]");
+		const elt = toggle.closest<HTMLElement>("[lp-entity]");
+		const key = elt?.dataset.key;
+		if (!elt || !key) return;
 		elt.classList.add("opacity-50", "pointer-events-none");
 		toggle.disabled = true;
 
 		const data = new FormData();
-		data.append("completed", toggle.checked);
+		data.append("completed", String(toggle.checked));
 
-		const route = this.endpoints.completeTask(elt.dataset.key);
+		const route = this.endpoints.completeTask(key);
 
 		if (!this.view.online) {
 			const queue =
 				this.view.offlineQueue || (await this.view.ensureOfflineQueue?.());
 			if (!queue) return;
-			if (elt.dataset.key.startsWith("offline:")) {
+			if (key.startsWith("offline:")) {
 				await queue.cancel({
 					action: "create",
-					client_key: elt.dataset.key,
+					client_key: key,
 				});
 			} else {
 				await queue.queue({
-					id: `complete:${elt.dataset.key}`,
+					id: `complete:${key}`,
 					kind: "task",
 					action: "complete",
 					method: "PUT",
 					route,
-					target_key: elt.dataset.key,
+					target_key: key,
 					data,
 				});
 			}
 			return;
 		}
 
-		const response = await request.put(route, data);
+		const response = await request.put<HomeTaskResult>(route, data);
+		if (!response) return;
 
 		if (response.error) {
 			elt.classList.remove("opacity-50", "pointer-events-none");
@@ -303,9 +354,10 @@ export class HomeTaskList extends BaseList {
 		});
 	}
 
-	updated(response) {
-		if (!response.html) return;
-		this._replaceUserTaskCount(response.html);
+	updated(response: unknown) {
+		const html = listHtml(response);
+		if (!html) return;
+		this._replaceUserTaskCount(html);
 		super.updated(response);
 	}
 
@@ -330,26 +382,35 @@ export class HomeTaskList extends BaseList {
 			this._insertNewTasks();
 		}
 
-		this._listToggle.disabled = false;
-		this._listToggle.removeAttribute("aria-busy");
+		if (this._listToggle) {
+			this._listToggle.disabled = false;
+			this._listToggle.removeAttribute("aria-busy");
+		}
 		this._syncList();
 		this.target.setAttribute("loaded", "");
 	}
 
-	async _postpone(elt, button, value) {
+	async _postpone(
+		elt: HTMLElement,
+		button: HTMLButtonElement,
+		value: PostponeValue,
+	) {
 		if (!this.view.online) {
 			this._showNotification(elt, "Connect to postpone this task.");
 			return;
 		}
 
+		const key = elt.dataset.key;
+		if (!key) return;
 		elt.classList.add("opacity-50", "pointer-events-none");
 		button.disabled = true;
 
 		const data = new FormData();
-		data.append("newDueDate", value);
+		data.append("newDueDate", String(value));
 
-		const route = this.endpoints.changeDueDate(elt.dataset.key);
-		const response = await request.put(route, data);
+		const route = this.endpoints.changeDueDate(key);
+		const response = await request.put<HomeTaskResult>(route, data);
+		if (!response) return;
 
 		if (response.error) {
 			elt.classList.remove("opacity-50", "pointer-events-none");
@@ -363,11 +424,14 @@ export class HomeTaskList extends BaseList {
 		});
 	}
 
-	_commitTaskResponse(elt, response) {
+	_commitTaskResponse(
+		elt: HTMLElement,
+		response: RequestResult<HomeTaskResult>,
+	) {
 		if (response.removed) {
 			elt.remove();
 		} else if (response.html) {
-			const newTask = response.html.querySelector("[lp-entity]");
+			const newTask = response.html.querySelector<HTMLElement>("[lp-entity]");
 			if (newTask) {
 				elt.remove();
 				_insertSorted(this.target, newTask);
@@ -379,16 +443,17 @@ export class HomeTaskList extends BaseList {
 		this._updateUserTaskCount(response.count);
 	}
 
-	_initPostponeMenus(root) {
-		for (const button of root.querySelectorAll(
+	_initPostponeMenus(root: HTMLElement) {
+		for (const button of root.querySelectorAll<HTMLButtonElement>(
 			"[data-role='change-due-date']",
 		)) {
-			const menu = _postponeMenu(button, (btn, value) => {
-				const elt = btn.closest("[lp-entity]");
-				this._postpone(elt, btn, value);
-			});
 			const dropdown = new Dropdown(button);
-			dropdown.init(menu);
+			dropdown.init(
+				_postponeMenu(dropdown, (value) => {
+					const elt = button.closest<HTMLElement>("[lp-entity]");
+					if (elt) void this._postpone(elt, button, value);
+				}),
+			);
 			this.dropdowns.push(dropdown);
 		}
 	}
@@ -405,7 +470,9 @@ export class HomeTaskList extends BaseList {
 		}
 
 		let lastDate = null;
-		for (const item of this.target.querySelectorAll("[lp-entity]")) {
+		for (const item of this.target.querySelectorAll<HTMLElement>(
+			"[lp-entity]",
+		)) {
 			const dueDate = item.dataset.dueDate;
 			if (dueDate && dueDate !== lastDate) {
 				const { label, due } = _dateInfo(dueDate);
@@ -422,43 +489,48 @@ export class HomeTaskList extends BaseList {
 	}
 
 	_updateTaskCount() {
-		const taskCount = this.component.elt.querySelector(
+		const taskCount = this.component.elt.querySelector<HTMLElement>(
 			"[data-role='task-count']",
 		);
 		const count = this.target.querySelectorAll("[lp-entity]").length;
-		taskCount.textContent = count;
+		if (!taskCount) return;
+		taskCount.textContent = String(count);
 		taskCount.dataset.kind = count > 0 ? "task" : "success";
 		taskCount.dataset.visible = "true";
 	}
 
-	_updateUserTaskCount(count) {
+	_updateUserTaskCount(count?: number) {
 		if (count === undefined) return;
 		const elt = document.querySelector("[data-role='user-task-count']");
-		if (elt) elt.textContent = count;
+		if (elt) elt.textContent = String(count);
 	}
 
-	_updateUserTaskCountOffline(delta) {
+	_updateUserTaskCountOffline(delta: number) {
 		const elt = document.querySelector("[data-role='user-task-count']");
 		if (!elt) return;
 
 		const count = Number.parseInt(elt.textContent || "0", 10);
 		if (Number.isNaN(count)) return;
 
-		elt.textContent = Math.max(0, count + delta);
+		elt.textContent = String(Math.max(0, count + delta));
 	}
 
-	_offlineTaskVisible(record, queue) {
+	_offlineTaskVisible(record: OfflineMutationRecord, queue: OfflineQueue) {
 		return _isWithinHomeTaskWindow(queue.field(record, "due-date"));
 	}
 
-	_renderOfflineTask(record, queue) {
+	_renderOfflineTask(
+		record: OfflineMutationRecord,
+		queue: OfflineQueue,
+		key: string,
+	) {
 		const name = queue.field(record, "name") || "Untitled task";
 		const dueDate = queue.field(record, "due-date");
 
 		const item = document.createElement("li");
 		item.setAttribute("lp-entity", "");
 		item.setAttribute("lp-link", "");
-		item.dataset.key = record.client_key;
+		item.dataset.key = key;
 		item.dataset.fingerprint = `offline:${record.id}`;
 		item.dataset.name = name;
 		item.dataset.dueDate = dueDate;
@@ -515,18 +587,18 @@ export class HomeTaskList extends BaseList {
 		return item;
 	}
 
-	_taskByKey(root, key) {
+	_taskByKey(root: HTMLElement | null, key?: string | null) {
 		if (!root || !key) return null;
-		return Array.from(root.querySelectorAll("[lp-entity][data-key]")).find(
-			(item) => item.dataset.key === key,
-		);
+		return Array.from(
+			root.querySelectorAll<HTMLElement>("[lp-entity][data-key]"),
+		).find((item) => item.dataset.key === key);
 	}
 
-	_removeTaskByKey(key) {
+	_removeTaskByKey(key?: string | null) {
 		this._taskByKey(this.target, key)?.remove();
 	}
 
-	_replaceUserTaskCount(html) {
+	_replaceUserTaskCount(html: Pick<ParentNode, "querySelector">) {
 		const fresh = html.querySelector("[data-role='user-task-count']");
 		const current = document.querySelector("[data-role='user-task-count']");
 		if (current && fresh) current.replaceWith(fresh);
@@ -537,8 +609,9 @@ export class HomeTaskList extends BaseList {
 		this.target.dataset.visible = count > 0 && this.visible ? "true" : "false";
 	}
 
-	_showNotification(elt, message) {
-		elt.querySelector("[data-role='notification']").textContent = message;
+	_showNotification(elt: HTMLElement, message: string) {
+		const notification = elt.querySelector("[data-role='notification']");
+		if (notification) notification.textContent = message;
 	}
 
 	destroy() {

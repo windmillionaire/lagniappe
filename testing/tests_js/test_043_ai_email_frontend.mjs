@@ -48,7 +48,7 @@ test("test_ai_email_address_selection_and_copy_controls", async (t) => {
 	});
 	replaceGlobal(t, "clearTimeout", () => {});
 	const { CreateToolReport } = await esmock.strict(
-		"../../src/script/widgets/tools.mjs",
+		"../../src/script/widgets/tools.ts",
 		{
 			"../../src/script/elements/base/baseUpload.ts": {
 				BaseUpload: class {},
@@ -100,7 +100,7 @@ test("test_create_tool_report_preserves_and_resets_auto_execute_control", async 
 	const autoExecuteControl = { role: "auto-execute-control" };
 	const contextElement = { role: "context-upload" };
 	const { CreateToolReport } = await esmock.strict(
-		"../../src/script/widgets/tools.mjs",
+		"../../src/script/widgets/tools.ts",
 		{
 			"../../src/script/elements/base/baseUpload.ts": {
 				BaseUpload: class {

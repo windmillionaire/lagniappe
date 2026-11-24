@@ -1,4 +1,4 @@
-import { SelectBox } from "../elements/combobox/index.mjs";
+import { SelectBox } from "../elements/combobox/index.ts";
 import { primitives } from "../elements/primitives.mjs";
 import { STYLES } from "../generated/styles.mjs";
 import { FormWidget } from "./base/formWidget.ts";

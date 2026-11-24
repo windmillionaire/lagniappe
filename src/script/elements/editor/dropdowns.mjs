@@ -1,6 +1,6 @@
 import { STYLES } from "../../generated/styles.mjs";
 import { setIcon } from "../../shared/icons.ts";
-import { Dropdown } from "../combobox/dropdown.mjs";
+import { Dropdown } from "../combobox/dropdown.ts";
 
 export const createMenuButton = (settings) => {
 	const button = document.createElement("button");

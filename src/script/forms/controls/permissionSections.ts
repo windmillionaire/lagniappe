@@ -1,4 +1,4 @@
-import { FacetsBox } from "../../elements/combobox/facets.mjs";
+import { FacetsBox } from "../../elements/combobox/facets.ts";
 import { withTransition } from "../../shared/transitions.ts";
 import type { FacetsUpdatedEvent, FormControlOptions } from "./loader.ts";
 

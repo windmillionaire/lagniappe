@@ -177,7 +177,7 @@ test("test_remote_combobox_invalidates_before_debounce_and_on_destroy", async ()
 		return delayed;
 	};
 	const { RemoteQueryCombobox } = await esmock.strict(
-		"../../src/script/elements/combobox/remote.mjs",
+		"../../src/script/elements/combobox/remote.ts",
 		{
 			"../../src/script/shared/errors.ts": {
 				captureError: (error) => {
@@ -186,7 +186,7 @@ test("test_remote_combobox_invalidates_before_debounce_and_on_destroy", async ()
 			},
 			"../../src/script/shared/queryLifecycle.ts": { QueryLifecycle },
 			"../../src/script/shared/utilities.ts": { debounce },
-			"../../src/script/elements/combobox/combobox.mjs": { Combobox },
+			"../../src/script/elements/combobox/combobox.ts": { Combobox },
 		},
 	);
 	let inputs = 0;
@@ -257,7 +257,7 @@ test("test_search_threshold_settles_stale_work_and_restores_recent_results", asy
 		}
 	}
 	const { SearchBox } = await esmock.strict(
-		"../../src/script/elements/combobox/search.mjs",
+		"../../src/script/elements/combobox/search.ts",
 		{
 			"../../src/script/generated/styles.mjs": {
 				STYLES: { dropdown: { panel: "panel" } },
@@ -266,8 +266,8 @@ test("test_search_threshold_settles_stale_work_and_restores_recent_results", asy
 				ENDPOINTS: { search: { bar: "/l/search-bar", page: "/l/search-page" } },
 			},
 			"../../src/script/shared/request.ts": { request: {} },
-			"../../src/script/elements/combobox/remote.mjs": { RemoteQueryCombobox },
-			"../../src/script/elements/combobox/results.mjs": { Results },
+			"../../src/script/elements/combobox/remote.ts": { RemoteQueryCombobox },
+			"../../src/script/elements/combobox/results.ts": { Results },
 		},
 	);
 	const box = new SearchBox({ value: "" });
@@ -455,7 +455,7 @@ test("test_builder_destroys_owned_search_modal_and_panels_during_startup", async
 	const { default: FormBuilder } = await esmock.strict(
 		"../../src/script/views/builder/builder.mjs",
 		{
-			"../../src/script/elements/combobox/search.mjs": { SearchBox },
+			"../../src/script/elements/combobox/search.ts": { SearchBox },
 			"../../src/script/elements/entityMenu.mjs": { EntityMenu },
 			"../../src/script/shared/directUpload.ts": { directUpload: {} },
 			"../../src/script/shared/index.ts": {

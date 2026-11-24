@@ -1,4 +1,4 @@
-import { SiteSetting } from "./base.mjs";
+import { SiteSetting } from "./base.ts";
 
 const display = (value) => value || "None";
 

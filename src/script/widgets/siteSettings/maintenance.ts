@@ -1,12 +1,73 @@
 import { buttons } from "../../elements/buttons.mjs";
 import { STYLES } from "../../generated/styles.mjs";
+import type { ENDPOINTS } from "../../shared/endpoints.ts";
 import { Modal, request } from "../../shared/index.ts";
 import { clearRecentSearchResults } from "../../shared/storage.ts";
 import { withTransition } from "../../shared/transitions.ts";
-import { SiteSetting } from "./base.mjs";
+import {
+	type SiteActiveButton,
+	SiteSetting,
+	type SiteSettingAttributes,
+} from "./base.ts";
 
-export class SiteMaintenance extends SiteSetting {
-	constructor(attributes) {
+type MaintenanceEndpoints = ReturnType<typeof ENDPOINTS.SiteMaintenance>;
+
+interface RecordDetail {
+	message: string;
+	key?: string;
+	url?: string;
+	link_label?: string;
+}
+
+interface CacheStatus {
+	processed: number;
+	failed: number;
+	errors?: RecordDetail[];
+}
+
+interface MigrationAttempt {
+	status: string;
+	totals?: Partial<Record<"changed" | "repaired" | "failed", number>>;
+	repairs?: RecordDetail[];
+	errors?: RecordDetail[];
+}
+
+interface Migration {
+	id: string;
+	label: string;
+	state: string;
+	source?: string | null;
+	introduced_in?: string | null;
+	completed_at?: string | null;
+	completed_version?: string | null;
+	completed_build_id?: string | null;
+	audit_error?: string | null;
+	attempts?: MigrationAttempt[];
+}
+
+interface MigrationStatus {
+	status: string;
+	current_version: string | null;
+	cache_refresh_allowed: boolean;
+	counts: Partial<
+		Record<"pending" | "failed" | "interrupted" | "blocked", number>
+	>;
+	migrations: Migration[];
+}
+
+interface MigrationResponse {
+	migration_status?: MigrationStatus | null;
+}
+
+interface CacheResponse extends MigrationResponse {
+	cache_status?: CacheStatus | null;
+}
+
+export class SiteMaintenance extends SiteSetting<MaintenanceEndpoints> {
+	declare _migrationStatus: MigrationStatus | null;
+	declare _cacheStatus: CacheStatus | null;
+
+	constructor(attributes: SiteSettingAttributes<MaintenanceEndpoints>) {
 		super(attributes);
 		this._migrationStatus = null;
 		this._cacheStatus = null;
@@ -17,7 +78,7 @@ export class SiteMaintenance extends SiteSetting {
 		this._initConfiguration();
 	}
 
-	updated(response) {
+	updated(response: MigrationResponse) {
 		this._migrationStatus = response.migration_status || null;
 	}
 
@@ -27,13 +88,15 @@ export class SiteMaintenance extends SiteSetting {
 	}
 
 	_initActions() {
-		const cacheButton = this.target.querySelector(
+		const cacheButton = this.target.querySelector<HTMLButtonElement>(
 			"[data-role='rebuild-cache']",
 		);
-		const updateButton = this.target.querySelector("[data-role='site-update']");
+		const updateButton = this.target.querySelector<HTMLButtonElement>(
+			"[data-role='site-update']",
+		);
 		if (!cacheButton || !updateButton) return;
 
-		const rebuildCache = buttons.active({
+		const rebuildCache: SiteActiveButton = buttons.active({
 			existingButton: cacheButton,
 			icon: "database",
 			text: "Refresh Cache",
@@ -47,11 +110,13 @@ export class SiteMaintenance extends SiteSetting {
 			rebuildCache.activate();
 			this._cacheStatus = null;
 			this._renderCacheStatus(null);
-			const response = await request.post(this.endpoints.rebuildCache);
+			const response = await request.post<CacheResponse>(
+				this.endpoints.rebuildCache,
+			);
 			if (response?.migration_status) {
 				this._migrationStatus = response.migration_status;
 			}
-			if (!response.ok) {
+			if (!response?.ok) {
 				await withTransition(
 					() => {
 						rebuildCache.deactivate("Refresh Cache");
@@ -71,7 +136,7 @@ export class SiteMaintenance extends SiteSetting {
 			clearRecentSearchResults();
 		});
 
-		const applyUpdates = buttons.active({
+		const applyUpdates: SiteActiveButton = buttons.active({
 			existingButton: updateButton,
 			icon: "installation",
 			text: "Apply Updates",
@@ -83,11 +148,13 @@ export class SiteMaintenance extends SiteSetting {
 
 		applyUpdates.element.addEventListener("click", async () => {
 			applyUpdates.activate();
-			const response = await request.post(this.endpoints.siteUpdate);
+			const response = await request.post<MigrationResponse>(
+				this.endpoints.siteUpdate,
+			);
 			if (response?.migration_status) {
 				this._migrationStatus = response.migration_status;
 			}
-			if (!response.ok) {
+			if (!response?.ok) {
 				await withTransition(
 					() => {
 						applyUpdates.deactivate("Apply Updates");
@@ -108,15 +175,22 @@ export class SiteMaintenance extends SiteSetting {
 		});
 	}
 
-	_renderCacheStatus(status) {
-		const panel = this.target.querySelector("[data-role='cache-status']");
+	_renderCacheStatus(status: CacheStatus | null) {
+		const panel = this.target.querySelector<HTMLElement>(
+			"[data-role='cache-status']",
+		);
 		if (!panel) return;
 		panel.dataset.visible = status ? "true" : "false";
 		if (!status) return;
-		panel.querySelector("[data-role='cache-status-title']").textContent =
-			status.failed ? "Cache refreshed with errors" : "Cache refreshed";
+		const title = panel.querySelector("[data-role='cache-status-title']");
+		const summary = panel.querySelector("[data-role='cache-status-summary']");
+		const list = panel.querySelector("[data-role='cache-status-errors']");
+		if (!title || !summary || !list) return;
+		title.textContent = status.failed
+			? "Cache refreshed with errors"
+			: "Cache refreshed";
 		const errors = status.errors || [];
-		panel.querySelector("[data-role='cache-status-summary']").textContent =
+		summary.textContent =
 			`${status.processed} records processed; ${status.failed} skipped.` +
 			(status.failed
 				? " Skipped records could not be safely cached. Review them, then refresh again."
@@ -124,7 +198,6 @@ export class SiteMaintenance extends SiteSetting {
 			(status.failed > errors.length
 				? ` Showing ${errors.length} errors.`
 				: "");
-		const list = panel.querySelector("[data-role='cache-status-errors']");
 		list.replaceChildren();
 		for (const error of errors) {
 			const item = document.createElement("li");
@@ -143,20 +216,19 @@ export class SiteMaintenance extends SiteSetting {
 	}
 
 	_initConfiguration() {
-		const configurationButton = this.target.querySelector(
+		const configurationButton = this.target.querySelector<HTMLButtonElement>(
 			"[data-role='configuration']",
 		);
-		const configuration = configurationButton
-			? buttons.active({
-					existingButton: configurationButton,
-					icon: "configuration",
-					text: "Configuration",
-					processingText: "Loading Configuration",
-					completedText: "Configuration",
-					completedIcon: "configuration",
-				})
-			: null;
-		configurationButton?.addEventListener("click", async () => {
+		if (!configurationButton) return;
+		const configuration = buttons.active({
+			existingButton: configurationButton,
+			icon: "configuration",
+			text: "Configuration",
+			processingText: "Loading Configuration",
+			completedText: "Configuration",
+			completedIcon: "configuration",
+		});
+		configurationButton.addEventListener("click", async () => {
 			configuration.activate();
 			const modal = new Modal(this.view, configurationButton);
 			try {
@@ -167,8 +239,10 @@ export class SiteMaintenance extends SiteSetting {
 		});
 	}
 
-	_renderMigrationStatus(status) {
-		const panel = this.target.querySelector("[data-role='migration-status']");
+	_renderMigrationStatus(status: MigrationStatus | null) {
+		const panel = this.target.querySelector<HTMLElement>(
+			"[data-role='migration-status']",
+		);
 		if (!panel) return;
 
 		const title = panel.querySelector("[data-role='migration-status-title']");
@@ -178,9 +252,14 @@ export class SiteMaintenance extends SiteSetting {
 		const results = panel.querySelector(
 			"[data-role='migration-status-results']",
 		);
-		const errors = panel.querySelector("[data-role='migration-status-errors']");
-		const updateButton = this.target.querySelector("[data-role='site-update']");
-		const cacheButton = this.target.querySelector(
+		const errors = panel.querySelector<HTMLElement>(
+			"[data-role='migration-status-errors']",
+		);
+		if (!title || !summary || !results || !errors) return;
+		const updateButton = this.target.querySelector<HTMLButtonElement>(
+			"[data-role='site-update']",
+		);
+		const cacheButton = this.target.querySelector<HTMLButtonElement>(
 			"[data-role='rebuild-cache']",
 		);
 
@@ -241,8 +320,7 @@ export class SiteMaintenance extends SiteSetting {
 					: `${version}No site updates are required.`;
 		}
 
-		const appendDetail = (list, detail, label = "") => {
-			if (!list) return;
+		const appendDetail = (list: Element, detail: RecordDetail, label = "") => {
 			const item = document.createElement("li");
 			item.textContent = `${label ? `${label}: ` : ""}${detail.message}${detail.url ? " " : ""}`;
 			if (detail.url) {
@@ -255,7 +333,7 @@ export class SiteMaintenance extends SiteSetting {
 			list.appendChild(item);
 		};
 
-		const stateLabels = {
+		const stateLabels: Record<string, string | undefined> = {
 			complete: "Completed",
 			pending: "Pending",
 			running: "Running",
@@ -264,11 +342,12 @@ export class SiteMaintenance extends SiteSetting {
 			blocked: "Blocked by an earlier update",
 			"audit-error": "Audit error",
 		};
-		const releases = new Map();
+		const releases = new Map<string, Migration[]>();
 		for (const migration of visibleMigrations) {
 			const release = migration.introduced_in || "Unknown";
-			if (!releases.has(release)) releases.set(release, []);
-			releases.get(release).push(migration);
+			const migrations = releases.get(release);
+			if (migrations) migrations.push(migration);
+			else releases.set(release, [migration]);
 		}
 
 		for (const [release, migrations] of releases) {

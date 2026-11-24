@@ -382,13 +382,13 @@ test("test_interaction_preloads_have_stable_manual_chunks", () => {
 		"search",
 	]) {
 		assert.equal(
-			interactionFoundationChunk(`${root}elements/combobox/${module}.mjs`),
+			interactionFoundationChunk(`${root}elements/combobox/${module}.ts`),
 			"combobox",
 		);
 	}
 	for (const module of ["facets", "select", "submitter"]) {
 		assert.equal(
-			interactionFoundationChunk(`${root}elements/combobox/${module}.mjs`),
+			interactionFoundationChunk(`${root}elements/combobox/${module}.ts`),
 			"forms",
 		);
 	}

@@ -25,7 +25,7 @@ async function loadImportData({ request = {} } = {}) {
 		"../../src/script/widgets/ingress.mjs",
 		{
 			"../../src/script/elements/buttons.mjs": { buttons },
-			"../../src/script/elements/combobox/index.mjs": {
+			"../../src/script/elements/combobox/index.ts": {
 				FacetsBox: class {},
 				SelectBox: class {},
 			},

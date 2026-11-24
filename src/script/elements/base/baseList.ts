@@ -1,4 +1,4 @@
-interface ListAttributes {
+export interface ListAttributes {
 	[key: string]: unknown;
 	target: HTMLElement;
 	name: string;
@@ -12,7 +12,7 @@ interface ListAttributes {
 
 type ListHtml = Pick<ParentNode, "querySelector" | "querySelectorAll">;
 
-function listHtml(response: unknown): ListHtml | undefined {
+export function listHtml(response: unknown): ListHtml | undefined {
 	if (!response || typeof response !== "object" || !("html" in response)) {
 		return;
 	}
