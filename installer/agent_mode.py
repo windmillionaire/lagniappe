@@ -93,6 +93,7 @@ _ALLOWED_NON_SECRET_KEYS = frozenset(
         "external_ai_enabled",
         "mcp_name",
         "capture_errors",
+        "sentry_mode",
         "sentry_js_dsn",
         "analytics",
         "public_manual",
@@ -452,7 +453,7 @@ def _apply_non_secret_answers(
     app["EXTERNAL_AI_ENABLED"] = (
         _as_bool(
             answers.get("external_ai_enabled"),
-            bool(app.get("EXTERNAL_AI_ENABLED", False)),
+            bool(app.get("EXTERNAL_AI_ENABLED", True)),
         )
         if ai_enabled
         else False
@@ -460,10 +461,19 @@ def _apply_non_secret_answers(
     if answers.get("mcp_name"):
         app["MCP_NAME"] = mcp_connection_name(answers["mcp_name"])
 
-    app["CAPTURE_ERRORS"] = _as_bool(
+    capture_errors = _as_bool(
         answers.get("capture_errors"),
         bool(app.get("CAPTURE_ERRORS", False)),
     )
+    app["CAPTURE_ERRORS"] = capture_errors
+    sentry_mode = str(answers.get("sentry_mode") or "maintainer").strip().casefold()
+    if capture_errors:
+        if sentry_mode != "custom" and not str(app.get("SENTRY_DSN") or "").strip():
+            app["SENTRY_DSN"] = constants.SENTRY_DSN
+            app.setdefault("SENTRY_JS_DSN", constants.SENTRY_JS_DSN)
+    else:
+        app.pop("SENTRY_DSN", None)
+        app.pop("SENTRY_JS_DSN", None)
     if answers.get("sentry_js_dsn"):
         app["SENTRY_JS_DSN"] = str(answers["sentry_js_dsn"]).strip()
     app["ANALYTICS"] = _as_bool(

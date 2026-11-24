@@ -74,18 +74,30 @@ strictly:
    credential file in chat. NEVER write any secret into `answers.json`, shell
    arguments, or workspace files, and NEVER hand-craft raw `gcloud` provisioning
    commands when `setup.sh` owns that step.
-3. **Ask only 3 things in ONE short message — no questionnaires:** Do NOT ask a
-   long numbered list of optional settings. Ask in one brief, conversational
+3. **Keep chat short and conversational — no long questionnaires:** Do NOT ask
+   a long numbered list of optional settings. Ask in ONE brief, friendly
    message for just:
    - a short **workspace name**,
-   - the permanent Owner's **name and Google email**, and
+   - the permanent Owner's **name and Google email**,
    - whether to **create a new GCP project** (suggest a clean project ID) or use
-     an **existing project ID**.
+     an **existing project ID**, and
+   - **error reporting (explicit opt-in, off by default):** ask whether they are
+     willing to send privacy-reduced crash reports to the Lagniappe maintainer
+     (`"capture_errors": true`). Give a brief, honest plea — Lagniappe is a
+     solo-maintainer project, so opting in really helps catch bugs early,
+     requires no Sentry account, and can be turned off anytime (see
+     `ERROR_REPORTING_PRIVACY.md`). Never enable it without their explicit yes;
+     if they prefer their own Sentry project instead, set
+     `"sentry_mode": "custom"` so the browser vault asks for their DSN.
 
    Use sensible defaults for everything else (`us-central` / `us-central1`,
-   Google Sign-In on, Gmail App Password, built-in AI on, external MCP off,
-   Sentry off, analytics on, deploy automatically) unless the user asks to
-   change something.
+   Google Sign-In on, Gmail App Password, built-in AI on, external AI/MCP on —
+   which lets assistants like Claude, ChatGPT, Codex, or Gemini connect directly
+   to your workspace so you can share things from your phone or desktop and have
+   them file or look up pages — analytics on, deploy automatically) unless the
+   user asks to change something. Briefly explain external AI/MCP in plain
+   English like that when summarizing the defaults so the user knows what it
+   does.
 4. **Run the agent installer:** Write ONLY those non-secret choices to
    `answers.json` (see the schema below) and run:
    ```bash
@@ -126,7 +138,7 @@ strictly:
   "google_signin_enabled": true,
   "auth_email_provider": "gmail",
   "ai_enabled": true,
-  "external_ai_enabled": false,
+  "external_ai_enabled": true,
   "capture_errors": false,
   "deploy_now": true
 }

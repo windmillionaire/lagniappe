@@ -437,8 +437,24 @@ def test_populate_generated_documents_fills_index_and_deploy_before_provisioning
     assert draft.INDEX.get("indexes")
     assert draft.DEPLOY.get("service_account") == "fresh-checkout@fresh-checkout-1.iam.gserviceaccount.com"
     assert draft.MANIFEST.get("name") == "Fresh Checkout"
+    assert draft.APP.get("EXTERNAL_AI_ENABLED") is True
+    assert draft.APP.get("CAPTURE_ERRORS") is False
     # Saving all generated files succeeds on a fresh checkout (no "Nothing to save").
     draft.save()
+
+    # Explicit opt-in to maintainer Sentry populates the maintainer DSNs without
+    # requiring a custom Sentry vault entry.
+    agent_mode._apply_non_secret_answers({**answers, "capture_errors": True}, draft)
+    assert draft.APP.get("CAPTURE_ERRORS") is True
+    assert draft.APP.get("SENTRY_DSN")
+    assert agent_mode._missing_vault_flags(draft)["include_sentry"] is False
+
+    # Custom Sentry mode leaves DSN blank so the browser vault collects it.
+    draft_custom = cfg.SettingsDraft()
+    agent_mode._apply_non_secret_answers(
+        {**answers, "capture_errors": True, "sentry_mode": "custom"}, draft_custom
+    )
+    assert agent_mode._missing_vault_flags(draft_custom)["include_sentry"] is True
 
 
 def test_secret_manager_publish_retries_transient_403_propagation(monkeypatch):
