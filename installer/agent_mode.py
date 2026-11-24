@@ -9,9 +9,11 @@ installation with read-only ``doctor``.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import secrets as py_secrets
+import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,6 +51,17 @@ class AgentAnswersError(SetupError):
 
     category = "validation"
     exit_code = EXIT_INVALID_ANSWERS
+
+
+class AgentNeedsInputError(SetupError):
+    """Raised when provisioning requires one more non-secret choice from the user."""
+
+    category = "validation"
+    exit_code = EXIT_NEEDS_INPUT
+
+    def __init__(self, message: str, missing_fields: list[MissingField]) -> None:
+        super().__init__(message)
+        self.missing_fields = missing_fields
 
 _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _PROJECT_PATTERN = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
@@ -276,7 +289,7 @@ def collect_missing_inputs(
     has_existing_email = isinstance(existing_email, Mapping) and bool(
         existing_email.get("host")
     )
-    provider = str(answers.get("auth_email_provider") or "").strip().casefold()
+    provider = str(answers.get("auth_email_provider") or "gmail").strip().casefold()
     if not has_existing_email and provider not in {"gmail", "resend", "custom_smtp"}:
         missing.append(
             MissingField(
@@ -515,22 +528,201 @@ def _missing_vault_flags(draft: SettingsDraft) -> dict[str, bool]:
     }
 
 
+def _sync_settings_singleton(source: SettingsDraft, target: SettingsDraft) -> None:
+    """Copy draft mappings into/out of config.SETTINGS when they are distinct objects."""
+    if source is target:
+        return
+    for attr in ("APP", "DEPLOY", "DEV", "GCLOUD_CONFIG", "DEV_CONFIG", "TEST_CONFIG"):
+        dest = getattr(target, attr)
+        dest.clear()
+        dest.update(getattr(source, attr))
+
+
+def _ensure_project_and_billing(
+    project_id: str,
+    account: str,
+    config_name: str,
+    app_name: str,
+    *,
+    configured_billing_account: str = "",
+) -> str:
+    """Non-interactively ensure the GCP project exists, bootstrap APIs are on, and billing is linked."""
+    from installer import project_bootstrap, setup_target
+    from installer.commands import run_gcloud_command
+
+    project_state = setup_target._project_state(project_id)
+    if project_state["state"] == "unavailable":
+        raise SetupError(
+            f"Could not inspect Google Cloud project '{project_id}': "
+            f"{project_state.get('error') or 'unknown error'}"
+        )
+    if project_state["state"] in ("absent", "unverified"):
+        record_step("create Google Cloud project")
+        created = run_gcloud_command(
+            ["projects", "create", project_id, f"--name={app_name}"],
+            check=False,
+        )
+        if created.returncode != 0:
+            detail = (created.stderr or created.stdout or "").strip()
+            raise SetupError(
+                f"Failed to create Google Cloud project '{project_id}': "
+                f"{detail or 'gcloud projects create failed'}"
+            )
+
+    record_step("enable bootstrap Google Cloud APIs")
+    enable_boot = run_gcloud_command(
+        [
+            "services",
+            "enable",
+            *sorted(project_bootstrap.BOOTSTRAP_GOOGLE_CLOUD_APIS),
+            f"--project={project_id}",
+            "--quiet",
+        ],
+        check=False,
+        timeout=project_bootstrap.BOOTSTRAP_API_TIMEOUT,
+    )
+    if enable_boot.returncode != 0:
+        detail = (enable_boot.stderr or enable_boot.stdout or "").strip()
+        raise SetupError(
+            f"Could not enable bootstrap APIs on '{project_id}': "
+            f"{detail or 'gcloud services enable failed'}"
+        )
+
+    billing = project_bootstrap._load_gcloud_json(
+        ["billing", "projects", "describe", project_id, "--format=json"],
+        "Project billing check",
+    )
+    billing_enabled = bool(isinstance(billing, Mapping) and billing.get("billingEnabled"))
+    linked_account = (
+        str(billing.get("billingAccountName") or "").removeprefix("billingAccounts/")
+        if isinstance(billing, Mapping)
+        else ""
+    )
+    if billing_enabled and linked_account:
+        return linked_account
+
+    billing_account = configured_billing_account.strip()
+    if not billing_account:
+        accounts = project_bootstrap._load_gcloud_json(
+            ["billing", "accounts", "list", "--format=json"],
+            "Billing-account discovery",
+        )
+        open_accounts = [
+            item
+            for item in (accounts or [])
+            if isinstance(item, Mapping)
+            and item.get("open") is not False
+            and str(item.get("name") or "").removeprefix("billingAccounts/")
+        ]
+        if not open_accounts:
+            raise SetupError(
+                "No open Google Cloud billing account was found for this Google account. "
+                "Create or enable a billing account at https://console.cloud.google.com/billing "
+                "and rerun setup --agent."
+            )
+        if len(open_accounts) == 1:
+            billing_account = str(open_accounts[0]["name"]).removeprefix("billingAccounts/")
+        else:
+            choices = tuple(
+                str(item["name"]).removeprefix("billingAccounts/")
+                for item in open_accounts
+            )
+            described = ", ".join(
+                f"{str(item['name']).removeprefix('billingAccounts/')} "
+                f"({item.get('displayName') or 'unnamed'})"
+                for item in open_accounts
+            )
+            raise AgentNeedsInputError(
+                "Multiple open Google Cloud billing accounts are available; choose one in answers.json.",
+                [
+                    MissingField(
+                        key="billing_account",
+                        label="Google Cloud billing account ID",
+                        choices=choices,
+                        help_text=f"Available open billing accounts: {described}",
+                    )
+                ],
+            )
+
+    record_step("link Google Cloud billing account")
+    link = run_gcloud_command(
+        [
+            "billing",
+            "projects",
+            "link",
+            project_id,
+            f"--billing-account={billing_account}",
+        ],
+        check=False,
+    )
+    if link.returncode != 0:
+        detail = (link.stderr or link.stdout or "").strip()
+        raise SetupError(
+            f"Failed to link billing account '{billing_account}' to '{project_id}': "
+            f"{detail or 'gcloud billing projects link failed'}"
+        )
+    return billing_account
+
+
 def _default_provision_infrastructure(draft: SettingsDraft) -> None:
-    from installer import gcloud, identity
+    from config import SETTINGS
+    from installer import FORMATTER, credentials, gcloud, identity, setup_target
     from installer.secrets import ensure_runtime_secrets_infrastructure
+    from runner import gcloud as switcher
+
+    _sync_settings_singleton(draft, SETTINGS)
+    app_name = str(SETTINGS.APP["APP_NAME"])
+    project_id = str(SETTINGS.APP["GOOGLE_CLOUD_PROJECT"])
+    account = str(SETTINGS.GCLOUD_CONFIG["ACCOUNT"])
+    config_name = str(SETTINGS.GCLOUD_CONFIG["NAME"])
+
+    SETTINGS.DEV["setup_draft"] = {"APP_NAME": app_name}
+    SETTINGS.save(File.DEV_YAML)
+
+    record_step("configure gcloud target")
+    switcher.config_gcloud()
+
+    billing_account = _ensure_project_and_billing(
+        project_id,
+        account,
+        config_name,
+        app_name,
+        configured_billing_account=str(SETTINGS.GCLOUD_CONFIG.get("BILLING_ACCOUNT") or ""),
+    )
+    if billing_account and SETTINGS.GCLOUD_CONFIG.get("BILLING_ACCOUNT") != billing_account:
+        SETTINGS.GCLOUD_CONFIG["BILLING_ACCOUNT"] = billing_account
+        SETTINGS.save(File.DEV_YAML)
+
+    target = setup_target.SetupTarget(
+        app_name=app_name,
+        configuration_name=config_name,
+        account=account,
+        project_id=project_id,
+    )
+    f = FORMATTER.initialize()
+    record_step("align Google Cloud ADC credentials")
+    with credentials._adc_auth_transaction() as transaction:
+        credentials._ensure_adc_principal(target, transaction=transaction)
+        with f.progress(
+            text="Verifying Google Cloud credentials",
+            success_text="Google Cloud credentials verified",
+        ) as sp:
+            credentials._set_adc_quota_project(target, sp, transaction=transaction)
+            sp.ok()
+        transaction.commit()
 
     record_step("enable Google Cloud APIs")
     gcloud.enable_gcloud_apis()
+    record_step("reconcile App Engine and runtime service account")
+    gcloud.setup_app_engine(confirm=False)
     record_step("provision runtime Secret Manager infrastructure")
     ensure_runtime_secrets_infrastructure(
-        str(draft.APP["GOOGLE_CLOUD_PROJECT"]),
-        str(draft.APP["RUNTIME_SERVICE_ACCOUNT_EMAIL"]),
+        str(SETTINGS.APP["GOOGLE_CLOUD_PROJECT"]),
+        str(SETTINGS.APP["RUNTIME_SERVICE_ACCOUNT_EMAIL"]),
         secret_name=str(
-            draft.APP.get("SECRETS_SECRET_NAME") or DEFAULT_RUNTIME_SECRET_NAME
+            SETTINGS.APP.get("SECRETS_SECRET_NAME") or DEFAULT_RUNTIME_SECRET_NAME
         ),
     )
-    record_step("reconcile App Engine")
-    gcloud.setup_app_engine()
     record_step("reconcile storage buckets")
     gcloud.configure_storage_buckets()
     record_step("reconcile task queue")
@@ -541,6 +733,7 @@ def _default_provision_infrastructure(draft: SettingsDraft) -> None:
     gcloud.create_ocr_processor()
     record_step("reconcile standalone Identity Platform")
     identity.setup_identity_platform()
+    _sync_settings_singleton(SETTINGS, draft)
 
 
 def _default_validate_oauth(
@@ -801,8 +994,26 @@ def run_agent_install(
     record_step("apply non-secret agent answers")
     _apply_non_secret_answers(answers, active_draft)
 
+    stream_guard = (
+        contextlib.redirect_stdout(sys.stderr)
+        if json_output
+        else contextlib.nullcontext()
+    )
+
     record_step("provision cloud infrastructure")
-    provision_fn(active_draft)
+    try:
+        with stream_guard:
+            provision_fn(active_draft)
+    except AgentNeedsInputError as error:
+        _emit(
+            {
+                "status": "needs_input",
+                "missing_fields": [item.to_dict() for item in error.missing_fields],
+                "message": str(error),
+            },
+            json_output=json_output,
+        )
+        return EXIT_NEEDS_INPUT
 
     # Ensure generated config defaults are built in memory (without secrets on disk).
     from installer import config_builders
@@ -821,7 +1032,7 @@ def run_agent_install(
         active_draft.APP["APP_URL"] = f"https://{project_id}.appspot.com"
     if not active_draft.APP.get("GOOGLE_LOGIN_URI"):
         active_draft.APP["GOOGLE_LOGIN_URI"] = (
-            f"{active_draft.APP['APP_URL']}/users/google_login"
+            f"{active_draft.APP['APP_URL']}/users/google-signin"
         )
 
     flags = _missing_vault_flags(active_draft)
@@ -844,20 +1055,21 @@ def run_agent_install(
             validate_redis=validate_redis,
         )
         record_step("collect provider credentials via localhost browser vault")
-        if vault_runner is not None:
-            outcome = vault_runner(sections, submit_handler)
-        else:
-            open_browser = _as_bool(answers.get("open_browser"), True)
-            outcome = run_secret_vault(
-                sections,
-                submit_handler,
-                open_browser=open_browser,
-                on_ready=lambda url: (
-                    None
-                    if json_output
-                    else print(f"Open the local credential vault in your browser: {url}")
-                ),
-            )
+        with stream_guard:
+            if vault_runner is not None:
+                outcome = vault_runner(sections, submit_handler)
+            else:
+                open_browser = _as_bool(answers.get("open_browser"), True)
+                outcome = run_secret_vault(
+                    sections,
+                    submit_handler,
+                    open_browser=open_browser,
+                    on_ready=lambda url: print(
+                        f"Open the local credential vault in your browser: {url}",
+                        file=sys.stderr if json_output else sys.stdout,
+                        flush=True,
+                    ),
+                )
         if not outcome.ok:
             _emit(
                 {
@@ -908,7 +1120,8 @@ def run_agent_install(
     deploy_now = _as_bool(answers.get("deploy_now"), True)
     deployed = False
     if deploy_now:
-        deployed = bool(deploy_fn(active_draft))
+        with stream_guard:
+            deployed = bool(deploy_fn(active_draft))
         if not deployed:
             _emit(
                 {
@@ -921,7 +1134,8 @@ def run_agent_install(
             return EXIT_ERROR
 
     record_step("verify installation with doctor")
-    doctor_code = int(doctor_fn())
+    with stream_guard:
+        doctor_code = int(doctor_fn())
     result_payload: dict[str, object] = {
         "status": "ok" if doctor_code == 0 else "error",
         "project_id": str(active_draft.APP.get("GOOGLE_CLOUD_PROJECT") or ""),

@@ -176,8 +176,25 @@ def _status(result: object) -> int:
 def _prepare_setup_dependencies(args):
     """Bootstrap focused modes before importing their dependency-backed handlers."""
     if _mode(args) == "install":
-        # The full installer owns this step so it can announce recovery and ask
-        # for consent before changing the project environment.
+        if getattr(args, "agent", False):
+            from contextlib import nullcontext, redirect_stdout
+            from installer.commands import check_gcloud_cli
+            from installer.package_install import (
+                ensure_pip_is_available,
+                ensure_setup_dependencies,
+            )
+
+            stream_guard = (
+                redirect_stdout(sys.stderr)
+                if getattr(args, "json_output", False)
+                else nullcontext()
+            )
+            with stream_guard:
+                ensure_pip_is_available()
+                check_gcloud_cli()
+                ensure_setup_dependencies()
+        # The full interactive installer owns this step so it can announce
+        # recovery and ask for consent before changing the project environment.
         return
 
     if _read_only(args):

@@ -64,17 +64,25 @@ Lagniappe's built-in agent-assisted installer. Follow these rules strictly:
 3. NEVER write any secret into answers.json, shell arguments, or workspace
    files, and NEVER hand-craft raw gcloud provisioning commands when setup.sh
    owns that step.
-4. Ask me only the plain-English non-secret questions needed for answers.json
-   (workspace name, GCP project ID, region, owner name/email, email provider,
-   AI/MCP/monitoring choices), write ONLY those non-secret choices to
-   answers.json, and run:
+4. Keep chat short and conversational — DO NOT ask a long questionnaire. Ask me
+   in ONE brief message for just 3 things:
+   (a) a short workspace name,
+   (b) my name and Google email (permanent Owner), and
+   (c) whether to create a new GCP project (suggest a clean ID) or use an
+       existing project ID.
+   Use sensible defaults for everything else (us-central/us-central1, Google
+   Sign-In on, Gmail App Password, built-in AI on, external MCP off, Sentry
+   off, analytics on, deploy automatically) unless I ask to change something.
+   Write ONLY those non-secret choices to answers.json and run:
      ./setup.sh --agent --answers answers.json --json
 5. If setup returns exit code 3 ("status": "needs_input"), ask me only the
-   missing non-secret fields listed in missing_fields, update answers.json, and
-   rerun the same command.
-6. When setup opens Google sign-in or the local browser credential vault
-   (http://127.0.0.1:.../vault/...), tell me to complete it in my browser and
-   wait until setup finishes.
+   specific missing non-secret field(s) listed in missing_fields (such as
+   choosing between multiple billing accounts), update answers.json, and rerun
+   the same command.
+6. Setup automatically creates the GCP project, links billing, opens Google
+   sign-in, and opens the localhost browser credential vault (and prints the
+   vault link to stderr even under --json). Tell me when my browser needs
+   attention and wait until setup finishes.
 7. After setup completes, confirm `./setup.sh doctor` exits with 0, confirm no
    secrets exist in config/files/lagniappe_settings.yaml, and give me my live
    Lagniappe URL.

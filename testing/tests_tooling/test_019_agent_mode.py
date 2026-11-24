@@ -142,7 +142,55 @@ def test_agent_answers_reject_secrets_and_report_missing_inputs(
     payload = json.loads(capsys.readouterr().out)
     assert payload["status"] == "needs_input"
     keys = {item["key"] for item in payload["missing_fields"]}
-    assert {"project_id", "admin_name", "admin_email", "auth_email_provider"} <= keys
+    assert keys == {"project_id", "admin_name", "admin_email"}
+
+
+def test_agent_mode_returns_needs_input_on_billing_choice_and_keeps_json_stdout_clean(
+    isolated_env, tmp_path, capsys
+):
+    _, cfg, _, _ = isolated_env
+    answers_file = tmp_path / "answers.json"
+    answers_file.write_text(
+        json.dumps(
+            {
+                "app_name": "Billing Pilot",
+                "project_id": "billing-pilot-1",
+                "admin_name": "Alex",
+                "admin_email": "alex@example.com",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def _provision_needs_billing(_draft):
+        print("Provisioning log noise must go to stderr under --json")
+        raise agent_mode.AgentNeedsInputError(
+            "Multiple open Google Cloud billing accounts are available.",
+            [
+                agent_mode.MissingField(
+                    key="billing_account",
+                    label="Google Cloud billing account ID",
+                    choices=("01AAAA-BBBBBB-CCCCCC", "02DDDD-EEEEEE-FFFFFF"),
+                )
+            ],
+        )
+
+    rc = agent_mode.run_agent_install(
+        answers_path=answers_file,
+        json_output=True,
+        draft=cfg.SettingsDraft(),
+        provision_fn=_provision_needs_billing,
+    )
+    assert rc == agent_mode.EXIT_NEEDS_INPUT
+    captured = capsys.readouterr()
+    assert "Provisioning log noise must go to stderr under --json" in captured.err
+    payload = json.loads(captured.out)
+    assert payload["status"] == "needs_input"
+    assert payload["missing_fields"][0]["key"] == "billing_account"
+    assert payload["missing_fields"][0]["choices"] == [
+        "01AAAA-BBBBBB-CCCCCC",
+        "02DDDD-EEEEEE-FFFFFF",
+    ]
 
 
 def test_agent_install_vault_handoff_resume_and_zero_disk_secrets(

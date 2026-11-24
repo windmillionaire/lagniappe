@@ -604,7 +604,7 @@ def configure_storage_buckets(
     return True
 
 
-def create_app_engine_app() -> Application:
+def create_app_engine_app(*, confirm: bool = True) -> Application:
     """Get the immutable App Engine application or create it after confirmation."""
     from config import SETTINGS
     from config.locations import normalize_app_engine_location
@@ -663,22 +663,23 @@ def create_app_engine_app() -> Application:
             wrap_text("Creating the App Engine application may take up to 5 minutes.")
         )
     )
-    try:
-        confirmation = input(
-            format_prompt(
-                f"Create the App Engine application in '{location}'? [y/N]: "
+    if confirm:
+        try:
+            confirmation = input(
+                format_prompt(
+                    f"Create the App Engine application in '{location}'? [y/N]: "
+                )
             )
-        )
-    except EOFError as error:
-        message = (
-            "App Engine confirmation could not read from this terminal. "
-            "Run setup again in an interactive terminal."
-        )
-        print(f.error(message))
-        raise SetupCancelled(message) from error
-    if confirmation.strip().lower() not in ("y", "yes"):
-        print(ui.status(wrap_text("App Engine application creation cancelled.")))
-        raise SetupCancelled("App Engine application creation was cancelled.")
+        except EOFError as error:
+            message = (
+                "App Engine confirmation could not read from this terminal. "
+                "Run setup again in an interactive terminal."
+            )
+            print(f.error(message))
+            raise SetupCancelled(message) from error
+        if confirmation.strip().lower() not in ("y", "yes"):
+            print(ui.status(wrap_text("App Engine application creation cancelled.")))
+            raise SetupCancelled("App Engine application creation was cancelled.")
 
     with f.progress(
         text="Create App Engine application (may take up to 5 minutes)",
@@ -1152,7 +1153,7 @@ def create_ocr_processor() -> bool | None:
             ) from e
 
 
-def setup_app_engine() -> None:
+def setup_app_engine(*, confirm: bool = True) -> None:
     """Configure App Engine and service account."""
     from config import SETTINGS
 
@@ -1175,7 +1176,7 @@ def setup_app_engine() -> None:
     if settings_changed:
         SETTINGS.save()
 
-    application = create_app_engine_app()
+    application = create_app_engine_app(confirm=confirm)
     location = str(getattr(application, "location_id", "") or "").strip()
     hostname = str(getattr(application, "default_hostname", "") or "").strip()
     if not location or not hostname:
