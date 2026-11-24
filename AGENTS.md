@@ -39,6 +39,7 @@ These instructions apply to the whole repository unless a more specific
 - Prefer the repo runner for common test commands:
   - `venv/bin/python run.py test`
   - `venv/bin/python run.py test unit`
+  - `venv/bin/python run.py test http`
   - `venv/bin/python run.py test e2e`
   - `venv/bin/python run.py test js`
   - `venv/bin/python run.py test tooling`
@@ -86,12 +87,15 @@ These instructions apply to the whole repository unless a more specific
   `testing/tests_tooling/`.
 - Test placement:
   - backend unit tests belong in `testing/tests_unit/`;
+  - offline Flask `test_client()` route/auth/header/API contract tests belong in
+    `testing/tests_http/`;
   - browser/server workflow tests belong in `testing/tests_e2e/`;
   - Node-backed JavaScript behavior that does not require a live browser belongs
     in `testing/tests_js/`;
   - setup, config smoke, repository-health, and reporter tests belong in
     `testing/tests_tooling/`.
-- Only E2E tests may import `lagniappe.web`. Tooling tests also must not import
+- Only `testing/tests_http/` (offline `test_client()`) and `testing/tests_e2e/`
+  may import `lagniappe.web`. Tooling tests also must not import
   `lagniappe.core` or execute Node; use the unit and JavaScript suites instead.
 
 ## Project Map

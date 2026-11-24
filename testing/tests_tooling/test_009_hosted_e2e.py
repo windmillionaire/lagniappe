@@ -1012,7 +1012,7 @@ def test_hosted_complete_run_merges_all_phases_without_hiding_failure(tmp_path, 
 
     monkeypatch.setattr(hosted_e2e_job, "subprocess", SimpleNamespace(run=run))
     assert hosted_e2e_job._run_complete_suites("standard") == int(any(statuses))
-    assert commands[0][4:-1] == ["unit", "js", "tooling", "-m", "not unfinished"]
+    assert commands[0][4:-1] == ["unit", "http", "js", "tooling", "-m", "not unfinished"]
     assert commands[1][3:-1] == ["--parallel"]
     merged = json.loads(evidence.read_text())
     assert set(merged["tests"]) == set(targets)

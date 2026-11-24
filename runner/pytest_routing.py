@@ -49,6 +49,7 @@ SETUP_TEST_GROUPS = {
 }
 TEST_SUITE_ALIASES = {
     "unit": ("testing/tests_unit/",),
+    "http": ("testing/tests_http/",),
     "e2e": ("testing/tests_e2e/",),
     "js": ("testing/tests_js/",),
     "tooling": ("testing/tests_tooling/",),

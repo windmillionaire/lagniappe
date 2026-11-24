@@ -1477,11 +1477,13 @@ def test_configure_test_environment_only_sets_import_environment(monkeypatch):
 
     run.configure_test_environment(includes_e2e=False)
     assert os.environ["FLASK_ENV"] == "testing"
+    assert os.environ["LAGNIAPPE_OFFLINE_WEB_TEST"] == "1"
     assert calls == []
 
     monkeypatch.setenv("FLASK_ENV", "production")
     run.configure_test_environment(includes_e2e=True)
     assert os.environ["FLASK_ENV"] == "testing"
+    assert "LAGNIAPPE_OFFLINE_WEB_TEST" not in os.environ
     assert calls == []
 
 
@@ -1596,11 +1598,13 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
 @pytest.mark.parametrize(
     "arguments",
     [
+        ["http"],
         ["tooling"],
         ["js"],
         ["setup"],
         ["setup", "-m", "setup_drift"],
         ["testing/tests_unit/test_001_config_validation.py"],
+        ["testing/tests_http/test_001_web_security_wiring.py"],
     ],
 )
 def test_run_py_offline_suites_skip_gcloud_activation(monkeypatch, arguments):

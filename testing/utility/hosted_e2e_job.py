@@ -23,7 +23,7 @@ EVIDENCE_PATH = REPOSITORY_ROOT / "testing/evidence/latest.json"
 MAX_FOCUSED_TARGETS = 50
 HOSTED_E2E_ENVIRONMENTS = ("standard",)
 STANDARD_JOB = "lagniappe-e2e"
-TEST_SUITES = ("tests_unit", "tests_js", "tests_tooling", "tests_e2e")
+TEST_SUITES = ("tests_unit", "tests_http", "tests_js", "tests_tooling", "tests_e2e")
 
 
 def _required_environment(name: str) -> str:
@@ -152,7 +152,7 @@ def _run_complete_suites(environment):
     destination.unlink(missing_ok=True)
     statuses, reports = [], []
     for name, options in (
-        ("support", {"suites": ("unit", "js", "tooling")}),
+        ("support", {"suites": ("unit", "http", "js", "tooling")}),
         ("e2e", {"parallel": True}),
     ):
         report = HOSTED_REPORT_ROOT / f"{name}.xml"

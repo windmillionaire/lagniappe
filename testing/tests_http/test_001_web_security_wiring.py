@@ -19,7 +19,7 @@ from lagniappe.web.start import blueprints as blueprint_start
 from lagniappe.web.start import login as login_start
 
 
-pytestmark = pytest.mark.e2e
+pytestmark = pytest.mark.http
 
 
 class Sentinel:

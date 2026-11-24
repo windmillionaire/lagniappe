@@ -16,7 +16,7 @@ from lagniappe.web import app
 from lagniappe.web.experiments import initialize_measurements, task_list_context_keys
 from lagniappe.web.routes.api import main as api
 
-pytestmark = pytest.mark.e2e
+pytestmark = pytest.mark.http
 
 
 def test_experiments_execute_requires_remote_admin_and_exact_proposal(monkeypatch):
@@ -351,6 +351,8 @@ def test_experiments_request_headers_and_private_log_summary(
 
 
 def test_experiments_comparison_metadata_survives_304(monkeypatch):
+    from lagniappe.core.tools.polling import task_lists
+
     flask_app = Flask("experiments-comparison-test")
     config = SimpleNamespace(
         EXPERIMENTS_ENABLED=True, EXPERIMENTS_DIAGNOSTICS="summary",
@@ -358,6 +360,11 @@ def test_experiments_comparison_metadata_survives_304(monkeypatch):
     )
     records = []
     monkeypatch.setattr(measurements, "emit", records.append)
+    monkeypatch.setattr(
+        task_lists,
+        "DATA",
+        SimpleNamespace(datastore=SimpleNamespace(key=lambda *parts: parts)),
+    )
     initialize_measurements(flask_app, config)
 
     @flask_app.get("/fixture")

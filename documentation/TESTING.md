@@ -15,12 +15,15 @@ session.
 | Suite | Location | Use it for |
 | --- | --- | --- |
 | Unit | `testing/tests_unit/` | Deterministic backend entities, properties, permissions, validation, and services. |
+| HTTP | `testing/tests_http/` | Offline Flask `test_client()` route, CSRF, header/CSP, OIDC, API envelope, and negative auth/403 contracts (no browser, no cloud services). |
 | JavaScript | `testing/tests_js/` | Frontend modules in Node with jsdom and simulated persistence; no live browser/server. |
-| E2E | `testing/tests_e2e/` | Browser/server workflows, DOM, routing, storage lifecycle, rendering, and multi-user behavior. |
+| E2E | `testing/tests_e2e/` | Browser/server workflows, happy paths, DOM, routing, storage lifecycle, rendering, and multi-user behavior. |
 | Tooling | `testing/tests_tooling/` | Setup/config smoke, runner, reporters, and repository health. |
 
 Tooling tests must not import `lagniappe.core` or `lagniappe.web` and must not
-execute Node. Only E2E may import `lagniappe.web`.
+execute Node. Unit and JavaScript suites must not import `lagniappe.web`. Only
+HTTP (`test_client()`, offline) and E2E may import `lagniappe.web`, and HTTP
+tests must not import Playwright or browser-harness modules.
 
 ## Dependencies
 
@@ -42,6 +45,7 @@ Use the repository virtualenv and runner:
 ```bash
 venv/bin/python run.py test
 venv/bin/python run.py test unit
+venv/bin/python run.py test http
 venv/bin/python run.py test js
 venv/bin/python run.py test tooling
 venv/bin/python run.py test setup
@@ -136,7 +140,7 @@ so adding a setup module cannot silently omit it from the alias.
 
 | Marker | Meaning |
 | --- | --- |
-| `unit`, `js`, `e2e`, `tooling` | Suite ownership. |
+| `unit`, `http`, `js`, `e2e`, `tooling` | Suite ownership. |
 | `ai` | Live-LLM behavior (opt-in via `-m ai`; excluded from default runs so routine E2E stays deterministic and fast; uses a longer operation budget and result report). |
 | `setup_drift` | Read-only provider/config audit. |
 | `setup_provider` | Sequential live-provider runtime contract. |

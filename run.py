@@ -47,6 +47,10 @@ def hosted_e2e_enabled() -> bool:
 def configure_test_environment(*, includes_e2e: bool) -> None:
     """Set test env vars before pytest imports the app package."""
     os.environ["FLASK_ENV"] = "testing"
+    if includes_e2e:
+        os.environ.pop("LAGNIAPPE_OFFLINE_WEB_TEST", None)
+    else:
+        os.environ["LAGNIAPPE_OFFLINE_WEB_TEST"] = "1"
 
 
 RELEASES_DIR = REPOSITORY_ROOT / "documentation/releases"

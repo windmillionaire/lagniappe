@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 from datetime import timedelta
 import json
+import os
 import re
 from urllib.parse import urlsplit
 
@@ -77,7 +78,10 @@ initialize_measurements(app, CONFIG)
 
 csrf = CSRFProtect()
 csrf.init_app(app)
-initialize_app(app, csrf)
+_initialize_services = not (
+    CONFIG.testing and os.environ.get("LAGNIAPPE_OFFLINE_WEB_TEST") == "1"
+)
+initialize_app(app, csrf, initialize_services=_initialize_services)
 
 GOOGLE_IDENTITY_BASE = "https://accounts.google.com/gsi/"
 GOOGLE_IDENTITY_SCRIPT = f"{GOOGLE_IDENTITY_BASE}client"

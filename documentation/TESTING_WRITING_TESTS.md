@@ -69,9 +69,10 @@ the behavior.
 
 | Layer | Use it for |
 | --- | --- |
-| Unit | Deterministic backend entities, properties, permissions, validation, retries, and service logic without a live app server. |
+| Unit | Deterministic backend entities, properties, permissions, validation, retries, and service logic without Flask or a live app server. |
+| HTTP | Offline Flask `test_client()` contracts for non-UI and negative route paths: auth/403s, CSRF exemptions, security headers/CSP, OIDC/webhook gates, and API envelopes (no browser, no live cloud I/O). |
 | JavaScript | Frontend module behavior in Node, including jsdom DOM operations and simulated persistence; no live browser/server. |
-| E2E | User workflows or browser lifecycle behavior that requires a real browser/server boundary, DOM, routing, storage, rendering, or multi-user interaction. |
+| E2E | User workflows, happy paths, or browser lifecycle behavior that requires a real browser/server boundary, DOM, routing, storage, rendering, or multi-user interaction. |
 | Tooling | Setup/config smoke tests, repository health, reporters, and runner behavior. Tooling tests must not import `lagniappe.core` or `lagniappe.web`, or execute Node. |
 
 Do not keep procedural coverage in E2E merely because an E2E test can reach it.

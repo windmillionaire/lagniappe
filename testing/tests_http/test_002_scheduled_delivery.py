@@ -12,7 +12,7 @@ from lagniappe.web import app
 from lagniappe.web.routes.process import main as process_routes
 
 
-pytestmark = pytest.mark.e2e
+pytestmark = pytest.mark.http
 
 
 @pytest.mark.parametrize("delivery", [
