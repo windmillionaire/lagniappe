@@ -257,7 +257,7 @@ export default class Report extends Core {
 				if (!status) {
 					status = document.createElement("div");
 					status.dataset.role = "report-status";
-					status.className = "flex flex-col gap-1";
+					status.className = "flex flex-col gap-2";
 
 					const heading = document.createElement("h2");
 					heading.className = "text-base font-semibold text-base-dark";
@@ -265,16 +265,23 @@ export default class Report extends Core {
 
 					const note = document.createElement("p");
 					note.dataset.role = "report-status-note";
-					note.className = "text-base-dark";
+					note.className = "flex items-center gap-1.5 text-base-dark";
 					status.append(heading, note);
 					section.prepend(status);
 				}
 
 				const note =
-					status.querySelector("[data-role='report-status-note']") || status;
-				const spinner = createIcon("spinner", "mr-1");
+					status.querySelector<HTMLElement>(
+						"[data-role='report-status-note']",
+					) || status;
+				if (note !== status) {
+					note.className = "flex items-center gap-1.5 text-base-dark";
+				}
+				const spinner = createIcon("spinner", "icon-sm shrink-0");
 				spinner.setAttribute("aria-hidden", "true");
-				note.replaceChildren(spinner, ` ${message}`);
+				const text = document.createElement("span");
+				text.textContent = message;
+				note.replaceChildren(spinner, text);
 				let progress = status.querySelector<HTMLElement>(
 					"[data-role='deferred-progress']",
 				);

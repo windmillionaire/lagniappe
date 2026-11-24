@@ -284,8 +284,8 @@
         class="group/view max-w-5xl mx-auto">
     <div class="{{ styles.layout.view.header }}" data-flipped="false">
       <nav class="{{ styles.layout.view.title }}" data-nav="view">
-        <div class="min-w-0">
-          {{ render_icon(report_icon, "mr-3 text-kind-default") }}
+        <div class="flex min-w-0 items-center gap-2.5">
+          {{ render_icon(report_icon, "icon-xl shrink-0 text-kind-default") }}
           <span data-role="title">{{ report_title }}</span>
         </div>
         <div class="{{ styles.layout.nav.group }}" data-role="actions">
@@ -353,11 +353,12 @@
             </details>
           {% endif %}
           {% if report.pending or report.error or report.status in ["running", "failed"] or (not is_ask and not report.proposal) %}
-            <div data-role="report-status" class="flex flex-col gap-1">
+            <div data-role="report-status" class="flex flex-col gap-2">
               <h2 class="text-base font-semibold text-base-dark">Status</h2>
-              <p data-role="report-status-note" class="text-base-dark">
-                {% if report.pending %}{{ render_icon("spinner", "mr-1") }}{% endif %}
-                {{ report.error or report.note }}
+              <p data-role="report-status-note"
+                 class="{% if report.pending %}flex items-center gap-1.5 {% endif %}text-base-dark">
+                {%- if report.pending -%}{{ render_icon("spinner", "icon-sm shrink-0") }}{%- endif -%}
+                <span>{{ report.error or report.note }}</span>
               </p>
               {% if report.pending and operation_key %}
                 <p class="text-sm text-base-medium" aria-live="polite">
