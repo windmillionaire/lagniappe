@@ -321,6 +321,9 @@ def test_public_manual_sections_render_cleanly_including_all_mcp_clients(
         elif section["key"] == "personalization":
             assert "<code>-update</code>" not in html
             assert "./setup.sh update" in html
+        elif section["key"] == "installation":
+            assert 'data-role="ai-assisted-install"' in html
+            assert "./setup.sh --agent --answers answers.json --json" in html
 
 
 def test_public_directory_places_ordered_group_before_manual(
