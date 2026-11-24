@@ -19,6 +19,7 @@ from .package_install import install_if_missing
 from .commands import run_gcloud_command
 from .errors import (
     ProviderConflict,
+    ProviderInvalidInput,
     ProviderNotFound,
     ProviderTimeout,
     ProviderTransientError,
@@ -390,9 +391,45 @@ def configure_service_account() -> dict[str, str]:
                     raise e
                 time.sleep(1)
 
+    def _is_sa_policy_propagation_error(error: Exception) -> bool:
+        classified = classify_provider_error(error)
+        if isinstance(classified, ProviderTransientError):
+            return True
+        if isinstance(classified, (ProviderInvalidInput, ProviderNotFound)):
+            text = str(error).casefold()
+            return any(
+                marker in text
+                for marker in (
+                    "does not exist",
+                    "not found",
+                    "service account",
+                    "unknown service account",
+                )
+            )
+        return False
+
     try:
         wait_for_service_account(account.name)
-        apply_iam_policy(account.email)
+        propagation_delays = (3, 5, 10, 15)
+        for attempt in range(len(propagation_delays) + 1):
+            try:
+                apply_iam_policy(account.email)
+                break
+            except Exception as exc:
+                if (
+                    attempt < len(propagation_delays)
+                    and _is_sa_policy_propagation_error(exc)
+                ):
+                    delay = propagation_delays[attempt]
+                    print(
+                        f.info(
+                            "New service account IAM is still propagating; "
+                            f"retrying in {delay} seconds..."
+                        )
+                    )
+                    time.sleep(delay)
+                    continue
+                raise
     except Exception as e:
         classified = classify_provider_error(e)
         if isinstance(classified, ProviderTransientError):
@@ -1173,6 +1210,18 @@ def setup_app_engine(*, confirm: bool = True) -> None:
     if SETTINGS.DEPLOY.get("service_account") != runtime_email:
         SETTINGS.DEPLOY["service_account"] = runtime_email
         settings_changed = True
+    from config.secrets import DEFAULT_RUNTIME_SECRET_NAME, uses_secret_manager
+
+    if uses_secret_manager(SETTINGS.APP) and runtime_email:
+        from installer.secrets import ensure_runtime_secrets_infrastructure
+
+        ensure_runtime_secrets_infrastructure(
+            str(SETTINGS.GCLOUD_CONFIG["PROJECT"]),
+            str(runtime_email),
+            secret_name=str(
+                SETTINGS.APP.get("SECRETS_SECRET_NAME") or DEFAULT_RUNTIME_SECRET_NAME
+            ),
+        )
     if settings_changed:
         SETTINGS.save()
 

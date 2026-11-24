@@ -14,6 +14,7 @@ import json
 import re
 import secrets as py_secrets
 import sys
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -556,6 +557,7 @@ def _ensure_project_and_billing(
             f"Could not inspect Google Cloud project '{project_id}': "
             f"{project_state.get('error') or 'unknown error'}"
         )
+    project_created = False
     if project_state["state"] in ("absent", "unverified"):
         record_step("create Google Cloud project")
         created = run_gcloud_command(
@@ -568,6 +570,15 @@ def _ensure_project_and_billing(
                 f"Failed to create Google Cloud project '{project_id}': "
                 f"{detail or 'gcloud projects create failed'}"
             )
+        project_created = True
+        from installer.state import record_mutation
+
+        record_mutation(
+            "create Google Cloud project",
+            action="created",
+            resource="project",
+            identifier=project_id,
+        )
 
     record_step("enable bootstrap Google Cloud APIs")
     enable_boot = run_gcloud_command(
@@ -599,6 +610,8 @@ def _ensure_project_and_billing(
         else ""
     )
     if billing_enabled and linked_account:
+        if project_created:
+            _wait_for_new_project_quota_access(project_id)
         return linked_account
 
     billing_account = configured_billing_account.strip()
@@ -661,7 +674,34 @@ def _ensure_project_and_billing(
             f"Failed to link billing account '{billing_account}' to '{project_id}': "
             f"{detail or 'gcloud billing projects link failed'}"
         )
+    if project_created:
+        _wait_for_new_project_quota_access(project_id)
     return billing_account
+
+
+def _wait_for_new_project_quota_access(project_id: str) -> None:
+    """Wait for serviceusage.services.use propagation on a brand-new project.
+
+    ``gcloud auth application-default login --project=<id>`` immediately checks
+    ``testIamPermissions`` with ``x-goog-user-project``; running it before
+    propagation finishes causes ADC login to fail and roll back after browser
+    sign-in, forcing a second login prompt.
+    """
+    from installer.commands import run_gcloud_command
+
+    probe = [
+        "projects",
+        "describe",
+        project_id,
+        f"--billing-project={project_id}",
+        "--format=value(projectId)",
+    ]
+    for delay in (0, 5, 10, 15, 15, 15):
+        if delay:
+            time.sleep(delay)
+        result = run_gcloud_command(probe, check=False, timeout=30)
+        if result.returncode == 0:
+            return
 
 
 def _default_provision_infrastructure(draft: SettingsDraft) -> None:

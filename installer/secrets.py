@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable, Mapping
 from subprocess import CalledProcessError, CompletedProcess
 from typing import Protocol
@@ -116,16 +117,33 @@ def ensure_runtime_secrets_infrastructure(
     )
     created_secret = False
     if describe.returncode != 0:
-        create = _run(
-            gcloud_runner,
-            [
-                "secrets",
-                "create",
-                secret_name,
-                "--replication-policy=automatic",
-                f"--project={project_id}",
-            ],
-        )
+        create_cmd = [
+            "secrets",
+            "create",
+            secret_name,
+            "--replication-policy=automatic",
+            f"--project={project_id}",
+        ]
+        create = _run(gcloud_runner, create_cmd)
+        if create.returncode != 0 and not api_already_enabled and gcloud_runner is None:
+            for delay in (3, 6, 12):
+                time.sleep(delay)
+                create = _run(gcloud_runner, create_cmd)
+                if create.returncode == 0:
+                    break
+                retry_describe = _run(
+                    gcloud_runner,
+                    [
+                        "secrets",
+                        "describe",
+                        secret_name,
+                        f"--project={project_id}",
+                        "--format=json",
+                    ],
+                )
+                if retry_describe.returncode == 0:
+                    create = retry_describe
+                    break
         if create.returncode != 0:
             raise SecretsBackendError(
                 f"Could not create Secret Manager secret {secret_name} in {project_id}."

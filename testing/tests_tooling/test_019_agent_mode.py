@@ -358,3 +358,63 @@ def test_configure_secrets_migrate_offers_and_runs_deploy(monkeypatch):
     monkeypatch.setattr(ui, "read_input", lambda prompt="": "n")
     assert installer_secrets.configure_secrets_migrate() == 0
     assert events == ["prepare", "migrate"]
+
+
+def test_setup_app_engine_provisions_secret_manager_before_saving(monkeypatch):
+    import config
+    from installer import gcloud as installer_gcloud
+    from installer import secrets as installer_secrets
+
+    events: list[str] = []
+
+    class _FakeSettings:
+        APP = {
+            "SECRETS_BACKEND": "secret_manager",
+            "SECRETS_SECRET_NAME": "lagniappe-runtime-secrets",
+            "SECRET_KEY": "generated-secret",
+        }
+        DEPLOY: dict[str, object] = {}
+        GCLOUD_CONFIG = {"PROJECT": "demo-proj"}
+
+        def save(self, *args):
+            events.append("save")
+            return ()
+
+    fake_settings = _FakeSettings()
+    monkeypatch.setattr(config, "SETTINGS", fake_settings)
+    monkeypatch.setattr(
+        installer_gcloud,
+        "configure_service_account",
+        lambda: (
+            events.append("sa")
+            or {"client_email": "demo@demo-proj.iam.gserviceaccount.com"}
+        ),
+    )
+    monkeypatch.setattr(
+        installer_secrets,
+        "ensure_runtime_secrets_infrastructure",
+        lambda project_id, runtime_email, *, secret_name: (
+            events.append(f"secrets_infra:{project_id}:{runtime_email}:{secret_name}")
+            or {}
+        ),
+    )
+    monkeypatch.setattr(
+        installer_gcloud,
+        "create_app_engine_app",
+        lambda *, confirm=True: (
+            events.append(f"app_engine:confirm={confirm}")
+            or SimpleNamespace(
+                location_id="us-central",
+                default_hostname="demo-proj.uc.r.appspot.com",
+            )
+        ),
+    )
+
+    installer_gcloud.setup_app_engine(confirm=False)
+    assert events == [
+        "sa",
+        "secrets_infra:demo-proj:demo@demo-proj.iam.gserviceaccount.com:lagniappe-runtime-secrets",
+        "save",
+        "app_engine:confirm=False",
+        "save",
+    ]
