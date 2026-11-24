@@ -21,7 +21,11 @@ from lagniappe.core.definitions.manual import MANUAL_SECTIONS
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import capture
 from lagniappe.core.properties.page_public import normalize_public_settings
-from lagniappe.core.tools.cache.public_discovery import DirectoryGroup, DirectorySnapshot
+from lagniappe.core.tools.cache.public_discovery import (
+    DirectoryGroup,
+    DirectoryPage,
+    DirectorySnapshot,
+)
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import site as site_database
 from lagniappe.core.tools.email.notifications.links import absolute_url
@@ -286,6 +290,27 @@ def sitemap_xml(urls: Iterable[str]) -> str:
     return ElementTree.tostring(root, encoding="unicode", xml_declaration=True)
 
 
+def directory_page_sort_key(page: DirectoryPage) -> tuple[bool, int, str]:
+    """Sort explicitly ordered pages first, then alphabetically by title."""
+    order = page.get("order")
+    return (order is None, order if order is not None else 0, page["title"].casefold())
+
+
+def directory_group_sort_key(group: DirectoryGroup) -> tuple[bool, int, str]:
+    """Float groups containing ordered pages ahead of alphabetical groups."""
+    orders = [
+        order
+        for page in group["pages"]
+        if (order := page.get("order")) is not None
+    ]
+    min_order = min(orders) if orders else None
+    return (
+        min_order is None,
+        min_order if min_order is not None else 0,
+        group["name"].casefold(),
+    )
+
+
 def public_directory_snapshot() -> DirectorySnapshot:
     """Build the privacy-bounded catalog stored for anonymous directory reads."""
     indexing = runtime_settings()["PUBLIC_PAGE_INDEXING"]
@@ -338,20 +363,21 @@ def public_directory_snapshot() -> DirectorySnapshot:
                 "pages": [],
             },
         )
-        group["pages"].append(
-            {
-                "path": f"/pages/public/{public_id}",
-                "title": settings["title"] or page.name or "",
-                # Directory cards never derive an excerpt from document content.
-                "description": settings["description"],
-            }
-        )
+        entry: DirectoryPage = {
+            "path": f"/pages/public/{public_id}",
+            "title": settings["title"] or page.name or "",
+            # Directory cards never derive an excerpt from document content.
+            "description": settings["description"],
+        }
+        if settings["directory_order"] is not None:
+            entry["order"] = settings["directory_order"]
+        group["pages"].append(entry)
 
     for group in groups.values():
-        group["pages"].sort(key=lambda page: page["title"].casefold())
+        group["pages"].sort(key=directory_page_sort_key)
     snapshot["groups"] = sorted(
         groups.values(),
-        key=lambda group: group["name"].casefold(),
+        key=directory_group_sort_key,
     )
     return snapshot
 

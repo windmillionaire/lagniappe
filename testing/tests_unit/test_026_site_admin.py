@@ -316,6 +316,51 @@ def test_public_directory_snapshot_groups_safe_metadata_and_avoids_documents(
     assert [request.depth for request in fetch_requests] == [FetchDepth.DIRECT]
 
 
+def test_public_directory_snapshot_orders_pinned_pages_and_groups_first(monkeypatch):
+    alpha = SimpleNamespace(urlsafe_key="alpha-key", name="Alpha")
+    pages = [
+        _public_page(
+            "",
+            name="Aardvark Guide",
+            settings={"directory_category": "alpha-key"},
+            categories=[alpha],
+            db={"public_id": "alpha-plain"},
+        ),
+        _public_page(
+            "",
+            name="Why Lagniappe?",
+            settings={"directory_order": 1},
+            db={"public_id": "welcome"},
+        ),
+        _public_page(
+            "",
+            name="Approach to AI",
+            settings={"directory_order": 2},
+            db={"public_id": "ai"},
+        ),
+        _public_page(
+            "",
+            name="About",
+            settings={},
+            db={"public_id": "about"},
+        ),
+    ]
+    monkeypatch.setattr(public_pages.database_get, "discoverable_page_rows", lambda: ["row"])
+    monkeypatch.setattr(public_pages.Entities, "fetch", lambda *_rows, request: pages)
+    monkeypatch.setattr(public_pages, "runtime_settings", lambda: {"PUBLIC_PAGE_INDEXING": True})
+
+    snapshot = public_pages.public_directory_snapshot()
+
+    assert [group["name"] for group in snapshot["groups"]] == ["Public Pages", "Alpha"]
+    assert [page["title"] for page in snapshot["groups"][0]["pages"]] == [
+        "Why Lagniappe?",
+        "Approach to AI",
+        "About",
+    ]
+    assert snapshot["groups"][0]["pages"][0]["order"] == 1
+    assert "order" not in snapshot["groups"][0]["pages"][2]
+
+
 def test_public_directory_snapshot_skips_page_query_when_discovery_is_off(
     monkeypatch,
 ):

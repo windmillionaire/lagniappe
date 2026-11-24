@@ -190,6 +190,7 @@ def test_page_public_settings_normalize_and_invalidate_discovery():
         "description": None,
         "preview_image_asset": None,
         "directory_category": None,
+        "directory_order": None,
     }
 
     page.public_settings = {
@@ -198,15 +199,21 @@ def test_page_public_settings_normalize_and_invalidate_discovery():
         "preview_image_asset": "image_preview",
         "allow_indexing": True,
         "directory_category": "category-key",
+        "directory_order": "2",
     }
     assert page.public_settings["title"] == "Public title"
     assert page.public_settings["description"] == "Public description"
     assert page.public_settings["directory_category"] == "category-key"
+    assert page.public_settings["directory_order"] == 2
     assert page.mutation_intents[0].intent.value == "public-discovery-invalidate"
     assert "public_settings" in page.exclude_from_index
 
     page.public_settings = {**page.public_settings, "allow_indexing": False}
     assert page.public_settings["allow_indexing"] is False
+    assert page.mutation_intents[0].intent.value == "public-discovery-invalidate"
+
+    page.public_settings = {**page.public_settings, "directory_order": 1}
+    assert page.public_settings["directory_order"] == 1
     assert page.mutation_intents[0].intent.value == "public-discovery-invalidate"
 
     saved = page.db["public_settings"]
@@ -218,6 +225,10 @@ def test_page_public_settings_normalize_and_invalidate_discovery():
         normalize_public_settings({"title": "x" * 121})
     with pytest.raises(ValidationError, match="URL-safe key"):
         normalize_public_settings({"directory_category": 123})
+    for bad_order in (0, -1, 10000, True, "abc", "1.5"):
+        with pytest.raises(ValidationError, match="1 to 9999"):
+            normalize_public_settings({"directory_order": bad_order})
+    assert normalize_public_settings({"directory_order": ""})["directory_order"] is None
 
 
 @pytest.mark.unit

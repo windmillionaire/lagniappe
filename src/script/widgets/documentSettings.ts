@@ -16,6 +16,7 @@ interface PublicDocumentSettings {
 	title?: string;
 	description?: string;
 	directory_category?: string;
+	directory_order?: number | null;
 	preview_image_asset?: string;
 }
 
@@ -209,6 +210,24 @@ export class DocumentSettings extends FormWidget {
 		categoryGuidance.textContent =
 			"Choosing a category publishes that category name in the directory. Only categories already attached to this page are available.";
 
+		const directoryOrder = primitives.input({
+			label: "Public directory order (optional)",
+			name: "directory-order",
+			type: "number",
+			value:
+				settings.directory_order != null
+					? String(settings.directory_order)
+					: "",
+			placeholder: "Leave blank to sort alphabetically (1 shows first)",
+			kind: this.kind,
+		});
+		const orderInput = directoryOrder.querySelector("input");
+		if (orderInput) {
+			orderInput.min = "1";
+			orderInput.max = "9999";
+			orderInput.step = "1";
+		}
+
 		wrapper.append(
 			heading,
 			siteState,
@@ -218,6 +237,7 @@ export class DocumentSettings extends FormWidget {
 			description,
 			directoryCategory,
 			categoryGuidance,
+			directoryOrder,
 		);
 		const previews = this.previewPickerElement;
 		if (previews) wrapper.append(previews);

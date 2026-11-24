@@ -293,3 +293,53 @@ def test_public_manual_sections_render_cleanly_including_all_mcp_clients(
         elif section["key"] == "personalization":
             assert "<code>-update</code>" not in html
             assert "./setup.sh update" in html
+
+
+def test_public_directory_places_ordered_group_before_manual(
+    monkeypatch: pytest.MonkeyPatch,
+    http_client,
+):
+    from lagniappe.core.tools import cache
+
+    snapshot = {
+        "schema": 1,
+        "site_indexing": True,
+        "groups": [
+            {
+                "id": "public-pages",
+                "name": "Public Pages",
+                "pages": [
+                    {
+                        "path": "/pages/public/welcome",
+                        "title": "Why Lagniappe?",
+                        "description": "Overview and tour.",
+                        "order": 1,
+                    },
+                    {
+                        "path": "/pages/public/about",
+                        "title": "About",
+                        "description": None,
+                    },
+                ],
+            },
+            {
+                "id": "category:z-cat",
+                "name": "Zebra",
+                "pages": [
+                    {
+                        "path": "/pages/public/zebra",
+                        "title": "Zebra Notes",
+                        "description": None,
+                    }
+                ],
+            },
+        ],
+    }
+    monkeypatch.setattr(CONFIG, "PUBLIC_MANUAL", True)
+    monkeypatch.setattr(cache, "cached_public_directory", lambda _builder: snapshot)
+
+    response = http_client.get("/public/")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert html.index("Public Pages") < html.index("Manual") < html.index("Zebra")
+    assert html.index("Why Lagniappe?") < html.index("About")

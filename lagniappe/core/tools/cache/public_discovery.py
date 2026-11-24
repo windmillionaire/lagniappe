@@ -17,6 +17,7 @@ class DirectoryPage(TypedDict):
     path: str
     title: str
     description: NotRequired[str | None]
+    order: NotRequired[int | None]
 
 
 class DirectoryGroup(TypedDict):
@@ -71,6 +72,13 @@ def _decode_directory(value: str | bytes) -> DirectorySnapshot | None:
                 or (
                     page.get("description") is not None
                     and not isinstance(page.get("description"), str)
+                )
+                or (
+                    page.get("order") is not None
+                    and (
+                        isinstance(page.get("order"), bool)
+                        or not isinstance(page.get("order"), int)
+                    )
                 )
             ):
                 return None

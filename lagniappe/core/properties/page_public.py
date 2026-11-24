@@ -15,11 +15,14 @@ class PageSettings(TypedDict):
     description: str | None
     preview_image_asset: str | None
     directory_category: str | None
+    directory_order: int | None
 
 
 PUBLIC_PAGE_SETTINGS_VERSION = 2
 PUBLIC_TITLE_LIMIT = 120
 PUBLIC_DESCRIPTION_LIMIT = 300
+PUBLIC_DIRECTORY_ORDER_MIN = 1
+PUBLIC_DIRECTORY_ORDER_MAX = 9999
 
 
 def normalize_public_settings(value: object = None) -> PageSettings:
@@ -58,6 +61,32 @@ def normalize_public_settings(value: object = None) -> PageSettings:
         2048,
         "Directory category",
     )
+    raw_order = incoming.get("directory_order")
+    directory_order: int | None
+    if raw_order is None or (isinstance(raw_order, str) and not raw_order.strip()):
+        directory_order = None
+    elif isinstance(raw_order, bool):
+        raise ValidationError(
+            "Public directory order must be a whole number from 1 to 9999."
+        )
+    else:
+        try:
+            if isinstance(raw_order, int):
+                parsed_order = raw_order
+            elif isinstance(raw_order, str) and raw_order.strip().isdigit():
+                parsed_order = int(raw_order.strip())
+            else:
+                raise ValueError("not an integer")
+        except ValueError as error:
+            raise ValidationError(
+                "Public directory order must be a whole number from 1 to 9999."
+            ) from error
+        if not (PUBLIC_DIRECTORY_ORDER_MIN <= parsed_order <= PUBLIC_DIRECTORY_ORDER_MAX):
+            raise ValidationError(
+                "Public directory order must be a whole number from 1 to 9999."
+            )
+        directory_order = parsed_order
+
     return {
         "version": PUBLIC_PAGE_SETTINGS_VERSION,
         "allow_indexing": allow_indexing,
@@ -69,6 +98,7 @@ def normalize_public_settings(value: object = None) -> PageSettings:
         ),
         "preview_image_asset": preview,
         "directory_category": directory_category,
+        "directory_order": directory_order,
     }
 
 
@@ -109,6 +139,7 @@ class PublicSettings(DBProperty[PageSettings]):
         if (
             normalized["allow_indexing"] != previous["allow_indexing"]
             or normalized["directory_category"] != previous["directory_category"]
+            or normalized["directory_order"] != previous["directory_order"]
         ):
             self.entity.add_mutation_intents(
                 MutationIntent.invalidate_public_discovery(

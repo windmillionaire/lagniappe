@@ -657,6 +657,7 @@ def visibility(
                 "description": request.form.get("public-description"),
                 "preview_image_asset": preview,
                 "directory_category": directory_category,
+                "directory_order": request.form.get("directory-order"),
             }
         except ValidationError as error:
             return responses.error(error)

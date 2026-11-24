@@ -27,7 +27,7 @@ def public_directory() -> ResponseReturnValue:
     groups = list(snapshot["groups"])
     if CONFIG.PUBLIC_MANUAL:
         groups.append(public_pages.manual_directory_group())
-    groups.sort(key=lambda group: group["name"].casefold())
+    groups.sort(key=public_pages.directory_group_sort_key)
 
     has_content = any(group["pages"] for group in groups)
     if not has_content and not current_user.is_authenticated:
