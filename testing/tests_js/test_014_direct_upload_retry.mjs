@@ -3,6 +3,23 @@ import { test } from "node:test";
 import esmock from "esmock";
 import { createBrowser } from "../utility/js/environment.mjs";
 
+test("test_dropzone_renders_file_labels_as_text", async (t) => {
+	createBrowser(t);
+	const { uploadElement } = await import(
+		"../../src/script/elements/upload.mjs"
+	);
+	const dropzone = uploadElement.dropzone({});
+	const label = dropzone.element.querySelector("p");
+	const filename = "Budget <draft> & notes.pdf";
+	dropzone.setText(filename);
+	assert.equal(label.textContent, filename);
+	assert.equal(label.children.length, 0);
+	const spinner = document.createElement("span");
+	dropzone.setContent(spinner, " Uploading...");
+	assert.equal(label.firstChild, spinner);
+	assert.equal(label.textContent, " Uploading...");
+});
+
 const cloneHeaders = (headers) =>
 	headers instanceof Headers
 		? Object.fromEntries(headers.entries())

@@ -300,7 +300,10 @@ const dropzone = (options) => {
 		},
 		setText: (newText) => {
 			if (element) return;
-			if (textElement) textElement.innerHTML = newText;
+			if (textElement) textElement.textContent = newText;
+		},
+		setContent: (...children) => {
+			textElement?.replaceChildren(...children);
 		},
 		hide: () => {
 			dropzone.dataset.visible = "false";

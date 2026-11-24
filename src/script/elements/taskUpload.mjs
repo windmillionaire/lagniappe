@@ -167,7 +167,7 @@ export class TaskUpload extends BaseUpload {
 			return;
 		}
 
-		this.dropzone.setText(`${createIcon("spinner").outerHTML} Uploading...`);
+		this.dropzone.setContent(createIcon("spinner"), " Uploading...");
 		const prepared = await this.prepareSubmit({ route: this.endpoints.upload });
 		if (!prepared) return;
 
