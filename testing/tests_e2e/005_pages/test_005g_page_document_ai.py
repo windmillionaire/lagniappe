@@ -240,8 +240,14 @@ def test_generate_text_provider_error_surfaces_in_form(
             re.compile(error)
         )
 
-@pytest.mark.ai
-@pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+@pytest.mark.parametrize(
+    "live_ai_quota",
+    [
+        pytest.param(False, id="live", marks=pytest.mark.ai),
+        pytest.param(True, id="quota-fallback"),
+    ],
+    indirect=True,
+)
 def test_generate_text_live_page_context_with_tasks_and_files(get_admin, get_user, request, browser_failures, live_ai_quota):
     """
     Exercise real generation with page context and bounded quota recovery.

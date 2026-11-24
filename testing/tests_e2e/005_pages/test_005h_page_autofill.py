@@ -79,8 +79,14 @@ def _attach_evidence(page):
 
 
 # @template pages/info.html::info_form
-@pytest.mark.ai
-@pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+@pytest.mark.parametrize(
+    "live_ai_job_quota",
+    [
+        pytest.param(False, id="live", marks=pytest.mark.ai),
+        pytest.param(True, id="quota-fallback"),
+    ],
+    indirect=True,
+)
 def test_page_autofill_runs_deferred_with_attached_file_context(
     get_admin, get_user, monkeypatch, browser_failures, results, live_ai_job_quota
 ):

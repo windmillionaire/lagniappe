@@ -226,11 +226,11 @@ def run_tests(test_args: list[str]) -> int:
         os.environ["STRICT_RELATION_LOADS"] = "1"
 
     configure_test_environment(includes_e2e=invocation.includes_e2e)
-    if partitions.root_args is not None and not hosted:
+    if partitions.root_args is not None and invocation.includes_e2e and not hosted:
         try:
             activate_repository_gcloud(
-                ensure_adc=invocation.includes_e2e,
-                allow_runtime_adc=invocation.includes_e2e,
+                ensure_adc=True,
+                allow_runtime_adc=True,
                 allow_adc_login=False,
             )
         except RuntimeError as error:

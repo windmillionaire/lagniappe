@@ -382,8 +382,14 @@ def test_rejecting_file_backed_suggestion_discards_staged_upload_on_update(get_a
 
 
 # @template pages/tasks.html::task_form
-@pytest.mark.ai
-@pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+@pytest.mark.parametrize(
+    "live_ai_job_quota",
+    [
+        pytest.param(False, id="live", marks=pytest.mark.ai),
+        pytest.param(True, id="quota-fallback"),
+    ],
+    indirect=True,
+)
 def test_task_autofill_runs_deferred_with_page_file_context(get_admin, get_user, monkeypatch, results, live_ai_job_quota):
     user = get_admin()
     page, task = _create_autofill_fixture(user)

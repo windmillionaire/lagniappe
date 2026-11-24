@@ -31,8 +31,8 @@ CASES = ("independent-a", "independent-b", "shared-a", "shared-b", "exclusive")
 PROTOCOL_TARGETS = tuple(f"{PILOT_FILE}::test_worker_page_and_task[{case}]" for case in CASES)
 STORY_TARGETS = (
     'testing/tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag',
-    'testing/tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode',
-    'testing/tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode',
+    'testing/tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode[quota-fallback]',
+    'testing/tests_e2e/002_home/test_002c_home_categories.py::test_create_category_manual_mode',
     'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_category',
     'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_project',
     'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_page',

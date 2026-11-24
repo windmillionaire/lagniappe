@@ -277,8 +277,14 @@ def test_add_inputs_to_form(get_admin, get_user):
 
 
 # @template forms/builder.html::generate
-@pytest.mark.ai
-@pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+@pytest.mark.parametrize(
+    "live_ai_quota",
+    [
+        pytest.param(False, id="live", marks=pytest.mark.ai),
+        pytest.param(True, id="quota-fallback"),
+    ],
+    indirect=True,
+)
 def test_generate_form_schema_live_saved_state(get_admin, get_user, request, browser_failures, live_ai_quota):
     """
     Exercise real builder generation with bounded quota recovery.

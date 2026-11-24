@@ -351,7 +351,10 @@ def ai_results(request):
     ``request.node.ai_results.record(...)`` directly, while tests that still
     request the existing ``results`` fixture receive the same report object.
     """
-    if not request.node.get_closest_marker("ai"):
+    if not (
+        request.node.get_closest_marker("ai")
+        or {"live_ai_quota", "live_ai_job_quota"}.intersection(request.fixturenames)
+    ):
         yield
         return
 

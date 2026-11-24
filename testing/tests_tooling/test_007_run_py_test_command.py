@@ -1189,7 +1189,7 @@ def test_run_py_unit_partitions_adapter_once_and_merges_results(monkeypatch):
     monkeypatch.setattr(
         run,
         "activate_repository_gcloud",
-        lambda **kwargs: calls.append("gcloud"),
+        lambda **kwargs: pytest.fail("offline unit tests must skip gcloud"),
     )
     monkeypatch.setattr(
         run,
@@ -1218,7 +1218,7 @@ def test_run_py_unit_partitions_adapter_once_and_merges_results(monkeypatch):
         )
     ) == 1
     assert ("merge", 0, 0) in calls
-    assert calls[:2] == ["prepare", "gcloud"]
+    assert calls[0] == "prepare"
 
 
 @pytest.mark.parametrize("root_status,mcp_status", [(1, 0), (0, 1), (0, 0)])
@@ -1521,16 +1521,7 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
             return 3
 
     def fake_popen(command, **kwargs):
-        assert events == [
-            (
-                "activate-gcloud",
-                {
-                    "ensure_adc": False,
-                    "allow_runtime_adc": False,
-                    "allow_adc_login": False,
-                },
-            )
-        ]
+        assert events == []
         calls.append((command, kwargs))
         return FakeProcess()
 
@@ -1564,6 +1555,65 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
     }
     assert "Running:" in capsys.readouterr().out
     assert os.environ["LAGNIAPPE_TEST_COMMAND"] == '["outer", "test"]'
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["tooling"],
+        ["js"],
+        ["setup"],
+        ["setup", "-m", "setup_drift"],
+        ["testing/tests_unit/test_001_config_validation.py"],
+    ],
+)
+def test_run_py_offline_suites_skip_gcloud_activation(monkeypatch, arguments):
+    monkeypatch.setattr(
+        run,
+        "activate_repository_gcloud",
+        lambda **kwargs: pytest.fail(
+            f"offline test selection {arguments!r} must skip gcloud preflight"
+        ),
+    )
+    monkeypatch.setattr(run, "_run_pytest_subprocess", lambda command: 0)
+
+    assert run.run_tests(arguments) == 0
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["setup", "-m", "setup_provider"],
+        ["setup", "-m", "provider"],
+    ],
+)
+def test_run_py_provider_contract_markers_require_gcloud_activation(
+    monkeypatch, arguments
+):
+    from runner import mcp_environment
+
+    calls = []
+    monkeypatch.setattr(mcp_environment, "prepare_environment", lambda: None)
+    monkeypatch.setattr(
+        run,
+        "activate_repository_gcloud",
+        lambda **kwargs: calls.append(kwargs)
+        or (_ for _ in ()).throw(RuntimeError("gcloud mismatch")),
+    )
+    monkeypatch.setattr(
+        run,
+        "_run_pytest_subprocess",
+        lambda command: pytest.fail("pytest must not start when gcloud fails"),
+    )
+
+    assert run.run_tests(arguments) == 1
+    assert calls == [
+        {
+            "ensure_adc": True,
+            "allow_runtime_adc": True,
+            "allow_adc_login": False,
+        }
+    ]
 
 
 def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):

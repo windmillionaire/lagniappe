@@ -211,7 +211,14 @@ def test_page_creation_requires_name_and_rows_do_not_follow_attached_form(get_ad
 
 
 # @template categories/tools.html::create_page
-@pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+@pytest.mark.parametrize(
+    "live_ai_job_quota",
+    [
+        pytest.param(False, id="live", marks=pytest.mark.ai),
+        pytest.param(True, id="quota-fallback"),
+    ],
+    indirect=True,
+)
 def test_create_page_autofill_is_deferred(get_admin, get_user, monkeypatch, results, live_ai_job_quota):
     user = get_admin()
     category = Categories.test_basic_inputs_submission.get(user)

@@ -92,10 +92,12 @@ suite:
 venv/bin/python run.py test --strict unit --tb=short
 ```
 
-The runner activates the checkout's complete saved gcloud target before pytest.
-An unconfigured checkout can run offline tests; a partial target fails before
-collection. E2E and managed-server startup also verify ADC. Use
-`venv/bin/python run.py auth` when alignment is needed.
+The runner activates the checkout's complete saved gcloud target and verifies
+ADC before cloud-aware runs (`e2e`, unfiltered full-suite runs, and
+`setup_provider` / `provider`). Offline suites (`unit`, `js`, `tooling`, and
+ordinary `setup`) skip `gcloud` preflight so they run without cloud CLI access
+or writable gcloud config. Use `venv/bin/python run.py auth` when alignment is
+needed.
 
 Start with one nodeid or file. Expand after focused probes pass. Local E2E and
 `test-server` share one durable checkout session plus a cross-machine data
@@ -135,7 +137,7 @@ so adding a setup module cannot silently omit it from the alias.
 | Marker | Meaning |
 | --- | --- |
 | `unit`, `js`, `e2e`, `tooling` | Suite ownership. |
-| `ai` | Live AI behavior with a longer operation budget and result report. |
+| `ai` | Live-LLM behavior (opt-in via `-m ai`; excluded from default runs so routine E2E stays deterministic and fast; uses a longer operation budget and result report). |
 | `setup_drift` | Read-only provider/config audit. |
 | `setup_provider` | Sequential live-provider runtime contract. |
 | `unfinished` | Explicit backlog stub, excluded by default. |

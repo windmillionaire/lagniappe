@@ -119,8 +119,14 @@ def test_create_project_manual_mode(get_admin, get_user):
 
 # @template home/projects.html::create
 # @template home/projects.html::project
-@pytest.mark.ai
-@pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+@pytest.mark.parametrize(
+    "live_ai_quota",
+    [
+        pytest.param(False, id="live", marks=pytest.mark.ai),
+        pytest.param(True, id="quota-fallback"),
+    ],
+    indirect=True,
+)
 def test_create_project_ai_mode(get_admin, get_user, results, browser_failures, live_ai_quota):
     """
     Verify project creation in AI mode.

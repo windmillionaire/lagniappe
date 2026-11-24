@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib
 import os
 import re
@@ -124,6 +125,33 @@ def _consume_runner_separator(arguments: list[str]) -> list[str]:
     return routed
 
 
+def _positive_markers(expression: str) -> set[str]:
+    """Return marker names referenced positively (outside ``not``) in an expression."""
+    if not expression.strip():
+        return set()
+    try:
+        tree = ast.parse(expression, mode="eval")
+    except SyntaxError:
+        return set(_MARKER_TOKEN_PATTERN.findall(expression))
+
+    selected: set[str] = set()
+
+    def visit(node: ast.AST, *, negated: bool) -> None:
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+            visit(node.operand, negated=not negated)
+        elif isinstance(node, ast.BoolOp):
+            for value in node.values:
+                visit(value, negated=negated)
+        elif isinstance(node, ast.Name) and not negated:
+            selected.add(node.id)
+        else:
+            for child in ast.iter_child_nodes(node):
+                visit(child, negated=negated)
+
+    visit(tree.body, negated=False)
+    return selected
+
+
 def _expand_targets(targets: list[str], marker_expression: str) -> tuple[str, ...]:
     aliases = [target for target in targets if target in TEST_SUITE_ALIASES]
     explicit = [target for target in targets if target not in TEST_SUITE_ALIASES]
@@ -133,7 +161,7 @@ def _expand_targets(targets: list[str], marker_expression: str) -> tuple[str, ..
             "nodeids; choose aliases only or paths only"
         )
 
-    selected_markers = set(_MARKER_TOKEN_PATTERN.findall(marker_expression))
+    selected_markers = _positive_markers(marker_expression)
     normalized = []
     for target in targets:
         if target not in TEST_SUITE_ALIASES:
