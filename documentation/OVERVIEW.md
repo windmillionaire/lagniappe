@@ -19,7 +19,7 @@ is an optional mode described in [INFRA_EXPERIMENTS.md](INFRA_EXPERIMENTS.md).
 | Frontend application | [FRONTEND_OVERVIEW.md](FRONTEND_OVERVIEW.md) |
 | Views and widgets | [FRONTEND_VIEWS.md](FRONTEND_VIEWS.md) |
 | Synchronization | [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md) |
-| Configuration and setup | [INFRA_CONFIG.md](INFRA_CONFIG.md), [INFRA_SETUP.md](INFRA_SETUP.md), [INFRA_SETUP_CLI.md](INFRA_SETUP_CLI.md) |
+| Configuration and setup | [INFRA_CONFIG.md](INFRA_CONFIG.md), [INFRA_SETUP.md](INFRA_SETUP.md), [INSTALL_WITH_AI.md](INSTALL_WITH_AI.md), [INFRA_SETUP_CLI.md](INFRA_SETUP_CLI.md) |
 | Tests | [TESTING.md](TESTING.md), [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) |
 
 ## AI

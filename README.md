@@ -56,7 +56,7 @@ The guided installer supports Windows, macOS, and Linux. It walks through the re
 
 Follow the [installation guide](https://lagniappe.site/manual/installation) for current prerequisites and platform-specific instructions, including recovery and repair. Updates and upgrades are covered in the manual's [personalization guide](https://lagniappe.site/manual/personalization).
 
-For installer architecture and implementation details, see [INFRA_SETUP.md](documentation/INFRA_SETUP.md).
+For installer architecture and implementation details, see [INFRA_SETUP.md](documentation/INFRA_SETUP.md). To install with a local desktop/IDE AI assistant without using a terminal or pasting secrets into chat, see [INSTALL_WITH_AI.md](documentation/INSTALL_WITH_AI.md).
 
 Each checkout manages the installation selected by its untracked local settings.
 Keep separate settings for separate installations, and resolve cloud projects,

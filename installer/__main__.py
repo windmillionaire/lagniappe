@@ -16,6 +16,22 @@ class _SetupArgumentParser(argparse.ArgumentParser):
 def _parser() -> argparse.ArgumentParser:
     parser = _SetupArgumentParser(description="Lagniappe setup")
     parser.add_argument("--experiments", action="store_true", help="Create a dedicated experiments installation with an Administrator agent")
+    parser.add_argument(
+        "--agent",
+        action="store_true",
+        help="Run non-interactive agent-assisted install using Secret Manager and the localhost browser vault",
+    )
+    parser.add_argument(
+        "--answers",
+        metavar="FILE",
+        help="Path to non-secret JSON/YAML answers file for --agent mode",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Emit structured JSON output for --agent mode",
+    )
     commands = parser.add_subparsers(
         dest="command",
         metavar="COMMAND",
@@ -54,6 +70,15 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser(
         "security",
         help="Configure Redis transport security",
+    )
+    secrets_cmd = commands.add_parser(
+        "secrets",
+        help="Migrate runtime secrets to GCP Secret Manager",
+    )
+    secrets_actions = secrets_cmd.add_subparsers(dest="secrets_action", required=True)
+    secrets_actions.add_parser(
+        "migrate",
+        help="Move local_yaml runtime secrets into GCP Secret Manager and strip them from disk",
     )
     commands.add_parser(
         "jobs",
@@ -243,6 +268,17 @@ def _dispatch(args):
         from installer.security import configure_security
 
         return configure_security()
+    if command == "secrets":
+        from installer.secrets import migrate_local_yaml_to_secret_manager
+
+        result = migrate_local_yaml_to_secret_manager()
+        print(
+            ui.success(
+                f"Migrated runtime secrets for {result['project_id']} to Secret Manager "
+                f"({result['secret_name']}) and stripped them from lagniappe_settings.yaml."
+            )
+        )
+        return 0
     if command == "jobs":
         from installer.verify import prepare_existing_installation
 
@@ -328,6 +364,14 @@ def _dispatch(args):
         restore_backup(args.backup_id, dry_run=args.dry_run)
         return 0
 
+    if getattr(args, "agent", False):
+        from installer.agent_mode import run_agent_install
+
+        return run_agent_install(
+            answers_path=getattr(args, "answers", None),
+            json_output=bool(getattr(args, "json_output", False)),
+        )
+
     from installer.install import install
 
     return install(experiments=True) if getattr(args, "experiments", False) else install()
@@ -342,6 +386,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(arguments)
     if args.experiments and args.command:
         parser.error("--experiments is an installation option; later commands retain the saved setting")
+    if (args.answers or args.json_output) and not args.agent:
+        parser.error("--answers and --json require --agent")
+    if args.agent and args.command:
+        parser.error("--agent cannot be combined with a subcommand")
     if args.command == "archive":
         if args.archive_target == "validate":
             if not args.validation_path:
