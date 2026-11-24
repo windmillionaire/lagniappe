@@ -3,7 +3,7 @@ interface ListAttributes {
 	target: HTMLElement;
 	name: string;
 	component: { active?: unknown };
-	view: { addFlash: (...items: HTMLLIElement[]) => void };
+	view: { addFlash: (item: HTMLLIElement) => void };
 	readonly?: boolean;
 	visible?: boolean;
 	modified?: boolean;
@@ -106,7 +106,7 @@ export class BaseList {
 
 		if (this._created && this._created.length > 0) {
 			this.target.prepend(...this._created);
-			this.view.addFlash(...this._created);
+			for (const item of this._created) this.view.addFlash(item);
 			this._created = [];
 		}
 

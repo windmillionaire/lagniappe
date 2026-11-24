@@ -7,6 +7,32 @@ class EntityBoundary {
 	async reconcilePollingSubscriptions() {}
 }
 
+test("test_base_list_flashes_every_new_row", async (t) => {
+	createBrowser(t, { html: "<ul></ul>" });
+	const { BaseList } = await import(
+		"../../src/script/elements/base/baseList.ts"
+	);
+	const target = document.querySelector("ul");
+	const flashed = [];
+	const list = new BaseList({
+		target,
+		component: {},
+		name: "List",
+		view: { addFlash: (row) => flashed.push(row.dataset.key) },
+	});
+	const html = new DOMParser().parseFromString(
+		'<ul><li data-key="first"></li><li data-key="second"></li></ul>',
+		"text/html",
+	);
+	list.created({ html });
+	list.postreconcile();
+	assert.deepEqual(
+		[...target.children].map((row) => row.dataset.key),
+		["first", "second"],
+	);
+	assert.deepEqual(flashed, ["first", "second"]);
+});
+
 test("test_user_mode_switch_loads_all_pages_and_preserves_current_mode_on_failure", async (t) => {
 	createBrowser(t, {
 		html: `<main data-user-mode="regular">
