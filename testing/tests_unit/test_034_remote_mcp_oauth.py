@@ -15,6 +15,8 @@ import pytest
 from config.remote_mcp import (
     ACCESS_SECONDS,
     CODE_SECONDS,
+    REFRESH_RACE_GRACE_SECONDS,
+    REFRESH_RACE_MAX_MINTS,
     REFRESH_SECONDS,
     CLIENT_ID,
     REDIRECT_URI,
@@ -310,15 +312,20 @@ def test_code_is_single_use_and_refresh_replay_revokes_the_family(oauth):
     assert sum(result is not None for result in results) == 1
     first = next(result for result in results if result)
     assert first["expires_in"] == ACCESS_SECONDS
-    second = auth.exchange_token(_refresh(oauth, first["refresh_token"]))
+    second = auth.exchange_token(_refresh(oauth, first["refresh_token"]), now=NOW)
     assert first["refresh_token"] != second["refresh_token"]
-    assert auth.authenticate_access(first["access_token"])[0] is oauth.actor
-    assert auth.authenticate_access(second["access_token"])[0] is oauth.actor
+    assert auth.authenticate_access(first["access_token"], now=NOW)[0] is oauth.actor
+    assert auth.authenticate_access(second["access_token"], now=NOW)[0] is oauth.actor
+    # Replay past the concurrent-refresh grace window revokes the entire family.
+    after_grace = NOW + timedelta(seconds=REFRESH_RACE_GRACE_SECONDS)
     with pytest.raises(auth.OAuthError):
-        auth.exchange_token(_refresh(oauth, first["refresh_token"]))
+        auth.exchange_token(
+            _refresh(oauth, first["refresh_token"]),
+            now=after_grace,
+        )
     for value in (first, second):
         with pytest.raises(auth.OAuthError):
-            auth.authenticate_access(value["access_token"])
+            auth.authenticate_access(value["access_token"], now=after_grace)
     persisted = repr(oauth.rows)
     for secret in (
         parameters["code"],
@@ -328,6 +335,79 @@ def test_code_is_single_use_and_refresh_replay_revokes_the_family(oauth):
         second["refresh_token"],
     ):
         assert secret not in persisted
+
+
+def test_concurrent_refresh_burst_succeeds_without_revoking_and_bounds_reuse(oauth):
+    first = auth.exchange_token(_code(oauth), now=NOW)
+    refresh_at = NOW + timedelta(minutes=30)
+
+    def race_refresh():
+        return auth.exchange_token(
+            _refresh(oauth, first["refresh_token"]),
+            now=refresh_at,
+        )
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        burst = list(pool.map(lambda _: race_refresh(), range(3)))
+
+    assert len({entry["access_token"] for entry in burst}) == 3
+    assert len({entry["refresh_token"] for entry in burst}) == 3
+    for entry in burst:
+        assert auth.authenticate_access(entry["access_token"], now=refresh_at)[0] is oauth.actor
+
+    # Any sibling refresh token returned by the racing burst cleanly rotates to generation 3.
+    third_at = refresh_at + timedelta(minutes=30)
+    third = auth.exchange_token(_refresh(oauth, burst[-1]["refresh_token"]), now=third_at)
+    assert auth.authenticate_access(third["access_token"], now=third_at)[0] is oauth.actor
+
+    # Replaying an older generation (gen 1 when grant is gen 3) revokes immediately,
+    # even within the grace window of the latest rotation.
+    with pytest.raises(auth.OAuthError):
+        auth.exchange_token(
+            _refresh(oauth, first["refresh_token"]),
+            now=third_at + timedelta(seconds=1),
+        )
+    with pytest.raises(auth.OAuthError):
+        auth.authenticate_access(third["access_token"], now=third_at + timedelta(seconds=1))
+
+    # Reusing a stale sibling gen-2 refresh token past the grace window also revokes the family.
+    fresh = auth.exchange_token(_code(oauth), now=NOW)
+    t0 = NOW + timedelta(minutes=2)
+    gen2_a = auth.exchange_token(_refresh(oauth, fresh["refresh_token"]), now=t0)
+    gen2_b = auth.exchange_token(
+        _refresh(oauth, fresh["refresh_token"]),
+        now=t0 + timedelta(seconds=2),
+    )
+    t1 = t0 + timedelta(minutes=5)
+    gen3 = auth.exchange_token(_refresh(oauth, gen2_a["refresh_token"]), now=t1)
+    assert auth.authenticate_access(gen3["access_token"], now=t1)[0] is oauth.actor
+    with pytest.raises(auth.OAuthError):
+        auth.exchange_token(
+            _refresh(oauth, gen2_b["refresh_token"]),
+            now=t1 + timedelta(seconds=REFRESH_RACE_GRACE_SECONDS),
+        )
+    with pytest.raises(auth.OAuthError):
+        auth.authenticate_access(
+            gen3["access_token"],
+            now=t1 + timedelta(seconds=REFRESH_RACE_GRACE_SECONDS),
+        )
+
+    # Exceeding the concurrent-refresh burst cap revokes the grant family.
+    capped = auth.exchange_token(_code(oauth), now=NOW)
+    cap_time = NOW + timedelta(minutes=6)
+    latest = auth.exchange_token(_refresh(oauth, capped["refresh_token"]), now=cap_time)
+    for _ in range(REFRESH_RACE_MAX_MINTS):
+        latest = auth.exchange_token(
+            _refresh(oauth, capped["refresh_token"]),
+            now=cap_time + timedelta(seconds=1),
+        )
+    with pytest.raises(auth.OAuthError):
+        auth.exchange_token(
+            _refresh(oauth, capped["refresh_token"]),
+            now=cap_time + timedelta(seconds=2),
+        )
+    with pytest.raises(auth.OAuthError):
+        auth.authenticate_access(latest["access_token"], now=cap_time + timedelta(seconds=2))
 
 
 def test_token_exchange_rejects_wrong_binding_expiry_and_scope_expansion(oauth, monkeypatch):

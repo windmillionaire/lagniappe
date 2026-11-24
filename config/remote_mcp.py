@@ -29,6 +29,8 @@ ACCESS_SECONDS = 30 * 60
 CODE_SECONDS = 5 * 60
 PENDING_SECONDS = 10 * 60
 REFRESH_SECONDS = 30 * 24 * 60 * 60
+REFRESH_RACE_GRACE_SECONDS = 15
+REFRESH_RACE_MAX_MINTS = 8
 
 
 def mcp_connection_name(value: object = "lagniappe-remote") -> str:

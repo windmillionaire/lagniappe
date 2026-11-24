@@ -35,6 +35,8 @@ from config.remote_mcp import (
     client_allowed,
     redirect_allowed,
     PENDING_SECONDS,
+    REFRESH_RACE_GRACE_SECONDS,
+    REFRESH_RACE_MAX_MINTS,
     REFRESH_SECONDS,
     LEGACY_SCOPE,
 )
@@ -385,6 +387,31 @@ def _grant_name(user, client_id: str | None = None) -> str:
     return "grant-" + credential_id(user) + suffix
 
 
+def _within_refresh_race_grace(
+    grant: Mapping[str, object],
+    row: Mapping[str, object],
+    now: datetime,
+) -> bool:
+    """Allow immediate concurrent refreshes of the just-rotated generation without revoking."""
+    rotated_at = grant.get("rotated_at")
+    if not isinstance(rotated_at, datetime):
+        return False
+    if rotated_at.tzinfo is None:
+        rotated_at = rotated_at.replace(tzinfo=UTC)
+    elapsed = now - rotated_at
+    generation = grant.get("generation")
+    row_generation = row.get("generation")
+    race_mints = grant.get("race_mints", 0)
+    return (
+        isinstance(generation, int)
+        and isinstance(row_generation, int)
+        and isinstance(race_mints, int)
+        and generation == row_generation + 1
+        and timedelta(0) <= elapsed < timedelta(seconds=REFRESH_RACE_GRACE_SECONDS)
+        and race_mints < REFRESH_RACE_MAX_MINTS
+    )
+
+
 def exchange_token(parameters: Mapping[str, str], *, now: datetime | None = None) -> dict[str, str | int]:
     config = settings()
     now = _now(now)
@@ -433,43 +460,51 @@ def exchange_token(parameters: Mapping[str, str], *, now: datetime | None = None
     def transition(records):
         row = records.get(name)
         grant = records.get(grant_name)
-        if not _live(row, now) or dict(row) != dict(candidate):
-            # A racing refresh must take the replay path, not merely fail CAS.
-            if (
-                not is_code
-                and row
-                and row.get("used")
-                and grant
-                and grant.get("family") == row.get("family")
-            ):
-                records.put(grant_name, {**grant, "revoked": True})
-                return None
-            raise OAuthError()
         if is_code:
-            if row.get("used"):
+            if not _live(row, now) or dict(row) != dict(candidate) or row.get("used"):
                 raise OAuthError()
             grant = {
                 "user": user.key,
                 "family": family,
                 "issued_at": now,
                 "generation": 1,
+                "rotated_at": now,
+                "race_mints": 0,
                 "expires_at": now + timedelta(seconds=REFRESH_SECONDS),
                 "issuer": config["issuer"],
                 "client_id": candidate["client_id"],
                 "resource": config["resource"],
             }
-        elif (
-            not _live(grant, now)
-            or grant.get("family") != row.get("family")
-            or not _bound(grant, config)
-        ):
-            raise OAuthError()
-        elif row.get("used"):
-            records.put(grant_name, {**grant, "revoked": True})
-            return None
+            records.put(name, {**row, "used": True})
         else:
-            grant = {**grant, "generation": grant["generation"] + 1}
-        records.put(name, {**row, "used": True})
+            if (
+                not _live(row, now)
+                or not _bound(row, config)
+                or row.get("client_id") != candidate["client_id"]
+                or row.get("family") != candidate.get("family")
+                or not _live(grant, now)
+                or grant.get("family") != row.get("family")
+                or not _bound(grant, config)
+            ):
+                raise OAuthError()
+            if not row.get("used") and row.get("generation") == grant.get("generation"):
+                grant = {
+                    **grant,
+                    "generation": grant["generation"] + 1,
+                    "rotated_at": now,
+                    "race_mints": 0,
+                }
+                records.put(name, {**row, "used": True, "used_at": now})
+            elif _within_refresh_race_grace(grant, row, now):
+                grant = {
+                    **grant,
+                    "race_mints": int(grant.get("race_mints") or 0) + 1,
+                }
+                if not row.get("used"):
+                    records.put(name, {**row, "used": True, "used_at": now})
+            else:
+                records.put(grant_name, {**grant, "revoked": True})
+                return None
         records.put(grant_name, grant)
         common = {
             key: grant[key]
