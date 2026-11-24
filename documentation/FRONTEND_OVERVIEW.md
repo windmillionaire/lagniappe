@@ -114,6 +114,19 @@ migration notices are separate sibling modules. FormWidget retains the widget
 and replacement lifecycle in `widgets/base/formWidget.mjs`.
 See [Frontend Forms](FRONTEND_FORMS.md) for ownership and service contracts.
 
+## Frontend type checking
+
+Run `npm run typecheck` with the Node version in `.nvmrc` after `npm ci`.
+The compiler checks JavaScript without emitting files. The initial config
+checks `views/builder/config.mjs` as a smoke test and reserves
+`src/script/types/` for shared declarations. The JavaScript tests use the
+repository runner separately.
+
+TypeScript checks imported JavaScript as well as the files listed in
+`tsconfig.json` when `checkJs` is enabled. Before expanding the checked scope,
+measure the diagnostics in imported modules. A staged rollout can use
+`// @ts-check` in migrated modules with project-wide `checkJs` disabled.
+
 ## Styles and build output
 
 Authored styles live in `src/style/`. CSS files own layout and behavior;

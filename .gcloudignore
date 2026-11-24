@@ -41,6 +41,7 @@ venv/
 /run.py
 /AGENTS.md
 /pyrightconfig.json
+/tsconfig.json
 
 # Interrupted atomic writes, local backups, and imported recovery snapshots.
 **/*.tmp

@@ -43,6 +43,7 @@
     "rollup-plugin-postcss": "^4.0.2",
     "rollup-plugin-visualizer": "^7.1.2",
     "tailwindcss": "^4.3.4",
+    "typescript": "6.0.3",
     "web-vitals": "6.2.3"
   },
   "engines": {
@@ -56,6 +57,7 @@
     "check": "biome check src/script src/style build testing/utility/js testing/tests_js/*.mjs",
     "dev": "node build/run-rollup.mjs development",
     "format": "biome format --write src/script src/style build testing/utility/js testing/tests_js/*.mjs",
+    "typecheck": "tsc --noEmit",
     "watch": "chokidar './src/**/*.{css,js,mjs,yaml}' 'lagniappe/web/templates/*.html' 'lagniappe/web/templates/**/*.html' -c 'node build/run-rollup.mjs development'"
   },
   "version": "2.5.0"
