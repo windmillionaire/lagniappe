@@ -38,7 +38,7 @@ environment exists is `venv/bin/python -m installer ...`.
 | `mcp` | Confirm app deployment, then build/reconcile the selected MCP component and publish its app configuration. |
 | `ai-email` | Configure Resend receiving and the AI email webhook. |
 | `security` | Configure verified Redis TLS. |
-| `secrets migrate` | Migrate an existing `local_yaml` installation's runtime secrets into GCP Secret Manager and strip them from disk. |
+| `secrets migrate` | Migrate an existing `local_yaml` installation's runtime secrets into GCP Secret Manager, strip them from disk, and offer deployment. |
 | `jobs` | Reconcile deferred-job Cloud Scheduler infrastructure. |
 | `handoff` | Transfer a delegated installation to the permanent Owner/deployer. |
 | `update` | Regenerate configuration and restore app-saved settings without replacing source. |

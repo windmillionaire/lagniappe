@@ -109,6 +109,6 @@ Supported values for `auth_email_provider`:
 
 - **Interrupted install:** Rerun `./setup.sh --agent --answers answers.json --json`. Already-provisioned GCP resources and already-saved Secret Manager entries are reused automatically; the browser vault only asks for credentials that are still missing.
 - **Fresh checkout recovery:** Because `config/files/lagniappe_settings.yaml` holds only non-secret settings plus `SECRETS_BACKEND: secret_manager`, restoring into a new checkout only needs the non-secret settings file and your Google Cloud sign-in — runtime secrets hydrate directly from Secret Manager.
-- **Migrating an older `local_yaml` install:** Run `./setup.sh secrets migrate` to enable Secret Manager, grant least-privilege access to your runtime service account, publish your existing runtime secrets to `lagniappe-runtime-secrets`, and strip them from `config/files/lagniappe_settings.yaml`.
+- **Migrating an older `local_yaml` install:** Run `./setup.sh secrets migrate` to enable Secret Manager, grant least-privilege access to your runtime service account, publish your existing runtime secrets to `lagniappe-runtime-secrets`, strip them from `config/files/lagniappe_settings.yaml`, and deploy the updated configuration.
 
 See [INFRA_SETUP.md](INFRA_SETUP.md) and [INFRA_CONFIG.md](INFRA_CONFIG.md#runtime-secrets-backend-secrets_backend) for technical details.

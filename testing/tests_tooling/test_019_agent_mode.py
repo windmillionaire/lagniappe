@@ -271,3 +271,42 @@ def test_cli_parser_supports_agent_flags_and_secrets_migrate():
     migrate = parser.parse_args(["secrets", "migrate"])
     assert migrate.command == "secrets"
     assert migrate.secrets_action == "migrate"
+
+
+def test_configure_secrets_migrate_offers_and_runs_deploy(monkeypatch):
+    from installer import deploy as installer_deploy
+    from installer import secrets as installer_secrets
+    from installer import verify as installer_verify
+    from runner import presentation as ui
+
+    events: list[str] = []
+    monkeypatch.setattr(
+        installer_verify,
+        "prepare_existing_installation",
+        lambda: events.append("prepare"),
+    )
+    monkeypatch.setattr(
+        installer_secrets,
+        "migrate_local_yaml_to_secret_manager",
+        lambda: (
+            events.append("migrate")
+            or {"project_id": "demo-proj", "secret_name": "lagniappe-runtime-secrets"}
+        ),
+    )
+    monkeypatch.setattr(
+        installer_deploy,
+        "deploy_to_app_engine",
+        lambda *, print_final_summary=True: events.append(
+            f"deploy:{print_final_summary}"
+        ),
+    )
+    monkeypatch.setattr(ui, "output", lambda *a, **k: None)
+
+    monkeypatch.setattr(ui, "read_input", lambda prompt="": "")
+    assert installer_secrets.configure_secrets_migrate() == 0
+    assert events == ["prepare", "migrate", "deploy:False"]
+
+    events.clear()
+    monkeypatch.setattr(ui, "read_input", lambda prompt="": "n")
+    assert installer_secrets.configure_secrets_migrate() == 0
+    assert events == ["prepare", "migrate"]

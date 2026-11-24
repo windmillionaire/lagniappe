@@ -269,16 +269,9 @@ def _dispatch(args):
 
         return configure_security()
     if command == "secrets":
-        from installer.secrets import migrate_local_yaml_to_secret_manager
+        from installer.secrets import configure_secrets_migrate
 
-        result = migrate_local_yaml_to_secret_manager()
-        print(
-            ui.success(
-                f"Migrated runtime secrets for {result['project_id']} to Secret Manager "
-                f"({result['secret_name']}) and stripped them from lagniappe_settings.yaml."
-            )
-        )
-        return 0
+        return configure_secrets_migrate()
     if command == "jobs":
         from installer.verify import prepare_existing_installation
 

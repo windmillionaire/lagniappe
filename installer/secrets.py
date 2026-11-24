@@ -329,3 +329,45 @@ def migrate_local_yaml_to_secret_manager(
         "project_id": project_id,
         "infrastructure": infra,
     }
+
+
+def configure_secrets_migrate() -> int:
+    """Interactive entry point for migrating local_yaml secrets and offering deploy."""
+    from installer.deploy import deploy_to_app_engine
+    from installer.verify import prepare_existing_installation
+    from runner import presentation as ui
+    from runner.console import format_prompt, wrap_text
+    from runner.presentation import output as print, read_input as input
+
+    prepare_existing_installation()
+    result = migrate_local_yaml_to_secret_manager()
+    print(
+        ui.success(
+            wrap_text(
+                f"Migrated runtime secrets for {result['project_id']} to Secret Manager "
+                f"({result['secret_name']}) and stripped them from lagniappe_settings.yaml."
+            )
+        )
+    )
+    print(
+        ui.info(
+            wrap_text(
+                "The app must be redeployed so App Engine switches to reading runtime "
+                "secrets from Secret Manager."
+            )
+        )
+    )
+    consent = input(format_prompt("Deploy the updated app now? [Y/n]: "))
+    if consent.strip().casefold() != "n":
+        deploy_to_app_engine(print_final_summary=False)
+        print(ui.success(wrap_text("Secret Manager runtime configuration deployed.")))
+    else:
+        print(
+            ui.warning(
+                wrap_text(
+                    "Deployment deferred. Run ./setup.sh update when ready to activate "
+                    "Secret Manager on App Engine."
+                )
+            )
+        )
+    return 0
