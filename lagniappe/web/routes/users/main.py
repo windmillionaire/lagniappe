@@ -35,7 +35,7 @@ def user_index() -> ResponseReturnValue:
 @users.route("/rows", methods=["GET"])
 @permission(Resource.USERS, Action.VIEW)
 def rows() -> ResponseReturnValue:
-    user_index = index.UserIndex(**pagination_options())
+    user_index = index.UserIndex(mode=request.args.get("mode"), **pagination_options())
     users = user_index.users
 
     return responses.rows(users, user_index)
