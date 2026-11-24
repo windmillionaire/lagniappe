@@ -233,11 +233,13 @@
           </div>
           <div data-role="external-ai-pi-setup" class="space-y-3">
             <h3 class="font-semibold text-page-default">Connect Pi</h3>
-            <p>Add the remote MCP server URL <code>{{ mcp_url }}</code> under
-              <code>mcpServers</code> in <code>~/.pi/agent/mcp.json</code> (or a
-              project <code>.pi/mcp.json</code>) without an API key; Pi discovers
-              OAuth automatically via its client metadata document and opens your
-              browser to sign in and choose <strong>Allow</strong>.</p>
+            <p>With Pi's built-in MCP client enabled, add the remote MCP server
+              URL <code>{{ mcp_url }}</code> using OAuth client metadata
+              discovery (<code>--oauth-client-registration cimd</code>, or set
+              <code>"oauth": {"clientRegistration": "cimd"}</code> under
+              <code>mcpServers</code> in <code>~/.pi/agent/mcp.json</code> or a
+              project <code>.pi/mcp.json</code>) without an API key. Pi opens
+              your browser to sign in and choose <strong>Allow</strong>.</p>
             <p>To revoke Pi access, open
               <strong>My Page / User Settings / Manage AI connections</strong> in Lagniappe.</p>
           </div>
