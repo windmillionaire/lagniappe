@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..entities.entity import Entity
     from ..entities.user import User
+    from ..entities.category import Category
     from ..entities.page import Page
     from ..entities.project import Project
     from ..entities.model_task import ModelTask
@@ -30,6 +31,7 @@ PATCH_FIELDS = {
     "task": frozenset({"name", "description", "page", "project", "model", "form", "submission", "assigned_to", "due_date", "schedule"}),
     "model": frozenset({"name", "form"}),
     "project": frozenset({"name", "description", "model_tasks"}),
+    "category": frozenset({"name", "description", "form"}),
     "page": frozenset({"name", "description", "categories", "form", "submission"}),
     "file": frozenset({"name", "description"}),
 }
@@ -83,7 +85,7 @@ def prepare_patch(
             if form is not None:
                 _reference(form, "form", actor)
                 _unlocked(form)
-                expected_type = "page" if kind == "page" else "task"
+                expected_type = "page" if kind in {"page", "category"} else "task"
                 if form.form_type != expected_type:
                     raise ValidationError(f"This edit requires a {expected_type} Form.")
                 sources[form.key] = form
@@ -196,6 +198,13 @@ def prepare_patch(
         value = changes[field]
         if field == "name" and (not isinstance(value, str) or not value.strip()):
             raise ValidationError("Name cannot be cleared.")
+        if (
+            kind == "category"
+            and field == "name"
+            and cast("Category", entity).name == UNCATEGORIZED_PAGES_NAME
+            and value != UNCATEGORIZED_PAGES_NAME
+        ):
+            raise ValidationError("Uncategorized Pages cannot be renamed.")
         if value is not None and not isinstance(value, str):
             raise ValidationError(f"{field} must be text or null.")
         if kind == "file" and field == "description":
@@ -260,8 +269,12 @@ def _patch_answers(entity, values, actor, *, complete):
         return
     submission = entity.properties.submission
     fields = {key: field for key, field in submission.fields.items() if not isinstance(field, HTML)}
-    if set(values) - set(fields):
-        raise ValidationError("Submission contains unknown fields.")
+    unknown = set(values) - set(fields)
+    if unknown:
+        valid = ", ".join(sorted(fields)) or "(none)"
+        raise ValidationError(
+            f"Submission contains unknown fields: {', '.join(sorted(unknown))}. Valid fields: {valid}."
+        )
     if complete and set(values) != set(fields):
         raise ValidationError("Form reassignment requires every target answer field, including empty values.")
     prepared = {key: SchemaFields.prepare_ai_field(fields[key], value, entity, user=actor) for key, value in values.items()}

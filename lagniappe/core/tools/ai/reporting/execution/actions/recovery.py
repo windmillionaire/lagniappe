@@ -6,6 +6,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.definitions import Action
 from lagniappe.core.tools.database import get as database_get
 
+from ...contracts.actions import DELETE_TARGETS
 from .common import TASK_FORM_TYPE_ERROR
 from .results import (
     _entity_result,
@@ -90,12 +91,14 @@ def _inspect_action_applied(action, report, user, record):
         return ACTION_NOT_APPLIED
     if not expected:
         return ACTION_NOT_APPLIED
+    if action_type in DELETE_TARGETS:
+        return ACTION_APPLIED if entity is None else ACTION_NOT_APPLIED
     if entity is None and entity_id:
         return ACTION_DRIFTED
     if entity is not None and not _recovery_entity_allowed(entity, user):
         return ACTION_DRIFTED
 
-    if action_type in {"update_task", "update_page", "update_project", "update_model_task", "update_file"}:
+    if action_type in {"update_task", "update_page", "update_project", "update_category", "update_model_task", "update_file"}:
         from lagniappe.core.tools.entity_patches import _projection
         if entity is not None and _projection(entity) == expected.get("entity_update_after"):
             return ACTION_APPLIED

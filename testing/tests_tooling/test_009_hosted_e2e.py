@@ -1460,6 +1460,59 @@ def test_hosted_teardown_checks_all_executions(monkeypatch):
         hosted_e2e._active_job_executions(infrastructure)
 
 
+def test_hosted_teardown_recognizes_cancelled_execution_without_completion_time(monkeypatch):
+    infrastructure = _infrastructure()
+    job = infrastructure.job
+    executions = [
+        # Observed Cloud Run terminal cancellation with no completionTime.
+        {
+            "metadata": {"name": f"{job}-cancelled"},
+            "status": {
+                "conditions": [
+                    {"type": "Completed", "status": "False", "reason": "Cancelled"},
+                ]
+            },
+        },
+        # Still cancelling (Unknown) must remain active.
+        {
+            "metadata": {"name": f"{job}-cancelling"},
+            "status": {
+                "conditions": [
+                    {"type": "Completed", "status": "Unknown", "reason": "Cancelling"},
+                ]
+            },
+        },
+        # Completed normally via condition without completionTime.
+        {
+            "metadata": {"name": f"{job}-done"},
+            "status": {
+                "conditions": [
+                    {"type": "Completed", "status": "True"},
+                ]
+            },
+        },
+        # Genuinely running execution beside completed/cancelled ones.
+        {
+            "metadata": {"name": f"{job}-running"},
+            "status": {
+                "conditions": [
+                    {"type": "Started", "status": "True"},
+                ]
+            },
+        },
+    ]
+
+    def list_executions(*arguments):
+        assert any("status.conditions" in arg for arg in arguments)
+        return SimpleNamespace(stdout=json.dumps(executions))
+
+    monkeypatch.setattr(hosted_e2e, "_gcloud", list_executions)
+    assert hosted_e2e._active_job_executions(infrastructure) == (
+        f"{job}-cancelling",
+        f"{job}-running",
+    )
+
+
 @pytest.mark.parametrize("force", [False, True])
 def test_hosted_teardown_removes_resources_and_results_without_redis(
     tmp_path,

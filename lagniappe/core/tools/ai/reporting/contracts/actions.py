@@ -50,9 +50,20 @@ READ_ONLY_CONTEXT_TOOLS = (
     "get_category_details",
 )
 
+DELETE_TARGETS = {
+    "delete_page": "page",
+    "delete_task": "task",
+    "delete_category": "category",
+    "delete_project": "project",
+    "delete_model_task": "model",
+    "delete_file": "file",
+}
+
 REPORT_ACTION_DATA_CONTRACTS = {
     **{name: {"fields": ("entity", "changes"), "required": ("entity", "changes")}
-       for name in ("update_task", "update_model_task", "update_project", "update_page", "update_file")},
+       for name in ("update_task", "update_model_task", "update_project", "update_category", "update_page", "update_file")},
+    **{name: {"fields": ("entity", "entity_name"), "required": ("entity",)}
+       for name in DELETE_TARGETS},
     "create_form": {
         "fields": ("name", "form_type", "schema"),
         "required": ("name", "form_type", "schema"),

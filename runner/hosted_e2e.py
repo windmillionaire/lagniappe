@@ -2473,6 +2473,24 @@ def results(
     return manifest
 
 
+def _execution_is_terminal(execution: dict[str, object]) -> bool:
+    """Return True when Cloud Run reports a confirmed terminal execution state."""
+    status = execution.get("status")
+    status = status if isinstance(status, dict) else {}
+    if execution.get("completionTime") or status.get("completionTime"):
+        return True
+    conditions = status.get("conditions")
+    if not isinstance(conditions, list):
+        return False
+    for condition in conditions:
+        if not isinstance(condition, dict) or condition.get("type") != "Completed":
+            continue
+        cond_status = str(condition.get("status") or "")
+        if cond_status in {"True", "False"}:
+            return True
+    return False
+
+
 def _active_job_executions(infrastructure, *, job=None):
     job = job or infrastructure.job
     result = _gcloud(
@@ -2483,7 +2501,7 @@ def _active_job_executions(infrastructure, *, job=None):
         f"--job={job}",
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
-        "--format=json(name,metadata.name,completionTime,status.completionTime)",
+        "--format=json(name,metadata.name,completionTime,status.completionTime,status.conditions)",
     )
     try:
         executions = json.loads(result.stdout)
@@ -2498,9 +2516,7 @@ def _active_job_executions(infrastructure, *, job=None):
     for execution in executions:
         if not isinstance(execution, dict):
             raise HostedE2EError("Cloud Run returned an invalid hosted execution.")
-        status = execution.get("status")
-        status = status if isinstance(status, dict) else {}
-        if execution.get("completionTime") or status.get("completionTime"):
+        if _execution_is_terminal(execution):
             continue
         name = execution.get("name")
         metadata = execution.get("metadata")

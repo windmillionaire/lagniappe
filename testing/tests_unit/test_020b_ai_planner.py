@@ -277,8 +277,9 @@ def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
         ),
         (
             {"page-one": "DELETE"},
-            {"can_update_pages", "can_update_tasks", "can_delete_pages"},
-            {"append_page_document", "replace_page_document", "attach_file", "move_file", "move_task", "suggest_page_deletion"},
+            {"can_update_pages", "can_update_tasks", "can_delete_pages", "can_delete_tasks", "can_delete_files"},
+            {"append_page_document", "replace_page_document", "attach_file", "move_file", "move_task",
+             "suggest_page_deletion", "delete_page", "delete_task", "delete_file"},
         ),
         (
             {"models": "EDIT"},
@@ -288,9 +289,13 @@ def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
         (
             {"models": "CREATE"},
             {"can_create_categories", "can_create_projects", "can_create_pages",
-             "can_create_model_tasks", "can_update_pages", "can_update_tasks", "can_delete_pages"},
+             "can_create_model_tasks", "can_update_pages", "can_update_tasks",
+             "can_delete_pages", "can_delete_categories", "can_delete_projects",
+             "can_delete_tasks", "can_delete_files"},
             {"create_category", "create_project", "create_page", "create_model_task",
-             "append_page_document", "replace_page_document", "attach_file", "move_file", "move_task", "suggest_page_deletion"},
+             "append_page_document", "replace_page_document", "attach_file", "move_file", "move_task",
+             "suggest_page_deletion", "delete_page", "delete_category", "delete_project",
+             "delete_model_task", "delete_task", "delete_file"},
         ),
     ],
     ids=["viewer", "page-editor", "category-editor", "project-editor", "form-editor",
@@ -314,11 +319,14 @@ def test_action_catalog_uses_create_update_delete_permissions(
         "can_create_forms", "can_create_categories", "can_create_projects",
         "can_create_pages", "can_create_model_tasks", "can_update_pages",
         "can_update_tasks", "can_update_forms", "can_delete_pages",
+        "can_delete_categories", "can_delete_projects", "can_delete_tasks",
+        "can_delete_files",
     }
     assert {key for key, value in capabilities.items() if value} == expected_capabilities
     assert actions == {
         "create_task", "complete_task", "skip", "needs_review", "update_task",
-        "update_page", "update_project", "update_model_task", "update_file",
+        "update_page", "update_project", "update_category", "update_model_task",
+        "update_file",
     } | additional_actions
 
 

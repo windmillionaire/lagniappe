@@ -174,6 +174,32 @@ def test_safety_pause_detects_schema_updates_needs_review_issues_and_require_rev
     )
     assert "form schema" in (auto_execute.plan_requires_review(schema_report) or "")
 
+    for delete_type in (
+        "delete_page",
+        "delete_task",
+        "delete_category",
+        "delete_project",
+        "delete_model_task",
+        "delete_file",
+    ):
+        delete_report = _make_report(
+            actor,
+            proposal={
+                "summary": "Delete record",
+                "actions": [{"id": "d1", "type": delete_type, "data": {}}],
+                "issues": [],
+            },
+        )
+        assert "deletes workspace records" in (
+            auto_execute.plan_requires_review(delete_report) or ""
+        )
+        assert (
+            auto_execute.plan_requires_review(
+                delete_report, enforce_safety_pause=False
+            )
+            is None
+        )
+
     needs_review_report = _make_report(
         actor,
         proposal={

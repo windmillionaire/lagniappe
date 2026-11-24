@@ -17,6 +17,7 @@ from pathlib import Path
 import signal
 import subprocess
 import tempfile
+import time
 
 from runner.context import REPOSITORY_ROOT, setup_command
 from installer.errors import SetupError, SetupInterrupted
@@ -117,13 +118,23 @@ def _pid_running(pid):
 class SetupProcessLock:
     """Cross-platform single-process lock based on atomic file creation."""
 
-    def __init__(self, path: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        path: str | Path | None = None,
+        *,
+        wait_seconds: float = 0.0,
+        poll_interval: float = 0.1,
+    ) -> None:
         self.path = Path(path or (_state_dir() / ".lagniappe_setup.lock"))
+        self.wait_seconds = max(0.0, float(wait_seconds))
+        self.poll_interval = max(0.01, float(poll_interval))
         self.acquired = False
 
     def acquire(self) -> Self:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        for _attempt in range(2):
+        deadline = time.monotonic() + self.wait_seconds
+        stale_retries = 0
+        while True:
             try:
                 descriptor = os.open(
                     self.path,
@@ -137,11 +148,21 @@ class SetupProcessLock:
                     )
                 except (OSError, ValueError, json.JSONDecodeError):
                     payload = {}
-                if _pid_running(payload.get("pid")):
+                holder_pid = payload.get("pid")
+                if _pid_running(holder_pid):
+                    remaining = deadline - time.monotonic()
+                    if remaining > 0:
+                        time.sleep(min(self.poll_interval, remaining))
+                        continue
                     raise SetupError(
                         "Another Lagniappe setup process is already running "
-                        f"(pid {payload['pid']})."
+                        f"(pid {holder_pid})."
                     ) from None
+                if stale_retries >= 3:
+                    raise SetupError(
+                        "Could not acquire the Lagniappe setup process lock."
+                    ) from None
+                stale_retries += 1
                 self.path.unlink(missing_ok=True)
                 continue
             with os.fdopen(
@@ -164,7 +185,6 @@ class SetupProcessLock:
             _restrict_state_file(self.path)
             self.acquired = True
             return self
-        raise SetupError("Could not acquire the Lagniappe setup process lock.")
 
     def release(self) -> None:
         if self.acquired:

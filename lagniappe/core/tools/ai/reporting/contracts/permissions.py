@@ -15,7 +15,7 @@ from .actions import ACTION_ORDER
 def allowed_report_actions(user: models.User) -> tuple[str, ...]:
     """Return report action types this user may ask the runner to execute."""
     capabilities = user.properties.restrictions.ai_action_capabilities
-    allowed = {"create_task", "complete_task", "skip", "needs_review", "update_task", "update_page", "update_project", "update_model_task", "update_file"}
+    allowed = {"create_task", "complete_task", "skip", "needs_review", "update_task", "update_page", "update_project", "update_category", "update_model_task", "update_file"}
 
     if capabilities["can_create_forms"]:
         allowed.add("create_form")
@@ -38,6 +38,15 @@ def allowed_report_actions(user: models.User) -> tuple[str, ...]:
         allowed.add("update_form_schema")
     if capabilities["can_delete_pages"]:
         allowed.add("suggest_page_deletion")
+        allowed.add("delete_page")
+    if capabilities.get("can_delete_categories"):
+        allowed.add("delete_category")
+    if capabilities.get("can_delete_projects"):
+        allowed.update({"delete_project", "delete_model_task"})
+    if capabilities.get("can_delete_tasks"):
+        allowed.add("delete_task")
+    if capabilities.get("can_delete_files"):
+        allowed.add("delete_file")
 
     return tuple(action for action in ACTION_ORDER if action in allowed)
 
@@ -48,7 +57,7 @@ def report_action_permission_context(
     allowed = tuple(allowed_report_actions(user) if allowed_actions is None else allowed_actions)
     allowed_set = set(allowed)
     rules = ["Only return action types listed in allowed_actions."]
-    if {"update_page", "update_task", "update_project", "update_model_task"} & allowed_set:
+    if {"update_page", "update_task", "update_project", "update_category", "update_model_task"} & allowed_set:
         rules.append("Cohesive updates require exact editable targets. Use data.entity and data.changes. Omitted fields remain unchanged; form reassignment requires complete target submission. Existing-form submission patches preserve unmentioned answer IDs. Completed tasks cannot be restructured. Model-task form changes affect future tasks only. Project model_tasks ordering includes every model exactly once. Use $action_id for earlier creations. Documents support append or explicit whole-document replacement with a recovery pin; inline edits require the editor.")
     if "create_page" in allowed_set:
         rules.append("Creating pages requires an editable category.")
@@ -74,6 +83,8 @@ def report_action_permission_context(
         rules.append("Schema edits require editable forms and user review. Preview migrations across every affected Page/Task, explain destructive changes, and require visibility of the complete population.")
     if "suggest_page_deletion" in allowed_set:
         rules.append("Page deletion is manual cleanup rendered after report execution.")
+    if {"delete_page", "delete_task", "delete_category", "delete_project", "delete_model_task", "delete_file"} & allowed_set:
+        rules.append("Delete actions permanently remove existing records (never user personal pages or Uncategorized Pages) and pause for browser confirmation on ordinary user accounts.")
     rules.append(
         "If the useful action is not allowed, use needs_review or answer without actions."
         if "needs_review" in allowed_set

@@ -32,6 +32,7 @@ from installer.config_builders import (
     build_index_yaml,
     build_manifest,
 )
+from installer.errors import SetupError
 from installer.state import SetupProcessLock
 from runner.context import GCLOUD_CLI, GIT_CLI
 
@@ -517,6 +518,34 @@ def restore(
         raise
 
 
+def _restore_already_current(
+    root: Path,
+    project: str,
+    requested_version: str,
+    resolved_version: str,
+    source: str,
+    operator: dict[str, str] | None,
+    receipt: dict[str, object],
+) -> bool:
+    """Return True when this worktree already has the exact requested restore."""
+    if not receipt:
+        return False
+    if (
+        receipt.get("project") != project
+        or receipt.get("secret") != SECRET
+        or receipt.get("source") != source
+        or receipt.get("fingerprint") != _snapshot(root)
+    ):
+        return False
+    if requested_version != "current" and receipt.get("version") != requested_version:
+        return False
+    if receipt.get("version") != resolved_version:
+        return False
+    if operator is not None and receipt.get("operator_target") != operator:
+        return False
+    return all((root / path).is_file() for path in (APP, DEV))
+
+
 def main(arguments: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="run.py cloud-settings")
     commands = parser.add_subparsers(dest="action", required=True)
@@ -559,7 +588,23 @@ def main(arguments: list[str]) -> int:
             raise CloudSettingsError(
                 "The settings directory must belong to the checkout."
             )
-        with SetupProcessLock(root / FILES / ".lagniappe_setup.lock"):
+        lock_wait = 30.0 if args.action in {"restore", "check"} else 0.0
+        try:
+            lock = SetupProcessLock(
+                root / FILES / ".lagniappe_setup.lock",
+                wait_seconds=lock_wait,
+            )
+            lock.acquire()
+        except SetupError as error:
+            retry = (
+                f"venv/bin/python run.py cloud-settings {args.action} "
+                f"--project {args.project}"
+            )
+            raise CloudSettingsError(
+                f"Another settings operation is still active in {root}: {error} "
+                f"Retry with: {retry}"
+            ) from None
+        try:
             _recover(root)
             receipt = _receipt(root)
             if receipt and (
@@ -581,32 +626,64 @@ def main(arguments: list[str]) -> int:
                 result = publish(root, args.project, store, receipt, source)
                 version = result["version"]
             else:
-                version, bundle = store.access(args.version)
-                validate_bundle(bundle, args.project)
-                if args.action == "restore":
-                    operator = (
-                        {"NAME": name, "ACCOUNT": account} if args.operator else None
-                    )
-                    restore(
+                operator = (
+                    {"NAME": name, "ACCOUNT": account}
+                    if args.action == "restore" and args.operator
+                    else None
+                )
+                if (
+                    args.action == "restore"
+                    and not args.replace
+                    and args.version != "current"
+                    and receipt
+                    and _restore_already_current(
                         root,
                         args.project,
-                        version,
-                        bundle,
-                        receipt,
+                        args.version,
+                        str(receipt.get("version") or ""),
                         source,
                         operator,
-                        args.replace,
-                    )
-                elif (
-                    not receipt
-                    or receipt.get("version") != version
-                    or not _same_settings(
-                        _local_bundle(root, args.project, receipt), bundle
+                        receipt,
                     )
                 ):
-                    raise CloudSettingsError(
-                        "This checkout does not match the selected secret version."
-                    )
+                    version = str(receipt["version"])
+                else:
+                    version, bundle = store.access(args.version)
+                    validate_bundle(bundle, args.project)
+                    if args.action == "restore":
+                        if not args.replace and _restore_already_current(
+                            root,
+                            args.project,
+                            args.version,
+                            version,
+                            source,
+                            operator,
+                            receipt,
+                        ):
+                            pass
+                        else:
+                            restore(
+                                root,
+                                args.project,
+                                version,
+                                bundle,
+                                receipt,
+                                source,
+                                operator,
+                                args.replace,
+                            )
+                    elif (
+                        not receipt
+                        or receipt.get("version") != version
+                        or not _same_settings(
+                            _local_bundle(root, args.project, receipt), bundle
+                        )
+                    ):
+                        raise CloudSettingsError(
+                            "This checkout does not match the selected secret version."
+                        )
+        finally:
+            lock.release()
         print(
             f"{args.action} succeeded for {args.project}/{SECRET} version {version} at checkout {source}."
         )

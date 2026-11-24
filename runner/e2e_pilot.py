@@ -249,6 +249,16 @@ def run_pilot(
                 state = f"exit={statuses[name]}" if name in statuses else "running"
                 print(f"{name}: {counts['completed']}/{counts['total']} complete, "
                       f"{counts['failed']} failed ({state}); {counts['last_nodeid']}", flush=True)
+                first_failed = counts.get("first_failed_nodeid")
+                if first_failed:
+                    diagnostic = counts.get("first_failed_diagnostic") or "see JUnit artifact"
+                    rerun = counts.get("first_failed_rerun") or (
+                        f"venv/bin/python run.py hosted-e2e execute --target {first_failed}"
+                    )
+                    print(
+                        f"  first failure: {first_failed} — {diagnostic} | rerun: {rerun}",
+                        flush=True,
+                    )
 
     def cancel(signum, frame):
         raise KeyboardInterrupt(f"E2E pilot cancelled by signal {signum}")

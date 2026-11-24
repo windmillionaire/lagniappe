@@ -295,6 +295,13 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
         "replace_page_document": (("page", {"page"}),),
         "summarize_file": (("file", {"file"}),),
         "suggest_page_deletion": (("page", {"page"}),),
+        "update_category": (("entity", {"category"}),),
+        "delete_page": (("entity", {"page"}),),
+        "delete_task": (("entity", {"task"}),),
+        "delete_category": (("entity", {"category"}),),
+        "delete_project": (("entity", {"project"}),),
+        "delete_model_task": (("entity", {"model"}),),
+        "delete_file": (("entity", {"file"}),),
     }
     data = action.get("data") if isinstance(action, dict) else None
     if not isinstance(data, dict):

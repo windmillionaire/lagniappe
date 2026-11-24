@@ -36,6 +36,7 @@ UPDATE_TARGETS = {
     "update_task": "task",
     "update_model_task": "model",
     "update_project": "project",
+    "update_category": "category",
     "update_page": "page",
     "update_file": "file",
 }

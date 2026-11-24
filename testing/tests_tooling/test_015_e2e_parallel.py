@@ -290,11 +290,30 @@ def test_worker_progress_counts_cases_without_double_counting_phases(tmp_path, m
     monkeypatch.setenv("LAGNIAPPE_E2E_WORKER_CONTEXT", str(record))
     outcomes = {"a": {"outcome": "passed"}, "b": {"outcome": "skipped"}}
     write_progress(outcomes, "b")
-    outcomes["a"]["outcome"] = "failed"  # A teardown failure changes the same case.
-    write_progress(outcomes, "a")
     assert json.loads((tmp_path / "progress.json").read_text()) == {
-        "passed": 0, "failed": 1, "skipped": 1, "completed": 2, "total": 3, "last_nodeid": "a",
+        "passed": 1, "failed": 0, "skipped": 1, "completed": 2, "total": 3, "last_nodeid": "b",
     }
+    outcomes["a"] = {
+        "outcome": "failed",
+        "failed_phase": "teardown",
+        "traceback": "E   AssertionError: Authorization: Bearer secret-token at https://example.test/x",
+    }  # A teardown failure changes the same case.
+    write_progress(outcomes, "a")
+    outcomes["c"] = {"outcome": "passed"}
+    write_progress(outcomes, "c")
+    progress = json.loads((tmp_path / "progress.json").read_text())
+    assert progress == {
+        "passed": 1,
+        "failed": 1,
+        "skipped": 1,
+        "completed": 3,
+        "total": 3,
+        "last_nodeid": "c",
+        "first_failed_nodeid": "testing/a",
+        "first_failed_diagnostic": "AssertionError: Authorization: [redacted] at [redacted]",
+        "first_failed_rerun": "venv/bin/python run.py hosted-e2e execute --target testing/a",
+    }
+    assert "secret-token" not in progress["first_failed_diagnostic"]
     assert not (tmp_path / "progress.tmp").exists()
 
 

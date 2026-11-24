@@ -3,6 +3,8 @@
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, MutationIntent, Resource
 from lagniappe.core.entities import Entities
+from lagniappe.core.entities.category import UNCATEGORIZED_PAGES_NAME
+from ...contracts.actions import DELETE_TARGETS
 
 from .common import _category_form, _data, _first_data_reference, _require_allowed
 from .results import (
@@ -259,6 +261,74 @@ def _suggest_page_deletion(action, _report, user, created):
                 ),
             },
             "note": "Manual cleanup suggested.",
+        },
+    )
+
+
+def _delete_entity(action, _report, user, created, context=None):
+    action_type = action.get("type")
+    kind = DELETE_TARGETS.get(action_type)
+    if not kind:
+        raise exceptions.ValidationError("Unsupported delete action.")
+    expected_cls = {
+        "page": Entities.PAGE,
+        "task": Entities.TASK,
+        "category": Entities.CATEGORY,
+        "project": Entities.PROJECT,
+        "model": Entities.MODEL_TASK,
+        "file": Entities.FILE,
+    }[kind]
+    data = _data(action)
+    entity = _resolve_entity(data.get("entity"), created, expected=expected_cls)
+    _require_allowed(
+        entity.allowed(Action.DELETE, user=user),
+        f"You do not have permission to delete this {kind}.",
+    )
+    if kind == "category" and entity.name == UNCATEGORIZED_PAGES_NAME:
+        raise exceptions.ValidationError("Uncategorized Pages cannot be deleted.")
+    if kind == "page" and getattr(entity, "user", None):
+        raise exceptions.ValidationError(
+            "User personal pages cannot be deleted by a plan."
+        )
+
+    batch = context.get("batch") if isinstance(context, dict) else None
+    if batch is not None and batch.indices:
+        batch.commit()
+
+    if kind == "page":
+        categories = list(entity.categories)
+        editable_categories = [
+            category for category in categories if category.allowed(Action.EDIT, user=user)
+        ]
+        retained_categories = [
+            category for category in categories if category not in editable_categories
+        ]
+        for category in editable_categories:
+            entity.properties.categories.remove(category)
+        if retained_categories:
+            entity.save()
+            if editable_categories:
+                Entities.save(*editable_categories)
+            return (
+                entity,
+                [],
+                {
+                    "deleted": False,
+                    "note": "Removed page from editable categories; retained in other categories.",
+                },
+            )
+        Entities.delete(entity)
+        if categories:
+            Entities.save(*categories)
+    else:
+        Entities.delete(entity)
+
+    return (
+        entity,
+        [],
+        {
+            "deleted": True,
+            "note": f"Deleted {kind}.",
         },
     )
 

@@ -363,9 +363,9 @@ def _report_action_data_response_schema(action_type, include_submission_fields):
     }
     if required:
         schema["required"] = required
-    if action_type in {"update_task", "update_model_task", "update_project", "update_page", "update_file"}:
+    if action_type in {"update_task", "update_model_task", "update_project", "update_category", "update_page", "update_file"}:
         from lagniappe.core.tools.entity_patches import PATCH_FIELDS
-        kind = {"update_task": "task", "update_model_task": "model", "update_project": "project", "update_page": "page", "update_file": "file"}[action_type]
+        kind = {"update_task": "task", "update_model_task": "model", "update_project": "project", "update_category": "category", "update_page": "page", "update_file": "file"}[action_type]
         fields = {}
         for field in sorted(PATCH_FIELDS[kind]):
             if field in {"categories", "model_tasks"}:
@@ -376,6 +376,8 @@ def _report_action_data_response_schema(action_type, include_submission_fields):
                     fields[field]["nullable"] = True
         schema["properties"]["changes"] = {"type": "object", "properties": fields, "minProperties": 1, "additionalProperties": False}
         schema["properties"]["entity"]["description"] = "Exact existing entity reference or $id of an earlier action. Omitted changes preserve values; null explicitly clears a supported field."
+    elif action_type in {"delete_page", "delete_task", "delete_category", "delete_project", "delete_model_task", "delete_file"}:
+        schema["properties"]["entity"]["description"] = "Exact hash reference of the existing record to delete."
 
 
     # Cross-field reference alternatives remain an application validation

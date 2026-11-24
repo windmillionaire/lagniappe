@@ -27,12 +27,14 @@ admin agent `execute_plan` through verified remote MCP via
 clients can execute safe submitted proposals either via standalone
 `POST /api/v1/plans/{plan_id}/execute` (or MCP `execute_plan`) or in one step
 via `submitPlan` / `submit_plan` with `execute: true` and a stable
-`operation_id`. Proposals containing `update_form_schema`, `needs_review`
+`operation_id`. Proposals containing `update_form_schema`, delete actions
+(`delete_page`, `delete_task`, `delete_category`, `delete_project`,
+`delete_model_task`, `delete_file`), `needs_review`
 actions, non-empty `issues`, or per-request `require_review: true` always pause
 in `ready` state for authenticated browser review on standard user
 auto-execution; a designated experiments-installation admin agent over verified
-remote MCP may execute `update_form_schema`, `needs_review`, and `issues`
-proposals directly without opting into `User.allow_auto_execute` (still
+remote MCP may execute `update_form_schema`, delete actions, `needs_review`, and
+`issues` proposals directly without opting into `User.allow_auto_execute` (still
 honoring explicit `require_review: true`). `POST /plans/{plan_id}/execute`
 returns a compact plan receipt (`include_proposal=false`), and
 `GET /plans/{plan_id}` accepts `?include_proposal=false` (the default for MCP
@@ -534,8 +536,14 @@ reference its action id in `move_file.data.to_task_action` and `depends_on`.
 Task Form submissions must contain final values.
 
 The cohesive update contracts are `update_task`, `update_model_task`,
-`update_project`, `update_page`, and `update_file`. Every action supplies an exact `entity`
+`update_project`, `update_page`, `update_category`, and `update_file`. Every action supplies an exact `entity`
 and a nonempty `changes` object. Earlier outputs use `$action_id` references.
+Confirmation-gated delete actions (`delete_page`, `delete_task`,
+`delete_category`, `delete_project`, `delete_model_task`, `delete_file`) supply
+an exact `entity` reference and obey live `DELETE` permissions; `Uncategorized
+Pages` and personal user Pages cannot be deleted, and `Uncategorized Pages`
+cannot be renamed. On standard user auto-execution, any delete action pauses
+for browser confirmation.
 
 ```json
 {"id":"edit","type":"update_task","data":{"entity":"hash:012345abcdef","changes":{"name":"Review results","submission":{"textarea-notes":"Updated notes"},"due_date":"2026-10-01"}}}

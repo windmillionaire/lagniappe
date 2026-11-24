@@ -53,6 +53,15 @@ def document_details(
     details.add("Recovery" if replacing else "Attribution", "The previous document will be pinned; this replaces its content as a collaborative edit." if replacing else "Server-recorded time and source; existing text is preserved.")
 
 
+def delete_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
+    details.reference("Entity", data, "entity")
+    details.add("Effect", "Permanently deletes this record and its dependent data.")
+
+
 ENTITY_ACTION_DISPLAYS = (
     ProposalActionDisplay("append_page_document", "Append Page Document", document_details),
     ProposalActionDisplay("replace_page_document", "Replace Page Document", document_details),
@@ -67,5 +76,11 @@ ENTITY_ACTION_DISPLAYS = (
             InheritedProposalDetail(("category", "model"), "Form", ("form",)),
         ),
     ),
+    ProposalActionDisplay("delete_page", "Delete Page", delete_details),
+    ProposalActionDisplay("delete_task", "Delete Task", delete_details),
+    ProposalActionDisplay("delete_category", "Delete Category", delete_details),
+    ProposalActionDisplay("delete_project", "Delete Project", delete_details),
+    ProposalActionDisplay("delete_model_task", "Delete Model Task", delete_details),
+    ProposalActionDisplay("delete_file", "Delete File", delete_details),
     ProposalActionDisplay("suggest_page_deletion", "Suggest Page Deletion", hidden=True),
 )

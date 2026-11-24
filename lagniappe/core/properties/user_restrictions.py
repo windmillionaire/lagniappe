@@ -334,6 +334,20 @@ class Restrictions(Property[list[str], "User"]):
         can_delete_categories = can_delete_models or self._has_permission_kind(
             self._permission_details, "category", Action.DELETE
         )
+        can_delete_projects = can_delete_models or self._has_permission_kind(
+            self._permission_details, "project", Action.DELETE
+        )
+        can_delete_pages = can_delete_categories or self._has_permission_kind(
+            self._permission_details,
+            "page",
+            Action.DELETE,
+        )
+        can_delete_tasks = (
+            can_delete_pages
+            or can_delete_projects
+            or self._has_permission_kind(self._permission_details, "task", Action.DELETE)
+        )
+        can_delete_files = can_delete_pages or can_delete_tasks
         can_edit_forms = self.entity.has_permission(Resource.FORMS, Action.EDIT)
 
         return {
@@ -345,14 +359,11 @@ class Restrictions(Property[list[str], "User"]):
             "can_update_pages": can_edit_pages,
             "can_update_tasks": can_edit_tasks,
             "can_update_forms": can_edit_forms,
-            "can_delete_pages": (
-                can_delete_categories
-                or self._has_permission_kind(
-                    self._permission_details,
-                    "page",
-                    Action.DELETE,
-                )
-            ),
+            "can_delete_pages": can_delete_pages,
+            "can_delete_categories": can_delete_categories,
+            "can_delete_projects": can_delete_projects,
+            "can_delete_tasks": can_delete_tasks,
+            "can_delete_files": can_delete_files,
         }
 
     def _ensure_permission_details(self) -> None:

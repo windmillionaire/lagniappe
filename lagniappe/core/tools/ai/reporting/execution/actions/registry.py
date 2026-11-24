@@ -1,8 +1,8 @@
 """Supported forward-only report actions."""
-from ...contracts.actions import ALLOWED_ACTIONS, REPORT_ACTION_DATA_CONTRACTS
+from ...contracts.actions import ALLOWED_ACTIONS, DELETE_TARGETS, REPORT_ACTION_DATA_CONTRACTS
 from ...entity_updates import UPDATE_TARGETS, execute_update_action
 from .base import ReportActionAdapter
-from .entities import _create_form, _create_category, _create_project, _create_model_task, _create_page, _move_task, _suggest_page_deletion, _skip_action, _needs_review_action
+from .entities import _create_form, _create_category, _create_project, _create_model_task, _create_page, _delete_entity, _move_task, _suggest_page_deletion, _skip_action, _needs_review_action
 from .files import _attach_file, _move_file, _summarize_file
 from .forms import _update_form_schema
 from .tasks import _create_task
@@ -11,6 +11,7 @@ from .task_completion import _complete_task
 
 REPORT_ACTION_ADAPTERS = {adapter.action_type: adapter for adapter in (
     *(ReportActionAdapter(name, execute_update_action, uses_context=True) for name in UPDATE_TARGETS),
+    *(ReportActionAdapter(name, _delete_entity, uses_context=True) for name in DELETE_TARGETS),
     ReportActionAdapter("create_form", _create_form, uses_context=True),
     ReportActionAdapter("create_category", _create_category, uses_context=True),
     ReportActionAdapter("create_project", _create_project, uses_context=True),

@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import threading
 
@@ -68,14 +69,66 @@ def worker_runtime():
         watcher.join(timeout=2)
 
 
+_REDACT_PATTERNS = (
+    re.compile(r"https?://\S+", re.IGNORECASE),
+    re.compile(r"\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+", re.IGNORECASE),
+    re.compile(r"\b(?:lgn_|lgmo_|AIza|sk-|ghp_|gho_|ya29\.)[A-Za-z0-9._~-]{8,}"),
+)
+
+
+def _format_target_nodeid(nodeid: str) -> str:
+    cleaned = str(nodeid or "").strip()
+    if cleaned and not cleaned.startswith("testing/"):
+        return f"testing/{cleaned}"
+    return cleaned
+
+
+def _redacted_diagnostic(traceback_text: object, *, limit: int = 160) -> str:
+    if not isinstance(traceback_text, str) or not traceback_text.strip():
+        return ""
+    lines = [line.strip() for line in traceback_text.splitlines() if line.strip()]
+    chosen = next((line for line in reversed(lines) if line.startswith("E ")), "")
+    chosen = chosen[1:].strip() if chosen else (lines[-1] if lines else "")
+    for pattern in _REDACT_PATTERNS:
+        chosen = pattern.sub("[redacted]", chosen)
+    chosen = " ".join(chosen.split())
+    if len(chosen) > limit:
+        return chosen[: limit - 1].rstrip() + "…"
+    return chosen
+
+
+def _first_failure_fields(outcomes) -> dict[str, str]:
+    for failed_nodeid, row in outcomes.items():
+        if not isinstance(row, dict) or row.get("outcome") != "failed":
+            continue
+        target = _format_target_nodeid(failed_nodeid)
+        diagnostic = _redacted_diagnostic(row.get("traceback"))
+        if not diagnostic and row.get("failed_phase"):
+            diagnostic = f"failed during {row['failed_phase']}"
+        return {
+            "first_failed_nodeid": target,
+            "first_failed_diagnostic": diagnostic,
+            "first_failed_rerun": (
+                f"venv/bin/python run.py hosted-e2e execute --target {target}"
+            ),
+        }
+    return {}
+
+
 def write_progress(outcomes, nodeid):
     record = context()
     counts = {state: sum(row["outcome"] == state for row in outcomes.values())
               for state in ("passed", "failed", "skipped")}
+    payload = {
+        **counts,
+        "completed": sum(counts.values()),
+        "total": len(record["nodeids"]),
+        "last_nodeid": nodeid,
+        **_first_failure_fields(outcomes),
+    }
     path = Path(record["artifacts"]) / "progress.json"
     temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps({**counts, "completed": sum(counts.values()),
-                                     "total": len(record["nodeids"]), "last_nodeid": nodeid}), encoding="utf-8")
+    temporary.write_text(json.dumps(payload), encoding="utf-8")
     temporary.replace(path)
 
 

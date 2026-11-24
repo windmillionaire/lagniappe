@@ -245,6 +245,125 @@ def test_update_execution_overwrites_selected_values_but_rejects_unreviewed_prop
         execute_update_action(action, None, actor, {})
 
 
+def test_patch_answers_accepts_unset_schema_field_and_reports_unknown_field_ids():
+    actor, task, form, _page = case()
+    # Add an optional schema field not present in task.db["submission"].
+    form.set_schema([
+        *form.schema,
+        {"id": "optional_reason", "type": "textarea", "title": "Reason"},
+    ])
+    task.db["submission"] = {"answer": "old answer"}
+    patched = prepare_patch(task, {"submission": {"optional_reason": "Added later"}}, actor)
+    assert patched.entity.submission == {"answer": "old answer", "optional_reason": "Added later"}
+
+    with pytest.raises(ValidationError, match=r"bad_field.*Valid fields:.*optional_reason"):
+        prepare_patch(task, {"submission": {"bad_field": "oops"}}, actor)
+
+
+def test_update_category_and_delete_actions_enforce_permissions_and_guards(monkeypatch):
+    from lagniappe.core.entities.category import UNCATEGORIZED_PAGES_NAME
+    from lagniappe.core.tools.ai.reporting.execution.actions.entities import _delete_entity
+    from lagniappe.core.tools.ai.reporting.execution.actions.recovery import (
+        ACTION_APPLIED,
+        ACTION_NOT_APPLIED,
+        _inspect_action_applied,
+    )
+
+    actor = _test_user("cat-admin")
+    category = entity("CATEGORY", "old-cat")
+    category.name = "Old Name"
+    category.description = "Old desc"
+    page_form = entity("FORM", "cat-page-form")
+    page_form.form_type = "page"
+    task_form = entity("FORM", "cat-task-form")
+    task_form.form_type = "task"
+
+    patched = prepare_patch(
+        category,
+        {"name": "New Name", "description": "New desc", "form": page_form},
+        actor,
+    )
+    assert patched.entity.name == "New Name"
+    assert patched.entity.description == "New desc"
+    assert patched.entity.form.key == page_form.key
+
+    with pytest.raises(ValidationError, match="page Form"):
+        prepare_patch(category, {"form": task_form}, actor)
+
+    uncat = entity("CATEGORY", "uncat")
+    uncat.name = UNCATEGORIZED_PAGES_NAME
+    with pytest.raises(ValidationError, match="Uncategorized Pages cannot be renamed"):
+        prepare_patch(uncat, {"name": "Renamed"}, actor)
+
+    # Delete actions flush batch, enforce reserved guards, and call Entities.delete.
+    deleted = []
+    flushed = []
+    monkeypatch.setattr(Entities, "delete", lambda item, **kwargs: deleted.append(item))
+    monkeypatch.setattr(Entities, "save", lambda *items: None)
+    batch = SimpleNamespace(indices=[0], commit=lambda: flushed.append(True))
+
+    created = {category.urlsafe_key: category, uncat.urlsafe_key: uncat}
+    _, writes, metadata = _delete_entity(
+        {"type": "delete_category", "data": {"entity": category.urlsafe_key}},
+        None,
+        actor,
+        created,
+        {"batch": batch},
+    )
+    assert writes == []
+    assert metadata["deleted"] is True
+    assert flushed == [True]
+    assert deleted == [category]
+
+    with pytest.raises(ValidationError, match="Uncategorized Pages cannot be deleted"):
+        _delete_entity(
+            {"type": "delete_category", "data": {"entity": uncat.urlsafe_key}},
+            None,
+            actor,
+            created,
+            {},
+        )
+
+    personal = entity("PAGE", "personal-page")
+    personal.properties.user._value = actor
+    with pytest.raises(ValidationError, match="personal pages cannot be deleted"):
+        _delete_entity(
+            {"type": "delete_page", "data": {"entity": personal.urlsafe_key}},
+            None,
+            actor,
+            {personal.urlsafe_key: personal},
+            {},
+        )
+
+    # Recovery treats missing entity as applied for delete_* and present as not-applied.
+    monkeypatch.setattr(
+        "lagniappe.core.tools.ai.reporting.execution.actions.recovery._fetch_report_entity",
+        lambda _ref: None,
+    )
+    assert (
+        _inspect_action_applied(
+            {"type": "delete_category"},
+            None,
+            actor,
+            {"expected": {"entity": category.urlsafe_key}},
+        )
+        == ACTION_APPLIED
+    )
+    monkeypatch.setattr(
+        "lagniappe.core.tools.ai.reporting.execution.actions.recovery._fetch_report_entity",
+        lambda _ref: category,
+    )
+    assert (
+        _inspect_action_applied(
+            {"type": "delete_category"},
+            None,
+            actor,
+            {"expected": {"entity": category.urlsafe_key}},
+        )
+        == ACTION_NOT_APPLIED
+    )
+
+
 def test_update_missing_dependencies_never_fall_back_to_entity_lookup(monkeypatch):
     actor, task, form, page = case()
     reads = []

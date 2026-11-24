@@ -11,6 +11,16 @@ from .settings import runtime_ai_settings
 
 OPERATION_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 PROPOSAL_FINGERPRINT_PATTERN = re.compile(r"^[a-f0-9]{64}$")
+DELETE_ACTION_TYPES = frozenset(
+    {
+        "delete_page",
+        "delete_task",
+        "delete_category",
+        "delete_project",
+        "delete_model_task",
+        "delete_file",
+    }
+)
 
 
 def site_auto_execute_enabled(config: object = CONFIG) -> bool:
@@ -105,6 +115,13 @@ def review_required_reason(proposal: Mapping[str, object] | None) -> str | None:
             if action_type == "update_form_schema":
                 return (
                     "Paused for browser review because this plan changes a form schema."
+                )
+        for action in actions:
+            if not isinstance(action, Mapping):
+                continue
+            if action.get("type") in DELETE_ACTION_TYPES:
+                return (
+                    "Paused for browser review because this plan deletes workspace records."
                 )
         for action in actions:
             if not isinstance(action, Mapping):

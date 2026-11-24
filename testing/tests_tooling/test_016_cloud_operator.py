@@ -218,6 +218,88 @@ def test_cloud_settings_cli(bundle, tmp_path, monkeypatch, capsys):
     assert "sensitive-test-password" not in output.err + output.out
 
 
+def test_concurrent_cloud_settings_restore_waits_and_reuses_completed_restore(
+    bundle, tmp_path, generation, monkeypatch, capsys
+):
+    import threading
+    import time
+    from installer.state import SetupProcessLock
+
+    store = Store()
+    store.versions["1"] = bundle
+    store.current = "1"
+    monkeypatch.setattr(settings, "SecretManager", lambda *args: store)
+    monkeypatch.setattr(settings, "_source", lambda root: SOURCE)
+    (tmp_path / "package.json").write_text('{"version": "2.5.0"}')
+
+    restore_calls = []
+    real_restore = settings.restore
+
+    def slow_restore(*args, **kwargs):
+        restore_calls.append(1)
+        time.sleep(0.15)
+        return real_restore(*args, **kwargs)
+
+    monkeypatch.setattr(settings, "restore", slow_restore)
+
+    # First worker acquires lock and restores; second waits and reuses the exact restore.
+    results = []
+
+    def run_restore():
+        results.append(
+            settings.main(
+                [
+                    "restore",
+                    "--project",
+                    PROJECT,
+                    "--configuration",
+                    "lagniappe-operator",
+                    "--account",
+                    f"lagniappe-codex@{PROJECT}.iam.gserviceaccount.com",
+                    "--operator",
+                    "--version",
+                    "1",
+                ]
+            )
+        )
+
+    t1 = threading.Thread(target=run_restore)
+    t2 = threading.Thread(target=run_restore)
+    t1.start()
+    time.sleep(0.03)
+    t2.start()
+    t1.join(timeout=5)
+    t2.join(timeout=5)
+    assert results == [0, 0]
+    assert len(restore_calls) == 1
+
+    # If the lock stays held beyond the wait timeout, report the worktree and retry command.
+    monkeypatch.setattr(
+        settings,
+        "SetupProcessLock",
+        lambda path, **kwargs: SetupProcessLock(path, wait_seconds=0.02, poll_interval=0.01),
+    )
+    with SetupProcessLock(tmp_path / settings.FILES / ".lagniappe_setup.lock"):
+        rc = settings.main(
+            [
+                "restore",
+                "--project",
+                PROJECT,
+                "--configuration",
+                "lagniappe-operator",
+                "--account",
+                f"lagniappe-codex@{PROJECT}.iam.gserviceaccount.com",
+                "--operator",
+                "--version",
+                "1",
+            ]
+        )
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert str(tmp_path) in err
+    assert "Retry with:" in err
+
+
 class Bucket:
     def __init__(self):
         self.generation = 0
