@@ -1,5 +1,50 @@
+interface ListAttributes {
+	[key: string]: unknown;
+	target: HTMLElement;
+	name: string;
+	component: { active?: unknown };
+	view: { addFlash: (...items: HTMLLIElement[]) => void };
+	readonly?: boolean;
+	visible?: boolean;
+	modified?: boolean;
+	loaded?: boolean;
+}
+
+type ListHtml = Pick<ParentNode, "querySelector" | "querySelectorAll">;
+
+function listHtml(response: unknown): ListHtml | undefined {
+	if (!response || typeof response !== "object" || !("html" in response)) {
+		return;
+	}
+	const { html } = response;
+	if (
+		html &&
+		typeof html === "object" &&
+		"querySelector" in html &&
+		typeof html.querySelector === "function" &&
+		"querySelectorAll" in html &&
+		typeof html.querySelectorAll === "function"
+	) {
+		return html as ListHtml;
+	}
+}
+
 export class BaseList {
-	constructor(attributes) {
+	declare target: ListAttributes["target"];
+	declare name: ListAttributes["name"];
+	declare component: ListAttributes["component"];
+	declare view: ListAttributes["view"];
+	declare readonly?: boolean;
+	declare visible?: boolean;
+	declare modified?: boolean;
+	declare loaded?: boolean;
+	declare refreshScope: "collection";
+	declare _created: HTMLLIElement[];
+	declare _updated: HTMLElement | null;
+	declare _itemCount: number;
+	declare _isEmpty: boolean;
+
+	constructor(attributes: ListAttributes) {
 		Object.assign(this, attributes);
 		this.refreshScope = "collection";
 		this._created = [];
@@ -20,17 +65,21 @@ export class BaseList {
 		return this.itemCount === 0 ? this.target.dataset.ifEmpty : false;
 	}
 
-	updated(response) {
-		if (!response.html) return;
+	updated(response: unknown) {
+		const html = listHtml(response);
+		if (!html) return;
 
-		this._itemCount = Array.from(response.html.querySelectorAll("li")).length;
-		this._updated = response.html.querySelector(`[data-widget='${this.name}']`);
+		this._itemCount = Array.from(html.querySelectorAll("li")).length;
+		this._updated = html.querySelector<HTMLElement>(
+			`[data-widget='${this.name}']`,
+		);
 		this._isEmpty = this._updated?.children?.length === 0;
 	}
 
-	created(response) {
-		if (!response.html) return;
-		this._created = Array.from(response.html.querySelectorAll("li"))
+	created(response: unknown) {
+		const html = listHtml(response);
+		if (!html) return;
+		this._created = Array.from(html.querySelectorAll("li"))
 			.map((elt) => {
 				return this.target.querySelector(`[data-key="${elt.dataset.key}"]`)
 					? null
@@ -40,7 +89,7 @@ export class BaseList {
 		this.modified = this.modified || this._created.length > 0;
 	}
 
-	refresh(response) {
+	refresh(response: unknown) {
 		this.updated(response);
 		this.postreconcile();
 	}

@@ -8,12 +8,14 @@ const CLIPBOARD_ERROR = "Couldn't access clipboard.";
 const CLIPBOARD_PERMISSION_ERROR = "Clipboard permission denied.";
 const CLIPBOARD_ACCESS_NOT_AVAILABLE_ERROR = "Clipboard access not available.";
 const CLIPBOARD_NO_FILE_ERROR = "No valid file found in clipboard.";
-const DROP_ERROR = (error) => `Error dropping file: ${error.message}`;
-const PROCESS_NEW_FILE_ERROR = (error) =>
-	`Error processing file: ${error.message}`;
-const FILE_TOO_LARGE_ERROR = (fileSizeMB, maxSizeMB) =>
+const DROP_ERROR = (error: unknown) =>
+	`Error dropping file: ${errorMessage(error)}`;
+const PROCESS_NEW_FILE_ERROR = (error: unknown) =>
+	`Error processing file: ${errorMessage(error)}`;
+const FILE_TOO_LARGE_ERROR = (fileSizeMB: string, maxSizeMB: number) =>
 	`File is too large (${fileSizeMB}MB). Maximum file size is ${maxSizeMB}MB.`;
-const IMAGE_LOAD_ERROR = (error) => `Failed to load image: ${error.message}`;
+const IMAGE_LOAD_ERROR = (error: unknown) =>
+	`Failed to load image: ${errorMessage(error)}`;
 const IMAGE_PROCESS_ERROR = `Failed to process image`;
 const NOT_IMAGE_ERROR =
 	"This upload only accepts images. Choose an image file (for example PNG, JPEG, or WebP).";
@@ -25,8 +27,62 @@ const DIRECT_UPLOAD_REQUIRED_ERROR =
 	"This file is too large for the compatibility upload path. Please try again.";
 const INDIVIDUAL_FILES_ONLY_ERROR = "Only individual files are supported";
 
+type UploadInput = ReturnType<typeof uploadElement.hiddenFileInput>;
+type UploadMenu = { create(): void; destroy(): void };
+type Dropzone = {
+	element: HTMLElement;
+	menuButton?: HTMLElement | null;
+	clear(): void;
+	setText(text: string): void;
+};
+
+interface UploadAttributes {
+	[key: string]: unknown;
+	target?: HTMLElement;
+	readonly?: boolean;
+	dropzone?: Dropzone | null;
+	uploadMenu?: UploadMenu | null;
+	inputName?: string;
+	uploadType?: string;
+	multiple?: boolean;
+	route?: string | null;
+	endpoints?: { upload?: string | null } & Record<string, unknown>;
+	maxFileSize?: number;
+}
+
+interface FileSelectionOptions {
+	source?: string;
+	preserveExisting?: boolean;
+}
+
+interface UploadContext {
+	source: string;
+	originalFile: File;
+	file: File;
+	filename: string;
+	isTextFile: boolean;
+	mimeType: string;
+}
+
+interface DirectUploadRecord {
+	_fileSignature: string;
+	token: string;
+	input_name: string;
+	filename: string;
+	content_type: string;
+	size: number;
+	generation: string | number | undefined;
+	path: string | undefined;
+}
+
+function errorMessage(error: unknown) {
+	return typeof error === "object" && error !== null && "message" in error
+		? error.message
+		: undefined;
+}
+
 async function containsDroppedDirectory(
-	dataTransfer,
+	dataTransfer: DataTransfer | null,
 	files = Array.from(dataTransfer?.files || []),
 ) {
 	const items = Array.from(dataTransfer?.items || []).filter(
@@ -36,10 +92,21 @@ async function containsDroppedDirectory(
 		const entry = item.webkitGetAsEntry?.();
 		if (entry?.isDirectory) return true;
 
-		if (!entry && typeof item.getAsFileSystemHandle === "function") {
+		if (
+			!entry &&
+			"getAsFileSystemHandle" in item &&
+			typeof item.getAsFileSystemHandle === "function"
+		) {
 			try {
-				const handle = await item.getAsFileSystemHandle();
-				if (handle?.kind === "directory") return true;
+				const handle: unknown = await item.getAsFileSystemHandle();
+				if (
+					handle &&
+					typeof handle === "object" &&
+					"kind" in handle &&
+					handle.kind === "directory"
+				) {
+					return true;
+				}
 			} catch (_error) {
 				// Fall through to the file metadata check below.
 			}
@@ -49,16 +116,16 @@ async function containsDroppedDirectory(
 	return files.some((file) => file.size === 0 && !file.type);
 }
 
-function isLikelyImageFile(file) {
+function isLikelyImageFile(file: File) {
 	if (file.type?.startsWith("image/")) return true;
 	if (file.type && file.type !== "application/octet-stream") return false;
 	const name = (file.name || "").toLowerCase();
 	return /\.(png|jpe?g|gif|webp|bmp|svg|heic|heif|avif|ico|tiff?)$/.test(name);
 }
 
-function mimeToExtension(mimeType) {
+function mimeToExtension(mimeType: string) {
 	if (!mimeType) return "bin";
-	const map = {
+	const map: Record<string, string | undefined> = {
 		"image/png": "png",
 		"image/jpeg": "jpg",
 		"image/jpg": "jpg",
@@ -78,19 +145,49 @@ function mimeToExtension(mimeType) {
  * BaseUpload#filename.
  *
  */
-function defaultClipboardFilename(mimeType) {
+function defaultClipboardFilename(mimeType: string) {
 	return `paste-${Date.now()}.${mimeToExtension(mimeType)}`;
 }
 
-function resolvedClipboardFileName(blob, typeHint) {
+function resolvedClipboardFileName(blob: Blob, typeHint: string) {
 	const mime = blob.type || typeHint;
-	const fromBlob =
-		typeof blob.name === "string" && blob.name.trim().includes(".");
-	return fromBlob ? blob.name.trim() : defaultClipboardFilename(mime);
+	if ("name" in blob && typeof blob.name === "string") {
+		const name = blob.name.trim();
+		if (name.includes(".")) return name;
+	}
+	return defaultClipboardFilename(mime);
 }
 
 export class BaseUpload {
-	constructor(attributes) {
+	// Standalone subclasses can supply these attributes before init().
+	declare target: HTMLElement;
+	declare inputName: string;
+	declare readonly?: boolean;
+	declare dropzone?: UploadAttributes["dropzone"];
+	declare uploadMenu?: UploadAttributes["uploadMenu"];
+	declare uploadType?: string;
+	declare multiple?: boolean;
+	declare route?: UploadAttributes["route"];
+	declare endpoints?: UploadAttributes["endpoints"];
+	declare maxFileSize?: number;
+	declare uploadImage?: (file: File, context: UploadContext) => unknown;
+
+	// Created by init() on the interactive upload path.
+	declare form: FormController;
+	declare fileInput: UploadInput;
+	declare mimeType: UploadInput;
+	declare fileDialogOpen?: boolean;
+	declare pasteActive?: boolean;
+	declare maxWidth: number;
+	declare maxHeight: number;
+	declare keyboardPaste: (event: ClipboardEvent) => void;
+	declare windowFocus: () => void;
+	declare destroyables: { destroy?(): void }[];
+	declare directUploads: DirectUploadRecord[];
+	declare directUploadSignature: string | null;
+	declare directUploadSelectionSignature: string | null;
+
+	constructor(attributes?: UploadAttributes) {
 		Object.assign(this, attributes);
 		this.maxWidth = 1280;
 		this.maxHeight = 720;
@@ -139,8 +236,9 @@ export class BaseUpload {
 		this.mimeType = uploadElement.mimeType();
 		this.form.target.appendChild(this.mimeType.element);
 
-		this.fileInput.element.addEventListener("change", (event) => {
-			const files = event.target.files;
+		const input = this.fileInput.element;
+		input.addEventListener("change", () => {
+			const files = input.files;
 			if (files && files.length > 0) {
 				this._processNewFiles(files, {
 					source: "select",
@@ -151,8 +249,8 @@ export class BaseUpload {
 		});
 	}
 
-	_processImage(file) {
-		return new Promise((resolve, reject) => {
+	_processImage(file: File) {
+		return new Promise<File>((resolve, reject) => {
 			const img = new Image();
 			const objectUrl = URL.createObjectURL(file);
 
@@ -161,6 +259,10 @@ export class BaseUpload {
 
 				const canvas = document.createElement("canvas");
 				const ctx = canvas.getContext("2d");
+				if (!ctx) {
+					reject(new Error(IMAGE_PROCESS_ERROR));
+					return;
+				}
 
 				const scale = Math.min(
 					this.maxWidth / img.width,
@@ -197,9 +299,9 @@ export class BaseUpload {
 				);
 			};
 
-			img.onerror = (e) => {
+			img.onerror = (event) => {
 				URL.revokeObjectURL(objectUrl);
-				reject(new Error(IMAGE_LOAD_ERROR(e.message)));
+				reject(new Error(IMAGE_LOAD_ERROR(errorMessage(event))));
 			};
 
 			img.src = objectUrl;
@@ -207,21 +309,19 @@ export class BaseUpload {
 	}
 
 	get filename() {
-		if (!this.fileInput.element.files.length) return "";
-		const name = this.fileInput.element.files[0].name;
+		const file = this.fileInput.element.files?.[0];
+		if (!file) return "";
+		const name = file.name;
 		const extensionIndex = name.lastIndexOf(".");
 		return extensionIndex > 0 ? name.substring(0, extensionIndex) : name;
 	}
 
 	get textFileAttached() {
-		return (
-			this.fileInput.element.files.length > 0 &&
-			this.fileInput.element.files[0].type.startsWith("text/")
-		);
+		return this.fileInput.element.files?.[0]?.type.startsWith("text/") ?? false;
 	}
 
 	get fileAttached() {
-		return this.fileInput?.element.files.length > 0;
+		return (this.fileInput?.element.files?.length ?? 0) > 0;
 	}
 
 	get fileLabel() {
@@ -231,26 +331,26 @@ export class BaseUpload {
 		return `${files.length} files selected`;
 	}
 
-	onFileAccepted() {}
+	onFileAccepted(_file: File, _context: UploadContext) {}
 
-	shouldAutoUpload() {
+	shouldAutoUpload(_file: File, _context: UploadContext) {
 		return typeof this.uploadImage === "function";
 	}
 
-	async autoUpload(file, context) {
+	async autoUpload(file: File, context: UploadContext) {
 		if (typeof this.uploadImage === "function") {
 			return this.uploadImage(file, context);
 		}
 	}
 
-	applyDefaultAttachUI(_file, context) {
+	applyDefaultAttachUI(_file: File, context: UploadContext) {
 		if (this.dropzone) {
 			this.dropzone.setText(context.filename);
 		}
 		this.form?.showSubmitButton();
 	}
 
-	onFileAttached() {}
+	onFileAttached(_file: File, _context: UploadContext) {}
 
 	get directUploadRoute() {
 		return this.route || this.target?.dataset?.route || this.endpoints?.upload;
@@ -275,7 +375,7 @@ export class BaseUpload {
 			.join("|");
 	}
 
-	applyDirectUploads(data) {
+	applyDirectUploads<T extends Pick<FormData, "delete" | "set">>(data: T): T {
 		if (!this.directUploads?.length) return data;
 
 		data.delete(this.inputName);
@@ -288,7 +388,7 @@ export class BaseUpload {
 		return data;
 	}
 
-	_canFallbackToMultipart(files) {
+	_canFallbackToMultipart(files: File[]) {
 		return (
 			files.length <= DIRECT_UPLOAD_FALLBACK_MAX_FILES &&
 			files.reduce((total, file) => total + file.size, 0) <=
@@ -296,19 +396,19 @@ export class BaseUpload {
 		);
 	}
 
-	_directUploadFileSignature(file, index) {
+	_directUploadFileSignature(file: File, index: number) {
 		return [index, file.name, file.size, file.type, file.lastModified].join(
 			":",
 		);
 	}
 
-	_updateDirectUploadProgress(file, loaded, total) {
+	_updateDirectUploadProgress(file: File, loaded: number, total: number) {
 		const percent = total ? Math.round((loaded / total) * 100) : 0;
 		const name = file.name || "file";
 		this.dropzone?.setText(`Uploading ${name} - ${percent}%`);
 	}
 
-	async prepareSubmit({ route = null } = {}) {
+	async prepareSubmit({ route = null }: { route?: string | null } = {}) {
 		const files = Array.from(this.fileInput?.element?.files || []);
 		if (!files.length) {
 			this.directUploads = [];
@@ -334,9 +434,9 @@ export class BaseUpload {
 				? new Map(
 						this.directUploads.map((record) => [record._fileSignature, record]),
 					)
-				: new Map();
-		const completed = [];
-		let activeFile = null;
+				: new Map<string, DirectUploadRecord>();
+		const completed: DirectUploadRecord[] = [];
+		let activeFile: File | null = null;
 		try {
 			for (const [index, file] of files.entries()) {
 				if (!file.size) continue;
@@ -393,8 +493,8 @@ export class BaseUpload {
 		return true;
 	}
 
-	async _processNewFile(file, options = {}) {
-		const context = { source: options.source || "unknown" };
+	async _processNewFile(file: File, options: FileSelectionOptions = {}) {
+		const source = options.source || "unknown";
 		const maxFileSize = this.uploadLimit;
 		if (file.size > maxFileSize) {
 			const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
@@ -430,11 +530,14 @@ export class BaseUpload {
 		this.uploadMenu?.create();
 
 		this.hideError();
-		context.originalFile = file;
-		context.file = processed;
-		context.filename = this.multiple ? this.fileLabel : this.filename;
-		context.isTextFile = this.textFileAttached;
-		context.mimeType = file.type || "";
+		const context: UploadContext = {
+			source,
+			originalFile: file,
+			file: processed,
+			filename: this.multiple ? this.fileLabel : this.filename,
+			isTextFile: this.textFileAttached,
+			mimeType: file.type || "",
+		};
 		this.mimeType.element.value = context.mimeType;
 
 		this.onFileAccepted(processed, context);
@@ -446,7 +549,10 @@ export class BaseUpload {
 		this.onFileAttached(processed, context);
 	}
 
-	async _processNewFiles(files, options = {}) {
+	async _processNewFiles(
+		files: Iterable<File> | ArrayLike<File> | null | undefined,
+		options: FileSelectionOptions = {},
+	) {
 		const selected = Array.from(files || []);
 		if (!this.multiple) {
 			if (selected[0]) await this._processNewFile(selected[0], options);
@@ -468,7 +574,7 @@ export class BaseUpload {
 
 		this.dropzone.element.addEventListener("dragover", (event) => {
 			event.preventDefault();
-			event.dataTransfer.dropEffect = "copy";
+			if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
 		});
 
 		this.dropzone.element.addEventListener("drop", async (event) => {
@@ -490,14 +596,18 @@ export class BaseUpload {
 		});
 
 		this.dropzone.element.addEventListener("click", (e) => {
+			const target = e.target;
 			if (
 				this.fileDialogOpen ||
-				e.target.closest("[data-role='upload-menu']")
+				!target ||
+				!("closest" in target) ||
+				typeof target.closest !== "function" ||
+				target.closest("[data-role='upload-menu']")
 			) {
 				return;
 			}
 
-			if (e.target.closest('[data-role="dropzone"]')) {
+			if (target.closest('[data-role="dropzone"]')) {
 				e.preventDefault();
 				e.stopPropagation();
 				this.fileDialogOpen = true;
@@ -507,7 +617,7 @@ export class BaseUpload {
 	}
 
 	async processPaste() {
-		const processFile = async (item, type) => {
+		const processFile = async (item: ClipboardItem, type: string) => {
 			const blob = await item.getType(type);
 			const fileName = resolvedClipboardFileName(blob, type);
 			const file = new File([blob], fileName, { type: blob.type || type });
@@ -540,9 +650,13 @@ export class BaseUpload {
 				this.showError(CLIPBOARD_NO_FILE_ERROR);
 			}
 		} catch (error) {
-			if (error.name === "NotAllowedError") {
+			const name =
+				error && typeof error === "object" && "name" in error
+					? error.name
+					: undefined;
+			if (name === "NotAllowedError") {
 				this.showError(CLIPBOARD_PERMISSION_ERROR);
-			} else if (error.name === "SecurityError") {
+			} else if (name === "SecurityError") {
 				this.showError(CLIPBOARD_ACCESS_NOT_AVAILABLE_ERROR);
 			} else {
 				this.showError(CLIPBOARD_ERROR);
@@ -550,7 +664,7 @@ export class BaseUpload {
 		}
 	}
 
-	_keyboardPaste(event) {
+	_keyboardPaste(event: ClipboardEvent) {
 		if (!this.pasteActive) return;
 
 		event.preventDefault();
@@ -605,7 +719,7 @@ export class BaseUpload {
 		this.form.hideError();
 	}
 
-	showError(message) {
+	showError(message: string) {
 		this.form.showError(message);
 	}
 
