@@ -11,9 +11,10 @@ import copy
 import json
 import re
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import requests
+if TYPE_CHECKING:
+    import requests
 
 SECRETS_BACKEND_LOCAL = "local_yaml"
 SECRETS_BACKEND_SECRET_MANAGER = "secret_manager"
@@ -337,7 +338,12 @@ class SecretManagerRuntimeStore:
             f"https://secretmanager.googleapis.com/v1/"
             f"projects/{project_id}/secrets/{secret_name}"
         )
-        self.session = session or requests.Session()
+        if session is None:
+            import requests
+
+            self.session = requests.Session()
+        else:
+            self.session = session
         token = access_token if access_token is not None else _adc_access_token()
         self.session.headers["Authorization"] = f"Bearer {token}"
 
@@ -349,6 +355,8 @@ class SecretManagerRuntimeStore:
         json_body: dict[str, Any] | None = None,
         params: dict[str, str] | None = None,
     ) -> dict[str, Any]:
+        import requests
+
         try:
             response = self.session.request(
                 method,

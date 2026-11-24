@@ -1,0 +1,273 @@
+"""Tests for non-interactive agent-assisted installation (--agent)."""
+
+from __future__ import annotations
+
+import base64
+import importlib
+import json
+import sys
+from types import SimpleNamespace
+
+import google_crc32c
+import pytest
+
+from installer import agent_mode
+from installer.__main__ import _parser
+from installer.secret_vault import VaultSubmitResult
+
+pytestmark = pytest.mark.tooling
+
+
+class _FakeSecretSession:
+    def __init__(self) -> None:
+        self.headers: dict[str, str] = {}
+        self.versions: dict[str, bytes] = {}
+        self.aliases: dict[str, str] = {}
+        self.etag = "etag-1"
+        self.next_version = 1
+
+    def request(self, method, url, *, json=None, params=None, timeout=None, allow_redirects=True):
+        if method == "GET" and url.endswith(":access"):
+            version = url.rsplit("/versions/", 1)[1].removesuffix(":access")
+            resolved = self.aliases.get(version, version)
+            if resolved not in self.versions:
+                return SimpleNamespace(ok=False, status_code=404, json=lambda: {})
+            raw = self.versions[resolved]
+            return SimpleNamespace(
+                ok=True,
+                status_code=200,
+                json=lambda: {
+                    "name": f"projects/pilot-project-1/secrets/lagniappe-runtime-secrets/versions/{resolved}",
+                    "payload": {
+                        "data": base64.b64encode(raw).decode("ascii"),
+                        "dataCrc32c": str(google_crc32c.value(raw)),
+                    },
+                },
+            )
+        if method == "GET":
+            return SimpleNamespace(
+                ok=True,
+                status_code=200,
+                json=lambda: {"etag": self.etag, "versionAliases": dict(self.aliases)},
+            )
+        if method == "POST" and url.endswith(":addVersion"):
+            raw = base64.b64decode(json["payload"]["data"], validate=True)
+            version = str(self.next_version)
+            self.next_version += 1
+            self.versions[version] = raw
+            return SimpleNamespace(
+                ok=True,
+                status_code=200,
+                json=lambda: {
+                    "name": f"projects/pilot-project-1/secrets/lagniappe-runtime-secrets/versions/{version}"
+                },
+            )
+        if method == "PATCH":
+            self.aliases = dict(json["versionAliases"])
+            self.etag = f"etag-{self.next_version}"
+            return SimpleNamespace(ok=True, status_code=200, json=lambda: {"etag": self.etag})
+        return SimpleNamespace(ok=False, status_code=500, json=lambda: {})
+
+
+@pytest.fixture
+def isolated_env(monkeypatch, tmp_path):
+    original_modules = {
+        name: module
+        for name, module in sys.modules.items()
+        if name == "config" or name.startswith("config.")
+    }
+    for name in original_modules:
+        sys.modules.pop(name)
+    monkeypatch.setenv("LAGNIAPPE_CONFIG_ROOT", str(tmp_path))
+    monkeypatch.setenv("LAGNIAPPE_SETUP_STATE_DIR", str(tmp_path / "state"))
+    # Seed minimal package.json + constants.py checksum target for generation manifest.
+    (tmp_path / "package.json").write_text('{"version": "2.5.0"}\n', encoding="utf-8")
+    (tmp_path / "config").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "config" / "constants.py").write_text('BUILD_ID = "test"\n', encoding="utf-8")
+    cfg = importlib.import_module("config")
+    secrets_mod = importlib.import_module("config.secrets")
+    real_store_cls = secrets_mod.SecretManagerRuntimeStore
+    session = _FakeSecretSession()
+    monkeypatch.setattr(
+        secrets_mod,
+        "SecretManagerRuntimeStore",
+        lambda project_id, secret_name: real_store_cls(
+            project_id,
+            secret_name,
+            access_token="fake-token",
+            session=session,
+        ),
+    )
+    monkeypatch.setattr(agent_mode, "File", cfg.File)
+    try:
+        yield tmp_path, cfg, secrets_mod, session
+    finally:
+        for name in list(sys.modules):
+            if name == "config" or name.startswith("config."):
+                sys.modules.pop(name)
+        sys.modules.update(original_modules)
+
+
+def test_agent_answers_reject_secrets_and_report_missing_inputs(
+    isolated_env, tmp_path, capsys
+):
+    _, cfg, _, _ = isolated_env
+
+    # Any secret field in answers.json is hard-rejected with exit code 2.
+    bad_answers = tmp_path / "bad_answers.json"
+    bad_answers.write_text(
+        json.dumps({"app_name": "Demo", "redis_password": "leaked-value"}),
+        encoding="utf-8",
+    )
+    rc = agent_mode.run_agent_install(
+        answers_path=bad_answers,
+        json_output=True,
+        draft=cfg.SettingsDraft(),
+    )
+    assert rc == agent_mode.EXIT_INVALID_ANSWERS
+    out = json.loads(capsys.readouterr().out)
+    assert out["status"] == "error"
+    assert "redis_password" in out["message"]
+    assert "leaked-value" not in out["message"]
+
+    # Partial non-secret answers return deterministic needs_input (exit code 3).
+    partial_answers = tmp_path / "partial.json"
+    partial_answers.write_text(json.dumps({"app_name": "Demo"}), encoding="utf-8")
+    rc = agent_mode.run_agent_install(
+        answers_path=partial_answers,
+        json_output=True,
+        draft=cfg.SettingsDraft(),
+    )
+    assert rc == agent_mode.EXIT_NEEDS_INPUT
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "needs_input"
+    keys = {item["key"] for item in payload["missing_fields"]}
+    assert {"project_id", "admin_name", "admin_email", "auth_email_provider"} <= keys
+
+
+def test_agent_install_vault_handoff_resume_and_zero_disk_secrets(
+    isolated_env, tmp_path, capsys
+):
+    _, cfg, secrets_mod, session = isolated_env
+    answers_file = tmp_path / "answers.json"
+    answers_file.write_text(
+        json.dumps(
+            {
+                "app_name": "Pilot Workspace",
+                "project_id": "pilot-project-1",
+                "admin_name": "Alex",
+                "admin_email": "alex@example.com",
+                "auth_email_provider": "gmail",
+                "google_signin_enabled": True,
+                "ai_enabled": True,
+                "external_ai_enabled": False,
+                "capture_errors": False,
+                "deploy_now": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    oauth_calls: list[tuple[str, str]] = []
+    vault_invocations = 0
+
+    def fake_vault(sections, on_submit):
+        nonlocal vault_invocations
+        vault_invocations += 1
+        assert [s.section_id for s in sections] == [
+            "google_oauth",
+            "auth_email",
+            "redis",
+        ]
+        # First attempt has a bad Gmail app password -> rejected inline.
+        bad = on_submit(
+            {
+                "oauth_credentials_json": "",
+                "oauth_client_id": "123456.apps.googleusercontent.com",
+                "oauth_client_secret": "GOCSPX-transient-secret",
+                "auth_email_password": "short",
+                "redis_cli_command": "redis-cli -u redis://default:redis-secret-pass@redis.test:6379",
+                "redis_host": "",
+                "redis_port": "",
+                "redis_password": "",
+            }
+        )
+        assert bad.ok is False
+        assert "auth_email_password" in bad.field_errors
+        assert "GOCSPX-transient-secret" not in bad.error
+
+        # Second attempt succeeds.
+        good = on_submit(
+            {
+                "oauth_credentials_json": "",
+                "oauth_client_id": "123456.apps.googleusercontent.com",
+                "oauth_client_secret": "GOCSPX-transient-secret",
+                "auth_email_password": "abcd efgh ijkl mnop",
+                "redis_cli_command": "redis-cli -u redis://default:redis-secret-pass@redis.test:6379",
+                "redis_host": "",
+                "redis_port": "",
+                "redis_password": "",
+            }
+        )
+        assert good.ok is True
+        return good
+
+    draft = cfg.SettingsDraft()
+    rc = agent_mode.run_agent_install(
+        answers_path=answers_file,
+        json_output=True,
+        draft=draft,
+        provision_fn=lambda d: None,
+        vault_runner=fake_vault,
+        validate_oauth=lambda cid, csec, uri: oauth_calls.append((cid, csec)),
+        validate_smtp=lambda cfg_map, rcpt: None,
+        validate_redis=lambda settings_map: None,
+        deploy_fn=lambda d: True,
+        doctor_fn=lambda: 0,
+    )
+    assert rc == agent_mode.EXIT_OK
+    assert vault_invocations == 1
+    assert oauth_calls[-1] == ("123456.apps.googleusercontent.com", "GOCSPX-transient-secret")
+
+    out_text = capsys.readouterr().out
+    result = json.loads(out_text)
+    assert result["status"] == "ok"
+    assert result["secrets_backend"] == "secret_manager"
+    assert result["deployed"] is True
+    assert result["doctor_exit_code"] == 0
+    # Zero secret values in JSON stdout or on disk!
+    for secret_str in ("GOCSPX-transient-secret", "abcdefghijklmnop", "redis-secret-pass"):
+        assert secret_str not in out_text
+        assert secret_str not in cfg.File.APP_SETTINGS_YAML.value.read_text(encoding="utf-8")
+    assert secrets_mod.find_leaked_secret_keys(cfg.File.APP_SETTINGS_YAML.load()) == []
+    assert session.aliases.get("current") is not None
+
+    # Resume pass: reopening draft hydrates secrets from Secret Manager and skips vault!
+    resumed_draft = cfg.SettingsDraft()
+    rc2 = agent_mode.run_agent_install(
+        answers_path=answers_file,
+        json_output=True,
+        draft=resumed_draft,
+        provision_fn=lambda d: None,
+        vault_runner=lambda sections, cb: VaultSubmitResult(
+            ok=False, error="Vault should have been skipped on resume!"
+        ),
+        deploy_fn=lambda d: True,
+        doctor_fn=lambda: 0,
+    )
+    assert rc2 == agent_mode.EXIT_OK
+    resumed_out = json.loads(capsys.readouterr().out)
+    assert resumed_out["status"] == "ok"
+    assert resumed_out["vault_sections_completed"] == []
+
+
+def test_cli_parser_supports_agent_flags_and_secrets_migrate():
+    parser = _parser()
+    parsed = parser.parse_args(["--agent", "--answers", "answers.json", "--json"])
+    assert parsed.agent is True
+    assert parsed.answers == "answers.json"
+    assert parsed.json_output is True
+
+    migrate = parser.parse_args(["secrets", "migrate"])
+    assert migrate.command == "secrets"
+    assert migrate.secrets_action == "migrate"
