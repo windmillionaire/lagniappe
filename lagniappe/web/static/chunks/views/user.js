@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition, r as request } from '../foundation.js?v=b6ea3fe0';
-import { E as EntityIndex } from '../index-foundation.js?v=b6ea3fe0';
-import '../upstreamUnavailable.js?v=b6ea3fe0';
-import '../connectivity.js?v=b6ea3fe0';
-import '../core-foundation.js?v=b6ea3fe0';
+import { w as withTransition, r as request } from '../foundation.js?v=bbf4a50a';
+import { E as EntityIndex } from '../index-foundation.js?v=bbf4a50a';
+import '../upstreamUnavailable.js?v=bbf4a50a';
+import '../connectivity.js?v=bbf4a50a';
+import '../core-foundation.js?v=bbf4a50a';
 
 class Users extends EntityIndex {
   constructor(node) {

@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as createIcon, S as STYLES } from './ui-resources.js?v=b6ea3fe0';
-import { r as request, E as ENDPOINTS } from './foundation.js?v=b6ea3fe0';
-import './connectivity.js?v=b6ea3fe0';
-import { Modal } from './modal.js?v=b6ea3fe0';
-import { a as FacetsBox } from './forms.js?v=b6ea3fe0';
-import './upstreamUnavailable.js?v=b6ea3fe0';
-import './ui-controls.js?v=b6ea3fe0';
-import './combobox.js?v=b6ea3fe0';
+import { c as createIcon, S as STYLES } from './ui-resources.js?v=bbf4a50a';
+import { r as request, E as ENDPOINTS } from './foundation.js?v=bbf4a50a';
+import './connectivity.js?v=bbf4a50a';
+import { Modal } from './modal.js?v=bbf4a50a';
+import { a as FacetsBox } from './forms.js?v=bbf4a50a';
+import './upstreamUnavailable.js?v=bbf4a50a';
+import './ui-controls.js?v=bbf4a50a';
+import './combobox.js?v=bbf4a50a';
 
 class ComposerModal extends Modal {
   constructor(composer) {

@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as connectivity } from './chunks/connectivity.js?v=b6ea3fe0';
-import { n as applyNotificationStateHeader } from './chunks/foundation.js?v=b6ea3fe0';
-import { i as installUpstreamUnavailableBanner, c as connectivityMessage } from './chunks/upstreamUnavailable.js?v=b6ea3fe0';
+import { c as connectivity } from './chunks/connectivity.js?v=bbf4a50a';
+import { n as applyNotificationStateHeader } from './chunks/foundation.js?v=bbf4a50a';
+import { i as installUpstreamUnavailableBanner, c as connectivityMessage } from './chunks/upstreamUnavailable.js?v=bbf4a50a';
 
-const BUILD_ID = "b6ea3fe0";
+const BUILD_ID = "bbf4a50a";
 const VIEW_REGISTRY = Object.freeze({
   project: { entry: "project", source: "./views/project.ts" },
   page: { entry: "page", source: "./views/page.ts" },
@@ -43,7 +43,7 @@ async function onError(event) {
     captureError,
     isSkippedViewTransitionError,
     isTransientNetworkError
-  } = await import('./chunks/foundation.js?v=b6ea3fe0').then(function (n) { return n.o; });
+  } = await import('./chunks/foundation.js?v=bbf4a50a').then(function (n) { return n.o; });
   const eventError = "error" in event ? event.error : void 0;
   const rejection = "reason" in event ? event.reason : void 0;
   const message = "message" in event ? event.message : void 0;
@@ -89,7 +89,7 @@ const getView = async () => {
   __activeView = (async () => {
     const viewModule = await loadView(viewElt.dataset.kind);
     if (!viewModule) {
-      const { captureError } = await import('./chunks/foundation.js?v=b6ea3fe0').then(function (n) { return n.o; });
+      const { captureError } = await import('./chunks/foundation.js?v=bbf4a50a').then(function (n) { return n.o; });
       captureError(
         new Error(`Unknown view kind: ${viewElt.dataset.kind || "missing"}`),
         viewElt,
@@ -259,7 +259,7 @@ function pageMode() {
   return document?.querySelector("meta[name='mode']")?.getAttribute("content");
 }
 async function startAnalytics() {
-  const { analytics } = await import('./chunks/analytics.js?v=b6ea3fe0');
+  const { analytics } = await import('./chunks/analytics.js?v=bbf4a50a');
   analytics.view();
 }
 function startErrorHandling() {
@@ -269,14 +269,14 @@ function startErrorHandling() {
 function startServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   navigator.serviceWorker.register("/sw.js").catch(async (error) => {
-    const { captureNetworkError } = await import('./chunks/foundation.js?v=b6ea3fe0').then(function (n) { return n.o; });
+    const { captureNetworkError } = await import('./chunks/foundation.js?v=bbf4a50a').then(function (n) { return n.o; });
     captureNetworkError(error, "/sw.js", { context: "service_worker" });
   });
   navigator.serviceWorker.addEventListener("controllerchange", async () => {
     updateConnectivity({
       controller: navigator.serviceWorker?.controller ? "controlled" : "uncontrolled"
     });
-    const { clearRecentSearchResults } = await import('./chunks/foundation.js?v=b6ea3fe0').then(function (n) { return n.q; });
+    const { clearRecentSearchResults } = await import('./chunks/foundation.js?v=bbf4a50a').then(function (n) { return n.q; });
     clearRecentSearchResults();
     syncView();
   });
@@ -284,8 +284,8 @@ function startServiceWorker() {
 async function startAuthenticatedLifecycle() {
   startErrorHandling();
   const [{ initializeLogoutForms }, { updateUserData }] = await Promise.all([
-    import('./chunks/account.js?v=b6ea3fe0').then(function (n) { return n.l; }),
-    import('./chunks/account.js?v=b6ea3fe0').then(function (n) { return n.a; })
+    import('./chunks/account.js?v=bbf4a50a').then(function (n) { return n.l; }),
+    import('./chunks/account.js?v=bbf4a50a').then(function (n) { return n.a; })
   ]);
   initializeLogoutForms();
   void startAnalytics();

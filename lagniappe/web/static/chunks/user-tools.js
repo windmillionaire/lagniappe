@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { b as FormWidget, I as InputElement, c as FacetedSearchElement, R as RadioElement } from './forms.js?v=b6ea3fe0';
+import { b as FormWidget, I as InputElement, c as FacetedSearchElement, R as RadioElement } from './forms.js?v=bbf4a50a';
 
 class CreateUser extends FormWidget {
   init() {

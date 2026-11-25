@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as ShellView, r as request, w as withTransition } from '../foundation.js?v=b6ea3fe0';
-import '../upstreamUnavailable.js?v=b6ea3fe0';
-import '../connectivity.js?v=b6ea3fe0';
+import { S as ShellView, r as request, w as withTransition } from '../foundation.js?v=bbf4a50a';
+import '../upstreamUnavailable.js?v=bbf4a50a';
+import '../connectivity.js?v=bbf4a50a';
 
 class Analytics extends ShellView {
   async init() {

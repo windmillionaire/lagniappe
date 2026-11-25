@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BROWSER_PROTOCOL } from './connectivity.js?v=b6ea3fe0';
+import { B as BROWSER_PROTOCOL } from './connectivity.js?v=bbf4a50a';
 
 const BROWSER_PROTOCOL_ID = BROWSER_PROTOCOL.id;
 const BROWSER_PROTOCOL_VERSION = BROWSER_PROTOCOL.version;
@@ -288,7 +288,7 @@ function receiveUpstreamUnavailableMessage(message) {
   if (!message || typeof message !== "object" || !("state" in message))
     return false;
   return receiveUpstreamUnavailable(message.state, async () => {
-    const { request } = await import('./foundation.js?v=b6ea3fe0').then(function (n) { return n.p; });
+    const { request } = await import('./foundation.js?v=bbf4a50a').then(function (n) { return n.p; });
     return request.get(window.location.pathname, null, {
       replaceErrorPage: false,
       retryUpstream: false
@@ -306,7 +306,7 @@ function installUpstreamUnavailableBanner() {
     });
     if (window.__TESTING__) {
       window.__TEST_UPSTREAM_UNAVAILABLE__ = async () => {
-        const { request } = await import('./foundation.js?v=b6ea3fe0').then(function (n) { return n.p; });
+        const { request } = await import('./foundation.js?v=bbf4a50a').then(function (n) { return n.p; });
         return request.get("/testing/upstream-unavailable");
       };
     }
