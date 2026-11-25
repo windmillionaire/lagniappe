@@ -30,7 +30,7 @@ def handle_http_error(error: HTTPException) -> ResponseReturnValue:
     code = error.code or 500 if hasattr(error, "code") else 500
 
     if request.path == "/api" or request.path.startswith("/api/"):
-        from lagniappe.web.routes.api.main import handle_api_http_error
+        from lagniappe.web.routes.api.http import handle_api_http_error
 
         return handle_api_http_error(error)
 

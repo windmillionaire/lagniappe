@@ -39,7 +39,6 @@ def test_experiments_execute_requires_remote_admin_and_exact_proposal(monkeypatc
         monkeypatch.setattr(CONFIG, name, value)
     monkeypatch.setattr(agent_api, "authenticate_credential", lambda token: (actor, {}))
     monkeypatch.setattr(remote_mcp, "authenticate_envelope", lambda *args: (actor, {}))
-    monkeypatch.setattr(api, "_rate_limit", lambda *args: None)
     monkeypatch.setattr(
         api, "_load_plan", lambda identifier: SimpleNamespace(id=identifier)
     )
@@ -122,7 +121,6 @@ def test_app_wide_auto_execute_api_key_compact_get_and_one_step_submit(monkeypat
         lambda config=CONFIG: {"AI_AUTO_EXECUTE": True},
     )
     monkeypatch.setattr(agent_api, "authenticate_credential", lambda token: (actor, {"active": True}))
-    monkeypatch.setattr(api, "_rate_limit", lambda *args: None)
 
     plan_calls = []
 
