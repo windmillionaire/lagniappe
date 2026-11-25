@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from '../foundation.js?v=b438e48a';
-import '../upstreamUnavailable.js?v=b438e48a';
-import '../connectivity.js?v=b438e48a';
+import { w as withTransition } from '../foundation.js?v=b8c49d0d';
+import '../upstreamUnavailable.js?v=b8c49d0d';
+import '../connectivity.js?v=b8c49d0d';
 
 function legacyCopy(url, documentRef) {
   const textarea = documentRef.createElement("textarea");

@@ -981,6 +981,25 @@ def test_json_parent_lookup_skips_empty_parent_query():
 
 
 @pytest.mark.unit
+def test_json_parent_lookup_includes_matches_beyond_default_search_page(monkeypatch):
+    client = CacheJSON()
+    parents = [f"JSON:project{index}:all-v3" for index in range(14)]
+    first_page = SimpleNamespace(total=len(parents), docs=[SimpleNamespace(id=p) for p in parents[:10]])
+    all_results = SimpleNamespace(total=len(parents), docs=[SimpleNamespace(id=p) for p in parents])
+    pages = []
+
+    def search(query):
+        arguments = list(query.get_args())
+        limit = arguments[arguments.index("LIMIT") + 2]
+        pages.append(limit)
+        return first_page if limit == 10 else all_results
+
+    monkeypatch.setattr(client, "search", search)
+    assert client.get_new_parents([f"project{i}" for i in range(14)]) == parents
+    assert pages == [10, 14]
+
+
+@pytest.mark.unit
 def test_delete_cache_flushes_db_and_recreates_indexes(monkeypatch):
     from lagniappe.core.tools.cache import help as help_cache
     calls = []

@@ -294,20 +294,26 @@ class CacheJSON:
         # This JSONPath selects only identifiers from persisted refresh markers.
         return cast(list[str], refresh_members) if refresh_members else []
 
+    def _parent_ids(self, query: Query, result: Result) -> list[str]:
+        # RediSearch returns ten documents by default. A category-backed Page
+        # or a batch spanning Projects can match more parent caches.
+        if result.total > len(result.docs):
+            result = self.search(query.paging(0, result.total))
+        return [doc.id for doc in result.docs]
+
     def get_existing_parents(self, hashes: Collection[str]) -> dict[str, list[str]]:
         """Return a mapping of hashes to their parent JSON key IDs."""
+        queries = {h: Query(f"@cache_key:{{{h}}}").no_content() for h in hashes}
         with self.redis.pipeline() as pipe:
-            for h in hashes:
-                key_query = Query(f"@cache_key:{{{h}}}").no_content()
-                pipe.ft(self.INDEX).search(key_query)
-
+            for query in queries.values():
+                pipe.ft(self.INDEX).search(query)
             results = pipe.execute()
 
         parents = {}
-        for entity_hash, raw in zip(hashes, results, strict=True):
+        for (entity_hash, query), raw in zip(queries.items(), results, strict=True):
             result = Result.from_resp3(raw) if isinstance(raw, dict) else Result(raw, hascontent=False)
             if result.docs:
-                parents[entity_hash] = [doc.id for doc in result.docs]
+                parents[entity_hash] = self._parent_ids(query, result)
         return parents
 
     def get_new_parents(self, parent_hashes: Iterable[str]) -> list[str]:
@@ -316,10 +322,8 @@ class CacheJSON:
         if not parent_hashes:
             return []
 
-        new_parents = f"@hash:{{ {' | '.join(parent_hashes)} }}"
-        hash_query = Query(f"{new_parents}").no_content()
-        results = self.search(hash_query)
-        return [doc.id for doc in results.docs]
+        query = Query(f"@hash:{{ {' | '.join(parent_hashes)} }}").no_content()
+        return self._parent_ids(query, self.search(query))
 
 
 filter_cache = CacheJSON()
