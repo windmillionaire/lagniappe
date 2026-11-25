@@ -435,7 +435,9 @@ export class TableElement extends BaseElement {
 				document.createElement("span"),
 			);
 			text.textContent = "Add row";
-			label.appendChild(this._createButton);
+			const labelRow =
+				label.querySelector<HTMLElement>("[data-role='label']") ?? label;
+			labelRow.appendChild(this._createButton);
 		}
 
 		this._table = this.table();

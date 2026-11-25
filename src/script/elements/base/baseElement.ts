@@ -195,6 +195,7 @@ export class BaseElement {
 		const button = document.createElement("button");
 		button.type = "button";
 		button.dataset.role = "history-fill";
+		button.dataset.kind = "default";
 		button.ariaLabel = "Fill from latest history";
 		button.title = "Fill from latest history";
 		button.className = STYLES.form.icon;
@@ -251,7 +252,12 @@ export class BaseElement {
 			return false;
 		}
 
-		label.append(button);
+		const clearButton = label.querySelector("[data-role='clear']");
+		if (clearButton) {
+			label.insertBefore(button, clearButton);
+		} else {
+			label.append(button);
+		}
 		return true;
 	}
 
@@ -290,30 +296,25 @@ export class BaseElement {
 			read.dataset.role = "read";
 			if (!this.readonly && this.hasSubmission) {
 				read.classList.add("cursor-pointer", "transition-colors");
-				const readRow = document.createElement("div");
-				readRow.dataset.role = "read-row";
-				readRow.className = STYLES.form.readRow;
-
-				const button = document.createElement("button");
-				button.type = "button";
-				button.dataset.role = "edit";
-				button.ariaLabel = `Edit ${this.label}`;
-				button.title = `Edit ${this.label}`;
-				button.className = STYLES.form.readEdit;
-				setIcon(
-					button.appendChild(document.createElement("span")),
-					"edit",
-					"icon-sm",
-				);
-
-				readRow.append(read, button);
-				elt.appendChild(readRow);
-			} else {
-				elt.appendChild(read);
-				if (this.readonly) {
-					elt.classList.add("flex", "flex-col", "gap-1");
+				if (label) {
+					const button = label.appendChild(document.createElement("button"));
+					button.type = "button";
+					button.dataset.role = "edit";
+					button.ariaLabel = `Edit ${this.label}`;
+					button.title = `Edit ${this.label}`;
+					button.className = `group-data-[mode=edit]/element:hidden ${STYLES.form.icon}`;
+					setIcon(
+						button.appendChild(document.createElement("span")),
+						"edit",
+						"icon-xs",
+					);
+					const editText = button.appendChild(document.createElement("span"));
+					editText.textContent = "Edit";
 				}
+			} else if (this.readonly) {
+				elt.classList.add("flex", "flex-col", "gap-1");
 			}
+			elt.appendChild(read);
 		}
 
 		if (label && "clear" in this && this.clear && !this.readonly) {

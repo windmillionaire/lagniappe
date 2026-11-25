@@ -119,7 +119,7 @@ test("test_todo_title_actions_use_table_style_semantics", async (t) => {
 	todo._input = document.createElement("input");
 	todo._historyValue = { items: [{ text: "Earlier", checked: false }] };
 	todo._render();
-	let controls = todo._elt.querySelectorAll("h3 > button");
+	let controls = todo._elt.querySelectorAll("h3 [data-role='label'] > button");
 	const add = [...controls].find((child) => child.dataset.role === "todo-edit");
 	const history = [...controls].find(
 		(child) => child.dataset.role === "history-fill",
@@ -132,11 +132,11 @@ test("test_todo_title_actions_use_table_style_semantics", async (t) => {
 	assert.equal(add?.className, STYLES.form.icon);
 	assert.equal(add?.dataset.kind, "add");
 	assert.equal(history?.className, STYLES.form.icon);
-	assert.equal(history?.dataset.kind, undefined);
+	assert.equal(history?.dataset.kind, "default");
 
 	todo._editing = true;
 	todo._render();
-	controls = todo._elt.querySelectorAll("h3 > button");
+	controls = todo._elt.querySelectorAll("h3 [data-role='label'] > button");
 	const done = [...controls].find(
 		(child) => child.dataset.role === "todo-done",
 	);

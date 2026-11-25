@@ -137,10 +137,7 @@ STYLES = {
 			"title": "text-lg font-semibold text-kind-default flex flex-row items-center gap-2",
 			"controls": "flex flex-row items-center gap-1"
 		},
-		"icon": "ml-1.5 inline-flex h-6 items-center gap-1 rounded-full border border-base-light bg-white px-2 text-xs font-medium text-kind-default shadow-2xs transition-colors hover:border-kind-default hover:text-kind-dark focus-visible:border-kind-default focus-visible:text-kind-dark focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
-		"readRow": "form-read-row group/read group-data-[mode=edit]/element:hidden inline-flex max-w-full flex-row items-center gap-1.5",
-		"readEdit": "inline-grid size-7 shrink-0 place-items-center rounded-md text-kind-default opacity-45 transition-opacity hover:bg-white/80 hover:opacity-100 group-hover/read:opacity-100 focus-visible:bg-white focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-kind-default cursor-pointer",
-		"editAll": "inline-flex h-7 items-center gap-1 rounded-md border border-base-light bg-white px-2.5 text-xs font-semibold text-kind-default shadow-2xs transition-colors hover:border-kind-default hover:text-kind-dark focus-visible:border-kind-default focus-visible:text-kind-dark focus-visible:outline-2 focus-visible:outline-kind-default cursor-pointer",
+		"icon": "form-field-action inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-kind-default transition-colors hover:bg-black/5 hover:text-kind-dark focus-visible:bg-white/80 focus-visible:text-kind-dark focus-visible:outline-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
 		"linkLabel": "form-link-label",
 		"restriction": "flex flex-row items-center gap-2 px-3 py-2 justify-between",
 		"table": {
@@ -173,8 +170,9 @@ STYLES = {
 		},
 		"elementLabel": "flex flex-col gap-1 font-semibold sm:text-sm text-base-dark",
 		"submission": {
-			"default": "submission-outline flex min-h-10 min-w-0 w-fit max-w-full flex-row items-center justify-center rounded-md bg-white/60 px-3 py-1.25 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]",
-			"grows": "submission-outline min-w-0 w-fit max-w-full rounded-md bg-white/60 px-3 py-2.5 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]"
+			"default": "submission-outline flex min-h-10 min-w-0 w-full flex-row items-center justify-start rounded-md bg-white/60 px-3 py-1.25 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]",
+			"grows": "submission-outline min-w-0 w-full rounded-md bg-white/60 px-3 py-2.5 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]",
+			"chip": "inline-flex items-center rounded-sm border border-kind-light/40 bg-kind-bg/70 px-2 py-0.5 text-xs font-medium text-kind-dark"
 		}
 	},
 	"help": {

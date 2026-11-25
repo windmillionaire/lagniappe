@@ -44,18 +44,23 @@ export class SelectElement extends BaseElement {
 		if (!this.schema.options) return null;
 
 		const options = this.schema.options;
-
 		const read = document.createElement("div");
-		read.className = "flex flex-row flex-wrap gap-2";
 
-		this.values.forEach((item) => {
-			const option = options.find((opt) => opt.value === item);
-			if (!option) return;
+		if (this.schema.multiple) {
+			read.className = `${STYLES.form.submission.default} flex-wrap gap-1.5`;
+			this.values.forEach((item) => {
+				const option = options.find((opt) => opt.value === item);
+				if (!option) return;
 
-			const container = read.appendChild(document.createElement("div"));
-			container.className = STYLES.form.submission.default;
-			container.textContent = option.label;
-		});
+				const chip = read.appendChild(document.createElement("span"));
+				chip.className = STYLES.form.submission.chip;
+				chip.textContent = option.label;
+			});
+		} else {
+			read.className = STYLES.form.submission.default;
+			const option = options.find((opt) => opt.value === this.values[0]);
+			if (option) read.textContent = option.label;
+		}
 
 		read.classList.add("group-data-[mode=edit]/element:hidden");
 		this._read = read;

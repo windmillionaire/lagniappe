@@ -294,7 +294,8 @@ export class TodoElement extends BaseElement {
 		);
 
 		if (!this.readonly) {
-			const controls = label;
+			const controls =
+				label.querySelector<HTMLElement>("[data-role='label']") ?? label;
 			if (this._editing) {
 				controls.appendChild(
 					this._button({

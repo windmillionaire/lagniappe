@@ -97,7 +97,7 @@ test("test_due_date_and_task_upload_open_panels_render_outside_section_toggle_ro
 	upload.destroy();
 });
 
-test("test_form_fields_click_to_edit_neutral_clear_lazy_history_and_edit_all", async (t) => {
+test("test_form_fields_click_to_edit_divider_actions_full_width_read_and_lazy_history", async (t) => {
 	createBrowser(t, {
 		url: "https://lagniappe.test/pages/page-1",
 		html: `<form data-widget="TestForm" data-kind="page"></form>`,
@@ -105,6 +105,8 @@ test("test_form_fields_click_to_edit_neutral_clear_lazy_history_and_edit_all", a
 
 	const { InputElement } = await import("../../src/script/elements/input.ts");
 	const { RadioElement } = await import("../../src/script/elements/radio.ts");
+	const { TableElement } = await import("../../src/script/elements/table.ts");
+	const { TodoElement } = await import("../../src/script/elements/todo.ts");
 	const { FormWidget } = await import(
 		"../../src/script/widgets/base/formWidget.ts"
 	);
@@ -137,10 +139,32 @@ test("test_form_fields_click_to_edit_neutral_clear_lazy_history_and_edit_all", a
 		{ id: "varroa", title: "Varroa", input: "text" },
 		null,
 	);
+	const tableField = new TableElement(
+		{ kind: "page", readonly: false },
+		{
+			id: "table-1",
+			type: "table",
+			title: "Measurements",
+			columns: [{ id: "row-1", type: "input", input: "text", title: "Item" }],
+		},
+		null,
+	);
+	const todoField = new TodoElement(
+		{ kind: "task", readonly: false },
+		{ id: "todo-1", type: "todo", title: "Checklist" },
+		{ items: [{ text: "Check brood", checked: false }] },
+	);
 
 	class TestFormWidget extends FormWidget {
 		get html() {
-			return [nameField.elt, emailField.elt, radioField.elt, historyField.elt];
+			return [
+				nameField.elt,
+				emailField.elt,
+				radioField.elt,
+				historyField.elt,
+				tableField.elt,
+				todoField.elt,
+			];
 		}
 	}
 
@@ -150,19 +174,42 @@ test("test_form_fields_click_to_edit_neutral_clear_lazy_history_and_edit_all", a
 		await widget.init();
 		const form = widget.target;
 
-		// Value pill uses existing 'edit' icon beside read pill, and Edit all appears for 2+ read fields.
+		// No form-level Edit all bar is rendered.
+		assert.equal(form.querySelector("[data-role='edit-all']"), null);
+		assert.equal(form.querySelector("[data-role='edit-all-bar']"), null);
+
+		// Edit action lives in the label row with the existing 'edit' icon, divider hook, and full-width read box.
 		const nameElt = form.querySelector("#name");
-		const editBtn = nameElt.querySelector("[data-role='edit']");
-		assert.ok(editBtn);
+		const editBtn = nameElt.querySelector(
+			"[data-role='label'] [data-role='edit']",
+		);
+		assert.ok(editBtn, "Edit button should live inside the label row");
+		assert.equal(editBtn.getAttribute("aria-label"), "Edit Name");
+		assert.ok(editBtn.textContent.includes("Edit"));
+		assert.ok(editBtn.classList.contains("form-field-action"));
 		assert.equal(
 			editBtn.querySelector("[data-icon]")?.dataset.icon,
 			"edit",
-			"Edit button beside read pill must keep the existing edit icon",
+			"Edit button must keep the existing edit icon",
 		);
-		const editAllBtn = form.querySelector("[data-role='edit-all']");
-		assert.ok(editAllBtn, "Edit all button should appear for 2+ read fields");
+		const nameRead = nameElt.querySelector("[data-role='read']");
+		assert.equal(nameElt.querySelector("[data-role='read-row']"), null);
+		assert.ok(
+			nameRead.classList.contains("w-full"),
+			"Read-mode value box should span full width",
+		);
 
-		// Clicking an <a> link inside a read pill must not hijack into edit mode.
+		// Table and Todo header actions also live inside [data-role='label'] with divider hook.
+		const addRowBtn = form.querySelector(
+			"#table-1 [data-role='label'] [data-role='create']",
+		);
+		assert.ok(addRowBtn?.classList.contains("form-field-action"));
+		const todoEditBtn = form.querySelector(
+			"#todo-1 [data-role='label'] [data-role='todo-edit']",
+		);
+		assert.ok(todoEditBtn?.classList.contains("form-field-action"));
+
+		// Clicking an <a> link inside a read box must not hijack into edit mode.
 		const emailElt = form.querySelector("#email");
 		const mailLink = emailElt.querySelector("[data-role='read'] a");
 		assert.ok(mailLink);
@@ -173,32 +220,30 @@ test("test_form_fields_click_to_edit_neutral_clear_lazy_history_and_edit_all", a
 		await flush();
 		assert.equal(emailElt.dataset.mode, "read");
 
-		// Clicking the read value pill itself switches into edit mode and exposes neutral Clear chip.
-		nameElt
-			.querySelector("[data-role='read']")
-			.dispatchEvent(
-				new MouseEvent("click", { bubbles: true, cancelable: true }),
-			);
+		// Clicking the read value box switches into edit mode and exposes neutral Clear divider action.
+		nameRead.dispatchEvent(
+			new MouseEvent("click", { bubbles: true, cancelable: true }),
+		);
 		await flush();
 		assert.equal(nameElt.dataset.mode, "edit");
-		const nameClear = nameElt.querySelector("[data-role='clear']");
+		const nameClear = nameElt.querySelector(
+			"[data-role='label'] [data-role='clear']",
+		);
 		assert.ok(nameClear);
+		assert.ok(nameClear.classList.contains("form-field-action"));
 		assert.equal(nameClear.dataset.kind, "default");
 		assert.equal(nameClear.hidden, false);
-		assert.equal(
-			form.querySelector("[data-role='edit-all']"),
-			null,
-			"Edit all should hide once fewer than 2 read fields remain",
-		);
 
-		// Clearing empties the input and hides the Clear chip.
+		// Clearing empties the input and hides the Clear action.
 		nameClear.click();
 		assert.equal(nameElt.querySelector("input").value, "");
 		assert.equal(nameClear.hidden, true);
 
-		// Initially-empty radio gets a hidden Clear chip that appears once an option is chosen.
+		// Initially-empty radio gets a hidden Clear action that appears once an option is chosen.
 		const radioElt = form.querySelector("#queen");
-		const radioClear = radioElt.querySelector("[data-role='clear']");
+		const radioClear = radioElt.querySelector(
+			"[data-role='label'] [data-role='clear']",
+		);
 		assert.ok(radioClear);
 		assert.equal(radioClear.hidden, true);
 		const yesRadio = radioElt.querySelector("input[type='radio'][value='yes']");
@@ -209,7 +254,7 @@ test("test_form_fields_click_to_edit_neutral_clear_lazy_history_and_edit_all", a
 		assert.equal(yesRadio.checked, false);
 		assert.equal(radioClear.hidden, true);
 
-		// History fill chip stays lazy and shows 'Use last' -> 'Loading...' -> restores value.
+		// History fill stays lazy, sits before Clear in the label row, and restores value.
 		let resolveHistory;
 		let fetchCalls = 0;
 		const added = historyField.addHistoryFill(() => {
@@ -220,9 +265,21 @@ test("test_form_fields_click_to_edit_neutral_clear_lazy_history_and_edit_all", a
 		});
 		assert.equal(added, true);
 		assert.equal(fetchCalls, 0, "History fill must remain lazy until clicked");
-		const historyBtn = form.querySelector("#varroa [data-role='history-fill']");
+		const varroaLabel = form.querySelector("#varroa [data-role='label']");
+		const historyBtn = varroaLabel.querySelector("[data-role='history-fill']");
+		const varroaClear = varroaLabel.querySelector("[data-role='clear']");
 		assert.ok(historyBtn);
+		assert.ok(historyBtn.classList.contains("form-field-action"));
+		assert.equal(historyBtn.dataset.kind, "default");
 		assert.ok(historyBtn.textContent.includes("Use last"));
+		assert.equal(
+			Boolean(
+				historyBtn.compareDocumentPosition(varroaClear) &
+					Node.DOCUMENT_POSITION_FOLLOWING,
+			),
+			true,
+			"Use last should sit before Clear in the label row",
+		);
 		historyBtn.click();
 		assert.equal(fetchCalls, 1);
 		assert.ok(historyBtn.textContent.includes("Loading..."));
@@ -232,14 +289,10 @@ test("test_form_fields_click_to_edit_neutral_clear_lazy_history_and_edit_all", a
 			form.querySelector("#varroa [data-role='read']")?.textContent,
 			"1.2",
 		);
-
-		// Now email + varroa are in read mode (2 read fields): Edit all switches both at once.
-		assert.ok(form.querySelector("[data-role='edit-all']"));
-		form.querySelector("[data-role='edit-all']").click();
-		await flush();
-		assert.equal(emailElt.dataset.mode, "edit");
-		assert.equal(form.querySelector("#varroa").dataset.mode, "edit");
-		assert.equal(form.querySelector("[data-role='edit-all']"), null);
+		assert.ok(
+			form.querySelector("#varroa [data-role='label'] [data-role='edit']"),
+			"Restored field should expose Edit in its label row",
+		);
 	} finally {
 		widget.destroy();
 	}

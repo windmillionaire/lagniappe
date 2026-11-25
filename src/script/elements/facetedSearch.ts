@@ -31,12 +31,12 @@ export class FacetedSearchElement extends BaseElement {
 		if (this._read) return this._read;
 
 		const read = document.createElement("div");
-		read.className = "flex flex-row flex-wrap gap-2";
+		read.className = `${STYLES.form.submission.default} flex-wrap gap-1.5`;
 		read.dataset.kind = String(this.renderer.kind);
 
 		this.values.forEach((item) => {
-			const container = read.appendChild(document.createElement("div"));
-			container.className = STYLES.form.submission.default;
+			const container = read.appendChild(document.createElement("span"));
+			container.className = STYLES.form.submission.chip;
 			container.appendChild(formatting.name(item));
 		});
 

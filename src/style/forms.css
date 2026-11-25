@@ -177,10 +177,11 @@ input[role="combobox"] {
 
 	&
 		label:has(
-			:is([data-role="history-fill"], [data-role="clear"]):is(
-					:hover,
-					:focus-visible
-				)
+			:is(
+					[data-role="edit"],
+					[data-role="history-fill"],
+					[data-role="clear"]
+				):is(:hover, :focus-visible)
 		) {
 		& :where(.form-input:not(:disabled)) {
 			outline: 0.5px solid var(--color-base-light);
@@ -199,6 +200,27 @@ button[lp-select]:disabled {
 	}
 }
 
+/* @style form.icon */
+.form-field-action {
+	position: relative;
+	margin-left: 0.5rem;
+	&::before {
+		content: "";
+		position: absolute;
+		left: -0.375rem;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 1px;
+		height: 0.75rem;
+		background-color: color-mix(
+			in oklch,
+			var(--color-base-medium) 45%,
+			transparent
+		);
+		pointer-events: none;
+	}
+}
+
 /* @style form.submission.default form.submission.grows */
 .submission-outline {
 	outline-style: solid;
@@ -206,12 +228,14 @@ button[lp-select]:disabled {
 	outline-color: color-mix(in oklch, var(--kind-light) 50%, transparent);
 }
 
-/* @style form.readRow */
-.form-read-row:hover .submission-outline,
-.form-read-row:has([data-role="edit"]:focus-visible) .submission-outline {
-	background-color: white;
-	outline-color: var(--kind-default);
-	outline-width: 2px;
+/* @style form.submission.default form.submission.grows */
+.form-element[data-mode="read"]:has([data-role="edit"]) {
+	& > .submission-outline:hover,
+	&:has([data-role="edit"]:is(:hover, :focus-visible)) > .submission-outline {
+		background-color: white;
+		outline-color: var(--kind-default);
+		outline-width: 2px;
+	}
 }
 
 /* @style form.linkLabel */

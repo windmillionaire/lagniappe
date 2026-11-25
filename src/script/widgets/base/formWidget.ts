@@ -10,9 +10,7 @@ import {
 	renderReviewBar,
 } from "../../forms/reviewBar.ts";
 import type { EditWatcher } from "../../forms/revisions/watcher.ts";
-import { STYLES } from "../../generated/styles.mjs";
 import type { DeferredOperationManager } from "../../shared/deferredOperations.ts";
-import { setIcon } from "../../shared/icons.ts";
 import type { Modal } from "../../shared/modal.ts";
 import type { OfflineQueue } from "../../shared/offlineQueue.ts";
 import { withTransition } from "../../shared/transitions.ts";
@@ -681,7 +679,6 @@ export class FormWidget {
 		this.target.addEventListener("input", this._syncFieldClearEvent);
 		this.target.addEventListener("change", this._syncFieldClearEvent);
 		this.target.addEventListener("updated", this._syncFieldClearEvent);
-		this._syncEditAllButton();
 		const hasDeferredOperation =
 			this.target.matches?.("[data-operation]") ||
 			this.target.querySelector?.("[data-operation]");
@@ -692,59 +689,6 @@ export class FormWidget {
 		this.initialized = true;
 		this.loaded = this.target.hasAttribute("loaded");
 		this.target.setAttribute("initialized", "");
-	}
-
-	_editableReadFields() {
-		if (this.readonly || this.revisionPreview || !this.target) return [];
-		return Array.from(
-			this.target.querySelectorAll<FormFieldTarget>(
-				".form-element[data-mode='read']",
-			),
-		).filter((element) => Boolean(element.querySelector("[data-role='read']")));
-	}
-
-	_syncEditAllButton() {
-		if (!this.target) return;
-		const existingBar = this.target.querySelector<HTMLElement>(
-			":scope > [data-role='edit-all-bar']",
-		);
-		const readFields = this._editableReadFields();
-		if (readFields.length < 2) {
-			existingBar?.remove();
-			return;
-		}
-		if (existingBar) {
-			existingBar.hidden = false;
-			return;
-		}
-
-		const firstField = this.target.querySelector<HTMLElement>(".form-element");
-		if (!firstField) return;
-
-		const bar = document.createElement("div");
-		bar.dataset.role = "edit-all-bar";
-		bar.className = "flex items-center justify-end -mb-3";
-
-		const button = document.createElement("button");
-		button.type = "button";
-		button.dataset.role = "edit-all";
-		button.ariaLabel = "Edit all fields";
-		button.title = "Edit all fields";
-		button.className = STYLES.form.editAll;
-		setIcon(
-			button.appendChild(document.createElement("span")),
-			"edit",
-			"icon-xs",
-		);
-		const text = button.appendChild(document.createElement("span"));
-		text.textContent = "Edit all";
-		bar.appendChild(button);
-
-		if (firstField.parentElement === this.target) {
-			this.target.insertBefore(bar, firstField);
-		} else {
-			firstField.before(bar);
-		}
 	}
 
 	_hasFieldValue(element: FormFieldTarget) {
@@ -786,7 +730,6 @@ export class FormWidget {
 		const target = e.target as Element | null;
 		const element = target?.closest<FormFieldTarget>(".form-element") ?? null;
 		this._syncFieldClear(element);
-		if (e.type === "change") this._syncEditAllButton();
 	}
 
 	_focusFieldControl(element: FormFieldTarget) {
@@ -807,7 +750,6 @@ export class FormWidget {
 			() => {
 				element.dataset.mode = "edit";
 				this._syncFieldClear(element);
-				this._syncEditAllButton();
 				if (focus) this._focusFieldControl(element);
 			},
 			{ label: "form:edit-field" },
@@ -819,26 +761,6 @@ export class FormWidget {
 
 		const target = e.target as Element | null;
 		if (!target?.closest) return;
-
-		const editAll = target.closest<HTMLElement>("[data-role='edit-all']");
-		if (editAll && this.target.contains(editAll)) {
-			e.preventDefault();
-			e.stopPropagation();
-			const readFields = this._editableReadFields();
-			if (readFields.length === 0) return;
-			void withTransition(
-				() => {
-					for (const field of readFields) {
-						field.dataset.mode = "edit";
-						this._syncFieldClear(field);
-					}
-					this._syncEditAllButton();
-					this._focusFieldControl(readFields[0]);
-				},
-				{ label: "form:edit-all-fields" },
-			);
-			return;
-		}
 
 		const element = target.closest<FormFieldTarget>(".form-element");
 		const role = target.closest<HTMLElement>("[data-role]")?.dataset.role;

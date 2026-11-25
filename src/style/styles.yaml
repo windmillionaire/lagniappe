@@ -458,23 +458,11 @@ form:
       intent: controls presentation within form header
       surfaces: [server, frontend]
   icon:
-    classes: ml-1.5 inline-flex h-6 items-center gap-1 rounded-full border border-base-light bg-white px-2 text-xs font-medium text-kind-default shadow-2xs transition-colors hover:border-kind-default hover:text-kind-dark focus-visible:border-kind-default focus-visible:text-kind-dark focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer
-    intent: compact label-adjacent field action chip (Use last, Clear, Add row, Edit, Done)
+    classes: form-field-action inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-kind-default transition-colors hover:bg-black/5 hover:text-kind-dark focus-visible:bg-white/80 focus-visible:text-kind-dark focus-visible:outline-2 focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50 cursor-pointer
+    intent: borderless label-adjacent field action separated by a vertical divider (Edit, Use last, Clear, Add row, Done)
     surfaces: [frontend]
-  readRow:
-    classes: form-read-row group/read group-data-[mode=edit]/element:hidden inline-flex max-w-full flex-row items-center gap-1.5
-    intent: read-mode value pill paired with a subtle click-to-edit action beside it
-    surfaces: [frontend]
-    hooks: [form-read-row]
+    hooks: [form-field-action]
     css: [src/style/forms.css]
-  readEdit:
-    classes: inline-grid size-7 shrink-0 place-items-center rounded-md text-kind-default opacity-45 transition-opacity hover:bg-white/80 hover:opacity-100 group-hover/read:opacity-100 focus-visible:bg-white focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-kind-default cursor-pointer
-    intent: subtle edit-icon button beside a clickable read-mode submission value
-    surfaces: [frontend]
-  editAll:
-    classes: inline-flex h-7 items-center gap-1 rounded-md border border-base-light bg-white px-2.5 text-xs font-semibold text-kind-default shadow-2xs transition-colors hover:border-kind-default hover:text-kind-dark focus-visible:border-kind-default focus-visible:text-kind-dark focus-visible:outline-2 focus-visible:outline-kind-default cursor-pointer
-    intent: form-level button switching all read-mode fields into edit mode at once
-    surfaces: [frontend]
   linkLabel:
     classes: form-link-label
     intent: form link text whose first-line height matches its leading icon
@@ -588,17 +576,21 @@ form:
     surfaces: [frontend, server]
   submission:
     default:
-      classes: submission-outline flex min-h-10 min-w-0 w-fit max-w-full flex-row items-center justify-center rounded-md bg-white/60 px-3 py-1.25 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]
-      intent: compact form value that wraps long text within its container
+      classes: submission-outline flex min-h-10 min-w-0 w-full flex-row items-center justify-start rounded-md bg-white/60 px-3 py-1.25 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]
+      intent: full-width form value that wraps long text within its container
       surfaces: [frontend]
       hooks: [submission-outline]
       css: [src/style/forms.css]
     grows:
-      classes: submission-outline min-w-0 w-fit max-w-full rounded-md bg-white/60 px-3 py-2.5 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]
-      intent: multiline form value that wraps long text within its container
+      classes: submission-outline min-w-0 w-full rounded-md bg-white/60 px-3 py-2.5 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]
+      intent: full-width multiline form value that wraps long text within its container
       surfaces: [frontend]
       hooks: [submission-outline]
       css: [src/style/forms.css]
+    chip:
+      classes: inline-flex items-center rounded-sm border border-kind-light/40 bg-kind-bg/70 px-2 py-0.5 text-xs font-medium text-kind-dark
+      intent: compact selected option chip inside a full-width multi-value read container
+      surfaces: [frontend]
 
 help:
   content:
