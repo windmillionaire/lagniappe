@@ -1128,3 +1128,19 @@ def test_unnamed_text_upload_preserves_stream_and_uses_text_mimetype():
     assert encoding
     assert file_utility.determine_mimetype(upload, upload.filename, None, encoding) == "text/plain"
     assert upload.stream.tell() == 2
+
+
+@pytest.mark.parametrize("filename,content,expected", [
+    ("record.JSON", b'{"amount": 42}', "application/json"),
+    ("notes.md", b"a" * 8191 + "é".encode(), "text/markdown"),
+    ("log.txt", b"First line\nSecond line", "text/plain"),
+    ("contact.vcf", b"BEGIN:VCARD\r\nEND:VCARD", "text/vcard"),
+    ("binary.json", b"binary\0payload", "application/octet-stream"),
+    ("invalid.md", b"invalid utf8\xff", "application/octet-stream"),
+    ("active.html", b"<script>sample</script>", "application/octet-stream"),
+    ("image.md", b"\x89PNG\r\n\x1a\n" + b"\0" * 32, "image/png"),
+])
+def test_generic_uploads_recognize_text_documents_from_the_bounded_sample(filename, content, expected):
+    upload = FileStorage(stream=BytesIO(content), filename=filename, content_type="application/octet-stream")
+    assert file_utility.determine_mimetype(upload, filename, upload.content_type, None) == expected
+    assert upload.stream.tell() == 0
