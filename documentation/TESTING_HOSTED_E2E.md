@@ -28,6 +28,14 @@ An inert App Engine anchor remains as the service traffic owner. Teardown keeps
 the reusable Artifact Registry repository, Secret Manager mounts, WIF provider,
 result bucket, service accounts, and anchor.
 
+The `runner/hosted_e2e/` package follows this lifecycle. `cli.py` dispatches
+the commands and `runtime.py` handles environment selection and checkpointed
+state. `provisioning.py` owns one-time setup. `preflight.py` verifies and
+exports the commit, `app_engine.py` manages app descriptors and routing, and
+`candidate.py` builds and deploys the candidate. `execution.py` starts and
+monitors jobs, `evidence.py` imports and validates results, and `lifecycle.py`
+implements status and teardown.
+
 By default, creation adds the exact candidate's browser origin to each test
 bucket and teardown removes it. An installation owner can opt into a standing
 origin for the project's `e2e` service. On each test bucket, add

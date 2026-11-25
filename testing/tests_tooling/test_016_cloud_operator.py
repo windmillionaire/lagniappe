@@ -404,6 +404,47 @@ def test_checkpoint_is_opt_in(monkeypatch, tmp_path):
         assert checkpoints.ACTIVE.get() is None
 
 
+def test_hosted_status_reads_the_restored_cloud_checkpoint(tmp_path, bundle, monkeypatch, capsys):
+    from runner.hosted_e2e import lifecycle, run_hosted_e2e_command, runtime
+
+    save_installation(tmp_path, bundle)
+    settings._record(tmp_path, PROJECT, "1", SOURCE)
+    monkeypatch.setattr(settings, "_source", lambda root: SOURCE)
+    monkeypatch.setenv("LAGNIAPPE_CLOUD_CHECKPOINT_PROJECT", PROJECT)
+    monkeypatch.setattr(runtime, "APP_DIR", tmp_path)
+    monkeypatch.setattr(runtime, "STATE_PATH", tmp_path / "state.json")
+    installation = SimpleNamespace(
+        APP=yaml.safe_load(bundle["app"]),
+        GCLOUD_CONFIG={"PROJECT": PROJECT},
+    )
+    monkeypatch.setattr(runtime, "SETTINGS", installation)
+    monkeypatch.setattr(runtime, "activate_repository_gcloud", lambda **options: None)
+    monkeypatch.setattr(runtime, "_project_number", lambda project: "123")
+    monkeypatch.setattr(lifecycle, "_describe", lambda arguments: None)
+
+    target = runtime._infrastructure()
+    state = {
+        "schema_version": 1,
+        "project": PROJECT,
+        "region": target.region,
+        "service": target.service,
+        "job": target.job,
+        "artifact_bucket": target.artifact_bucket,
+        "status": "torn-down",
+    }
+    bucket = Bucket()
+    checkpoint = checkpoints.Checkpoint(bucket, PROJECT)
+    checkpoint.doc["state"] = state
+    checkpoint.save()
+    monkeypatch.setattr(checkpoints, "_bucket", lambda project, number: bucket)
+
+    assert run_hosted_e2e_command(["status"]) == 0
+    header, payload = capsys.readouterr().out.split("\n", 1)
+    assert header == "Checkpoint generation 1, operation idle"
+    assert json.loads(payload) == dict(state, app_version_present=False, job_present=False)
+    assert bucket.generation == 1
+
+
 def test_cloud_connection_requires_target_identity(tmp_path, monkeypatch):
     path = tmp_path / "native.json"
     monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(path))
