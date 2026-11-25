@@ -157,8 +157,8 @@ def behavior_file_fingerprint(path: Path) -> str:
     content = path.read_bytes()
     if path.suffix == ".py":
         if path.name == "constants.py" and path.parent.name == "config":
-            # BUILD_ID is random output from the production asset build. It is
-            # recorded in hosted provenance but is not a source-tree change.
+            # Historical revisions embedded a generated ID here. Hosted evidence
+            # already records that ID separately from the source fingerprint.
             content = re.sub(
                 rb"(?m)^BUILD_ID\s*=.*(?:\r?\n|$)",
                 b"",

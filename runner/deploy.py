@@ -19,6 +19,7 @@ from config import (
     _atomic_write_text,
     verify_generation_manifest,
 )
+from runner.frontend_bundle import sync as install_frontend_bundle
 from runner.frontend_build import (
     FilesystemFrontendBuildReader,
     inspect_frontend_build,
@@ -410,6 +411,8 @@ def deploy(
 
     if build_assets:
         ensure_production_frontend_bundle(announce_progress=announce_progress)
+    else:
+        install_frontend_bundle(Directory.APP.value)
 
     verify_frontend_build(
         app_dir=Directory.APP.value,

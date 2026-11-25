@@ -507,6 +507,9 @@ jobs:
           python -m venv venv
           venv/bin/python -m pip install --disable-pip-version-check -r requirements-dev.txt
 
+      - name: Install the release candidate frontend
+        run: venv/bin/python -m runner.frontend_bundle sync
+
       - name: Exercise setup imports on Python 3.14
         run: |
           venv/bin/python -m installer --help

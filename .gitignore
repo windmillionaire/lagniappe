@@ -44,3 +44,17 @@ gha-creds-*.json
 # Local planning notes
 todo/
 /archives/
+
+# Frontend publication outputs (the PWA manifest and site artwork are authored).
+/lagniappe/web/static/*.map
+/lagniappe/web/static/build.json
+/lagniappe/web/static/chunks/
+/lagniappe/web/static/fonts/*.*.woff2
+/lagniappe/web/static/login.js
+/lagniappe/web/static/pdf.worker.min.mjs
+/lagniappe/web/static/pdfjs/wasm/
+/lagniappe/web/static/script.js
+/lagniappe/web/static/sentry.js
+/lagniappe/web/static/style.css
+/lagniappe/web/static/sw.js
+/lagniappe/web/static/third-party-licenses.txt

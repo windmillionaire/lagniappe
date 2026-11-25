@@ -63,6 +63,11 @@ def install(*, experiments: bool = False) -> int:
         SETTINGS.DEV["experiments_requested"] = True
         SETTINGS.save(File.DEV_YAML)
 
+    from runner.context import REPOSITORY_ROOT
+    from runner.frontend_bundle import sync
+
+    record_step("verify and install the production frontend")
+    sync(REPOSITORY_ROOT)
     from installer.create_config import set_application_defaults
 
     record_step("initialize application settings")

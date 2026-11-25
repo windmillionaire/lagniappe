@@ -244,7 +244,7 @@ HTML, and leaves mutation results visibly uncertain without replaying them.
 
 | Variable | Replaced With | Purpose |
 |---|---|---|
-| `__BUILD_ID__` | Build cache string | Embedded as `SW_VERSION` constant and tracked in `config/constants.py`; ensures the SW file changes on each frontend build so the browser detects an update |
+| `__BUILD_ID__` | Build cache string | Embedded as `SW_VERSION` and recorded in `build.json` so the browser detects a new frontend generation |
 | `/* __BROWSER_PROTOCOL__ */ null` | `config/browser_protocol.json` | Gives the standalone worker the same versioned message/event and connectivity-state vocabulary as the main bundle and Python message producers |
 | `/* __PRECACHE_URLS__ */ []` | JSON array of versioned Rollup output chunk URLs | Lets activation warm the current build's exact dynamic JS cache keys into `static-cache` |
 

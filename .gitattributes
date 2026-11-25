@@ -5,3 +5,16 @@ lagniappe/web/start/styles/styles.py linguist-generated=true
 
 # Vendored third-party assets
 *.woff2 binary
+
+# Match Git object bytes for the portable frontend source digest on Windows.
+.nvmrc text eol=lf
+THIRD_PARTY_LICENSES/** -text
+build/** text eol=lf
+config/browser_protocol.json text eol=lf
+lagniappe/web/templates/** text eol=lf
+package*.json text eol=lf
+src/fonts/*.json text eol=lf
+src/fonts/upstream/*.ttf binary
+src/script/** text eol=lf
+src/style/** text eol=lf
+lagniappe/web/start/styles/*.py text eol=lf

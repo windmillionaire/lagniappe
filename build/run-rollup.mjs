@@ -9,11 +9,8 @@ import {
 	frontendSourceIdentity,
 	publishFrontendBuild,
 } from "./publication.mjs";
-import {
-	generateBuildId,
-	generateStyleModules,
-	updateConstantsBuildId,
-} from "./utility.mjs";
+import { readBuildSettings, resolveSentryBuild } from "./sentry.mjs";
+import { generateBuildId, generateStyleModules } from "./utility.mjs";
 
 const modes = {
 	development: "rollup.dev.config.mjs",
@@ -36,9 +33,17 @@ if (!configName) {
 	);
 	const temporaryDirectory = mkdtempSync(join(tmpdir(), "lagniappe-frontend-"));
 	const artifactInventoryPath = join(temporaryDirectory, "artifacts.json");
-	const buildId = generateBuildId();
 	generateStyleModules();
 	const sourceIdentity = frontendSourceIdentity(repositoryRoot);
+	const canonicalProduction =
+		mode === "production" &&
+		!resolveSentryBuild(
+			readBuildSettings(),
+			JSON.parse(readFileSync(join(repositoryRoot, "package.json"), "utf8")),
+		).enabled;
+	const buildId = canonicalProduction
+		? `b${sourceIdentity.slice(0, 7)}`
+		: generateBuildId();
 
 	try {
 		rmSync(metadataPath, { force: true });
@@ -77,7 +82,6 @@ if (!configName) {
 				version: inventory.version,
 				artifacts: inventory.artifacts,
 				sourceIdentity,
-				beforePublish: () => updateConstantsBuildId(buildId),
 			});
 		}
 	} finally {

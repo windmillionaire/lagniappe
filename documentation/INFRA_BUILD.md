@@ -4,9 +4,9 @@ Rollup bundles authored TypeScript and CSS from `src/` into
 `lagniappe/web/static/`. The build also generates server-side style maps,
 service-worker metadata, and stable cache generations.
 
-`lagniappe/web/static/` is disposable generated output. Change `src/`,
-`build/`, or the style registries and run the appropriate build; do not edit
-generated bundles. The authored runtime-free `404.html` is the sole exception.
+Rollup owns the files listed in `build.json`. Edit their inputs under `src/`
+or `build/`. The same static directory also contains tracked files such as
+`404.html`, PWA branding and site artwork.
 
 For styles, icons, and linting, read
 [INFRA_BUILD_STYLES.md](INFRA_BUILD_STYLES.md).
@@ -22,7 +22,7 @@ npm run typecheck
 Development output is readable and tagged with mode `development`. Production
 output is minified, enforces startup budgets, records mode `production`, and
 may upload hidden JavaScript source maps when `SENTRY_AUTH_TOKEN` is present.
-Both modes emit a fresh build ID and bundle analysis under `reports/`.
+Development builds use a fresh build ID. Distributable production builds derive their ID from the frontend source digest, including the templates scanned by Tailwind. Local Sentry source-map uploads get a fresh ID. Both write bundle analysis under `reports/`.
 The application version in build metadata comes from `package.json`, even when
 local generated settings still describe an earlier release. Production bundle
 version replacements and Sentry releases use that same package version.
@@ -104,14 +104,14 @@ Assets already present in the worker's static cache are skipped during precache.
 version, build ID, build mode, a digest of all declared frontend sources, and
 the path, size, and digest of every published artifact. The inventory includes
 nested chunks, fonts, PDF.js assets, the service worker, and the generated
-Python style/icon registries. `config/constants.py` receives the same build ID
+Python style/icon registries. The runtime reads the build ID from this marker
 for template URLs and ETags. Local application settings must not define
 `BUILD_ID`.
 
 The build wrapper generates the tracked JavaScript/Python registries before
 recording the source digest, then removes the previous completion marker before
 Rollup starts.
-It publishes `BUILD_ID` and a new `build.json` only after every Rollup entry,
+It publishes the new `build.json` after every Rollup entry,
 optional Sentry upload, and output check succeeds, and only if the authored
 source digest is unchanged. A failed or interrupted build therefore leaves no
 apparently complete marker; the next managed build repairs it.
@@ -235,22 +235,34 @@ application modules should remain visible.
 
 ## Release boundary
 
-Development occurs on `next/<version>` or `hotfix/<version>` branches. At
-release freeze, run one canonical dependency install and production build:
+The **Frontend bundle** workflow builds a production ZIP when frontend inputs
+change on `next/*` or `hotfix/*`. It publishes the ZIP as an asset on the
+`frontend-<full source SHA-256>` GitHub prerelease. The build ID, archive
+members and timestamps are deterministic, so a retry can verify the existing
+asset. Pull requests run the build and retain a downloadable Actions artifact.
+
+A clean owner installation retrieves the ZIP using Python. The installer checks
+its SHA-256, source identity, version and every file in `build.json` before
+installing the static files. Saved copies live in `reports/frontend-bundles/`.
+The PWA manifest and site artwork are installation-owned. Python style bindings
+are included in the ZIP and checked against their tracked copies.
+
+At release freeze, record the published archive digest and check the staged tree.
 
 ```bash
-npm ci
-npm run build
+venv/bin/python -m runner.frontend_bundle pin
+git add config/frontend-release.json
 venv/bin/python run.py release-check --base origin/main
 ```
 
-Commit the generated output and test the complete candidate before merging its
-release pull request. The release gate verifies the exact Git index rather than
-the working tree: its source digest and every recorded artifact digest must
-match committed production metadata and the settings version. A development,
-partial, or stale build cannot pass.
+A backend-only change can reuse the same pin. Hosted E2E installs the pinned
+archive in its exported Git tree before building either hosted artifact. The
+approved release publisher attaches that same ZIP to the versioned release.
 
-Hosted E2E exports an exact clean commit with production output, deploys that
-commit without rebuilding, and imports evidence for the same source tree. See
-[TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md) and
-[INFRA_DEPLOYMENT.md](INFRA_DEPLOYMENT.md).
+For a local rehearsal, `npm run build` followed by
+`venv/bin/python -m runner.frontend_bundle pack` prints the ZIP path.
+`pin --archive PATH` can bootstrap the first pin before branch publication.
+Copy a pinned ZIP into a fresh checkout's `reports/frontend-bundles/` and run
+`venv/bin/python -m runner.frontend_bundle sync` to verify and install it offline.
+
+[Hosted E2E](TESTING_HOSTED_E2E.md) · [Deployment](INFRA_DEPLOYMENT.md)

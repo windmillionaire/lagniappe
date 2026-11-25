@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
 @import "./fonts.css";
 @import "./editor.css";
 @import "./kinds.css";
@@ -16,6 +16,8 @@
 @import "./content.css";
 
 @source "./styles.yaml";
+@source "../script";
+@source "../../lagniappe/web/templates";
 
 @theme {
 	--font-sans: "Source Sans 3", sans-serif;

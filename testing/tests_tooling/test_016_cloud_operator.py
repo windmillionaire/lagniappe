@@ -685,7 +685,7 @@ def test_publication_retries_with_annotated_tag(tmp_path, monkeypatch):
     releases = []
 
     def gh_or_git(args, **kwargs):
-        if args[0] == "git":
+        if Path(args[0]).name == "git":
             return run(args, **kwargs)
         if args[2] == "view":
             return SimpleNamespace(

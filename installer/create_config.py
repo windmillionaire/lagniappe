@@ -134,13 +134,21 @@ def update_config() -> str:
     """Refresh generated config defaults and return the active package version."""
     from importlib import reload
     from installer import config_builders
-    from runner import deploy
+    from runner import frontend_build
 
     # Older in-memory upgrade orchestrators reload only this facade. Refresh
     # the builders and their explicit-input manifest helper even if the process
     # loaded their older implementations before replacing the checkout.
+    reload(frontend_build)
+    from runner import deploy, frontend_bundle
+    from runner.context import REPOSITORY_ROOT
+
+    reload(frontend_bundle)
     reload(deploy)
     reload(config_builders)
+    # Includes the first upgrade launched by an installation that tracked assets.
+    if not (REPOSITORY_ROOT / frontend_build.BUILD_METADATA_PATH).is_file():
+        frontend_bundle.sync(REPOSITORY_ROOT)
     from config import SETTINGS, constants
 
     version = str(SETTINGS.NODE.get("version") or "").strip()

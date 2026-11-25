@@ -12,8 +12,7 @@
 | `vX.Y.Z` | Immutable tag for a published release |
 
 - Every change to `main` uses a pull request and squash merge.
-- Commit the canonical production build with the release. Tracked static output
-  may remain stale during development, but not on `main`.
+- Commit the SHA-256 pin for the published production ZIP before hosted validation.
 - Never commit installation-local configuration, deployment descriptors,
   credentials, reports, or source maps.
 - Use annotated, unsigned, immutable release tags.
@@ -119,12 +118,11 @@ Stop for an unexpected dirty tree or failed ancestry check. If `main` advanced,
 rebase onto `origin/main`, retain the `next/X.Y.Z` version metadata, and restart
 release preparation.
 
-### 3. Build and commit the exact candidate
+### 3. Pin and commit the exact candidate
 
 ```bash
-npm ci
-npm run build
-git add -A
+venv/bin/python -m runner.frontend_bundle pin
+git add config/frontend-release.json
 git commit -m "Release Candidate X.Y.Z"
 git status --short
 ```
@@ -133,8 +131,8 @@ Review the complete authored tree before committing. Add any intentional new
 files explicitly. Normal deployment also reconciles selected MCP services,
 building changed service inputs and activating them after App Engine; see
 [Deployment](INFRA_DEPLOYMENT.md#remote-mcp-service).
-Skip the commit if the canonical builds are already committed and the tree is
-clean.
+The Frontend bundle workflow must finish publishing the current frontend source
+before freezing it. Reuse the existing pin when the frontend inputs match.
 
 For a mechanical change recorded in `.git-blame-ignore-revs`, check whether
 each listed commit is already an ancestor of the release base before carrying
@@ -233,12 +231,11 @@ Run the shortest critical release-specific smoke from `main`. For remote release
 gh workflow run publish-release.yml --ref main -f pull_request=PR_NUMBER
 ```
 
-The Owner can also publish manually from the verified main commit.
+An authorized Owner can run the same publisher locally from the verified main
+checkout. It checks the hosted attestation and attaches the exact tested ZIP.
 
 ```bash
-git tag -a vX.Y.Z -m "Lagniappe X.Y.Z"
-git push origin vX.Y.Z
-gh release create vX.Y.Z --title "Lagniappe X.Y.Z" --notes-file documentation/releases/X.Y.Z.md
+venv/bin/python -m runner.publish_release OWNER/REPO "$(git rev-parse HEAD)" PR_NUMBER --publish
 ```
 
 Confirm GitHub deleted `next/X.Y.Z`, then follow **Start the next release

@@ -2762,6 +2762,7 @@ def _release_check_repository(tmp_path: Path) -> Path:
                 encoding="utf-8"
             )
         ),
+        "runner/frontend_bundle.py": (Path(run.__file__).parent / "runner/frontend_bundle.py").read_text(),
         "runner/frontend_build.py": (
             (Path(run.__file__).parent / "runner" / "frontend_build.py").read_text(
                 encoding="utf-8"
@@ -3121,7 +3122,7 @@ def test_run_py_release_check_rejects_development_build(tmp_path, capsys):
 
     assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
     output = capsys.readouterr().out
-    assert "must identify a production build" in output
+    assert "expected production" in output
 
 
 def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
@@ -3146,7 +3147,7 @@ def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
     output = capsys.readouterr().out
     assert "Installation-local files are present" in output
     assert "package.json version must use stable X.Y.Z form" in output
-    assert "must identify a production build" in output
+    assert "expected production" in output
 
 
 @pytest.mark.parametrize(
