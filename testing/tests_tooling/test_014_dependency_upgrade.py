@@ -14,6 +14,7 @@ import threading
 import pytest
 
 from runner import upgrade
+from runner.upgrade import node, npm, reporting
 
 pytestmark = pytest.mark.tooling
 
@@ -42,7 +43,7 @@ def node_declarations(monkeypatch, tmp_path):
     for path in paths.values():
         path.chmod(0o640)
     monkeypatch.setattr(
-        upgrade, "resolve_node_image",
+        node, "resolve_node_image",
         lambda _version: "node:26.8.2-bookworm-slim@sha256:" + "b" * 64,
     )
     return paths
@@ -54,7 +55,7 @@ def test_node_alignment_failure_preserves_all_declarations(monkeypatch, node_dec
     def unavailable(version):
         raise OSError("image has not been published")
 
-    monkeypatch.setattr(upgrade, "resolve_node_image", unavailable)
+    monkeypatch.setattr(node, "resolve_node_image", unavailable)
     report = upgrade.UpgradeReport()
     assert not upgrade.update_node_version_pin("26.8.2", report, node_declarations["pin"])
     assert "image has not been published" in report.errors[0]
@@ -255,7 +256,7 @@ def test_node_image_lookup_verifies_registry_digest(monkeypatch):
         response.headers = {"Docker-Content-Digest": "sha256:wrong" if invalid else digest}
         return response
 
-    monkeypatch.setattr(upgrade, "urlopen", open_response)
+    monkeypatch.setattr(node, "urlopen", open_response)
     assert upgrade.resolve_node_image("26.8.2") == f"node:26.8.2-bookworm-slim@{digest}"
     assert requests[0] == (
         "https://auth.docker.io/token?service=registry.docker.io"
@@ -414,7 +415,7 @@ def test_npm_upgrade_uses_one_bounded_lookup_and_preserves_package_metadata(monk
             )
         return subprocess.CompletedProcess(command, 0, "", "")
 
-    monkeypatch.setattr(upgrade, "run_command", execute)
+    monkeypatch.setattr(npm, "run_command", execute)
     report = upgrade.UpgradeReport()
     assert upgrade.upgrade_npm_packages(report)
     saved = json.loads(package_path.read_text())
@@ -452,7 +453,7 @@ def test_npm_lookup_failure_does_not_modify_or_install_dependencies(monkeypatch,
         commands.append(command)
         return subprocess.CompletedProcess(command, returncode, output, "")
 
-    monkeypatch.setattr(upgrade, "run_command", execute)
+    monkeypatch.setattr(npm, "run_command", execute)
     report = upgrade.UpgradeReport()
     assert not upgrade.upgrade_npm_packages(report)
     assert package_path.read_text() == original
@@ -477,7 +478,7 @@ def test_npm_interruption_records_completed_file_changes(monkeypatch, tmp_path, 
             raise KeyboardInterrupt
         raise subprocess.TimeoutExpired(command, 900)
 
-    monkeypatch.setattr(upgrade, "run_command", execute)
+    monkeypatch.setattr(npm, "run_command", execute)
     report = upgrade.UpgradeReport()
     with pytest.raises(failure):
         upgrade.upgrade_npm_packages(report)
@@ -499,7 +500,7 @@ def test_dependency_upgrade_stops_on_failure_and_saves_report(monkeypatch, tmp_p
     monkeypatch.setattr(upgrade, "upgrade_npm_packages", fail)
     monkeypatch.setattr(upgrade, "upgrade_pip_packages", unexpected)
     report_path = tmp_path / "report.md"
-    monkeypatch.setattr(upgrade, "default_upgrade_report_path", lambda timestamp: report_path)
+    monkeypatch.setattr(reporting, "default_upgrade_report_path", lambda timestamp: report_path)
     assert upgrade.upgrade_all() == 1
     assert "registry unavailable" in report_path.read_text()
     output = capsys.readouterr().out
@@ -515,7 +516,7 @@ def test_dependency_upgrade_saves_report_on_interrupt(monkeypatch, tmp_path):
 
     monkeypatch.setattr(upgrade, "upgrade_npm_packages", interrupt)
     report_path = tmp_path / "report.md"
-    monkeypatch.setattr(upgrade, "default_upgrade_report_path", lambda timestamp: report_path)
+    monkeypatch.setattr(reporting, "default_upgrade_report_path", lambda timestamp: report_path)
     assert upgrade.upgrade_all(only="npm") == 130
     report = report_path.read_text()
     assert "Interrupted by the user" in report

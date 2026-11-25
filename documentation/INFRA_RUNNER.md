@@ -187,6 +187,12 @@ development requirements. Transitive Python packages update when required by
 the selected direct upgrades. The separate locked MCP environment remains
 managed by the MCP tooling.
 
+The command enters through `runner.upgrade.upgrade_all`. Within
+`runner/upgrade/`, `node.py` updates the runtime and its version declarations,
+`npm.py` updates package ranges and the lockfile, and `python_packages.py`
+resolves and pins Python requirements. All three use `commands.py` to run
+subprocesses and `reporting.py` to record version changes and command output.
+
 Development follows the latest stable releases. The Node upgrade records that
 resolved version in `.nvmrc`, updates the minimum engine in `package.json` and
 the lockfile, and resolves the matching official `node:<version>-bookworm-slim`
