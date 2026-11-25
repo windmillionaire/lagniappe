@@ -62,5 +62,5 @@
     "watch": "chokidar './src/**/*.{css,js,mjs,ts,mts,yaml}' 'lagniappe/web/templates/*.html' 'lagniappe/web/templates/**/*.html' -c 'node build/run-rollup.mjs development'"
   },
   "type": "module",
-  "version": "2.5.0"
+  "version": "2.6.0"
 }
