@@ -47,10 +47,11 @@ const date = (date: Date | string | null | undefined) => {
 		// Append time to avoid UTC interpretation of date-only strings
 		date = new Date(`${date}T00:00:00`);
 	}
+	const currentYear = new Date().getFullYear();
 	return date.toLocaleDateString("en-US", {
 		month: "short",
 		day: "numeric",
-		year: "numeric",
+		...(date.getFullYear() === currentYear ? {} : { year: "numeric" }),
 	});
 };
 

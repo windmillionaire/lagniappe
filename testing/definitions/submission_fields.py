@@ -9,7 +9,11 @@ from .schema_fields import SchemaField
 
 
 def format_date(value):
-    return datetime.strptime(value, "%Y-%m-%d").strftime("%b %d, %Y")
+    parsed = datetime.strptime(value, "%Y-%m-%d").date()
+    month = parsed.strftime("%b")
+    if parsed.year == datetime.now().year:
+        return f"{month} {parsed.day}"
+    return f"{month} {parsed.day}, {parsed.year}"
 
 
 def format_time(value):

@@ -62,10 +62,11 @@ function _dateInfo(dateStr: string) {
 	if (dateStr === _toDateStr(-1)) return { label: "Yesterday", due: "past" };
 
 	const [year, month, day] = dateStr.split("-").map(Number);
-	const label = new Date(year, month - 1, day).toLocaleDateString(undefined, {
-		day: "numeric",
+	const currentYear = new Date().getFullYear();
+	const label = new Date(year, month - 1, day).toLocaleDateString("en-US", {
 		month: "short",
-		year: "numeric",
+		day: "numeric",
+		...(year === currentYear ? {} : { year: "numeric" }),
 	});
 	return { label, due: dateStr < today ? "past" : "future" };
 }

@@ -279,3 +279,22 @@ test("test_builder_select_model_avoids_native_select_arrow", async (t) => {
 	assert.ok(internalLink.querySelector("input[disabled]"));
 	assert.ok(internalLink.querySelector("[data-icon='search']"));
 });
+
+test("test_formatting_date_omits_current_year_and_keeps_other_years", async (t) => {
+	createBrowser(t, { url: "https://lagniappe.test/pages/page-1" });
+	const { formatting } = await import(
+		"../../src/script/elements/formatting.ts"
+	);
+
+	const thisYear = new Date().getFullYear();
+	assert.equal(formatting.date(`${thisYear}-09-08`), "Sep 8");
+	assert.equal(
+		formatting.date(`${thisYear + 1}-09-08`),
+		`Sep 8, ${thisYear + 1}`,
+	);
+	assert.equal(
+		formatting.date(`${thisYear - 1}-01-15`),
+		`Jan 15, ${thisYear - 1}`,
+	);
+	assert.equal(formatting.date(""), "");
+});

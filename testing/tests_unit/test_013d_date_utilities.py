@@ -302,3 +302,30 @@ def test_format_date_as_input_string():
     assert generic_dates.format_date_as_input_string(datetime(2026, 7, 13, 18, 30)) == (
         "2026-07-13"
     )
+
+
+@pytest.mark.unit
+def test_web_format_date_omits_current_year_and_keeps_other_years():
+    import importlib.util
+    from datetime import date
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "lagniappe/web/start/formatters.py"
+    spec = importlib.util.spec_from_file_location("_isolated_web_formatters", path)
+    assert spec and spec.loader
+    formatters = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(formatters)
+
+    today = date(2026, 11, 25)
+    assert formatters.format_date(None, today=today) == ""
+    assert formatters.format_date(date(2026, 9, 8), today=today) == "Sep 8"
+    assert formatters.format_date(date(2027, 9, 8), today=today) == "Sep 8, 2027"
+    assert formatters.format_date(date(2025, 1, 15), today=today) == "Jan 15, 2025"
+    assert (
+        formatters.format_datetime(datetime(2026, 9, 8, 8, 5), today=today)
+        == "8:05 AM, Sep 8"
+    )
+    assert (
+        formatters.format_datetime(datetime(2027, 9, 8, 14, 30), today=today)
+        == "2:30 PM, Sep 8, 2027"
+    )

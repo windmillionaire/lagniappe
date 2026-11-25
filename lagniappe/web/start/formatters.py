@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from datetime import date, datetime, time
 
+from lagniappe.core.tools.dates import user_today
 from lagniappe.core.tools.files.html import render_markdown, strip_tags
 
 
@@ -15,22 +16,27 @@ def format_markdown_text(value: str) -> str:
     return strip_tags(render_markdown(value))
 
 
-def format_datetime(value: datetime | str | None) -> str:
+def format_datetime(value: datetime | str | None, *, today: date | None = None) -> str:
     if not value:
         return ""
     elif isinstance(value, str):
         return value
 
-    return value.strftime("%I:%M %p, %d %b %Y")
+    time_str = value.strftime("%I:%M %p").lstrip("0")
+    return f"{time_str}, {format_date(value, today=today)}"
 
 
-def format_date(value: date | str | None) -> str:
+def format_date(value: date | str | None, *, today: date | None = None) -> str:
     if not value:
         return ""
     elif isinstance(value, str):
         return value
 
-    return value.strftime("%d %b %Y")
+    current_year = (today or user_today().date()).year
+    month = value.strftime("%b")
+    if value.year == current_year:
+        return f"{month} {value.day}"
+    return f"{month} {value.day}, {value.year}"
 
 
 def format_time(value: datetime | time | str | None) -> str:

@@ -51,6 +51,31 @@
 	}
 }
 
+/* @style button.secondary */
+.action-button-secondary {
+	background-color: white;
+	color: var(--kind-default);
+	cursor: pointer;
+	outline: 1.5px solid var(--kind-default);
+	outline-offset: -1.5px;
+	transition:
+		background-color 100ms ease,
+		color 100ms ease,
+		outline-color 100ms ease;
+	&:hover,
+	&:focus-visible {
+		background-color: var(--kind-bg);
+		color: var(--kind-dark);
+		outline-color: var(--kind-dark);
+		outline-width: 2px;
+		outline-offset: -2px;
+	}
+	&:disabled {
+		opacity: 0.5;
+		pointer-events: none;
+	}
+}
+
 /* @style button.submit */
 .action-button.review-revise-action {
 	background-color: var(--kind-bg);

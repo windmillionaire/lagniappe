@@ -209,8 +209,10 @@ def test_public_document_images_are_anonymous_and_revocable(
         SpinnerButtons.UPLOAD.click(image_form)
     image = editor.get_element("img")
     expect(image).to_be_visible()
+    image_src = image.get_attribute("src")
+    assert image_src
     editor.wait_for_render()
-    with user.page.expect_response(_document_save_response(marker)):
+    with user.page.expect_response(_document_save_response(image_src)):
         user.page.evaluate("window.dispatchEvent(new CustomEvent('sync-save'))")
 
     user.go(page)

@@ -166,6 +166,12 @@ button:
     surfaces: [server, frontend]
     hooks: [action-button]
     css: [src/style/buttons.css]
+  secondary:
+    classes: grid w-full grow place-items-center rounded-md bg-white px-3 py-1.5 text-base font-semibold text-kind-default shadow-xs action-button-secondary
+    intent: full-width centered outlined secondary action button paired alongside a solid primary submit button
+    surfaces: [server]
+    hooks: [action-button-secondary]
+    css: [src/style/buttons.css]
   close:
     classes: ml-2 text-center text-base rounded-md px-2.5 py-1 font-semibold shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 hover:outline-2 hover:outline-offset-2 text-white bg-delete-default hover:bg-delete-dark outline-delete-default hover:outline-delete-dark
     intent: close presentation within button

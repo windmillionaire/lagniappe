@@ -84,7 +84,7 @@
         <div data-role="user-fields" class="flex flex-col gap-4">
           <div data-role="user-email" class="flex flex-col gap-4">
             <div class="flex flex-col gap-4 sm:flex-row">
-              <label class="w-full sm:basis-1/2">
+              <label class="w-full">
                 <h3 class="{{ styles.label.sectionHeading }}">Email</h3>
                 <input name="email"
                        type="email"
@@ -158,12 +158,12 @@
                 <div data-role="api-key-actions" class="{{ styles.button.group }}">
                   <button type="button"
                           data-action="issue-api-key"
-                          class="{{ styles.button.submit }} sm:basis-1/2">Generate API key</button>
+                          class="{{ styles.button.secondary }} sm:basis-1/2">Generate API key</button>
                   <button type="button"
                           data-action="revoke-api-key"
                           data-kind="delete"
                           data-visible="false"
-                          class="{{ styles.button.submit }} sm:basis-1/2">Revoke API key</button>
+                          class="{{ styles.button.secondary }} sm:basis-1/2">Revoke API key</button>
                 </div>
                 <template data-role="api-key-confirmation-template">
                   <div id="modal"
