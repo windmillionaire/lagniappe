@@ -14,6 +14,7 @@ from lagniappe.core.report_contracts import MAX_PROPOSAL_ACTIONS as MAX_PROPOSAL
 from lagniappe.core.tools.database import get as database_get
 
 from ..references import HASH_REFERENCE_REGEX, hash_reference
+from ..reporting.execution.failures import public_failure_reason
 from .validation import _walk_strings
 
 
@@ -104,6 +105,8 @@ def public_execution_receipt(report: AIReport, user: User) -> dict[str, object] 
             for key in ("id", "type", "status")
             if record.get(key) is not None
         }
+        if reason := public_failure_reason(record):
+            action["reason"] = reason
         source = record.get("entity")
         if isinstance(source, dict):
             identifier = source.get("id")
@@ -130,13 +133,16 @@ def public_execution_receipt(report: AIReport, user: User) -> dict[str, object] 
                     for status in ("applied", "skipped")
                 }
         actions.append(action)
-    return {
+    receipt: dict[str, object] = {
         "status": str(result.get("status") or report.status)[:40],
         "actions": actions,
         "returned_count": len(actions),
         "total_count": len(records),
         "has_more": len(records) > len(selected),
     }
+    if receipt["status"] == "failed" and not any(action.get("status") == "failed" for action in actions):
+        receipt["reason"] = "Execution stopped before recording a failed action. Review the outstanding actions before retrying."
+    return receipt
 
 
 def public_plan_proposal(report: AIReport, user: User | None = None) -> dict[str, object] | None:

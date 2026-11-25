@@ -9,7 +9,8 @@ from google.cloud.datastore import Entity as StoredEntity, Key
 
 from lagniappe.core.definitions import MutationOperation, MutationEffectType
 from lagniappe.core.entities import Entities
-from lagniappe.core.exceptions import MutationConflict
+from lagniappe.core.exceptions import MutationConflict, ValidationError
+from lagniappe.core.tools.ai.external.presentation import public_execution_receipt
 from lagniappe.core.tools.ai.reporting.entity_updates import prepare_entity_updates
 from lagniappe.core.tools.ai.reporting.execution import batch as batches, runner
 from lagniappe.core.tools.ai.reporting.execution.actions.base import ReportActionAdapter
@@ -89,6 +90,31 @@ def setup_case(monkeypatch, actions, initial=()):
 
 def create(kind, name, **data):
     return {"id": name, "type": "create_" + kind, "data": {"name": name, **data}}
+
+
+def test_reviewed_form_fields_and_custom_ids_survive_execution(monkeypatch):
+    page_fields = [
+        {"id": "field_text", "type": "text", "title": "Notes"},
+        {"id": "items", "type": "table", "title": "Items", "columns": [
+            {"id": "col_item", "type": "input"}, {"id": "col_count", "type": "number"},
+        ]},
+    ]
+    task_fields = [
+        {"id": "checklist", "type": "todo", "title": "Checklist"},
+        {"id": "sign_here", "type": "signature", "title": "Sign here"},
+    ]
+    state = setup_case(monkeypatch, [
+        create("form", "page-form", form_type="page", schema=page_fields),
+        create("form", "task-form", form_type="task", schema=task_fields),
+    ])
+    proposed = deepcopy(state.report.proposal)
+    result = runner.run_report(state.report, state.actor)
+    assert result["status"] == "complete", state.report.error
+    page, task = [state.rows[row["entity"]["id"]] for row in result["actions"]]
+    assert [(field["id"], field["type"]) for field in page.schema] == [("field_text", "input"), ("items", "table")]
+    assert [(col["id"], col["input"]) for col in page.schema[1]["columns"]] == [("col_item", "text"), ("col_count", "number")]
+    assert task.schema == task_fields
+    assert state.report.proposal == proposed
 
 
 def test_create_batch_reserves_one_key_per_output_and_reuses_receipts(monkeypatch):
@@ -272,10 +298,42 @@ def test_batch_failure_and_ambiguous_commit_do_not_duplicate_creations(monkeypat
         assert result["status"] == "failed"
         assert not any(item.entity_kind == "project" for item in state.rows.values())
         assert result["actions"][1]["status"] == "pending"
+        receipt = public_execution_receipt(state.report, state.actor)
+        first, second = receipt["actions"]
+        assert first["id"] == "first" and first["status"] == "failed"
+        assert "batch" in first["reason"] and "changed" in first["reason"]
+        assert "Rejected test batch" not in str(receipt)
+        assert "reason" not in second
         result = runner.run_report(state.report, state.actor)
     assert result["status"] == "complete", state.report.error
+    assert all("failure" not in row for row in result["actions"])
     assert sorted(item.name for item in state.rows.values() if item.entity_kind == "project") == ["first", "second"]
     assert len([items for items in state.commits if len(items) > 1]) == 1
+
+
+@pytest.mark.parametrize("message,status", [
+    ("You do not have permission to edit private-target.", "failed"),
+    ("Referenced entity not found: private-target", "skipped"),
+])
+def test_get_plan_explains_action_failures_and_dependent_skips(monkeypatch, message, status):
+    state = setup_case(monkeypatch, [
+        create("project", "first"), {**create("project", "second"), "depends_on": ["first"]},
+    ])
+
+    def reject(*args, **kwargs):
+        raise ValidationError(message)
+
+    monkeypatch.setattr(ReportActionAdapter, "apply", reject)
+    runner.run_report(state.report, state.actor)
+    receipt = public_execution_receipt(state.report, state.actor)
+    first, second = receipt["actions"]
+    assert first["status"] == status
+    assert ("permissions" if status == "failed" else "references") in first["reason"]
+    if status == "skipped":
+        assert second["status"] == "skipped" and "earlier action" in second["reason"]
+    else:
+        assert second["status"] == "pending" and "reason" not in second
+    assert "private-target" not in str(receipt)
 
 
 def test_documents_upload_before_combined_commit_and_publish_after(monkeypatch):

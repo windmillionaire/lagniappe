@@ -33,6 +33,7 @@ from .actions.registry import _is_required_file_placement, report_action_adapter
 from .actions.results import (
     _diagnostic_entity,
 )
+from .failures import FailureReason, execution_failure
 from .ledger import (
     REPORT_LEDGER_VERSION,
     _new_report_ledger,
@@ -120,8 +121,12 @@ def run_report(
         if record.get("status") in {"complete", "skipped"}:
             index += 1
             continue
+        record.pop("failure", None)
+        record.pop("error", None)
         if action.get("skip") or any(context.get("action_records", {}).get(dependency, {}).get("status") != "complete" for dependency in action.get("depends_on", [])):
             record.update(status="skipped", note=action.get("reason") or "Skipped by user or required prior action.")
+            if not action.get("skip"):
+                record["failure"] = {"scope": "action", "code": FailureReason.DEPENDENCY.name}
             index += 1
             continue
         adapter = report_action_adapter(action["type"])
@@ -141,7 +146,6 @@ def run_report(
                 adapter.prepare(action, report, user, created, context, record)
                 record["prepared"] = True
             record["attempts"] = int(record.get("attempts") or 0) + 1
-            record.pop("error", None)
             context["action_record"] = record
             ensure_active()
             entity, writes, metadata = adapter.apply(action, report, user, created, context)
@@ -166,6 +170,7 @@ def run_report(
             restart = min(batch.indices or [index])
             batch.discard()
             record = result["actions"][index]
+            record["failure"] = execution_failure(error, scope="action")
             if _is_recoverable_action_error(action, error):
                 if _is_required_file_placement(action):
                     _record_required_file_placement_error(record, error)
@@ -219,7 +224,7 @@ def _fail_batch(report, result, batch, error):
     index = min(indices or [0])
     if result["actions"]:
         record = result["actions"][index]
-        record.update(status="failed", error=str(error))
+        record.update(status="failed", error=str(error), failure=execution_failure(error, scope="batch"))
         record.pop("expected", None)
     result.update(status="failed", failed_at=index + 1)
     report.properties.process.fail(str(error), result=result)

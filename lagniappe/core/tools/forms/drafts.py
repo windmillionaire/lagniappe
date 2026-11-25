@@ -72,8 +72,12 @@ def _digest(value: object) -> str:
 
 
 def _field_records(field: dict[str, object], name: str) -> list[dict[str, object]]:
-    """Options and conditions have already passed canonical schema validation."""
-    return cast(list[dict[str, object]], field.get(name) or [])
+    records = field.get(name)
+    if records is None:
+        return []
+    if not isinstance(records, list) or not all(isinstance(record, dict) for record in records):
+        raise exceptions.ValidationError(f"Field {field['id']!r} requires {name} to be a list of objects.")
+    return cast(list[dict[str, object]], records)
 
 
 def validate_draft_schema(
@@ -84,37 +88,43 @@ def validate_draft_schema(
         raise exceptions.ValidationError("Unknown form type.")
     canonical = canonicalize_schema(schema, form_type=form_type)
     fields = {field["id"]: field for field in canonical}
-    for singleton in ("status", "signature", "bookmark"):
-        if sum(field["type"] == singleton for field in canonical) > 1:
-            raise exceptions.ValidationError("This field type may occur only once per Form.")
+    singletons = set()
     for field in canonical:
-        if form_type == "page" and field["type"] in {"html", "status", "signature", "todo"}:
-            raise exceptions.ValidationError("This field type is available only on task forms.")
-        if field["id"] in {"name", "description"}:
-            expected = "input" if field["id"] == "name" else "textarea"
-            if form_type != "page" or field["type"] != expected or (
+        field_id, field_type = field["id"], field["type"]
+        if form_type == "page" and field_type in {"html", "status", "signature", "todo"}:
+            raise exceptions.ValidationError(f"Field {field_id!r} of type {field_type!r} is available only on task forms.")
+        if field_type in {"status", "signature", "bookmark"}:
+            if field_type in singletons:
+                raise exceptions.ValidationError(f"Field {field_id!r} duplicates type {field_type!r}, which may occur only once per Form.")
+            singletons.add(field_type)
+        if field_id in {"name", "description"}:
+            expected = "input" if field_id == "name" else "textarea"
+            if form_type != "page" or field_type != expected or (
                 expected == "input" and field.get("input", "text") != "text"
             ):
-                raise exceptions.ValidationError("Reserved Page field identity cannot be changed.")
-        values = [option["value"] for option in _field_records(field, "options")]
+                raise exceptions.ValidationError(f"Reserved Page field {field_id!r} cannot be changed.")
+        values = [option.get("value") for option in _field_records(field, "options")]
+        if any(not isinstance(value, str) or not value.strip() for value in values):
+            raise exceptions.ValidationError(f"Field {field_id!r} option values must be non-empty strings.")
         if len(values) != len(set(values)):
-            raise exceptions.ValidationError("Option values must be unique within their field.")
+            raise exceptions.ValidationError(f"Option values must be unique within field {field_id!r}.")
         for condition in [*_field_records(field, "visibility"), *_field_records(field, "status")]:
-            target = fields.get(condition.get("id"))
-            if target is None or target["id"] == field["id"]:
-                raise exceptions.ValidationError("A condition references an unavailable field.")
+            target_id = condition.get("id")
+            target = fields.get(target_id) if isinstance(target_id, str) else None
+            if target is None or target["id"] == field_id:
+                raise exceptions.ValidationError(f"A condition on field {field_id!r} references an unavailable field.")
             if target["type"] not in {"checkbox", "radio", "select"}:
-                raise exceptions.ValidationError("Conditions require a checkbox or selection field.")
+                raise exceptions.ValidationError(f"A condition on field {field_id!r} requires a checkbox or selection field.")
             if target["type"] == "checkbox" and not isinstance(
                 condition.get("value", condition.get("checked", True)), bool
             ):
-                raise exceptions.ValidationError("Checkbox conditions require a Boolean value.")
+                raise exceptions.ValidationError(f"The checkbox condition on field {field_id!r} requires a Boolean value.")
             if target["type"] in {"radio", "select"}:
                 allowed = {option["value"] for option in _field_records(target, "options")}
                 selected = condition.get("value", condition.get("checked"))
                 selected = selected if isinstance(selected, list) else [selected]
-                if any(value not in allowed for value in selected):
-                    raise exceptions.ValidationError("A condition references an unavailable option.")
+                if any(not isinstance(value, str) or value not in allowed for value in selected):
+                    raise exceptions.ValidationError(f"A condition on field {field_id!r} references an unavailable option.")
     return canonical
 
 

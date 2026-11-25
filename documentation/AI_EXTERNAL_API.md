@@ -507,7 +507,10 @@ currently viewable resulting entity names, hash references, and URLs. Missing or
 no-longer-viewable entities are null; stored ledger names, recovery snapshots,
 private diagnostics and standalone internal entity keys are not exposed. An
 unavailable entity does not mean its action never ran. An answer has no execution
-receipt.
+receipt. Failed actions include a short `reason` in `execution.actions`. A batch
+failure appears on its first action and identifies the batch in the reason.
+Actions skipped after an execution error or an unmet dependency also carry a
+reason. Older receipts have less detail.
 
 ### Answers and proposals
 
@@ -517,6 +520,12 @@ actions. Empty actions publish an answer; nonempty actions publish a proposal
 requiring browser review. Raw answer_html is rejected. Use human link labels
 and canonical tool-returned browser URLs. Revisions can turn an answer into a
 proposal or vice versa until execution begins.
+
+`submit_plan` checks each `create_form` schema before saving a revision or
+starting automatic execution. The error identifies the action and the invalid
+field or table column. Page forms accept field types such as text, select and
+table. Static HTML, status, signature and todo fields require a Task form.
+Custom field and column IDs such as `field_text` and `col_item` are supported.
 
 Instructions and files are individually optional, with at least one needed
 before publication. Classify every upload in file_usage as evidence or organize.

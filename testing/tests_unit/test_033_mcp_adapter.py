@@ -1812,6 +1812,24 @@ def test_published_tools_still_honor_next_request_revocation_or_permission_loss(
     ]
 
 
+def test_compact_get_plan_keeps_public_failure_reason(monkeypatch):
+    plan = _plan()
+    receipt = {"status": "failed", "actions": [
+        {"id": "form", "type": "create_form", "status": "failed", "reason": "A record changed during execution."},
+    ], "returned_count": 1, "total_count": 1, "has_more": False}
+    plan.update(status="failed", output_kind="proposal", execution=receipt)
+    monkeypatch.setattr(f"{__name__}._plan", lambda: deepcopy(plan))
+
+    async def exercise():
+        adapter = LagniappeAdapter(ConnectionConfig(normalize_site_url("https://example.com"), "api-secret"), rest=_WorkflowREST())
+        await adapter.initialize()
+        result = await adapter.execute("get_plan", {"plan_id": plan["id"]})
+        await adapter.aclose()
+        return result.value
+
+    assert asyncio.run(exercise())["execution"] == receipt
+
+
 def test_adapter_executes_only_typed_lifecycle_and_catalog_routes() -> None:
     async def exercise() -> tuple[_WorkflowREST, dict[str, Any]]:
         rest = _WorkflowREST()

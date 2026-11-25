@@ -13,11 +13,14 @@ if TYPE_CHECKING:
 
 import re
 
+from config.form_schema import SchemaValidationError
 from lagniappe.core import exceptions
 from lagniappe.core.properties.schema import SchemaFields
 from lagniappe.core.tools import dates
+from lagniappe.core.tools.forms.drafts import validate_draft_schema
 
 from ...debug import ai_debug
+from ...form_content import static_form_markdown
 from ...references import normalize_hash_references, render_ai_markdown
 from ..contracts.actions import ALLOWED_ACTIONS
 from ..schedules import validate_task_schedule
@@ -473,7 +476,7 @@ def _validate_create_form_action_data(data, action_label):
         raise exceptions.AIException(f"Action {action_label} requires data.name.")
 
     form_type = data.get("form_type") or data.get("form-type")
-    if form_type not in {"page", "task"}:
+    if form_type not in ("page", "task"):
         raise exceptions.AIException(f"Action {action_label} requires data.form_type.")
 
     schema = data.get("schema")
@@ -490,20 +493,18 @@ def _validate_create_form_action_data(data, action_label):
             f"data.schema[{index}]",
             used_ids,
         )
-        field_type = field.get("type") if isinstance(field, dict) else None
-        if field_type == "html":
-            if form_type != "task":
-                raise exceptions.AIException(
-                    f"Action {action_label} static HTML fields require a task form."
-                )
-            if "html" in field:
-                raise exceptions.AIException(
-                    f"Action {action_label} static HTML fields must use content_markdown."
-                )
-            if not _proposal_string(field.get("content_markdown")):
-                raise exceptions.AIException(
-                    f"Action {action_label} static HTML fields require content_markdown."
-                )
+
+    schema_label = f"Action {action_label} data.schema"
+    try:
+        canonical = validate_draft_schema(schema, form_type)
+    except (SchemaValidationError, exceptions.ValidationError) as error:
+        detail = " ".join((str(error), *getattr(error, "__notes__", ())))
+        raise exceptions.AIException(f"{schema_label} — {detail}") from error
+    for field in canonical:
+        try:
+            static_form_markdown(field, form_type=form_type)
+        except exceptions.ValidationError as error:
+            raise exceptions.AIException(f"{schema_label} field {field['id']!r} — {error}") from error
 
 
 def _validate_update_form_schema_action_data(data, action_label):

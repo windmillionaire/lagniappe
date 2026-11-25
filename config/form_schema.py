@@ -123,8 +123,8 @@ def _canonical_field(definition, *, table_column=False, discard_invalid=False):
     if field_type in _INPUT_TYPES:
         input_type = field_type
         field_type = "input"
-    elif field_type == "input":
-        input_type = input_type or "text"
+    elif field_type == "input" and (input_type is None or input_type == ""):
+        input_type = "text"
 
     allowed_types = _TABLE_FIELD_TYPES if table_column else _FIELD_TYPES
     if field_type not in allowed_types:
@@ -132,7 +132,9 @@ def _canonical_field(definition, *, table_column=False, discard_invalid=False):
             f"Schema field {field_id!r} has unsupported type {field_type!r}",
             discard_invalid,
         )
-    if field_type == "input" and input_type not in _INPUT_TYPES:
+    if field_type == "input" and (
+        not isinstance(input_type, str) or input_type not in _INPUT_TYPES
+    ):
         return _invalid(
             f"Schema field {field_id!r} has unsupported input type {input_type!r}",
             discard_invalid,
@@ -151,8 +153,10 @@ def _canonical_field(definition, *, table_column=False, discard_invalid=False):
         field["title"] = title.strip()
 
     if field_type == "link":
-        location = field.get("location") or "out"
-        if location not in {"in", "out"}:
+        location = field.get("location", "out")
+        if location is None or location == "":
+            location = "out"
+        if location not in ("in", "out"):
             return _invalid(
                 f"Schema field {field_id!r} has unsupported link location",
                 discard_invalid,
@@ -178,7 +182,7 @@ def _canonical_field(definition, *, table_column=False, discard_invalid=False):
             field.get("status", []), field_id, "status", discard_invalid
         )
         if status is None:
-            return None
+            return _invalid(f"Schema field {field_id!r} status must be a list", discard_invalid)
         field["status"] = status
 
     if field_type == "table":
@@ -192,12 +196,16 @@ def _canonical_field(definition, *, table_column=False, discard_invalid=False):
                 )
         columns = []
         column_ids = set()
-        for raw_column in raw_columns:
-            column = _canonical_field(
-                raw_column,
-                table_column=True,
-                discard_invalid=discard_invalid,
-            )
+        for index, raw_column in enumerate(raw_columns, 1):
+            try:
+                column = _canonical_field(
+                    raw_column,
+                    table_column=True,
+                    discard_invalid=discard_invalid,
+                )
+            except SchemaValidationError as error:
+                error.add_note(f"(table {field_id!r}, column {index})")
+                raise
             if column is None:
                 continue
             if column["id"] in column_ids:
@@ -239,7 +247,9 @@ def normalize_form_schema(
         if form_type == "page" and field["type"] == "todo":
             if discard_invalid:
                 continue
-            raise SchemaValidationError("Todo lists are supported only on task forms")
+            error = SchemaValidationError("Todo lists are supported only on task forms")
+            error.add_note(f"(field {field['id']!r})")
+            raise error
         field_ids.add(field["id"])
         fields.append(field)
 

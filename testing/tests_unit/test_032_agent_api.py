@@ -1230,6 +1230,22 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
 
 
 @pytest.mark.unit
+def test_get_plan_handles_historical_and_unrecorded_execution_failures():
+    report = SimpleNamespace(status="failed", result={"status": "failed", "actions": [
+        {"id": "old-form", "status": "failed", "error": "This field type is available only on task forms."},
+        {"id": "old-action", "status": "failed", "error": "private datastore key", "note": "private note"},
+    ]})
+    receipt = external_api.public_execution_receipt(report, object())
+    known, unknown = receipt["actions"]
+    assert "Task-only field" in known["reason"]
+    assert "retrying" in unknown["reason"] and "private" not in str(receipt)
+    report.result["actions"] = [{"id": "unstarted", "status": "pending"}]
+    receipt = external_api.public_execution_receipt(report, object())
+    assert "before recording a failed action" in receipt["reason"]
+    assert "reason" not in receipt["actions"][0]
+
+
+@pytest.mark.unit
 def test_external_tool_catalog_uses_id_for_subject_entity_references():
     expected_required = {
         "get_entity": {"id"},

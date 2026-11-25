@@ -12,21 +12,20 @@ from lagniappe.core import exceptions
 from .references import render_ai_markdown
 
 
-def prepare_static_form_element(element: dict[str, object], *, form_type: str | None) -> tuple[dict[str, object], SafeHTML | None]:
-    """Return a durable field plus optional rendered static HTML sidecar."""
-    field = deepcopy(element)
+def static_form_markdown(field: dict[str, object], *, form_type: str | None) -> str | None:
+    """Validate generated static content without rendering or fetching references."""
     if "html" in field:
         raise exceptions.ValidationError(
             "Generated form fields must use content_markdown instead of html."
         )
 
-    markdown = field.pop("content_markdown", None)
+    markdown = field.get("content_markdown")
     if field.get("type") != "html":
         if markdown is not None:
             raise exceptions.ValidationError(
                 "content_markdown is supported only on static HTML fields."
             )
-        return field, None
+        return None
 
     if form_type != "task":
         raise exceptions.ValidationError(
@@ -39,4 +38,12 @@ def prepare_static_form_element(element: dict[str, object], *, form_type: str | 
         raise exceptions.ValidationError(
             "Static HTML fields require non-empty content_markdown."
         )
-    return field, render_ai_markdown(markdown)
+    return markdown
+
+
+def prepare_static_form_element(element: dict[str, object], *, form_type: str | None) -> tuple[dict[str, object], SafeHTML | None]:
+    """Return a durable field plus optional rendered static HTML sidecar."""
+    markdown = static_form_markdown(element, form_type=form_type)
+    field = deepcopy(element)
+    field.pop("content_markdown", None)
+    return field, render_ai_markdown(markdown) if markdown is not None else None

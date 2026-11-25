@@ -1,6 +1,7 @@
 """HTTP execution gates and request measurement lifecycle for experiments."""
 
 import json
+from copy import deepcopy
 from types import SimpleNamespace
 
 from flask import Flask, render_template_string
@@ -88,6 +89,63 @@ def test_experiments_execute_requires_remote_admin_and_exact_proposal(monkeypatc
     monkeypatch.setattr(CONFIG, "EXPERIMENTS_ENABLED", False)
     assert client.post(url, json=body, headers=remote).status_code == 403
     assert len(calls) == before
+
+
+@pytest.mark.parametrize("execute,field_type", [(False, "todo"), (True, "signature")])
+def test_submit_rejects_invalid_page_form_before_saving_or_queueing(monkeypatch, execute, field_type):
+    from lagniappe.core.tools.ai.external import plans
+    from testing.utility.ai_report_fakes import _patch_fake_keys, _test_user
+    from testing.utility.test_entities import TestEntities
+
+    plans.Entities.initialize()
+    TestEntities.initialize(plans.Entities)
+    _patch_fake_keys(monkeypatch)
+    actor = _test_user("form-plan-owner")
+    monkeypatch.setattr(CONFIG, "AI_ENABLED", True)
+    monkeypatch.setattr(CONFIG, "EXTERNAL_AI_ENABLED", True)
+    monkeypatch.setattr(agent_api, "authenticate_credential", lambda token: (actor, {}))
+    monkeypatch.setattr(plans.Entities, "save", lambda *items: None)
+    report = plans.create_plan(actor, instructions="Create a Page form.")
+    if execute:
+        plans.submit_plan(
+            report, actor, {"summary": "Earlier review", "confidence": 1, "actions": [
+                {"id": "review", "type": "needs_review", "data": {"reason": "Review the form."}},
+            ]}, contract_version=plans.CONTRACT_VERSION, file_usage=[],
+        )
+    previous = deepcopy((report.status, report.proposal, report.agent_manifest))
+
+    def reject_save(*items):
+        pytest.fail("Invalid revision was saved")
+
+    monkeypatch.setattr(plans.Entities, "fetch_one", lambda *args, **kwargs: report)
+    monkeypatch.setattr(
+        plans.agent_api_store, "claim_plan_operation",
+        lambda *args, **kwargs: plans.agent_api_store.PLAN_OPERATION_CLAIMED,
+    )
+    monkeypatch.setattr(plans, "release_plan_operation_claim", lambda *a, **k: None)
+    monkeypatch.setattr(plans, "claimed_plan_save", lambda *args, **kwargs: reject_save)
+    monkeypatch.setattr(execution, "request_execution", lambda *a, **k: pytest.fail("Invalid revision queued execution"))
+
+    body = {
+        "contract_version": plans.CONTRACT_VERSION, "file_usage": [],
+        "proposal": {"summary": "Add forms", "confidence": 1, "actions": [
+            {"id": "page-form", "type": "create_form", "data": {
+                "name": "Page details", "form_type": "page",
+                "schema": [{"id": "field_custom", "type": field_type, "title": "Details"}],
+            }},
+        ]},
+    }
+    if execute:
+        body.update(execute=True, operation_id="attempt-invalid-form")
+    response = app.test_client().post(
+        f"/api/v1/plans/{report.urlsafe_key}/submit",
+        headers={"Authorization": "Bearer form-plan-token"}, json=body,
+    )
+    assert response.status_code == 422, response.json
+    assert response.json["error"]["code"] == "validation_failed"
+    message = response.json["error"]["message"]
+    assert "page-form" in message and "field_custom" in message and "only on task forms" in message
+    assert (report.status, report.proposal, report.agent_manifest) == previous
 
 
 def test_app_wide_auto_execute_api_key_compact_get_and_one_step_submit(monkeypatch):
