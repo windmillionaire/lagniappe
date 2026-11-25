@@ -23,6 +23,7 @@ from lagniappe.core.tools import cache
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
+from .contract import CHANNEL_REVISION_PATHS, poll_result, revision_result
 
 
 type StatusLoader = Callable[[list[str], User], list[JobStatus]]
@@ -37,26 +38,6 @@ class _Unspecified(Enum):
 
 
 PERSONAL_CHANNELS = frozenset({"starred", "tool-reports"})
-CHANNEL_REVISION_PATHS = {
-    "home": (
-        "/",
-        "/categories/index",
-        "/projects/index",
-        "/pages/index",
-        "/tasks/index",
-    ),
-    "home-notes": ("/",),
-    "categories": ("/categories/index",),
-    "projects": ("/projects/index",),
-    "pages": ("/pages/index",),
-    "tasks": ("/tasks/index",),
-    "forms": ("/forms/index",),
-    "users": ("/users/index",),
-    "ingress": ("/ingress/index",),
-    "messages": (),
-    "starred": (),
-    "tool-reports": ("/reports/index",),
-}
 
 
 def filter_revision(entity: Entity, user: User) -> str:
@@ -264,40 +245,16 @@ def render_operation_statuses(entities: Iterable[Entity] | None, user: User, *, 
     return statuses
 
 
-def _result(descriptor, status, *, revision=None, payload=None):
-    result = {
-        "id": descriptor["id"],
-        "type": descriptor["type"],
-        "status": status,
-        "poll_after_ms": 15_000,
-    }
-    if revision is not None:
-        result["revision"] = revision
-    if payload is not None:
-        result["payload"] = payload
-    return result
-
-
-def _revision_result(descriptor, revision, payload=None):
-    changed = descriptor["revision"] != revision
-    return _result(
-        descriptor,
-        "changed" if changed else "unchanged",
-        revision=revision,
-        payload=payload if changed else None,
-    )
-
-
 def lock_result(descriptor: KeyDescriptor, entity: Entity | None, active_locks: Mapping[str, ActiveLock], *, user: User) -> dict[str, object]:
     """Project one form lock without reading Flask's process-global actor."""
     if not entity or not entity.allowed(Action.VIEW, user=user):
-        return _result(descriptor, "unavailable")
+        return poll_result(descriptor, "unavailable")
     active = active_locks.get(descriptor["key"])
     if not active:
-        return _revision_result(descriptor, "unlocked", {"locked": False})
+        return revision_result(descriptor, "unlocked", {"locked": False})
     lock, job = active
     revision = f"{job.urlsafe_key}:{int(job.status_revision or 0)}"
-    return _revision_result(
+    return revision_result(
         descriptor,
         revision,
         {

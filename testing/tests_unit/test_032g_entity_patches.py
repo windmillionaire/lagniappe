@@ -930,3 +930,46 @@ def test_correction_snapshot_excludes_nested_long_values_from_datastore_indexes(
     restored = entity_from_protobuf(encoded)
     assert restored["correction"]["proposal"] == source.proposal
     assert restored["correction"]["result"] == source.result
+
+
+def test_editable_page_exposes_round_trip_markdown_only_in_edit_view(monkeypatch):
+    from lagniappe.core.tools.ai.function_definitions.get_entity import execute_get_entity
+    from lagniappe.core.definitions import Action
+    from lagniappe.core.tools.files.html import render_markdown, sanitize_html
+
+    actor, _task, _form, page = case()
+    monkeypatch.setattr("lagniappe.core.entities.page.url_for", lambda endpoint, **kwargs: "/pages/test")
+    source = ('<h2>Reading</h2><p>Visit <a href="/notes">notes</a>.</p>'
+              '<ul><li>One</li><li>Two</li></ul>'
+              '<table><thead><tr><th>Name</th></tr></thead><tbody><tr><td>First</td></tr></tbody></table>')
+    monkeypatch.setattr(Entities, "fetch_one", lambda *_args, **_kwargs: page)
+    monkeypatch.setattr(page.properties.document, "_source_html", source)
+    monkeypatch.setattr(page, "allowed", lambda *_args, **_kwargs: True)
+    assert "page_document_markdown" not in execute_get_entity({"id": page.urlsafe_key}, actor)
+    result = execute_get_entity({"id": page.urlsafe_key, "view": "edit"}, actor)
+    assert result["page_document_markdown_complete"] is True
+    text = result["page_document_markdown"]
+    assert "## Reading" in text and "[notes](/notes)" in text and "| First |" in text
+    assert render_markdown(text) == sanitize_html(source)
+    monkeypatch.setattr(page, "allowed", lambda action, *args, **kwargs: action == Action.VIEW)
+    assert "page_document_markdown" not in execute_get_entity({"id": page.urlsafe_key, "view": "edit"}, actor)
+
+
+def test_edit_projection_identifies_partial_rich_and_oversized_documents():
+    from lagniappe.core.tools.ai.page_document import document_edit_projection, MAX_EDIT_MARKDOWN_BYTES
+    table = '<table><tbody><tr><td colspan="2">Spanning</td></tr></tbody></table>'
+    assert document_edit_projection(table, has_snapshot=True) == {
+        "page_document_markdown": table,
+        "page_document_markdown_complete": True,
+        "page_document_markdown_truncated": False,
+    }
+    link = '<p><a href="/notes" target="_self" rel="external">Link</a></p>'
+    assert not document_edit_projection(link, has_snapshot=True)["page_document_markdown_complete"]
+    partial = document_edit_projection('<p>Keep this</p><img src="/image">', has_snapshot=True)
+    assert partial["page_document_markdown_complete"] is False
+    assert partial["page_document_markdown"] == "Keep this"
+    large = document_edit_projection("<p>" + "界" * MAX_EDIT_MARKDOWN_BYTES + "</p>", has_snapshot=True)
+    assert large["page_document_markdown_truncated"] is True
+    assert large["page_document_markdown_complete"] is False
+    assert len(large["page_document_markdown"].encode()) <= MAX_EDIT_MARKDOWN_BYTES
+    assert not document_edit_projection(None, has_snapshot=True)["page_document_markdown_complete"]

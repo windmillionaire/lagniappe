@@ -88,7 +88,7 @@ def build_openapi_document(*, app_name: str, server_url: str) -> dict[str, objec
                 "responses": {
                     "200": {
                         "description": "Authenticated user and capabilities.",
-                        **json_content({"type": "object"}),
+                        **json_content({"$ref": "#/components/schemas/Actor"}),
                     },
                     "default": error_response,
                 },
@@ -232,7 +232,7 @@ def build_openapi_document(*, app_name: str, server_url: str) -> dict[str, objec
                         "type": "object", "required": ["plan", "operation"],
                         "properties": {
                             "plan": {"$ref": "#/components/schemas/Plan"},
-                            "operation": {"type": "object", "required": ["id", "status"], "properties": {"id": {"type": "string"}, "status": {"type": "string"}}},
+                            "operation": {"$ref": "#/components/schemas/PlanOperation"},
                         },
                     })},
                     "default": error_response,
@@ -512,7 +512,7 @@ def build_openapi_document(*, app_name: str, server_url: str) -> dict[str, objec
             "responses": {
                 "200": {
                     "description": "Current date, timezone, personal Page, report_created=false and workflow_rules.",
-                    **json_content({"type": "object"}),
+                    **json_content({"$ref": "#/components/schemas/AnswerContext"}),
                 },
                 "default": error_response,
             },
@@ -613,7 +613,18 @@ def build_openapi_document(*, app_name: str, server_url: str) -> dict[str, objec
                         "expected": {},
                     },
                 },
+                "Actor": definitions.actor_schema(),
+                "AnswerContext": {
+                    "type": "object", "additionalProperties": False,
+                    "required": ["current_date", "timezone", "personal_page", "report_created", "workflow_rules"],
+                    "properties": {
+                        "current_date": {"type": "string"}, "timezone": {"type": "string"},
+                        "personal_page": {"type": "object"}, "report_created": {"const": False},
+                        "workflow_rules": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
                 "PlanFile": {
+                    "additionalProperties": False,
                     "type": "object",
                     "required": ["ref", "name", "filename", "mimetype", "size"],
                     "properties": {
@@ -628,6 +639,7 @@ def build_openapi_document(*, app_name: str, server_url: str) -> dict[str, objec
                     },
                 },
                 "Plan": {
+                    "additionalProperties": False,
                     "type": "object",
                     "required": [
                         "id",
@@ -664,9 +676,13 @@ def build_openapi_document(*, app_name: str, server_url: str) -> dict[str, objec
                         "file_usage": file_usage_schema(),
                         "files": {
                             "type": "array",
+                            "maxItems": definitions.MAX_PLAN_FILES,
                             "items": {"$ref": "#/components/schemas/PlanFile"},
                         },
                         "uploads_pending": {"type": "boolean"},
+                        "correction": {"type": ["object", "null"]},
+                        "superseded_by": {"type": ["string", "null"]},
+                        "require_review": {"type": "boolean"},
                         "upload_batch_id": {
                             "oneOf": [
                                 upload_batch_id_schema,
@@ -718,6 +734,11 @@ def build_openapi_document(*, app_name: str, server_url: str) -> dict[str, objec
                         },
                     },
                 },
+                "PlanOperation": {
+                    "type": "object", "required": ["id", "status"],
+                    "properties": {"id": {"type": "string"}, "status": {"type": "string"}},
+                    "additionalProperties": False,
+                },
                 "ActionSummary": {
                     "type": "object",
                     "required": ["total", "by_type"],
@@ -754,8 +775,8 @@ def build_openapi_document(*, app_name: str, server_url: str) -> dict[str, objec
                                     "type": "integer",
                                     "const": definitions.CONTRACT_VERSION,
                                 },
-                                "file_usage": file_usage_schema(),
-                                "proposal": {"type": "object"},
+                                "file_usage": {"type": "array", "maxItems": 0},
+                                "proposal": {"type": "object", "maxProperties": 0},
                             },
                         },
                         "rule": {"type": "string"},
@@ -867,14 +888,7 @@ def build_openapi_document(*, app_name: str, server_url: str) -> dict[str, objec
                                 "differ from a digest of the raw request body."
                             ),
                         },
-                        "operation": {
-                            "type": "object",
-                            "required": ["id", "status"],
-                            "properties": {
-                                "id": {"type": "string"},
-                                "status": {"type": "string"},
-                            },
-                        },
+                        "operation": {"$ref": "#/components/schemas/PlanOperation"},
                         "execution": {
                             "type": "object",
                             "required": ["started"],

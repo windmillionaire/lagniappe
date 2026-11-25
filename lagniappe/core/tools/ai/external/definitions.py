@@ -56,6 +56,84 @@ def _text_bytes(value):
     return len(str(value or "").encode("utf-8"))
 
 
+def actor_schema() -> dict[str, object]:
+    """Public actor envelope consumed by OpenAPI and the standalone MCP adapter."""
+    return {
+        "type": "object",
+        "required": ["user", "credential", "capabilities"],
+        "properties": {
+            "user": {
+                "type": "object",
+                "required": ["name", "hash", "timezone", "personal_page"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "hash": {"type": "string"},
+                    "timezone": {"type": "string"},
+                    "personal_page": {
+                        "type": "object",
+                        "required": [
+                            "kind",
+                            "hash",
+                            "name",
+                            "url",
+                            "can_view",
+                            "can_edit",
+                        ],
+                        "properties": {
+                            "kind": {"const": "page"},
+                            "hash": {"type": "string"},
+                            "name": {"type": ["string", "null"]},
+                            "url": {"type": "string"},
+                            "can_view": {"type": "boolean"},
+                            "can_edit": {"type": "boolean"},
+                        },
+                        "additionalProperties": False,
+                    },
+                },
+                "additionalProperties": False,
+            },
+            "credential": {
+                "type": "object",
+                "required": [
+                    "active",
+                    "display_prefix",
+                    "issued_at",
+                    "expires_at",
+                    "generation",
+                ],
+                "properties": {
+                    "active": {"type": "boolean"},
+                    "display_prefix": {"type": ["string", "null"]},
+                    "issued_at": {"type": ["string", "null"], "format": "date-time"},
+                    "expires_at": {"type": ["string", "null"], "format": "date-time"},
+                    "generation": {"type": "integer", "minimum": 0},
+                },
+                "additionalProperties": False,
+            },
+            "capabilities": {
+                "type": "object",
+                "required": ["plans"],
+                "properties": {
+                    "plans": {"type": "boolean"},
+                    "execute_plan": {"type": "boolean"},
+                },
+                "additionalProperties": False,
+            },
+            "installation": {
+                "type": "object",
+                "required": ["project", "experiments", "source_id"],
+                "properties": {
+                    "project": {"type": "string"},
+                    "experiments": {"type": "boolean"},
+                    "source_id": {"type": ["string", "null"]},
+                },
+                "additionalProperties": False,
+            },
+        },
+        "additionalProperties": False,
+    }
+
+
 def create_plan_request_schema() -> ObjectSchema:
     return {
         "type": "object",

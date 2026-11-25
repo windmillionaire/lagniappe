@@ -6,6 +6,8 @@ from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, replace
 import re
+import json
+from importlib.resources import files
 from typing import cast
 
 from mcp import Tool
@@ -14,8 +16,6 @@ from mcp_types.version import LATEST_MODERN_VERSION, MODERN_PROTOCOL_VERSIONS
 
 from .errors import SchemaError, TransportError
 from .limits import (
-    CONTRACT_VERSION_MAX,
-    CONTRACT_VERSION_MIN,
     MAX_CATALOG_BYTES,
     MAX_SCHEMA_BYTES,
     MAX_TOOL_COUNT,
@@ -70,352 +70,63 @@ GET_FILE_SAFE_PROPERTIES: dict[str, dict[str, object]] = {
     "error": {"type": "string"},
 }
 
-PLAN_FILE_SCHEMA = {
-    "type": "object",
-    "required": ["ref", "name", "filename", "mimetype", "size"],
-    "properties": {
-        "ref": {"type": "string", "pattern": r"^hash:[A-Za-z0-9_-]{12}$"},
-        "name": {"type": "string"},
-        "filename": {"type": "string"},
-        "mimetype": {"type": "string"},
-        "size": {"type": "integer", "minimum": 0},
-    },
-    "additionalProperties": False,
-}
+def _model_projection(source: dict, fields: tuple[str, ...]) -> dict:
+    """Keep an explicit allowlist at the boundary that removes private transport fields."""
+    return {
+        "type": "object", "additionalProperties": False,
+        "required": [name for name in source["required"] if name in fields],
+        "properties": {name: source["properties"][name] for name in fields},
+    }
 
-ACTION_SUMMARY_SCHEMA = {
-    "type": "object",
-    "required": ["total", "by_type"],
-    "properties": {
-        "total": {"type": "integer", "minimum": 0},
-        "by_type": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
-        "maximum": {"type": "integer", "minimum": 1},
-    },
-    "additionalProperties": False,
-}
 
-SAFE_PLAN_SCHEMA = {
-    "type": "object",
-    "required": [
-        "id",
-        "status",
-        "name",
-        "instructions",
-        "files",
-        "uploads_pending",
-        "contract_version",
-        "preview_url",
-        "review_url",
-    ],
-    "properties": {
-        "correction": {"type": ["object", "null"]},
-        "superseded_by": {"type": ["string", "null"]},
-        "id": {"type": "string"},
-        "status": {
-            "enum": [
-                "draft",
-                "ready",
-                "running",
-                "complete",
-                "failed",
-            ]
-        },
-        "name": {"type": "string"},
-        "instructions": {"type": "string"},
-        "output_kind": {"enum": ["answer", "proposal", None]},
-        "file_usage": {"type": "array", "items": {"type": "object"}},
-        "files": {
-            "type": "array",
-            "maxItems": MAX_UPLOAD_FILES,
-            "items": PLAN_FILE_SCHEMA,
-        },
-        "uploads_pending": {"type": "boolean"},
-        "contract_version": {
-            "type": "integer",
-            "minimum": CONTRACT_VERSION_MIN,
-            "maximum": CONTRACT_VERSION_MAX,
-        },
-        "preview_url": {"type": "string"},
-        "review_url": {"type": "string"},
-        "proposal": {"type": ["object", "null"]},
-        "execution": {"type": ["object", "null"]},
-        "original_brief": {"type": ["object", "null"]},
-        "action_summary": ACTION_SUMMARY_SCHEMA,
-        "require_review": {"type": "boolean"},
-    },
-    "additionalProperties": False,
-}
+_WIRE = json.loads(files(__package__).joinpath("wire_schemas.json").read_text(encoding="utf-8"))
+ACTOR_SCHEMA = _WIRE["Actor"]
+PLAN_FILE_SCHEMA = _WIRE["PlanFile"]
+SAFE_PLAN_SCHEMA = _model_projection(_WIRE["Plan"], (
+    "id", "status", "name", "instructions", "files", "uploads_pending", "contract_version",
+    "preview_url", "review_url", "correction", "superseded_by", "output_kind", "file_usage",
+    "proposal", "execution", "original_brief", "action_summary", "require_review",
+))
+SAFE_RECEIPT_SCHEMA = _model_projection(_WIRE["SubmissionReceipt"], (
+    "id", "status", "preview_url", "review_url", "contract_version", "proposal_fingerprint",
+    "action_summary", "operation", "execution",
+))
 
-ACTOR_SCHEMA = {
-    "type": "object",
-    "required": ["user", "credential", "capabilities"],
-    "properties": {
-        "user": {
-            "type": "object",
-            "required": ["name", "hash", "timezone", "personal_page"],
-            "properties": {
-                "name": {"type": "string"},
-                "hash": {"type": "string"},
-                "timezone": {"type": "string"},
-                "personal_page": {
-                    "type": "object",
-                    "required": [
-                        "kind",
-                        "hash",
-                        "name",
-                        "url",
-                        "can_view",
-                        "can_edit",
-                    ],
-                    "properties": {
-                        "kind": {"const": "page"},
-                        "hash": {"type": "string"},
-                        "name": {"type": ["string", "null"]},
-                        "url": {"type": "string"},
-                        "can_view": {"type": "boolean"},
-                        "can_edit": {"type": "boolean"},
-                    },
-                    "additionalProperties": False,
-                },
-            },
-            "additionalProperties": False,
-        },
-        "credential": {
-            "type": "object",
-            "required": [
-                "active",
-                "display_prefix",
-                "issued_at",
-                "expires_at",
-                "generation",
-            ],
-            "properties": {
-                "active": {"type": "boolean"},
-                "display_prefix": {"type": ["string", "null"]},
-                "issued_at": {"type": ["string", "null"], "format": "date-time"},
-                "expires_at": {"type": ["string", "null"], "format": "date-time"},
-                "generation": {"type": "integer", "minimum": 0},
-            },
-            "additionalProperties": False,
-        },
-        "capabilities": {
-            "type": "object",
-            "required": ["plans"],
-            "properties": {
-                "plans": {"type": "boolean"},
-                "execute_plan": {"type": "boolean"},
-            },
-            "additionalProperties": False,
-        },
-        "installation": {
-            "type": "object",
-            "required": ["project", "experiments", "source_id"],
-            "properties": {
-                "project": {"type": "string"},
-                "experiments": {"type": "boolean"},
-                "source_id": {"type": ["string", "null"]},
-            },
-            "additionalProperties": False,
-        },
-    },
-    "additionalProperties": False,
-}
-
-SAFE_RECEIPT_SCHEMA = {
-    "type": "object",
-    "required": [
-        "id",
-        "status",
-        "preview_url",
-        "review_url",
-        "contract_version",
-        "proposal_fingerprint",
-    ],
-    "properties": {
-        "action_summary": ACTION_SUMMARY_SCHEMA,
-        "id": {"type": "string"},
-        "status": {"enum": ["ready", "running", "complete"]},
-        "preview_url": {"type": "string"},
-        "review_url": {"type": "string"},
-        "contract_version": {
-            "type": "integer",
-            "minimum": CONTRACT_VERSION_MIN,
-            "maximum": CONTRACT_VERSION_MAX,
-        },
-        "proposal_fingerprint": {
-            "oneOf": [
-                {"type": "string", "minLength": 1},
-                {"type": "null"},
-            ]
-        },
-        "operation": {
-            "type": "object",
-            "required": ["id", "status"],
-            "properties": {
-                "id": {"type": "string"},
-                "status": {"type": "string"},
-            },
-            "additionalProperties": False,
-        },
-        "execution": {
-            "type": "object",
-            "required": ["started"],
-            "properties": {
-                "started": {"type": "boolean"},
-                "reason": {"type": "string"},
-            },
-            "additionalProperties": False,
-        },
-    },
-    "additionalProperties": False,
-}
-
-SAFE_CONTRACT_SCHEMA = {
+MCP_SUBMISSION_SCHEMA = {
     "type": "object",
     "required": [
         "contract_version",
-        "current_date",
-        "timezone",
-        "personal_page",
+        "proposal",
         "proposal_schema",
-        "permissions",
-        "required_file_refs",
-        "upload_inventory",
-        "file_checklist",
-        "guidance_requirements",
-        "uploads_supported",
-        "workflow_rules",
-        "reference_rules",
-        "limits",
-        "payload_sizes",
-        "mcp_submission",
+        "instructions",
+        "file_usage",
     ],
     "properties": {
-        "contract_version": {
-            "type": "integer",
-            "minimum": CONTRACT_VERSION_MIN,
-            "maximum": CONTRACT_VERSION_MAX,
+        "contract_version": {"type": "integer"},
+        "proposal": {"type": "object"},
+        "file_usage": {"type": "array"},
+        "proposal_schema": {
+            "const": "$.proposal_schema",
+            "description": "Path relative to this contract object, not the enclosing lifecycle result.",
         },
-        "current_date": {"type": "string", "format": "date"},
-        "timezone": {"type": "string"},
-        "personal_page": {"type": "object"},
-        "proposal_schema": {"type": ["object", "null"]},
-        "file_usage_schema": {"type": "object"},
-        "schema_scope": {"enum": ["full", "selected", "summary"]},
-        "schema_actions": {"type": "array", "items": {"type": "string"}},
-        "schema_instructions": {"type": "string"},
-        "permissions": {"type": "object"},
-        "required_file_refs": {"type": "array", "items": {"type": "string"}},
-        "upload_inventory": {"type": ["object", "null"]},
-        "file_checklist": {"type": "array", "items": {"type": "object"}},
-        "guidance_requirements": {"type": "object"},
-        "uploads_supported": {"type": "boolean"},
-        "workflow_rules": {"type": "array", "items": {"type": "string"}},
-        "reference_rules": {"type": "array", "items": {"type": "string"}},
-        "limits": {"type": "object"},
-        "payload_sizes": {"type": "object"},
-        "mcp_submission": {
-            "type": "object",
-            "required": [
-                "contract_version",
-                "proposal",
-                "proposal_schema",
-                "instructions",
-                "file_usage",
-            ],
-            "properties": {
-                "contract_version": {"type": "integer"},
-                "proposal": {"type": "object"},
-                "file_usage": {"type": "array"},
-                "proposal_schema": {
-                    "const": "$.proposal_schema",
-                    "description": "Path relative to this contract object, not the enclosing lifecycle result.",
-                },
-                "instructions": {"const": MCP_SUBMISSION_INSTRUCTIONS},
-            },
-            "additionalProperties": False,
-        },
+        "instructions": {"const": MCP_SUBMISSION_INSTRUCTIONS},
     },
     "additionalProperties": False,
 }
 
-SCHEMA_CONTRACT_KEYS = (
-    "contract_version", "proposal_schema", "file_usage_schema", "schema_scope",
-    "schema_actions", "schema_instructions", "mcp_submission",
-)
-SAFE_SCHEMA_CONTRACT_SCHEMA = {
-    "type": "object",
-    "required": list(SCHEMA_CONTRACT_KEYS),
-    "properties": {
-        key: ({"type": "object"} if key == "proposal_schema" else SAFE_CONTRACT_SCHEMA["properties"][key])
-        for key in SCHEMA_CONTRACT_KEYS
-    },
-    "additionalProperties": False,
-}
+REST_CONTRACT_SCHEMA = _WIRE["PlanContract"]
+REST_SCHEMA_CONTRACT_SCHEMA = _WIRE["PlanSchemaContract"]
 
 
-REST_CONTRACT_SCHEMA = {
-    "type": "object",
-    "required": [
-        *[
-            item
-            for item in SAFE_CONTRACT_SCHEMA["required"]
-            if item != "mcp_submission"
-        ],
-        "submission_format",
-    ],
-    "properties": {
-        **{
-            key: value
-            for key, value in SAFE_CONTRACT_SCHEMA["properties"].items()
-            if key != "mcp_submission"
-        },
-        "submission_format": {
-            "type": "object",
-            "required": ["method", "url", "contract_version", "body", "rule"],
-            "properties": {
-                "method": {"const": "POST"},
-                "url": {"type": "string", "format": "uri"},
-                "contract_version": {
-                    "type": "integer",
-                    "minimum": CONTRACT_VERSION_MIN,
-                    "maximum": CONTRACT_VERSION_MAX,
-                },
-                "body": {
-                    "type": "object",
-                    "required": ["contract_version", "proposal", "file_usage"],
-                    "properties": {
-                        "contract_version": {
-                            "type": "integer",
-                            "minimum": CONTRACT_VERSION_MIN,
-                            "maximum": CONTRACT_VERSION_MAX,
-                        },
-                        "proposal": {"type": "object", "maxProperties": 0},
-                        "file_usage": {"type": "array", "maxItems": 0},
-                    },
-                    "additionalProperties": False,
-                },
-                "rule": {"type": "string"},
-            },
-            "additionalProperties": False,
-        },
-    },
-    "additionalProperties": False,
-}
+def _mcp_contract(rest: dict) -> dict:
+    public = _model_projection(rest, tuple(key for key in rest["properties"] if key != "submission_format"))
+    public["properties"]["mcp_submission"] = MCP_SUBMISSION_SCHEMA
+    public["required"].append("mcp_submission")
+    return public
 
-REST_SCHEMA_CONTRACT_KEYS = (
-    *[key for key in SCHEMA_CONTRACT_KEYS if key != "mcp_submission"],
-    "submission_format",
-)
-REST_SCHEMA_CONTRACT_SCHEMA = {
-    "type": "object",
-    "required": list(REST_SCHEMA_CONTRACT_KEYS),
-    "properties": {
-        key: ({"type": "object"} if key == "proposal_schema" else REST_CONTRACT_SCHEMA["properties"][key])
-        for key in REST_SCHEMA_CONTRACT_KEYS
-    },
-    "additionalProperties": False,
-}
+
+SAFE_CONTRACT_SCHEMA = _mcp_contract(REST_CONTRACT_SCHEMA)
+SAFE_SCHEMA_CONTRACT_SCHEMA = _mcp_contract(REST_SCHEMA_CONTRACT_SCHEMA)
 
 
 UPLOAD_RESULT_SCHEMA = {
@@ -468,12 +179,44 @@ LIFECYCLE_CONTEXT_SCHEMA = {
     ],
     "additionalProperties": False,
 }
+# A new Plan needs live permissions and any explicitly requested action schemas.
+# The full guidance remains discoverable through get_plan_contract on the same ID.
+START_CONTRACT_FIELDS = (
+    "contract_version", "current_date", "timezone", "personal_page", "proposal_schema",
+    "schema_scope", "schema_actions", "required_file_refs", "uploads_supported",
+)
+START_SUBMISSION_INSTRUCTIONS = (
+    "Call submit_plan with this plan_id, contract_version, proposal and file_usage. "
+    "Read get_plan_contract with view=schema and actions for exact schemas, "
+    "or view=full for workflow, file and permission rules. Reuse this plan_id."
+)
+START_CONTRACT_SCHEMA = {
+    "type": "object",
+    "required": [key for key in START_CONTRACT_FIELDS if key in SAFE_CONTRACT_SCHEMA["required"]]
+                + ["permissions", "mcp_submission"],
+    "properties": {
+        **{key: SAFE_CONTRACT_SCHEMA["properties"][key] for key in START_CONTRACT_FIELDS},
+        "permissions": {"type": "object", "properties": {"allowed_actions": ACTION_SELECTION_SCHEMA},
+                        "additionalProperties": False},
+        "mcp_submission": {
+            **SAFE_CONTRACT_SCHEMA["properties"]["mcp_submission"],
+            "properties": {
+                **SAFE_CONTRACT_SCHEMA["properties"]["mcp_submission"]["properties"],
+                "instructions": {"const": START_SUBMISSION_INSTRUCTIONS},
+            },
+        },
+    },
+    "additionalProperties": False,
+}
 START_RESULT_SCHEMA = {
     **SAFE_PLAN_SCHEMA,
     "required": [*SAFE_PLAN_SCHEMA["required"], "context"],
     "properties": {
         **SAFE_PLAN_SCHEMA["properties"],
-        "context": LIFECYCLE_CONTEXT_SCHEMA,
+        "context": {
+            **LIFECYCLE_CONTEXT_SCHEMA,
+            "properties": {**LIFECYCLE_CONTEXT_SCHEMA["properties"], "contract": START_CONTRACT_SCHEMA},
+        },
     },
 }
 ENRICHED_UPLOAD_RESULT_SCHEMA = {
@@ -486,33 +229,21 @@ ENRICHED_UPLOAD_RESULT_SCHEMA = {
 }
 
 
-def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, object]:
-    return {
-        "type": "object",
-        "required": [],
-        "properties": {
-            "instructions": {
-                "type": "string",
-            },
-            "name": {"type": "string", "maxLength": 120},
-            "revises_plan_id": {"type": ["string", "null"], "minLength": 1, "description": "Creator-owned stopped execution to correct. Omit or use null for an independent Plan. Read current workspace state; propose only additional changes."},
-            "require_review": {
-                "type": "boolean",
-                "description": "When true, lock this Plan to browser review only so external execution is rejected.",
-            },
-            **(
-                {
-                    "actions": {
-                        **ACTION_SELECTION_SCHEMA,
-                        "description": "Known action types whose exact permitted schemas should be returned in context.contract, for example [create_task]. Use [] for a saved answer without changes. Omit for a summary without schemas.",
-                    }
-                }
-                if selected_actions
-                else {}
-            ),
-        },
-        "additionalProperties": False,
+def _plan_input_schema() -> dict[str, object]:
+    schema = _model_projection(_WIRE["createPlan"], ("instructions", "name", "revises_plan_id", "require_review"))
+    schema["properties"]["revises_plan_id"] = {
+        **schema["properties"]["revises_plan_id"],
+        "description": "Creator-owned stopped execution to correct. Omit or use null for an independent Plan. Read current workspace state; propose only additional changes.",
     }
+    schema["properties"]["require_review"] = {
+        **schema["properties"]["require_review"],
+        "description": "When true, lock this Plan to browser review only so external execution is rejected.",
+    }
+    schema["properties"]["actions"] = {
+        **ACTION_SELECTION_SCHEMA,
+        "description": "Known action types whose exact permitted schemas should be returned in context.contract, for example [create_task]. Use [] for a saved answer without changes. Omit for a summary without schemas.",
+    }
+    return schema
 
 
 def _plan_id_input(properties: dict[str, object]) -> dict[str, object]:
@@ -721,24 +452,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
             "answer_question",
             "Get lightweight guidance and personal Page context for answering or retrieving tasks without saving a report. The client model answers using plan-free read tools; this does not call a server model or create a Plan. Answer in chat first and offer to save afterward. Only when the user wants to save, use start_plan then submit_plan. Reuse this context during the conversation.",
             {"type": "object", "properties": {}, "additionalProperties": False},
-            {
-                "type": "object",
-                "required": [
-                    "current_date",
-                    "timezone",
-                    "personal_page",
-                    "report_created",
-                    "workflow_rules",
-                ],
-                "properties": {
-                    "current_date": {"type": "string"},
-                    "timezone": {"type": "string"},
-                    "personal_page": {"type": "object"},
-                    "report_created": {"const": False},
-                    "workflow_rules": {"type": "array", "items": {"type": "string"}},
-                },
-                "additionalProperties": False,
-            },
+            _WIRE["AnswerContext"],
             "answer_context",
             READ_ANNOTATIONS,
         ),
@@ -752,8 +466,8 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "start_plan",
-            f"Start one Plan for workspace changes, file organization, or an explicitly requested saved answer. For ordinary questions use answer_question and plan-free reads without saving. Instructions and uploads are optional individually; publishing needs at least one. {common_start} Pass actions=[\"create_task\"] or other known actions for selected schemas, or omit for compact context. Continue the same Plan for mixed requests and revisions. {review_only}",
-            _plan_input_schema(selected_actions=True),
+            f"Start one Plan for workspace changes, file organization, or an explicitly requested saved answer. For ordinary questions use answer_question and plan-free reads without saving. Instructions and uploads are optional individually; publishing needs at least one. {common_start} Pass actions=[\"create_task\"] or other known actions for selected schemas, or omit for compact context. Use get_plan_contract with view=full for workflow and permission rules. Continue the same Plan for mixed requests and revisions. {review_only}",
+            _plan_input_schema(),
             START_RESULT_SCHEMA,
             "start_plan",
             START_ANNOTATIONS,
@@ -822,13 +536,14 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
                 "required": ["plan_id", "contract_version", "proposal", "file_usage"],
                 "properties": {
                     "plan_id": {"type": "string", "minLength": 1, "maxLength": 2048},
-                    "contract_version": {"type": "integer"},
-                    "proposal": {"type": "object"},
+                    # The server validates candidate versions and per-file usage, returning
+                    # field-level correction details to the client.
+                    "contract_version": {"type": _WIRE["submitPlan"]["properties"]["contract_version"]["type"]},
+                    "proposal": _WIRE["submitPlan"]["properties"]["proposal"],
                     "file_usage": {"type": "array", "items": {"type": "object"}},
-                    "name": {"type": "string", "minLength": 1, "maxLength": 120},
+                    "name": _WIRE["submitPlan"]["properties"]["name"],
                     "instructions": {
-                        "type": "string",
-                        "minLength": 1,
+                        **_WIRE["submitPlan"]["properties"]["instructions"],
                         "maxLength": 65536,
                     },
                     "require_review": {
@@ -1007,12 +722,11 @@ def build_tool_registry(catalog: Mapping[str, object], *, execute_plan: bool = F
                 cast(dict[str, object], submit_schema["properties"]).update(
                     {
                         "execute": {
-                            "type": "boolean",
+                            **_WIRE["submitPlan"]["properties"]["execute"],
                             "description": "When true, immediately start executing the submitted proposal (requires operation_id). Plans marked require_review or containing form schema changes, review items, or flagged issues still pause in ready state for browser review.",
                         },
                         "operation_id": {
-                            "type": "string",
-                            "pattern": "^[A-Za-z0-9._-]{1,128}$",
+                            **_WIRE["submitPlan"]["properties"]["operation_id"],
                             "description": "Stable operation ID (required when execute is true).",
                         },
                     }
@@ -1047,27 +761,13 @@ def execution_tool() -> ToolDefinition:
         "execute_plan",
         "Execute an already submitted proposal when automatic plan execution is enabled for this connection. Use the proposal_fingerprint returned by submit_plan and a stable operation_id. Retry an uncertain request with those same values; poll get_plan for outcomes and never recreate successful actions. Plans marked require_review or containing form schema changes, review items, or flagged issues still require browser review. Current permissions and the exact proposal are checked again. This applies app records, not shell commands or deployments.",
         {
-            "type": "object",
-            "required": ["plan_id", "proposal_fingerprint", "operation_id"],
-            "properties": {
-                "plan_id": {"type": "string", "minLength": 1, "maxLength": 2048},
-                "proposal_fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-                "operation_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$"},
-            },
-            "additionalProperties": False,
+            **_plan_id_input(_WIRE["executePlan"]["properties"]),
+            "required": ["plan_id", *_WIRE["executePlan"]["required"]],
         },
         {
             "type": "object",
             "required": ["plan", "operation"],
-            "properties": {
-                "plan": SAFE_PLAN_SCHEMA,
-                "operation": {
-                    "type": "object",
-                    "required": ["id", "status"],
-                    "properties": {"id": {"type": "string"}, "status": {"type": "string"}},
-                    "additionalProperties": False,
-                },
-            },
+            "properties": {"plan": SAFE_PLAN_SCHEMA, "operation": SAFE_RECEIPT_SCHEMA["properties"]["operation"]},
             "additionalProperties": False,
         },
         "execute_plan",

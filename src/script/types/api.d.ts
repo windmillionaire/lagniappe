@@ -1,5 +1,12 @@
 import type * as Sentry from "@sentry/browser";
 
+import type { JobStatus as DeferredOperationStatus } from "../generated/poll.ts";
+
+export type {
+	JobStatus as DeferredOperationStatus,
+	PollResponse,
+} from "../generated/poll.ts";
+
 export interface EntityRevision {
 	key: string;
 	fingerprint: string;
@@ -51,44 +58,9 @@ export interface SessionUpdateResponse {
 	userHash: string;
 }
 
-/** The coordinator validates the wire envelope and each result before use. */
-export interface PollResponse {
-	version: unknown;
-	results: unknown;
-}
-
 export type NotificationState =
 	| { generation: null; revision: null; count: null; miss: true }
 	| { generation: string; revision: number; count: number; miss: false };
-
-/** The owner-visible projection from deferred_job_lifecycle.status_projection. */
-export interface DeferredOperationStatus {
-	key: string;
-	type: string | null;
-	status: string | null;
-	phase: string;
-	phase_label: string;
-	attempt: number;
-	remaining_seconds: number | null;
-	last_progress_at: string | null;
-	retry_reason: string | null;
-	elapsed_seconds: number;
-	phase_elapsed_seconds: number;
-	updated_at: string | null;
-	next_attempt_at: string | null;
-	revision: number;
-	terminal: boolean;
-	stale: boolean;
-	recovering: boolean;
-	source_widget: string | null;
-	destination: string | null;
-	entity_key: string | null;
-	can_cancel?: boolean;
-	target_key?: string | null;
-	operation_id?: string | null;
-	snapshot_revision?: string | null;
-	error?: string;
-}
 
 declare global {
 	interface Window {

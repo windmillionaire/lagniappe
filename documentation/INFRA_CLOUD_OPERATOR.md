@@ -75,8 +75,8 @@ LAGNIAPPE_CONFIG_ROOT="$PWD/testing/fixtures/offline-runtime" venv/bin/python ru
 This path uses Python 3.14 and the Node version in `.nvmrc`. It creates local
 `venv` and locked `mcp/.venv` directories and uses a writable npm cache under
 `venv`. An existing writable `npm_config_cache` can be reused across worktrees.
-The synthetic settings support credential-free source checks. The frontend
-build writes the usual generated assets in this worktree.
+The synthetic settings support credential-free source checks. The production
+build enforces the startup budgets and writes the usual assets in this worktree.
 
 For installation-specific work, use the task launcher below with the selected
 project and numeric settings version. It restores that installation and sets

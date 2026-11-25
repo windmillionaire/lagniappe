@@ -26,7 +26,8 @@ REPORT_DOCUMENT_GUIDELINES = """
   read the existing content and supply only the requested addition, never a
   rewritten copy. For an explicitly requested whole-document replacement, use
   replace_page_document with the complete replacement; the previous version is
-  pinned before the collaborative edit. Read the current document first.
+  pinned before the collaborative edit. Read get_entity(view=edit) first. Use page_document_markdown for a replacement only
+  when page_document_markdown_complete is true. A partial projection needs the editor.
 - The server begins each new document/addition with a source and UTC timestamp
   quote. Do not invent or supply that header yourself. Manual editing is unchanged.
 - Use headings, paragraphs, emphasis, links, block quotes, tables, fenced code,

@@ -2767,6 +2767,12 @@ def _release_check_repository(tmp_path: Path) -> Path:
                 encoding="utf-8"
             )
         ),
+        "runner/wire_contracts.py": (
+            "from pathlib import Path\n"
+            "if Path('src/script/generated/poll.ts').read_text() != '// expected\\n':\n"
+            "    raise SystemExit('stale polling schema')\n"
+        ),
+        "src/script/generated/poll.ts": "// expected\n",
         "runner/browser_endpoints.py": (
             Path(run.__file__).parent / "runner/browser_endpoints.py"
         ).read_text(encoding="utf-8"),
@@ -2945,6 +2951,26 @@ def test_release_check_rejects_staged_route_drift_despite_unstaged_fix(tmp_path,
 
     assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
     assert "src/script/generated/endpoints.ts is stale" in capsys.readouterr().out
+
+
+def test_generated_wire_schemas_match_the_application_contracts():
+    subprocess.run(
+        [sys.executable, "-m", "runner.wire_contracts", "--check"],
+        cwd=Path(run.__file__).parent, check=True,
+    )
+
+
+def test_release_check_rejects_staged_wire_schema_drift(tmp_path, capsys):
+    repo = _release_check_repository(tmp_path)
+    _write_release_candidate(repo)
+    binding = repo / "src/script/generated/poll.ts"
+    original = binding.read_text()
+    binding.write_text("// stale\n")
+    _git(repo, "add", "src/script/generated/poll.ts")
+    binding.write_text(original)
+
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
+    assert "Wire schemas: stale polling schema" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("change", ["runner", "documentation", "backend"])

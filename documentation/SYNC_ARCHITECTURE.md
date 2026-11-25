@@ -49,7 +49,9 @@ the preloaded records and takes the ordinary authenticated read path.
 Under `src/script/shared/polling/`, `coordinator.ts` schedules subscriptions
 for one mounted view and `protocol.ts` validates request bodies, subscription
 descriptors, and individual results. Each subscription has a stable ID,
-type-specific fields, and an opaque revision.
+type-specific fields, and an opaque revision. The browser imports its field sets,
+limits and wire types from the Python polling contract through the
+[wire schema generator](INFRA_BUILD.md#polling-and-external-api-schemas).
 The coordinator:
 
 - batches at most 64 due subscriptions;

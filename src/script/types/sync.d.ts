@@ -1,3 +1,10 @@
+import type {
+	DocumentPoll as DocumentPollPayload,
+	PollDescriptor,
+} from "../generated/poll.ts";
+
+export type { DocumentPoll as DocumentPollPayload } from "../generated/poll.ts";
+
 import type { PollingCoordinator } from "../shared/polling.ts";
 
 interface DocumentIdentity {
@@ -6,11 +13,10 @@ interface DocumentIdentity {
 	fingerprint?: string | null;
 }
 
-export interface DocumentCursor {
-	generation: string | null;
-	revision: number;
-	presence_digest: string | null;
-}
+export type DocumentCursor = Pick<
+	PollDescriptor<"document">,
+	"generation" | "revision" | "presence_digest"
+>;
 
 export interface SyncMention {
 	occurrence_id: string;
@@ -53,39 +59,6 @@ interface SyncAcknowledgement {
 
 export interface SyncResponse {
 	updates: SyncAcknowledgement[];
-}
-
-interface DocumentAuthor {
-	hash: string;
-	name: string;
-}
-
-interface DocumentReader {
-	id: string;
-	hash?: string;
-	name?: string;
-}
-
-interface DocumentDelta {
-	revision: number;
-	update: string;
-	user_hash: string | null;
-}
-
-export interface DocumentPollPayload {
-	generation: string;
-	revision: number;
-	fingerprint: string | null;
-	mode: "snapshot" | "delta";
-	updates: DocumentDelta[];
-	checkpoint_required: boolean;
-	ydoc?: string | null;
-	markup?: string | null;
-	user_hash?: string;
-	authors?: Record<string, DocumentAuthor>;
-	users?: (DocumentReader & { client_id: string })[];
-	user?: DocumentReader;
-	presence_digest?: string;
 }
 
 interface CachedDocumentSnapshot {

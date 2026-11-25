@@ -49,15 +49,15 @@ LIFECYCLE_SCHEMA_SHA256 = {'answer_question': ('99334726611ccf58a148b0814696bfa6
  'get_actor': ('99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa',
                '67f1f90a7a55e2bf678291801655eb551ca5d979b914f39be9abe1ccc05daaeb'),
  'start_plan': ('febc18d7d91a25de641e364d358574079883b24e81ad2b961c816667ac2115bb',
-                '6e5eb2f960a8280e34ebaf0e0b97664b53da8ec515be47d893e6a626cadc77bb'),
+                '115b7952d098d9e9bc3377bd9ec6108049818c74781ffc384a24400ecab4f493'),
  'get_plan': ('6ddc49debd71ded568dc1b5928713313380901355a601ce131801d7a034fdc37',
-              '5cb97bd86379b6e8ce4c60cdb414dc7302379b6c369e83ec159ea3f652a3712c'),
+              '3d7c4bdc47c93482ed842a04b350ab8a03f55d891a66dd898c0b0cd59c7b6799'),
  'get_plan_contract': ('337cb97fa06d416268081a87b7a7f90574031467337bbc6806554a989ca0dde3',
-                       '512d8688602644cb4fb4136d272c3795c70e2381ca77e69f6e66467079496a9c'),
+                       '32b4ccad3e3f2d0f31f1d7dcf40f2778837c649772f3d9b909f5582fb1569a5b'),
  'upload_local_files': ('716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259',
-                        'a166f75959e09ae3dfc1fcaa417d0b1d3eb09c9d8ad7eb46082ac79d69639525'),
+                        'f6643ceccefca40fedd575101f9f65752bf0947f8670d17c27b8ded94922fca8'),
  'submit_plan': ('dd9ee98735d6b733ab37289d24e6bb18e7cbd584610223b99d6bfe983ee42ec9',
-                 '048a45182d3bc25d6ba808defe1f31fe0103ea11595a79d32a4a4d94ab0d30ae')}
+                 '4631403814453ae8aa2700748c0990e0d1fe3bded68c6de97e90877b5e1a90e5')}
 PLAN_KEYS = {
     "id",
     "status",
@@ -480,7 +480,7 @@ def _assert_safe_plan(
     return value
 
 
-def _assert_mcp_contract(contract: dict, *, tool: str) -> None:
+def _assert_mcp_contract(contract: dict, *, tool: str, compact: bool = False) -> None:
     _assert_no_private_transport(contract)
     assert "submission_format" not in contract
     assert "tool" not in contract
@@ -496,6 +496,11 @@ def _assert_mcp_contract(contract: dict, *, tool: str) -> None:
     assert submission["proposal"] == {}
     assert submission["proposal_schema"] == "$.proposal_schema"
     assert submission["instructions"].startswith("Call submit_plan")
+    if compact:
+        assert "get_plan_contract" in submission["instructions"]
+        assert "view=full" in submission["instructions"]
+        assert "workflow_rules" not in contract
+        return
     assert "to this contract object" in submission["instructions"]
     assert "refreshes summary context" in submission["instructions"]
     assert "API validates the submission" in submission["instructions"]
@@ -857,7 +862,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             "can_create": True,
         }
         ask_contract = ask_start["context"]["contract"]
-        _assert_mcp_contract(ask_contract, tool="ask")
+        _assert_mcp_contract(ask_contract, tool="ask", compact=True)
         assert ask_contract["schema_scope"] == "selected"
         assert ask_contract["schema_actions"] == []
         assert ask_contract["proposal_schema"]["properties"]["actions"] == {"type": "array", "maxItems": 0}
@@ -878,7 +883,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
             context="contract",
         )
         create_contract = create_start["context"]["contract"]
-        _assert_mcp_contract(create_contract, tool="create")
+        _assert_mcp_contract(create_contract, tool="create", compact=True)
         assert "create_page" in create_contract["permissions"]["allowed_actions"]
         assert create_contract["schema_scope"] == "selected"
         assert set(create_contract["proposal_schema"]["$defs"]) == {
@@ -936,7 +941,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         )
         update_context = update_start["context"]["contract"]
         assert update_context["proposal_schema"] is None
-        assert "required_before_analysis" not in update_context["guidance_requirements"]
+        assert "guidance_requirements" not in update_context
         update_contract = _structured(workflow["update"]["contract"])
         _assert_mcp_contract(update_contract, tool="organize")
         assert update_contract["required_file_refs"] == []

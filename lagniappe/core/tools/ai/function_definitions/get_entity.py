@@ -15,6 +15,7 @@ from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
+from ..page_document import document_edit_projection
 from ..references import stored_file_identifiers
 
 
@@ -29,7 +30,8 @@ GET_ENTITY = types.FunctionDeclaration(
         "and description — useful for understanding a category before "
         "drilling into its pages with get_category_pages. For forms and "
         "form-bearing pages, tasks, or model tasks, the result includes the "
-        "schema needed to create valid submission objects."
+        "schema needed to create valid submission objects. An editable Page in edit view "
+        "includes page_document_markdown and a flag indicating whether it can be round-tripped."
     ),
     parameters=types.Schema.model_validate({
         "type": "object",
@@ -108,6 +110,11 @@ def edit_entity(entity: Entity, user: User, schemas: dict[str, list[dict[str, ob
     if entity.entity_kind in {"page", "task"}:
         result["answers"] = deepcopy(entity.submission or {})
         result["generation"] = entity.generation
+    if entity.entity_kind == "page" and entity.allowed(Action.EDIT, user=user):
+        page = cast("Page", entity)
+        result.update(document_edit_projection(
+            page.properties.document.source_html, has_snapshot=bool(page.get_asset("snapshot")),
+        ))
     form_owner = cast("Task | Page | ModelTask", entity)
     if entity.entity_kind in {"task", "page", "model"} and (form := form_owner.form) and form.allowed(Action.VIEW, user=user):
         if ai_key := form_owner.properties.form.ai_key:
