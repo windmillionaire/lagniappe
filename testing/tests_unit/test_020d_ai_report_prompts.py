@@ -1,11 +1,20 @@
 """Focused AI-report characterization coverage."""
 
+from collections import Counter
+from datetime import UTC, datetime, timedelta
+from threading import Barrier, Lock, get_ident
+from types import SimpleNamespace
+
+from google.genai import errors
 import pytest
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import LARGE_ASSET_BYTES
 from lagniappe.core.tools.ai import planner, summarize
+from lagniappe.core.tools.ai.observability import ai_execution_context, current_execution_control
 from lagniappe.core.tools.ai.reporting.completion import files as organize_completion
+from lagniappe.core.tools.deferred_jobs.control import DeferredExecutionControl
+from lagniappe.core.tools.deferred_jobs.errors import DeferredJobClaimLostError
 from testing.utility.ai_report_fakes import (
     _prompt_context_json,
     _test_file,
@@ -67,14 +76,14 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
     )
 
     assert summarized == [first, office, markdown, vcard, second]
-    assert saved == [first, office, markdown, vcard, second]
-    assert generated == [
+    assert Counter(saved) == Counter([first, office, markdown, vcard, second])
+    assert Counter(generated) == Counter([
         "first.pdf",
         "agenda.docx",
         "service-confirmation.md",
         "marisol-vega.vcf",
         "second.pdf",
-    ]
+    ])
     assert first.properties.summarize.enabled is True
     assert first.properties.summarize.search is True
     assert first.properties.summarize.complete is True
@@ -92,7 +101,7 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
     assert second.properties.summarize.complete is True
     assert existing.summary == "Already summarized."
     assert unsupported.summary is None
-    assert len(active_checks) == 12
+    assert active_checks
 
     unindexed = _test_file("unindexed.pdf", "application/pdf")
     unindexed_report = TestEntities.get(
@@ -156,6 +165,15 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
     assert third.properties.summarize.search is True
     assert third.properties.summarize.complete is True
     assert fourth.summary is None
+    retried = []
+
+    def finish(file, **kwargs):
+        retried.append(file)
+        file.summary = "Fourth summary."
+
+    monkeypatch.setattr(organize_completion, "generate_summary", finish)
+    assert organize_completion.summarize_report_input_files(quota_report, save=quota_saved.append) == [fourth]
+    assert retried == [fourth] and quota_saved == [third, fourth]
 
 
 @pytest.mark.unit
@@ -193,7 +211,7 @@ def test_summarize_report_input_files_falls_back_for_large_files(monkeypatch):
 
     assert generated == ["large-source.pdf"]
     assert summarized == [supported, unsupported]
-    assert saved == [supported, unsupported]
+    assert Counter(saved) == Counter([supported, unsupported])
     assert supported.summary == organize_completion.OVERSIZED_REPORT_SUMMARY
     assert unsupported.summary == organize_completion.OVERSIZED_REPORT_SUMMARY
     assert small.summary is None
@@ -211,6 +229,114 @@ def test_summarize_report_input_files_falls_back_for_large_files(monkeypatch):
     )
     assert by_filename["large-source.pdf"]["large"] is True
     assert by_filename["large-source.zip"]["display_name"] == "large-source"
+
+
+@pytest.mark.unit
+def test_parallel_file_summaries_keep_job_control_and_checkpoint_on_caller(monkeypatch):
+    files = [_test_file(f"receipt-{index}.pdf") for index in range(8)]
+    progress, saved = [], []
+    control = DeferredExecutionControl(
+        deadline_at=datetime.now(UTC) + timedelta(minutes=1),
+        active_check=lambda: True, progress_callback=progress.append,
+    )
+    coordinator = get_ident()
+    barrier = Barrier(4, timeout=5)
+    lock = Lock()
+    active = peak = 0
+
+    def generate(file, **_options):
+        nonlocal active, peak
+        assert current_execution_control() is control
+        control.before_provider("initial")
+        with lock:
+            active += 1
+            peak = max(peak, active)
+        barrier.wait()
+        file.summary = file.filename
+        control.set_phase("validating")
+        with lock:
+            active -= 1
+
+    def save(file):
+        assert get_ident() == coordinator
+        saved.append(file)
+
+    monkeypatch.setattr(organize_completion, "generate_summary", generate)
+    with ai_execution_context(execution_control=control):
+        result = organize_completion.summarize_report_input_files(
+            SimpleNamespace(input_files=files), save=save, ensure_active=control.ensure_active,
+        )
+    control.before_provider("initial")
+    assert result == files and Counter(saved) == Counter(files)
+    assert peak == 4
+    assert [entry["phase"] for entry in progress] == ["summarizing", "generating"]
+
+
+@pytest.mark.unit
+def test_cancelled_summary_does_not_save_or_dispatch_more_files(monkeypatch):
+    files = [_test_file(f"receipt-{index}.pdf") for index in range(8)]
+    saved, started = [], []
+    active = True
+
+    def check():
+        if not active:
+            raise DeferredJobClaimLostError("cancelled")
+
+    def generate(file, **_options):
+        nonlocal active
+        started.append(file)
+        file.summary = file.filename
+        active = False
+
+    monkeypatch.setattr(organize_completion, "generate_summary", generate)
+    with pytest.raises(DeferredJobClaimLostError):
+        organize_completion.summarize_report_input_files(
+            SimpleNamespace(input_files=files), save=saved.append, ensure_active=check,
+        )
+    assert 1 <= len(started) <= 4
+    assert saved == []
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("token_count,direct", [(32_000, True), (32_001, False), (None, False), ("unavailable", False)])
+def test_mixed_upload_budget_counts_all_originals_in_one_primary_request(monkeypatch, token_count, direct):
+    from lagniappe.core.tools.ai import core
+
+    pdf = _test_file("invoice.pdf", "application/pdf")
+    note = _test_file("purchase.json", "application/json")
+    for file in [pdf, note]:
+        file.test_spec["asset_sizes"] = {"file": 20_000}
+    counts = []
+
+    def count_tokens(*, model, contents, config):
+        counts.append(model)
+        assert [item.file_data.file_uri for item in contents] == [
+            "gs://private-bucket/invoice.pdf", "gs://private-bucket/purchase.json",
+        ]
+        assert [item.file_data.mime_type for item in contents] == ["application/pdf", "text/plain"]
+        assert config.http_options.retry_options.attempts == 1
+        if token_count == "unavailable":
+            raise errors.ServerError(503, {"error": {"message": "Service unavailable"}})
+        return SimpleNamespace(total_tokens=token_count)
+
+    monkeypatch.setattr(core, "runtime_ai_settings", lambda: {"AI_MODEL": "configured-primary"})
+    monkeypatch.setattr(core.GenAI, "_client", SimpleNamespace(models=SimpleNamespace(count_tokens=count_tokens)))
+    assert organize_completion.use_original_report_files(SimpleNamespace(input_files=[pdf, note])) is direct
+    assert counts == ["configured-primary"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("reason", ["large", "unknown size", "unsupported", "existing summary"])
+def test_unsuitable_bundles_reuse_summary_path_without_provider_preflight(monkeypatch, reason):
+    mimetype = "application/zip" if reason == "unsupported" else "text/plain"
+    file = _test_file("upload", mimetype)
+    if reason != "unknown size":
+        file.test_spec["asset_sizes"] = {"file": LARGE_ASSET_BYTES + 1 if reason == "large" else 100}
+    if reason == "existing summary":
+        file.summary = "Previously saved summary"
+
+    monkeypatch.setattr(planner.ai_model, "count_file_tokens", lambda *_: pytest.fail("Unnecessary count"))
+    assert not organize_completion.use_original_report_files(SimpleNamespace(input_files=[file]))
 
 
 @pytest.mark.unit

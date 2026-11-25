@@ -189,7 +189,7 @@ def validate_proposal(
             seen_ids.add(action_id)
             seen_actions[action_id] = action
 
-    if normal_refs:
+    if normal_refs or require_file_summaries:
         attached_file_refs = {
             action.get("data", {}).get("file")
             for action in actions

@@ -80,6 +80,7 @@ GEMINI_MIMETYPES = {
 GEMINI_MIMETYPE_ALIASES = {
     # Gemini accepts text/plain file parts, while Lagniappe retains these
     # canonical media types for storage, downloads, and previews.
+    "application/json": "text/plain",
     "text/markdown": "text/plain",
     "text/md": "text/plain",
     "text/vcard": "text/plain",

@@ -24,6 +24,19 @@ class ProviderErrorDetails(TypedDict):
     raw: str
 
 
+class ReportOriginalsRejected(Exception):
+    """The provider rejected the uploaded media on the initial planner request."""
+
+    @staticmethod
+    def matches(error: Exception) -> bool:
+        details = provider_error_details(error)
+        message = (details["message"] or details["raw"]).casefold()
+        return str(details["code"]) == "400" and any(marker in message for marker in (
+            "document has no pages", "exceeds the supported page limit", "unsupported mime type",
+            "unable to process input image", "input token count", "too many input tokens",
+        ))
+
+
 def retry_http_options(
     api_version: str | None = None,
     attempts: int | None = None,

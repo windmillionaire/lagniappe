@@ -387,7 +387,7 @@ def _report_action_data_response_schema(action_type, include_submission_fields):
     return schema
 
 
-def _report_action_response_schema(action_type, include_submission_fields):
+def _report_action_response_schema(action_type, include_submission_fields, *, require_file_summary_terms=False):
     """Return one discriminated action variant with its exact data contract."""
     properties = {
         "id": {"type": "string"},
@@ -400,6 +400,8 @@ def _report_action_response_schema(action_type, include_submission_fields):
             include_submission_fields,
         ),
     }
+    if action_type == "summarize_file" and require_file_summary_terms:
+        properties["data"]["required"].append("retrieval_terms")
     return {
         "type": "object",
         "properties": properties,
@@ -442,6 +444,7 @@ def report_proposal_response_schema(
                     _report_action_response_schema(
                         action_type,
                         include_submission_fields,
+                        require_file_summary_terms=True,
                     )
                     for action_type in action_types
                 ]
@@ -588,6 +591,7 @@ def _external_report_action_response_schema(
     schema = _report_action_response_schema(
         action_type,
         include_submission_fields,
+        require_file_summary_terms=require_file_summary_terms,
     )
     schema["properties"]["type"] = {
         "type": "string",
@@ -631,11 +635,6 @@ def _external_report_action_response_schema(
         terms_schema = data_schema["properties"]["retrieval_terms"]
         terms_schema["uniqueItems"] = True
         terms_schema["items"]["maxLength"] = 80
-        if require_file_summary_terms:
-            required = list(data_schema.get("required", ()))
-            if "retrieval_terms" not in required:
-                required.append("retrieval_terms")
-            data_schema["required"] = required
     return schema
 
 

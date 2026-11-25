@@ -134,9 +134,13 @@ def validate_file_usage(
     return deepcopy(file_usage)
 
 
-def report_prompt(report: AIReport, user: User, feedback: str | None = None) -> Prompt:
+def report_prompt(
+    report: AIReport, user: User, feedback: str | None = None, *, original_files: bool = False
+) -> Prompt:
     can_create = user.access(AI.CREATE)
     allowed = allowed_report_actions(user) if can_create else ()
+    if original_files and can_create:
+        allowed = (*allowed, "summarize_file")
     prompt = Prompt(
         "You are the Lagniappe assistant. Answer questions and prepare reviewed workspace changes in one conversation.",
         user=user,
@@ -176,6 +180,8 @@ def report_prompt(report: AIReport, user: User, feedback: str | None = None) -> 
             }
         )
         item["report_file_ref"] = hash_reference(file)
+        if original_files:
+            prompt.add_file(file, report_file_ref=item["report_file_ref"])
         warning = _report_file_summary_warning(file)
         if warning:
             item["summary_warning"] = warning
@@ -227,6 +233,17 @@ never silently discard a file.
                 "an executable attachment to an exact existing target or earlier "
                 "creation action."
             )
+        if original_files:
+            prompt.add_instructions(
+                "The original of each upload is attached and labeled with its report_file_ref. "
+                "Use those originals together and reuse them throughout this conversation."
+            )
+            if can_create:
+                prompt.add_instructions(
+                    "Include exactly one summarize_file action with a grounded summary and "
+                    "two distinct retrieval terms for each organize upload. Evidence files "
+                    "need no summary action."
+                )
         if prompt.require_organization:
             prompt.add_instructions("With files and no instructions, organize all files.")
     else:
@@ -272,6 +289,7 @@ def generate_report(prompt: Prompt) -> GeneratedReport:
             required_file_refs=[
                 item["file"] for item in usage if item["usage"] == "organize"
             ],
+            require_file_summaries="summarize_file" in (prompt.allowed_actions or ()),
             user=prompt.user,
             validate_reference_kinds=True,
             prepare_schema_changes=True,

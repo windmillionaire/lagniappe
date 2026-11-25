@@ -88,13 +88,15 @@ def _attach_file(action, report, user, created):
     return file, writes, {"file_summary": _file_summary_result(file), "target": _entity_result(target)}
 
 
-def _summarize_file(action, report, _user, created):
+def _summarize_file(action, report, user, created):
     data = _data(action)
     file = _resolve_report_file(
         data.get("file") or data.get("file_id") or data.get("file_ref"),
         report,
         created,
     )
+    if file.has_references:
+        _require_allowed(file.allowed(Action.EDIT, user=user), "You do not have permission to summarize this file.")
     summary = (data.get("summary") or data.get("description") or "").strip()
     if not summary:
         raise exceptions.ValidationError("Summarize file actions require summary text.")

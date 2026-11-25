@@ -216,8 +216,7 @@ REPORT_ACTION_DATA_CONTRACTS = {
 }
 
 # The ordered contract registry is the source of truth for action vocabulary.
-# Keep summarize_file valid for older saved proposals and direct runner tests,
-# but do not advertise it to new report prompts.
+# Planners that receive originals explicitly add the reviewed summary action.
 ALLOWED_ACTIONS = frozenset(REPORT_ACTION_DATA_CONTRACTS)
 ACTION_ORDER = tuple(
     action_type

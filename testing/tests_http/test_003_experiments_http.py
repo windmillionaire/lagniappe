@@ -21,6 +21,31 @@ from lagniappe.web.routes.api import main as api
 pytestmark = pytest.mark.http
 
 
+@pytest.mark.parametrize("enabled,header,expected", [
+    (True, "summaries", True), (True, None, False), (False, "summaries", False),
+])
+def test_native_report_records_summary_comparison_only_on_experiments(monkeypatch, enabled, header, expected):
+    from lagniappe.web.routes.tools import main as reports
+
+    actor = SimpleNamespace()
+    report = SimpleNamespace(db={}, key="report")
+    queued = []
+    monkeypatch.setattr(CONFIG, "EXPERIMENTS_ENABLED", enabled)
+    monkeypatch.setattr(reports, "authenticated_user", lambda: actor)
+    monkeypatch.setattr(reports.Entities.REPORT, "create", lambda data: report)
+    monkeypatch.setattr(reports.Entities, "save", lambda *items: None)
+    monkeypatch.setattr(reports.Entities, "fetch_one", lambda *args, **kwargs: None)
+    monkeypatch.setattr(reports.DeferredJobs, "start", lambda spec: (queued.append(spec), None))
+    monkeypatch.setattr(reports.responses, "deferred_tool_report", lambda *args, **kwargs: "queued")
+    headers = {"X-Lagniappe-Experiments-Report-Files": header} if header else {}
+    with app.test_request_context("/tools/ai", method="POST", headers=headers):
+        assert reports._start_tool_report(
+            "File these.", default_name="Plan", upload_manifest=[{"filename": "receipt.json"}],
+        ) == "queued"
+    assert len(queued) == 1
+    assert queued[0].inputs["report"].db.get("summaries_first", False) is expected
+
+
 def test_experiments_execute_requires_remote_admin_and_exact_proposal(monkeypatch):
     actor = SimpleNamespace(
         email=CONFIG.AGENT_ACCESS_EMAIL,

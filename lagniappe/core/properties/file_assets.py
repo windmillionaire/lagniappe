@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Protocol, TypedDict, cast
+from typing import TYPE_CHECKING, Any, NotRequired, Protocol, TypedDict, cast
 
 if TYPE_CHECKING:
     from werkzeug.datastructures import FileStorage
@@ -29,6 +29,7 @@ type _FileOwner = File | Ingress
 class FilePart(TypedDict):
     uri: str
     mime_type: str
+    report_file_ref: NotRequired[str]
 
 
 class _PreparedUpload(Protocol):
