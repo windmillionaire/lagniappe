@@ -8,23 +8,35 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 from types import SimpleNamespace
 from xml.etree import ElementTree
 
 import pytest
 import yaml
 
-from runner import hosted_e2e
-from runner.hosted_e2e_anchor import main as hosted_e2e_anchor
+from config import APP_DIR, SETTINGS
+from config.constants import APP_HANDLERS
+from config.storage import BUCKET_CORS_HEADERS, BUCKET_CORS_METHODS
+from runner import cloud_checkpoints, hosted_e2e
 from runner.hosted_e2e import (
     HostedE2EError,
     HostedE2EInfrastructure,
-    _describe,
-    _hosted_app_descriptor,
-    _verify_soft_routing_guard,
+    app_engine,
+    candidate as candidate_runner,
+    cli,
+    evidence as result_evidence,
+    execution as job_execution,
+    lifecycle,
     merge_remote_evidence,
+    preflight,
+    provisioning,
     require_clean_source,
+    runtime,
 )
+from runner.hosted_e2e.app_engine import _hosted_app_descriptor, _verify_soft_routing_guard
+from runner.hosted_e2e.runtime import _describe
+from runner.hosted_e2e_anchor import main as hosted_e2e_anchor
 from testing.utility.test_evidence import (
     TEST_RUN_SCHEMA_VERSION,
     behavior_snapshot,
@@ -97,8 +109,8 @@ def test_hosted_cors_preserves_standing_and_exact_origin_lifecycles(monkeypatch)
     candidate = hosted.replace("*", "e2e-1234567890abcdef")
     unrelated = {"origin": ["https://docs.example.com"], "method": ["GET"]}
     base = {
-        "method": hosted_e2e.BUCKET_CORS_METHODS,
-        "responseHeader": hosted_e2e.BUCKET_CORS_HEADERS,
+        "method": BUCKET_CORS_METHODS,
+        "responseHeader": BUCKET_CORS_HEADERS,
         "maxAgeSeconds": 3600,
     }
 
@@ -120,11 +132,11 @@ def test_hosted_cors_preserves_standing_and_exact_origin_lifecycles(monkeypatch)
         "partial": Bucket(partial),
         "empty": Bucket([]),
     }
-    monkeypatch.setattr(hosted_e2e, "_test_bucket_names", lambda: tuple(buckets))
+    monkeypatch.setattr(app_engine, "_test_bucket_names", lambda: tuple(buckets))
     monkeypatch.setattr(storage, "Client", lambda **_: SimpleNamespace(get_bucket=buckets.__getitem__))
     infrastructure = SimpleNamespace(project="project-1")
     for _ in range(2):
-        hosted_e2e._change_test_bucket_cors(infrastructure, candidate, present=True)
+        app_engine._change_test_bucket_cors(infrastructure, candidate, present=True)
     assert buckets["standing"].cors == installed
     assert buckets["standing"].metageneration == 3
     for name in ("exact", "partial", "empty"):
@@ -134,7 +146,7 @@ def test_hosted_cors_preserves_standing_and_exact_origin_lifecycles(monkeypatch)
     # An older candidate may have added its exact origin before the standing rule existed.
     buckets["older"] = Bucket([dict(base, origin=[site, candidate, hosted]), unrelated])
     for _ in range(2):
-        hosted_e2e._change_test_bucket_cors(infrastructure, candidate, present=False)
+        app_engine._change_test_bucket_cors(infrastructure, candidate, present=False)
     assert buckets["standing"].metageneration == 3
     assert buckets["older"].metageneration == 4
     assert buckets["older"].cors == installed
@@ -150,7 +162,7 @@ def test_provider_describe_distinguishes_absence_from_operational_errors(monkeyp
         stdout="",
         stderr="NOT_FOUND: the resource does not exist",
     )
-    monkeypatch.setattr(hosted_e2e, "_gcloud", lambda *_args, **_kwargs: missing)
+    monkeypatch.setattr(runtime, "_gcloud", lambda *_args, **_kwargs: missing)
     assert _describe(["run", "jobs", "describe", "missing"]) is None
 
     denied = subprocess.CompletedProcess(
@@ -159,7 +171,7 @@ def test_provider_describe_distinguishes_absence_from_operational_errors(monkeyp
         stdout="",
         stderr="PERMISSION_DENIED: caller cannot inspect the job",
     )
-    monkeypatch.setattr(hosted_e2e, "_gcloud", lambda *_args, **_kwargs: denied)
+    monkeypatch.setattr(runtime, "_gcloud", lambda *_args, **_kwargs: denied)
     with pytest.raises(HostedE2EError, match="PERMISSION_DENIED"):
         _describe(["run", "jobs", "describe", "protected"])
 
@@ -186,10 +198,10 @@ def test_cloud_build_identity_waits_for_first_setup_propagation(monkeypatch):
         calls.append((arguments, options))
         return next(results)
 
-    monkeypatch.setattr(hosted_e2e, "_gcloud", gcloud)
-    monkeypatch.setattr(hosted_e2e.time, "sleep", delays.append)
+    monkeypatch.setattr(provisioning, "_gcloud", gcloud)
+    monkeypatch.setattr(time, "sleep", delays.append)
 
-    assert hosted_e2e._cloud_build_service_account(_infrastructure()) == (
+    assert provisioning._cloud_build_service_account(_infrastructure()) == (
         "1234-compute@developer.gserviceaccount.com"
     )
     assert delays == [2]
@@ -205,11 +217,11 @@ def test_cloud_build_identity_rejects_legacy_cloud_build_account(monkeypatch):
         stdout="1234@cloudbuild.gserviceaccount.com\n",
         stderr="",
     )
-    monkeypatch.setattr(hosted_e2e, "_gcloud", lambda *_args, **_options: legacy)
-    monkeypatch.setattr(hosted_e2e.time, "sleep", lambda _delay: None)
+    monkeypatch.setattr(provisioning, "_gcloud", lambda *_args, **_options: legacy)
+    monkeypatch.setattr(time, "sleep", lambda _delay: None)
 
     with pytest.raises(HostedE2EError, match="Compute Engine default"):
-        hosted_e2e._cloud_build_service_account(_infrastructure())
+        provisioning._cloud_build_service_account(_infrastructure())
 
 
 def test_soft_routing_guard_preflight_requires_marker(monkeypatch):
@@ -223,7 +235,7 @@ def test_soft_routing_guard_preflight_requires_marker(monkeypatch):
         lambda url, **options: calls.append((url, options)) or Response(),
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        app_engine,
         "_app_default_hostname",
         lambda _infrastructure: "project-1.uc.r.appspot.com",
     )
@@ -273,20 +285,20 @@ def test_hosted_anchor_redeploys_only_when_its_contract_is_stale(
             ["gcloud"], returncode=0, stdout="", stderr=""
         )
 
-    monkeypatch.setattr(hosted_e2e, "ANCHOR_ROOT", tmp_path)
-    monkeypatch.setattr(hosted_e2e, "_gcloud", gcloud)
+    monkeypatch.setattr(app_engine, "ANCHOR_ROOT", tmp_path)
+    monkeypatch.setattr(app_engine, "_gcloud", gcloud)
     monkeypatch.setattr(
-        hosted_e2e,
+        app_engine,
         "_verify_soft_routing_guard",
         lambda _infrastructure: events.append("guard"),
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        app_engine,
         "_describe",
         lambda _arguments: {"envVariables": {}},
     )
 
-    hosted_e2e._ensure_anchor(_infrastructure())
+    app_engine._ensure_anchor(_infrastructure())
 
     assert descriptors[0]["env_variables"] == {
         "HOSTED_E2E_ANCHOR_REVISION": hosted_e2e.ANCHOR_REVISION
@@ -298,14 +310,14 @@ def test_hosted_anchor_redeploys_only_when_its_contract_is_stale(
     descriptors.clear()
     events.clear()
     monkeypatch.setattr(
-        hosted_e2e,
+        app_engine,
         "_describe",
         lambda _arguments: {
             "envVariables": {"HOSTED_E2E_ANCHOR_REVISION": hosted_e2e.ANCHOR_REVISION}
         },
     )
 
-    hosted_e2e._ensure_anchor(_infrastructure())
+    app_engine._ensure_anchor(_infrastructure())
 
     assert descriptors == []
     assert calls[-1][0][:4] == ("app", "services", "set-traffic", "e2e")
@@ -313,9 +325,9 @@ def test_hosted_anchor_redeploys_only_when_its_contract_is_stale(
 
     calls.clear()
     events.clear()
-    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: None)
+    monkeypatch.setattr(app_engine, "_describe", lambda _arguments: None)
 
-    hosted_e2e._ensure_anchor(_infrastructure())
+    app_engine._ensure_anchor(_infrastructure())
 
     assert events == ["guard", "deploy", "traffic", "guard"]
 
@@ -346,9 +358,9 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
     revision = "a" * 40
     commands = []
 
-    monkeypatch.setattr(hosted_e2e, "NPM_CLI", "npm")
+    monkeypatch.setattr(preflight, "NPM_CLI", "npm")
     monkeypatch.setattr(
-        hosted_e2e,
+        preflight,
         "_git",
         lambda *arguments, **options: subprocess.CompletedProcess(
             arguments,
@@ -358,7 +370,7 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        preflight,
         "run_command",
         lambda command, **options: (
             commands.append((command, options))
@@ -367,7 +379,7 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
     )
 
     assert (
-        hosted_e2e._run_create_preflight(revision, base_ref="release-base") == revision
+        preflight._run_create_preflight(revision, base_ref="release-base") == revision
     )
 
     command_arguments = [list(map(str, command)) for command, _options in commands]
@@ -406,19 +418,19 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
             "check": False,
             "capture_output": False,
             "timeout": 1800,
-            "cwd": hosted_e2e.APP_DIR,
+            "cwd": APP_DIR,
         }
         for _command, options in commands
     )
 
     events = []
     monkeypatch.setattr(
-        hosted_e2e,
+        candidate_runner,
         "require_clean_source",
         lambda: events.append("source") or revision,
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        candidate_runner,
         "_require_committed_production_build",
         lambda _source: events.append("build") or "b1234567",
     )
@@ -427,9 +439,9 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
         events.append(("preflight", source, base_ref))
         raise HostedE2EError("preflight stopped")
 
-    monkeypatch.setattr(hosted_e2e, "_run_create_preflight", stop_preflight)
+    monkeypatch.setattr(candidate_runner, "_run_create_preflight", stop_preflight)
     monkeypatch.setattr(
-        hosted_e2e,
+        candidate_runner,
         "_activate",
         lambda **_options: events.append("provider"),
     )
@@ -459,27 +471,27 @@ def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
 def test_hosted_setup_contract_rejects_stale_runtime_roles(tmp_path, monkeypatch):
     infrastructure = _infrastructure()
     setup_path = tmp_path / "setup.json"
-    monkeypatch.setattr(hosted_e2e, "SETUP_PATH", setup_path)
+    monkeypatch.setattr(provisioning, "SETUP_PATH", setup_path)
     state = {
         "schema_version": hosted_e2e.STATE_SCHEMA_VERSION,
-        "setup_contract": hosted_e2e._setup_contract_fingerprint(),
+        "setup_contract": provisioning._setup_contract_fingerprint(),
         "project": infrastructure.project,
         "region": infrastructure.region,
         "service": infrastructure.service,
         "job": infrastructure.job,
         "artifact_bucket": infrastructure.artifact_bucket,
     }
-    hosted_e2e._write_json(setup_path, state)
+    runtime._write_json(setup_path, state)
 
-    assert hosted_e2e._require_current_setup(infrastructure) == state
+    assert provisioning._require_current_setup(infrastructure) == state
 
     monkeypatch.setattr(
-        hosted_e2e,
+        provisioning,
         "RUNTIME_PROJECT_ROLES",
-        (*hosted_e2e.RUNTIME_PROJECT_ROLES, "roles/example.newRuntimeRole"),
+        (*provisioning.RUNTIME_PROJECT_ROLES, "roles/example.newRuntimeRole"),
     )
     with pytest.raises(HostedE2EError, match="setup is stale.*rerun"):
-        hosted_e2e._require_current_setup(infrastructure)
+        provisioning._require_current_setup(infrastructure)
 
 
 def _evidence(snapshot, paths, test_name, outcome="passed"):
@@ -865,7 +877,7 @@ def test_hosted_focused_targets_require_individual_nodeids(tmp_path, monkeypatch
     # Invalid input must fail before activating credentials or touching a provider.
     activations = []
     monkeypatch.setattr(
-        hosted_e2e, "_activate", lambda **kwargs: activations.append(kwargs)
+        job_execution, "_activate", lambda **kwargs: activations.append(kwargs)
     )
     for invalid in invalid_targets:
         with pytest.raises(RuntimeError):
@@ -1034,15 +1046,15 @@ def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch, pilot)
     )
     calls = []
     writes = []
-    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
-    monkeypatch.setattr(hosted_e2e, "_infrastructure", _infrastructure)
+    monkeypatch.setattr(job_execution, "_activate", lambda **_options: None)
+    monkeypatch.setattr(job_execution, "_infrastructure", _infrastructure)
     monkeypatch.setattr(
-        hosted_e2e,
+        job_execution,
         "_state_ready",
         lambda _infrastructure: {"status": "ready"},
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        job_execution,
         "_write_json",
         lambda path, payload, **options: writes.append((path, payload, options)),
     )
@@ -1056,9 +1068,9 @@ def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch, pilot)
             stderr="",
         )
 
-    monkeypatch.setattr(hosted_e2e, "_gcloud", gcloud)
+    monkeypatch.setattr(job_execution, "_gcloud", gcloud)
     monkeypatch.setattr(
-        hosted_e2e,
+        job_execution,
         "_wait_for_execution",
         lambda *_arguments, **_options: ({"status": {}}, 0),
     )
@@ -1086,20 +1098,20 @@ def test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr(
 ):
     writes = []
     calls = []
-    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
-    monkeypatch.setattr(hosted_e2e, "_infrastructure", _infrastructure)
+    monkeypatch.setattr(job_execution, "_activate", lambda **_options: None)
+    monkeypatch.setattr(job_execution, "_infrastructure", _infrastructure)
     monkeypatch.setattr(
-        hosted_e2e,
+        job_execution,
         "_state_ready",
         lambda _infrastructure: {"status": "ready"},
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        job_execution,
         "_write_json",
         lambda path, payload, **options: writes.append((path, payload, options)),
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        job_execution,
         "_gcloud",
         lambda *arguments, **_options: calls.append(arguments)
         or subprocess.CompletedProcess(
@@ -1115,7 +1127,7 @@ def test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr(
         ),
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        job_execution,
         "_wait_for_execution",
         lambda *_arguments, **_options: (
             {
@@ -1182,9 +1194,9 @@ def test_hosted_execution_wait_reports_progress_and_failure(monkeypatch, capsys)
     def sleep(seconds):
         clock[0] += seconds
 
-    monkeypatch.setattr(hosted_e2e, "_describe", describe)
+    monkeypatch.setattr(job_execution, "_describe", describe)
 
-    payload, exit_status = hosted_e2e._wait_for_execution(
+    payload, exit_status = job_execution._wait_for_execution(
         _infrastructure(),
         "lagniappe-e2e-progress1",
         poll_interval=60,
@@ -1211,7 +1223,7 @@ def test_hosted_execution_wait_reports_progress_and_failure(monkeypatch, capsys)
 
 def test_hosted_execution_wait_recognizes_success(monkeypatch):
     monkeypatch.setattr(
-        hosted_e2e,
+        job_execution,
         "_describe",
         lambda _arguments: {
             "spec": {"taskCount": 1},
@@ -1223,7 +1235,7 @@ def test_hosted_execution_wait_recognizes_success(monkeypatch):
         },
     )
 
-    payload, exit_status = hosted_e2e._wait_for_execution(
+    payload, exit_status = job_execution._wait_for_execution(
         _infrastructure(),
         "lagniappe-e2e-success1",
         report=False,
@@ -1291,7 +1303,7 @@ def test_hosted_execute_command_defaults_to_all_and_imports(
 ):
     calls = []
     monkeypatch.setattr(
-        hosted_e2e,
+        cli,
         "execute",
         lambda **options: (
             calls.append(options)
@@ -1323,7 +1335,7 @@ def test_hosted_execute_command_defaults_to_all_and_imports(
 def test_hosted_create_command_routes_preflight_base(monkeypatch, capsys):
     calls = []
     monkeypatch.setattr(
-        hosted_e2e,
+        cli,
         "create",
         lambda **options: (
             calls.append(options) or {"base_url": "https://e2e.example.test"}
@@ -1347,7 +1359,7 @@ def test_hosted_release_evidence_command_routes_validation(monkeypatch, capsys):
     base = "c" * 40
     calls = []
     monkeypatch.setattr(
-        hosted_e2e,
+        cli,
         "validate_release_evidence",
         lambda *arguments, **options: (
             calls.append((arguments, options))
@@ -1415,10 +1427,10 @@ def test_hosted_results_can_skip_large_report_archive(tmp_path, monkeypatch, cap
             assert name == "lagniappe-e2e-artifacts-example"
             return Bucket()
 
-    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
-    monkeypatch.setattr(hosted_e2e, "_infrastructure", _infrastructure)
-    monkeypatch.setattr(hosted_e2e, "STATE_ROOT", tmp_path)
-    monkeypatch.setattr(hosted_e2e, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(result_evidence, "_activate", lambda **_options: None)
+    monkeypatch.setattr(result_evidence, "_infrastructure", _infrastructure)
+    monkeypatch.setattr(runtime, "STATE_ROOT", tmp_path)
+    monkeypatch.setattr(runtime, "STATE_PATH", tmp_path / "state.json")
     monkeypatch.setattr("google.cloud.storage.Client", Client)
 
     manifest = hosted_e2e.results(
@@ -1452,13 +1464,13 @@ def test_hosted_teardown_checks_all_executions(monkeypatch):
         assert not any(arg.startswith("--limit=") for arg in arguments)
         return SimpleNamespace(stdout=json.dumps(executions))
 
-    monkeypatch.setattr(hosted_e2e, "_gcloud", list_executions)
-    assert hosted_e2e._active_job_executions(infrastructure) == (
+    monkeypatch.setattr(lifecycle, "_gcloud", list_executions)
+    assert lifecycle._active_job_executions(infrastructure) == (
         f"{job}-newer", f"{job}-older",
     )
     executions.append({"status": {}})
     with pytest.raises(HostedE2EError, match="unidentified active"):
-        hosted_e2e._active_job_executions(infrastructure)
+        lifecycle._active_job_executions(infrastructure)
 
 
 def test_hosted_teardown_recognizes_cancelled_execution_without_completion_time(monkeypatch):
@@ -1507,8 +1519,8 @@ def test_hosted_teardown_recognizes_cancelled_execution_without_completion_time(
         assert any("status.conditions" in arg for arg in arguments)
         return SimpleNamespace(stdout=json.dumps(executions))
 
-    monkeypatch.setattr(hosted_e2e, "_gcloud", list_executions)
-    assert hosted_e2e._active_job_executions(infrastructure) == (
+    monkeypatch.setattr(lifecycle, "_gcloud", list_executions)
+    assert lifecycle._active_job_executions(infrastructure) == (
         f"{job}-cancelling",
         f"{job}-running",
     )
@@ -1544,24 +1556,24 @@ def test_hosted_teardown_removes_resources_and_results_without_redis(
         "base_url": "https://hosted-e2e.example.test",
         "status": "ready",
     }
-    hosted_e2e._write_json(state_path, state)
+    runtime._write_json(state_path, state)
 
-    monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
-    monkeypatch.setattr(hosted_e2e, "STATE_ROOT", state_root)
-    monkeypatch.setattr(hosted_e2e, "STATE_PATH", state_path)
-    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
-    monkeypatch.setattr(hosted_e2e, "_infrastructure", lambda: infrastructure)
-    monkeypatch.setattr(hosted_e2e, "_verify_soft_routing_guard", lambda _value: None)
-    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: {"present": True})
+    monkeypatch.setattr(lifecycle, "APP_DIR", tmp_path)
+    monkeypatch.setattr(runtime, "STATE_ROOT", state_root)
+    monkeypatch.setattr(runtime, "STATE_PATH", state_path)
+    monkeypatch.setattr(lifecycle, "_activate", lambda **_options: None)
+    monkeypatch.setattr(lifecycle, "_infrastructure", lambda: infrastructure)
+    monkeypatch.setattr(lifecycle, "_verify_soft_routing_guard", lambda _value: None)
+    monkeypatch.setattr(lifecycle, "_describe", lambda _arguments: {"present": True})
     active_executions = ["lagniappe-e2e-active1"]
     monkeypatch.setattr(
-        hosted_e2e,
+        lifecycle,
         "_active_job_executions",
         lambda *_args, **_kwargs: tuple(active_executions),
     )
     provider_calls = []
     monkeypatch.setattr(
-        hosted_e2e,
+        lifecycle,
         "_gcloud",
         lambda *arguments, **options: provider_calls.append((arguments, options)),
     )
@@ -1570,13 +1582,13 @@ def test_hosted_teardown_removes_resources_and_results_without_redis(
         lambda *args, **kwargs: pytest.fail("Resource teardown issued a Redis command"),
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        lifecycle,
         "_version_url",
         lambda _infrastructure, _version: state["base_url"],
     )
     cors_changes = []
     monkeypatch.setattr(
-        hosted_e2e,
+        lifecycle,
         "_change_test_bucket_cors",
         lambda *arguments, **options: cors_changes.append((arguments, options)),
     )
@@ -1591,7 +1603,7 @@ def test_hosted_teardown_removes_resources_and_results_without_redis(
     result = hosted_e2e.teardown(force=force)
 
     assert result["status"] == "torn-down"
-    assert hosted_e2e._load_json(state_path)["status"] == "torn-down"
+    assert runtime._load_json(state_path)["status"] == "torn-down"
     assert not result_root.exists()
     assert setup_path.exists()
     if force:
@@ -1655,7 +1667,7 @@ print(TEST_RUN_SCHEMA_VERSION)
 """
     result = subprocess.run(
         [sys.executable, "-c", script],
-        cwd=hosted_e2e.APP_DIR,
+        cwd=APP_DIR,
         capture_output=True,
         text=True,
     )
@@ -1703,7 +1715,7 @@ def test_hosted_result_directory_import_requires_the_exact_source(
     monkeypatch.setenv("PYTHONPATH", str(packages))
     monkeypatch.setenv("LAGNIAPPE_CONFIG_ROOT", str(checkout))
     command = [
-        sys.executable, "-S", hosted_e2e.APP_DIR / "run.py",
+        sys.executable, "-S", APP_DIR / "run.py",
         "hosted-e2e", "import-results",
         "--directory", result_dir,
         "--execution", manifest["execution"],
@@ -1773,13 +1785,13 @@ def test_hosted_complete_import_replaces_retired_parameter_results(
     result_dir = tmp_path / "reports/result"
     test_evidence.write_json(result_dir / "manifest.json", manifest)
     test_evidence.write_json(result_dir / "evidence.json", remote)
-    monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
+    monkeypatch.setattr(result_evidence, "APP_DIR", tmp_path)
     monkeypatch.setattr(
-        hosted_e2e, "_git",
+        result_evidence, "_git",
         lambda *_args, **_kwargs: subprocess.CompletedProcess(["git"], 0, stdout=source, stderr=""),
     )
 
-    monkeypatch.setattr(hosted_e2e, "_committed_build_id", lambda *_: "b1234567")
+    monkeypatch.setattr(result_evidence, "_committed_build_id", lambda *_: "b1234567")
     hosted_e2e.import_result_directory(result_dir)
 
     merged = test_evidence.load_json(evidence_path)
@@ -1822,8 +1834,8 @@ def test_hosted_import_rejects_inconsistent_evidence_without_overwriting(
     test_evidence.write_json(directory / "evidence.json", remote)
     evidence_path = tmp_path / test_evidence.LATEST_TEST_RUN
     test_evidence.write_json(evidence_path, {"previous": True})
-    monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
-    monkeypatch.setattr(hosted_e2e, "_git", lambda *_: subprocess.CompletedProcess([], 0, stdout=source))
+    monkeypatch.setattr(result_evidence, "APP_DIR", tmp_path)
+    monkeypatch.setattr(result_evidence, "_git", lambda *_: subprocess.CompletedProcess([], 0, stdout=source))
     with pytest.raises(HostedE2EError, match="exit status|provenance"):
         hosted_e2e.import_result_directory(directory)
     assert test_evidence.load_json(evidence_path) == {"previous": True}
@@ -1888,7 +1900,7 @@ def test_hosted_image_upload_boundary_excludes_local_credentials_and_results():
 def test_hosted_runner_installs_complete_test_collection_dependencies():
     development_requirements = {
         line.strip()
-        for line in (hosted_e2e.APP_DIR / "requirements-dev.txt")
+        for line in (APP_DIR / "requirements-dev.txt")
         .read_text(encoding="utf-8")
         .splitlines()
         if line.strip().startswith("-r ")
@@ -1905,7 +1917,7 @@ def test_hosted_runner_installs_complete_test_collection_dependencies():
         "COPY requirements.txt requirements-dev.txt requirements-installer.txt ./"
         in dockerfile
     )
-    node_version = (hosted_e2e.APP_DIR / ".nvmrc").read_text().strip()
+    node_version = (APP_DIR / ".nvmrc").read_text().strip()
     assert f"FROM node:{node_version}-bookworm-slim@sha256:" in dockerfile
     assert "AS node-runtime" in dockerfile
     assert "apt-get install --yes --no-install-recommends git procps" in dockerfile
@@ -1935,7 +1947,7 @@ def test_hosted_anchor_declares_its_upload_boundary():
 
 def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     """One workflow owns hosted candidates and the current-head release gate."""
-    workflow_path = hosted_e2e.APP_DIR / ".github/workflows/hosted-e2e.yml"
+    workflow_path = APP_DIR / ".github/workflows/hosted-e2e.yml"
     workflow_text = workflow_path.read_text(encoding="utf-8")
     workflow = yaml.load(workflow_text, Loader=yaml.BaseLoader)
 
@@ -2024,7 +2036,7 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
 
 def test_hosted_workflow_retains_results_before_reporting_and_guards_movement():
     """Failed evidence is returned before red, without overwriting a moved ref."""
-    workflow_path = hosted_e2e.APP_DIR / ".github/workflows/hosted-e2e.yml"
+    workflow_path = APP_DIR / ".github/workflows/hosted-e2e.yml"
     workflow_text = workflow_path.read_text(encoding="utf-8")
     workflow = yaml.load(workflow_text, Loader=yaml.BaseLoader)
     steps = workflow["jobs"]["execute"]["steps"]
@@ -2067,14 +2079,14 @@ def test_hosted_workflow_retains_results_before_reporting_and_guards_movement():
 def test_ci_invoker_can_only_read_the_result_bucket(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        hosted_e2e,
+        provisioning,
         "_gcloud",
         lambda *arguments, **options: calls.append((arguments, options)),
     )
     infrastructure = _infrastructure()
     invoker = f"serviceAccount:{infrastructure.invoker_email}"
 
-    hosted_e2e._grant_ci_result_access(infrastructure, invoker)
+    provisioning._grant_ci_result_access(infrastructure, invoker)
 
     assert calls == [
         (
@@ -2097,9 +2109,9 @@ def test_settings_and_redis_ca_use_separate_secret_versions(tmp_path, monkeypatc
     redis_ca.parent.mkdir(parents=True)
     redis_ca.write_text("public trust certificate\n", encoding="utf-8")
     calls = []
-    monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
+    monkeypatch.setattr(candidate_runner, "APP_DIR", tmp_path)
     monkeypatch.setattr(
-        hosted_e2e.SETTINGS,
+        SETTINGS,
         "APP",
         {
             "REDIS_TLS": True,
@@ -2107,12 +2119,12 @@ def test_settings_and_redis_ca_use_separate_secret_versions(tmp_path, monkeypatc
         },
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        candidate_runner,
         "_gcloud",
         lambda *arguments, **_options: calls.append(arguments),
     )
 
-    hosted_e2e._sync_settings_secret(_infrastructure())
+    candidate_runner._sync_settings_secret(_infrastructure())
 
     additions = [
         arguments for arguments in calls if arguments[1:3] == ("versions", "add")
@@ -2133,7 +2145,7 @@ def test_hosted_e2e_requires_a_committed_production_build(tmp_path):
     source = _git(tmp_path, "rev-parse", "HEAD").stdout.strip()
 
     assert (
-        hosted_e2e._require_committed_production_build(
+        preflight._require_committed_production_build(
             source,
             repo_root=tmp_path,
             expected_version="1.2.3",
@@ -2146,7 +2158,7 @@ def test_hosted_e2e_requires_a_committed_production_build(tmp_path):
         encoding="utf-8",
     )
     assert (
-        hosted_e2e._require_committed_production_build(
+        preflight._require_committed_production_build(
             source,
             repo_root=tmp_path,
             expected_version="1.2.3",
@@ -2158,7 +2170,7 @@ def test_hosted_e2e_requires_a_committed_production_build(tmp_path):
     _git(tmp_path, "commit", "-m", "development build")
     development_source = _git(tmp_path, "rev-parse", "HEAD").stdout.strip()
     with pytest.raises(HostedE2EError, match="committed production"):
-        hosted_e2e._require_committed_production_build(
+        preflight._require_committed_production_build(
             development_source,
             repo_root=tmp_path,
             expected_version="1.2.3",
@@ -2177,7 +2189,7 @@ def test_committed_source_export_ignores_generated_worktree_churn(tmp_path):
     source = _git(tmp_path, "rev-parse", "HEAD").stdout.strip()
     generated.write_text("local development bundle\n", encoding="utf-8")
 
-    with hosted_e2e._committed_source_tree(
+    with preflight._committed_source_tree(
         source,
         repo_root=tmp_path,
     ) as source_root:
@@ -2219,16 +2231,13 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch, cloud_oper
             stderr="",
         )
 
-    monkeypatch.setattr(
-        hosted_e2e,
-        "_gcloud",
-        gcloud,
-    )
+    monkeypatch.setattr(runtime, "_gcloud", gcloud)
+    monkeypatch.setattr(candidate_runner, "_gcloud", gcloud)
 
     infrastructure = _infrastructure()
     checkpoint = SimpleNamespace(project=infrastructure.project) if cloud_operator else None
-    with hosted_e2e.cloud_checkpoints.ACTIVE.set(checkpoint):
-        image, returned_build_id = hosted_e2e._build_runner_image(
+    with cloud_checkpoints.ACTIVE.set(checkpoint):
+        image, returned_build_id = candidate_runner._build_runner_image(
             infrastructure, "a" * 40, tmp_path,
         )
 
@@ -2265,9 +2274,9 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch, cloud_oper
     {"name": "other-bucket", "projectNumber": "1234"},
 ])
 def test_cloud_build_source_requires_the_operators_own_bucket(monkeypatch, metadata):
-    monkeypatch.setattr(hosted_e2e, "_describe", lambda args: metadata)
+    monkeypatch.setattr(candidate_runner, "_describe", lambda args: metadata)
     with pytest.raises(HostedE2EError, match="gs://project-1_cloudbuild.*belong to project project-1"):
-        hosted_e2e._operator_build_staging_dir(_infrastructure())
+        candidate_runner._operator_build_staging_dir(_infrastructure())
 
 
 def test_runner_image_refuses_an_unsafe_staged_root_ignore(tmp_path, monkeypatch):
@@ -2279,7 +2288,7 @@ def test_runner_image_refuses_an_unsafe_staged_root_ignore(tmp_path, monkeypatch
     staged_ignore = container_root / hosted_e2e.RUNNER_GCLOUDIGNORE_COPY
     staged_ignore.symlink_to(tmp_path / ".gcloudignore")
     monkeypatch.setattr(
-        hosted_e2e,
+        candidate_runner,
         "_gcloud",
         lambda *_arguments, **_options: pytest.fail(
             "unsafe staging must fail before Cloud Build"
@@ -2287,7 +2296,7 @@ def test_runner_image_refuses_an_unsafe_staged_root_ignore(tmp_path, monkeypatch
     )
 
     with pytest.raises(HostedE2EError, match="staged root .gcloudignore path"):
-        hosted_e2e._build_runner_image(
+        candidate_runner._build_runner_image(
             _infrastructure(),
             "a" * 40,
             tmp_path,
@@ -2305,11 +2314,11 @@ def test_runner_image_build_waits_for_recorded_cloud_build(monkeypatch):
         calls.append(arguments)
         return next(descriptions)
 
-    monkeypatch.setattr(hosted_e2e, "_describe", describe)
-    monkeypatch.setattr(hosted_e2e.time, "monotonic", lambda: 0)
-    monkeypatch.setattr(hosted_e2e.time, "sleep", delays.append)
+    monkeypatch.setattr(candidate_runner, "_describe", describe)
+    monkeypatch.setattr(time, "monotonic", lambda: 0)
+    monkeypatch.setattr(time, "sleep", delays.append)
 
-    result = hosted_e2e._wait_runner_image_build(
+    result = candidate_runner._wait_runner_image_build(
         _infrastructure(),
         cloud_build_id,
         poll_interval=0.01,
@@ -2320,7 +2329,7 @@ def test_runner_image_build_waits_for_recorded_cloud_build(monkeypatch):
     assert delays == [0.01]
 
     monkeypatch.setattr(
-        hosted_e2e,
+        candidate_runner,
         "_describe",
         lambda _arguments: {
             "status": "FAILURE",
@@ -2329,7 +2338,7 @@ def test_runner_image_build_waits_for_recorded_cloud_build(monkeypatch):
         },
     )
     with pytest.raises(HostedE2EError, match="Docker step failed.*Logs: https"):
-        hosted_e2e._wait_runner_image_build(_infrastructure(), cloud_build_id)
+        candidate_runner._wait_runner_image_build(_infrastructure(), cloud_build_id)
 
 
 def test_hosted_create_resumes_only_the_same_committed_lifecycle(monkeypatch):
@@ -2356,12 +2365,12 @@ def test_hosted_create_resumes_only_the_same_committed_lifecycle(monkeypatch):
         "experiments_workers": 6,
     }
     monkeypatch.setattr(
-        hosted_e2e,
+        candidate_runner,
         "_version_url",
         lambda _infrastructure, _version: base_url,
     )
 
-    resumed = hosted_e2e._resumable_create_state(
+    resumed = candidate_runner._resumable_create_state(
         state,
         infrastructure,
         source=source,
@@ -2372,14 +2381,14 @@ def test_hosted_create_resumes_only_the_same_committed_lifecycle(monkeypatch):
     assert resumed == state
     assert resumed is not state
     with pytest.raises(HostedE2EError, match="different worker capacity"):
-        hosted_e2e._resumable_create_state(
+        candidate_runner._resumable_create_state(
             state, infrastructure, source=source, source_snapshot=snapshot,
             build_id="b1234567", experiments_workers=3,
         )
 
     mismatched = dict(state, source="c" * 40)
     with pytest.raises(HostedE2EError, match="different committed build"):
-        hosted_e2e._resumable_create_state(
+        candidate_runner._resumable_create_state(
             mismatched,
             infrastructure,
             source=source,
@@ -2387,7 +2396,7 @@ def test_hosted_create_resumes_only_the_same_committed_lifecycle(monkeypatch):
             build_id="b1234567",
         )
     with pytest.raises(HostedE2EError, match="has not been torn down"):
-        hosted_e2e._resumable_create_state(
+        candidate_runner._resumable_create_state(
             dict(state, status="ready"),
             infrastructure,
             source=source,
@@ -2397,7 +2406,7 @@ def test_hosted_create_resumes_only_the_same_committed_lifecycle(monkeypatch):
     missing_build_id = dict(state, image_ready=True)
     missing_build_id.pop("cloud_build_id")
     with pytest.raises(HostedE2EError, match="without recording"):
-        hosted_e2e._resumable_create_state(
+        candidate_runner._resumable_create_state(
             missing_build_id,
             infrastructure,
             source=source,
@@ -2421,25 +2430,25 @@ def test_hosted_app_resume_requires_exact_deployment_metadata(monkeypatch):
         "LAGNIAPPE_HOSTED_E2E_BUILD_ID": state["build_id"],
     }
 
-    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: None)
-    assert not hosted_e2e._hosted_app_version_present(infrastructure, state)
+    monkeypatch.setattr(app_engine, "_describe", lambda _arguments: None)
+    assert not app_engine._hosted_app_version_present(infrastructure, state)
 
     monkeypatch.setattr(
-        hosted_e2e,
+        app_engine,
         "_describe",
         lambda _arguments: {"envVariables": variables},
     )
-    assert hosted_e2e._hosted_app_version_present(infrastructure, state)
+    assert app_engine._hosted_app_version_present(infrastructure, state)
 
     monkeypatch.setattr(
-        hosted_e2e,
+        app_engine,
         "_describe",
         lambda _arguments: {
             "envVariables": dict(variables, LAGNIAPPE_HOSTED_E2E_SOURCE="c" * 40)
         },
     )
     with pytest.raises(HostedE2EError, match="unexpected deployment metadata"):
-        hosted_e2e._hosted_app_version_present(infrastructure, state)
+        app_engine._hosted_app_version_present(infrastructure, state)
 
 
 @pytest.mark.parametrize("workers", [3, 6])
@@ -2459,8 +2468,8 @@ def test_hosted_descriptor_preserves_native_static_handlers(workers):
         experiments_workers=workers,
     )
 
-    assert descriptor["handlers"][:-1] == hosted_e2e.APP_HANDLERS[:-1]
-    assert descriptor["handlers"] is not hosted_e2e.APP_HANDLERS
+    assert descriptor["handlers"][:-1] == APP_HANDLERS[:-1]
+    assert descriptor["handlers"] is not APP_HANDLERS
 
     chunk_handler = next(
         handler
@@ -2502,7 +2511,7 @@ def test_hosted_descriptor_preserves_native_static_handlers(workers):
 def test_hosted_runtime_identity_roles_include_deployer_signing(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        hosted_e2e,
+        provisioning,
         "_service_account_role",
         lambda account, member, role: calls.append((account, member, role)),
     )
@@ -2510,7 +2519,7 @@ def test_hosted_runtime_identity_roles_include_deployer_signing(monkeypatch):
     runtime_member = f"serviceAccount:{infrastructure.runtime_email}"
     deployer_member = "user:operator@example.test"
 
-    hosted_e2e._grant_runtime_identity_roles(
+    provisioning._grant_runtime_identity_roles(
         infrastructure,
         runtime_member,
         deployer_member,
@@ -2553,15 +2562,15 @@ def test_hosted_runtime_identity_roles_include_deployer_signing(monkeypatch):
 @pytest.mark.parametrize("workers", [3, 6])
 def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch, redis_tls, workers):
     calls = []
-    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: None)
+    monkeypatch.setattr(candidate_runner, "_describe", lambda _arguments: None)
     monkeypatch.setattr(
-        hosted_e2e,
+        candidate_runner,
         "_deployer_member",
         lambda: "user:operator@example.test",
     )
-    monkeypatch.setattr(hosted_e2e.SETTINGS, "APP", {"REDIS_TLS": redis_tls})
+    monkeypatch.setattr(SETTINGS, "APP", {"REDIS_TLS": redis_tls})
     monkeypatch.setattr(
-        hosted_e2e,
+        candidate_runner,
         "_gcloud",
         lambda *arguments, **options: calls.append((arguments, options)),
     )
@@ -2576,7 +2585,7 @@ def test_hosted_job_grants_only_job_scoped_ci_permissions(monkeypatch, redis_tls
         "experiments_workers": workers,
     }
 
-    hosted_e2e._update_job(infrastructure, state)
+    candidate_runner._update_job(infrastructure, state)
 
     bindings = {
         (
@@ -2633,24 +2642,24 @@ def test_hosted_environment_rejects_retired_lifecycle(
     monkeypatch,
 ):
     standard_state = tmp_path / "state.json"
-    monkeypatch.setattr(hosted_e2e, "STATE_ROOT", tmp_path)
-    monkeypatch.setattr(hosted_e2e, "STATE_PATH", standard_state)
+    monkeypatch.setattr(runtime, "STATE_ROOT", tmp_path)
+    monkeypatch.setattr(runtime, "STATE_PATH", standard_state)
 
-    standard = hosted_e2e._environment("standard")
+    standard = runtime._environment("standard")
 
     assert standard.job == "lagniappe-e2e"
     assert standard.state_path == standard_state
     assert standard.result_root == tmp_path / "results"
     assert standard.image_base(_infrastructure()).endswith("/runner")
     with pytest.raises(HostedE2EError, match="standard"):
-        hosted_e2e._environment("mcp-package")
+        runtime._environment("mcp-package")
 
 
 
 def test_hosted_cli_routes_closed_environment(monkeypatch, capsys):
     calls = []
     monkeypatch.setattr(
-        hosted_e2e,
+        cli,
         "create",
         lambda **options: (
             calls.append(("create", options))
@@ -2658,7 +2667,7 @@ def test_hosted_cli_routes_closed_environment(monkeypatch, capsys):
         ),
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        cli,
         "execute",
         lambda **options: (
             calls.append(("execute", options))
@@ -2670,12 +2679,12 @@ def test_hosted_cli_routes_closed_environment(monkeypatch, capsys):
         ),
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        cli,
         "status",
         lambda **options: calls.append(("status", options)) or {"status": "ready"},
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        cli,
         "teardown",
         lambda **options: (
             calls.append(("teardown", options)) or {"version": "e2e-abcdef1234567890"}
@@ -2724,40 +2733,40 @@ def test_hosted_cli_routes_closed_environment(monkeypatch, capsys):
 def test_hosted_setup_provisions_only_supported_runtime_identities(monkeypatch):
     infrastructure = _infrastructure()
     service_accounts = []
-    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
-    monkeypatch.setattr(hosted_e2e, "_infrastructure", lambda: infrastructure)
-    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: {})
+    monkeypatch.setattr(provisioning, "_activate", lambda **_options: None)
+    monkeypatch.setattr(provisioning, "_infrastructure", lambda: infrastructure)
+    monkeypatch.setattr(provisioning, "_describe", lambda _arguments: {})
     monkeypatch.setattr(
-        hosted_e2e,
+        provisioning,
         "_gcloud",
         lambda *_arguments, **_options: None,
     )
     monkeypatch.setattr(
-        hosted_e2e,
+        provisioning,
         "_ensure_service_account",
         lambda _infrastructure, account, display_name: service_accounts.append(
             (account, display_name)
         ),
     )
-    monkeypatch.setattr(hosted_e2e, "_project_role", lambda *_arguments: None)
-    monkeypatch.setattr(hosted_e2e, "_remove_project_role", lambda *_arguments: None)
+    monkeypatch.setattr(provisioning, "_project_role", lambda *_arguments: None)
+    monkeypatch.setattr(provisioning, "_remove_project_role", lambda *_arguments: None)
     monkeypatch.setattr(
-        hosted_e2e,
+        provisioning,
         "_grant_runtime_identity_roles",
         lambda *_arguments: None,
     )
-    monkeypatch.setattr(hosted_e2e, "_deployer_member", lambda: "user:owner@test")
+    monkeypatch.setattr(provisioning, "_deployer_member", lambda: "user:owner@test")
     monkeypatch.setattr(
-        hosted_e2e,
+        provisioning,
         "_cloud_build_service_account",
         lambda _infrastructure: "cloud-build@project-1.iam.gserviceaccount.com",
     )
-    monkeypatch.setattr(hosted_e2e, "_ensure_artifact_bucket", lambda *_args: None)
-    monkeypatch.setattr(hosted_e2e, "_grant_ci_result_access", lambda *_args: None)
-    monkeypatch.setattr(hosted_e2e, "_test_bucket_names", lambda: ())
-    monkeypatch.setattr(hosted_e2e, "_ensure_workload_identity", lambda *_args: None)
-    monkeypatch.setattr(hosted_e2e, "_ensure_anchor", lambda *_args: None)
-    monkeypatch.setattr(hosted_e2e, "_write_json", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(provisioning, "_ensure_artifact_bucket", lambda *_args: None)
+    monkeypatch.setattr(provisioning, "_grant_ci_result_access", lambda *_args: None)
+    monkeypatch.setattr(provisioning, "_test_bucket_names", lambda: ())
+    monkeypatch.setattr(provisioning, "_ensure_workload_identity", lambda *_args: None)
+    monkeypatch.setattr(provisioning, "_ensure_anchor", lambda *_args: None)
+    monkeypatch.setattr(provisioning, "_write_json", lambda *_args, **_kwargs: None)
 
     payload = hosted_e2e.setup(github_repository="owner/repository")
 
@@ -2770,11 +2779,11 @@ def test_hosted_setup_provisions_only_supported_runtime_identities(monkeypatch):
 
 
 def test_hosted_status_reads_only_the_supported_job(monkeypatch):
-    monkeypatch.setattr(hosted_e2e, "_activate", lambda **options: None)
-    monkeypatch.setattr(hosted_e2e, "_infrastructure", _infrastructure)
-    monkeypatch.setattr(hosted_e2e, "_load_json", lambda path: {"status": "absent"})
+    monkeypatch.setattr(lifecycle, "_activate", lambda **options: None)
+    monkeypatch.setattr(lifecycle, "_infrastructure", _infrastructure)
+    monkeypatch.setattr(lifecycle, "_load_json", lambda path: {"status": "absent"})
     requests = []
-    monkeypatch.setattr(hosted_e2e, "_describe", lambda args: requests.append(args) or {})
+    monkeypatch.setattr(lifecycle, "_describe", lambda args: requests.append(args) or {})
     result = hosted_e2e.status()
     assert result["app_version_present"] is False
     assert result["job_present"] is True
