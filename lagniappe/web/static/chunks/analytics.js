@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request } from './foundation.js?v=b1ee16b4';
-import './upstreamUnavailable.js?v=b1ee16b4';
-import './connectivity.js?v=b1ee16b4';
+import { r as request } from './foundation.js?v=bf7d4d98';
+import './upstreamUnavailable.js?v=bf7d4d98';
+import './connectivity.js?v=bf7d4d98';
 
 const meta = (name) => document.querySelector(`meta[name="${name}"]`)?.getAttribute("content") || "";
 const token = () => document.querySelector("#token")?.value || "";

@@ -168,12 +168,27 @@ export class HomeActivityList extends BaseList {
 		});
 	}
 
+	ensureEmptyState(list: HTMLElement | null = this.target) {
+		if (!list) return false;
+		if (list.querySelector("li:not([data-role='empty'])")) return false;
+		if (list.querySelector("li[data-role='empty']")) return false;
+		const empty = document.createElement("li");
+		empty.dataset.role = "empty";
+		empty.className = STYLES.note.empty;
+		empty.textContent = "No notes yet — use + to add a quick note.";
+		list.append(empty);
+		return true;
+	}
+
 	_commitRemoveItem(item: HTMLElement) {
 		const list = item.closest("ul");
 		item.remove();
 
-		if (list && list.querySelectorAll("li").length === 0) {
-			list.dataset.visible = "false";
+		if (
+			list &&
+			list.querySelectorAll("li:not([data-role='empty'])").length === 0
+		) {
+			this.ensureEmptyState(list);
 			this.view.syncHomeSectionState?.(this.component);
 		}
 	}
@@ -181,6 +196,12 @@ export class HomeActivityList extends BaseList {
 	postreconcile() {
 		const updated = this._updated;
 		super.postreconcile();
+		if (
+			this.ensureEmptyState() &&
+			(this.visible || this.component.active === this)
+		) {
+			this.target.dataset.visible = "true";
+		}
 		if (updated) {
 			this.destroy();
 			this.init();

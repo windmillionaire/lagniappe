@@ -74,6 +74,8 @@ const STYLES = {
       "multiple": "dropdown-option-multiple"
     },
     "panel": "p-1 scrollbar-thin scrollbar-thumb-base-light scrollbar-track-transparent absolute z-50 hidden max-h-96 min-w-64 overflow-y-auto rounded-md bg-white shadow-lg outline outline-base-light/50",
+    "empty": "px-3 py-2.5 text-sm italic text-base-medium",
+    "emptyWithAction": "mt-1 border-t border-base-light/50 px-3 py-2.5 text-sm italic text-base-medium",
     "history": "text-left px-3 py-1.5 rounded-sm hover:bg-base-bg w-full",
     "search": {
       "result": "dropdown-option dropdown-option-flow cursor-default",
@@ -237,7 +239,8 @@ const STYLES = {
       "page": "max-h-96 w-auto max-w-full rounded-md object-contain"
     },
     "meta": "flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-normal text-base-medium",
-    "discard": "grid size-7 shrink-0 place-items-center rounded-md text-base-medium hover:bg-white hover:text-delete-default focus-visible:outline-2 focus-visible:outline-delete-default"
+    "discard": "grid size-7 shrink-0 place-items-center rounded-md text-base-medium hover:bg-white hover:text-delete-default focus-visible:outline-2 focus-visible:outline-delete-default",
+    "empty": "rounded-sm border border-dashed border-note-light/80 bg-note-bg/40 px-4 py-3 text-sm italic text-base-medium"
   },
   "icon": {
     "default": "text-kind-default"
@@ -354,6 +357,15 @@ const STYLES = {
     "navButton": "flex items-center gap-3 rounded-md px-3 py-1.5 font-semibold shadow-sm outline w-full focus-visible:outline-2 hover:outline-2 bg-white hover:bg-page-bg outline-base-light text-base-dark focus-visible:outline-page-default hover:outline-page-default"
   },
   "message": "w-full sm:text-sm italic rounded-md px-3 py-2 outline-kind-default bg-kind-bg",
+  "messages": {
+    "sidebarEmpty": "px-6 py-4 text-sm italic text-base-medium",
+    "empty": {
+      "container": "flex flex-1 flex-col items-center justify-center gap-2 py-12 px-4 text-center",
+      "title": "text-base font-semibold text-base-dark",
+      "body": "max-w-sm text-sm text-base-medium",
+      "action": "mt-2 inline-flex items-center gap-1.5 rounded-md bg-user-default px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-user-dark hover:outline-2 hover:outline-offset-2 hover:outline-user-dark focus-visible:bg-user-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-dark"
+    }
+  },
   "modal": {
     "wrapper": "fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-100",
     "content": "bg-white rounded-lg shadow-xl max-w-4xl mx-4 max-h-[90vh] overflow-y-auto relative",
@@ -433,6 +445,13 @@ const STYLES = {
         "active": "[grid-area:1/1] group-data-[sorting=true]/header:invisible hover:text-kind-default",
         "inactive": "[grid-area:1/1] invisible text-kind-default group-data-[sorting=true]/header:visible hover:text-delete-default"
       }
+    },
+    "loading": {
+      "cell": "py-3 px-4 sm:px-0",
+      "list": "flex flex-col gap-3 animate-pulse motion-reduce:animate-none",
+      "item": "flex items-center justify-between gap-4 py-1",
+      "barPrimary": "h-4 w-2/5 max-w-64 rounded bg-base-light/50",
+      "barSecondary": "h-3.5 w-24 rounded bg-base-bg"
     }
   },
   "task": {

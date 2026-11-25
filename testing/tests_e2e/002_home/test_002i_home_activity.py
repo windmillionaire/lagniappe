@@ -195,6 +195,35 @@ def _warm_offline_create_widgets(home, *, note=True, task=True):
 
 
 # @template home/notes.html::list
+# @template home/notes.html::empty_note_item
+def test_home_notes_empty_state_opens_with_hint(get_admin, get_user):
+    owner = get_admin()
+    suffix = uuid4().hex
+    user = get_user(
+        UserDefinition(
+            name=f"Empty Notes {suffix[:8]}",
+            email=f"empty-notes-{suffix}@example.test",
+        ),
+        creator=owner,
+    )
+    home = user.go(SitePages.HOME)
+    notes_toggle = user.locate(home.NOTE_LIST_TOGGLE)
+    notes_list = user.locate(home.NOTE_LIST)
+
+    expect(notes_list).to_be_hidden()
+    notes_toggle.click()
+    expect(notes_toggle).to_have_attribute("aria-expanded", "true")
+    expect(notes_list).to_be_visible()
+    empty_item = notes_list.locator("li[data-role='empty']")
+    expect(empty_item).to_be_visible()
+    expect(empty_item).to_contain_text("No notes yet")
+
+    note_body = _unique("First note after empty hint")
+    _create_text_note_from_home(user, home, note_body)
+    expect(empty_item).not_to_be_attached()
+
+
+# @template home/notes.html::list
 # @template home/notes.html::note_item
 def test_home_notes_exclude_notifications(get_admin, get_user):
     user = get_admin()
@@ -509,6 +538,9 @@ def test_notification_menu_deletes_and_clears(
 
     expect(panel).to_be_visible()
     expect(panel.locator("[role='option']")).to_have_count(0)
+    expect(panel.locator("[data-role='empty']")).to_have_text(
+        "No unread notifications"
+    )
     expect(notifications).to_have_attribute("data-visible", "true")
     expect(notifications).to_have_attribute("aria-hidden", "false")
     expect(notifications).to_have_attribute("tabindex", "0")

@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES, c as createIcon } from './ui-resources.js?v=b1ee16b4';
-import { r as request, E as ENDPOINTS, w as withTransition, n as renderNotificationBadge } from './foundation.js?v=b1ee16b4';
-import './connectivity.js?v=b1ee16b4';
-import { D as Dropdown } from './combobox.js?v=b1ee16b4';
-import './upstreamUnavailable.js?v=b1ee16b4';
-import './ui-controls.js?v=b1ee16b4';
+import { S as STYLES, c as createIcon } from './ui-resources.js?v=bf7d4d98';
+import { r as request, E as ENDPOINTS, w as withTransition, n as renderNotificationBadge } from './foundation.js?v=bf7d4d98';
+import './connectivity.js?v=bf7d4d98';
+import { D as Dropdown } from './combobox.js?v=bf7d4d98';
+import './upstreamUnavailable.js?v=bf7d4d98';
+import './ui-controls.js?v=bf7d4d98';
 
 const CLEAR_ALL_KEY = "__clear_all_notifications__";
 function clickTarget(event) {
@@ -49,6 +49,7 @@ class Notifications {
         await this._ensureLoaded();
         return this._dropdownItems();
       },
+      emptyHtml: () => this._emptyNoticeHtml(),
       onShow: () => {
         this.menuOpen = true;
       },
@@ -98,12 +99,25 @@ class Notifications {
     if (!this.view.online) await window.__CONNECTIVITY_READY__;
     if (!this.dropdown || !this.view.online) return false;
     const response = await request.get(ENDPOINTS.notifications);
-    if (!response?.ok || !response.html) return false;
-    this.notifications = this._optionsFromHtml(response.html);
+    if (!response?.ok || response.html == null) return false;
+    this.notifications = typeof response.html === "string" ? [] : this._optionsFromHtml(response.html);
     this.loaded = true;
     this.stale = false;
     this._updateDropdown();
     return true;
+  }
+  _hasNotificationContent() {
+    return this.notifications.some(
+      (item) => item.key && !item.key.startsWith("__") || item.action === "open-messages"
+    );
+  }
+  _emptyNoticeHtml() {
+    if (this._hasNotificationContent()) return "";
+    const hasAction = this.notifications.some(
+      (item) => item.action === "message-user"
+    );
+    const className = hasAction ? STYLES.dropdown.emptyWithAction || "" : STYLES.dropdown.empty || "";
+    return `<div role="status" data-role="empty" class="${className}">No unread notifications</div>`;
   }
   _optionsFromHtml(html) {
     return Array.from(
@@ -169,7 +183,7 @@ class Notifications {
     const action = option?.dataset?.action;
     if (action === "message-user") {
       event?.preventDefault();
-      const { ensureMessageComposer } = await import('./messageComposer.js?v=b1ee16b4');
+      const { ensureMessageComposer } = await import('./messageComposer.js?v=bf7d4d98');
       ensureMessageComposer(this.view).open();
       return;
     }

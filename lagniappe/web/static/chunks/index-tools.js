@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BaseTable } from './baseTable.js?v=b1ee16b4';
-import { c as captureError, w as withTransition, j as sessionStore } from './foundation.js?v=b1ee16b4';
-import { p as primitives } from './ui-controls.js?v=b1ee16b4';
-import { T as TableVisibilityState } from './index-foundation.js?v=b1ee16b4';
+import { B as BaseTable } from './baseTable.js?v=bf7d4d98';
+import { c as captureError, w as withTransition, j as sessionStore } from './foundation.js?v=bf7d4d98';
+import { p as primitives } from './ui-controls.js?v=bf7d4d98';
+import { T as TableVisibilityState } from './index-foundation.js?v=bf7d4d98';
 
 class IndexTable extends BaseTable {
   constructor(attributes) {
@@ -29,7 +29,13 @@ class IndexTable extends BaseTable {
       "th[data-column='selector'] button"
     );
   }
+  _clearLoadingState() {
+    this.target.removeAttribute("aria-busy");
+    this.target.querySelector("tr[data-role='loading']")?.remove();
+    this.view.clearTableLoading?.();
+  }
   setEmptyRowVisibility() {
+    this._clearLoadingState();
     const emptyRow = this.target.querySelector(
       "tr[data-role='empty']"
     );
@@ -203,7 +209,13 @@ class IndexTable extends BaseTable {
       void this.component?.widgets?.TableEditor?.refreshCheckboxes().catch(
         captureError
       );
+    } else if (this.target.hasAttribute("loaded")) {
+      this._clearLoadingState();
     }
+  }
+  destroy() {
+    this._clearLoadingState();
+    super.destroy();
   }
 }
 
@@ -307,7 +319,7 @@ class TableSorting {
   }
   get rows() {
     return Array.from(this.body?.querySelectorAll("tr") ?? []).filter(
-      (row) => row.dataset.visible !== "false"
+      (row) => row.dataset.visible !== "false" && row.dataset.role !== "loading"
     );
   }
   init() {

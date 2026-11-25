@@ -12,6 +12,7 @@ interface IndexTableView {
 	key?: string | null;
 	mobile?: boolean;
 	addFlash(row: HTMLElement): void;
+	clearTableLoading?(): void;
 }
 
 interface IndexTableComponent extends TableComponent {
@@ -69,7 +70,14 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 		);
 	}
 
+	_clearLoadingState() {
+		this.target.removeAttribute("aria-busy");
+		this.target.querySelector("tr[data-role='loading']")?.remove();
+		this.view.clearTableLoading?.();
+	}
+
 	setEmptyRowVisibility() {
+		this._clearLoadingState();
 		const emptyRow = this.target.querySelector<HTMLTableRowElement>(
 			"tr[data-role='empty']",
 		);
@@ -273,6 +281,13 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 			void this.component?.widgets?.TableEditor?.refreshCheckboxes().catch(
 				captureError,
 			);
+		} else if (this.target.hasAttribute("loaded")) {
+			this._clearLoadingState();
 		}
+	}
+
+	destroy() {
+		this._clearLoadingState();
+		super.destroy();
 	}
 }

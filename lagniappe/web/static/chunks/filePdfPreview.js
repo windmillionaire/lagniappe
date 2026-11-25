@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { p as primitives } from './ui-controls.js?v=b1ee16b4';
-import { S as STYLES, s as setIcon } from './ui-resources.js?v=b1ee16b4';
+import { p as primitives } from './ui-controls.js?v=bf7d4d98';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=bf7d4d98';
 
 /**
  * @licstart The following is the entire license notice for the

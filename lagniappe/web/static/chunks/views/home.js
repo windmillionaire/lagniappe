@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { e as localStore, w as withTransition } from '../foundation.js?v=b1ee16b4';
-import { C as Core } from '../core-foundation.js?v=b1ee16b4';
-import '../upstreamUnavailable.js?v=b1ee16b4';
-import '../connectivity.js?v=b1ee16b4';
+import { e as localStore, w as withTransition } from '../foundation.js?v=bf7d4d98';
+import { C as Core } from '../core-foundation.js?v=bf7d4d98';
+import '../upstreamUnavailable.js?v=bf7d4d98';
+import '../connectivity.js?v=bf7d4d98';
 
 const HOME_CHANNELS = Object.freeze({
   HomeActivityList: "home-notes",
@@ -328,6 +328,10 @@ class Home extends Core {
       for (const widget of Object.values(component.widgets)) {
         const target = widget?.target;
         if (target?.tagName === "UL" && target.children.length === 0) {
+          if (widget.name === "HomeActivityList" && "ensureEmptyState" in widget && typeof widget.ensureEmptyState === "function") {
+            widget.ensureEmptyState();
+            continue;
+          }
           target.dataset.visible = "false";
           hidAny = true;
         }

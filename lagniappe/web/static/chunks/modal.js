@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES } from './ui-resources.js?v=b1ee16b4';
-import { w as withTransition, r as request, c as captureError, E as ENDPOINTS } from './foundation.js?v=b1ee16b4';
-import './upstreamUnavailable.js?v=b1ee16b4';
-import './connectivity.js?v=b1ee16b4';
+import { S as STYLES } from './ui-resources.js?v=bf7d4d98';
+import { w as withTransition, r as request, c as captureError, E as ENDPOINTS } from './foundation.js?v=bf7d4d98';
+import './upstreamUnavailable.js?v=bf7d4d98';
+import './connectivity.js?v=bf7d4d98';
 
 class Modal {
   constructor(view, trigger) {

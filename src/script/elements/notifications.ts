@@ -79,6 +79,7 @@ export class Notifications {
 				await this._ensureLoaded();
 				return this._dropdownItems();
 			},
+			emptyHtml: () => this._emptyNoticeHtml(),
 			onShow: () => {
 				this.menuOpen = true;
 			},
@@ -141,13 +142,35 @@ export class Notifications {
 		if (!this.dropdown || !this.view.online) return false;
 
 		const response = await request.get(ENDPOINTS.notifications);
-		if (!response?.ok || !response.html) return false;
+		if (!response?.ok || response.html == null) return false;
 
-		this.notifications = this._optionsFromHtml(response.html);
+		this.notifications =
+			typeof response.html === "string"
+				? []
+				: this._optionsFromHtml(response.html);
 		this.loaded = true;
 		this.stale = false;
 		this._updateDropdown();
 		return true;
+	}
+
+	_hasNotificationContent() {
+		return this.notifications.some(
+			(item) =>
+				(item.key && !item.key.startsWith("__")) ||
+				item.action === "open-messages",
+		);
+	}
+
+	_emptyNoticeHtml() {
+		if (this._hasNotificationContent()) return "";
+		const hasAction = this.notifications.some(
+			(item) => item.action === "message-user",
+		);
+		const className = hasAction
+			? STYLES.dropdown.emptyWithAction || ""
+			: STYLES.dropdown.empty || "";
+		return `<div role="status" data-role="empty" class="${className}">No unread notifications</div>`;
 	}
 
 	_optionsFromHtml(html: ParentNode) {

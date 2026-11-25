@@ -373,3 +373,32 @@ def test_task_index_quick_edit_keeps_revealed_completed_column_editable(get_admi
     expect(visibility).to_have_attribute("data-visible", "false")
     expect(body).to_have_attribute("data-editing", "true")
     expect(edit_toggle).to_have_attribute("data-editing", "true")
+
+
+def test_task_index_shows_delayed_loading_skeleton_when_rows_are_slow(get_admin, get_user):
+    from config import SETTINGS
+
+    user = get_admin()
+    task = Tasks.test_task_index_page_active.get(user)
+    held = []
+
+    with scoped_browser_route(
+        user.page.context,
+        "**/tasks/rows*",
+        lambda route: held.append(route),
+    ):
+        try:
+            user.page.goto(
+                f"{SETTINGS.test_config['BASE_URL']}/tasks/index",
+                wait_until="domcontentloaded",
+            )
+            loading_row = user.locate("#table tbody tr[data-role='loading']")
+            expect(loading_row).to_be_visible(timeout=5000)
+            expect(user.locate("#table tbody")).to_have_attribute("aria-busy", "true")
+        finally:
+            for route in held:
+                route.continue_()
+
+    expect(user.locate("#table tbody tr[data-role='loading']")).to_have_count(0)
+    expect(user.locate("#table tbody")).to_have_attribute("loaded", "")
+    expect(_row_for(user, task)).to_be_visible()

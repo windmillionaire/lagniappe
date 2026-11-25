@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES, s as setIcon } from './ui-resources.js?v=b1ee16b4';
-import { g as generateElementId, c as captureError, Q as QueryLifecycle, d as debounce, e as localStore, E as ENDPOINTS, r as request } from './foundation.js?v=b1ee16b4';
-import { p as primitives, f as formatting } from './ui-controls.js?v=b1ee16b4';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=bf7d4d98';
+import { g as generateElementId, c as captureError, Q as QueryLifecycle, d as debounce, e as localStore, E as ENDPOINTS, r as request } from './foundation.js?v=bf7d4d98';
+import { p as primitives, f as formatting } from './ui-controls.js?v=bf7d4d98';
 
 /**
  * Custom positioning reference element.
@@ -1754,6 +1754,11 @@ class Combobox {
     option.className = `${option.className} ${STYLES.dropdown.option.multiple}`.trim();
     option._checkbox = checkboxElement.querySelector("input");
   }
+  _hasPanelContent(panel = this.panel) {
+    return Boolean(
+      panel?.querySelector(`[role='${this.optionRole}'], [data-role='empty']`)
+    );
+  }
   updatePanel(html) {
     if (this._destroyed) return false;
     if (!this.panel) this._createPanel();
@@ -1787,14 +1792,14 @@ class Combobox {
         this._addCheckbox(optionElt);
       }
     });
-    if (this.options.length === 0) {
+    if (!this._hasPanelContent(panel)) {
       this.hidePanel();
     }
   }
   showPanel() {
     if (this._destroyed) return Promise.resolve(false);
     const panel = this.panel;
-    if (!panel?.querySelector(`[role='${this.optionRole}']`)) {
+    if (!panel || !this._hasPanelContent(panel)) {
       this.hidePanel();
       return Promise.resolve(false);
     }
@@ -2327,6 +2332,7 @@ class Dropdown extends Combobox {
     this.matchReferenceWidth = menu.matchReferenceWidth ?? this.matchReferenceWidth;
     if ("triggerRole" in menu) this.triggerRole = menu.triggerRole;
     this._loadOptions = menu.loadOptions || (async () => this.items);
+    this.emptyHtml = menu.emptyHtml ?? null;
     this.onShow = menu.onShow || null;
     this.onHide = menu.onHide || null;
     super.init(menu);
@@ -2348,12 +2354,18 @@ class Dropdown extends Combobox {
     itemButton.appendChild(text);
     return itemButton.outerHTML;
   }
+  _emptyMarkup() {
+    const markup = typeof this.emptyHtml === "function" ? this.emptyHtml() : this.emptyHtml;
+    return markup ? markup.trim() : "";
+  }
   _renderOptions() {
-    if (this.items.length === 0) {
+    const itemsHtml = this.items.map((item) => item.html || this._createDropdownButton(item)).join("");
+    const emptyHtml = this._emptyMarkup();
+    const html = `${itemsHtml}${emptyHtml}`;
+    if (!html) {
       this.updatePanel("");
       return;
     }
-    const html = this.items.map((item) => item.html || this._createDropdownButton(item)).join("");
     this.updatePanel(html);
   }
   async showPanel() {
@@ -2385,7 +2397,7 @@ class Dropdown extends Combobox {
   updateOptions(options = []) {
     this.items = Array.isArray(options) ? options : [];
     this._renderOptions();
-    if (!this.items.length && this.panelOpen) {
+    if (!this.items.length && !this._emptyMarkup() && this.panelOpen) {
       this.hidePanel();
       return;
     }

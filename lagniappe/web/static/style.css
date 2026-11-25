@@ -641,6 +641,9 @@
   .h-2 {
     height: calc(var(--spacing) * 2);
   }
+  .h-3\.5 {
+    height: calc(var(--spacing) * 3.5);
+  }
   .h-4 {
     height: calc(var(--spacing) * 4);
   }
@@ -734,6 +737,9 @@
   .w-2 {
     width: calc(var(--spacing) * 2);
   }
+  .w-2\/5 {
+    width: calc(2 / 5 * 100%);
+  }
   .w-5 {
     width: calc(var(--spacing) * 5);
   }
@@ -751,6 +757,9 @@
   }
   .w-12 {
     width: calc(var(--spacing) * 12);
+  }
+  .w-24 {
+    width: calc(var(--spacing) * 24);
   }
   .w-28 {
     width: calc(var(--spacing) * 28);
@@ -1317,6 +1326,12 @@
   .border-note-light {
     border-color: var(--color-note-light);
   }
+  .border-note-light\/80 {
+    border-color: color-mix(in srgb, oklch(0.85 0.14 92) 80%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-note-light) 80%, transparent);
+    }
+  }
   .border-page-default {
     border-color: var(--color-page-default);
   }
@@ -1412,6 +1427,12 @@
   }
   .bg-note-bg {
     background-color: var(--color-note-bg);
+  }
+  .bg-note-bg\/40 {
+    background-color: color-mix(in srgb, oklch(0.96 0.05 92) 40%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-note-bg) 40%, transparent);
+    }
   }
   .bg-page-bg {
     background-color: var(--color-page-bg);
@@ -2347,6 +2368,9 @@
     .hover\:bg-user-bg:hover {
       background-color: var(--color-user-bg);
     }
+    .hover\:bg-user-dark:hover {
+      background-color: var(--color-user-dark);
+    }
     .hover\:bg-white:hover {
       background-color: var(--color-white);
     }
@@ -2413,6 +2437,9 @@
     .hover\:outline-page-default:hover {
       outline-color: var(--color-page-default);
     }
+    .hover\:outline-user-dark:hover {
+      outline-color: var(--color-user-dark);
+    }
     .hover\:outline-white:hover {
       outline-color: var(--color-white);
     }
@@ -2447,6 +2474,9 @@
   }
   .focus-visible\:bg-kind-dark:focus-visible {
     background-color: var(--kind-dark);
+  }
+  .focus-visible\:bg-user-dark:focus-visible {
+    background-color: var(--color-user-dark);
   }
   .focus-visible\:bg-white:focus-visible {
     background-color: var(--color-white);
@@ -2490,6 +2520,9 @@
   }
   .focus-visible\:outline-page-default:focus-visible {
     outline-color: var(--color-page-default);
+  }
+  .focus-visible\:outline-user-dark:focus-visible {
+    outline-color: var(--color-user-dark);
   }
   .focus-visible\:outline-white:focus-visible {
     outline-color: var(--color-white);
@@ -2628,6 +2661,9 @@
     display: flex;
   }
   @media (prefers-reduced-motion: reduce) {
+    .motion-reduce\:animate-none {
+      animation: none;
+    }
     .motion-reduce\:transition-none {
       transition-property: none;
     }
@@ -4254,6 +4290,9 @@ td [data-role="quick-edit-error"] {
   }
   table[id="table"]:not([data-embedded]) > tbody {
     border-top: none;
+  }
+  table[id="table"]:not([data-embedded]) > tbody > tr[data-role="loading"][data-visible="true"] {
+    display: block;
   }
   table[id="table"]:not([data-embedded]) > tbody > tr[data-key] {
     display: flex;

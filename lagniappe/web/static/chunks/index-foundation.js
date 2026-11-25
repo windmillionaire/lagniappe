@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from './foundation.js?v=b1ee16b4';
-import { C as Core } from './core-foundation.js?v=b1ee16b4';
+import { w as withTransition } from './foundation.js?v=bf7d4d98';
+import { C as Core } from './core-foundation.js?v=bf7d4d98';
 
 class TableVisibilityState {
   constructor({
@@ -72,7 +72,7 @@ class TableVisibilityState {
       document.adoptedStyleSheets.push(this.stylesheet);
     }
     const id = this.component.elt.id;
-    const rowSelector = `#${id} tr:not([data-widget], [data-embedded], [data-role="empty"]) > td:not([data-column="delete"])`;
+    const rowSelector = `#${id} tr:not([data-widget], [data-embedded], [data-role="empty"], [data-role="loading"]) > td:not([data-column="delete"])`;
     const thSelector = `#${id} th:not([data-column="selector"], [data-embedded])`;
     this.stylesheet.replaceSync(
       this.hiddenColumns.map(
@@ -93,6 +93,8 @@ class TableVisibilityState {
   }
 }
 
+const INDEX_LOADING_DELAY_MS = 200;
+const INDEX_SKELETON_ROWS = 4;
 function isTableColumn(value) {
   return Boolean(
     value && typeof value === "object" && "field" in value && typeof value.field === "string" && (!("title" in value) || typeof value.title === "string") && (!("selected" in value) || typeof value.selected === "boolean")
@@ -104,6 +106,9 @@ class EntityIndex extends Core {
     this.dropdown = null;
     this.nav = null;
     this.toolsObserver = null;
+    this._tableLoadingTimer = null;
+    this._tableLoadingTarget = null;
+    this._tableLoadingToken = 0;
   }
   async init() {
     await super.init();
@@ -137,6 +142,9 @@ class EntityIndex extends Core {
       },
       { label: "index:initial-table" }
     );
+    if (table.elt.hasAttribute("lp-prefetch")) {
+      this._scheduleTableLoading(table.elt);
+    }
     const continuation = indexTable?.target?.querySelector("tr[lp-load]");
     if (continuation && indexTable?.target) {
       const route = continuation.dataset.route;
@@ -272,8 +280,8 @@ class EntityIndex extends Core {
     );
     if (!trigger) return;
     this._dropdownPromise = Promise.all([
-      import('./combobox.js?v=b1ee16b4').then(function (n) { return n.e; }),
-      import('./ui-resources.js?v=b1ee16b4').then(function (n) { return n.a; })
+      import('./combobox.js?v=bf7d4d98').then(function (n) { return n.e; }),
+      import('./ui-resources.js?v=bf7d4d98').then(function (n) { return n.a; })
     ]).then(([{ Dropdown }, { STYLES }]) => {
       if (this._destroyed || !this.mobile) return null;
       const items = [];
@@ -322,7 +330,87 @@ class EntityIndex extends Core {
     });
     return this._dropdownPromise;
   }
+  async prefetch() {
+    try {
+      await super.prefetch();
+    } finally {
+      const table = this.getComponent(this.elt.querySelector("#table"));
+      const indexTable = table?.widgets?.IndexTable;
+      if (!indexTable?.loading || indexTable.loaded) {
+        this.clearTableLoading();
+      }
+    }
+  }
+  _scheduleTableLoading(tableElt) {
+    const tbody = tableElt.querySelector(
+      "tbody[data-widget='IndexTable']"
+    );
+    if (!tbody || tbody.hasAttribute("loaded") || tbody.querySelector("tr[lp-entity]")) {
+      return;
+    }
+    this.clearTableLoading();
+    this._tableLoadingTarget = tbody;
+    const token = ++this._tableLoadingToken;
+    this._tableLoadingTimer = setTimeout(() => {
+      this._tableLoadingTimer = null;
+      void this._showTableLoading(tableElt, tbody, token);
+    }, INDEX_LOADING_DELAY_MS);
+  }
+  async _showTableLoading(tableElt, tbody, token) {
+    if (this._destroyed || token !== this._tableLoadingToken || !tbody.isConnected || tbody.hasAttribute("loaded") || tbody.querySelector("tr[lp-entity]") || tbody.querySelector("tr[data-role='loading']")) {
+      return;
+    }
+    const { STYLES } = await import('./ui-resources.js?v=bf7d4d98').then(function (n) { return n.a; });
+    if (this._destroyed || token !== this._tableLoadingToken || !tbody.isConnected || tbody.hasAttribute("loaded") || tbody.querySelector("tr[lp-entity]") || tbody.querySelector("tr[data-role='loading']")) {
+      return;
+    }
+    const columnCount = tableElt.querySelectorAll("thead > tr:first-child > th").length || 1;
+    const row = document.createElement("tr");
+    row.dataset.role = "loading";
+    row.dataset.visible = "true";
+    row.setAttribute("aria-live", "polite");
+    const cell = document.createElement("td");
+    cell.colSpan = columnCount;
+    cell.className = STYLES.table.loading.cell;
+    const srLabel = document.createElement("span");
+    srLabel.className = "sr-only";
+    srLabel.setAttribute("role", "status");
+    srLabel.textContent = "Loading rows";
+    cell.append(srLabel);
+    const list = document.createElement("div");
+    list.className = STYLES.table.loading.list;
+    list.setAttribute("aria-hidden", "true");
+    for (let i = 0; i < INDEX_SKELETON_ROWS; i += 1) {
+      const item = document.createElement("div");
+      item.className = STYLES.table.loading.item;
+      const primary = document.createElement("span");
+      primary.className = STYLES.table.loading.barPrimary;
+      const secondary = document.createElement("span");
+      secondary.className = STYLES.table.loading.barSecondary;
+      item.append(primary, secondary);
+      list.append(item);
+    }
+    cell.append(list);
+    row.append(cell);
+    tbody.setAttribute("aria-busy", "true");
+    tbody.prepend(row);
+  }
+  clearTableLoading() {
+    this._tableLoadingToken += 1;
+    if (this._tableLoadingTimer !== null && this._tableLoadingTimer !== void 0) {
+      clearTimeout(this._tableLoadingTimer);
+      this._tableLoadingTimer = null;
+    }
+    const tbody = this._tableLoadingTarget || this.elt.querySelector(
+      "#table tbody[data-widget='IndexTable']"
+    );
+    this._tableLoadingTarget = null;
+    if (!tbody) return;
+    tbody.removeAttribute("aria-busy");
+    tbody.querySelector("tr[data-role='loading']")?.remove();
+  }
   destroy() {
+    this.clearTableLoading();
     if (this._indexMobileResize)
       this.elt.removeEventListener("mobile-resize", this._indexMobileResize);
     super.destroy();
@@ -336,4 +424,4 @@ class EntityIndex extends Core {
   }
 }
 
-export { EntityIndex as E, TableVisibilityState as T };
+export { EntityIndex as E, INDEX_LOADING_DELAY_MS as I, TableVisibilityState as T };

@@ -429,6 +429,14 @@ export default class Home extends Core {
 			for (const widget of Object.values(component.widgets)) {
 				const target = widget?.target;
 				if (target?.tagName === "UL" && target.children.length === 0) {
+					if (
+						widget.name === "HomeActivityList" &&
+						"ensureEmptyState" in widget &&
+						typeof widget.ensureEmptyState === "function"
+					) {
+						widget.ensureEmptyState();
+						continue;
+					}
 					target.dataset.visible = "false";
 					hidAny = true;
 				}

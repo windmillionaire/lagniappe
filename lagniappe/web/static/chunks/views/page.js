@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { s as setIcon } from '../ui-resources.js?v=b1ee16b4';
-import { w as withTransition } from '../foundation.js?v=b1ee16b4';
-import { E as Entity } from '../entity-foundation.js?v=b1ee16b4';
-import '../upstreamUnavailable.js?v=b1ee16b4';
-import '../connectivity.js?v=b1ee16b4';
-import '../core-foundation.js?v=b1ee16b4';
+import { s as setIcon } from '../ui-resources.js?v=bf7d4d98';
+import { w as withTransition } from '../foundation.js?v=bf7d4d98';
+import { E as Entity } from '../entity-foundation.js?v=bf7d4d98';
+import '../upstreamUnavailable.js?v=bf7d4d98';
+import '../connectivity.js?v=bf7d4d98';
+import '../core-foundation.js?v=bf7d4d98';
 
 class Page extends Entity {
   async reconcilePollingSubscriptions() {

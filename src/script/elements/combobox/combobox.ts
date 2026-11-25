@@ -341,6 +341,12 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 		option._checkbox = checkboxElement.querySelector("input");
 	}
 
+	_hasPanelContent(panel: HTMLElement | null = this.panel) {
+		return Boolean(
+			panel?.querySelector(`[role='${this.optionRole}'], [data-role='empty']`),
+		);
+	}
+
 	updatePanel(html: string | null | undefined) {
 		if (this._destroyed) return false;
 		if (!this.panel) this._createPanel();
@@ -379,7 +385,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 				}
 			});
 
-		if (this.options.length === 0) {
+		if (!this._hasPanelContent(panel)) {
 			this.hidePanel();
 		}
 	}
@@ -387,7 +393,7 @@ export abstract class Combobox<InitArguments extends unknown[] = []> {
 	showPanel(): Promise<boolean> {
 		if (this._destroyed) return Promise.resolve(false);
 		const panel = this.panel;
-		if (!panel?.querySelector(`[role='${this.optionRole}']`)) {
+		if (!panel || !this._hasPanelContent(panel)) {
 			this.hidePanel();
 			return Promise.resolve(false);
 		}

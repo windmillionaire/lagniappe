@@ -1,13 +1,13 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as EntityMenu, S as SearchBox } from './combobox.js?v=b1ee16b4';
-import { d as directUpload } from './directUpload.js?v=b1ee16b4';
-import { r as request, w as withTransition, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=b1ee16b4';
-import { c as connectivity } from './connectivity.js?v=b1ee16b4';
-import { OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b1ee16b4';
-import { PollingCoordinator } from './polling.js?v=b1ee16b4';
-import { S as STYLES, s as setIcon } from './ui-resources.js?v=b1ee16b4';
-import { p as primitives } from './ui-controls.js?v=b1ee16b4';
-import { F as FormController, d as FormRenderer } from './forms.js?v=b1ee16b4';
+import { E as EntityMenu, S as SearchBox } from './combobox.js?v=bf7d4d98';
+import { d as directUpload } from './directUpload.js?v=bf7d4d98';
+import { r as request, w as withTransition, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=bf7d4d98';
+import { c as connectivity } from './connectivity.js?v=bf7d4d98';
+import { OfflineModal, DeleteModal, HelpModal } from './modal.js?v=bf7d4d98';
+import { PollingCoordinator } from './polling.js?v=bf7d4d98';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=bf7d4d98';
+import { p as primitives } from './ui-controls.js?v=bf7d4d98';
+import { F as FormController, d as FormRenderer } from './forms.js?v=bf7d4d98';
 
 class FormChangeStatus {
   constructor(builder) {
@@ -142,12 +142,12 @@ class FormChangeStatus {
 }
 
 const CONDITION_REGISTRY = {
-  modify: () => import('./builder-controls.js?v=b1ee16b4').then(function (n) { return n.m; }),
-  html: () => import('./html.js?v=b1ee16b4'),
-  status: () => import('./builder-controls.js?v=b1ee16b4').then(function (n) { return n.s; }),
-  visibility: () => import('./builder-controls.js?v=b1ee16b4').then(function (n) { return n.v; }),
-  columns: () => import('./builder-controls.js?v=b1ee16b4').then(function (n) { return n.c; }),
-  options: () => import('./builder-controls.js?v=b1ee16b4').then(function (n) { return n.o; })
+  modify: () => import('./builder-controls.js?v=bf7d4d98').then(function (n) { return n.m; }),
+  html: () => import('./html.js?v=bf7d4d98'),
+  status: () => import('./builder-controls.js?v=bf7d4d98').then(function (n) { return n.s; }),
+  visibility: () => import('./builder-controls.js?v=bf7d4d98').then(function (n) { return n.v; }),
+  columns: () => import('./builder-controls.js?v=bf7d4d98').then(function (n) { return n.c; }),
+  options: () => import('./builder-controls.js?v=bf7d4d98').then(function (n) { return n.o; })
 };
 const loadCondition = async (builder, condition) => {
   const module = await CONDITION_REGISTRY[condition]();
@@ -5278,7 +5278,7 @@ class FormBuilder {
     if (inputFocus) return restoreInput();
   }
   async prepareGeneratedDocuments(htmlFields) {
-    const { default: HtmlEditor } = await import('./html.js?v=b1ee16b4');
+    const { default: HtmlEditor } = await import('./html.js?v=bf7d4d98');
     for (const [id, html] of Object.entries(htmlFields || {})) {
       const element = this.elements.get(id);
       if (this._destroyed || element?.schema.type !== "html" || this.htmlFields[id] === html)

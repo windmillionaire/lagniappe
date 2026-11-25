@@ -34,6 +34,7 @@ export interface DropdownMenu {
 	matchReferenceWidth?: boolean;
 	triggerRole?: string | null;
 	loadOptions?: DropdownLoader;
+	emptyHtml?: string | (() => string | null);
 	onShow?: () => void;
 	onHide?: () => void;
 }
@@ -41,6 +42,7 @@ export interface DropdownMenu {
 export class Dropdown extends Combobox<[menu: DropdownMenu]> {
 	declare items: DropdownItem[];
 	declare _loadOptions: DropdownLoader;
+	declare emptyHtml: string | (() => string | null) | null;
 	declare onShow: (() => void) | null;
 	declare onHide: (() => void) | null;
 
@@ -57,6 +59,7 @@ export class Dropdown extends Combobox<[menu: DropdownMenu]> {
 			menu.matchReferenceWidth ?? this.matchReferenceWidth;
 		if ("triggerRole" in menu) this.triggerRole = menu.triggerRole;
 		this._loadOptions = menu.loadOptions || (async () => this.items);
+		this.emptyHtml = menu.emptyHtml ?? null;
 		this.onShow = menu.onShow || null;
 		this.onHide = menu.onHide || null;
 
@@ -85,15 +88,23 @@ export class Dropdown extends Combobox<[menu: DropdownMenu]> {
 		return itemButton.outerHTML;
 	}
 
+	_emptyMarkup() {
+		const markup =
+			typeof this.emptyHtml === "function" ? this.emptyHtml() : this.emptyHtml;
+		return markup ? markup.trim() : "";
+	}
+
 	_renderOptions() {
-		if (this.items.length === 0) {
+		const itemsHtml = this.items
+			.map((item) => item.html || this._createDropdownButton(item))
+			.join("");
+		const emptyHtml = this._emptyMarkup();
+		const html = `${itemsHtml}${emptyHtml}`;
+
+		if (!html) {
 			this.updatePanel("");
 			return;
 		}
-
-		const html = this.items
-			.map((item) => item.html || this._createDropdownButton(item))
-			.join("");
 
 		this.updatePanel(html);
 	}
@@ -135,7 +146,7 @@ export class Dropdown extends Combobox<[menu: DropdownMenu]> {
 		this.items = Array.isArray(options) ? options : [];
 		this._renderOptions();
 
-		if (!this.items.length && this.panelOpen) {
+		if (!this.items.length && !this._emptyMarkup() && this.panelOpen) {
 			this.hidePanel();
 			return;
 		}

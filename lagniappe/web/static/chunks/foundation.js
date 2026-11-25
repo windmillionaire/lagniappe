@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { h as handleUpstreamResponse } from './upstreamUnavailable.js?v=b1ee16b4';
-import { c as connectivity } from './connectivity.js?v=b1ee16b4';
+import { h as handleUpstreamResponse } from './upstreamUnavailable.js?v=bf7d4d98';
+import { c as connectivity } from './connectivity.js?v=bf7d4d98';
 
 const getErrorDetails = (error) => error && (typeof error === "object" || typeof error === "function") ? error : void 0;
 const getElementContext = (element) => {
@@ -1079,7 +1079,7 @@ class ShellView {
       "_pollingPromise",
       "PollingCoordinator",
       async () => {
-        const { PollingCoordinator } = await import('./polling.js?v=b1ee16b4');
+        const { PollingCoordinator } = await import('./polling.js?v=bf7d4d98');
         return this._destroyed ? null : new PollingCoordinator(this).init();
       }
     );
@@ -1088,7 +1088,7 @@ class ShellView {
     return loadViewService(this, "_searchPromise", "SearchBox", async () => {
       const search = document.querySelector("[lp-search]");
       if (!search) return null;
-      const { SearchBox } = await import('./combobox.js?v=b1ee16b4').then(function (n) { return n.d; });
+      const { SearchBox } = await import('./combobox.js?v=bf7d4d98').then(function (n) { return n.d; });
       if (this._destroyed) return null;
       const box = new SearchBox(search);
       await box.init();
@@ -1103,7 +1103,7 @@ class ShellView {
       async () => {
         if (!document.querySelector("[data-role='notifications']")) return null;
         await this.ensurePollingCoordinator();
-        const { Notifications } = await import('./notifications.js?v=b1ee16b4');
+        const { Notifications } = await import('./notifications.js?v=bf7d4d98');
         if (this._destroyed) return null;
         const notifications = new Notifications(this);
         notifications.init();

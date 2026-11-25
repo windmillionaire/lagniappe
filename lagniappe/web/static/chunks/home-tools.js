@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { BaseList, listHtml } from './baseList.js?v=b1ee16b4';
-import { e as localStore, w as withTransition, r as request } from './foundation.js?v=b1ee16b4';
-import { S as STYLES, s as setIcon } from './ui-resources.js?v=b1ee16b4';
-import './connectivity.js?v=b1ee16b4';
-import { D as Dropdown } from './combobox.js?v=b1ee16b4';
+import { BaseList, listHtml } from './baseList.js?v=bf7d4d98';
+import { e as localStore, w as withTransition, r as request } from './foundation.js?v=bf7d4d98';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=bf7d4d98';
+import './connectivity.js?v=bf7d4d98';
+import { D as Dropdown } from './combobox.js?v=bf7d4d98';
 
 const REPORT_FILTERS = ["active", "executed", "answers"];
 function isReportFilter(value) {
@@ -236,7 +236,7 @@ class ToolReportList extends BaseList {
     if (!content || !description || !confirm || !confirmLabel) return;
     this._openingDelete = true;
     try {
-      const { Modal } = await import('./modal.js?v=b1ee16b4');
+      const { Modal } = await import('./modal.js?v=bf7d4d98');
       if (this._destroyed) return;
       this._deleteModal?.destroy();
       const modal = new Modal(this.view, trigger);
@@ -272,7 +272,7 @@ class ToolReportList extends BaseList {
     error.hidden = true;
     this._renderFilters();
     try {
-      const { request } = await import('./foundation.js?v=b1ee16b4').then(function (n) { return n.p; });
+      const { request } = await import('./foundation.js?v=bf7d4d98').then(function (n) { return n.p; });
       const response = await request.delete(route, {
         keys
       });
@@ -471,17 +471,31 @@ class HomeActivityList extends BaseList {
       label: "home:activity-offline-remove"
     });
   }
+  ensureEmptyState(list = this.target) {
+    if (!list) return false;
+    if (list.querySelector("li:not([data-role='empty'])")) return false;
+    if (list.querySelector("li[data-role='empty']")) return false;
+    const empty = document.createElement("li");
+    empty.dataset.role = "empty";
+    empty.className = STYLES.note.empty;
+    empty.textContent = "No notes yet \u2014 use + to add a quick note.";
+    list.append(empty);
+    return true;
+  }
   _commitRemoveItem(item) {
     const list = item.closest("ul");
     item.remove();
-    if (list && list.querySelectorAll("li").length === 0) {
-      list.dataset.visible = "false";
+    if (list && list.querySelectorAll("li:not([data-role='empty'])").length === 0) {
+      this.ensureEmptyState(list);
       this.view.syncHomeSectionState?.(this.component);
     }
   }
   postreconcile() {
     const updated = this._updated;
     super.postreconcile();
+    if (this.ensureEmptyState() && (this.visible || this.component.active === this)) {
+      this.target.dataset.visible = "true";
+    }
     if (updated) {
       this.destroy();
       this.init();
