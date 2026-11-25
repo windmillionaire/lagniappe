@@ -334,7 +334,7 @@ def test_load_refresh_collection_resolves_component_from_view_entity():
 
 @pytest.mark.unit
 def test_filter_cache_query_roots_uses_root_fetch_without_permission_expansion():
-    parent = SimpleNamespace(hash="refresh-filter-parent")
+    parent = SimpleNamespace(kind="project", hash="refresh-filter-parent")
     filter_entity = SimpleNamespace(definitions=[])
     filter_cache = FilterCache(parent, user=_viewer())
 

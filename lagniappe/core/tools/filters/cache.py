@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from lagniappe.core.entities.project import Project
     from lagniappe.core.entities.user import User
 
-from ..cache import Keys, filter_cache
+from ..cache import Keys, filter_cache, project_filters
 from ..services.task_queue import create_task
 from .build import FilterExpression
 from .contract import CompiledFilter
@@ -26,6 +26,7 @@ from .contract import CompiledFilter
 
 # Rebuild indexes populated before task updates tracked project membership.
 FILTER_CACHE_SCOPE = "all-v3"
+PROJECT_FILTER_CACHE_SCOPE = "all-v4"
 
 
 def _entity_ids(value: object) -> TypeGuard[list[str]]:
@@ -64,9 +65,18 @@ class FilterCache:
     def __init__(self, entity: Category | Project, user: User | None = None) -> None:
         self.entity = entity
         self.user = current_context_user(user)
-        self.cache_key = Keys.FILTER.value.format(self.entity.hash, FILTER_CACHE_SCOPE)
+        scope = PROJECT_FILTER_CACHE_SCOPE if entity.kind == "project" else FILTER_CACHE_SCOPE
+        self.cache_key = Keys.FILTER.value.format(self.entity.hash, scope)
 
         self._to_cache = {}
+
+    def _query_index(self, expression: str) -> JsonType:
+        result = filter_cache.query(self.cache_key, expression)
+        if result is None and self.entity.kind == "project":
+            # The root can expire between update() and the actual filter read.
+            self.cache()
+            result = filter_cache.query(self.cache_key, expression)
+        return result
 
     def _query_keys(self, filter: CompiledFilter) -> list[str]:
         if not isinstance(filter, CompiledFilter):
@@ -74,13 +84,13 @@ class FilterCache:
         literals = [definition for definition in filter.definitions if _needs_literal_match(definition)]
         if not literals:
             expression = FilterExpression(filter.definitions).build()
-            identifiers = filter_cache.query(self.cache_key, expression)
+            identifiers = self._query_index(expression)
             if not _entity_ids(identifiers):
                 raise TypeError("Expected an array of entity IDs from the filter index")
             return identifiers
         remaining = [definition for definition in filter.definitions if definition not in literals]
         expression = FilterExpression(remaining).build(ids_only=False) if remaining else "$.*"
-        rows = filter_cache.query(self.cache_key, expression)
+        rows = self._query_index(expression)
         if not isinstance(rows, list):
             raise TypeError("Expected an array of records from the filter index")
         return [
@@ -124,10 +134,6 @@ class FilterCache:
         return {e.hash: cast("JsonType", escape_for_filter(e.to_filter_index())) for e in entities}
 
     def _load(self, cursor=None):
-        if self.entity.kind == "project":
-            self._load_project_tasks()
-            return
-
         if self.entity.kind != "category":
             return
 
@@ -147,7 +153,7 @@ class FilterCache:
                 return
             cursor = index.next_cursor
 
-    def _load_project_tasks(self):
+    def _load_project_tasks(self) -> dict[str, JsonType]:
         """Load every task for a project filter cache.
 
         The project UI task index shows incomplete tasks. A filter cache needs
@@ -166,14 +172,15 @@ class FilterCache:
             request=Fetch.nested(because=FetchReason.TASK_FILTER_INDEX_MATERIALIZATION),
         )
 
-        self._to_cache.update(self._entity_map(tasks))
+        return self._entity_map(tasks)
 
     def cache(self) -> None:
         """Build or incrementally refresh the filter cache."""
-        # filter_cache.delete(self.cache_key)
-        if self.entity.kind == "project" and CONFIG.local:
-            self._load()
-            filter_cache.create(self.cache_key, self._to_cache)
+        if self.entity.kind == "project":
+            project_filters.ensure(
+                self.cache_key, self.entity.hash, self._load_project_tasks,
+                self._refresh_project_tasks, force=CONFIG.local,
+            )
             return
 
         if not filter_cache.exists(self.cache_key):
@@ -186,10 +193,11 @@ class FilterCache:
 
             if not _entity_ids(to_refresh):
                 raise TypeError("Expected an array of entity IDs requiring a refresh")
-            request = (
-                Fetch.nested(because=FetchReason.TASK_FILTER_INDEX_MATERIALIZATION)
-                if self.entity.kind == "project"
-                else Fetch.direct()
-            )
-            refreshed = Entities.fetch(*to_refresh, request=request)
+            refreshed = Entities.fetch(*to_refresh, request=Fetch.direct())
             filter_cache.set(self.cache_key, self._entity_map(refreshed))
+
+    def _refresh_project_tasks(self, ids: list[str]) -> dict[str, JsonType]:
+        tasks = Entities.fetch(
+            *ids, request=Fetch.nested(because=FetchReason.TASK_FILTER_INDEX_MATERIALIZATION),
+        )
+        return self._entity_map(task for task in tasks if task.db.get("project") == self.entity.key)

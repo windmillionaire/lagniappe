@@ -11,6 +11,7 @@ from redis import ResponseError
 
 from .core import cache, filter_cache
 from .keys import Keys, Search
+from .project_filters import record_task_changes
 
 MISSING_INDEX_MESSAGES = (
     "unknown index name",
@@ -59,6 +60,7 @@ def _drop_index_if_exists(index):
 def delete(entities: Collection[Entity | None]) -> None:
     """Remove entities from both the hash cache and parent JSON indexes."""
     hash_map = {e.hash: e for e in entities if e and e.hash}
+    record_task_changes([h for h, entity in hash_map.items() if entity.kind == "task"])
     existing_parents = filter_cache.get_existing_parents(hash_map.keys())
 
     entity_keys = set()

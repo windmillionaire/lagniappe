@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -91,6 +91,17 @@ def test_filter_cache_rejects_uncompiled_query_definitions():
         FilterCache(parent, user=_user()).query(
             SimpleNamespace(definitions=["untrusted"])
         )
+
+
+def test_project_filter_recovers_when_root_expires_between_update_and_query(monkeypatch):
+    from lagniappe.core.tools.filters import cache as module
+
+    reader = FilterCache(_parent("project"), user=_user())
+    rebuild = MagicMock()
+    monkeypatch.setattr(reader, "cache", rebuild)
+    monkeypatch.setattr(module.filter_cache, "query", MagicMock(side_effect=[None, ["task-id"]]))
+    assert reader._query_index("$.query") == ["task-id"]
+    rebuild.assert_called_once()
 
 
 @pytest.mark.parametrize("comparator", [Comparator.EQUALS, Comparator.SUBSTRING])
@@ -227,7 +238,7 @@ def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filt
         ) as load,
     ):
         cache = FilterCache(parent, user=_user(task=["restricted"]))
-        cache._load_project_tasks()
+        rows = cache._load_project_tasks()
 
     datastore_key.assert_called_once_with(parent)
     load.assert_called_once_with(
@@ -243,7 +254,7 @@ def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filt
         ("eq", "project", parent.key),
     ]
     assert query.orders == ["-modified"]
-    assert cache._to_cache == {
+    assert rows == {
         "active-hash": {"id": "active-task-key", "name": "Active", "completed": False},
         "task-hash": {
             "id": "task-key",
@@ -254,7 +265,6 @@ def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filt
 
 
 def test_edits_completion_and_project_moves_keep_actual_filter_members(monkeypatch):
-    from unittest.mock import MagicMock
     from lagniappe.core.tools.cache import add
 
     project = _parent("project")
@@ -267,6 +277,8 @@ def test_edits_completion_and_project_moves_keep_actual_filter_members(monkeypat
         for name in ("edited", "completed", "new", "moved")
     ]
     tasks[1].completed = True
+    record_changes = MagicMock()
+    monkeypatch.setattr(add, "record_task_changes", record_changes)
     pipe = MagicMock()
     commands = pipe.__enter__.return_value.json.return_value
     commands.set.side_effect = lambda key, path, value: rows[key].update({path[2:]: value})
@@ -281,6 +293,7 @@ def test_edits_completion_and_project_moves_keep_actual_filter_members(monkeypat
 
     add.update_json_index(tasks)
 
+    record_changes.assert_called_once_with(["edited", "completed", "new", "moved"], {project.hash})
     assert rows[former] == {}
     assert rows[current] == {
         name: {"id": f"id-{name}", "cache_key": name, "refresh": 1}

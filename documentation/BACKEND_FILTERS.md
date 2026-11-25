@@ -31,7 +31,7 @@ Filter Entity (core/entities/filter.py)
 FilterCache (core/tools/filters/cache.py)
   │
   ├── Builds entity filter indices (entity.to_filter_index)
-  ├── Stores as Redis JSON keyed by entity hash + user access
+  ├── Stores as Redis JSON keyed by parent hash and format scope
   └── Queries with FilterExpression → JSONPath
          │
          ▼
@@ -167,16 +167,31 @@ Caches entity filter indices in Redis JSON for fast querying.
 
 ### Cache Key
 
-The shared cache key is the parent hash plus the format scope `all-v2`.
-Permission checks happen after matched roots are loaded. The scope version
-ensures caches built before punctuation-preserving values are not reused.
+The shared cache key uses the parent hash and a format scope. Projects use
+`all-v4` and Categories use `all-v3`. Each query checks the viewer's permissions
+after loading the matching entities. A new Project scope lets the first read
+rebuild older projections that may contain stale Task values.
 
 ### Building the Cache
 
-`cache()` either creates or refreshes the cache:
+Categories page through their Pages. A cold Project reads all its Tasks,
+including completed Tasks, and their filterable relations. Both use
+`entity.to_filter_index()` to build the RedisJSON document.
 
-- **Create**: Paginates through all child entities (pages for categories, tasks for projects), calls `entity.to_filter_index(user)` on each, and stores the result as a Redis JSON document.
-- **Refresh**: Checks which entities have been modified since the last cache build and updates only those entries.
+One worker holds a renewable Redis lease while building a Project. Other
+readers reuse its published index. Task cache writers record the changed
+Task hashes and destination Project hashes before looking up existing
+projections. The builder checks those changes back to the start of its read.
+Checking both kinds of hash covers Tasks arriving in a Project and Tasks
+leaving one whose old index was absent. If the change history no longer
+covers the read, the builder reloads. A Redis transaction verifies ownership
+and publishes the complete document with its expiry.
+
+A clean Project needs one RedisJSON read to check for refresh markers.
+Incremental refresh watches the existing document, reloads marked Tasks and
+removes entries for Tasks that left the Project. A racing edit or an expired
+document causes a retry. If a builder stops, its lease expires and a waiting
+reader can take over.
 
 ### Querying
 
