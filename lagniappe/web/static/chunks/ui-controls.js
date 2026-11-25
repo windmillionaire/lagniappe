@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES, s as setIcon, i as iconDefinition, c as createIcon } from './ui-resources.js?v=b14914a4';
+import { S as STYLES, s as setIcon, i as iconDefinition, c as createIcon } from './ui-resources.js?v=b1ee16b4';
 
 const setAttributes = (elt, attributes) => {
   if (attributes.name) elt.name = attributes.name;

@@ -248,6 +248,23 @@
                 class="{{ styles.home.create }}">{{ render_icon("plus", styles.icon.default) }}</button>
       </div>
       {{ tasks.create() }}
+      <div data-role="task-feedback"
+           data-kind="success"
+           data-visible="false"
+           role="status"
+           aria-live="polite"
+           class="{{ styles.home.taskFeedback }}">
+        {{ render_icon("success", styles.icon.default) }}
+        <span data-role="task-feedback-text" class="min-w-0 flex-1"></span>
+        <a href='{{ url_for("pages.view", key=current_user.page.urlsafe_key, tab="tasks") }}'
+           data-role="task-feedback-link"
+           class="{{ styles.home.taskFeedbackLink }}">View on My Page</a>
+        <button type="button"
+                data-role="dismiss-task-feedback"
+                aria-label="Dismiss"
+                title="Dismiss"
+                class="{{ styles.home.taskFeedbackDismiss }}">{{ render_icon("close") }}</button>
+      </div>
       <ul lp-prefetch
           data-widget="HomeTaskList"
           data-route='{{ url_for("internal.get", kind="tasks") }}'

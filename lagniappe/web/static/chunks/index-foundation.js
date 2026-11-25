@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from './foundation.js?v=b14914a4';
-import { C as Core } from './core-foundation.js?v=b14914a4';
+import { w as withTransition } from './foundation.js?v=b1ee16b4';
+import { C as Core } from './core-foundation.js?v=b1ee16b4';
 
 class TableVisibilityState {
   constructor({
@@ -272,8 +272,8 @@ class EntityIndex extends Core {
     );
     if (!trigger) return;
     this._dropdownPromise = Promise.all([
-      import('./combobox.js?v=b14914a4').then(function (n) { return n.e; }),
-      import('./ui-resources.js?v=b14914a4').then(function (n) { return n.a; })
+      import('./combobox.js?v=b1ee16b4').then(function (n) { return n.e; }),
+      import('./ui-resources.js?v=b1ee16b4').then(function (n) { return n.a; })
     ]).then(([{ Dropdown }, { STYLES }]) => {
       if (this._destroyed || !this.mobile) return null;
       const items = [];

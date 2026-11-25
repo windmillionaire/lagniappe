@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { BaseList, listHtml } from './baseList.js?v=b14914a4';
-import { e as localStore, w as withTransition, r as request } from './foundation.js?v=b14914a4';
-import { S as STYLES, s as setIcon } from './ui-resources.js?v=b14914a4';
-import './connectivity.js?v=b14914a4';
-import { D as Dropdown } from './combobox.js?v=b14914a4';
+import { BaseList, listHtml } from './baseList.js?v=b1ee16b4';
+import { e as localStore, w as withTransition, r as request } from './foundation.js?v=b1ee16b4';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=b1ee16b4';
+import './connectivity.js?v=b1ee16b4';
+import { D as Dropdown } from './combobox.js?v=b1ee16b4';
 
 const REPORT_FILTERS = ["active", "executed", "answers"];
 function isReportFilter(value) {
@@ -236,7 +236,7 @@ class ToolReportList extends BaseList {
     if (!content || !description || !confirm || !confirmLabel) return;
     this._openingDelete = true;
     try {
-      const { Modal } = await import('./modal.js?v=b14914a4');
+      const { Modal } = await import('./modal.js?v=b1ee16b4');
       if (this._destroyed) return;
       this._deleteModal?.destroy();
       const modal = new Modal(this.view, trigger);
@@ -272,7 +272,7 @@ class ToolReportList extends BaseList {
     error.hidden = true;
     this._renderFilters();
     try {
-      const { request } = await import('./foundation.js?v=b14914a4').then(function (n) { return n.p; });
+      const { request } = await import('./foundation.js?v=b1ee16b4').then(function (n) { return n.p; });
       const response = await request.delete(route, {
         keys
       });
@@ -677,6 +677,8 @@ class HomeTaskList extends BaseList {
     this._listToggle = this.component.elt.querySelector(
       "[lp-show='tasks:HomeTaskList'][data-toggle]"
     );
+    this._pendingUserTaskCount = null;
+    this._pendingFeedback = null;
   }
   init() {
     this.target.addEventListener("change", this._change);
@@ -696,7 +698,12 @@ class HomeTaskList extends BaseList {
       if (!key) return;
       this._updateUserTaskCountOffline(1);
       if (!this._offlineTaskVisible(record, queue)) {
-        return { ok: true, removed: true };
+        return {
+          ok: true,
+          removed: true,
+          name: queue.field(record, "name") || "Untitled task",
+          scheduled: Boolean(queue.field(record, "due-date"))
+        };
       }
       return queue.response(this._renderOfflineTask(record, queue, key));
     }
@@ -774,6 +781,21 @@ class HomeTaskList extends BaseList {
     this._replaceUserTaskCount(html);
     super.updated(response);
   }
+  created(response) {
+    super.created(response);
+    if (!response || typeof response !== "object") return;
+    const result = response;
+    if (typeof result.count === "number") {
+      this._pendingUserTaskCount = result.count;
+    }
+    if (result.removed) {
+      const name = typeof result.name === "string" ? result.name.trim() : "";
+      const qualifier = result.scheduled ? "scheduled beyond this week" : "unscheduled";
+      this._pendingFeedback = name ? `\u201C${name}\u201D saved to My Page (${qualifier}).` : `Task saved to My Page (${qualifier}).`;
+    } else if (this._created.length > 0) {
+      this._pendingFeedback = "";
+    }
+  }
   _insertNewTasks() {
     this._created.forEach((item) => {
       _insertSorted(this.target, item);
@@ -791,6 +813,14 @@ class HomeTaskList extends BaseList {
       this._initPostponeMenus(this.target);
     } else if (this._created.length > 0) {
       this._insertNewTasks();
+    }
+    if (typeof this._pendingUserTaskCount === "number") {
+      this._updateUserTaskCount(this._pendingUserTaskCount);
+      this._pendingUserTaskCount = null;
+    }
+    if (this._pendingFeedback !== null) {
+      this._setTaskFeedback(this._pendingFeedback);
+      this._pendingFeedback = null;
     }
     if (this._listToggle) {
       this._listToggle.disabled = false;
@@ -890,15 +920,39 @@ class HomeTaskList extends BaseList {
   }
   _updateUserTaskCount(count) {
     if (count === void 0) return;
-    const elt = document.querySelector("[data-role='user-task-count']");
-    if (elt) elt.textContent = String(count);
+    const elt = document.querySelector(
+      "[data-role='user-task-count']"
+    );
+    if (!elt) return;
+    const safeCount = Math.max(0, count);
+    elt.textContent = String(safeCount);
+    elt.dataset.visible = "true";
+    elt.classList.add("font-bold", "ml-auto");
+    elt.classList.toggle("text-task-default", safeCount > 0);
+    elt.classList.toggle("text-project-default", safeCount === 0);
   }
   _updateUserTaskCountOffline(delta) {
     const elt = document.querySelector("[data-role='user-task-count']");
     if (!elt) return;
     const count = Number.parseInt(elt.textContent || "0", 10);
     if (Number.isNaN(count)) return;
-    elt.textContent = String(Math.max(0, count + delta));
+    this._updateUserTaskCount(count + delta);
+  }
+  _setTaskFeedback(message) {
+    const banner = this.component.elt.querySelector(
+      "[data-role='task-feedback']"
+    );
+    if (!banner) return;
+    const text = banner.querySelector(
+      "[data-role='task-feedback-text']"
+    );
+    if (!message) {
+      banner.dataset.visible = "false";
+      if (text) text.textContent = "";
+      return;
+    }
+    if (text) text.textContent = message;
+    banner.dataset.visible = "true";
   }
   _offlineTaskVisible(record, queue) {
     return _isWithinHomeTaskWindow(queue.field(record, "due-date"));

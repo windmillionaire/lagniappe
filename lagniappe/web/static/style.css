@@ -2350,6 +2350,17 @@
     .hover\:bg-white:hover {
       background-color: var(--color-white);
     }
+    .hover\:bg-white\/70:hover {
+      background-color: color-mix(in srgb, #fff 70%, transparent);
+    }
+    @supports (color: color-mix(in lab, red, red)) {
+      .hover\:bg-white\/70:hover {
+        background-color: color-mix(in oklab, var(--color-white) 70%, transparent);
+      }
+    }
+    .hover\:text-base-dark:hover {
+      color: var(--color-base-dark);
+    }
     .hover\:text-delete-default:hover {
       color: var(--color-delete-default);
     }

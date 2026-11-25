@@ -199,4 +199,9 @@ def toggle_star(key: str) -> ResponseReturnValue:
 
     current_user.save()
 
-    return responses.json_response({"starred": starred})
+    return responses.json_response(
+        {
+            "starred": starred,
+            "count": len(current_user.properties.starred.keys),
+        }
+    )

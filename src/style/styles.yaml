@@ -694,6 +694,18 @@ home:
     classes: shrink-0 text-base-medium
     intent: trailing directional arrow distinguishing direct Home navigation links from expandable sections
     surfaces: [server]
+  taskFeedback:
+    classes: flex flex-wrap sm:flex-nowrap items-center gap-2 rounded-md border border-kind-light bg-kind-bg px-3 py-2 text-sm text-base-dark
+    intent: inline confirmation banner inside Home tasks when a personal task is saved outside the near-term list
+    surfaces: [server]
+  taskFeedbackLink:
+    classes: shrink-0 font-semibold text-kind-dark hover:underline focus-visible:underline
+    intent: action link inside the Home task confirmation banner pointing to My Page tasks
+    surfaces: [server]
+  taskFeedbackDismiss:
+    classes: grid size-6 shrink-0 place-items-center rounded-sm text-base-medium hover:bg-white/70 hover:text-base-dark focus-visible:outline-2 focus-visible:outline-kind-default
+    intent: dismiss control for the Home task confirmation banner
+    surfaces: [server]
   view:
     classes: grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 w-full p-4 sm:pb-0 sm:pt-6 lg:pt-8 sm:px-6 lg:px-8 mx-auto max-w-7xl
     intent: view presentation within home

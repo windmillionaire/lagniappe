@@ -27,7 +27,10 @@ type TaskListAttributes = ListAttributes & {
 };
 
 interface HomeTaskResult {
-	count: number;
+	count?: number;
+	removed?: boolean;
+	name?: string;
+	scheduled?: boolean;
 }
 
 const WEEKDAY_NAMES = [
@@ -240,6 +243,8 @@ export class HomeTaskList extends BaseList {
 	declare endpoints: TaskListAttributes["endpoints"];
 	declare dropdowns: Dropdown[];
 	declare _listToggle: HTMLButtonElement | null;
+	declare _pendingUserTaskCount: number | null;
+	declare _pendingFeedback: string | null;
 
 	constructor(attributes: TaskListAttributes) {
 		super(attributes);
@@ -248,6 +253,8 @@ export class HomeTaskList extends BaseList {
 		this._listToggle = this.component.elt.querySelector<HTMLButtonElement>(
 			"[lp-show='tasks:HomeTaskList'][data-toggle]",
 		);
+		this._pendingUserTaskCount = null;
+		this._pendingFeedback = null;
 	}
 
 	init() {
@@ -270,7 +277,12 @@ export class HomeTaskList extends BaseList {
 			if (!key) return;
 			this._updateUserTaskCountOffline(1);
 			if (!this._offlineTaskVisible(record, queue)) {
-				return { ok: true, removed: true };
+				return {
+					ok: true,
+					removed: true,
+					name: queue.field(record, "name") || "Untitled task",
+					scheduled: Boolean(queue.field(record, "due-date")),
+				};
 			}
 			return queue.response(this._renderOfflineTask(record, queue, key));
 		}
@@ -362,6 +374,26 @@ export class HomeTaskList extends BaseList {
 		super.updated(response);
 	}
 
+	created(response: unknown) {
+		super.created(response);
+		if (!response || typeof response !== "object") return;
+		const result = response as HomeTaskResult;
+		if (typeof result.count === "number") {
+			this._pendingUserTaskCount = result.count;
+		}
+		if (result.removed) {
+			const name = typeof result.name === "string" ? result.name.trim() : "";
+			const qualifier = result.scheduled
+				? "scheduled beyond this week"
+				: "unscheduled";
+			this._pendingFeedback = name
+				? `“${name}” saved to My Page (${qualifier}).`
+				: `Task saved to My Page (${qualifier}).`;
+		} else if (this._created.length > 0) {
+			this._pendingFeedback = "";
+		}
+	}
+
 	_insertNewTasks() {
 		this._created.forEach((item) => {
 			_insertSorted(this.target, item);
@@ -381,6 +413,15 @@ export class HomeTaskList extends BaseList {
 			this._initPostponeMenus(this.target);
 		} else if (this._created.length > 0) {
 			this._insertNewTasks();
+		}
+
+		if (typeof this._pendingUserTaskCount === "number") {
+			this._updateUserTaskCount(this._pendingUserTaskCount);
+			this._pendingUserTaskCount = null;
+		}
+		if (this._pendingFeedback !== null) {
+			this._setTaskFeedback(this._pendingFeedback);
+			this._pendingFeedback = null;
 		}
 
 		if (this._listToggle) {
@@ -502,8 +543,16 @@ export class HomeTaskList extends BaseList {
 
 	_updateUserTaskCount(count?: number) {
 		if (count === undefined) return;
-		const elt = document.querySelector("[data-role='user-task-count']");
-		if (elt) elt.textContent = String(count);
+		const elt = document.querySelector<HTMLElement>(
+			"[data-role='user-task-count']",
+		);
+		if (!elt) return;
+		const safeCount = Math.max(0, count);
+		elt.textContent = String(safeCount);
+		elt.dataset.visible = "true";
+		elt.classList.add("font-bold", "ml-auto");
+		elt.classList.toggle("text-task-default", safeCount > 0);
+		elt.classList.toggle("text-project-default", safeCount === 0);
 	}
 
 	_updateUserTaskCountOffline(delta: number) {
@@ -513,7 +562,24 @@ export class HomeTaskList extends BaseList {
 		const count = Number.parseInt(elt.textContent || "0", 10);
 		if (Number.isNaN(count)) return;
 
-		elt.textContent = String(Math.max(0, count + delta));
+		this._updateUserTaskCount(count + delta);
+	}
+
+	_setTaskFeedback(message: string) {
+		const banner = this.component.elt.querySelector<HTMLElement>(
+			"[data-role='task-feedback']",
+		);
+		if (!banner) return;
+		const text = banner.querySelector<HTMLElement>(
+			"[data-role='task-feedback-text']",
+		);
+		if (!message) {
+			banner.dataset.visible = "false";
+			if (text) text.textContent = "";
+			return;
+		}
+		if (text) text.textContent = message;
+		banner.dataset.visible = "true";
 	}
 
 	_offlineTaskVisible(record: OfflineMutationRecord, queue: OfflineQueue) {

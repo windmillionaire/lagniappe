@@ -777,7 +777,7 @@ def _home_task_response(task):
     if not task.completed and scheduling.due_in_home_task_window(due):
         return responses.home_task(task)
 
-    return responses.home_task_removed()
+    return responses.home_task_removed(task)
 
 
 @tasks.route("<key>/history/latest-submission", methods=["GET"])

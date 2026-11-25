@@ -1,14 +1,14 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { ensureMessageComposer } from '../messageComposer.js?v=b14914a4';
-import { S as STYLES, c as createIcon } from '../ui-resources.js?v=b14914a4';
-import { r as request, E as ENDPOINTS } from '../foundation.js?v=b14914a4';
-import '../connectivity.js?v=b14914a4';
-import { C as Core } from '../core-foundation.js?v=b14914a4';
-import '../modal.js?v=b14914a4';
-import '../forms.js?v=b14914a4';
-import '../ui-controls.js?v=b14914a4';
-import '../combobox.js?v=b14914a4';
-import '../upstreamUnavailable.js?v=b14914a4';
+import { ensureMessageComposer } from '../messageComposer.js?v=b1ee16b4';
+import { S as STYLES, c as createIcon } from '../ui-resources.js?v=b1ee16b4';
+import { r as request, E as ENDPOINTS } from '../foundation.js?v=b1ee16b4';
+import '../connectivity.js?v=b1ee16b4';
+import { C as Core } from '../core-foundation.js?v=b1ee16b4';
+import '../modal.js?v=b1ee16b4';
+import '../forms.js?v=b1ee16b4';
+import '../ui-controls.js?v=b1ee16b4';
+import '../combobox.js?v=b1ee16b4';
+import '../upstreamUnavailable.js?v=b1ee16b4';
 
 const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
 function hasConversationId(conversation) {
@@ -245,7 +245,7 @@ class Messages extends Core {
     if (this.conversationDropdown || this._conversationDropdownPromise) {
       return this.conversationDropdown ?? this._conversationDropdownPromise ?? null;
     }
-    this._conversationDropdownPromise = import('../combobox.js?v=b14914a4').then(function (n) { return n.e; }).then(({ Dropdown }) => {
+    this._conversationDropdownPromise = import('../combobox.js?v=b1ee16b4').then(function (n) { return n.e; }).then(({ Dropdown }) => {
       if (this._destroyed || !this.mobile) return null;
       this.conversationDropdown = new Dropdown(this.selector).init({
         items: [],

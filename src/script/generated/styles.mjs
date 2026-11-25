@@ -206,6 +206,9 @@ const STYLES = {
     "listToggle": "flex w-full flex-row items-center gap-2 rounded-md bg-white hover:bg-kind-bg px-2.5 py-1.5 font-semibold text-base-dark shadow-sm outline focus-visible:outline-kind-default hover:outline-kind-default outline-base-light/50 hover:outline-2 focus-visible:outline-2 group/list-toggle group/toggle",
     "expandIndicator": "shrink-0 text-base-medium transition-transform duration-150 motion-reduce:transition-none group-aria-expanded/toggle:rotate-180",
     "linkIndicator": "shrink-0 text-base-medium",
+    "taskFeedback": "flex flex-wrap sm:flex-nowrap items-center gap-2 rounded-md border border-kind-light bg-kind-bg px-3 py-2 text-sm text-base-dark",
+    "taskFeedbackLink": "shrink-0 font-semibold text-kind-dark hover:underline focus-visible:underline",
+    "taskFeedbackDismiss": "grid size-6 shrink-0 place-items-center rounded-sm text-base-medium hover:bg-white/70 hover:text-base-dark focus-visible:outline-2 focus-visible:outline-kind-default",
     "view": "grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 w-full p-4 sm:pb-0 sm:pt-6 lg:pt-8 sm:px-6 lg:px-8 mx-auto max-w-7xl"
   },
   "note": {

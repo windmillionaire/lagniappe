@@ -239,9 +239,71 @@ export default class Home extends Core {
 		else this._openSections.delete(sectionId);
 	}
 
+	_click(e?: MouseEvent) {
+		const target = e?.target;
+		if (
+			e &&
+			target instanceof Element &&
+			target.closest("[data-role='dismiss-task-feedback']")
+		) {
+			e.preventDefault();
+			const feedback = this.elt?.querySelector?.<HTMLElement>(
+				"[data-role='task-feedback']",
+			);
+			if (feedback) {
+				void withTransition(
+					() => {
+						feedback.dataset.visible = "false";
+					},
+					{ label: "home:dismiss-task-feedback" },
+				);
+			}
+			return;
+		}
+		super._click(e);
+	}
+
+	_setStarredCount(count: number) {
+		const safeCount = Math.max(0, count);
+		const countElt = this.elt?.querySelector?.<HTMLElement>(
+			"[data-role='starred-count']",
+		);
+		if (countElt) countElt.textContent = String(safeCount);
+
+		const toggle = this._sectionToggle("starred");
+		if (toggle) {
+			toggle.classList.toggle("opacity-50", safeCount === 0);
+			toggle.classList.toggle("pointer-events-none", safeCount === 0);
+		}
+		if (safeCount === 0) {
+			const list = this._sectionElement(
+				"starred",
+			)?.querySelector?.<HTMLElement>("[data-widget='StarredList']");
+			if (list) list.dataset.visible = "false";
+			this.syncHomeSectionState(this.components.starred);
+		}
+	}
+
+	_adjustStarredCount(delta: number) {
+		const countElt = this.elt?.querySelector?.<HTMLElement>(
+			"[data-role='starred-count']",
+		);
+		if (!countElt) return;
+		const current = Number.parseInt(countElt.textContent?.trim() || "0", 10);
+		if (Number.isNaN(current)) return;
+		this._setStarredCount(current + delta);
+	}
+
 	onComponentRendered(component: ViewComponent) {
 		const sectionId = component.name;
 		if (!isHomeSectionId(sectionId)) return;
+
+		if (sectionId === "tasks" && component.active?.name === "CreateUserTask") {
+			const feedback = component.elt.querySelector<HTMLElement>(
+				"[data-role='task-feedback']",
+			);
+			if (feedback) feedback.dataset.visible = "false";
+		}
 
 		const wasOpen = this._openSections.has(sectionId);
 		this.syncHomeSectionState(component);

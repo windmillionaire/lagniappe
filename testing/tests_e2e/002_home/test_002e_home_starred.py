@@ -173,10 +173,17 @@ def test_star_project(get_admin, get_user):
     project_item = project_list.find_item(project)
 
     # Star from home page
+    starred_count = user.locate(home.STARRED_COUNT)
+    starred_toggle = user.locate(home.STARRED_LIST_TOGGLE)
+    initial_count = int((starred_count.text_content() or "0").strip())
+
     star_button = StarButton(project_item)
     assert star_button.is_unstarred is True
     star_button.toggle()
     assert star_button.is_starred is True
+    expect(starred_count).to_have_text(str(initial_count + 1))
+    expect(starred_toggle).not_to_contain_class("opacity-50")
+    expect(starred_toggle).not_to_contain_class("pointer-events-none")
 
     # Verify appears in starred list
     starred_list = home.starred_list
@@ -186,6 +193,7 @@ def test_star_project(get_admin, get_user):
     # Unstar from home page project list
     star_button.toggle()
     assert star_button.is_unstarred is True
+    expect(starred_count).to_have_text(str(initial_count))
     expect(starred_project).not_to_be_visible()
 
     # Navigate to project page and star from its title menu.
