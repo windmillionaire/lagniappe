@@ -5,7 +5,8 @@ import base64
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from copy import deepcopy
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
+from hashlib import sha256
 import json
 import logging
 import os
@@ -49,6 +50,7 @@ from lagniappe_mcp.adapter import (
     AdapterResult, LagniappeAdapter, _reject_private_model_data, validate_file_result,
 )
 from lagniappe_mcp.configuration import ConnectionConfig
+from lagniappe_mcp.catalog import ToolDefinition
 from lagniappe_mcp.errors import AdapterError, ConfigurationError
 from lagniappe_mcp.files import _preflight_contract, _preflight_requested_count
 from .attachments import spool_attachments
@@ -238,6 +240,7 @@ class RequestREST(RESTClient):
 
     actor_preflight: JsonObject | None = None
     api_json_calls = 0
+    metadata_verified = False
 
     async def request_json(
         self, method: str, target: str, *, body: object = None,
@@ -248,24 +251,78 @@ class RequestREST(RESTClient):
         self.api_json_calls += 1
         return await super().request_json(method, target, body=body, max_bytes=max_bytes)
 
+    async def startup(self) -> tuple[JsonObject, JsonObject, JsonObject]:
+        discovery, actor, catalog = await super().startup()
+        if self.metadata_digest:
+            documents = "\n".join(
+                json.dumps(item, sort_keys=True, separators=(",", ":")) for item in (discovery, catalog)
+            )
+            # A rolling deploy can serve /me and /tools from different revisions.
+            self.metadata_verified = sha256(documents.encode()).hexdigest() == self.metadata_digest
+        return discovery, actor, catalog
+
+
+@dataclass(frozen=True)
+class _ToolMetadata:
+    digest: str
+    discovery: JsonObject
+    tools: dict[str, ToolDefinition]
+
+
+@dataclass
+class _MetadataCache:
+    # One registry per live execute capability. No actors, grants or tool results.
+    entries: dict[bool, _ToolMetadata] = field(default_factory=dict)
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+
+    def lookup(self, *, execute: bool, digest: str) -> _ToolMetadata | None:
+        entry = self.entries.get(execute)
+        return entry if entry is not None and entry.digest == digest else None
+
 
 class HostedAdapter(LagniappeAdapter):
     _remote_initialized = False
+    metadata_cache: _MetadataCache | None = None
 
     async def initialize(self) -> None:
         if self._remote_initialized:
             return
+        rest = cast(RequestREST, self.rest)
+        cache = self.metadata_cache
+        digest = rest.metadata_digest
+        if cache is None or not digest or self.actor is None:
+            await self._load_tools()
+        else:
+            execute = cast(JsonObject, self.actor["capabilities"]).get("execute_plan") is True
+            cached = cache.lookup(execute=execute, digest=digest)
+            if cached is None:
+                async with cache.lock:
+                    cached = cache.lookup(execute=execute, digest=digest)
+                    if cached is None:
+                        await self._load_tools()
+                        if rest.metadata_verified and self.discovery is not None:
+                            cache.entries[execute] = _ToolMetadata(digest, self.discovery, self.tools.copy())
+            if cached is not None:
+                self.discovery = cached.discovery
+                self.tools = cached.tools.copy()
+                self._screen_metadata(self.config.api_key, getattr(rest.client, "workload_token", None))
+        self._remote_initialized = True
+
+    def _screen_metadata(self, *bearers: str | None) -> None:
+        published = [
+            tool.as_mcp_tool().model_dump(by_alias=True, exclude_none=True)
+            for tool in self.tools.values()
+        ]
+        for bearer in bearers:
+            if bearer:
+                _reject_private_model_data(self.actor, bearer=bearer)
+                _reject_private_model_data(published, bearer=bearer)
+
+    async def _load_tools(self) -> None:
         await super().initialize()
         proof = getattr(self.rest.client, "workload_token", None)
         if proof:
-            _reject_private_model_data(self.actor, bearer=proof)
-            _reject_private_model_data(
-                [
-                    tool.as_mcp_tool().model_dump(by_alias=True, exclude_none=True)
-                    for tool in self.tools.values()
-                ],
-                bearer=proof,
-            )
+            self._screen_metadata(proof)
         local = self.tools.pop("upload_local_files")
         schema = deepcopy(local.input_schema)
         file_properties = cast(dict[str, dict[str, object]], schema["properties"])
@@ -289,7 +346,6 @@ class HostedAdapter(LagniappeAdapter):
         self.tools.update(
             {tool.name: tool for tool in terminal_files.tool_definitions(local)}
         )
-        self._remote_initialized = True
 
     async def execute(self, name: str, arguments: object) -> AdapterResult:
         if name not in {"prepare_file_uploads", "finalize_file_uploads"}:
@@ -337,6 +393,7 @@ def create_app(
     adapter_factory: Callable[[str], AbstractAsyncContextManager[HostedAdapter]] | None = None,
 ) -> Starlette:
     identity = WorkloadIdentity(config.audience)
+    metadata_cache = _MetadataCache()
 
     @asynccontextmanager
     async def request_adapter(token: str) -> AsyncIterator[HostedAdapter]:
@@ -359,6 +416,8 @@ def create_app(
         await adapter.initialize()
         tools = []
         for definition in adapter.tools.values():
+            if definition.name == "get_entity" and "get_entities" in adapter.tools:
+                continue  # Still callable by clients with the earlier tool list.
             tool = definition.as_mcp_tool(ctx.protocol_version)
             values = tool.model_dump(by_alias=True, exclude_none=True)
             values["_meta"] = {**values.get("_meta", {}), "securitySchemes": _SCHEMES}
@@ -580,6 +639,7 @@ def create_app(
                     # Even initialize, ping, GET, and notifications validate the
                     # live grant at the main API before the SDK can process them.
                     actor = await adapter._get_actor()
+                    adapter.metadata_cache = metadata_cache
                     cast(RequestREST, adapter.rest).actor_preflight = actor.value
                     scope.setdefault("state", {})["mcp_adapter"] = adapter
                     if request.method != "POST":

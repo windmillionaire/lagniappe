@@ -589,7 +589,7 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
     }
     assert "Task History" not in _context_labels(task_prompt)
     assert "Completed Tasks" not in _context_labels(task_prompt)
-    assert task_prompt.tools == page_prompt.tools == ["get_file", "get_entity"]
+    assert task_prompt.tools == page_prompt.tools == ["get_file", "get_entities"]
     assert page_file.to_ai(user) not in _context_json(task_prompt, "Attached Files")
 
 

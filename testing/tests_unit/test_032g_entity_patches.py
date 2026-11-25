@@ -46,6 +46,80 @@ def case():
     return actor, task, form, page
 
 
+@pytest.mark.parametrize("view", ["default", "edit"])
+def test_bulk_detail_reads_match_single_records_and_hide_inaccessible_slots(monkeypatch, view):
+    from lagniappe.core.tools.ai import functions, references
+    from lagniappe.core.tools.database import get as database_get
+
+    actor, task, form, page = case()
+    task.db["hash"], form.db["hash"] = "task00000001", "form00000001"
+    hidden = entity("FORM", "private00001")
+    monkeypatch.setattr(hidden, "allowed", lambda *_args, **_kwargs: False)
+    for kind in ("page", "task", "form"):
+        monkeypatch.setattr(f"lagniappe.core.entities.{kind}.url_for", lambda endpoint, **kw: f"/{endpoint}/{kw['key']}")
+    records = {record.key: record for record in (task, form, hidden, page)}
+    lookup = {record.hash: {"id": record.urlsafe_key} for record in records.values()}
+    monkeypatch.setattr(references.cache, "get_details_by_hash", lambda hashes: {h: lookup[h] for h in hashes if h in lookup})
+    loads = []
+
+    def fetch_keys(keys):
+        if keys:
+            loads.append(list(keys))
+        return [records[key] for key in reversed(keys) if key in records]
+
+    monkeypatch.setattr(database_get, "entities", fetch_keys)
+    ids = [f"hash:{r.hash}" for r in (task, hidden, form, task)] + ["hash:missing00001"]
+    results, _ = functions.execute_registered_tool("get_entities", {"ids": ids, "view": view}, actor)
+    assert set(loads[0]) == {task.key, hidden.key, form.key}
+    single, _ = functions.execute_registered_tool("get_entity", {"id": ids[0], "view": view}, actor)
+    other, _ = functions.execute_registered_tool("get_entity", {"id": ids[2], "view": view}, actor)
+    assert "error" not in single and "error" not in other
+    assert results == {"results": [
+        {"entity": single}, {"error": "Entity unavailable"}, {"entity": other},
+        {"entity": single}, {"error": "Entity unavailable"},
+    ]}
+    singleton, _ = functions.execute_registered_tool("get_entities", {"ids": ids[:1], "view": view}, actor)
+    assert singleton == {"results": [{"entity": single}]}
+
+    def damaged_record(*_args):
+        raise ValueError("Private stored data")
+
+    monkeypatch.setattr(task, "to_ai", damaged_record)
+    mixed, _ = functions.execute_registered_tool("get_entities", {"ids": [ids[0], ids[2]], "view": view}, actor)
+    assert mixed == {"results": [{"error": "Entity details could not be read"}, {"entity": other}]}
+
+
+@pytest.mark.parametrize("size", [8, 13, 20])
+def test_bulk_reads_fetch_distinct_entity_roots_together(monkeypatch, size):
+    from lagniappe.core.tools.ai.functions import execute_registered_tool
+    from lagniappe.core.tools.database import get as database_get
+
+    forms = [entity("FORM", f"form{i:08d}") for i in range(size)]
+    records = {form.key: form for form in forms}
+    root_reads = []
+
+    def fetch_keys(keys):
+        roots = [key for key in keys if key in records]
+        if roots:
+            root_reads.append(roots)
+        return [records[key] for key in reversed(roots)]
+
+    monkeypatch.setattr(database_get, "entities", fetch_keys)
+    monkeypatch.setattr("lagniappe.core.entities.form.url_for", lambda endpoint, **kw: f"/forms/{kw['key']}")
+    result, _ = execute_registered_tool("get_entities", {"ids": [f.urlsafe_key for f in forms]}, _test_user("reader"))
+    assert [row["entity"]["hash"] for row in result["results"]] == [f"hash:{f.hash}" for f in forms]
+    assert len(root_reads) == 1 and set(root_reads[0]) == set(records)
+
+
+@pytest.mark.parametrize("ids", [[], "hash:task00000001", [None], [""], ["hash:task00000001"] * 21])
+def test_invalid_bulk_requests_stop_before_resolving_references(monkeypatch, ids):
+    from lagniappe.core.tools.ai import functions, references
+
+    monkeypatch.setattr(references.cache, "get_details_by_hash", lambda *_: pytest.fail("unexpected lookup"))
+    result, _ = functions.execute_registered_tool("get_entities", {"ids": ids}, _test_user("reader"))
+    assert "error" in result
+
+
 def test_task_patch_preserves_omitted_values_and_source():
     actor, task, form, page = case()
     original = deepcopy(task.db)

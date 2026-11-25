@@ -63,7 +63,7 @@ GET_CATEGORY_PAGES = types.FunctionDeclaration(
                 "description": (
                     "When true, return lightweight page references only: hash, "
                     "name, page_description, form/category refs, URL, and "
-                    "permissions. Use get_entity on a likely page hash to load "
+                    "permissions. Use get_entities on a likely page hash to load "
                     "submission fields or document text."
                 ),
             },

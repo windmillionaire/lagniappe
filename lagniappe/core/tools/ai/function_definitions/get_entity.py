@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from lagniappe.core.entities import Identifier
     from lagniappe.core.entities.entity import Entity
     from lagniappe.core.entities.page import Page
     from lagniappe.core.entities.task import Task
@@ -15,8 +16,9 @@ from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools.database import get as database_get
 from ..page_document import document_edit_projection
-from ..references import stored_file_identifiers
+from ..references import normalize_hash_references, stored_file_identifiers
 
 
 GET_ENTITY = types.FunctionDeclaration(
@@ -47,37 +49,93 @@ GET_ENTITY = types.FunctionDeclaration(
 )
 
 
+MAX_ENTITY_IDS = 20
+GET_ENTITIES = types.FunctionDeclaration(
+    name="get_entities",
+    description=(
+        "Load full details for one or more known entity hashes together, including "
+        "descriptions, dates, relationships and attached form schemas. Pass a one-item "
+        "array for one entity. Use view=edit for editable fields and Page document "
+        "Markdown. Results follow input order, including repeats. Each position "
+        "contains either an entity or an error. Reuse details already in search or page results."
+    ),
+    parameters=types.Schema.model_validate({
+        "type": "object",
+        "properties": {
+            "ids": {
+                "type": "array", "items": {"type": "string", "minLength": 1},
+                "minItems": 1, "maxItems": MAX_ENTITY_IDS,
+                "description": "Entity hash tokens from context, search or a previous tool result.",
+            },
+            "view": {"type": "string", "enum": ["default", "edit"]},
+        },
+        "required": ["ids"],
+    }),
+)
+
+
+def execute_get_entities(args: Mapping[str, object], user: User) -> Mapping[str, object]:
+    ids = args.get("ids")
+    if not isinstance(ids, list) or not 1 <= len(ids) <= MAX_ENTITY_IDS:
+        return {"error": f"ids must contain between 1 and {MAX_ENTITY_IDS} entity IDs"}
+    if not all(isinstance(identifier, str) and identifier.strip() for identifier in ids):
+        return {"error": "Each entity ID must be a nonempty string"}
+    view = args.get("view", "default")
+    if view not in ("default", "edit"):
+        return {"error": "view must be default or edit"}
+
+    keys = [database_get.datastore_key(identifier) for identifier in normalize_hash_references(ids)]
+    entities = Entities.fetch(*keys, request=Fetch.root())
+    groups: dict[Fetch, list[Identifier]] = {}
+    for entity in entities:
+        request, roots = _relation_roots(entity)
+        groups.setdefault(request, []).extend(roots)
+    for request, roots in groups.items():
+        Entities.fetch(*roots, request=request)
+
+    rows = {}
+    for entity in entities:
+        if entity.allowed(Action.VIEW, user):
+            try:
+                rows[entity.key] = {"entity": _project_entity(entity, user, edit=view == "edit")}
+            except Exception:
+                # A damaged record should neither hide its neighbors nor expose stored data.
+                rows[entity.key] = {"error": "Entity details could not be read"}
+    # Position identifies unsuccessful inputs without exposing resolved storage keys
+    # or distinguishing a missing entity from one the caller cannot view.
+    return {"results": [rows.get(key, {"error": "Entity unavailable"}) for key in keys]}
+
+
 def execute_get_entity(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
     if not isinstance(identifier, str) or not identifier:
         return {"error": "id is required"}
 
-    entity = _load_entity(identifier)
+    entity = Entities.fetch_one(identifier, request=Fetch.root())
     if not entity:
         return {"error": "Entity not found"}
-
+    request, roots = _relation_roots(entity)
+    if len(roots) == 1:
+        Entities.fetch_one(entity, request=request)
+    else:
+        Entities.fetch(*roots, request=request)
     if not entity.allowed(Action.VIEW, user):
         return {"error": "Access denied"}
+    return _project_entity(entity, user, edit=args.get("view") == "edit")
 
+
+def _project_entity(entity: Entity, user: User, *, edit: bool) -> dict[str, object]:
     _ensure_attached_form(entity)
-    if args.get("view") == "edit":
-        return edit_entity(entity, user)
-    entity_data = entity.to_ai(user)
-    return entity_data
+    return edit_entity(entity, user) if edit else entity.to_ai(user)
 
 
-def _load_entity(identifier):
-    entity = Entities.fetch_one(identifier, request=Fetch.root())
-    if isinstance(entity, (Entities.TASK, Entities.FILE)):
-        Entities.fetch_one(entity, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
-    elif isinstance(entity, Entities.TASK_HISTORY):
-        Entities.fetch(
-            entity, entity.properties.task.key, *stored_file_identifiers(entity),
-            request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
-        )
-    elif entity is not None:
-        Entities.fetch_one(entity, request=Fetch.direct())
-    return entity
+def _relation_roots(entity: Entity) -> tuple[Fetch, list[Identifier]]:
+    if isinstance(entity, (Entities.TASK, Entities.FILE, Entities.TASK_HISTORY)):
+        roots: list[Identifier] = [entity]
+        if isinstance(entity, Entities.TASK_HISTORY):
+            roots.extend([entity.properties.task.key, *stored_file_identifiers(entity)])
+        return Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION), roots
+    return Fetch.direct(), [entity]
 
 
 def _ensure_attached_form(entity):

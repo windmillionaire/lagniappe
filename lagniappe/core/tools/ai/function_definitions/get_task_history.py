@@ -40,7 +40,7 @@ GET_TASK_HISTORY = types.FunctionDeclaration(
             "id": {
                 "type": "string",
                 "description": (
-                    "The task hash token from search_entities, get_entity, "
+                    "The task hash token from search_entities, get_entities, "
                     "or get_page_tasks."
                 ),
             },

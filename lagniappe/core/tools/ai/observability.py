@@ -72,6 +72,7 @@ KNOWN_TOOL_NAMES = {
     "get_help",
     "search_entities",
     "get_entity",
+    "get_entities",
     "get_file",
     "get_category_pages",
     "get_category_forms",

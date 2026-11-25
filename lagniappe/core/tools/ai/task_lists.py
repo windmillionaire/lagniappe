@@ -108,7 +108,7 @@ def compact_task_list(
             errors.append(
                 {
                     "hash": hash_reference(task),
-                    "message": "Task details could not be read. Use get_entity for this task.",
+                    "message": "Task details could not be read. Use get_entities for this task.",
                 }
             )
             continue

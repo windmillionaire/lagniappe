@@ -51,7 +51,7 @@ AUTOFILL_RULES = """
   Creative content is appropriate only when the field or request calls for it.
 - The supplied original file is ready to use: do not wait for a summary. Other
   listed files can be read with get_file(include_original=true) when needed.
-- Optional page/category context is available through get_entity using the listed
+- Optional page/category context is available through get_entities using the listed
   references. Read it only if relevant answers need that context; do not explore
   unrelated entities, sibling tasks, or task history. Batch independent reads.
 - Once you have enough evidence, return the proposed updates. Unsupported fields
@@ -295,7 +295,7 @@ def form_autofill_prompt(**kwargs: Unpack[AutofillPromptOptions]) -> Prompt:
     if attached_files:
         tool_names.append("get_file")
     if kwargs.get("context_references"):
-        tool_names.append("get_entity")
+        tool_names.append("get_entities")
     if tool_names and kwargs.get("user"):
         prompt.enable_tools(*tool_names)
         prompt.set_max_tool_iterations(AUTOFILL_MAX_TOOL_ITERATIONS)

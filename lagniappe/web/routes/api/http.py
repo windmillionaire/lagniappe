@@ -237,6 +237,8 @@ def annotate_response(response: Response) -> Response:
     )
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Lagniappe-Build-ID"] = CONFIG.BUILD_ID
+    if digest := getattr(g, "mcp_metadata_digest", None):
+        response.headers["X-Lagniappe-MCP-Metadata"] = digest
     return response
 
 

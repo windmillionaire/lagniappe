@@ -9,7 +9,7 @@ from .references import HASH_REFERENCE_REGEX
 MAX_INDEX_CHARS = 1_000_000
 MIN_RECORD_CHARS = 256
 _ENTITY_TOOLS = {
-    "get_entity", "get_category_details", "get_category_pages", "get_page_details",
+    "get_entity", "get_entities", "get_category_details", "get_category_pages", "get_page_details",
     "get_page_tasks", "get_task_history", "query_workspace_filter", "search_entities",
 }
 _LABELS = (
