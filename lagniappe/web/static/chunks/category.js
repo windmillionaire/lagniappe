@@ -1,2 +1,121 @@
-import{b as s,I as n,T as o}from"./forms.js?v=baa4a64d";import{s as m,S as l}from"./form-sections.js?v=baa4a64d";import"./ui-resources.js?v=baa4a64d";import"./ui-controls.js?v=baa4a64d";import"./foundation.js?v=baa4a64d";import"./upstreamUnavailable.js?v=baa4a64d";import"./connectivity.js?v=baa4a64d";import"./modal.js?v=baa4a64d";import"./combobox.js?v=baa4a64d";import"./uploads.js?v=baa4a64d";import"./directUpload.js?v=baa4a64d";class r extends s{get nameElement(){return new n({kind:"category",readonly:this.readonly},{id:"name",title:"Category Name",placeholder:"name this category...",input:"text"},this.target.dataset.name||"").elt}get descriptionElement(){return new o({kind:"category",readonly:this.readonly},{id:"description",label:"Category Description",input:"textarea",placeholder:"describe this category..."},this.target.dataset.description||"").elt}get formSelectElement(){const t=this.target.querySelector('[data-action="select-form"]');if(!t)return null;const e=l.facet(this,t);return e.init(),this.destroyables.push(e),e.elt}}class d extends r{constructor(t){super(t),this.messages={submit:"Update Category",submitting:"Updating Category",submitted:"Category Updated",queued:"Queued Sync"}}offline({data:t,method:e,route:i}){return{id:`update:category:${this.key}`,action:"update",kind:"category",method:e,route:i,target_key:this.key,data:t}}handleOfflineQueue({phase:t,record:e}){e?.kind!=="category"||e.target_key!==this.key||(t==="queued"&&(this.form?.queued(),this.setEntityMetadata()),t==="replayed"&&(this.form?.success(),this.setEntityMetadata()))}get html(){return[this.nameElement,this.descriptionElement,this.formSelectElement]}postreconcile(){super.postreconcile(),this.setEntityMetadata()}}class c extends r{constructor(t){super(t),this.messages={submit:"Create Category",submitting:"Creating Category",submitted:"Category Created"}}async init(){this.target.dataset.mode="manual",this.target.dataset.role="generate",await super.init()}get html(){const t=this.nameElement,e=this.descriptionElement;return t&&(t.dataset.role="manual"),e&&(e.dataset.role="manual"),[m.generateEntityForm(this),t,e,this.formSelectElement]}}export{d as CategoryInfo,c as CreateCategory};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { b as FormWidget, I as InputElement, T as TextareaElement } from './forms.js?v=b14914a4';
+import { s as sections, S as SectionToggle } from './form-sections.js?v=b14914a4';
+import './ui-resources.js?v=b14914a4';
+import './ui-controls.js?v=b14914a4';
+import './foundation.js?v=b14914a4';
+import './upstreamUnavailable.js?v=b14914a4';
+import './connectivity.js?v=b14914a4';
+import './modal.js?v=b14914a4';
+import './combobox.js?v=b14914a4';
+import './uploads.js?v=b14914a4';
+import './directUpload.js?v=b14914a4';
+
+class CategoryForm extends FormWidget {
+  get nameElement() {
+    return new InputElement(
+      { kind: "category", readonly: this.readonly },
+      {
+        id: "name",
+        title: "Category Name",
+        placeholder: "name this category...",
+        input: "text"
+      },
+      this.target.dataset.name || ""
+    ).elt;
+  }
+  get descriptionElement() {
+    return new TextareaElement(
+      {
+        kind: "category",
+        readonly: this.readonly
+      },
+      {
+        id: "description",
+        label: "Category Description",
+        input: "textarea",
+        placeholder: "describe this category..."
+      },
+      this.target.dataset.description || ""
+    ).elt;
+  }
+  get formSelectElement() {
+    const target = this.target.querySelector(
+      '[data-action="select-form"]'
+    );
+    if (!target) return null;
+    const control = SectionToggle.facet(this, target);
+    control.init();
+    this.destroyables.push(control);
+    return control.elt;
+  }
+}
+class CategoryInfo extends CategoryForm {
+  constructor(attributes) {
+    super(attributes);
+    this.messages = {
+      submit: "Update Category",
+      submitting: "Updating Category",
+      submitted: "Category Updated",
+      queued: "Queued Sync"
+    };
+  }
+  offline({ data, method, route }) {
+    return {
+      id: `update:category:${this.key}`,
+      action: "update",
+      kind: "category",
+      method,
+      route,
+      target_key: this.key,
+      data
+    };
+  }
+  handleOfflineQueue({ phase, record }) {
+    if (record?.kind !== "category" || record.target_key !== this.key) return;
+    if (phase === "queued") {
+      this.form?.queued();
+      this.setEntityMetadata();
+    }
+    if (phase === "replayed") {
+      this.form?.success();
+      this.setEntityMetadata();
+    }
+  }
+  get html() {
+    return [this.nameElement, this.descriptionElement, this.formSelectElement];
+  }
+  postreconcile() {
+    super.postreconcile();
+    this.setEntityMetadata();
+  }
+}
+class CreateCategory extends CategoryForm {
+  constructor(attributes) {
+    super(attributes);
+    this.messages = {
+      submit: "Create Category",
+      submitting: "Creating Category",
+      submitted: "Category Created"
+    };
+  }
+  async init() {
+    this.target.dataset.mode = "manual";
+    this.target.dataset.role = "generate";
+    await super.init();
+  }
+  get html() {
+    const name = this.nameElement;
+    const description = this.descriptionElement;
+    if (name) name.dataset.role = "manual";
+    if (description) description.dataset.role = "manual";
+    return [
+      sections.generateEntityForm(this),
+      name,
+      description,
+      this.formSelectElement
+    ];
+  }
+}
+
+export { CategoryInfo, CreateCategory };

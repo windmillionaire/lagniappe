@@ -1,2 +1,332 @@
-import{c as p}from"./chunks/connectivity.js?v=baa4a64d";import{k as O}from"./chunks/foundation.js?v=baa4a64d";import{i as k,c as D}from"./chunks/upstreamUnavailable.js?v=baa4a64d";const V="baa4a64d",E=Object.freeze({project:{entry:"project",source:"./views/project.ts"},page:{entry:"page",source:"./views/page.ts"},home:{entry:"home",source:"./views/home.ts"},manual:{entry:"manual",source:"./views/manual.ts"},help:{entry:"help",source:"./views/base/shell.ts"},user:{entry:"user",source:"./views/user.ts"},form:{entry:"index",source:"./views/base/index.ts"},category:{entry:"index",source:"./views/base/index.ts"},task:{entry:"index",source:"./views/base/index.ts"},builder:{entry:"builder",source:"./views/builder/builder.ts"},results:{entry:"results",source:"./views/results.ts"},file:{entry:"file",source:"./views/file.ts"},report:{entry:"report",source:"./views/report.ts"},analytics:{entry:"analytics",source:"./views/analytics.ts"},admin:{entry:"admin",source:"./views/admin.ts"},messages:{entry:"messages",source:"./views/messages.ts"}});Object.freeze(Object.fromEntries(Object.values(E).map(({entry:e,source:n})=>[e,n])));const P=e=>{if(!e||!Object.hasOwn(E,e))return null;const n=E[e].entry;return n?`./chunks/views/${n}.js?v=${V}`:null},j=e=>{const n=P(e);return n?import(n):null};async function g(e){const{captureError:n,isSkippedViewTransitionError:t,isTransientNetworkError:r}=await import("./chunks/foundation.js?v=baa4a64d").then(function(S){return S.o}),a="error"in e?e.error:void 0,c="reason"in e?e.reason:void 0,l="message"in e?e.message:void 0,o=a||c||l||"Unknown error";if(t(o)||r(o)){e.preventDefault();return}const u=e.type==="unhandledrejection"?{event:{type:"unhandledrejection"}}:{},v=document.activeElement!==document.body?document.activeElement:null;n(o,v,u)}window.__CONNECTIVITY__=p.snapshot(),window.__CONNECTIVITY_READY__=Promise.resolve();function C(){window.__NAVIGATION_TRANSITION_READY__||(window.__NAVIGATION_TRANSITION_SETTLED__=!1,window.__NAVIGATION_TRANSITION_READY__=new Promise(e=>{const n=()=>{const t=document.activeViewTransition;if(t){Promise.resolve(t.finished).catch(()=>{}).then(()=>requestAnimationFrame(n));return}window.__NAVIGATION_TRANSITION_SETTLED__=!0,e()};if(document.activeViewTransition){n();return}requestAnimationFrame(()=>requestAnimationFrame(n))}))}C();let _=null;const I=async()=>{const e=document.querySelector("[lp-view]");if(!e)return null;if(e._lp_view)return e._lp_view;if(_)return await _;const n=()=>e.isConnected===!1;return _=(async()=>{const t=await j(e.dataset.kind);if(!t){const{captureError:a}=await import("./chunks/foundation.js?v=baa4a64d").then(function(c){return c.o});return a(new Error(`Unknown view kind: ${e.dataset.kind||"missing"}`),e,{view_kind:e.dataset.kind||""}),null}if(n())return null;const r=new t.default(e);return await r.init(),r._destroyed||n()?null:(r.publish?.(),r)})(),await _};let w=null;const R=5e3;async function T(){if(w)return w;w=(async()=>{const n=new AbortController,t=setTimeout(()=>n.abort(),R);try{const r=await fetch("/l/ping",{method:"HEAD",signal:n.signal});return O(r.headers),r.ok}catch{return!1}finally{clearTimeout(t),w=null}})();const e=w;return window.__PING_PENDING__=e,e.finally(()=>{window.__PING_PENDING__===e&&(window.__PING_PENDING__=null)}),e}let m=null;const G=600*1e3,M=2*1e3,W=5*1e3;function N(){m&&(clearTimeout(m),m=null)}function x(e){if(N(),window.__TESTING__&&e)return;const n=p.snapshot().browser==="online";m=setTimeout(s,e?G:n?M:W)}let d=null,i=null;function Y(){return document.hidden||document.hasFocus?.()===!1}function f(e){const n=p.transition(e);return window.__CONNECTIVITY__=n,navigator.serviceWorker?.controller?.postMessage(D(n)),n}function q({hidden:e,blurred:n,blurredAt:t,force:r=!1,browser:a}={}){const c=e===void 0?i?.hidden:!!e,l=n===void 0?i?.blurred:!!n,o=t===void 0?i?.blurredAt:t,u=a===void 0?i?.browser:a;i={force:!!(i?.force||r)},c!==void 0&&(i.hidden=c),l!==void 0&&(i.blurred=l),o!==void 0&&(i.blurredAt=o),u!==void 0&&(i.browser=u)}async function B({hidden:e=Y(),blurred:n=e&&!document.hidden&&document.hasFocus?.()===!1,blurredAt:t=n?Date.now():null,force:r=!1,browser:a=navigator.onLine===!1?"offline":"online"}={}){const c=navigator.serviceWorker?.controller?"controlled":"uncontrolled";f({browser:a,controller:c,visibility:e?"hidden":"visible"});const l=I();if(e){N();const v=await l;v?.sync&&await v.sync({hidden:!0,blurred:n,blurredAt:t,force:r});return}const o=await T();f({server:o?"online":"offline"}),x(o);const u=await l;u?.sync&&await u.sync({hidden:e,blurred:!1,blurredAt:null,force:r})}async function s(e={}){return q(e),d||(d=(async()=>{let n=null;for(;i;){const t=i;i=null;try{await B(t)}catch(r){n||=r}}if(n)throw n})().finally(()=>{d=null}),window.__CONNECTIVITY_READY__=d,d)}function b(e){return f({browser:e}),s({browser:e})}function y({blurred:e=!1,blurredAt:n=e?Date.now():null}={}){return f({browser:navigator.onLine===!1?"offline":"online",controller:navigator.serviceWorker?.controller?"controlled":"uncontrolled",visibility:"hidden"}),s({hidden:!0,blurred:e,blurredAt:n})}function F(){document?.querySelector("meta[name='mode']")?.getAttribute("content")==="testing"&&(window.__TESTING__=!0)}function U(){return document?.querySelector("meta[name='mode']")?.getAttribute("content")}async function A(){const{analytics:e}=await import("./chunks/analytics.js?v=baa4a64d");e.view()}function L(){window.addEventListener("unhandledrejection",g),window.addEventListener("error",g)}function H(){"serviceWorker"in navigator&&(navigator.serviceWorker.register("/sw.js").catch(async e=>{const{captureNetworkError:n}=await import("./chunks/foundation.js?v=baa4a64d").then(function(t){return t.o});n(e,"/sw.js",{context:"service_worker"})}),navigator.serviceWorker.addEventListener("controllerchange",async()=>{f({controller:navigator.serviceWorker?.controller?"controlled":"uncontrolled"});const{clearRecentSearchResults:e}=await import("./chunks/foundation.js?v=baa4a64d").then(function(n){return n.q});e(),s()}))}async function z(){L();const[{initializeLogoutForms:e},{updateUserData:n}]=await Promise.all([import("./chunks/account.js?v=baa4a64d").then(function(t){return t.l}),import("./chunks/account.js?v=baa4a64d").then(function(t){return t.a})]);e(),A(),s(),document.addEventListener("visibilitychange",()=>{document.hidden?y():s()}),window.addEventListener("offline",()=>b("offline")),window.addEventListener("online",()=>b("online")),window.addEventListener("blur",()=>y({blurred:!document.hidden})),window.addEventListener("focus",()=>s({hidden:!1,blurred:!1,blurredAt:null})),window.addEventListener("pagehide",()=>y()),window.addEventListener("pageshow",t=>{s({force:t.persisted})}),n()}function h(){if(window.__INITIALIZED__)return;window.__INITIALIZED__=!0,F(),k();const e=U();if(H(),e==="public"){I(),L(),A();return}z()}document.readyState==="loading"?document.addEventListener("DOMContentLoaded",h,{once:!0}):h();export{h as initialize,T as pingServer,y as suspendCurrentView,s as syncView};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { c as connectivity } from './chunks/connectivity.js?v=b14914a4';
+import { k as applyNotificationStateHeader } from './chunks/foundation.js?v=b14914a4';
+import { i as installUpstreamUnavailableBanner, c as connectivityMessage } from './chunks/upstreamUnavailable.js?v=b14914a4';
+
+const BUILD_ID = "b14914a4";
+const VIEW_REGISTRY = Object.freeze({
+  project: { entry: "project", source: "./views/project.ts" },
+  page: { entry: "page", source: "./views/page.ts" },
+  home: { entry: "home", source: "./views/home.ts" },
+  manual: { entry: "manual", source: "./views/manual.ts" },
+  help: { entry: "help", source: "./views/base/shell.ts" },
+  user: { entry: "user", source: "./views/user.ts" },
+  form: { entry: "index", source: "./views/base/index.ts" },
+  category: { entry: "index", source: "./views/base/index.ts" },
+  task: { entry: "index", source: "./views/base/index.ts" },
+  builder: { entry: "builder", source: "./views/builder/builder.ts" },
+  results: { entry: "results", source: "./views/results.ts" },
+  file: { entry: "file", source: "./views/file.ts" },
+  report: { entry: "report", source: "./views/report.ts" },
+  analytics: { entry: "analytics", source: "./views/analytics.ts" },
+  admin: { entry: "admin", source: "./views/admin.ts" },
+  messages: { entry: "messages", source: "./views/messages.ts" }
+});
+Object.freeze(
+  Object.fromEntries(
+    Object.values(VIEW_REGISTRY).map(({ entry, source }) => [entry, source])
+  )
+);
+const viewEntryUrl = (kind) => {
+  if (!kind || !Object.hasOwn(VIEW_REGISTRY, kind)) return null;
+  const entry = VIEW_REGISTRY[kind].entry;
+  return entry ? `./chunks/views/${entry}.js?v=${BUILD_ID}` : null;
+};
+const loadView = (kind) => {
+  const url = viewEntryUrl(kind);
+  if (!url) return null;
+  return import(url);
+};
+
+async function onError(event) {
+  const {
+    captureError,
+    isSkippedViewTransitionError,
+    isTransientNetworkError
+  } = await import('./chunks/foundation.js?v=b14914a4').then(function (n) { return n.o; });
+  const eventError = "error" in event ? event.error : void 0;
+  const rejection = "reason" in event ? event.reason : void 0;
+  const message = "message" in event ? event.message : void 0;
+  const error = eventError || rejection || message || "Unknown error";
+  if (isSkippedViewTransitionError(error) || isTransientNetworkError(error)) {
+    event.preventDefault();
+    return;
+  }
+  const context = event.type === "unhandledrejection" ? { event: { type: "unhandledrejection" } } : {};
+  const element = document.activeElement !== document.body ? document.activeElement : null;
+  captureError(error, element, context);
+}
+window.__CONNECTIVITY__ = connectivity.snapshot();
+window.__CONNECTIVITY_READY__ = Promise.resolve();
+function publishNavigationTransitionReadiness() {
+  if (window.__NAVIGATION_TRANSITION_READY__) return;
+  window.__NAVIGATION_TRANSITION_SETTLED__ = false;
+  window.__NAVIGATION_TRANSITION_READY__ = new Promise((resolve) => {
+    const publishWhenInactive = () => {
+      const transition = document.activeViewTransition;
+      if (transition) {
+        Promise.resolve(transition.finished).catch(() => void 0).then(() => requestAnimationFrame(publishWhenInactive));
+        return;
+      }
+      window.__NAVIGATION_TRANSITION_SETTLED__ = true;
+      resolve();
+    };
+    if (document.activeViewTransition) {
+      publishWhenInactive();
+      return;
+    }
+    requestAnimationFrame(() => requestAnimationFrame(publishWhenInactive));
+  });
+}
+publishNavigationTransitionReadiness();
+let __activeView = null;
+const getView = async () => {
+  const viewElt = document.querySelector("[lp-view]");
+  if (!viewElt) return null;
+  if (viewElt._lp_view) return viewElt._lp_view;
+  if (__activeView) return await __activeView;
+  const disconnected = () => viewElt.isConnected === false;
+  __activeView = (async () => {
+    const viewModule = await loadView(viewElt.dataset.kind);
+    if (!viewModule) {
+      const { captureError } = await import('./chunks/foundation.js?v=b14914a4').then(function (n) { return n.o; });
+      captureError(
+        new Error(`Unknown view kind: ${viewElt.dataset.kind || "missing"}`),
+        viewElt,
+        { view_kind: viewElt.dataset.kind || "" }
+      );
+      return null;
+    }
+    if (disconnected()) return null;
+    const view = new viewModule.default(viewElt);
+    await view.init();
+    if (view._destroyed || disconnected()) return null;
+    view.publish?.();
+    return view;
+  })();
+  return await __activeView;
+};
+let _ping = null;
+const SERVER_HEALTH_TIMEOUT_MS = 5e3;
+async function pingServer() {
+  if (_ping) return _ping;
+  _ping = (async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      SERVER_HEALTH_TIMEOUT_MS
+    );
+    try {
+      const response = await fetch("/l/ping", {
+        method: "HEAD",
+        signal: controller.signal
+      });
+      applyNotificationStateHeader(response.headers);
+      return response.ok;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timeoutId);
+      _ping = null;
+    }
+  })();
+  const pending = _ping;
+  window.__PING_PENDING__ = pending;
+  void pending.finally(() => {
+    if (window.__PING_PENDING__ === pending) window.__PING_PENDING__ = null;
+  });
+  return pending;
+}
+let _pollTimeout = null;
+const KEEP_AWAKE_MS = 10 * 60 * 1e3;
+const POLL_MS = 2 * 1e3;
+const OFFLINE_POLL_MS = 5 * 1e3;
+function stopPolling() {
+  if (!_pollTimeout) return;
+  clearTimeout(_pollTimeout);
+  _pollTimeout = null;
+}
+function pollServer(online) {
+  stopPolling();
+  if (window.__TESTING__ && online) return;
+  const browserOnline = connectivity.snapshot().browser === "online";
+  const delay = online ? KEEP_AWAKE_MS : browserOnline ? POLL_MS : OFFLINE_POLL_MS;
+  _pollTimeout = setTimeout(syncView, delay);
+}
+let _sync = null;
+let _syncPending = null;
+function documentInactive() {
+  return document.hidden || document.hasFocus?.() === false;
+}
+function updateConnectivity(patch) {
+  const state = connectivity.transition(patch);
+  window.__CONNECTIVITY__ = state;
+  navigator.serviceWorker?.controller?.postMessage(connectivityMessage(state));
+  return state;
+}
+function queueSync({
+  hidden,
+  blurred,
+  blurredAt,
+  force = false,
+  browser
+} = {}) {
+  const pendingHidden = hidden === void 0 ? _syncPending?.hidden : Boolean(hidden);
+  const pendingBlurred = blurred === void 0 ? _syncPending?.blurred : Boolean(blurred);
+  const pendingBlurredAt = blurredAt === void 0 ? _syncPending?.blurredAt : blurredAt;
+  const pendingBrowser = browser === void 0 ? _syncPending?.browser : browser;
+  _syncPending = {
+    force: Boolean(_syncPending?.force || force)
+  };
+  if (pendingHidden !== void 0) _syncPending.hidden = pendingHidden;
+  if (pendingBlurred !== void 0) _syncPending.blurred = pendingBlurred;
+  if (pendingBlurredAt !== void 0) _syncPending.blurredAt = pendingBlurredAt;
+  if (pendingBrowser !== void 0) _syncPending.browser = pendingBrowser;
+}
+async function syncViewOnce({
+  hidden = documentInactive(),
+  blurred = hidden && !document.hidden && document.hasFocus?.() === false,
+  blurredAt = blurred ? Date.now() : null,
+  force = false,
+  browser = navigator.onLine === false ? "offline" : "online"
+} = {}) {
+  const controller = navigator.serviceWorker?.controller ? "controlled" : "uncontrolled";
+  updateConnectivity({
+    browser,
+    controller,
+    visibility: hidden ? "hidden" : "visible"
+  });
+  const viewPromise = getView();
+  if (hidden) {
+    stopPolling();
+    const view2 = await viewPromise;
+    if (view2?.sync) {
+      await view2.sync({ hidden: true, blurred, blurredAt, force });
+    }
+    return;
+  }
+  const online = await pingServer();
+  updateConnectivity({ server: online ? "online" : "offline" });
+  pollServer(online);
+  const view = await viewPromise;
+  if (view?.sync) {
+    await view.sync({ hidden, blurred: false, blurredAt: null, force });
+  }
+}
+async function syncView(options = {}) {
+  queueSync(options);
+  if (_sync) return _sync;
+  _sync = (async () => {
+    let firstError = null;
+    while (_syncPending) {
+      const nextSync = _syncPending;
+      _syncPending = null;
+      try {
+        await syncViewOnce(nextSync);
+      } catch (error) {
+        firstError ||= error;
+      }
+    }
+    if (firstError) throw firstError;
+  })().finally(() => {
+    _sync = null;
+  });
+  window.__CONNECTIVITY_READY__ = _sync;
+  return _sync;
+}
+function browserConnectivityChanged(browser) {
+  updateConnectivity({ browser });
+  return syncView({ browser });
+}
+function suspendCurrentView({
+  blurred = false,
+  blurredAt = blurred ? Date.now() : null
+} = {}) {
+  updateConnectivity({
+    browser: navigator.onLine === false ? "offline" : "online",
+    controller: navigator.serviceWorker?.controller ? "controlled" : "uncontrolled",
+    visibility: "hidden"
+  });
+  return syncView({ hidden: true, blurred, blurredAt });
+}
+function setTestMode() {
+  const mode = document?.querySelector("meta[name='mode']")?.getAttribute("content");
+  if (mode === "testing") {
+    window.__TESTING__ = true;
+  }
+}
+function pageMode() {
+  return document?.querySelector("meta[name='mode']")?.getAttribute("content");
+}
+async function startAnalytics() {
+  const { analytics } = await import('./chunks/analytics.js?v=b14914a4');
+  analytics.view();
+}
+function startErrorHandling() {
+  window.addEventListener("unhandledrejection", onError);
+  window.addEventListener("error", onError);
+}
+function startServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.register("/sw.js").catch(async (error) => {
+    const { captureNetworkError } = await import('./chunks/foundation.js?v=b14914a4').then(function (n) { return n.o; });
+    captureNetworkError(error, "/sw.js", { context: "service_worker" });
+  });
+  navigator.serviceWorker.addEventListener("controllerchange", async () => {
+    updateConnectivity({
+      controller: navigator.serviceWorker?.controller ? "controlled" : "uncontrolled"
+    });
+    const { clearRecentSearchResults } = await import('./chunks/foundation.js?v=b14914a4').then(function (n) { return n.q; });
+    clearRecentSearchResults();
+    syncView();
+  });
+}
+async function startAuthenticatedLifecycle() {
+  startErrorHandling();
+  const [{ initializeLogoutForms }, { updateUserData }] = await Promise.all([
+    import('./chunks/account.js?v=b14914a4').then(function (n) { return n.l; }),
+    import('./chunks/account.js?v=b14914a4').then(function (n) { return n.a; })
+  ]);
+  initializeLogoutForms();
+  void startAnalytics();
+  void syncView();
+  document.addEventListener("visibilitychange", () => {
+    document.hidden ? suspendCurrentView() : syncView();
+  });
+  window.addEventListener(
+    "offline",
+    () => browserConnectivityChanged("offline")
+  );
+  window.addEventListener("online", () => browserConnectivityChanged("online"));
+  window.addEventListener(
+    "blur",
+    () => suspendCurrentView({ blurred: !document.hidden })
+  );
+  window.addEventListener(
+    "focus",
+    () => syncView({ hidden: false, blurred: false, blurredAt: null })
+  );
+  window.addEventListener("pagehide", () => suspendCurrentView());
+  window.addEventListener("pageshow", (event) => {
+    syncView({ force: event.persisted });
+  });
+  updateUserData();
+}
+function initialize() {
+  if (window.__INITIALIZED__) return;
+  window.__INITIALIZED__ = true;
+  setTestMode();
+  installUpstreamUnavailableBanner();
+  const mode = pageMode();
+  startServiceWorker();
+  if (mode === "public") {
+    void getView();
+    startErrorHandling();
+    void startAnalytics();
+    return;
+  }
+  void startAuthenticatedLifecycle();
+}
+document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", initialize, { once: true }) : initialize();
+
+export { initialize, pingServer, suspendCurrentView, syncView };

@@ -747,6 +747,8 @@ def test_create_tool_starts_pending_report(get_admin, get_user, cold_list):
         "aria-pressed", "false"
     )
     if cold_list:
+        user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
+        expect(report_panel).to_be_hidden()
         home = user.go(SitePages.HOME)
     instructions = (
         f"Create {_suffix()} a household inventory tracker with rooms, warranties, "

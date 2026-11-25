@@ -1,2 +1,232 @@
-import{C as p,N as f}from"./core-foundation.js?v=baa4a64d";import{d as _,w as d}from"./foundation.js?v=baa4a64d";class v extends p{constructor(t){super(t),this.collaborating={},this._renderLayout=this._renderLayout.bind(this),this._tabChange=this._tabChange.bind(this),this._defaultTabId="info",this._mobileNav=null}async init(){await super.init(),this.elt.addEventListener("set-subcomponent",this._tabChange),this.elt.addEventListener("mobile-resize",_(this._renderLayout,100)),await this._renderLayout()}get tabsCard(){return this.elt.querySelector("#tabs")}get secondaryCard(){return null}_initialTabId(){return this.querySlug(this.queryParam("tab"))||localStorage.getItem(`${this.hash}-active`)}_tabElement(t){return t&&Array.from(this.elt.querySelectorAll("[lp-component][data-tab='true']")).find(e=>e.id===t)||null}_tabChange(t){const{subcomponent:e}=t.detail;e.elt.dataset.tab==="true"&&localStorage.setItem(`${this.hash}-active`,e.name)}get mobileNav(){if(!this._mobileNav){const t=this.getComponent(this.tabsCard),e=this.elt.querySelector("[lp-nav][data-nav='mobile']");if(!t||!e)throw new Error("Entity layout requires mobile tab navigation");this._mobileNav=new f(t,e)}return this._mobileNav}_componentElement(t){if(!t)return null;if(typeof t!="string")return"elt"in t?t.elt:t;const e=document.getElementById(t);return e&&this.elt.contains(e)?e:null}setSecondaryCardActive(t,e){const i=this._componentElement(t);i&&(this.elt.dataset.secondary=e?"true":"false",this.elt.classList.toggle("max-w-7xl",e),this.elt.classList.toggle("max-w-5xl",!e),i.dataset.visible=e?"true":"false",i.dataset.persistent=e?"true":"false")}isSecondaryCardVisible(t=this.secondaryCard){const e=this._componentElement(t);return!!e&&this.elt.dataset.secondary==="true"&&e.dataset.visible==="true"}_layoutSnapshot(t=null){const e=this._componentElement(t);return{secondary:this.elt.dataset.secondary==="true",wide:this.elt.classList.contains("max-w-7xl"),narrow:this.elt.classList.contains("max-w-5xl"),selected:this._initialTabId(),visible:e?.dataset.visible==="true",persistent:e?.dataset.persistent==="true"}}_layoutChanged(t,e){return Object.entries(t).some(([i,s])=>s!==e[i])}async updateLayout({secondary:t=null,secondaryActive:e=null,activeTabId:i=null,mutate:s=null}={}){const a=this._componentElement(t),l=this._layoutSnapshot(a);let n=null,r=null,h=null,o=!1;i&&localStorage.setItem(`${this.hash}-active`,i);const u=await s?.({layoutChanged:!1});typeof u=="function"?r=()=>u():n=u;const c=e===null?void 0:e?a:null,m=await this._prepareLayoutBody(c);await d(()=>{r?.(),a&&e!==null&&this.setSecondaryCardActive(a,e);const b=this._layoutSnapshot(a);o=this._layoutChanged(l,b),h=this._commitLayoutBody(m)},{label:"entity:update-layout"}),this.postRender&&await this.postRender();const y=this._layoutSnapshot(a);return o=o||this._layoutChanged(l,y),{activeTabId:h,layoutChanged:o,result:n}}async _renderLayout(){return await this.updateLayout()}async _renderLayoutBody(){const t=await this._prepareLayoutBody();return await d(()=>this._commitLayoutBody(t),{label:"entity:render-layout"}),this.postRender&&await this.postRender(),t.activeTabId}async _prepareLayoutBody(t){const e=this._initialTabId(),[i,s,a]=this._prerender(e,t),l=this._tabElement(a),n=this.elt.querySelector("#layout"),r=this.getComponent(l);if(!r||!n)throw new Error("Entity layout requires an active tab and layout container");return await r.activate("default"),await r.prepareRender?.(!0),{activeTab:r,activeTabId:a,layout:n,secondary:s,tabs:i}}_commitLayoutBody({activeTab:t,activeTabId:e,layout:i,secondary:s,tabs:a}){const l=this.mobileNav;return a.nav=this.mobile?l:null,Object.values(this.components).forEach(n=>{n.elt.dataset.tab==="true"&&(n.nav=this.mobile?a.nav:null)}),i.dataset.visible="true",this._reconcileTabsCard(a,e),s&&this._reconcileSecondaryCard(s,e),typeof a.reconcile=="function"&&a.reconcile(),typeof s?.reconcile=="function"&&s.reconcile(),a.elt.dataset.visible="true",l.element.dataset.visible=this.mobile?"true":"false",t.render(!0),localStorage.setItem(`${this.hash}-active`,e),e}_reconcileTabsCard(t,e){t.reconcile=()=>{const i=t.nav;i&&(i.element.dataset.visible=this.mobile?"false":"true"),t.elt.querySelectorAll("[lp-component][data-tab='true']").forEach(s=>{s.dataset.visible=s.id===e?"true":"false"}),t.reconcile=null}}_reconcileSecondaryCard(t,e){t.reconcile=()=>{this.mobile?(t.elt.dataset.persistent="false",this.tabsCard?.appendChild(t.elt),t.elt.dataset.visible=e===t.name?"true":"false"):(t.elt.dataset.persistent="true",this.elt.querySelector("#layout")?.prepend(t.elt),t.elt.dataset.visible="true"),t.reconcile=null}}_prerender(t,e){t??=this._defaultTabId;const i=this.getComponent(this.tabsCard);if(!i)throw new Error("Entity layout requires a tabs component");const s=e===void 0?this.secondaryCard:e,a=s?this.getComponent(s):null;return!this.mobile&&t===a?.name&&(t=this._defaultTabId),this._tabElement(t)||(t=this._defaultTabId),[i,a,t]}}export{v as E};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { C as Core, N as NavElement } from './core-foundation.js?v=b14914a4';
+import { d as debounce, w as withTransition } from './foundation.js?v=b14914a4';
+
+class Entity extends Core {
+  constructor(node) {
+    super(node);
+    this.collaborating = {};
+    this._renderLayout = this._renderLayout.bind(this);
+    this._tabChange = this._tabChange.bind(this);
+    this._defaultTabId = "info";
+    this._mobileNav = null;
+  }
+  async init() {
+    await super.init();
+    this.elt.addEventListener("set-subcomponent", this._tabChange);
+    this.elt.addEventListener(
+      "mobile-resize",
+      debounce(this._renderLayout, 100)
+    );
+    await this._renderLayout();
+  }
+  get tabsCard() {
+    return this.elt.querySelector("#tabs");
+  }
+  get secondaryCard() {
+    return null;
+  }
+  _initialTabId() {
+    return this.querySlug(this.queryParam("tab")) || localStorage.getItem(`${this.hash}-active`);
+  }
+  _tabElement(tabId) {
+    if (!tabId) return null;
+    return Array.from(
+      this.elt.querySelectorAll(
+        "[lp-component][data-tab='true']"
+      )
+    ).find((tab) => tab.id === tabId) || null;
+  }
+  _tabChange(event) {
+    const { subcomponent } = event.detail;
+    if (subcomponent.elt.dataset.tab !== "true") return;
+    localStorage.setItem(`${this.hash}-active`, subcomponent.name);
+  }
+  get mobileNav() {
+    if (!this._mobileNav) {
+      const tabs = this.getComponent(this.tabsCard);
+      const mobileNav = this.elt.querySelector(
+        "[lp-nav][data-nav='mobile']"
+      );
+      if (!tabs || !mobileNav)
+        throw new Error("Entity layout requires mobile tab navigation");
+      this._mobileNav = new NavElement(tabs, mobileNav);
+    }
+    return this._mobileNav;
+  }
+  _componentElement(component) {
+    if (!component) return null;
+    if (typeof component !== "string")
+      return "elt" in component ? component.elt : component;
+    const element = document.getElementById(component);
+    return element && this.elt.contains(element) ? element : null;
+  }
+  setSecondaryCardActive(component, active) {
+    const element = this._componentElement(component);
+    if (!element) return;
+    this.elt.dataset.secondary = active ? "true" : "false";
+    this.elt.classList.toggle("max-w-7xl", active);
+    this.elt.classList.toggle("max-w-5xl", !active);
+    element.dataset.visible = active ? "true" : "false";
+    element.dataset.persistent = active ? "true" : "false";
+  }
+  isSecondaryCardVisible(component = this.secondaryCard) {
+    const element = this._componentElement(component);
+    return !!element && this.elt.dataset.secondary === "true" && element.dataset.visible === "true";
+  }
+  _layoutSnapshot(component = null) {
+    const element = this._componentElement(component);
+    return {
+      secondary: this.elt.dataset.secondary === "true",
+      wide: this.elt.classList.contains("max-w-7xl"),
+      narrow: this.elt.classList.contains("max-w-5xl"),
+      selected: this._initialTabId(),
+      visible: element?.dataset.visible === "true",
+      persistent: element?.dataset.persistent === "true"
+    };
+  }
+  _layoutChanged(before, after) {
+    return Object.entries(before).some(
+      ([key, value]) => value !== after[key]
+    );
+  }
+  async updateLayout({
+    secondary = null,
+    secondaryActive = null,
+    activeTabId = null,
+    mutate = null
+  } = {}) {
+    const secondaryElement = this._componentElement(secondary);
+    const before = this._layoutSnapshot(secondaryElement);
+    let mutationResult = null;
+    let commitMutation = null;
+    let activeLayoutTabId = null;
+    let layoutChanged = false;
+    if (activeTabId) {
+      localStorage.setItem(`${this.hash}-active`, activeTabId);
+    }
+    const preparedMutation = await mutate?.({ layoutChanged: false });
+    if (typeof preparedMutation === "function") {
+      commitMutation = () => preparedMutation();
+    } else {
+      mutationResult = preparedMutation;
+    }
+    const preparedSecondary = secondaryActive === null ? void 0 : secondaryActive ? secondaryElement : null;
+    const preparedLayout = await this._prepareLayoutBody(preparedSecondary);
+    await withTransition(
+      () => {
+        commitMutation?.();
+        if (secondaryElement && secondaryActive !== null) {
+          this.setSecondaryCardActive(secondaryElement, secondaryActive);
+        }
+        const prepared = this._layoutSnapshot(secondaryElement);
+        layoutChanged = this._layoutChanged(before, prepared);
+        activeLayoutTabId = this._commitLayoutBody(preparedLayout);
+      },
+      { label: "entity:update-layout" }
+    );
+    if (this.postRender) await this.postRender();
+    const after = this._layoutSnapshot(secondaryElement);
+    layoutChanged = layoutChanged || this._layoutChanged(before, after);
+    return {
+      activeTabId: activeLayoutTabId,
+      layoutChanged,
+      result: mutationResult
+    };
+  }
+  async _renderLayout() {
+    return await this.updateLayout();
+  }
+  async _renderLayoutBody() {
+    const prepared = await this._prepareLayoutBody();
+    await withTransition(() => this._commitLayoutBody(prepared), {
+      label: "entity:render-layout"
+    });
+    if (this.postRender) await this.postRender();
+    return prepared.activeTabId;
+  }
+  async _prepareLayoutBody(secondaryElement) {
+    const tabId = this._initialTabId();
+    const [tabs, secondary, activeTabId] = this._prerender(
+      tabId,
+      secondaryElement
+    );
+    const activeTabElt = this._tabElement(activeTabId);
+    const layout = this.elt.querySelector("#layout");
+    const activeTab = this.getComponent(activeTabElt);
+    if (!activeTab || !layout)
+      throw new Error(
+        "Entity layout requires an active tab and layout container"
+      );
+    await activeTab.activate("default");
+    await activeTab.prepareRender?.(true);
+    return { activeTab, activeTabId, layout, secondary, tabs };
+  }
+  _commitLayoutBody({
+    activeTab,
+    activeTabId,
+    layout,
+    secondary,
+    tabs
+  }) {
+    const mobileNav = this.mobileNav;
+    tabs.nav = this.mobile ? mobileNav : null;
+    Object.values(this.components).forEach((component) => {
+      if (component.elt.dataset.tab === "true") {
+        component.nav = this.mobile ? tabs.nav : null;
+      }
+    });
+    layout.dataset.visible = "true";
+    this._reconcileTabsCard(tabs, activeTabId);
+    if (secondary) {
+      this._reconcileSecondaryCard(secondary, activeTabId);
+    }
+    if (typeof tabs.reconcile === "function") tabs.reconcile();
+    if (typeof secondary?.reconcile === "function") secondary.reconcile();
+    tabs.elt.dataset.visible = "true";
+    mobileNav.element.dataset.visible = this.mobile ? "true" : "false";
+    activeTab.render(true);
+    localStorage.setItem(`${this.hash}-active`, activeTabId);
+    return activeTabId;
+  }
+  _reconcileTabsCard(tabs, tabId) {
+    tabs.reconcile = () => {
+      const nav = tabs.nav;
+      if (nav) nav.element.dataset.visible = this.mobile ? "false" : "true";
+      tabs.elt.querySelectorAll("[lp-component][data-tab='true']").forEach((component) => {
+        component.dataset.visible = component.id === tabId ? "true" : "false";
+      });
+      tabs.reconcile = null;
+    };
+  }
+  _reconcileSecondaryCard(secondary, tabId) {
+    secondary.reconcile = () => {
+      if (this.mobile) {
+        secondary.elt.dataset.persistent = "false";
+        this.tabsCard?.appendChild(secondary.elt);
+        secondary.elt.dataset.visible = tabId === secondary.name ? "true" : "false";
+      } else {
+        secondary.elt.dataset.persistent = "true";
+        this.elt.querySelector("#layout")?.prepend(secondary.elt);
+        secondary.elt.dataset.visible = "true";
+      }
+      secondary.reconcile = null;
+    };
+  }
+  _prerender(tabId, secondaryElement) {
+    tabId ??= this._defaultTabId;
+    const tabs = this.getComponent(this.tabsCard);
+    if (!tabs) throw new Error("Entity layout requires a tabs component");
+    const resolvedSecondary = secondaryElement === void 0 ? this.secondaryCard : secondaryElement;
+    const secondary = resolvedSecondary ? this.getComponent(resolvedSecondary) : null;
+    if (!this.mobile && tabId === secondary?.name) {
+      tabId = this._defaultTabId;
+    }
+    if (!this._tabElement(tabId)) {
+      tabId = this._defaultTabId;
+    }
+    return [tabs, secondary, tabId];
+  }
+}
+
+export { Entity as E };

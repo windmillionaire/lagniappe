@@ -1,27 +1,213 @@
-import{c as p,S as s}from"./ui-resources.js?v=baa4a64d";import{r as f,E as b}from"./foundation.js?v=baa4a64d";import"./connectivity.js?v=baa4a64d";import{Modal as y}from"./modal.js?v=baa4a64d";import{a as g}from"./forms.js?v=baa4a64d";import"./upstreamUnavailable.js?v=baa4a64d";import"./ui-controls.js?v=baa4a64d";import"./combobox.js?v=baa4a64d";class x extends y{constructor(e){super(e.view,null),this.composer=e}destroy(){this.composer._releaseModal(this),super.destroy()}}class h{constructor(e,{onSent:t=null}={}){this.view=e,this.onSent=t,this.operationId=null,this._submit=this._submit.bind(this),this._recipientUpdated=this._recipientUpdated.bind(this)}init(){return this.confirmation=document.querySelector("[data-role='message-compose-confirmation']"),this.confirmation||(this.confirmation=document.createElement("div"),this.confirmation.dataset.role="message-compose-confirmation",this.confirmation.setAttribute("role","status"),this.confirmation.className="fixed bottom-4 right-4 z-50 hidden rounded-md bg-user-default px-4 py-3 font-medium text-white shadow-lg",document.body.appendChild(this.confirmation)),this}_buildModal(){const e=p("spinner").outerHTML,t=document.createElement("div");return t.id="modal",t.dataset.role="message-composer",t.dataset.kind="user",t.className=s.modal.wrapper,t.setAttribute("role","dialog"),t.setAttribute("aria-modal","true"),t.setAttribute("aria-labelledby","message-composer-title"),t.innerHTML=`
-			<div id="modal-content" class="${s.modal.content} w-full max-w-lg">
-				<div class="${s.modal.header}">
+/*! Third-party licenses: /third-party-licenses.txt */
+import { c as createIcon, S as STYLES } from './ui-resources.js?v=b14914a4';
+import { r as request, E as ENDPOINTS } from './foundation.js?v=b14914a4';
+import './connectivity.js?v=b14914a4';
+import { Modal } from './modal.js?v=b14914a4';
+import { a as FacetsBox } from './forms.js?v=b14914a4';
+import './upstreamUnavailable.js?v=b14914a4';
+import './ui-controls.js?v=b14914a4';
+import './combobox.js?v=b14914a4';
+
+class ComposerModal extends Modal {
+  constructor(composer) {
+    super(composer.view, null);
+    this.composer = composer;
+  }
+  destroy() {
+    this.composer._releaseModal(this);
+    super.destroy();
+  }
+}
+class MessageComposer {
+  constructor(view, { onSent = null } = {}) {
+    this.view = view;
+    this.onSent = onSent;
+    this.operationId = null;
+    this._submit = this._submit.bind(this);
+    this._recipientUpdated = this._recipientUpdated.bind(this);
+  }
+  init() {
+    this.confirmation = document.querySelector(
+      "[data-role='message-compose-confirmation']"
+    );
+    if (!this.confirmation) {
+      this.confirmation = document.createElement("div");
+      this.confirmation.dataset.role = "message-compose-confirmation";
+      this.confirmation.setAttribute("role", "status");
+      this.confirmation.className = "fixed bottom-4 right-4 z-50 hidden rounded-md bg-user-default px-4 py-3 font-medium text-white shadow-lg";
+      document.body.appendChild(this.confirmation);
+    }
+    return this;
+  }
+  _buildModal() {
+    const spinner = createIcon("spinner").outerHTML;
+    const modal = document.createElement("div");
+    modal.id = "modal";
+    modal.dataset.role = "message-composer";
+    modal.dataset.kind = "user";
+    modal.className = STYLES.modal.wrapper;
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-labelledby", "message-composer-title");
+    modal.innerHTML = `
+			<div id="modal-content" class="${STYLES.modal.content} w-full max-w-lg">
+				<div class="${STYLES.modal.header}">
 					<h2 id="message-composer-title" class="text-xl font-bold text-base-dark">New message</h2>
-					<button type="button" lp-control="close" class="${s.button.close}">Close</button>
+					<button type="button" lp-control="close" class="${STYLES.button.close}">Close</button>
 				</div>
 				<form data-role="message-compose-form" data-kind="user" class="space-y-4 p-6">
 					<label class="block text-sm font-medium">To
 						<input type="search" name="recipient" data-index="user" data-permission="message"
 							data-kind="user"
 							data-placeholder="Search managed users"
-							class="${s.input} mt-1">
+							class="${STYLES.input} mt-1">
 					</label>
 					<label class="block text-sm font-medium">Message
 						<textarea name="body" data-kind="user" maxlength="1000" required rows="5"
-							class="${s.textarea} mt-1"></textarea>
+							class="${STYLES.textarea} mt-1"></textarea>
 					</label>
 					<p data-role="message-compose-error" class="hidden text-sm text-delete-default"></p>
-					<div class="${s.modal.actions}">
-						<button type="submit" data-kind="user" class="${s.button.submit}">
-							<span data-role="icon" data-visible="false" aria-hidden="true">${e}</span>
+					<div class="${STYLES.modal.actions}">
+						<button type="submit" data-kind="user" class="${STYLES.button.submit}">
+							<span data-role="icon" data-visible="false" aria-hidden="true">${spinner}</span>
 							<span data-role="text">Send</span>
 						</button>
 					</div>
 				</form>
-			</div>`,t}async open(e=null){await this.close();const t=this._buildModal(),o=new x(this);this.modalController=o,await o.attach(t,this),this.dialog=t,this.form=t.querySelector("[data-role='message-compose-form']"),this.input=this.form?.querySelector("input[data-index='user']"),this.body=this.form?.querySelector("textarea[name='body']"),this.submit=this.form?.querySelector("button[type='submit']"),this.error=this.form?.querySelector("[data-role='message-compose-error']"),!(!this.form||!this.input)&&(this.recipient=new g(this.input),this.recipient.init(),this.input.addEventListener("updated",this._recipientUpdated),this.form.addEventListener("submit",this._submit),this._activate(e))}_recipientUpdated(e){if(!(e instanceof CustomEvent))return;const t=e.detail;t&&typeof t=="object"&&"options"in t&&t.options&&Object.keys(t.options).length&&this.body?.focus()}_setSubmitting(e){if(!this.submit)return;this.submit.disabled=e;const t=this.submit.querySelector("[data-role='icon']");t&&(t.dataset.visible=e?"true":"false")}_activate(e=null){!this.error||!this.recipient||(this.operationId=this.view.operationId?.()||crypto.randomUUID(),this.error.classList.add("hidden"),this.error.textContent="",this.recipient.clear({notify:!1}),e?.id&&e?.available!==!1&&this.recipient.addOption({id:e.id,name:e.name??void 0,kind:"user"},!0),(e?this.body:this.input)?.focus())}async close(){await this.modalController?.remove()}_releaseModal(e){this.form?.removeEventListener("submit",this._submit),this.input?.removeEventListener("updated",this._recipientUpdated),this.recipient?.destroy?.(),this.form=null,this.input=null,this.body=null,this.submit=null,this.error=null,this.recipient=null,this.dialog=null,this.modalController===e&&(this.modalController=null)}async _submit(e){e.preventDefault();const{error:t,input:o,form:m,body:c,recipient:n,confirmation:a}=this;if(!t||!o||!m||!c||!n||!a)return;const l=n.selectedOptions?.[0],u=(typeof l?.recipient_key=="string"?l.recipient_key:null)||l?.id;if(!u){t.textContent="Choose a message recipient.",t.classList.remove("hidden"),o.focus();return}const d=new FormData(m);d.set("recipient",u),d.set("operation_id",this.operationId||crypto.randomUUID()),this._setSubmitting(!0);let r;try{r=await f.post(b.messages.send,d)}finally{this._setSubmitting(!1)}if(!r?.ok){t.textContent=r?.error||"Message could not be sent.",t.classList.remove("hidden");return}c.value="",n.clear({notify:!1}),await this.close(),a.textContent="Message sent.",a.classList.remove("hidden"),clearTimeout(this.confirmationTimer),this.confirmationTimer=setTimeout(()=>a.classList.add("hidden"),3e3),await this.onSent?.(r)}destroy(){clearTimeout(this.confirmationTimer),this.modalController?.destroy()}}const v=(i,e={})=>(i.MessageComposer?e.onSent&&(i.MessageComposer.onSent=e.onSent):i.MessageComposer=new h(i,e).init(),i.MessageComposer);export{h as MessageComposer,v as ensureMessageComposer};
-/*! Third-party licenses: /third-party-licenses.txt */
+			</div>`;
+    return modal;
+  }
+  async open(recipient = null) {
+    await this.close();
+    const modal = this._buildModal();
+    const controller = new ComposerModal(this);
+    this.modalController = controller;
+    await controller.attach(modal, this);
+    this.dialog = modal;
+    this.form = modal.querySelector(
+      "[data-role='message-compose-form']"
+    );
+    this.input = this.form?.querySelector(
+      "input[data-index='user']"
+    );
+    this.body = this.form?.querySelector(
+      "textarea[name='body']"
+    );
+    this.submit = this.form?.querySelector(
+      "button[type='submit']"
+    );
+    this.error = this.form?.querySelector(
+      "[data-role='message-compose-error']"
+    );
+    if (!this.form || !this.input) return;
+    this.recipient = new FacetsBox(this.input);
+    this.recipient.init();
+    this.input.addEventListener("updated", this._recipientUpdated);
+    this.form.addEventListener("submit", this._submit);
+    this._activate(recipient);
+  }
+  _recipientUpdated(event) {
+    if (!(event instanceof CustomEvent)) return;
+    const detail = event.detail;
+    if (detail && typeof detail === "object" && "options" in detail && detail.options && Object.keys(detail.options).length)
+      this.body?.focus();
+  }
+  _setSubmitting(value) {
+    if (!this.submit) return;
+    this.submit.disabled = value;
+    const icon = this.submit.querySelector("[data-role='icon']");
+    if (icon) icon.dataset.visible = value ? "true" : "false";
+  }
+  _activate(recipient = null) {
+    if (!this.error || !this.recipient) return;
+    this.operationId = this.view.operationId?.() || crypto.randomUUID();
+    this.error.classList.add("hidden");
+    this.error.textContent = "";
+    this.recipient.clear({ notify: false });
+    if (recipient?.id && recipient?.available !== false) {
+      this.recipient.addOption(
+        {
+          id: recipient.id,
+          name: recipient.name ?? void 0,
+          kind: "user"
+        },
+        true
+      );
+    }
+    (recipient ? this.body : this.input)?.focus();
+  }
+  async close() {
+    await this.modalController?.remove();
+  }
+  _releaseModal(controller) {
+    this.form?.removeEventListener("submit", this._submit);
+    this.input?.removeEventListener("updated", this._recipientUpdated);
+    this.recipient?.destroy?.();
+    this.form = null;
+    this.input = null;
+    this.body = null;
+    this.submit = null;
+    this.error = null;
+    this.recipient = null;
+    this.dialog = null;
+    if (this.modalController === controller) this.modalController = null;
+  }
+  async _submit(event) {
+    event.preventDefault();
+    const { error, input, form, body, recipient, confirmation } = this;
+    if (!error || !input || !form || !body || !recipient || !confirmation)
+      return;
+    const selected = recipient.selectedOptions?.[0];
+    const selectedKey = typeof selected?.recipient_key === "string" ? selected.recipient_key : null;
+    const recipientKey = selectedKey || selected?.id;
+    if (!recipientKey) {
+      error.textContent = "Choose a message recipient.";
+      error.classList.remove("hidden");
+      input.focus();
+      return;
+    }
+    const data = new FormData(form);
+    data.set("recipient", recipientKey);
+    data.set("operation_id", this.operationId || crypto.randomUUID());
+    this._setSubmitting(true);
+    let response;
+    try {
+      response = await request.post(
+        ENDPOINTS.messages.send,
+        data
+      );
+    } finally {
+      this._setSubmitting(false);
+    }
+    if (!response?.ok) {
+      error.textContent = response?.error || "Message could not be sent.";
+      error.classList.remove("hidden");
+      return;
+    }
+    body.value = "";
+    recipient.clear({ notify: false });
+    await this.close();
+    confirmation.textContent = "Message sent.";
+    confirmation.classList.remove("hidden");
+    clearTimeout(this.confirmationTimer);
+    this.confirmationTimer = setTimeout(
+      () => confirmation.classList.add("hidden"),
+      3e3
+    );
+    await this.onSent?.(response);
+  }
+  destroy() {
+    clearTimeout(this.confirmationTimer);
+    this.modalController?.destroy();
+  }
+}
+const ensureMessageComposer = (view, options = {}) => {
+  if (!view.MessageComposer) {
+    view.MessageComposer = new MessageComposer(view, options).init();
+  } else if (options.onSent) {
+    view.MessageComposer.onSent = options.onSent;
+  }
+  return view.MessageComposer;
+};
+
+export { MessageComposer, ensureMessageComposer };

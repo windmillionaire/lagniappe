@@ -1,2 +1,405 @@
-import{c as v,w,r as g}from"./foundation.js?v=baa4a64d";import"./upstreamUnavailable.js?v=baa4a64d";import"./connectivity.js?v=baa4a64d";function l(u){const{active:t}=u;return t&&!("standalone"in t)?t:null}function m(u){return!!(u&&"revisionSnapshot"in u&&typeof u.revisionSnapshot=="function")}function b(u){return!!(u&&typeof u=="object"&&"key"in u&&typeof u.key=="string")}function y(u){return!!(u&&"disabled"in u&&typeof u.disabled=="boolean")}function _(u){return!!(u&&"closest"in u&&typeof u.closest=="function")}class A{constructor(t){this.view=t,this.activeSubmitter=null,this.submit=this.submit.bind(this)}_clearActiveSubmitter(){this.activeSubmitter&&(this.activeSubmitter.disabled=!1,this.activeSubmitter=null),this._syncOfflineSubmitStates()}_syncOfflineSubmitStates(){for(const t of Object.values(this.view?.components??{}))for(const e of Object.values(t.widgets))e.form?.syncOfflineState?.()}_setActiveSubmitter(t){t&&(this.activeSubmitter=t,this.activeSubmitter.disabled=!0)}async submit(t){const e=this.view;if(!e)return;const a="detail"in t?t.detail:void 0,r=()=>a?.onSettled?.(),n=_(t.target)?t.target:null,i=e.getComponent(n);if(!i){v(new Error("No component found"),t.target),r();return}t.preventDefault(),t.stopPropagation();const s=l(i),o=a?.route||i.route,h="submitter"in t?t.submitter:null;if(this._setActiveSubmitter(y(h)?h:null),s?.form?.syncOfflineState?.()){this._clearActiveSubmitter(),r();return}let c;try{c=await s?.prepareSubmit?.({route:o,submitter:h})}catch(d){i.active===s&&s?.target?.isConnected&&n?.isConnected&&i.showError(d instanceof Error&&d.message||"Could not prepare upload"),this._clearActiveSubmitter(),r();return}if(c===!1){this._clearActiveSubmitter(),r();return}if(i.active!==s||!s?.target?.isConnected||!n?.isConnected){this._clearActiveSubmitter(),r();return}const f=i.formData;if(!f){v(new Error("No form data found"),s.target),this._clearActiveSubmitter(),r();return}const S=h?.dataset?.role||a?.role;if(s.target?.hasAttribute("lp-deferred")&&(typeof f.has!="function"||!f.has("operation-id"))&&f.append("operation-id",e.operationId()),S&&f.append("role",S),s.target?.hasAttribute("lp-create"))this.create(i,f,o),r();else if(a?.update||s.target?.hasAttribute("lp-update"))if(a?.onSettled)try{await this.update(i,f,o)}catch(d){i.showError?.(d instanceof Error&&d.message||"Could not retry autofill."),v(d),this._clearActiveSubmitter()}finally{r()}else this.update(i,f,o).catch(d=>{i.active===s&&s?.target?.isConnected&&i.showError?.("Could not finish the update. Please try again."),this._clearActiveSubmitter(),v(d,s?.target)});else r()}successfulResponse(t,e){if(!t)return!1;if(t.already_running){const a=l(e);m(a)&&a.lockDeferredOperation?.({...t,status:b(t.status)?t.status:void 0});const r=t.operation;return r&&this.view?.ensureDeferredOperations?.().then(n=>n?.track(r,{node:e.active?.target})),e?.showError?.(t.message||"Autofill is already running. Your draft was kept."),this._clearActiveSubmitter(),!1}if(t.conflict)return!1;if(t.reload)return window.location.reload(),!1;if(t.error||t.ok===!1)return e?.showError?.(t.error||t.message||"The update was not saved. Please try again."),this._clearActiveSubmitter(),!1;if(t.modal){const{modal:a}=t;return this.view?.ensureModalClasses?.().then(r=>{if(!(!r?.Modal||!this.view||this.view._destroyed)){if(typeof a=="string"){v(new TypeError("Modal markup must be parsed before attachment"),e);return}new r.Modal(this.view).attach(a,e)}}),this._clearActiveSubmitter(),!1}return!0}async update(t,e,a=t.route){const r=this.view;if(!r)return;if(!r.online){const c=r.offlineQueue||await r.ensureOfflineQueue?.();a&&await c?.queueSubmit(t,e,String(a),"PUT")?await w(()=>{l(t)?.form?.queued?.(),this._clearActiveSubmitter()},{label:"submission:queue-offline"}):this._clearActiveSubmitter();return}const n=l(t),i=m(n)?n:null,s=i?.revisionSnapshot(),o=await g.put(a??String(a),e);if(t.active!==n||n?.target?.isConnected===!1){o?.deferred&&o.operation&&(await this.view?.ensureDeferredOperations?.())?.track(o.operation,{status:b(o.status)?o.status:void 0,revision:o.revision}),this._clearActiveSubmitter();return}if(o?.conflict){try{const c=await this.view?.ensureEditWatcher?.();i&&await c?.stageConflict?.(i,{response:o})&&await c?.openConflictReview?.(i,{blockedAction:e.get("role")==="autofill-submit"?"autofill":null})}finally{n?.form?.resetSubmitButton?.(),this._clearActiveSubmitter()}return}if(!this.successfulResponse(o,t))return;const h=i&&s!==i.revisionSnapshot();if(o.deferred){o.form_revision&&i&&(i.reviewState=o.form_state??i.reviewState??{},i.reviewState.revision=o.form_revision,i.initialTarget&&(i.initialTarget.dataset.formState=JSON.stringify(i.reviewState)),delete i._autofillRetry),await this._deferredUpdated(o,t);return}if(i?._reviewedOperations?.clear(),i?._usedAutofillOperations?.clear(),h&&i){Object.hasOwn(o,"submission")&&(i._baselineSubmission=structuredClone(o.submission??{}));try{await(await this.view?.ensureEditWatcher?.())?.stageConflict?.(i,{response:o})}finally{this._clearActiveSubmitter()}return}n?.form?.clearUnsavedState?.();try{await t.updated(o)}finally{this._clearActiveSubmitter()}}async create(t,e,a=t.route){const r=this.view;if(!r)return;if(!r.online){const i=r.offlineQueue||await r.ensureOfflineQueue?.(),s=a&&await i?.queueSubmit(t,e,String(a),"POST");if(s)try{await t.created(s)}finally{this._clearActiveSubmitter()}else this._clearActiveSubmitter();return}const n=await g.post(a??String(a),e);if(this.successfulResponse(n,t)){if(l(t)?.form?.clearUnsavedState?.(),n.deferred){await this._deferredCreated(n,t);return}try{await t.created(n)}finally{this._clearActiveSubmitter()}}}async _deferredCreated(t,e){const[a,r]=await Promise.all([this.view?.ensureDeferredOperations?.(),t.notification?this.view?.ensureNotifications?.():null]);if(t.operation&&a?.track(t.operation,{node:t.background?null:e.active?.target}),t.notification&&r?.upsertNotification?.(t.notification),t.html){try{await e.created(t)}finally{this._clearActiveSubmitter()}return}await l(e)?.created?.(t),await l(e)?.prereconcile?.(),await w(()=>{const n=l(e);n?.postreconcile?.(),n?.success?.(),this._clearActiveSubmitter()},{label:"submission:create-without-html"})}async _deferredUpdated(t,e){const a=l(e);if(t.scope==="form-autofill"&&!t.already_running){const i=a?.form,s=i?._subForm;s&&(s.target&&(s.target.dataset.visible="false"),s.reset?.(),i.toggleSubForm())}t.locked&&m(a)&&a.lockDeferredOperation?.({...t,status:b(t.status)?t.status:void 0});const[r,n]=await Promise.all([this.view?.ensureDeferredOperations?.(),t.notification?this.view?.ensureNotifications?.():null]);if(t.operation&&r?.track(t.operation,{node:e.active?.target,status:b(t.status)?t.status:void 0,revision:t.revision}),t.notification&&n?.upsertNotification?.(t.notification),t.html){try{await e.updated(t)}finally{this._clearActiveSubmitter()}return}await w(()=>{t.scope!=="form-autofill"&&!e.active?.target?.querySelector("[data-role='deferred-progress']")&&l(e)?.form?.success?.(),this._clearActiveSubmitter()})}destroy(){this._clearActiveSubmitter(),this.view=null}}export{A as SubmissionManager};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { c as captureError, w as withTransition, r as request } from './foundation.js?v=b14914a4';
+import './upstreamUnavailable.js?v=b14914a4';
+import './connectivity.js?v=b14914a4';
+
+function getSubmissionWidget(component) {
+  const { active } = component;
+  return active && !("standalone" in active) ? active : null;
+}
+function isRevisionWidget(widget) {
+  return Boolean(
+    widget && "revisionSnapshot" in widget && typeof widget.revisionSnapshot === "function"
+  );
+}
+function isOperationStatus(value) {
+  return Boolean(
+    value && typeof value === "object" && "key" in value && typeof value.key === "string"
+  );
+}
+function isSubmitter(element) {
+  return Boolean(
+    element && "disabled" in element && typeof element.disabled === "boolean"
+  );
+}
+function isSubmitTarget(target) {
+  return Boolean(
+    target && "closest" in target && typeof target.closest === "function"
+  );
+}
+class SubmissionManager {
+  constructor(view) {
+    this.view = view;
+    this.activeSubmitter = null;
+    this.submit = this.submit.bind(this);
+  }
+  _clearActiveSubmitter() {
+    if (this.activeSubmitter) {
+      this.activeSubmitter.disabled = false;
+      this.activeSubmitter = null;
+    }
+    this._syncOfflineSubmitStates();
+  }
+  _syncOfflineSubmitStates() {
+    for (const component of Object.values(this.view?.components ?? {})) {
+      for (const widget of Object.values(component.widgets)) {
+        widget.form?.syncOfflineState?.();
+      }
+    }
+  }
+  _setActiveSubmitter(submitter) {
+    if (!submitter) return;
+    this.activeSubmitter = submitter;
+    this.activeSubmitter.disabled = true;
+  }
+  async submit(event) {
+    const view = this.view;
+    if (!view) return;
+    const detail = "detail" in event ? event.detail : void 0;
+    const settle = () => detail?.onSettled?.();
+    const submitForm = isSubmitTarget(event.target) ? event.target : null;
+    const component = view.getComponent(submitForm);
+    if (!component) {
+      captureError(new Error("No component found"), event.target);
+      settle();
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const submitWidget = getSubmissionWidget(component);
+    const route = detail?.route || component.route;
+    const submitter = "submitter" in event ? event.submitter : null;
+    this._setActiveSubmitter(isSubmitter(submitter) ? submitter : null);
+    if (submitWidget?.form?.syncOfflineState?.()) {
+      this._clearActiveSubmitter();
+      settle();
+      return;
+    }
+    let prepared;
+    try {
+      prepared = await submitWidget?.prepareSubmit?.({
+        route,
+        submitter
+      });
+    } catch (error) {
+      if (component.active === submitWidget && submitWidget?.target?.isConnected && submitForm?.isConnected) {
+        component.showError(
+          error instanceof Error && error.message || "Could not prepare upload"
+        );
+      }
+      this._clearActiveSubmitter();
+      settle();
+      return;
+    }
+    if (prepared === false) {
+      this._clearActiveSubmitter();
+      settle();
+      return;
+    }
+    if (component.active !== submitWidget || !submitWidget?.target?.isConnected || !submitForm?.isConnected) {
+      this._clearActiveSubmitter();
+      settle();
+      return;
+    }
+    const data = component.formData;
+    if (!data) {
+      captureError(new Error("No form data found"), submitWidget.target);
+      this._clearActiveSubmitter();
+      settle();
+      return;
+    }
+    const role = submitter?.dataset?.role || detail?.role;
+    if (submitWidget.target?.hasAttribute("lp-deferred") && (typeof data.has !== "function" || !data.has("operation-id"))) {
+      data.append("operation-id", view.operationId());
+    }
+    if (role) data.append("role", role);
+    if (submitWidget.target?.hasAttribute("lp-create")) {
+      void this.create(component, data, route);
+      settle();
+    } else if (detail?.update || submitWidget.target?.hasAttribute("lp-update")) {
+      if (detail?.onSettled) {
+        try {
+          await this.update(component, data, route);
+        } catch (error) {
+          component.showError?.(
+            error instanceof Error && error.message || "Could not retry autofill."
+          );
+          captureError(error);
+          this._clearActiveSubmitter();
+        } finally {
+          settle();
+        }
+      } else {
+        void this.update(component, data, route).catch((error) => {
+          if (component.active === submitWidget && submitWidget?.target?.isConnected) {
+            component.showError?.(
+              "Could not finish the update. Please try again."
+            );
+          }
+          this._clearActiveSubmitter();
+          captureError(error, submitWidget?.target);
+        });
+      }
+    } else {
+      settle();
+    }
+  }
+  successfulResponse(response, component) {
+    if (!response) return false;
+    if (response.already_running) {
+      const widget = getSubmissionWidget(component);
+      if (isRevisionWidget(widget)) {
+        widget.lockDeferredOperation?.({
+          ...response,
+          status: isOperationStatus(response.status) ? response.status : void 0
+        });
+      }
+      const operation = response.operation;
+      if (operation) {
+        void this.view?.ensureDeferredOperations?.().then(
+          (manager) => manager?.track(operation, { node: component.active?.target })
+        );
+      }
+      component?.showError?.(
+        response.message || "Autofill is already running. Your draft was kept."
+      );
+      this._clearActiveSubmitter();
+      return false;
+    }
+    if (response.conflict) return false;
+    if (response.reload) {
+      window.location.reload();
+      return false;
+    } else if (response.error || response.ok === false) {
+      component?.showError?.(
+        response.error || response.message || "The update was not saved. Please try again."
+      );
+      this._clearActiveSubmitter();
+      return false;
+    } else if (response.modal) {
+      const { modal } = response;
+      void this.view?.ensureModalClasses?.().then((classes) => {
+        if (!classes?.Modal || !this.view || this.view._destroyed) return;
+        if (typeof modal === "string") {
+          captureError(
+            new TypeError("Modal markup must be parsed before attachment"),
+            component
+          );
+          return;
+        }
+        void new classes.Modal(this.view).attach(modal, component);
+      });
+      this._clearActiveSubmitter();
+      return false;
+    }
+    return true;
+  }
+  async update(component, data, route = component.route) {
+    const view = this.view;
+    if (!view) return;
+    if (!view.online) {
+      const queue = view.offlineQueue || await view.ensureOfflineQueue?.();
+      const response2 = route && await queue?.queueSubmit(component, data, String(route), "PUT");
+      if (response2) {
+        await withTransition(
+          () => {
+            getSubmissionWidget(component)?.form?.queued?.();
+            this._clearActiveSubmitter();
+          },
+          { label: "submission:queue-offline" }
+        );
+      } else {
+        this._clearActiveSubmitter();
+      }
+      return;
+    }
+    const submittedWidget = getSubmissionWidget(component);
+    const revisionWidget = isRevisionWidget(submittedWidget) ? submittedWidget : null;
+    const submittedSnapshot = revisionWidget?.revisionSnapshot();
+    const response = await request.put(
+      route ?? String(route),
+      data
+    );
+    if (component.active !== submittedWidget || submittedWidget?.target?.isConnected === false) {
+      if (response?.deferred && response.operation) {
+        const operations = await this.view?.ensureDeferredOperations?.();
+        operations?.track(response.operation, {
+          status: isOperationStatus(response.status) ? response.status : void 0,
+          revision: response.revision
+        });
+      }
+      this._clearActiveSubmitter();
+      return;
+    }
+    if (response?.conflict) {
+      try {
+        const watcher = await this.view?.ensureEditWatcher?.();
+        if (revisionWidget && await watcher?.stageConflict?.(revisionWidget, { response }))
+          await watcher?.openConflictReview?.(revisionWidget, {
+            blockedAction: data.get("role") === "autofill-submit" ? "autofill" : null
+          });
+      } finally {
+        submittedWidget?.form?.resetSubmitButton?.();
+        this._clearActiveSubmitter();
+      }
+      return;
+    }
+    if (!this.successfulResponse(response, component)) return;
+    const changedDuringSave = revisionWidget && submittedSnapshot !== revisionWidget.revisionSnapshot();
+    if (response.deferred) {
+      if (response.form_revision && revisionWidget) {
+        revisionWidget.reviewState = response.form_state ?? revisionWidget.reviewState ?? {};
+        revisionWidget.reviewState.revision = response.form_revision;
+        if (revisionWidget.initialTarget) {
+          revisionWidget.initialTarget.dataset.formState = JSON.stringify(
+            revisionWidget.reviewState
+          );
+        }
+        delete revisionWidget._autofillRetry;
+      }
+      await this._deferredUpdated(response, component);
+      return;
+    }
+    revisionWidget?._reviewedOperations?.clear();
+    revisionWidget?._usedAutofillOperations?.clear();
+    if (changedDuringSave && revisionWidget) {
+      if (Object.hasOwn(response, "submission"))
+        revisionWidget._baselineSubmission = structuredClone(
+          response.submission ?? {}
+        );
+      try {
+        const watcher = await this.view?.ensureEditWatcher?.();
+        await watcher?.stageConflict?.(revisionWidget, { response });
+      } finally {
+        this._clearActiveSubmitter();
+      }
+      return;
+    }
+    submittedWidget?.form?.clearUnsavedState?.();
+    try {
+      await component.updated(response);
+    } finally {
+      this._clearActiveSubmitter();
+    }
+  }
+  async create(component, data, route = component.route) {
+    const view = this.view;
+    if (!view) return;
+    if (!view.online) {
+      const queue = view.offlineQueue || await view.ensureOfflineQueue?.();
+      const response2 = route && await queue?.queueSubmit(component, data, String(route), "POST");
+      if (response2) {
+        try {
+          await component.created(response2);
+        } finally {
+          this._clearActiveSubmitter();
+        }
+      } else {
+        this._clearActiveSubmitter();
+      }
+      return;
+    }
+    const response = await request.post(
+      route ?? String(route),
+      data
+    );
+    if (!this.successfulResponse(response, component)) return;
+    getSubmissionWidget(component)?.form?.clearUnsavedState?.();
+    if (response.deferred) {
+      await this._deferredCreated(response, component);
+      return;
+    }
+    try {
+      await component.created(response);
+    } finally {
+      this._clearActiveSubmitter();
+    }
+  }
+  async _deferredCreated(response, component) {
+    const [operations, notifications] = await Promise.all([
+      this.view?.ensureDeferredOperations?.(),
+      response.notification ? this.view?.ensureNotifications?.() : null
+    ]);
+    if (response.operation) {
+      operations?.track(response.operation, {
+        node: response.background ? null : component.active?.target
+      });
+    }
+    if (response.notification) {
+      notifications?.upsertNotification?.(response.notification);
+    }
+    if (response.html) {
+      try {
+        await component.created(response);
+      } finally {
+        this._clearActiveSubmitter();
+      }
+      return;
+    }
+    await getSubmissionWidget(component)?.created?.(response);
+    await getSubmissionWidget(component)?.prereconcile?.();
+    await withTransition(
+      () => {
+        const widget = getSubmissionWidget(component);
+        widget?.postreconcile?.();
+        widget?.success?.();
+        this._clearActiveSubmitter();
+      },
+      { label: "submission:create-without-html" }
+    );
+  }
+  async _deferredUpdated(response, component) {
+    const widget = getSubmissionWidget(component);
+    if (response.scope === "form-autofill" && !response.already_running) {
+      const form = widget?.form;
+      const subform = form?._subForm;
+      if (subform) {
+        if (subform.target) subform.target.dataset.visible = "false";
+        subform.reset?.();
+        form.toggleSubForm();
+      }
+    }
+    if (response.locked && isRevisionWidget(widget)) {
+      widget.lockDeferredOperation?.({
+        ...response,
+        status: isOperationStatus(response.status) ? response.status : void 0
+      });
+    }
+    const [operations, notifications] = await Promise.all([
+      this.view?.ensureDeferredOperations?.(),
+      response.notification ? this.view?.ensureNotifications?.() : null
+    ]);
+    if (response.operation) {
+      operations?.track(response.operation, {
+        node: component.active?.target,
+        status: isOperationStatus(response.status) ? response.status : void 0,
+        revision: response.revision
+      });
+    }
+    if (response.notification) {
+      notifications?.upsertNotification?.(response.notification);
+    }
+    if (response.html) {
+      try {
+        await component.updated(response);
+      } finally {
+        this._clearActiveSubmitter();
+      }
+      return;
+    }
+    await withTransition(() => {
+      if (response.scope !== "form-autofill" && !component.active?.target?.querySelector(
+        "[data-role='deferred-progress']"
+      )) {
+        getSubmissionWidget(component)?.form?.success?.();
+      }
+      this._clearActiveSubmitter();
+    });
+  }
+  destroy() {
+    this._clearActiveSubmitter();
+    this.view = null;
+  }
+}
+
+export { SubmissionManager };

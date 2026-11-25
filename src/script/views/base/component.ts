@@ -527,6 +527,7 @@ export default class ViewComponent {
 		}
 
 		this.elt.dataset.open = open || "false";
+		this.view.onComponentRendered?.(this);
 		void this.view.schedulePollingReconciliation?.();
 	}
 

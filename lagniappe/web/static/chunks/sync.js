@@ -1,2 +1,555 @@
-import{i as f,r as y,E as _}from"./foundation.js?v=baa4a64d";import{getSyncRecord as m,getAllOfflineRecords as g,deleteSyncRecords as v,deleteSyncRecord as u,updateSyncRecord as h}from"./offline.js?v=baa4a64d";import"./upstreamUnavailable.js?v=baa4a64d";import"./connectivity.js?v=baa4a64d";const w={document:{load:()=>import("./document.js?v=baa4a64d").then(function(d){return d.b}),name:"CollaborativeDocument"}};function b(d){return d.endsWith(":document")?"document":null}async function k({sync_id:d,remote:e,offline:i}){const s=b(d);if(!s)return null;const{load:n,name:o}=w[s],t=await n(),c=t[o],r=document.createElement("div");r.setAttribute("lp-sync",d);const a=e??i;if(!a)return null;const l=e?.fingerprint??i?.fingerprint;l&&r.setAttribute("lp-fingerprint",l);const p=new c({target:r,headless:!0,view:null,readonly:!0,key:a.key});return t.hasDocumentSyncId(p)?p:null}const I=k;class P{constructor(e){this.view=e,this._initialized=!1,this._subscriptions=new Map,this._cursors=new Map,this._checkpointRetries=new Set,this._checkpointPollFirst=new Set,this._pendingParentTouches=new Set,this._activating=new Set,this._offlineReplayAttempts=new Map,this._registerPromise=null,this._sendPromise=null,this._queuedSend=null,this.ready=Promise.resolve(this),this._syncSave=()=>this.sendUpdates(!0)}init(){return this._initialized?this:(this._initialized=!0,window.addEventListener("sync-save",this._syncSave),this.ready=this.register(),this)}get widgets(){const e=[];for(const i of Object.values(this.view.components??{}))for(const s of Object.values(i.widgets??{}))s.syncId&&e.push([s.syncId,s]);return Object.fromEntries(e)}_componentVisible(e){if(e?.visible!==!0)return!1;let i=e.elt?.parentElement?.closest?.("[lp-component]");for(;i;){if(i.dataset.visible==="false")return!1;i=i.parentElement?.closest?.("[lp-component]")}return!0}_widgetVisible(e){return!!(e?.component?.active===e&&this._componentVisible(e.component)&&e.visible===!0)}_descriptor(e){const s=this.view.PollingCoordinator?.get(`document:${e.syncId}`)??this._cursors.get(e.syncId);return{key:e.component?.key??e.key,sync_id:e.syncId,generation:s?.generation??null,revision:s?.revision??0,presence_digest:s?.presence_digest??null}}_rememberCursor(e,i=null){const s=this.view.PollingCoordinator?.get(`document:${e}`),o={...this._cursors.get(e)??{},...s,...i};this._cursors.set(e,{generation:o.generation??null,revision:o.revision??0,presence_digest:o.presence_digest??null})}_replayBlocked(e){return this._offlineReplayAttempts.get(e)===(this.view.connectivityGeneration??0)}_subscribe(e,{force:i=!1}={}){if(!e?.syncId||this._subscriptions.has(e.syncId)||!i&&!this._widgetVisible(e))return;const n={id:`document:${e.syncId}`,type:"document",...this._descriptor(e)},o=this.view.PollingCoordinator?.subscribe(n,{mode:"periodic",initial:"immediate",beforePoll:()=>{const t=this.widgets[e.syncId]??e;if(!(!this._widgetVisible(t)&&!this._activating.has(e.syncId)))return this.sendUpdates(this._checkpointRetries.has(e.syncId)&&!this._checkpointPollFirst.has(e.syncId))},onResult:async t=>{const c=this.widgets[e.syncId]??e;if(!this._widgetVisible(c)&&!this._activating.has(e.syncId))return!1;if(t.status==="unavailable"&&await c.readCache?.clear(),!(t.status!=="changed"||!t.payload)){if(!c.initialized)return this._activating.has(e.syncId);if(c.remote=t.payload,await c.sync()===!1)return!1;this._rememberCursor(e.syncId),await c.readCache?.accept(t.payload),!c.readonly&&(t.payload.checkpoint_required||this._checkpointRetries.has(e.syncId))&&(this._checkpointPollFirst.delete(e.syncId),await this.sendUpdates(!0))}}});o&&(this._subscriptions.set(e.syncId,o),this._rememberCursor(e.syncId,n))}async state(e){await this.ready;const i=await m(e.syncId);if(i&&(e.offlineRecord=i),!this.view.online)return i?.ydoc?null:await e.readCache?.read()??null;this._activating.add(e.syncId);try{this._subscribe(e,{force:!0});const n=(await this.view.PollingCoordinator?.trigger(`document:${e.syncId}`))?.find(o=>o.id===`document:${e.syncId}`);return n?.payload?(await e.readCache?.accept(n.payload),n.payload):!n||n.status==="error"?i?.ydoc?null:await e.readCache?.read()??null:(n.status==="unavailable"&&(await e.readCache?.clear(),e.offlineRecord=null),null)}finally{this._activating.delete(e.syncId)}}register(){if(this._registerPromise)return this._registerPromise;const e=this.view.connectivityGeneration??0,i=this._register(e);this._registerPromise=i;const s=()=>{this._registerPromise===i&&(this._registerPromise=null)};return i.then(s,s),i}async _register(e){const{sync:i}=await g(),s=i.filter(({sync_id:o})=>o?.endsWith(":document")&&this._offlineReplayAttempts.get(o)!==e),n=i.filter(({sync_id:o})=>!o?.endsWith(":document"));n.length&&await v(n.map(({sync_id:o})=>o));for(const o of Object.values(this.widgets))this._subscribe(o);if(s.length){for(const{sync_id:t}of s)this._offlineReplayAttempts.set(t,e);if(await this._reconcile(s))for(const{sync_id:t}of s)this._offlineReplayAttempts.get(t)===e&&this._offlineReplayAttempts.delete(t)}}async reconcileSubscriptions(){if(!this.view.online||this.view.hidden)return;const e=this.widgets,i=new Map(Object.entries(e).filter(([,n])=>this._widgetVisible(n))),s=[...this._subscriptions.keys()].filter(n=>!i.has(n)&&!this._activating.has(n));if(s.length){await this.sendUpdates(!0,null,{touchSyncIds:s});for(const n of s)this._rememberCursor(n),this._subscriptions.get(n)?.(),this._subscriptions.delete(n);await this.view.PollingCoordinator?.closeDocuments(s)}for(const n of i.values())this._subscribe(n)}async deregister(){this._offlineReplayAttempts.clear();const e=[...this._subscriptions.keys()];await this.sendUpdates(!0,null,{keepalive:!0,touchSyncIds:e});for(const i of e)this._rememberCursor(i);for(const i of this._subscriptions.values())i();this._subscriptions.clear(),await this.view.PollingCoordinator?.closeDocuments(e)}async _waitForWidgetInitialized(e){if(e.initialized)return;const i=e.container??e.target;i&&await f(i,"initialized")}async _pollOfflineState(e){const i=`replay:${e.sync_id}`,s=this.view.PollingCoordinator;if(!s)return null;const n=s.subscribe({id:i,type:"document",key:e.key,sync_id:e.sync_id,generation:e.generation??null,revision:e.revision??0,presence_digest:null},{mode:"periodic",initial:"immediate"});if(!n)return null;try{const t=(await s.trigger(i))?.find(a=>a.id===i);if(!t||!["changed","unchanged"].includes(t.status)||t.status==="changed"&&!t.payload)return null;const c=s.get(i);return c?.generation?{cursor:{generation:c.generation,revision:c.revision},payload:t.payload??null}:null}finally{n()}}async _reconcile(e){const i=[],s=[];let n=!1;try{for(const t of e){if(t.touch_parent&&!t.update&&!t.ydoc&&!Object.hasOwn(t,"html")){i.push({key:t.key,sync_id:t.sync_id,fingerprint:t.fingerprint,generation:t.generation??null,revision:Number(t.revision)||0,save:!0,touch_parent:!0});continue}let c=this.widgets[t.sync_id];if(!c){if(c=await I({sync_id:t.sync_id,offline:t}),!c){n=!0;continue}s.push(c),await c.init(),await this._waitForWidgetInitialized(c)}const r=await this._pollOfflineState(t);if(!r){n=!0;continue}if(c.remote=r.payload,c.offlineRecord=t,await c.sync()===!1){n=!0;continue}this._rememberCursor(t.sync_id,r.cursor),await c.waitForRender();const a=c.saveData;if(!a){t.touch_parent?i.push({key:c.component?.key??c.key??t.key,sync_id:t.sync_id,fingerprint:c.fingerprint??t.fingerprint,...r.cursor,save:!0,touch_parent:!0}):await u(t.sync_id);continue}i.push({key:c.component?.key??c.key??t.key,sync_id:t.sync_id,fingerprint:c.fingerprint??t.fingerprint,...r.cursor,...a,save:!0,touch_parent:!0})}if(!i.length)return!n;const o=await this.sendUpdates(!1,i);return!n&&o?.ok===!0}finally{for(const o of s)o.destroy();await this.view.PollingCoordinator?.closeDocuments(s.map(o=>o.syncId))}}_collect(e,{touchSyncIds:i=[]}={}){const s=[],n=new Set(i),o=new Set;for(const t of Object.values(this.widgets)){if(this._replayBlocked(t.syncId))continue;const c=e?t.saveData:t.syncData;if(!c)continue;const r={...this._descriptor(t),...c,save:e};e&&n.has(t.syncId)&&(r.touch_parent=!0),s.push(r),o.add(t.syncId)}if(e)for(const t of n){if(o.has(t)||!this._pendingParentTouches.has(t))continue;const c=this.widgets[t];c&&s.push({...this._descriptor(c),save:!0,touch_parent:!0})}return s}async _sendUpdatesNow(e=!1,i=null,{keepalive:s=!1,touchSyncIds:n=[]}={}){const o=i??this._collect(e,{touchSyncIds:n});if(!o.length)return null;if(!this.view.online){for(const r of o)await h(r);return null}const t=await y.post(_.sync,{client_id:this.view.PollingCoordinator?.clientId,updates:o},{keepalive:s});if(t?.ok===!1){for(const r of o)await h(r),this._checkpointRetries.add(r.sync_id),this._checkpointPollFirst.delete(r.sync_id);return t}const c=new Map(o.map(r=>[r.sync_id,r]));for(const r of t?.updates??[]){const a=c.get(r.sync_id);if(r.checkpoint_accepted){const l={generation:r.generation,revision:r.revision};this.view.PollingCoordinator?.update(`document:${r.sync_id}`,l),this._rememberCursor(r.sync_id,l),this._checkpointRetries.delete(r.sync_id),this._checkpointPollFirst.delete(r.sync_id)}if(r.checkpoint_persisted){if(a?.save&&a.ydoc){const l=this.widgets[r.sync_id];await l?.readCache?.accept({mode:"snapshot",ydoc:a.ydoc,fingerprint:l.fingerprint}),l?.commitSavedBaseline?l.commitSavedBaseline(a.ydoc,a.mentions||[]):l&&(l.snapshot=a.ydoc)}r.entity_touched?this._pendingParentTouches.delete(r.sync_id):this._pendingParentTouches.add(r.sync_id),await u(r.sync_id)}else r.entity_touched?(this._pendingParentTouches.delete(r.sync_id),await u(r.sync_id)):a?.save&&(this._checkpointRetries.add(r.sync_id),this._checkpointPollFirst.add(r.sync_id),await h(a))}return t}async sendUpdates(e=!1,i=null,s={}){if(this._sendPromise)return i?(await this._sendPromise,this.sendUpdates(e,i,s)):(this._queuedSend={save:!!(this._queuedSend?.save||e),keepalive:!!(this._queuedSend?.keepalive||s.keepalive),touchSyncIds:new Set([...this._queuedSend?.touchSyncIds??[],...s.touchSyncIds??[]])},this._sendPromise);this._sendPromise=(async()=>{let n=await this._sendUpdatesNow(e,i,s);for(;this._queuedSend;){const o=this._queuedSend;this._queuedSend=null,n=await this._sendUpdatesNow(o.save,null,{keepalive:o.keepalive,touchSyncIds:o.touchSyncIds})}return n})();try{return await this._sendPromise}finally{this._sendPromise=null}}destroy(){for(const e of this._subscriptions.values())e();this._subscriptions.clear(),this._cursors.clear(),this._checkpointRetries.clear(),this._checkpointPollFirst.clear(),this._pendingParentTouches.clear(),this._activating.clear(),this._offlineReplayAttempts.clear(),this._registerPromise=null,window.removeEventListener("sync-save",this._syncSave),this._initialized=!1}}export{P as SyncManager};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { i as waitForAttribute, r as request, E as ENDPOINTS } from './foundation.js?v=b14914a4';
+import { getSyncRecord, getAllOfflineRecords, deleteSyncRecords, deleteSyncRecord, updateSyncRecord } from './offline.js?v=b14914a4';
+import './upstreamUnavailable.js?v=b14914a4';
+import './connectivity.js?v=b14914a4';
+
+const HEADLESS_WIDGETS = {
+  document: {
+    load: () => import('./document.js?v=b14914a4').then(function (n) { return n.b; }),
+    name: "CollaborativeDocument"
+  }
+};
+function _headlessKind(sync_id) {
+  if (sync_id.endsWith(":document")) return "document";
+  return null;
+}
+async function loadHeadlessWidget({
+  sync_id,
+  remote,
+  offline
+}) {
+  const kind = _headlessKind(sync_id);
+  if (!kind) return null;
+  const { load, name } = HEADLESS_WIDGETS[kind];
+  const module = await load();
+  const Widget = module[name];
+  const target = document.createElement("div");
+  target.setAttribute("lp-sync", sync_id);
+  const identity = remote ?? offline;
+  if (!identity) return null;
+  const fingerprint = remote?.fingerprint ?? offline?.fingerprint;
+  if (fingerprint) target.setAttribute("lp-fingerprint", fingerprint);
+  const widget = new Widget({
+    target,
+    headless: true,
+    view: null,
+    readonly: true,
+    key: identity.key
+  });
+  return module.hasDocumentSyncId(widget) ? widget : null;
+}
+
+const loadReplayWidget = loadHeadlessWidget;
+class SyncManager {
+  constructor(view) {
+    this.view = view;
+    this._initialized = false;
+    this._subscriptions = /* @__PURE__ */ new Map();
+    this._cursors = /* @__PURE__ */ new Map();
+    this._checkpointRetries = /* @__PURE__ */ new Set();
+    this._checkpointPollFirst = /* @__PURE__ */ new Set();
+    this._pendingParentTouches = /* @__PURE__ */ new Set();
+    this._activating = /* @__PURE__ */ new Set();
+    this._offlineReplayAttempts = /* @__PURE__ */ new Map();
+    this._registerPromise = null;
+    this._sendPromise = null;
+    this._queuedSend = null;
+    this.ready = Promise.resolve(this);
+    this._syncSave = () => this.sendUpdates(true);
+  }
+  init() {
+    if (this._initialized) return this;
+    this._initialized = true;
+    window.addEventListener("sync-save", this._syncSave);
+    this.ready = this.register();
+    return this;
+  }
+  get widgets() {
+    const entries = [];
+    for (const component of Object.values(this.view.components ?? {})) {
+      for (const widget of Object.values(component.widgets ?? {})) {
+        if (widget.syncId) {
+          entries.push([widget.syncId, widget]);
+        }
+      }
+    }
+    return Object.fromEntries(entries);
+  }
+  _componentVisible(component) {
+    if (component?.visible !== true) return false;
+    let ancestor = component.elt?.parentElement?.closest?.("[lp-component]");
+    while (ancestor) {
+      if (ancestor.dataset.visible === "false") return false;
+      ancestor = ancestor.parentElement?.closest?.("[lp-component]");
+    }
+    return true;
+  }
+  _widgetVisible(widget) {
+    return Boolean(
+      widget?.component?.active === widget && this._componentVisible(widget.component) && widget.visible === true
+    );
+  }
+  _descriptor(widget) {
+    const active = this.view.PollingCoordinator?.get(
+      `document:${widget.syncId}`
+    );
+    const protocol = active ?? this._cursors.get(widget.syncId);
+    return {
+      key: widget.component?.key ?? widget.key,
+      sync_id: widget.syncId,
+      generation: protocol?.generation ?? null,
+      revision: protocol?.revision ?? 0,
+      presence_digest: protocol?.presence_digest ?? null
+    };
+  }
+  _rememberCursor(syncId, patch = null) {
+    const active = this.view.PollingCoordinator?.get(`document:${syncId}`);
+    const current = this._cursors.get(syncId) ?? {};
+    const source = { ...current, ...active, ...patch };
+    this._cursors.set(syncId, {
+      generation: source.generation ?? null,
+      revision: source.revision ?? 0,
+      presence_digest: source.presence_digest ?? null
+    });
+  }
+  _replayBlocked(syncId) {
+    return this._offlineReplayAttempts.get(syncId) === (this.view.connectivityGeneration ?? 0);
+  }
+  _subscribe(widget, { force = false } = {}) {
+    if (!widget?.syncId || this._subscriptions.has(widget.syncId)) return;
+    if (!force && !this._widgetVisible(widget)) return;
+    const id = `document:${widget.syncId}`;
+    const descriptor = {
+      id,
+      type: "document",
+      ...this._descriptor(widget)
+    };
+    const unsubscribe = this.view.PollingCoordinator?.subscribe(descriptor, {
+      mode: "periodic",
+      initial: "immediate",
+      beforePoll: () => {
+        const current = this.widgets[widget.syncId] ?? widget;
+        if (!this._widgetVisible(current) && !this._activating.has(widget.syncId))
+          return;
+        return this.sendUpdates(
+          this._checkpointRetries.has(widget.syncId) && !this._checkpointPollFirst.has(widget.syncId)
+        );
+      },
+      onResult: async (result) => {
+        const current = this.widgets[widget.syncId] ?? widget;
+        if (!this._widgetVisible(current) && !this._activating.has(widget.syncId))
+          return false;
+        if (result.status === "unavailable") {
+          await current.readCache?.clear();
+        }
+        if (result.status !== "changed" || !result.payload) return;
+        if (!current.initialized) return this._activating.has(widget.syncId);
+        current.remote = result.payload;
+        if (await current.sync() === false) return false;
+        this._rememberCursor(widget.syncId);
+        await current.readCache?.accept(result.payload);
+        if (!current.readonly && (result.payload.checkpoint_required || this._checkpointRetries.has(widget.syncId))) {
+          this._checkpointPollFirst.delete(widget.syncId);
+          await this.sendUpdates(true);
+        }
+      }
+    });
+    if (unsubscribe) {
+      this._subscriptions.set(widget.syncId, unsubscribe);
+      this._rememberCursor(widget.syncId, descriptor);
+    }
+  }
+  async state(widget) {
+    await this.ready;
+    const offline = await getSyncRecord(widget.syncId);
+    if (offline) widget.offlineRecord = offline;
+    if (!this.view.online)
+      return offline?.ydoc ? null : await widget.readCache?.read() ?? null;
+    this._activating.add(widget.syncId);
+    try {
+      this._subscribe(widget, { force: true });
+      const results = await this.view.PollingCoordinator?.trigger(
+        `document:${widget.syncId}`
+      );
+      const result = results?.find(
+        (result2) => result2.id === `document:${widget.syncId}`
+      );
+      if (result?.payload) {
+        await widget.readCache?.accept(result.payload);
+        return result.payload;
+      }
+      if (!result || result.status === "error") {
+        return offline?.ydoc ? null : await widget.readCache?.read() ?? null;
+      }
+      if (result.status === "unavailable") {
+        await widget.readCache?.clear();
+        widget.offlineRecord = null;
+      }
+      return null;
+    } finally {
+      this._activating.delete(widget.syncId);
+    }
+  }
+  /**
+   * Coalesced lifecycle events may request registration more than once during
+   * one reconnect. A failed durable replay is attempted once per connectivity
+   * generation and remains queued for the next genuine recovery.
+   *
+   */
+  register() {
+    if (this._registerPromise) return this._registerPromise;
+    const generation = this.view.connectivityGeneration ?? 0;
+    const pending = this._register(generation);
+    this._registerPromise = pending;
+    const complete = () => {
+      if (this._registerPromise === pending) this._registerPromise = null;
+    };
+    void pending.then(complete, complete);
+    return pending;
+  }
+  async _register(generation) {
+    const { sync: allOffline } = await getAllOfflineRecords();
+    const offline = allOffline.filter(
+      ({ sync_id }) => sync_id?.endsWith(":document") && this._offlineReplayAttempts.get(sync_id) !== generation
+    );
+    const obsolete = allOffline.filter(
+      ({ sync_id }) => !sync_id?.endsWith(":document")
+    );
+    if (obsolete.length) {
+      await deleteSyncRecords(obsolete.map(({ sync_id }) => sync_id));
+    }
+    for (const widget of Object.values(this.widgets)) this._subscribe(widget);
+    if (offline.length) {
+      for (const { sync_id } of offline) {
+        this._offlineReplayAttempts.set(sync_id, generation);
+      }
+      const completed = await this._reconcile(offline);
+      if (completed) {
+        for (const { sync_id } of offline) {
+          if (this._offlineReplayAttempts.get(sync_id) === generation) {
+            this._offlineReplayAttempts.delete(sync_id);
+          }
+        }
+      }
+    }
+  }
+  /**
+   * Keep document presence and its fast polling cadence scoped to the active,
+   * visible document widget.
+   *
+   */
+  async reconcileSubscriptions() {
+    if (!this.view.online || this.view.hidden) return;
+    const widgets = this.widgets;
+    const active = new Map(
+      Object.entries(widgets).filter(
+        ([, widget]) => this._widgetVisible(widget)
+      )
+    );
+    const closing = [...this._subscriptions.keys()].filter(
+      (syncId) => !active.has(syncId) && !this._activating.has(syncId)
+    );
+    if (closing.length) {
+      await this.sendUpdates(true, null, { touchSyncIds: closing });
+      for (const syncId of closing) {
+        this._rememberCursor(syncId);
+        this._subscriptions.get(syncId)?.();
+        this._subscriptions.delete(syncId);
+      }
+      await this.view.PollingCoordinator?.closeDocuments(closing);
+    }
+    for (const widget of active.values()) this._subscribe(widget);
+  }
+  async deregister() {
+    this._offlineReplayAttempts.clear();
+    const syncIds = [...this._subscriptions.keys()];
+    await this.sendUpdates(true, null, {
+      keepalive: true,
+      touchSyncIds: syncIds
+    });
+    for (const syncId of syncIds) this._rememberCursor(syncId);
+    for (const unsubscribe of this._subscriptions.values()) unsubscribe();
+    this._subscriptions.clear();
+    await this.view.PollingCoordinator?.closeDocuments(syncIds);
+  }
+  async _waitForWidgetInitialized(widget) {
+    if (widget.initialized) return;
+    const target = widget.container ?? widget.target;
+    if (target) await waitForAttribute(target, "initialized");
+  }
+  /**
+   * Fetch the authoritative state newer than an offline record's base cursor.
+   *
+   */
+  async _pollOfflineState(offline) {
+    const id = `replay:${offline.sync_id}`;
+    const polling = this.view.PollingCoordinator;
+    if (!polling) return null;
+    const unsubscribe = polling.subscribe(
+      {
+        id,
+        type: "document",
+        key: offline.key,
+        sync_id: offline.sync_id,
+        generation: offline.generation ?? null,
+        revision: offline.revision ?? 0,
+        presence_digest: null
+      },
+      { mode: "periodic", initial: "immediate" }
+    );
+    if (!unsubscribe) return null;
+    try {
+      const results = await polling.trigger(id);
+      const result = results?.find(
+        (candidate) => candidate.id === id
+      );
+      if (!result || !["changed", "unchanged"].includes(result.status) || result.status === "changed" && !result.payload) {
+        return null;
+      }
+      const descriptor = polling.get(id);
+      if (!descriptor?.generation) return null;
+      const cursor = {
+        generation: descriptor.generation,
+        revision: descriptor.revision
+      };
+      return { cursor, payload: result.payload ?? null };
+    } finally {
+      unsubscribe();
+    }
+  }
+  async _reconcile(offlineRecords) {
+    const replays = [];
+    const headless = [];
+    let unresolved = false;
+    try {
+      for (const offline of offlineRecords) {
+        if (offline.touch_parent && !offline.update && !offline.ydoc && !Object.hasOwn(offline, "html")) {
+          replays.push({
+            key: offline.key,
+            sync_id: offline.sync_id,
+            fingerprint: offline.fingerprint,
+            generation: offline.generation ?? null,
+            revision: Number(offline.revision) || 0,
+            save: true,
+            touch_parent: true
+          });
+          continue;
+        }
+        let widget = this.widgets[offline.sync_id];
+        if (!widget) {
+          widget = await loadReplayWidget({
+            sync_id: offline.sync_id,
+            offline
+          });
+          if (!widget) {
+            unresolved = true;
+            continue;
+          }
+          headless.push(widget);
+          await widget.init();
+          await this._waitForWidgetInitialized(widget);
+        }
+        const current = await this._pollOfflineState(offline);
+        if (!current) {
+          unresolved = true;
+          continue;
+        }
+        widget.remote = current.payload;
+        widget.offlineRecord = offline;
+        if (await widget.sync() === false) {
+          unresolved = true;
+          continue;
+        }
+        this._rememberCursor(offline.sync_id, current.cursor);
+        await widget.waitForRender();
+        const saveData = widget.saveData;
+        if (!saveData) {
+          if (offline.touch_parent) {
+            replays.push({
+              key: widget.component?.key ?? widget.key ?? offline.key,
+              sync_id: offline.sync_id,
+              fingerprint: widget.fingerprint ?? offline.fingerprint,
+              ...current.cursor,
+              save: true,
+              touch_parent: true
+            });
+          } else {
+            await deleteSyncRecord(offline.sync_id);
+          }
+          continue;
+        }
+        replays.push({
+          key: widget.component?.key ?? widget.key ?? offline.key,
+          sync_id: offline.sync_id,
+          fingerprint: widget.fingerprint ?? offline.fingerprint,
+          ...current.cursor,
+          ...saveData,
+          save: true,
+          touch_parent: true
+        });
+      }
+      if (!replays.length) return !unresolved;
+      const response = await this.sendUpdates(false, replays);
+      return !unresolved && response?.ok === true;
+    } finally {
+      for (const widget of headless) {
+        widget.destroy();
+      }
+      await this.view.PollingCoordinator?.closeDocuments(
+        headless.map((widget) => widget.syncId)
+      );
+    }
+  }
+  _collect(save, { touchSyncIds = [] } = {}) {
+    const batch = [];
+    const touches = new Set(touchSyncIds);
+    const included = /* @__PURE__ */ new Set();
+    for (const widget of Object.values(this.widgets)) {
+      if (this._replayBlocked(widget.syncId)) continue;
+      const payload = save ? widget.saveData : widget.syncData;
+      if (!payload) continue;
+      const update = {
+        ...this._descriptor(widget),
+        ...payload,
+        save
+      };
+      if (save && touches.has(widget.syncId)) update.touch_parent = true;
+      batch.push(update);
+      included.add(widget.syncId);
+    }
+    if (save) {
+      for (const syncId of touches) {
+        if (included.has(syncId) || !this._pendingParentTouches.has(syncId))
+          continue;
+        const widget = this.widgets[syncId];
+        if (!widget) continue;
+        batch.push({
+          ...this._descriptor(widget),
+          save: true,
+          touch_parent: true
+        });
+      }
+    }
+    return batch;
+  }
+  async _sendUpdatesNow(save = false, updates = null, { keepalive = false, touchSyncIds = [] } = {}) {
+    const batch = updates ?? this._collect(save, { touchSyncIds });
+    if (!batch.length) return null;
+    if (!this.view.online) {
+      for (const update of batch) await updateSyncRecord(update);
+      return null;
+    }
+    const response = await request.post(
+      ENDPOINTS.sync,
+      {
+        client_id: this.view.PollingCoordinator?.clientId,
+        updates: batch
+      },
+      { keepalive }
+    );
+    if (response?.ok === false) {
+      for (const update of batch) {
+        await updateSyncRecord(update);
+        this._checkpointRetries.add(update.sync_id);
+        this._checkpointPollFirst.delete(update.sync_id);
+      }
+      return response;
+    }
+    const submitted = new Map(batch.map((update) => [update.sync_id, update]));
+    for (const acknowledgement of response?.updates ?? []) {
+      const update = submitted.get(acknowledgement.sync_id);
+      if (acknowledgement.checkpoint_accepted) {
+        const cursor = {
+          generation: acknowledgement.generation,
+          revision: acknowledgement.revision
+        };
+        this.view.PollingCoordinator?.update(
+          `document:${acknowledgement.sync_id}`,
+          cursor
+        );
+        this._rememberCursor(acknowledgement.sync_id, cursor);
+        this._checkpointRetries.delete(acknowledgement.sync_id);
+        this._checkpointPollFirst.delete(acknowledgement.sync_id);
+      }
+      if (acknowledgement.checkpoint_persisted) {
+        if (update?.save && update.ydoc) {
+          const widget = this.widgets[acknowledgement.sync_id];
+          await widget?.readCache?.accept({
+            mode: "snapshot",
+            ydoc: update.ydoc,
+            fingerprint: widget.fingerprint
+          });
+          if (widget?.commitSavedBaseline) {
+            widget.commitSavedBaseline(update.ydoc, update.mentions || []);
+          } else if (widget) {
+            widget.snapshot = update.ydoc;
+          }
+        }
+        if (acknowledgement.entity_touched) {
+          this._pendingParentTouches.delete(acknowledgement.sync_id);
+        } else {
+          this._pendingParentTouches.add(acknowledgement.sync_id);
+        }
+        await deleteSyncRecord(acknowledgement.sync_id);
+      } else if (acknowledgement.entity_touched) {
+        this._pendingParentTouches.delete(acknowledgement.sync_id);
+        await deleteSyncRecord(acknowledgement.sync_id);
+      } else if (update?.save) {
+        this._checkpointRetries.add(acknowledgement.sync_id);
+        this._checkpointPollFirst.add(acknowledgement.sync_id);
+        await updateSyncRecord(update);
+      }
+    }
+    return response;
+  }
+  async sendUpdates(save = false, updates = null, options = {}) {
+    if (this._sendPromise) {
+      if (updates) {
+        await this._sendPromise;
+        return this.sendUpdates(save, updates, options);
+      }
+      this._queuedSend = {
+        save: Boolean(this._queuedSend?.save || save),
+        keepalive: Boolean(this._queuedSend?.keepalive || options.keepalive),
+        touchSyncIds: /* @__PURE__ */ new Set([
+          ...this._queuedSend?.touchSyncIds ?? [],
+          ...options.touchSyncIds ?? []
+        ])
+      };
+      return this._sendPromise;
+    }
+    this._sendPromise = (async () => {
+      let response = await this._sendUpdatesNow(save, updates, options);
+      while (this._queuedSend) {
+        const queued = this._queuedSend;
+        this._queuedSend = null;
+        response = await this._sendUpdatesNow(queued.save, null, {
+          keepalive: queued.keepalive,
+          touchSyncIds: queued.touchSyncIds
+        });
+      }
+      return response;
+    })();
+    try {
+      return await this._sendPromise;
+    } finally {
+      this._sendPromise = null;
+    }
+  }
+  destroy() {
+    for (const unsubscribe of this._subscriptions.values()) unsubscribe();
+    this._subscriptions.clear();
+    this._cursors.clear();
+    this._checkpointRetries.clear();
+    this._checkpointPollFirst.clear();
+    this._pendingParentTouches.clear();
+    this._activating.clear();
+    this._offlineReplayAttempts.clear();
+    this._registerPromise = null;
+    window.removeEventListener("sync-save", this._syncSave);
+    this._initialized = false;
+  }
+}
+
+export { SyncManager };

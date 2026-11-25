@@ -1,2 +1,413 @@
-import{BaseList as p}from"./baseList.js?v=baa4a64d";import{b as c,p as u}from"./ui-controls.js?v=baa4a64d";import{r,w as o}from"./foundation.js?v=baa4a64d";import{S as d,a as f}from"./forms.js?v=baa4a64d";import"./connectivity.js?v=baa4a64d";import{E as m}from"./baseTable.js?v=baa4a64d";import{S as b}from"./ui-resources.js?v=baa4a64d";class g{constructor(t){Object.assign(this,t),this.conditions=this.conditions??[];const e=i=>{const s=this.target.querySelector(`[data-role='${i}']`);if(!s)throw new Error(`Filters widget is missing the ${i} element.`);return s};this.options=e("options"),this.formConditions=e("form-conditions"),this.entityConditions=e("conditions"),this.filters=e("filters"),this.feedback=e("feedback"),this.error=e("error"),this.updateConditions=this._updateConditions.bind(this),this.addFilter=this._addFilter.bind(this),this.rangeSelector=this._rangeSelector.bind(this),this._formSelect=null,this._entitySelect=null,this._optionSelect=null,this._buttons={}}async init(){this._initFilters(),this._initButtons(),await this._loadSavedFilters()}async _loadSavedFilters(){this.component.elt.querySelector("[data-widget='SavedFilters']")&&await this.component.loadWidget("SavedFilters")}_initFilters(){this._createConditions(),this.options.addEventListener("click",this.addFilter),this.entityConditions.addEventListener("updated",this.updateConditions),this.formConditions.addEventListener("updated",this.updateConditions)}_rangeSelector(t){const e=t.target;if(!(e instanceof HTMLInputElement)||!e.closest("fieldset"))return;const i=this.options.querySelector('[data-role="single"]'),s=this.options.querySelector('[data-role="range"]');!i||!s||(e.value==="BETWEEN"?(i.dataset.visible="false",s.dataset.visible="true"):(i.dataset.visible="true",s.dataset.visible="false"))}async _addFilter(t){if(!(t.target instanceof Element)||!t.target.closest("button[data-role='add-filter']"))return;t.preventDefault(),t.stopPropagation(),this._buttons.addFilter?.activate();const e=new FormData(this.target),i=new FormData;this.options.querySelectorAll("[name]").forEach(a=>{e.getAll(a.name).forEach(n=>{i.append(a.name,n)})}),i.append("field",this.options.dataset.field),i.append("parent",this.options.dataset.parent);const s=await r.get(this.endpoints.options,new URLSearchParams(Array.from(i,([a,n])=>[a,String(n)])));o(()=>{this._updateForm(s)}),this._buttons.addFilter?.deactivate()}async _updateConditions(t){const{options:e}=t.detail;if(!Object.keys(e).length||!(t.target instanceof Element))return;const i=t.target.closest("[data-parent]");if(!i)return;const s=new URLSearchParams;s.append("parent",i.dataset.parent),Object.entries(e).forEach(([n,l])=>{s.append("field",n),l.hash&&(s.append(`${n}_value`,l.hash),s.append(`${n}_key`,l.key))});const a=await r.get(this.endpoints.condition,s);o(()=>{this._updateForm(a)})}_initButtons(){const t=this.target.querySelector("[data-role='buttons']");t&&(t.querySelectorAll("button").forEach(e=>{const i=e.dataset.role;i&&(this._buttons[i]=c.active({existingButton:e}))}),t.addEventListener("click",async e=>{e.preventDefault(),e.stopPropagation();const i=e.target instanceof Element?e.target.closest("button"):null;if(!i)return;const s=i.dataset.role;s==="reset"?this.reset():s==="run"?await this.run():s==="save"&&await this.save()}))}get contract(){return JSON.stringify({version:1,conditions:this.definitions.map(t=>JSON.parse(t))})}get formData(){const t=new FormData;return t.append("contract",this.contract),t}async save(){this._buttons.save?.activate();const t=await r.post(this.endpoints.save,this.formData);if(!this.view.successfulResponse(t,this.component)||!t)return;const e=this.view.components.tools||this.component,i=await e.loadWidget("SavedFilters");await e.activate("SavedFilters"),await i?.created?.(t),await e.prepareRender(!0),await o(()=>{e.render(!0),this._buttons.save?.deactivate()},{label:"filters:save"})}async run(){if(this.definitions.length===0){this.showError("Please add at least one filter condition");return}this._buttons.run?.activate();const t=await r.get(this.endpoints.test,{contract:this.contract});if(!this.view.successfulResponse(t,this.component)||!t)return;await(await this.component.loadWidget("FilterResults"))?.updated?.(t),await this.component.activate("FilterResults"),this.target.dataset.filterList="filters:FilterResults",await this.component.prepareRender(!0),o(()=>{this.component.render(!0),this._buttons.run?.deactivate()},{label:"filters:run"})}_createFormConditions(t){const e=t.conditions;if(!e?.length)return;const i=this.formConditions.appendChild(u.select({options:e.map(s=>({label:s.label,value:s.field,details:s})),kind:"form",placeholder:"add a form condition..."}));this._formSelect=new d(i),this._formSelect.init(),this.formConditions.dataset.visible="true",this.formConditions.dataset.parent=t.form}_createConditions(){this.entityConditions.dataset.parent=this.key;const t=this.entityConditions.appendChild(u.select({options:this.conditions.map(e=>({label:e.label,value:e.hash?e.hash:e.field,details:e})),kind:this.kind,placeholder:"add a condition..."}));this._entitySelect=new d(t),this._entitySelect.init()}_addOptions(t){this.options.innerHTML=t.options,this.options.dataset.visible="true",this.options.dataset.kind=t.kind,this.options.dataset.parent=t.parent,this.options.dataset.field=t.field;const e=this.options.querySelector("h3")?.dataset.fieldType;e==="timestamp"||e==="number"?this.options.addEventListener("input",this.rangeSelector):this.options.removeEventListener("input",this.rangeSelector);const i=this.options.querySelector("[lp-select]");if(i){const s=!!i?.querySelector("[data-index]");this._optionSelect=s?new f(i):new d(i),this._optionSelect.init()}this._buttons.addFilter=c.active({existingButton:this.options.querySelector("[data-role='add-filter']")})}get definitions(){return Array.from(this.filters.querySelectorAll('input[name="definition"]')).map(t=>t.value)}_updateForm(t){if(this._cleanup(),!!t){if(t.form?(this._cleanupFormConditions(),this._createFormConditions(t)):this.formConditions.dataset.parent!==t.parent&&(this._cleanupFormConditions(),delete this.formConditions.dataset.parent,this.formConditions.dataset.visible="false"),t.options)this._addOptions(t);else if(t.html){const e=t.html.querySelector('input[name="definition"]');e&&!this.definitions.includes(e.value)&&(this.filters.append(...t.html.body.children),this.filters.dataset.visible="true")}t.error&&this.showError(t.error),t.feedback&&this.showFeedback(t.feedback)}}_clearMessages(){this.feedback.dataset.visible="false",this.feedback.innerHTML="",this.error.dataset.visible="false",this.error.innerHTML=""}_cleanupFormConditions(){this._formSelect?.destroy(),this._formSelect=null,this.formConditions.innerHTML="",this.formConditions.dataset.visible="false",this._clearMessages()}_cleanup(){this._optionSelect?.destroy(),this._optionSelect=null,this.options.dataset.visible="false",this.options.innerHTML="",this._clearMessages();const t=this.component.widgets.FilterResults;t&&"reset"in t&&typeof t.reset=="function"&&(t.reset(),delete this.target.dataset.filterList),Object.values(this._buttons).forEach(e=>{e?.deactivate()})}reset(){this._cleanup(),this._cleanupFormConditions(),this.filters.innerHTML="",this.filters.dataset.visible="false",this._entitySelect?.clear()}showError(t){this.error.textContent=t,this.error.dataset.visible="true"}showFeedback(t){this.feedback.textContent=t,this.feedback.dataset.visible="true"}destroy(){this.reset()}}class v extends p{}var _=Object.freeze({__proto__:null,Filters:g,SavedFilters:v});class S extends m{constructor(t){super(t),this.badges=null,this.table=null,this.tableContainer=null,this.container=null,this.filtering=this.target.dataset.kind}async updated(t){const e=t.html;e&&(this.table=e.querySelector("#embedded-table")||e.querySelector("table"),this.filtering==="page"&&(this.badges=this.component.widgets.Filters.filters.cloneNode(!0)))}get tbody(){return this.table?.querySelector("tbody")}get rows(){return this.tbody?.querySelectorAll("tr:not([data-role='empty'])")}get empty(){return this.tbody?.querySelector("tr[data-role='empty']")}postreconcile(){!this.table||this.target.contains(this.table)||(this.container=document.createElement("div"),this.container.dataset.role="results-table",this.container.className=b.table.container,this.tableContainer=document.createElement("div"),this.tableContainer.className="table-container px-4",this.tableContainer.dataset.role="table",this.tableContainer.dataset.embedded="true",this.tableContainer.appendChild(this.table),this.container.appendChild(this.tableContainer),this.table.dataset.visible="true",this.initVisibility(this.table),this.filtering==="page"&&this.badges?this.target.replaceChildren(this.badges,this.container):this.target.replaceChildren(this.container))}reset(){this.badges&&(this.badges.remove(),this.badges=null),this.container&&(this.container.remove(),this.container=null),this.tableContainer&&(this.tableContainer=null),this.table&&(this.table=null)}}var y=Object.freeze({__proto__:null,FilterResults:S});export{y as a,_ as f};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { BaseList } from './baseList.js?v=b14914a4';
+import { b as buttons, p as primitives } from './ui-controls.js?v=b14914a4';
+import { r as request, w as withTransition } from './foundation.js?v=b14914a4';
+import { S as SelectBox, a as FacetsBox } from './forms.js?v=b14914a4';
+import './connectivity.js?v=b14914a4';
+import { E as EmbeddedTable } from './baseTable.js?v=b14914a4';
+import { S as STYLES } from './ui-resources.js?v=b14914a4';
+
+class Filters {
+  constructor(attributes) {
+    Object.assign(this, attributes);
+    this.conditions = this.conditions ?? [];
+    const control = (role) => {
+      const element = this.target.querySelector(
+        `[data-role='${role}']`
+      );
+      if (!element)
+        throw new Error(`Filters widget is missing the ${role} element.`);
+      return element;
+    };
+    this.options = control("options");
+    this.formConditions = control("form-conditions");
+    this.entityConditions = control("conditions");
+    this.filters = control("filters");
+    this.feedback = control("feedback");
+    this.error = control("error");
+    this.updateConditions = this._updateConditions.bind(this);
+    this.addFilter = this._addFilter.bind(this);
+    this.rangeSelector = this._rangeSelector.bind(this);
+    this._formSelect = null;
+    this._entitySelect = null;
+    this._optionSelect = null;
+    this._buttons = {};
+  }
+  async init() {
+    this._initFilters();
+    this._initButtons();
+    await this._loadSavedFilters();
+  }
+  async _loadSavedFilters() {
+    if (!this.component.elt.querySelector("[data-widget='SavedFilters']")) {
+      return;
+    }
+    await this.component.loadWidget("SavedFilters");
+  }
+  _initFilters() {
+    this._createConditions();
+    this.options.addEventListener("click", this.addFilter);
+    this.entityConditions.addEventListener("updated", this.updateConditions);
+    this.formConditions.addEventListener("updated", this.updateConditions);
+  }
+  _rangeSelector(e) {
+    const target = e.target;
+    if (!(target instanceof HTMLInputElement) || !target.closest("fieldset"))
+      return;
+    const single = this.options.querySelector(`[data-role="single"]`);
+    const range = this.options.querySelector(`[data-role="range"]`);
+    if (!single || !range) return;
+    if (target.value === "BETWEEN") {
+      single.dataset.visible = "false";
+      range.dataset.visible = "true";
+    } else {
+      single.dataset.visible = "true";
+      range.dataset.visible = "false";
+    }
+  }
+  async _addFilter(e) {
+    if (!(e.target instanceof Element) || !e.target.closest("button[data-role='add-filter']"))
+      return;
+    e.preventDefault();
+    e.stopPropagation();
+    this._buttons.addFilter?.activate();
+    const form = new FormData(this.target);
+    const options = new FormData();
+    this.options.querySelectorAll("[name]").forEach((elt) => {
+      form.getAll(elt.name).forEach((value) => {
+        options.append(elt.name, value);
+      });
+    });
+    options.append("field", this.options.dataset.field);
+    options.append("parent", this.options.dataset.parent);
+    const response = await request.get(
+      this.endpoints.options,
+      new URLSearchParams(
+        Array.from(options, ([key, value]) => [key, String(value)])
+      )
+    );
+    withTransition(() => {
+      this._updateForm(response);
+    });
+    this._buttons.addFilter?.deactivate();
+  }
+  async _updateConditions(e) {
+    const { options } = e.detail;
+    if (!Object.keys(options).length || !(e.target instanceof Element)) return;
+    const parent = e.target.closest("[data-parent]");
+    if (!parent) return;
+    const params = new URLSearchParams();
+    params.append("parent", parent.dataset.parent);
+    Object.entries(options).forEach(([key, value]) => {
+      params.append("field", key);
+      if (value.hash) {
+        params.append(`${key}_value`, value.hash);
+        params.append(`${key}_key`, value.key);
+      }
+    });
+    const response = await request.get(
+      this.endpoints.condition,
+      params
+    );
+    withTransition(() => {
+      this._updateForm(response);
+    });
+  }
+  _initButtons() {
+    const container = this.target.querySelector("[data-role='buttons']");
+    if (!container) return;
+    container.querySelectorAll("button").forEach((button) => {
+      const role = button.dataset.role;
+      if (!role) return;
+      this._buttons[role] = buttons.active({
+        existingButton: button
+      });
+    });
+    container.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const button = e.target instanceof Element ? e.target.closest("button") : null;
+      if (!button) return;
+      const role = button.dataset.role;
+      if (role === "reset") {
+        this.reset();
+      } else if (role === "run") {
+        await this.run();
+      } else if (role === "save") {
+        await this.save();
+      }
+    });
+  }
+  get contract() {
+    return JSON.stringify({
+      version: 1,
+      conditions: this.definitions.map(
+        (definition) => JSON.parse(definition)
+      )
+    });
+  }
+  get formData() {
+    const data = new FormData();
+    data.append("contract", this.contract);
+    return data;
+  }
+  async save() {
+    this._buttons.save?.activate();
+    const response = await request.post(this.endpoints.save, this.formData);
+    if (!this.view.successfulResponse(response, this.component) || !response)
+      return;
+    const tools = this.view.components.tools || this.component;
+    const saved = await tools.loadWidget("SavedFilters");
+    await tools.activate("SavedFilters");
+    await saved?.created?.(response);
+    await tools.prepareRender(true);
+    await withTransition(
+      () => {
+        tools.render(true);
+        this._buttons.save?.deactivate();
+      },
+      { label: "filters:save" }
+    );
+  }
+  async run() {
+    if (this.definitions.length === 0) {
+      this.showError("Please add at least one filter condition");
+      return;
+    }
+    this._buttons.run?.activate();
+    const response = await request.get(this.endpoints.test, {
+      contract: this.contract
+    });
+    if (!this.view.successfulResponse(response, this.component) || !response)
+      return;
+    const results = await this.component.loadWidget("FilterResults");
+    await results?.updated?.(response);
+    await this.component.activate("FilterResults");
+    this.target.dataset.filterList = "filters:FilterResults";
+    await this.component.prepareRender(true);
+    withTransition(
+      () => {
+        this.component.render(true);
+        this._buttons.run?.deactivate();
+      },
+      { label: "filters:run" }
+    );
+  }
+  _createFormConditions(response) {
+    const conditions = response.conditions;
+    if (!conditions?.length) return;
+    const select = this.formConditions.appendChild(
+      primitives.select({
+        options: conditions.map((formCondition) => ({
+          label: formCondition.label,
+          value: formCondition.field,
+          details: formCondition
+        })),
+        kind: "form",
+        placeholder: "add a form condition..."
+      })
+    );
+    this._formSelect = new SelectBox(select);
+    this._formSelect.init();
+    this.formConditions.dataset.visible = "true";
+    this.formConditions.dataset.parent = response.form;
+  }
+  _createConditions() {
+    this.entityConditions.dataset.parent = this.key;
+    const select = this.entityConditions.appendChild(
+      primitives.select({
+        options: this.conditions.map((condition) => ({
+          label: condition.label,
+          value: condition.hash ? condition.hash : condition.field,
+          details: condition
+        })),
+        kind: this.kind,
+        placeholder: "add a condition..."
+      })
+    );
+    this._entitySelect = new SelectBox(select);
+    this._entitySelect.init();
+  }
+  _addOptions(response) {
+    this.options.innerHTML = response.options;
+    this.options.dataset.visible = "true";
+    this.options.dataset.kind = response.kind;
+    this.options.dataset.parent = response.parent;
+    this.options.dataset.field = response.field;
+    const fieldType = this.options.querySelector("h3")?.dataset.fieldType;
+    if (fieldType === "timestamp" || fieldType === "number") {
+      this.options.addEventListener("input", this.rangeSelector);
+    } else {
+      this.options.removeEventListener("input", this.rangeSelector);
+    }
+    const select = this.options.querySelector("[lp-select]");
+    if (select) {
+      const facet = !!select?.querySelector("[data-index]");
+      this._optionSelect = facet ? new FacetsBox(select) : new SelectBox(select);
+      this._optionSelect.init();
+    }
+    this._buttons.addFilter = buttons.active({
+      existingButton: this.options.querySelector(
+        "[data-role='add-filter']"
+      )
+    });
+  }
+  get definitions() {
+    return Array.from(
+      this.filters.querySelectorAll(
+        'input[name="definition"]'
+      )
+    ).map((filter) => filter.value);
+  }
+  _updateForm(response) {
+    this._cleanup();
+    if (!response) return;
+    if (response.form) {
+      this._cleanupFormConditions();
+      this._createFormConditions(response);
+    } else if (this.formConditions.dataset.parent !== response.parent) {
+      this._cleanupFormConditions();
+      delete this.formConditions.dataset.parent;
+      this.formConditions.dataset.visible = "false";
+    }
+    if (response.options) {
+      this._addOptions(response);
+    } else if (response.html) {
+      const definition = response.html.querySelector(
+        'input[name="definition"]'
+      );
+      if (definition && !this.definitions.includes(definition.value)) {
+        this.filters.append(...response.html.body.children);
+        this.filters.dataset.visible = "true";
+      }
+    }
+    if (response.error) this.showError(response.error);
+    if (response.feedback) this.showFeedback(response.feedback);
+  }
+  _clearMessages() {
+    this.feedback.dataset.visible = "false";
+    this.feedback.innerHTML = "";
+    this.error.dataset.visible = "false";
+    this.error.innerHTML = "";
+  }
+  _cleanupFormConditions() {
+    this._formSelect?.destroy();
+    this._formSelect = null;
+    this.formConditions.innerHTML = "";
+    this.formConditions.dataset.visible = "false";
+    this._clearMessages();
+  }
+  _cleanup() {
+    this._optionSelect?.destroy();
+    this._optionSelect = null;
+    this.options.dataset.visible = "false";
+    this.options.innerHTML = "";
+    this._clearMessages();
+    const results = this.component.widgets.FilterResults;
+    if (results && "reset" in results && typeof results.reset === "function") {
+      results.reset();
+      delete this.target.dataset.filterList;
+    }
+    Object.values(this._buttons).forEach((button) => {
+      button?.deactivate();
+    });
+  }
+  reset() {
+    this._cleanup();
+    this._cleanupFormConditions();
+    this.filters.innerHTML = "";
+    this.filters.dataset.visible = "false";
+    this._entitySelect?.clear();
+  }
+  showError(error) {
+    this.error.textContent = error;
+    this.error.dataset.visible = "true";
+  }
+  showFeedback(feedback) {
+    this.feedback.textContent = feedback;
+    this.feedback.dataset.visible = "true";
+  }
+  destroy() {
+    this.reset();
+  }
+}
+class SavedFilters extends BaseList {
+}
+
+var filters = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	Filters: Filters,
+	SavedFilters: SavedFilters
+});
+
+class FilterResults extends EmbeddedTable {
+  constructor(attributes) {
+    super(attributes);
+    this.badges = null;
+    this.table = null;
+    this.tableContainer = null;
+    this.container = null;
+    this.filtering = this.target.dataset.kind;
+  }
+  async updated(response) {
+    const html = response.html;
+    if (!html) return;
+    this.table = html.querySelector("#embedded-table") || html.querySelector("table");
+    if (this.filtering === "page") {
+      this.badges = this.component.widgets.Filters.filters.cloneNode(
+        true
+      );
+    }
+  }
+  get tbody() {
+    return this.table?.querySelector("tbody");
+  }
+  get rows() {
+    return this.tbody?.querySelectorAll("tr:not([data-role='empty'])");
+  }
+  get empty() {
+    return this.tbody?.querySelector("tr[data-role='empty']");
+  }
+  postreconcile() {
+    if (!this.table || this.target.contains(this.table)) return;
+    this.container = document.createElement("div");
+    this.container.dataset.role = "results-table";
+    this.container.className = STYLES.table.container;
+    this.tableContainer = document.createElement("div");
+    this.tableContainer.className = "table-container px-4";
+    this.tableContainer.dataset.role = "table";
+    this.tableContainer.dataset.embedded = "true";
+    this.tableContainer.appendChild(this.table);
+    this.container.appendChild(this.tableContainer);
+    this.table.dataset.visible = "true";
+    this.initVisibility(this.table);
+    if (this.filtering === "page" && this.badges) {
+      this.target.replaceChildren(this.badges, this.container);
+    } else {
+      this.target.replaceChildren(this.container);
+    }
+  }
+  reset() {
+    if (this.badges) {
+      this.badges.remove();
+      this.badges = null;
+    }
+    if (this.container) {
+      this.container.remove();
+      this.container = null;
+    }
+    if (this.tableContainer) {
+      this.tableContainer = null;
+    }
+    if (this.table) {
+      this.table = null;
+    }
+  }
+}
+
+var filterResults = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	FilterResults: FilterResults
+});
+
+export { filterResults as a, filters as f };

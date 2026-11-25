@@ -23,6 +23,7 @@
         <span>My Page</span>
       </span>
       <div data-visible="false" data-role="user-task-count"></div>
+      {{ render_icon("right", styles.home.linkIndicator) }}
     </a>
     <div id="starred"
          lp-component
@@ -33,6 +34,7 @@
       <button type="button"
               lp-show="starred:StarredList"
               data-toggle="true"
+              aria-expanded="false"
               class="{{ styles.home.listToggle }}">
         <span class="{{ styles.home.toggleLabel }}">
           {{ render_icon("star.home", styles.icon.default) }}
@@ -47,6 +49,7 @@
           {{ render_icon("spinner") }}
           <span class="sr-only">Loading</span>
         </span>
+        {{ render_icon("down", styles.home.expandIndicator) }}
       </button>
       <ul lp-load
           data-widget="StarredList"
@@ -64,11 +67,13 @@
       <button type="button"
               lp-show="directory:DirectoryList"
               data-toggle="true"
+              aria-expanded="false"
               class="{{ styles.home.toggle }}">
         <span class="{{ styles.home.toggleLabel }}">
           {{ render_icon("directory", styles.icon.default) }}
           <span>Directory</span>
         </span>
+        {{ render_icon("down", styles.home.expandIndicator) }}
       </button>
       {{ directory.list() }}
     </div>
@@ -79,6 +84,7 @@
         {{ render_icon("manual", styles.icon.default) }}
         <span>Manual</span>
       </span>
+      {{ render_icon("right", styles.home.linkIndicator) }}
     </a>
     {% if CONFIG.AI_ENABLED and not current_user.is_public %}
       <div id="tools"
@@ -92,6 +98,7 @@
           <button type="button"
                   lp-show="tools:ToolReportList"
                   data-toggle="true"
+                  aria-expanded="false"
                   class="{{ styles.home.listToggle }}">
             <span class="{{ styles.home.toggleLabel }}">
               {{ render_icon("generate", styles.icon.default) }}
@@ -104,6 +111,7 @@
               {{ render_icon("spinner") }}
               <span class="sr-only">Loading</span>
             </span>
+            {{ render_icon("down", styles.home.expandIndicator) }}
           </button>
           {% if current_user.access(AI.ASK) %}
             <button type="button"
@@ -140,6 +148,7 @@
         <button type="button"
                 lp-show="pages:HomePageList"
                 data-toggle="true"
+                aria-expanded="false"
                 class="{{ styles.home.listToggle }}">
           <span class="{{ styles.home.toggleLabel }}">
             {{ render_icon("page", styles.icon.default) }}
@@ -152,6 +161,7 @@
             {{ render_icon("spinner") }}
             <span class="sr-only">Loading</span>
           </span>
+          {{ render_icon("down", styles.home.expandIndicator) }}
         </button>
         {% if can_create_pages %}
           <button type="button"
@@ -181,6 +191,7 @@
         <button type="button"
                 lp-show="notes:HomeActivityList"
                 data-toggle="true"
+                aria-expanded="false"
                 class="{{ styles.home.listToggle }}">
           <span class="{{ styles.home.toggleLabel }}">
             {{ render_icon("notes", styles.icon.default) }}
@@ -193,6 +204,7 @@
             {{ render_icon("spinner") }}
             <span class="sr-only">Loading</span>
           </span>
+          {{ render_icon("down", styles.home.expandIndicator) }}
         </button>
         <button type="button"
                 lp-show="notes:CreateNote"
@@ -215,6 +227,7 @@
         <button type="button"
                 lp-show="tasks:HomeTaskList"
                 data-toggle="true"
+                aria-expanded="false"
                 aria-busy="true"
                 disabled
                 class="{{ styles.home.toggle }}">
@@ -225,6 +238,7 @@
           <div class="{{ styles.home.count }}"
                aria-live="polite"
                data-role="task-count">...</div>
+          {{ render_icon("down", styles.home.expandIndicator) }}
         </button>
         <button type="button"
                 lp-show="tasks:CreateUserTask"
@@ -253,6 +267,7 @@
         <button type="button"
                 lp-show="projects:HomeProjectList"
                 data-toggle="true"
+                aria-expanded="false"
                 class="{{ styles.home.listToggle }}">
           <span class="{{ styles.home.toggleLabel }}">
             {{ render_icon("project", styles.icon.default) }}
@@ -265,6 +280,7 @@
             {{ render_icon("spinner") }}
             <span class="sr-only">Loading</span>
           </span>
+          {{ render_icon("down", styles.home.expandIndicator) }}
         </button>
         {% if Resource.PROJECT.allowed(Action.CREATE) %}
           <button type="button"
@@ -293,6 +309,7 @@
         <button type="button"
                 lp-show="categories:HomeCategoryList"
                 data-toggle="true"
+                aria-expanded="false"
                 class="{{ styles.home.listToggle }}">
           <span class="{{ styles.home.toggleLabel }}">
             {{ render_icon("category", styles.icon.default) }}
@@ -305,6 +322,7 @@
             {{ render_icon("spinner") }}
             <span class="sr-only">Loading</span>
           </span>
+          {{ render_icon("down", styles.home.expandIndicator) }}
         </button>
         {% if Resource.CATEGORY.allowed(Action.CREATE) %}
           <button type="button"
@@ -327,7 +345,10 @@
 {% endmacro %}
 
 {% macro main() %}
-  <div lp-view data-kind="home" class="{{ styles.home.view }}">
+  <div lp-view
+       data-kind="home"
+       data-user="{{ current_user.hash }}"
+       class="{{ styles.home.view }}">
     <div class="{{ styles.home.column }}">{{ create() }}</div>
     <div class="{{ styles.home.column }}">{{ links() }}</div>
   </div>

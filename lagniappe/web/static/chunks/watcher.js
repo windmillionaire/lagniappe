@@ -1,2 +1,1672 @@
-import{f as O,r as $,c as L,w as x}from"./foundation.js?v=baa4a64d";import{e as E,r as M,f as K,h as Y}from"./forms.js?v=baa4a64d";import{b as V}from"./ui-controls.js?v=baa4a64d";import{S as g}from"./ui-resources.js?v=baa4a64d";import{Modal as F}from"./modal.js?v=baa4a64d";import{l as J}from"./core-foundation.js?v=baa4a64d";import"./upstreamUnavailable.js?v=baa4a64d";import"./connectivity.js?v=baa4a64d";import"./combobox.js?v=baa4a64d";async function B(_,t,{readonly:e=_.readonly}={}){const s=t.html;if(!s)return null;const i=s.querySelector(`[data-widget='${_.name}']`);if(!i)return null;const n=document.createElement("div");n.appendChild(i.cloneNode(!0));const o={key:_.key,kind:_.kind,readonly:e,online:!0,hidden:!1,showExtractReloadNotice(){}},r={elt:n,view:o,key:_.key,kind:_.kind,widgets:{},get readonly(){return e}},c=await J(r,_.name,{revisionPreview:!0,schema:t.schema??null,submission:t.submission??null}),a={...t,html:s.cloneNode(!0)};return c.updated&&await c.updated(a),c.prereconcile&&await c.prereconcile(),c.postreconcile&&c.postreconcile(),c}class G extends F{constructor(t,e,s,i,{blockedAction:n=null}={}){super(t.view,e.querySelector("[data-role='edited-reset']")),this.reconciler=t,this.marker=e,this.widget=s,this.state=i,this.blockedAction=n,this.selections=new Map,this.openReview=this._reviewSnapshot(),this.openSnapshot=s.revisionSnapshot()}_reviewSnapshot(){const t=this.state.response;if(!t)return null;const e=t.form_state??{};return structuredClone({schema:t.schema,submission:t.submission,revision:e.revision,reviews:e.reviews,queued:this.state.record?.id})}async _isCurrent(){return await Promise.all([this.state.probePromise,this.state.conflictPromise]),O(this.openReview,this._reviewSnapshot())&&this.widget.revisionSnapshot()===this.openSnapshot}_schemaSummary(){const t=new Map((this.state.record?.renderer_schema??this.widget.schema??[]).map(r=>[r?.id,r])),e=new Map((this.state.response?.schema??[]).map(r=>[r?.id,r])),s=[...e.keys()].filter(r=>r&&!t.has(r)),i=[...t.keys()].filter(r=>r&&!e.has(r)),n=[...e.keys()].filter(r=>r&&t.has(r)&&!O(t.get(r),e.get(r))),o=[];return s.length&&o.push(`${s.length} added`),i.length&&o.push(`${i.length} removed`),n.length&&o.push(`${n.length} changed`),o.length?`Schema update: ${o.join(", ")}.`:null}_value(t){const e=t?.elt?.cloneNode(!0);if(!e||t?.hasSubmission===!1){const i=document.createElement("p");return i.className="text-sm italic text-base-medium",i.textContent="Empty",i}(e.matches?.("[data-role='label']")?e:e.querySelector?.("[data-role='label']"))?.remove(),e.removeAttribute?.("id"),e.querySelectorAll?.("[id]").forEach(i=>{i.removeAttribute("id")}),e.querySelectorAll?.("button").forEach(i=>{i.remove()});for(const i of[e,...e.querySelectorAll("[data-visible]")])i.dataset.visible="true";return e}async _differences(t){const e=this.state.response;if(!e)return[];const s=this.state.record?this.state.record.renderer_submission??{}:this.widget.captureFormState().renderer_submission??{},i={...t.submission,...s},n=e.form_state??{};this.sources=[{id:"local",label:this.state.record?"Queued value":"Value in this tab",schema:this.state.record?.renderer_schema??this.widget.schema,submission:i},{id:"server",label:"Latest saved value",schema:e.schema,submission:e.submission??{}},...(n.reviews??[]).map(r=>({id:`ai:${r.operation}`,label:r.private?"Revised suggestion":"Autofill suggestion",...r}))];const o=await Promise.all(this.sources.map(r=>B(this.widget,{...e,schema:r.schema,submission:r.submission},{readonly:!0})));try{const r=o.map(l=>{if(!l)throw new Error("Could not render form review values");return new Map(Array.from(l.form?.renderer?.elements?.values?.()??[]).map(d=>[d.schema?.id,d]))}),c=[...new Map(this.sources.flatMap(l=>l.schema??[]).map(l=>[l.id,l])).values()],a=n.reviews??[],u=l=>a.some(d=>d.saved_baseline&&!this._sameValue(this.sources[1].submission[l.id],d.saved_baseline[l.id],l));return c.filter(l=>{if(!l?.id)return!1;if(a.some(f=>f.fields?.includes(l.id)&&!this._sameValue(f.baseline?.[l.id],f.submission?.[l.id],l)))return!0;if(a.length&&!this.state.record){const f=this.sources[0].schema?.find(h=>h.id===l.id),p=this.sources[1].schema?.find(h=>h.id===l.id);return u(l)||!E(f,p)}return this.sources.some(f=>(!f.fields||f.fields.includes(l.id))&&f.schema?.some(p=>p.id===l.id)&&(!this._sameValue(f.submission[l.id],this.sources[1].submission[l.id],l)||!E(f.schema.find(p=>p.id===l.id),this.sources[1].schema?.find(p=>p.id===l.id))))}).map(l=>({id:l.id,label:l.title||l.label||"Untitled field",choices:this.sources.flatMap((d,f)=>{if(d.fields&&!d.fields.includes(l.id))return[];if(d.id==="server"&&(a.length&&!this.state.record&&!u(l)&&E(this.sources[0].schema?.find(h=>h.id===l.id),d.schema?.find(h=>h.id===l.id))||this._sameValue(d.submission[l.id],this.sources[0].submission[l.id],l)&&E(this.sources[0].schema?.find(h=>h.id===l.id),d.schema?.find(h=>h.id===l.id))||!u(l)&&this.sources.some(h=>h.id.startsWith("ai:")&&h.fields?.includes(l.id)&&this._sameValue(d.submission[l.id],h.submission[l.id],l)&&E(h.schema?.find(k=>k.id===l.id),d.schema?.find(k=>k.id===l.id)))))return[];const p=d.schema?.find(h=>h.id===l.id);return p?d.id.startsWith("ai:")&&u(l)&&this._sameValue(d.submission[l.id],this.sources[1].submission[l.id],l)&&E(p,this.sources[1].schema?.find(h=>h.id===l.id))?[]:d.id.startsWith("ai:")&&this._sameValue(d.baseline?.[l.id],d.submission[l.id],l)&&this._sameValue(d.submission[l.id],this.sources[0].submission[l.id],l)&&E(p,this.sources[0].schema?.find(h=>h.id===l.id))?[]:[{source:d.id,label:d.label,compatible:d.id==="server"||E(p,this.sources[1].schema?.find(h=>h.id===l.id)),value:this._value(r[f].get(l.id))}]:[]}).sort((d,f)=>{const p=h=>h==="local"?0:h.startsWith("ai:")?1:h==="server"?2:3;return p(d.source)-p(f.source)})}))}finally{o.forEach(r=>{r?.destroy?.()})}}_sameValue(t,e,s=null){const i=n=>n==null||n===""||Array.isArray(n)&&!n.length||typeof n=="object"&&Object.keys(n).length===1&&("rows"in n&&Array.isArray(n.rows)&&!n.rows.length||"items"in n&&Array.isArray(n.items)&&!n.items.length)?null:s?.type==="input"&&s.input==="number"&&(typeof n=="string"||typeof n=="number")&&Number.isFinite(Number(n))?Number(n):n;return O(i(t),i(e))}_choice(t,{source:e,label:s,compatible:i,value:n}){const o=document.createElement(i?"button":"div");i?(o.setAttribute("type","button"),o.setAttribute("role","radio"),o.setAttribute("aria-checked",(e===this.selections.get(t.id)).toString())):o.dataset.role="incompatible-value",o.setAttribute("aria-label",`${s} for ${t.label}`),o.dataset.revisionSource=e,o.className="min-w-0 rounded-md border border-base-light/50 bg-white p-3 text-left transition-colors hover:bg-base-bg aria-checked:bg-kind-bg aria-checked:outline-2 aria-checked:outline-kind-default";const r=o.appendChild(document.createElement("span"));if(r.className="mb-2 block text-xs font-semibold text-base-medium",r.textContent=s,o.appendChild(n),!i){const c=o.appendChild(document.createElement("p"));return c.className="mt-2 text-xs text-base-medium",c.textContent="This field changed type or was removed. Keep this earlier value for reference and re-enter it in the updated form if needed.",o}return o.addEventListener("click",()=>{o.closest("[role='radiogroup']")?.querySelectorAll("[role='radio']").forEach(a=>{a.setAttribute("aria-checked",(a===o).toString())}),this.selections.set(t.id,e)}),o}async init(){const t=this.state.response;if(!t)return!1;const e=this.state.record?this.widget.buildLocalRevision(t,this.state.record):this.widget.buildLocalRevision(t),s=await this._differences(e.response);if(!s.length&&!this.state.response?.form_state)return!1;const i=!s.length&&!this.blockedAction&&!this.state.record&&!!this.state.response?.form_state?.reviews?.length,n=this.sources[1],o=this.state.response?.form_state?.reviews?.some(m=>{const v=m.saved_baseline;return v?[...new Map([...m.schema??[],...n.schema??[]].filter(w=>w?.id).map(w=>[w.id,w])).values()].some(w=>!this._sameValue(n.submission[w.id],v[w.id],w)):!1})??!1;for(const m of s){const v=m.choices.find(R=>R.source==="local"&&R.compatible),C=m.choices.find(R=>R.source==="server"&&R.compatible),w=m.choices.findLast(R=>R.compatible&&R.source.startsWith("ai:")),A=this.widget._baselineSubmission,D=this.state.record||A&&!this._sameValue(this.sources[0].submission[m.id]??null,A[m.id]??null);let P=w?.source??C?.source??v?.source;o&&(P=C?.source??(v?.compatible?"local":P)),v?.compatible&&D&&(P="local"),P&&this.selections.set(m.id,P)}const r=document.createElement("div");r.id="modal",r.className=g.modal.wrapper,r.dataset.kind=this.widget.kind||this.widget.component?.kind||this.reconciler.view.kind||"default";const c=r.appendChild(document.createElement("div"));c.id="modal-content",c.className=`${g.modal.content} w-full sm:max-w-3xl`;const a=c.appendChild(document.createElement("header"));a.className=g.modal.header;const u=a.appendChild(document.createElement("h2"));u.className="text-lg font-bold text-base-dark",u.textContent=this.blockedAction==="autofill"?"Review changes before autofill":i?"Autofill is complete":"Choose form values";const l=a.appendChild(document.createElement("button"));l.type="button",l.setAttribute("lp-control","close"),l.className=g.button.close,l.textContent="Close";const d=c.appendChild(document.createElement("div"));d.className="space-y-4 p-4 sm:p-6";const f=d.appendChild(document.createElement("p"));f.className="text-sm text-base-medium",f.textContent=this.blockedAction==="autofill"?"Autofill did not start because the saved form changed. Choose which values to keep, then select Use selected values and start Autofill again. Use Update first if you want to save your choices.":i?"No new form values were suggested. Keep your current values or revise the result below. Use Update afterward to acknowledge this review.":"Choose the values to keep. This updates your open form only; use Update afterward to save. Earlier values whose field type changed are shown for reference.",s.some(m=>m.choices.some(v=>!v.compatible))&&(f.textContent+=" Applying these choices drops incompatible draft values from the updated form. Copy any earlier values you need before continuing.");const p=this._schemaSummary();if(p){const m=d.appendChild(document.createElement("p"));m.className=g.message,m.textContent=p}const h=d.appendChild(document.createElement("div"));h.className="space-y-4";for(const m of s){const v=h.appendChild(document.createElement("section"));v.className="rounded-md border border-base-light/50 bg-base-bg p-3";const C=v.appendChild(document.createElement("h3"));C.className="mb-2 font-semibold text-base-dark",C.textContent=m.label;const w=v.appendChild(document.createElement("div"));m.choices.some(A=>A.compatible)&&w.setAttribute("role","radiogroup"),w.setAttribute("aria-label",m.label),w.className="grid gap-2 sm:grid-cols-2",w.append(...m.choices.map(A=>this._choice(m,A)))}if(!s.length&&!i){const m=h.appendChild(document.createElement("p"));m.textContent="The available values already match. You can revise them with a prompt below."}this._refinement(d);const k=d.appendChild(document.createElement("div"));k.className="flex w-full";const y=V.active({type:"button",text:i?"Keep current values":"Use selected values",processingText:"Applying values\u2026"}),S=k.appendChild(y.element);return S.addEventListener("click",async()=>{y.activate();try{if(!await this._isCurrent()){f.textContent="The form changed while this review was open. Close and reopen Review to compare the latest values.";return}await this.reconciler.resolveRevision(this.marker,{localResponse:e.response,selections:Object.fromEntries(this.selections),selectedSubmission:this._selectedSubmission()}),await this.remove()}finally{y.deactivate()}}),await super.attach(r,this.widget.component),S.focus(),!0}_selectedSubmission(){const t=this.state.response;if(!t)return{};const e=t.form_state??{},s=!this.state.record&&e.reviews?.length,i=structuredClone(s?this.sources[0].submission:t.submission??{});for(const[o,r]of this.selections){const c=this.sources.find(a=>a.id===r);!c||!E(c.schema?.find(a=>a.id===o),t.schema?.find(a=>a.id===o))||(Object.hasOwn(c.submission,o)?i[o]=structuredClone(c.submission[o]):delete i[o])}const n=new Set((t.schema??[]).map(o=>o.id));return Object.fromEntries(Object.entries(i).filter(([o])=>n.has(o)))}_refinement(t){const e=this.state.response?.form_state,s=e?.refine_url;if(!s||this.state.record||!e.reviews?.length)return;const i=t.appendChild(document.createElement("section"));i.className="space-y-2";const n=i.appendChild(document.createElement("label"));n.className="block text-sm font-semibold",n.append("Revise these values");const o=n.appendChild(document.createElement("textarea"));o.setAttribute("aria-label","Revise these values with AI"),o.className="mt-2 block w-full rounded-md border border-base-light p-2 text-sm",o.placeholder="Describe what to add, correct, or reorganize\u2026";const r=V.active({type:"button",icon:"generate",text:"Revise suggestions",processingText:"Revising suggestions\u2026",style:`${g.button.submit} review-revise-action`}),c=i.appendChild(r.element);c.setAttribute("aria-label","Revise suggestions with AI");const a=i.appendChild(document.createElement("p"));a.setAttribute("role","status"),a.className="text-sm text-base-medium",a.textContent="Suggestions stay private to you until you save the form. No file is required.",c.addEventListener("click",async()=>{if(o.value.trim()){if(!await this._isCurrent()){a.textContent="The form changed. Close and reopen Review before revising.";return}r.activate();try{const u=this.widget.view?.operationId?.();if(!u)throw new Error("Could not identify the review operation");const l=new FormData;l.set("autofill-description",o.value),l.set("form-revision",String(this.state.response?.form_state?.revision)),l.set("operation-id",u),l.set("submission",JSON.stringify(this._selectedSubmission()));const d=await $.post(s,l);if(!d?.ok){a.textContent=d?.message||d?.error||"The form changed or suggestions could not be started. Your choices were kept.";return}const f=typeof d.status=="object"?d.status:void 0;this.widget.lockDeferredOperation({...d,status:f}),M(this.widget,f);const p=await this.widget.view?.ensureDeferredOperations?.();d.operation&&p?.track(d.operation,{node:this.widget.target,status:f,revision:d.revision}),await this.remove()}catch{a.textContent="Suggestions could not be started. Your choices were kept; please try again."}finally{r.deactivate()}}})}}class I extends F{constructor(t,e,s){super(t.view,e.querySelector("[data-role='edited-reset']")),this.reconciler=t,this.marker=e,this.widget=s}async init(){const t=document.createElement("div");t.id="modal",t.className=g.modal.wrapper,t.dataset.kind=this.widget.kind||this.widget.component?.kind||this.reconciler.view.kind||"default";const e=t.appendChild(document.createElement("div"));e.id="modal-content",e.className=`${g.modal.content} w-full sm:max-w-lg`;const s=e.appendChild(document.createElement("header"));s.className=g.modal.header;const i=s.appendChild(document.createElement("h2"));i.className="text-lg font-bold text-base-dark",i.textContent="Choose form version";const n=s.appendChild(document.createElement("button"));n.type="button",n.setAttribute("lp-control","close"),n.className=g.button.close,n.textContent="Close";const o=e.appendChild(document.createElement("div"));o.className="space-y-4 p-4 sm:p-6";const r=o.appendChild(document.createElement("p"));r.className="text-sm text-base-medium",r.textContent="This form cannot be compared field by field. Use the saved version or retry the complete queued version.";const c=o.appendChild(document.createElement("div"));c.className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end";const a=c.appendChild(document.createElement("button"));a.type="button",a.className=g.button.cancel,a.textContent="Retry queued version";const u=c.appendChild(document.createElement("button"));u.type="button",u.className=g.button.submit,u.textContent="Use saved version",a.addEventListener("click",async()=>{await this.reconciler.resolveRevision(this.marker,"local"),await this.remove()}),u.addEventListener("click",async()=>{await this.reconciler.resolveRevision(this.marker,"server"),await this.remove()}),await super.attach(t,this.widget.component),u.focus()}}const Q={reset:"Reset form",reload:"Reload page",review:"Review values","whole-review":"Review versions",apply:"Continue",dismiss:"Dismiss"};class H{constructor(t,{recordMarkerRevision:e=()=>{},ownedDeferredCompletion:s=()=>null,forgetDeferredCompletion:i=()=>{}}={}){this.view=t,this.recordMarkerRevision=e,this.ownedDeferredCompletion=s,this.forgetDeferredCompletion=i}_state(t){return t._lp_edited_state??={mode:"reset",response:null,fingerprint:null,modified:null,record:null,remoteSnapshot:null,schemaChanged:!1,submissionChoice:!1,token:null,probePromise:null,probeRevision:null,pendingProbe:null,conflictPromise:null},t._lp_edited_state}async _prepareRevision(t,e){return t.prepareRevision?await t.prepareRevision(e):()=>{const s=t.applyRevision(e);typeof s?.then=="function"&&s.catch(L)}}async _prepareLocalRevision(t,e,s){return t.prepareLocalRevision?await t.prepareLocalRevision(e,s):()=>{const i=t.applyLocalRevision(e,s);typeof i?.then=="function"&&i.catch(L)}}_setAction(t,e,s=null){const i=this._state(t);i.mode=e;const n=t.querySelector("[data-role='edited-reset']");n&&!n.dataset?.reviewPending&&(n.textContent=Q[e]??"Review update");const o=t.querySelector("[data-role='edited-message']");o&&s&&(o.textContent=s),n&&(n.hidden=!1)}_hide(t){if(!t)return;t.dataset.visible="false";const e=this._state(t);e.response=null,e.fingerprint=null,e.modified=null,e.record=null,e.remoteSnapshot=null,e.schemaChanged=!1,e.submissionChoice=!1,this._setAction(t,"reset");const s=t.closest?.("form[data-widget]")?._lp_widget;s?.target?.dataset?.formState&&M(s)}_show(t){const e=t.dataset.visible==="true";t.dataset.visible="true",e||this.view.addFlash?.(t)}fallback(t,e=null){const s=this._state(t);s.response=null,this._setAction(t,"reload"),this._show(t),e&&L(e,t)}_rendererCapable(t,e){const s=i=>!!i&&typeof i=="object"&&!Array.isArray(i);return!!(t.form?.renderer&&Array.isArray(t.schema)&&t.schema.length&&s(t.submission)&&Array.isArray(e.schema)&&e.schema.length&&s(e.submission))}_rendererValuesDiffer(t,e){const s=t.submission??{},i=e.submission??{};return(t.schema??[]).some(n=>n?.id&&!O(i[n.id]??null,s[n.id]??null))}_storeRevision(t,e,{fingerprint:s,modified:i,record:n,remoteSnapshot:o,schemaChanged:r,submissionChoice:c}){const a=this._state(t);return a.response=e,a.fingerprint=s,a.modified=i,a.record=n,a.remoteSnapshot=o,a.schemaChanged=r,a.submissionChoice=c,a}async _stageRevision(t,e,s,{fingerprint:i=null,modified:n=null,record:o=null}={}){const r=this._state(t),c=o??r.record;if(s.form_state){const b=K(e,s.form_state.operation);e.reviewState={...s.form_state,operation:b,revision:e.reviewState?.revision??s.form_state.revision},b?.key&&(e.lockDeferredOperation?.({operation:b.key,revision:b.revision,scope:b.scope,blocks_edit:b.blocks_edit,status:b}),(this.view.DeferredOperations||await this.view.ensureDeferredOperations?.())?.track(b.key,{node:e.target,revision:b.revision,status:b})),M(e)}const a=!!s.form_state?.reviews?.some(b=>!e._reviewedOperations?.has(b.operation)),u=r.token,l=t.closest?.("[lp-entity]"),d=c?.fingerprint??l?.dataset?.fingerprint??null,f=c?.modified??l?.dataset?.modified??null,h=!!(!!(i&&d&&d!==i)&&n&&f&&f===n),k=!O(e.schema??null,s.schema??null),y=k||h;k&&(e._reviewedOperations?.clear(),e._usedAutofillOperations?.clear());const S=await B(e,s);if(u&&r.token!==u){S?.destroy?.();return}if(!S||!e.revisionCanReset(S)){S?.destroy?.(),this.fallback(t);return}const m=S.revisionSnapshot();S.destroy?.();const v=!!(c||e.form?._queued===!0),C=e.unsavedState===!0,w=!!(typeof document<"u"&&e.target?.contains?.(document.activeElement)),A=e.component?.active===e&&e.visible===!0,D=!C&&!v&&e.reviewState?.operation?.type!=="autofill"?this.ownedDeferredCompletion(t,e):null;if(!v&&!a&&!D&&!y&&m===e.revisionBaseline){this._hide(t);return}if(!(a||C||v||!y&&!D&&(A||w))){const b=await this._prepareRevision(e,s);await x(()=>{b(),this._hide(e.target?.querySelector("[lp-edited-marker]")??t)},{label:"edit-reconcile:apply-remote"});return}const R=e.revisionSnapshot(),q=this._rendererCapable(e,s),T=c?e.buildLocalRevision(s,c):e.buildLocalRevision(s),N=await B(e,T.response);if(u&&r.token!==u){N?.destroy?.();return}if(!N||!e.revisionCanReset(N)){N?.destroy?.(),this.fallback(t);return}const z=N.revisionSnapshot();N.destroy?.();const W=q&&this._rendererValuesDiffer(s,T.response),j=Y(c?.renderer_schema??e.schema??[],s.schema??[]);if(!(a||(C||v)&&j)&&(z===m||!c&&R===m)){c&&await this.view.offlineQueue?.cancel(c.id);const b=await this._prepareRevision(e,s);await x(()=>{b(),this._hide(e.target?.querySelector("[lp-edited-marker]")??t)},{label:"edit-reconcile:accept-matching"});return}if(a&&q||W&&!h||q&&j){this._storeRevision(t,s,{fingerprint:i,modified:n,record:c,remoteSnapshot:m,schemaChanged:y,submissionChoice:!0}),this._setAction(t,"review",y?"The form fields and saved values changed elsewhere.":"Another user has edited this form."),this._show(t),e.target?.dataset?.formState&&M(e);return}if(q&&y){const b=await this._prepareLocalRevision(e,s,{remoteSnapshot:m});await x(()=>{b(),t=e.target.querySelector("[lp-edited-marker]")??t,this._hide(t)},{label:"edit-reconcile:rebase-schema"}),c&&await this.view.offlineQueue?.rebaseSubmit(c,e,{fingerprint:i,modified:n})&&await this.view.offlineQueue?.replay();return}if(q&&m===e.revisionBaseline){const b=await this._prepareLocalRevision(e,s,{remoteSnapshot:m});await x(()=>{b(),t=e.target.querySelector("[lp-edited-marker]")??t,this._hide(t)},{label:"edit-reconcile:rebase-values"}),c&&await this.view.offlineQueue?.rebaseSubmit(c,e,{fingerprint:i,modified:n})&&await this.view.offlineQueue?.replay();return}this._storeRevision(t,s,{fingerprint:i,modified:n,record:c,remoteSnapshot:m,schemaChanged:y,submissionChoice:v}),this._setAction(t,v?"whole-review":"reset",v?"The saved form changed while this update was queued.":"This form changed elsewhere. Reset it to load the saved version."),this._show(t)}async _installUninitialized(t,e){const s=t.closest("form[data-widget]"),i=s?.dataset.widget,n=i&&e.html?e.html.querySelector(`[data-widget='${i}']`):null;if(!s||!n)return!1;const o=s.dataset.visible,r=n.cloneNode(!0);return o!==void 0&&(r.dataset.visible=o),await x(()=>s.replaceWith(r)),!0}_sameProbeRevision(t,e){return!!(t&&e&&t.fingerprint===e.fingerprint&&t.modified===e.modified)}probe(t,e,s=null){const i=this._state(t),n={fingerprint:e,modified:s};if(i.conflictPromise)return i.pendingProbe=n,i.conflictPromise.then(()=>{const c=i.pendingProbe;if(c)return i.pendingProbe=null,this.probe(t,c.fingerprint,c.modified)});if(i.probePromise&&this._sameProbeRevision(i.probeRevision,n)||(this._sameProbeRevision(i.pendingProbe,n)||(i.pendingProbe=n),i.probePromise))return i.probePromise;const r=(async()=>{let c=null;for(;i.pendingProbe;){const a=i.pendingProbe;i.pendingProbe=null,!this._sameProbeRevision(c,a)&&(i.probeRevision=a,await this._runProbe(t,a.fingerprint,a.modified),c=a)}})().finally(()=>{i.probePromise===r&&(i.probePromise=null,i.probeRevision=null)});return i.probePromise=r,r}async _runProbe(t,e,s=null){if(!t?.isConnected&&t?.isConnected!==void 0)return;const i=this._state(t),n={};i.token=n;const o=t.dataset.editedRoute;if(!o){this.fallback(t,new Error("Edited marker has no replacement route"));return}try{const r=await $.get(o,null,{acknowledgeEntities:!1,replaceErrorPage:!1});if(i.token!==n)return;const a=t.closest("form[data-widget]")?._lp_widget,u=this.ownedDeferredCompletion(t,a);if(r?.unchanged){i.response||this._hide(t),this.recordMarkerRevision(t,{fingerprint:e,modified:s}),this.forgetDeferredCompletion(u);return}if(!r?.ok){this.fallback(t),this.forgetDeferredCompletion(u);return}if(!a){if(await this._installUninitialized(t,r))return;this.fallback(t,new Error("Replacement response has no form"));return}a.revisionBaseline===null&&a.commitRevisionBaseline(),await this._stageRevision(t,a,r,{fingerprint:e,modified:s}),this.recordMarkerRevision(t,{fingerprint:e,modified:s}),this.forgetDeferredCompletion(u)}catch(r){i.token===n&&this.fallback(t,r)}}async stageConflict(t,{record:e,response:s}={}){const i=t?.target?.querySelector?.("[lp-edited-marker]");if(!i||!s)return!1;const n=(s.entities||[]).find(c=>c.key===(e?.target_key??t.key)),o=this._state(i),r=(async()=>(o.probePromise&&await o.probePromise,o.token={},t.revisionBaseline===null&&t.commitRevisionBaseline(),await this._stageRevision(i,t,s,{fingerprint:n?.fingerprint??null,modified:n?.modified??null,record:e}),delete t._offlineConflict,!0))();o.conflictPromise=r;try{return await r}catch(c){return this.fallback(i,c),!1}finally{o.conflictPromise===r&&(o.conflictPromise=null)}}async openConflictReview(t,{blockedAction:e=null}={}){const s=t?.target?.querySelector?.("[lp-edited-marker]");if(!s||!["review","whole-review"].includes(this._state(s).mode))return!1;const i=s.querySelector("[data-role='edited-reset']");return!i||i.disabled?!1:(await this._activateAction(s,i,{refresh:!0,blockedAction:e}),!0)}async resolveRevision(t,e){const s=this._state(t),i=t.closest("form[data-widget]")?._lp_widget;if(!i||!s.response)return this.fallback(t),!1;const n=e&&typeof e=="object"?e:null,o=n?n.selections??{}:null;if(o?Object.values(o).some(a=>a!=="server")||!!n?.selectedSubmission&&!s.record:e==="local"){let a=n?.selectedSubmission;if(o&&a===void 0){a=structuredClone(s.response.submission??{});const l=n?.localResponse?.submission??{};for(const[d,f]of Object.entries(o))f==="local"&&(Object.hasOwn(l,d)?a[d]=structuredClone(l[d]):delete a[d])}const u=await this._prepareLocalRevision(i,s.response,{remoteSnapshot:s.remoteSnapshot,markUnsaved:!s.record,selectedSubmission:a});await x(()=>u(),{label:"edit-reconcile:resolve-local"}),s.record&&await this.view.offlineQueue?.rebaseSubmit(s.record,i,{fingerprint:s.fingerprint,modified:s.modified})&&await this.view.offlineQueue?.replay()}else{s.record&&await this.view.offlineQueue?.cancel(s.record.id);const a=await this._prepareRevision(i,s.response);await x(()=>a(),{label:"edit-reconcile:resolve-server"})}const c=i.target?.querySelector("[lp-edited-marker]")??t;if(!s.record&&s.response.form_state?.reviews?.length){i._reviewedOperations??=new Set,i._usedAutofillOperations??=new Set;for(const a of s.response.form_state?.reviews??[])i._reviewedOperations.add(a.operation);for(const a of Object.values(o??{}))a.startsWith("ai:")&&i._usedAutofillOperations.add(a.slice(3));i.markUnsavedState?.()}return this._hide(c),!0}async handleClick(t){const e=t.target?.closest?.("[data-role='edited-reset']");if(!e)return;const s=e.closest("[lp-edited-marker]");s&&await this._activateAction(s,e)}async _activateAction(t,e,{refresh:s=!1,blockedAction:i=null}={}){const n=t?this._state(t):null;if(!n)return;if(n.mode==="reload"){window.location.reload();return}if(n.mode==="dismiss"){this._hide(t);return}if(e.disabled)return;const o=t.closest("form[data-widget]")?._lp_widget,r=["review","whole-review"].includes(n.mode),c=e.textContent;e.disabled=!0,r&&(e.dataset.reviewPending="true",e.textContent="Opening review\u2026",e.setAttribute("aria-busy","true"));try{if(await n.probePromise,await n.conflictPromise,(s||o?.target?.dataset?.formState)&&!n.record){const a=t.dataset.editedRoute,u=a?await $.get(a,null,{acknowledgeEntities:!1,replaceErrorPage:!1}):null;if(!u?.ok)throw new Error("Could not load the latest form values. Please try Review again.");if(!u.unchanged){if(!o){this.fallback(t);return}n.token={},await this._stageRevision(t,o,u)}}if(!n.response&&t.dataset.visible==="false")return;if(!o||!n.response){this.fallback(t);return}if(n.mode==="review"){const u=await new G(this,t,o,n,{blockedAction:i}).init();!u&&n.record?await new I(this,t,o).init():u||this._setAction(t,"reset","This form changed elsewhere. Reset it to load the saved version.")}else n.mode==="whole-review"?await new I(this,t,o).init():n.mode==="apply"&&n.record?await this.resolveRevision(t,"local"):await this.resolveRevision(t,"server")}catch(a){this.fallback(o?.target?.querySelector("[lp-edited-marker]")??t,a)}finally{r&&(delete e.dataset.reviewPending,e.removeAttribute("aria-busy"),e.textContent=Q[n.mode]??c),e.disabled=!1}}}class X{constructor(t){this.view=t,this._unsubscribers=new Map,this._markerRevisions=new WeakMap,this._latestRevisions=new Map,this._deferredCompletions=new Map,this._destroyed=!1,this._reconciler=new H(t,{recordMarkerRevision:(e,s)=>{this._markerRevisions.set(e,s)},ownedDeferredCompletion:(e,s)=>this._ownedDeferredCompletion(e,s),forgetDeferredCompletion:e=>this._forgetDeferredCompletion(e)}),this._click=e=>this._reconciler.handleClick(e),this._entityUpdated=this._entityUpdated.bind(this),this.check=this.check.bind(this)}init(){this.view.elt.addEventListener("click",this._click),window.addEventListener("entity-updated",this._entityUpdated),this.view.key&&this.view.elt.dataset.fingerprint&&this._latestRevisions.set(this.view.key,{fingerprint:this.view.elt.dataset.fingerprint,modified:this.view.elt.dataset.modified??null});for(const t of Object.values(this.view.components??{}))for(const e of Object.values(t.widgets??{}))if(e&&typeof e=="object"&&"_offlineConflict"in e&&e._offlineConflict){const s=e;this.stageConflict(s,s._offlineConflict)}this.resume()}get entities(){return this._entities()}_componentVisible(t){if(t?.visible!==!0)return!1;let e=t.elt?.parentElement?.closest?.("[lp-component]");for(;e;){if(e.dataset.visible==="false")return!1;e=e.parentElement?.closest?.("[lp-component]")}return!0}_markerActive(t){const e=t.closest?.("form[data-widget]")?._lp_widget;return!!(e&&e.component?.active===e&&this._componentVisible(e.component)&&e.visible===!0)}_markerRevision(t,e){let s=this._markerRevisions.get(t);return s||(s={fingerprint:e.dataset.fingerprint??null,modified:e.dataset.modified??null},this._markerRevisions.set(t,s)),s}_entities({activeOnly:t=!0}={}){const e=new Map,s=this.view.elt.querySelectorAll("[lp-edited-marker]");for(const i of s){const n=i.closest("[lp-entity]"),o=n?.dataset.key,r=n?this._markerRevision(i,n):null,c=r?.fingerprint;if(!n||!o||!r||!c){L(new Error("Edited marker has no fingerprinted entity anchor"),i);continue}if(t&&!this._markerActive(i))continue;const a=e.get(o)??{key:o,fingerprint:c,modified:r.modified,anchors:new Set,markers:new Set};a.anchors.add(n),a.markers.add(i),e.set(o,a)}return e}expectDeferredCompletion(t,e){if(!t||!e)return!1;const s=this._deferredCompletions.get(t)??new Set;return s.add(e),this._deferredCompletions.set(t,s),!0}_ownedDeferredCompletion(t,e){const s=t.closest?.("[lp-entity]")?.dataset?.key,i=e?._deferredOperation;if(!s||!i)return null;if(this._deferredCompletions.get(s)?.has(i))return{key:s,operation:i};for(const[n,o]of this._deferredCompletions)if(o.has(i))return{key:n,operation:i};return null}_forgetDeferredCompletion(t){if(!t)return;const e=this._deferredCompletions.get(t.key);e?.delete(t.operation),e?.size||this._deferredCompletions.delete(t.key)}async _probeEntity(t,e,s=null){const i=this.entities.get(t);if(!i)return;const n={fingerprint:e,modified:s},o=Array.from(i.markers).filter(a=>{const u=this._markerRevisions.get(a);return u?.fingerprint!==e||!!s&&u?.modified!==s||!!this._ownedDeferredCompletion(a,a.closest?.("form[data-widget]")?._lp_widget)});await Promise.all(o.map(a=>this._reconciler.probe(a,e,s)));const r=this._latestRevisions.get(t),c=r?.fingerprint?r:n;for(const a of i.anchors)a.dataset.fingerprint=c.fingerprint,c.modified&&(a.dataset.modified=c.modified)}async receiveEntityResult(t,e){if(!t||!e)return;if(e.status==="unavailable"){for(const i of this.entities.get(t)?.markers??[])this._reconciler.fallback(i);return}if(e.status==="unchanged"&&this._deferredCompletions.size){const i=this._latestRevisions.get(t)??{fingerprint:e.revision??null,modified:null};i.fingerprint&&await this._probeEntity(t,i.fingerprint,i.modified);return}if(e.status!=="changed"||!e.payload?.fingerprint)return;const s={fingerprint:e.payload.fingerprint,modified:e.payload.modified??null};this._latestRevisions.set(t,s),await this._probeEntity(t,s.fingerprint,s.modified)}async _lockEntity(t,e){if(!t||!e?.operation)return;const s=new Set;for(const o of t.markers??[]){const r=o.closest("form[data-widget]");r&&s.add(r)}for(const o of t.anchors??[])for(const r of o.querySelectorAll?.("form[data-widget='PageInfo'], form[data-widget='TaskForm']")??[])s.add(r);const i=[];for(const o of s){if(o.dataset.deferredLock!=="form"&&!["PageInfo","TaskForm"].includes(o.dataset.widget??""))continue;const r=o._lp_widget;r?._deferredOperation!==e.operation&&r?.lockDeferredOperation?.(e),r||(o.dataset.operation=e.operation,o.dataset.operationRevision=String(e.revision??0),o.dataset.operationScope=e.scope||"",e.blocks_edit===!0||e.scope==="form-change"?o.dataset.deferredLock="form":delete o.dataset.deferredLock),i.push({revision:e.revision??0,node:r?.target??o})}if(!i.length)return;const n=this.view.DeferredOperations||await this.view.ensureDeferredOperations?.();for(const o of i)n?.track(e.operation,o)}_syncSubscriptions(){const t=this.entities,e=new Set;for(const s of t.values()){const i=`edit:${s.key}`,n=`lock:${s.key}`;e.add(n),s.key!==this.view.key&&e.add(i),s.key!==this.view.key&&!this._unsubscribers.has(i)&&this._unsubscribers.set(i,this.view.PollingCoordinator?.subscribe({id:i,type:"entity",key:s.key,revision:s.fingerprint},{mode:"periodic",initial:"scheduled",onResult:o=>this.receiveEntityResult(s.key,o)})??(()=>{})),this._unsubscribers.has(n)||this._unsubscribers.set(n,this.view.PollingCoordinator?.subscribe({id:n,type:"form-lock",key:s.key,revision:"unlocked"},{mode:"periodic",initial:"scheduled",onResult:async o=>{o.status==="changed"&&(o.payload?.locked?await this._lockEntity(this.entities.get(s.key),o.payload):Array.from(this.entities.get(s.key)?.markers??[]).some(r=>r.closest?.("form[data-widget]")?.hasAttribute("data-deferred-lock"))&&await this.view.reconcileChange?.({type:"poll",key:s.key}))}})??(()=>{}))}for(const[s,i]of this._unsubscribers)e.has(s)||(i(),this._unsubscribers.delete(s));return t}async reconcileSubscriptions(){const t=this._syncSubscriptions();return await Promise.all(Array.from(t.values(),async e=>{const s=this._latestRevisions.get(e.key);s&&await this._probeEntity(e.key,s.fingerprint,s.modified)})),t}check(t=null,e={}){const s=this._syncSubscriptions(),n=(t===null?[...s.keys()]:Array.from(t)).flatMap(o=>[o===this.view.key?`view:entity:${o}`:`edit:${o}`,`lock:${o}`]);return this.view.PollingCoordinator?.trigger(n,e)}enqueue(t=null){const e=this._syncSubscriptions(),i=(t===null?[...e.keys()]:Array.from(t)).flatMap(n=>[n===this.view.key?`view:entity:${n}`:`edit:${n}`,`lock:${n}`]);this.view.PollingCoordinator?.enqueue(i)}invalidate(t){const e=t?(Array.isArray(t)?t:[t]).filter(Boolean):null;return this.check(e,{fresh:!0})}acknowledge({key:t,fingerprint:e,modified:s=null}={}){if(!t||!e)return;this._latestRevisions.set(t,{fingerprint:e,modified:s}),this.view.key===t&&(this.view.elt.dataset.fingerprint=e,s&&(this.view.elt.dataset.modified=s)),this.view.PollingCoordinator?.acknowledge(`edit:${t}`,e),this.view.PollingCoordinator?.acknowledge(`view:entity:${t}`,e);const i=this.entities.get(t);if(i){for(const n of i.anchors)n.dataset.fingerprint=e,s&&(n.dataset.modified=s);for(const n of i.markers)this._markerRevisions.set(n,{fingerprint:e,modified:s})}}pause(){}resume(){if(!(this._destroyed||!this.view.online||this.view.hidden))return this.reconcileSubscriptions()}stageConflict(t,e={}){return this._reconciler.stageConflict(t,e)}openConflictReview(t,e={}){return this._reconciler.openConflictReview(t,e)}resolveRevision(t,e){return this._reconciler.resolveRevision(t,e)}_entityUpdated(t){this.acknowledge(t.detail)}destroy(){this._destroyed=!0;for(const t of this._unsubscribers.values())t();this._unsubscribers.clear(),this._deferredCompletions.clear(),this.view.elt.removeEventListener("click",this._click),window.removeEventListener("entity-updated",this._entityUpdated)}}export{X as EditWatcher};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { f as areEqual, r as request, c as captureError, w as withTransition } from './foundation.js?v=b14914a4';
+import { e as compatibleField, r as renderReviewBar, f as currentReviewOperation, h as incompatibleSchema } from './forms.js?v=b14914a4';
+import { b as buttons } from './ui-controls.js?v=b14914a4';
+import { S as STYLES } from './ui-resources.js?v=b14914a4';
+import { Modal } from './modal.js?v=b14914a4';
+import { l as loadWidget } from './core-foundation.js?v=b14914a4';
+import './upstreamUnavailable.js?v=b14914a4';
+import './connectivity.js?v=b14914a4';
+import './combobox.js?v=b14914a4';
+
+async function loadRevisionPreview(liveWidget, response, { readonly = liveWidget.readonly } = {}) {
+  const html = response.html;
+  if (!html) return null;
+  const responseTarget = html.querySelector(
+    `[data-widget='${liveWidget.name}']`
+  );
+  if (!responseTarget) return null;
+  const container = document.createElement("div");
+  container.appendChild(responseTarget.cloneNode(true));
+  const view = {
+    key: liveWidget.key,
+    kind: liveWidget.kind,
+    readonly,
+    online: true,
+    hidden: false,
+    showExtractReloadNotice() {
+    }
+  };
+  const component = {
+    elt: container,
+    view,
+    key: liveWidget.key,
+    kind: liveWidget.kind,
+    widgets: {},
+    get readonly() {
+      return readonly;
+    }
+  };
+  const preview = await loadWidget(component, liveWidget.name, {
+    revisionPreview: true,
+    schema: response.schema ?? null,
+    submission: response.submission ?? null
+  });
+  const previewResponse = {
+    ...response,
+    html: html.cloneNode(true)
+  };
+  if (preview.updated) await preview.updated(previewResponse);
+  if (preview.prereconcile) await preview.prereconcile();
+  if (preview.postreconcile) preview.postreconcile();
+  return preview;
+}
+
+class FormRevisionModal extends Modal {
+  constructor(reconciler, marker, widget, state, { blockedAction = null } = {}) {
+    super(
+      reconciler.view,
+      marker.querySelector("[data-role='edited-reset']")
+    );
+    this.reconciler = reconciler;
+    this.marker = marker;
+    this.widget = widget;
+    this.state = state;
+    this.blockedAction = blockedAction;
+    this.selections = /* @__PURE__ */ new Map();
+    this.openReview = this._reviewSnapshot();
+    this.openSnapshot = widget.revisionSnapshot();
+  }
+  _reviewSnapshot() {
+    const response = this.state.response;
+    if (!response) return null;
+    const review = response.form_state ?? {};
+    return structuredClone({
+      schema: response.schema,
+      submission: response.submission,
+      revision: review.revision,
+      reviews: review.reviews,
+      queued: this.state.record?.id
+    });
+  }
+  async _isCurrent() {
+    await Promise.all([this.state.probePromise, this.state.conflictPromise]);
+    return areEqual(this.openReview, this._reviewSnapshot()) && this.widget.revisionSnapshot() === this.openSnapshot;
+  }
+  _schemaSummary() {
+    const before = new Map(
+      (this.state.record?.renderer_schema ?? this.widget.schema ?? []).map(
+        (field) => [field?.id, field]
+      )
+    );
+    const after = new Map(
+      (this.state.response?.schema ?? []).map((field) => [field?.id, field])
+    );
+    const added = [...after.keys()].filter((id) => id && !before.has(id));
+    const removed = [...before.keys()].filter((id) => id && !after.has(id));
+    const changed = [...after.keys()].filter(
+      (id) => id && before.has(id) && !areEqual(before.get(id), after.get(id))
+    );
+    const parts = [];
+    if (added.length) parts.push(`${added.length} added`);
+    if (removed.length) parts.push(`${removed.length} removed`);
+    if (changed.length) parts.push(`${changed.length} changed`);
+    return parts.length ? `Schema update: ${parts.join(", ")}.` : null;
+  }
+  _value(element) {
+    const rendered = element?.elt?.cloneNode(true);
+    if (!rendered || element?.hasSubmission === false) {
+      const empty = document.createElement("p");
+      empty.className = "text-sm italic text-base-medium";
+      empty.textContent = "Empty";
+      return empty;
+    }
+    const label = rendered.matches?.("[data-role='label']") ? rendered : rendered.querySelector?.("[data-role='label']");
+    label?.remove();
+    rendered.removeAttribute?.("id");
+    rendered.querySelectorAll?.("[id]").forEach((node) => {
+      node.removeAttribute("id");
+    });
+    rendered.querySelectorAll?.("button").forEach((button) => {
+      button.remove();
+    });
+    for (const node of [
+      rendered,
+      ...rendered.querySelectorAll("[data-visible]")
+    ]) {
+      node.dataset.visible = "true";
+    }
+    return rendered;
+  }
+  async _differences(localResponse) {
+    const response = this.state.response;
+    if (!response) return [];
+    const localSnapshot = this.state.record ? this.state.record.renderer_submission ?? {} : this.widget.captureFormState().renderer_submission ?? {};
+    const localSubmission = {
+      ...localResponse.submission,
+      ...localSnapshot
+    };
+    const state = response.form_state ?? {};
+    this.sources = [
+      {
+        id: "local",
+        label: this.state.record ? "Queued value" : "Value in this tab",
+        schema: this.state.record?.renderer_schema ?? this.widget.schema,
+        submission: localSubmission
+      },
+      {
+        id: "server",
+        label: "Latest saved value",
+        schema: response.schema,
+        submission: response.submission ?? {}
+      },
+      ...(state.reviews ?? []).map(
+        (review) => ({
+          id: `ai:${review.operation}`,
+          label: review.private ? "Revised suggestion" : "Autofill suggestion",
+          ...review
+        })
+      )
+    ];
+    const previews = await Promise.all(
+      this.sources.map(
+        (source) => loadRevisionPreview(
+          this.widget,
+          {
+            ...response,
+            schema: source.schema,
+            submission: source.submission
+          },
+          { readonly: true }
+        )
+      )
+    );
+    try {
+      const rendered = previews.map((preview) => {
+        if (!preview) throw new Error("Could not render form review values");
+        return new Map(
+          Array.from(preview.form?.renderer?.elements?.values?.() ?? []).map(
+            (element) => [element.schema?.id, element]
+          )
+        );
+      });
+      const fields = [
+        ...new Map(
+          this.sources.flatMap((source) => source.schema ?? []).map((field) => [field.id, field])
+        ).values()
+      ];
+      const reviews = state.reviews ?? [];
+      const savedChangedSinceLaunch = (field) => reviews.some(
+        (review) => review.saved_baseline && !this._sameValue(
+          this.sources[1].submission[field.id],
+          review.saved_baseline[field.id],
+          field
+        )
+      );
+      return fields.filter((field) => {
+        if (!field?.id) return false;
+        const suggestedChange = reviews.some(
+          (review) => review.fields?.includes(field.id) && !this._sameValue(
+            review.baseline?.[field.id],
+            review.submission?.[field.id],
+            field
+          )
+        );
+        if (suggestedChange) return true;
+        if (reviews.length && !this.state.record) {
+          const localField = this.sources[0].schema?.find(
+            (item) => item.id === field.id
+          );
+          const savedField = this.sources[1].schema?.find(
+            (item) => item.id === field.id
+          );
+          return savedChangedSinceLaunch(field) || !compatibleField(localField, savedField);
+        }
+        return this.sources.some(
+          (source) => (!source.fields || source.fields.includes(field.id)) && source.schema?.some((item) => item.id === field.id) && (!this._sameValue(
+            source.submission[field.id],
+            this.sources[1].submission[field.id],
+            field
+          ) || !compatibleField(
+            source.schema.find((item) => item.id === field.id),
+            this.sources[1].schema?.find((item) => item.id === field.id)
+          ))
+        );
+      }).map((field) => ({
+        id: field.id,
+        label: field.title || field.label || "Untitled field",
+        choices: this.sources.flatMap((source, index) => {
+          if (source.fields && !source.fields.includes(field.id)) return [];
+          if (source.id === "server" && (reviews.length && !this.state.record && !savedChangedSinceLaunch(field) && compatibleField(
+            this.sources[0].schema?.find(
+              (item) => item.id === field.id
+            ),
+            source.schema?.find((item) => item.id === field.id)
+          ) || this._sameValue(
+            source.submission[field.id],
+            this.sources[0].submission[field.id],
+            field
+          ) && compatibleField(
+            this.sources[0].schema?.find(
+              (item) => item.id === field.id
+            ),
+            source.schema?.find((item) => item.id === field.id)
+          ) || !savedChangedSinceLaunch(field) && this.sources.some(
+            (candidate) => candidate.id.startsWith("ai:") && candidate.fields?.includes(field.id) && this._sameValue(
+              source.submission[field.id],
+              candidate.submission[field.id],
+              field
+            ) && compatibleField(
+              candidate.schema?.find(
+                (item) => item.id === field.id
+              ),
+              source.schema?.find((item) => item.id === field.id)
+            )
+          )))
+            return [];
+          const definition = source.schema?.find(
+            (item) => item.id === field.id
+          );
+          if (!definition) return [];
+          if (source.id.startsWith("ai:") && savedChangedSinceLaunch(field) && this._sameValue(
+            source.submission[field.id],
+            this.sources[1].submission[field.id],
+            field
+          ) && compatibleField(
+            definition,
+            this.sources[1].schema?.find((item) => item.id === field.id)
+          ))
+            return [];
+          if (source.id.startsWith("ai:") && this._sameValue(
+            source.baseline?.[field.id],
+            source.submission[field.id],
+            field
+          ) && this._sameValue(
+            source.submission[field.id],
+            this.sources[0].submission[field.id],
+            field
+          ) && compatibleField(
+            definition,
+            this.sources[0].schema?.find((item) => item.id === field.id)
+          ))
+            return [];
+          return [
+            {
+              source: source.id,
+              label: source.label,
+              compatible: source.id === "server" || compatibleField(
+                definition,
+                this.sources[1].schema?.find(
+                  (item) => item.id === field.id
+                )
+              ),
+              value: this._value(rendered[index].get(field.id))
+            }
+          ];
+        }).sort((left, right) => {
+          const rank = (source) => {
+            if (source === "local") return 0;
+            if (source.startsWith("ai:")) return 1;
+            if (source === "server") return 2;
+            return 3;
+          };
+          return rank(left.source) - rank(right.source);
+        })
+      }));
+    } finally {
+      previews.forEach((preview) => {
+        preview?.destroy?.();
+      });
+    }
+  }
+  _sameValue(left, right, field = null) {
+    const comparable = (value) => {
+      if (value == null || value === "" || Array.isArray(value) && !value.length)
+        return null;
+      if (typeof value === "object" && Object.keys(value).length === 1 && ("rows" in value && Array.isArray(value.rows) && !value.rows.length || "items" in value && Array.isArray(value.items) && !value.items.length))
+        return null;
+      if (field?.type === "input" && field.input === "number" && (typeof value === "string" || typeof value === "number") && Number.isFinite(Number(value)))
+        return Number(value);
+      return value;
+    };
+    return areEqual(comparable(left), comparable(right));
+  }
+  _choice(field, { source, label, compatible, value }) {
+    const button = document.createElement(compatible ? "button" : "div");
+    if (compatible) {
+      button.setAttribute("type", "button");
+      button.setAttribute("role", "radio");
+      button.setAttribute(
+        "aria-checked",
+        (source === this.selections.get(field.id)).toString()
+      );
+    } else button.dataset.role = "incompatible-value";
+    button.setAttribute("aria-label", `${label} for ${field.label}`);
+    button.dataset.revisionSource = source;
+    button.className = "min-w-0 rounded-md border border-base-light/50 bg-white p-3 text-left transition-colors hover:bg-base-bg aria-checked:bg-kind-bg aria-checked:outline-2 aria-checked:outline-kind-default";
+    const heading = button.appendChild(document.createElement("span"));
+    heading.className = "mb-2 block text-xs font-semibold text-base-medium";
+    heading.textContent = label;
+    button.appendChild(value);
+    if (!compatible) {
+      const explanation = button.appendChild(document.createElement("p"));
+      explanation.className = "mt-2 text-xs text-base-medium";
+      explanation.textContent = "This field changed type or was removed. Keep this earlier value for reference and re-enter it in the updated form if needed.";
+      return button;
+    }
+    button.addEventListener("click", () => {
+      const group = button.closest("[role='radiogroup']");
+      group?.querySelectorAll("[role='radio']").forEach((choice) => {
+        choice.setAttribute("aria-checked", (choice === button).toString());
+      });
+      this.selections.set(field.id, source);
+    });
+    return button;
+  }
+  async init() {
+    const response = this.state.response;
+    if (!response) return false;
+    const local = this.state.record ? this.widget.buildLocalRevision(response, this.state.record) : this.widget.buildLocalRevision(response);
+    const differences = await this._differences(local.response);
+    if (!differences.length && !this.state.response?.form_state) return false;
+    const noNewAutofillValues = !differences.length && !this.blockedAction && !this.state.record && !!this.state.response?.form_state?.reviews?.length;
+    const saved = this.sources[1];
+    const savedContextChanged = this.state.response?.form_state?.reviews?.some((review) => {
+      const savedBaseline = review.saved_baseline;
+      if (!savedBaseline) return false;
+      const fields2 = new Map(
+        [...review.schema ?? [], ...saved.schema ?? []].filter((field) => field?.id).map((field) => [field.id, field])
+      );
+      return [...fields2.values()].some(
+        (field) => !this._sameValue(
+          saved.submission[field.id],
+          savedBaseline[field.id],
+          field
+        )
+      );
+    }) ?? false;
+    for (const field of differences) {
+      const localChoice = field.choices.find(
+        (choice) => choice.source === "local" && choice.compatible
+      );
+      const serverChoice = field.choices.find(
+        (choice) => choice.source === "server" && choice.compatible
+      );
+      const aiChoice = field.choices.findLast(
+        (choice) => choice.compatible && choice.source.startsWith("ai:")
+      );
+      const baseline = this.widget._baselineSubmission;
+      const changedLocally = this.state.record || baseline && !this._sameValue(
+        this.sources[0].submission[field.id] ?? null,
+        baseline[field.id] ?? null
+      );
+      let defaultSource = aiChoice?.source ?? serverChoice?.source ?? localChoice?.source;
+      if (savedContextChanged)
+        defaultSource = serverChoice?.source ?? (localChoice?.compatible ? "local" : defaultSource);
+      if (localChoice?.compatible && changedLocally) defaultSource = "local";
+      if (defaultSource) this.selections.set(field.id, defaultSource);
+    }
+    const modal = document.createElement("div");
+    modal.id = "modal";
+    modal.className = STYLES.modal.wrapper;
+    modal.dataset.kind = this.widget.kind || this.widget.component?.kind || this.reconciler.view.kind || "default";
+    const content = modal.appendChild(document.createElement("div"));
+    content.id = "modal-content";
+    content.className = `${STYLES.modal.content} w-full sm:max-w-3xl`;
+    const header = content.appendChild(document.createElement("header"));
+    header.className = STYLES.modal.header;
+    const title = header.appendChild(document.createElement("h2"));
+    title.className = "text-lg font-bold text-base-dark";
+    title.textContent = this.blockedAction === "autofill" ? "Review changes before autofill" : noNewAutofillValues ? "Autofill is complete" : "Choose form values";
+    const close = header.appendChild(document.createElement("button"));
+    close.type = "button";
+    close.setAttribute("lp-control", "close");
+    close.className = STYLES.button.close;
+    close.textContent = "Close";
+    const body = content.appendChild(document.createElement("div"));
+    body.className = "space-y-4 p-4 sm:p-6";
+    const intro = body.appendChild(document.createElement("p"));
+    intro.className = "text-sm text-base-medium";
+    intro.textContent = this.blockedAction === "autofill" ? "Autofill did not start because the saved form changed. Choose which values to keep, then select Use selected values and start Autofill again. Use Update first if you want to save your choices." : noNewAutofillValues ? "No new form values were suggested. Keep your current values or revise the result below. Use Update afterward to acknowledge this review." : "Choose the values to keep. This updates your open form only; use Update afterward to save. Earlier values whose field type changed are shown for reference.";
+    if (differences.some(
+      (field) => field.choices.some((choice) => !choice.compatible)
+    ))
+      intro.textContent += " Applying these choices drops incompatible draft values from the updated form. Copy any earlier values you need before continuing.";
+    const schemaSummary = this._schemaSummary();
+    if (schemaSummary) {
+      const schema = body.appendChild(document.createElement("p"));
+      schema.className = STYLES.message;
+      schema.textContent = schemaSummary;
+    }
+    const fields = body.appendChild(document.createElement("div"));
+    fields.className = "space-y-4";
+    for (const field of differences) {
+      const row = fields.appendChild(document.createElement("section"));
+      row.className = "rounded-md border border-base-light/50 bg-base-bg p-3";
+      const label = row.appendChild(document.createElement("h3"));
+      label.className = "mb-2 font-semibold text-base-dark";
+      label.textContent = field.label;
+      const choices = row.appendChild(document.createElement("div"));
+      if (field.choices.some((choice) => choice.compatible))
+        choices.setAttribute("role", "radiogroup");
+      choices.setAttribute("aria-label", field.label);
+      choices.className = "grid gap-2 sm:grid-cols-2";
+      choices.append(
+        ...field.choices.map((choice) => this._choice(field, choice))
+      );
+    }
+    if (!differences.length && !noNewAutofillValues) {
+      const noChanges = fields.appendChild(document.createElement("p"));
+      noChanges.textContent = "The available values already match. You can revise them with a prompt below.";
+    }
+    this._refinement(body);
+    const actions = body.appendChild(document.createElement("div"));
+    actions.className = "flex w-full";
+    const updateAction = buttons.active({
+      type: "button",
+      text: noNewAutofillValues ? "Keep current values" : "Use selected values",
+      processingText: "Applying values\u2026"
+    });
+    const update = actions.appendChild(updateAction.element);
+    update.addEventListener("click", async () => {
+      updateAction.activate();
+      try {
+        if (!await this._isCurrent()) {
+          intro.textContent = "The form changed while this review was open. Close and reopen Review to compare the latest values.";
+          return;
+        }
+        await this.reconciler.resolveRevision(this.marker, {
+          localResponse: local.response,
+          selections: Object.fromEntries(this.selections),
+          selectedSubmission: this._selectedSubmission()
+        });
+        await this.remove();
+      } finally {
+        updateAction.deactivate();
+      }
+    });
+    await super.attach(modal, this.widget.component);
+    update.focus();
+    return true;
+  }
+  _selectedSubmission() {
+    const response = this.state.response;
+    if (!response) return {};
+    const review = response.form_state ?? {};
+    const preserveTabDraft = !this.state.record && review.reviews?.length;
+    const submission = structuredClone(
+      preserveTabDraft ? this.sources[0].submission : response.submission ?? {}
+    );
+    for (const [id, sourceId] of this.selections) {
+      const source = this.sources.find(
+        (candidate) => candidate.id === sourceId
+      );
+      if (!source || !compatibleField(
+        source.schema?.find((field) => field.id === id),
+        response.schema?.find((field) => field.id === id)
+      ))
+        continue;
+      if (Object.hasOwn(source.submission, id))
+        submission[id] = structuredClone(source.submission[id]);
+      else delete submission[id];
+    }
+    const currentIds = new Set(
+      (response.schema ?? []).map((field) => field.id)
+    );
+    return Object.fromEntries(
+      Object.entries(submission).filter(([id]) => currentIds.has(id))
+    );
+  }
+  _refinement(body) {
+    const review = this.state.response?.form_state;
+    const url = review?.refine_url;
+    if (!url || this.state.record || !review.reviews?.length) return;
+    const section = body.appendChild(document.createElement("section"));
+    section.className = "space-y-2";
+    const label = section.appendChild(document.createElement("label"));
+    label.className = "block text-sm font-semibold";
+    label.append("Revise these values");
+    const prompt = label.appendChild(document.createElement("textarea"));
+    prompt.setAttribute("aria-label", "Revise these values with AI");
+    prompt.className = "mt-2 block w-full rounded-md border border-base-light p-2 text-sm";
+    prompt.placeholder = "Describe what to add, correct, or reorganize\u2026";
+    const reviseAction = buttons.active({
+      type: "button",
+      icon: "generate",
+      text: "Revise suggestions",
+      processingText: "Revising suggestions\u2026",
+      style: `${STYLES.button.submit} review-revise-action`
+    });
+    const button = section.appendChild(reviseAction.element);
+    button.setAttribute("aria-label", "Revise suggestions with AI");
+    const message = section.appendChild(document.createElement("p"));
+    message.setAttribute("role", "status");
+    message.className = "text-sm text-base-medium";
+    message.textContent = "Suggestions stay private to you until you save the form. No file is required.";
+    button.addEventListener("click", async () => {
+      if (!prompt.value.trim()) return;
+      if (!await this._isCurrent()) {
+        message.textContent = "The form changed. Close and reopen Review before revising.";
+        return;
+      }
+      reviseAction.activate();
+      try {
+        const operationId = this.widget.view?.operationId?.();
+        if (!operationId)
+          throw new Error("Could not identify the review operation");
+        const data = new FormData();
+        data.set("autofill-description", prompt.value);
+        data.set(
+          "form-revision",
+          String(this.state.response?.form_state?.revision)
+        );
+        data.set("operation-id", operationId);
+        data.set("submission", JSON.stringify(this._selectedSubmission()));
+        const response = await request.post(
+          url,
+          data
+        );
+        if (!response?.ok) {
+          message.textContent = response?.message || response?.error || "The form changed or suggestions could not be started. Your choices were kept.";
+          return;
+        }
+        const status = typeof response.status === "object" ? response.status : void 0;
+        this.widget.lockDeferredOperation({ ...response, status });
+        renderReviewBar(this.widget, status);
+        const manager = await this.widget.view?.ensureDeferredOperations?.();
+        if (response.operation)
+          manager?.track(response.operation, {
+            node: this.widget.target,
+            status,
+            revision: response.revision
+          });
+        await this.remove();
+      } catch {
+        message.textContent = "Suggestions could not be started. Your choices were kept; please try again.";
+      } finally {
+        reviseAction.deactivate();
+      }
+    });
+  }
+}
+class WholeFormRevisionModal extends Modal {
+  constructor(reconciler, marker, widget) {
+    super(
+      reconciler.view,
+      marker.querySelector("[data-role='edited-reset']")
+    );
+    this.reconciler = reconciler;
+    this.marker = marker;
+    this.widget = widget;
+  }
+  async init() {
+    const modal = document.createElement("div");
+    modal.id = "modal";
+    modal.className = STYLES.modal.wrapper;
+    modal.dataset.kind = this.widget.kind || this.widget.component?.kind || this.reconciler.view.kind || "default";
+    const content = modal.appendChild(document.createElement("div"));
+    content.id = "modal-content";
+    content.className = `${STYLES.modal.content} w-full sm:max-w-lg`;
+    const header = content.appendChild(document.createElement("header"));
+    header.className = STYLES.modal.header;
+    const title = header.appendChild(document.createElement("h2"));
+    title.className = "text-lg font-bold text-base-dark";
+    title.textContent = "Choose form version";
+    const close = header.appendChild(document.createElement("button"));
+    close.type = "button";
+    close.setAttribute("lp-control", "close");
+    close.className = STYLES.button.close;
+    close.textContent = "Close";
+    const body = content.appendChild(document.createElement("div"));
+    body.className = "space-y-4 p-4 sm:p-6";
+    const copy = body.appendChild(document.createElement("p"));
+    copy.className = "text-sm text-base-medium";
+    copy.textContent = "This form cannot be compared field by field. Use the saved version or retry the complete queued version.";
+    const actions = body.appendChild(document.createElement("div"));
+    actions.className = "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end";
+    const retry = actions.appendChild(document.createElement("button"));
+    retry.type = "button";
+    retry.className = STYLES.button.cancel;
+    retry.textContent = "Retry queued version";
+    const saved = actions.appendChild(document.createElement("button"));
+    saved.type = "button";
+    saved.className = STYLES.button.submit;
+    saved.textContent = "Use saved version";
+    retry.addEventListener("click", async () => {
+      await this.reconciler.resolveRevision(this.marker, "local");
+      await this.remove();
+    });
+    saved.addEventListener("click", async () => {
+      await this.reconciler.resolveRevision(this.marker, "server");
+      await this.remove();
+    });
+    await super.attach(modal, this.widget.component);
+    saved.focus();
+  }
+}
+
+const ACTION_LABELS = {
+  reset: "Reset form",
+  reload: "Reload page",
+  review: "Review values",
+  "whole-review": "Review versions",
+  apply: "Continue",
+  dismiss: "Dismiss"
+};
+class EditReconciler {
+  constructor(view, {
+    recordMarkerRevision = () => {
+    },
+    ownedDeferredCompletion = () => null,
+    forgetDeferredCompletion = () => {
+    }
+  } = {}) {
+    this.view = view;
+    this.recordMarkerRevision = recordMarkerRevision;
+    this.ownedDeferredCompletion = ownedDeferredCompletion;
+    this.forgetDeferredCompletion = forgetDeferredCompletion;
+  }
+  _state(marker) {
+    marker._lp_edited_state ??= {
+      mode: "reset",
+      response: null,
+      fingerprint: null,
+      modified: null,
+      record: null,
+      remoteSnapshot: null,
+      schemaChanged: false,
+      submissionChoice: false,
+      token: null,
+      probePromise: null,
+      probeRevision: null,
+      pendingProbe: null,
+      conflictPromise: null
+    };
+    return marker._lp_edited_state;
+  }
+  async _prepareRevision(widget, response) {
+    if (widget.prepareRevision) return await widget.prepareRevision(response);
+    return () => {
+      const result = widget.applyRevision(response);
+      if (typeof result?.then === "function") void result.catch(captureError);
+    };
+  }
+  async _prepareLocalRevision(widget, response, options) {
+    if (widget.prepareLocalRevision) {
+      return await widget.prepareLocalRevision(response, options);
+    }
+    return () => {
+      const result = widget.applyLocalRevision(response, options);
+      if (typeof result?.then === "function") void result.catch(captureError);
+    };
+  }
+  _setAction(marker, mode, message = null) {
+    const state = this._state(marker);
+    state.mode = mode;
+    const button = marker.querySelector(
+      "[data-role='edited-reset']"
+    );
+    if (button && !button.dataset?.reviewPending)
+      button.textContent = ACTION_LABELS[mode] ?? "Review update";
+    const copy = marker.querySelector("[data-role='edited-message']");
+    if (copy && message) copy.textContent = message;
+    if (button) button.hidden = false;
+  }
+  _hide(marker) {
+    if (!marker) return;
+    marker.dataset.visible = "false";
+    const state = this._state(marker);
+    state.response = null;
+    state.fingerprint = null;
+    state.modified = null;
+    state.record = null;
+    state.remoteSnapshot = null;
+    state.schemaChanged = false;
+    state.submissionChoice = false;
+    this._setAction(marker, "reset");
+    const widget = marker.closest?.("form[data-widget]")?._lp_widget;
+    if (widget?.target?.dataset?.formState) renderReviewBar(widget);
+  }
+  _show(marker) {
+    const wasVisible = marker.dataset.visible === "true";
+    marker.dataset.visible = "true";
+    if (!wasVisible) this.view.addFlash?.(marker);
+  }
+  fallback(marker, error = null) {
+    const state = this._state(marker);
+    state.response = null;
+    this._setAction(marker, "reload");
+    this._show(marker);
+    if (error) captureError(error, marker);
+  }
+  _rendererCapable(widget, response) {
+    const objectSubmission = (submission) => Boolean(submission) && typeof submission === "object" && !Array.isArray(submission);
+    return Boolean(
+      widget.form?.renderer && Array.isArray(widget.schema) && widget.schema.length && objectSubmission(widget.submission) && Array.isArray(response.schema) && response.schema.length && objectSubmission(response.submission)
+    );
+  }
+  _rendererValuesDiffer(response, localResponse) {
+    const saved = response.submission ?? {};
+    const local = localResponse.submission ?? {};
+    return (response.schema ?? []).some(
+      (field) => field?.id && !areEqual(local[field.id] ?? null, saved[field.id] ?? null)
+    );
+  }
+  _storeRevision(marker, response, {
+    fingerprint,
+    modified,
+    record,
+    remoteSnapshot,
+    schemaChanged,
+    submissionChoice
+  }) {
+    const next = this._state(marker);
+    next.response = response;
+    next.fingerprint = fingerprint;
+    next.modified = modified;
+    next.record = record;
+    next.remoteSnapshot = remoteSnapshot;
+    next.schemaChanged = schemaChanged;
+    next.submissionChoice = submissionChoice;
+    return next;
+  }
+  async _stageRevision(marker, widget, response, {
+    fingerprint = null,
+    modified = null,
+    record: incomingRecord = null
+  } = {}) {
+    const state = this._state(marker);
+    const record = incomingRecord ?? state.record;
+    if (response.form_state) {
+      const operation = currentReviewOperation(
+        widget,
+        response.form_state.operation
+      );
+      widget.reviewState = {
+        ...response.form_state,
+        operation,
+        revision: widget.reviewState?.revision ?? response.form_state.revision
+      };
+      if (operation?.key) {
+        widget.lockDeferredOperation?.({
+          operation: operation.key,
+          revision: operation.revision,
+          scope: operation.scope,
+          blocks_edit: operation.blocks_edit,
+          status: operation
+        });
+        const operations = this.view.DeferredOperations || await this.view.ensureDeferredOperations?.();
+        operations?.track(operation.key, {
+          node: widget.target,
+          revision: operation.revision,
+          status: operation
+        });
+      }
+      renderReviewBar(widget);
+    }
+    const explicitReview = Boolean(
+      response.form_state?.reviews?.some(
+        (review) => !widget._reviewedOperations?.has(review.operation)
+      )
+    );
+    const token = state.token;
+    const anchor = marker.closest?.("[lp-entity]");
+    const baselineFingerprint = record?.fingerprint ?? anchor?.dataset?.fingerprint ?? null;
+    const baselineModified = record?.modified ?? anchor?.dataset?.modified ?? null;
+    const fingerprintChanged = Boolean(
+      fingerprint && baselineFingerprint && baselineFingerprint !== fingerprint
+    );
+    const schemaOnlyRevision = Boolean(
+      fingerprintChanged && modified && baselineModified && baselineModified === modified
+    );
+    const observedSchemaChanged = !areEqual(
+      widget.schema ?? null,
+      response.schema ?? null
+    );
+    const schemaChanged = observedSchemaChanged || schemaOnlyRevision;
+    if (observedSchemaChanged) {
+      widget._reviewedOperations?.clear();
+      widget._usedAutofillOperations?.clear();
+    }
+    const remotePreview = await loadRevisionPreview(widget, response);
+    if (token && state.token !== token) {
+      remotePreview?.destroy?.();
+      return;
+    }
+    if (!remotePreview || !widget.revisionCanReset(remotePreview)) {
+      remotePreview?.destroy?.();
+      this.fallback(marker);
+      return;
+    }
+    const remoteSnapshot = remotePreview.revisionSnapshot();
+    remotePreview.destroy?.();
+    const queued = Boolean(record || widget.form?._queued === true);
+    const unsaved = widget.unsavedState === true;
+    const focused = Boolean(
+      typeof document !== "undefined" && widget.target?.contains?.(document.activeElement)
+    );
+    const active = widget.component?.active === widget && widget.visible === true;
+    const ownedDeferredCompletion = !unsaved && !queued && widget.reviewState?.operation?.type !== "autofill" ? this.ownedDeferredCompletion(marker, widget) : null;
+    if (!queued && !explicitReview && !ownedDeferredCompletion && !schemaChanged && remoteSnapshot === widget.revisionBaseline) {
+      this._hide(marker);
+      return;
+    }
+    const protectedRevision = explicitReview || unsaved || queued || !schemaChanged && !ownedDeferredCompletion && (active || focused);
+    if (!protectedRevision) {
+      const commitRevision = await this._prepareRevision(widget, response);
+      await withTransition(
+        () => {
+          commitRevision();
+          this._hide(
+            widget.target?.querySelector(
+              "[lp-edited-marker]"
+            ) ?? marker
+          );
+        },
+        { label: "edit-reconcile:apply-remote" }
+      );
+      return;
+    }
+    const current = widget.revisionSnapshot();
+    const rendererCapable = this._rendererCapable(widget, response);
+    const local = record ? widget.buildLocalRevision(response, record) : widget.buildLocalRevision(response);
+    const localPreview = await loadRevisionPreview(widget, local.response);
+    if (token && state.token !== token) {
+      localPreview?.destroy?.();
+      return;
+    }
+    if (!localPreview || !widget.revisionCanReset(localPreview)) {
+      localPreview?.destroy?.();
+      this.fallback(marker);
+      return;
+    }
+    const localSnapshot = localPreview.revisionSnapshot();
+    localPreview.destroy?.();
+    const rendererValuesDiffer = rendererCapable && this._rendererValuesDiffer(response, local.response);
+    const incompatible = incompatibleSchema(
+      record?.renderer_schema ?? widget.schema ?? [],
+      response.schema ?? []
+    );
+    const requiresReview = explicitReview || (unsaved || queued) && incompatible;
+    if (!requiresReview && (localSnapshot === remoteSnapshot || !record && current === remoteSnapshot)) {
+      if (record) await this.view.offlineQueue?.cancel(record.id);
+      const commitRevision = await this._prepareRevision(widget, response);
+      await withTransition(
+        () => {
+          commitRevision();
+          this._hide(
+            widget.target?.querySelector(
+              "[lp-edited-marker]"
+            ) ?? marker
+          );
+        },
+        { label: "edit-reconcile:accept-matching" }
+      );
+      return;
+    }
+    if (explicitReview && rendererCapable || rendererValuesDiffer && !schemaOnlyRevision || rendererCapable && incompatible) {
+      this._storeRevision(marker, response, {
+        fingerprint,
+        modified,
+        record,
+        remoteSnapshot,
+        schemaChanged,
+        submissionChoice: true
+      });
+      this._setAction(
+        marker,
+        "review",
+        schemaChanged ? "The form fields and saved values changed elsewhere." : "Another user has edited this form."
+      );
+      this._show(marker);
+      if (widget.target?.dataset?.formState) renderReviewBar(widget);
+      return;
+    }
+    if (rendererCapable && schemaChanged) {
+      const commitRevision = await this._prepareLocalRevision(
+        widget,
+        response,
+        {
+          remoteSnapshot
+        }
+      );
+      await withTransition(
+        () => {
+          commitRevision();
+          marker = widget.target.querySelector("[lp-edited-marker]") ?? marker;
+          this._hide(marker);
+        },
+        { label: "edit-reconcile:rebase-schema" }
+      );
+      if (record) {
+        const rebased = await this.view.offlineQueue?.rebaseSubmit(
+          record,
+          widget,
+          { fingerprint, modified }
+        );
+        if (rebased) await this.view.offlineQueue?.replay();
+      }
+      return;
+    }
+    if (rendererCapable && remoteSnapshot === widget.revisionBaseline) {
+      const commitRevision = await this._prepareLocalRevision(
+        widget,
+        response,
+        {
+          remoteSnapshot
+        }
+      );
+      await withTransition(
+        () => {
+          commitRevision();
+          marker = widget.target.querySelector("[lp-edited-marker]") ?? marker;
+          this._hide(marker);
+        },
+        { label: "edit-reconcile:rebase-values" }
+      );
+      if (record) {
+        const rebased = await this.view.offlineQueue?.rebaseSubmit(
+          record,
+          widget,
+          { fingerprint, modified }
+        );
+        if (rebased) await this.view.offlineQueue?.replay();
+      }
+      return;
+    }
+    this._storeRevision(marker, response, {
+      fingerprint,
+      modified,
+      record,
+      remoteSnapshot,
+      schemaChanged,
+      submissionChoice: queued
+    });
+    this._setAction(
+      marker,
+      queued ? "whole-review" : "reset",
+      queued ? "The saved form changed while this update was queued." : "This form changed elsewhere. Reset it to load the saved version."
+    );
+    this._show(marker);
+  }
+  async _installUninitialized(marker, response) {
+    const form = marker.closest("form[data-widget]");
+    const name = form?.dataset.widget;
+    const replacement = name && response.html ? response.html.querySelector(`[data-widget='${name}']`) : null;
+    if (!form || !replacement) return false;
+    const visible = form.dataset.visible;
+    const fresh = replacement.cloneNode(true);
+    if (visible !== void 0) fresh.dataset.visible = visible;
+    await withTransition(() => form.replaceWith(fresh));
+    return true;
+  }
+  _sameProbeRevision(left, right) {
+    return Boolean(
+      left && right && left.fingerprint === right.fingerprint && left.modified === right.modified
+    );
+  }
+  probe(marker, fingerprint, modified = null) {
+    const state = this._state(marker);
+    const requested = { fingerprint, modified };
+    if (state.conflictPromise) {
+      state.pendingProbe = requested;
+      return state.conflictPromise.then(() => {
+        const pending = state.pendingProbe;
+        if (!pending) return;
+        state.pendingProbe = null;
+        return this.probe(marker, pending.fingerprint, pending.modified);
+      });
+    }
+    if (state.probePromise && this._sameProbeRevision(state.probeRevision, requested)) {
+      return state.probePromise;
+    }
+    if (!this._sameProbeRevision(state.pendingProbe, requested)) {
+      state.pendingProbe = requested;
+    }
+    if (state.probePromise) return state.probePromise;
+    const drain = async () => {
+      let processed = null;
+      while (state.pendingProbe) {
+        const next = state.pendingProbe;
+        state.pendingProbe = null;
+        if (this._sameProbeRevision(processed, next)) continue;
+        state.probeRevision = next;
+        await this._runProbe(marker, next.fingerprint, next.modified);
+        processed = next;
+      }
+    };
+    const promise = drain().finally(() => {
+      if (state.probePromise !== promise) return;
+      state.probePromise = null;
+      state.probeRevision = null;
+    });
+    state.probePromise = promise;
+    return promise;
+  }
+  async _runProbe(marker, fingerprint, modified = null) {
+    if (!marker?.isConnected && marker?.isConnected !== void 0) return;
+    const state = this._state(marker);
+    const token = {};
+    state.token = token;
+    const route = marker.dataset.editedRoute;
+    if (!route) {
+      this.fallback(
+        marker,
+        new Error("Edited marker has no replacement route")
+      );
+      return;
+    }
+    try {
+      const response = await request.get(route, null, {
+        acknowledgeEntities: false,
+        replaceErrorPage: false
+      });
+      if (state.token !== token) return;
+      const form = marker.closest("form[data-widget]");
+      const widget = form?._lp_widget;
+      const completion = this.ownedDeferredCompletion(marker, widget);
+      if (response?.unchanged) {
+        if (!state.response) this._hide(marker);
+        this.recordMarkerRevision(marker, { fingerprint, modified });
+        this.forgetDeferredCompletion(completion);
+        return;
+      }
+      if (!response?.ok) {
+        this.fallback(marker);
+        this.forgetDeferredCompletion(completion);
+        return;
+      }
+      if (!widget) {
+        if (await this._installUninitialized(marker, response)) return;
+        this.fallback(marker, new Error("Replacement response has no form"));
+        return;
+      }
+      if (widget.revisionBaseline === null) widget.commitRevisionBaseline();
+      await this._stageRevision(marker, widget, response, {
+        fingerprint,
+        modified
+      });
+      this.recordMarkerRevision(marker, { fingerprint, modified });
+      this.forgetDeferredCompletion(completion);
+    } catch (error) {
+      if (state.token === token) this.fallback(marker, error);
+    }
+  }
+  async stageConflict(widget, { record, response } = {}) {
+    const marker = widget?.target?.querySelector?.("[lp-edited-marker]");
+    if (!marker || !response) return false;
+    const revision = (response.entities || []).find(
+      (entity) => entity.key === (record?.target_key ?? widget.key)
+    );
+    const state = this._state(marker);
+    const reconcile = (async () => {
+      if (state.probePromise) await state.probePromise;
+      state.token = {};
+      if (widget.revisionBaseline === null) widget.commitRevisionBaseline();
+      await this._stageRevision(marker, widget, response, {
+        fingerprint: revision?.fingerprint ?? null,
+        modified: revision?.modified ?? null,
+        record
+      });
+      delete widget._offlineConflict;
+      return true;
+    })();
+    state.conflictPromise = reconcile;
+    try {
+      return await reconcile;
+    } catch (error) {
+      this.fallback(marker, error);
+      return false;
+    } finally {
+      if (state.conflictPromise === reconcile) {
+        state.conflictPromise = null;
+      }
+    }
+  }
+  async openConflictReview(widget, { blockedAction = null } = {}) {
+    const marker = widget?.target?.querySelector?.("[lp-edited-marker]");
+    if (!marker || !["review", "whole-review"].includes(this._state(marker).mode))
+      return false;
+    const button = marker.querySelector(
+      "[data-role='edited-reset']"
+    );
+    if (!button || button.disabled) return false;
+    await this._activateAction(marker, button, {
+      refresh: true,
+      blockedAction
+    });
+    return true;
+  }
+  async resolveRevision(marker, choice) {
+    const state = this._state(marker);
+    const widget = marker.closest("form[data-widget]")?._lp_widget;
+    if (!widget || !state.response) {
+      this.fallback(marker);
+      return false;
+    }
+    const fieldChoice = choice && typeof choice === "object" ? choice : null;
+    const fieldSelection = fieldChoice ? fieldChoice.selections ?? {} : null;
+    const localSelected = fieldSelection ? Object.values(fieldSelection).some((source) => source !== "server") || !!fieldChoice?.selectedSubmission && !state.record : choice === "local";
+    if (!localSelected) {
+      if (state.record) await this.view.offlineQueue?.cancel(state.record.id);
+      const commitRevision = await this._prepareRevision(
+        widget,
+        state.response
+      );
+      await withTransition(() => commitRevision(), {
+        label: "edit-reconcile:resolve-server"
+      });
+    } else {
+      let selectedSubmission = fieldChoice?.selectedSubmission;
+      if (fieldSelection && selectedSubmission === void 0) {
+        selectedSubmission = structuredClone(state.response.submission ?? {});
+        const localSubmission = fieldChoice?.localResponse?.submission ?? {};
+        for (const [id, source] of Object.entries(fieldSelection)) {
+          if (source !== "local") continue;
+          if (Object.hasOwn(localSubmission, id)) {
+            selectedSubmission[id] = structuredClone(localSubmission[id]);
+          } else {
+            delete selectedSubmission[id];
+          }
+        }
+      }
+      const commitRevision = await this._prepareLocalRevision(
+        widget,
+        state.response,
+        {
+          remoteSnapshot: state.remoteSnapshot,
+          markUnsaved: !state.record,
+          selectedSubmission
+        }
+      );
+      await withTransition(() => commitRevision(), {
+        label: "edit-reconcile:resolve-local"
+      });
+      if (state.record) {
+        const rebased = await this.view.offlineQueue?.rebaseSubmit(
+          state.record,
+          widget,
+          {
+            fingerprint: state.fingerprint,
+            modified: state.modified
+          }
+        );
+        if (rebased) await this.view.offlineQueue?.replay();
+      }
+    }
+    const currentMarker = widget.target?.querySelector("[lp-edited-marker]") ?? marker;
+    if (!state.record && state.response.form_state?.reviews?.length) {
+      widget._reviewedOperations ??= /* @__PURE__ */ new Set();
+      widget._usedAutofillOperations ??= /* @__PURE__ */ new Set();
+      for (const review of state.response.form_state?.reviews ?? [])
+        widget._reviewedOperations.add(review.operation);
+      for (const source of Object.values(fieldSelection ?? {})) {
+        if (source.startsWith("ai:"))
+          widget._usedAutofillOperations.add(source.slice(3));
+      }
+      widget.markUnsavedState?.();
+    }
+    this._hide(currentMarker);
+    return true;
+  }
+  async handleClick(event) {
+    const button = event.target?.closest?.("[data-role='edited-reset']");
+    if (!button) return;
+    const marker = button.closest("[lp-edited-marker]");
+    if (!marker) return;
+    await this._activateAction(marker, button);
+  }
+  async _activateAction(marker, button, {
+    refresh = false,
+    blockedAction = null
+  } = {}) {
+    const state = marker ? this._state(marker) : null;
+    if (!state) return;
+    if (state.mode === "reload") {
+      window.location.reload();
+      return;
+    }
+    if (state.mode === "dismiss") {
+      this._hide(marker);
+      return;
+    }
+    if (button.disabled) return;
+    const widget = marker.closest("form[data-widget]")?._lp_widget;
+    const reviewPending = ["review", "whole-review"].includes(state.mode);
+    const originalLabel = button.textContent;
+    button.disabled = true;
+    if (reviewPending) {
+      button.dataset.reviewPending = "true";
+      button.textContent = "Opening review\u2026";
+      button.setAttribute("aria-busy", "true");
+    }
+    try {
+      await state.probePromise;
+      await state.conflictPromise;
+      if ((refresh || widget?.target?.dataset?.formState) && !state.record) {
+        const route = marker.dataset.editedRoute;
+        const response = route ? await request.get(route, null, {
+          acknowledgeEntities: false,
+          replaceErrorPage: false
+        }) : null;
+        if (!response?.ok)
+          throw new Error(
+            "Could not load the latest form values. Please try Review again."
+          );
+        if (!response.unchanged) {
+          if (!widget) {
+            this.fallback(marker);
+            return;
+          }
+          state.token = {};
+          await this._stageRevision(marker, widget, response);
+        }
+      }
+      if (!state.response && marker.dataset.visible === "false") return;
+      if (!widget || !state.response) {
+        this.fallback(marker);
+        return;
+      }
+      if (state.mode === "review") {
+        const modal = new FormRevisionModal(this, marker, widget, state, {
+          blockedAction
+        });
+        const shown = await modal.init();
+        if (!shown && state.record) {
+          await new WholeFormRevisionModal(this, marker, widget).init();
+        } else if (!shown) {
+          this._setAction(
+            marker,
+            "reset",
+            "This form changed elsewhere. Reset it to load the saved version."
+          );
+        }
+      } else if (state.mode === "whole-review") {
+        await new WholeFormRevisionModal(this, marker, widget).init();
+      } else if (state.mode === "apply" && state.record) {
+        await this.resolveRevision(marker, "local");
+      } else {
+        await this.resolveRevision(marker, "server");
+      }
+    } catch (error) {
+      this.fallback(
+        widget?.target?.querySelector("[lp-edited-marker]") ?? marker,
+        error
+      );
+    } finally {
+      if (reviewPending) {
+        delete button.dataset.reviewPending;
+        button.removeAttribute("aria-busy");
+        button.textContent = ACTION_LABELS[state.mode] ?? originalLabel;
+      }
+      button.disabled = false;
+    }
+  }
+}
+
+class EditWatcher {
+  constructor(view) {
+    this.view = view;
+    this._unsubscribers = /* @__PURE__ */ new Map();
+    this._markerRevisions = /* @__PURE__ */ new WeakMap();
+    this._latestRevisions = /* @__PURE__ */ new Map();
+    this._deferredCompletions = /* @__PURE__ */ new Map();
+    this._destroyed = false;
+    this._reconciler = new EditReconciler(view, {
+      recordMarkerRevision: (marker, revision) => {
+        this._markerRevisions.set(marker, revision);
+      },
+      ownedDeferredCompletion: (marker, widget) => this._ownedDeferredCompletion(marker, widget),
+      forgetDeferredCompletion: (completion) => this._forgetDeferredCompletion(completion)
+    });
+    this._click = (event) => this._reconciler.handleClick(event);
+    this._entityUpdated = this._entityUpdated.bind(this);
+    this.check = this.check.bind(this);
+  }
+  init() {
+    this.view.elt.addEventListener("click", this._click);
+    window.addEventListener("entity-updated", this._entityUpdated);
+    if (this.view.key && this.view.elt.dataset.fingerprint) {
+      this._latestRevisions.set(this.view.key, {
+        fingerprint: this.view.elt.dataset.fingerprint,
+        modified: this.view.elt.dataset.modified ?? null
+      });
+    }
+    for (const component of Object.values(this.view.components ?? {})) {
+      for (const widget of Object.values(component.widgets ?? {})) {
+        if (widget && typeof widget === "object" && "_offlineConflict" in widget && widget._offlineConflict) {
+          const form = widget;
+          void this.stageConflict(form, form._offlineConflict);
+        }
+      }
+    }
+    this.resume();
+  }
+  get entities() {
+    return this._entities();
+  }
+  _componentVisible(component) {
+    if (component?.visible !== true) return false;
+    let ancestor = component.elt?.parentElement?.closest?.("[lp-component]");
+    while (ancestor) {
+      if (ancestor.dataset.visible === "false") return false;
+      ancestor = ancestor.parentElement?.closest?.("[lp-component]");
+    }
+    return true;
+  }
+  _markerActive(marker) {
+    const widget = marker.closest?.("form[data-widget]")?._lp_widget;
+    return Boolean(
+      widget && widget.component?.active === widget && this._componentVisible(widget.component) && widget.visible === true
+    );
+  }
+  _markerRevision(marker, anchor) {
+    let revision = this._markerRevisions.get(marker);
+    if (!revision) {
+      revision = {
+        fingerprint: anchor.dataset.fingerprint ?? null,
+        modified: anchor.dataset.modified ?? null
+      };
+      this._markerRevisions.set(marker, revision);
+    }
+    return revision;
+  }
+  _entities({ activeOnly = true } = {}) {
+    const entities = /* @__PURE__ */ new Map();
+    const markers = this.view.elt.querySelectorAll("[lp-edited-marker]");
+    for (const marker of markers) {
+      const anchor = marker.closest("[lp-entity]");
+      const key = anchor?.dataset.key;
+      const revision = anchor ? this._markerRevision(marker, anchor) : null;
+      const fingerprint = revision?.fingerprint;
+      if (!anchor || !key || !revision || !fingerprint) {
+        captureError(
+          new Error("Edited marker has no fingerprinted entity anchor"),
+          marker
+        );
+        continue;
+      }
+      if (activeOnly && !this._markerActive(marker)) continue;
+      const entity = entities.get(key) ?? {
+        key,
+        fingerprint,
+        modified: revision.modified,
+        anchors: /* @__PURE__ */ new Set(),
+        markers: /* @__PURE__ */ new Set()
+      };
+      entity.anchors.add(anchor);
+      entity.markers.add(marker);
+      entities.set(key, entity);
+    }
+    return entities;
+  }
+  expectDeferredCompletion(key, operation) {
+    if (!key || !operation) return false;
+    const operations = this._deferredCompletions.get(key) ?? /* @__PURE__ */ new Set();
+    operations.add(operation);
+    this._deferredCompletions.set(key, operations);
+    return true;
+  }
+  _ownedDeferredCompletion(marker, widget) {
+    const key = marker.closest?.("[lp-entity]")?.dataset?.key;
+    const operation = widget?._deferredOperation;
+    if (!key || !operation) return null;
+    if (this._deferredCompletions.get(key)?.has(operation)) {
+      return { key, operation };
+    }
+    for (const [ownerKey, operations] of this._deferredCompletions) {
+      if (operations.has(operation)) return { key: ownerKey, operation };
+    }
+    return null;
+  }
+  _forgetDeferredCompletion(completion) {
+    if (!completion) return;
+    const operations = this._deferredCompletions.get(completion.key);
+    operations?.delete(completion.operation);
+    if (!operations?.size) this._deferredCompletions.delete(completion.key);
+  }
+  async _probeEntity(key, fingerprint, modified = null) {
+    const entity = this.entities.get(key);
+    if (!entity) return;
+    const revision = { fingerprint, modified };
+    const stale = Array.from(entity.markers).filter((marker) => {
+      const current = this._markerRevisions.get(marker);
+      return current?.fingerprint !== fingerprint || Boolean(modified) && current?.modified !== modified || Boolean(
+        this._ownedDeferredCompletion(
+          marker,
+          marker.closest?.("form[data-widget]")?._lp_widget
+        )
+      );
+    });
+    await Promise.all(
+      stale.map(
+        (marker) => this._reconciler.probe(marker, fingerprint, modified)
+      )
+    );
+    const latest = this._latestRevisions.get(key);
+    const anchorRevision = latest?.fingerprint ? latest : revision;
+    for (const anchor of entity.anchors) {
+      anchor.dataset.fingerprint = anchorRevision.fingerprint;
+      if (anchorRevision.modified) {
+        anchor.dataset.modified = anchorRevision.modified;
+      }
+    }
+  }
+  async receiveEntityResult(key, result) {
+    if (!key || !result) return;
+    if (result.status === "unavailable") {
+      for (const marker of this.entities.get(key)?.markers ?? []) {
+        this._reconciler.fallback(marker);
+      }
+      return;
+    }
+    if (result.status === "unchanged" && this._deferredCompletions.size) {
+      const revision2 = this._latestRevisions.get(key) ?? {
+        fingerprint: result.revision ?? null,
+        modified: null
+      };
+      if (revision2.fingerprint) {
+        await this._probeEntity(key, revision2.fingerprint, revision2.modified);
+      }
+      return;
+    }
+    if (result.status !== "changed" || !result.payload?.fingerprint) return;
+    const revision = {
+      fingerprint: result.payload.fingerprint,
+      modified: result.payload.modified ?? null
+    };
+    this._latestRevisions.set(key, revision);
+    await this._probeEntity(key, revision.fingerprint, revision.modified);
+  }
+  async _lockEntity(entity, descriptor) {
+    if (!entity || !descriptor?.operation) return;
+    const forms = /* @__PURE__ */ new Set();
+    for (const marker of entity.markers ?? []) {
+      const form = marker.closest("form[data-widget]");
+      if (form) forms.add(form);
+    }
+    for (const anchor of entity.anchors ?? []) {
+      for (const form of anchor.querySelectorAll?.(
+        "form[data-widget='PageInfo'], form[data-widget='TaskForm']"
+      ) ?? []) {
+        forms.add(form);
+      }
+    }
+    const tracked = [];
+    for (const form of forms) {
+      if (form.dataset.deferredLock !== "form" && !["PageInfo", "TaskForm"].includes(form.dataset.widget ?? ""))
+        continue;
+      const widget = form._lp_widget;
+      if (widget?._deferredOperation !== descriptor.operation) {
+        widget?.lockDeferredOperation?.(descriptor);
+      }
+      if (!widget) {
+        form.dataset.operation = descriptor.operation;
+        form.dataset.operationRevision = String(descriptor.revision ?? 0);
+        form.dataset.operationScope = descriptor.scope || "";
+        if (descriptor.blocks_edit === true || descriptor.scope === "form-change")
+          form.dataset.deferredLock = "form";
+        else delete form.dataset.deferredLock;
+      }
+      tracked.push({
+        revision: descriptor.revision ?? 0,
+        node: widget?.target ?? form
+      });
+    }
+    if (!tracked.length) return;
+    const operations = this.view.DeferredOperations || await this.view.ensureDeferredOperations?.();
+    for (const options of tracked) {
+      operations?.track(descriptor.operation, options);
+    }
+  }
+  _syncSubscriptions() {
+    const mounted = this.entities;
+    const active = /* @__PURE__ */ new Set();
+    for (const entity of mounted.values()) {
+      const entityId = `edit:${entity.key}`;
+      const lockId = `lock:${entity.key}`;
+      active.add(lockId);
+      if (entity.key !== this.view.key) active.add(entityId);
+      if (entity.key !== this.view.key && !this._unsubscribers.has(entityId)) {
+        this._unsubscribers.set(
+          entityId,
+          this.view.PollingCoordinator?.subscribe(
+            {
+              id: entityId,
+              type: "entity",
+              key: entity.key,
+              revision: entity.fingerprint
+            },
+            {
+              mode: "periodic",
+              initial: "scheduled",
+              onResult: (result) => this.receiveEntityResult(entity.key, result)
+            }
+          ) ?? (() => {
+          })
+        );
+      }
+      if (!this._unsubscribers.has(lockId)) {
+        this._unsubscribers.set(
+          lockId,
+          this.view.PollingCoordinator?.subscribe(
+            {
+              id: lockId,
+              type: "form-lock",
+              key: entity.key,
+              revision: "unlocked"
+            },
+            {
+              mode: "periodic",
+              initial: "scheduled",
+              onResult: async (result) => {
+                if (result.status !== "changed") return;
+                if (result.payload?.locked) {
+                  await this._lockEntity(
+                    this.entities.get(entity.key),
+                    result.payload
+                  );
+                } else if (Array.from(this.entities.get(entity.key)?.markers ?? []).some(
+                  (marker) => marker.closest?.("form[data-widget]")?.hasAttribute("data-deferred-lock")
+                )) {
+                  await this.view.reconcileChange?.({
+                    type: "poll",
+                    key: entity.key
+                  });
+                }
+              }
+            }
+          ) ?? (() => {
+          })
+        );
+      }
+    }
+    for (const [id, unsubscribe] of this._unsubscribers) {
+      if (active.has(id)) continue;
+      unsubscribe();
+      this._unsubscribers.delete(id);
+    }
+    return mounted;
+  }
+  async reconcileSubscriptions() {
+    const mounted = this._syncSubscriptions();
+    await Promise.all(
+      Array.from(mounted.values(), async (entity) => {
+        const latest = this._latestRevisions.get(entity.key);
+        if (!latest) return;
+        await this._probeEntity(
+          entity.key,
+          latest.fingerprint,
+          latest.modified
+        );
+      })
+    );
+    return mounted;
+  }
+  check(keys = null, options = {}) {
+    const mounted = this._syncSubscriptions();
+    const requested = keys === null ? [...mounted.keys()] : Array.from(keys);
+    const ids = requested.flatMap((key) => [
+      key === this.view.key ? `view:entity:${key}` : `edit:${key}`,
+      `lock:${key}`
+    ]);
+    return this.view.PollingCoordinator?.trigger(ids, options);
+  }
+  enqueue(keys = null) {
+    const mounted = this._syncSubscriptions();
+    const requested = keys === null ? [...mounted.keys()] : Array.from(keys);
+    const ids = requested.flatMap((key) => [
+      key === this.view.key ? `view:entity:${key}` : `edit:${key}`,
+      `lock:${key}`
+    ]);
+    this.view.PollingCoordinator?.enqueue(ids);
+  }
+  invalidate(keys) {
+    const requested = keys ? (Array.isArray(keys) ? keys : [keys]).filter(Boolean) : null;
+    return this.check(requested, { fresh: true });
+  }
+  acknowledge({
+    key,
+    fingerprint,
+    modified = null
+  } = {}) {
+    if (!key || !fingerprint) return;
+    this._latestRevisions.set(key, { fingerprint, modified });
+    if (this.view.key === key) {
+      this.view.elt.dataset.fingerprint = fingerprint;
+      if (modified) this.view.elt.dataset.modified = modified;
+    }
+    this.view.PollingCoordinator?.acknowledge(`edit:${key}`, fingerprint);
+    this.view.PollingCoordinator?.acknowledge(
+      `view:entity:${key}`,
+      fingerprint
+    );
+    const entity = this.entities.get(key);
+    if (!entity) return;
+    for (const anchor of entity.anchors) {
+      anchor.dataset.fingerprint = fingerprint;
+      if (modified) anchor.dataset.modified = modified;
+    }
+    for (const marker of entity.markers) {
+      this._markerRevisions.set(marker, { fingerprint, modified });
+    }
+  }
+  pause() {
+  }
+  resume() {
+    if (this._destroyed || !this.view.online || this.view.hidden) return;
+    return this.reconcileSubscriptions();
+  }
+  stageConflict(widget, conflict = {}) {
+    return this._reconciler.stageConflict(widget, conflict);
+  }
+  openConflictReview(widget, options = {}) {
+    return this._reconciler.openConflictReview(widget, options);
+  }
+  resolveRevision(marker, choice) {
+    return this._reconciler.resolveRevision(marker, choice);
+  }
+  _entityUpdated(event) {
+    this.acknowledge(event.detail);
+  }
+  destroy() {
+    this._destroyed = true;
+    for (const unsubscribe of this._unsubscribers.values()) unsubscribe();
+    this._unsubscribers.clear();
+    this._deferredCompletions.clear();
+    this.view.elt.removeEventListener("click", this._click);
+    window.removeEventListener("entity-updated", this._entityUpdated);
+  }
+}
+
+export { EditWatcher };

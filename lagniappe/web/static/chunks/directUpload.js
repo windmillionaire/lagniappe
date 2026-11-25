@@ -1,2 +1,190 @@
-import{r as f}from"./foundation.js?v=baa4a64d";const E=8*1024*1024,y=3,U=500,m=308,D=new Set([408,429,500,502,503,504]),h=t=>{if(!t)return null;const e=new URL(t,window.location.origin);return e.pathname=`${e.pathname.replace(/\/$/,"")}/direct-upload`,`${e.pathname}${e.search}`},_=async({route:t,file:e,inputName:n,replaceErrorPage:o=!0})=>{const p=h(t);if(!p)throw new Error("Could not start direct upload");const c=await f.post(p,{filename:e.name,content_type:e.type||"application/octet-stream",size:e.size,input_name:n},{replaceErrorPage:o});if(!c?.ok)throw new Error(c?.error||"Could not start direct upload");if(!T(c))throw new Error("Could not start direct upload");return c};function T(t){const{session_url:e,token:n,chunk_size:o}=t;return typeof e=="string"&&e.length>0&&typeof n=="string"&&n.length>0&&(o===void 0||typeof o=="number"&&Number.isInteger(o)&&o>0)}const R=(t,e)=>e*2**Math.max(0,t-1),g=t=>t>0?new Promise(e=>setTimeout(e,t)):Promise.resolve(),w=t=>{const e=t.headers.get("Range")||"",n=/^bytes=0-(\d+)$/i.exec(e.trim());return n?Number.parseInt(n[1],10)+1:0},A=async({file:t,sessionUrl:e})=>{const n=await fetch(e,{method:"PUT",headers:{"Content-Range":`bytes */${t.size}`}});if(n.status===m)return w(n);if(n.ok)return t.size;const o=await n.text().catch(()=>"");throw new Error(o||"Could not resume direct upload")},C=t=>D.has(t.status),l=async({file:t,sessionUrl:e,attempt:n,retries:o,retryDelay:p,onProgress:c})=>{let r=n,a=null;for(;r<=o;){await g(R(r,p));try{const d=await A({file:t,sessionUrl:e});return c(d,t.size),{attempt:r,offset:d}}catch(d){if(a=d,r>=o)break;r+=1}}throw a||new Error("Could not resume direct upload")},z=({file:t,sessionUrl:e,offset:n,end:o})=>fetch(e,{method:"PUT",headers:{"Content-Type":t.type||"application/octet-stream","Content-Range":`bytes ${n}-${o}/${t.size}`},body:t.slice(n,o+1)}),L=async({file:t,sessionUrl:e,chunkSize:n=E,retries:o=y,retryDelay:p=U,onProgress:c=()=>{}})=>{if(!t.size)return{};let r=0,a=0;for(;r<t.size;){const d=Math.min(r+n,t.size)-1;let i;try{i=await z({file:t,sessionUrl:e,offset:r,end:d})}catch(s){if(a>=o)throw s;a+=1;const u=await l({file:t,sessionUrl:e,attempt:a,retries:o,retryDelay:p,onProgress:c});a=u.attempt,r=u.offset;continue}if(C(i)){if(a>=o){const u=await i.text().catch(()=>"");throw new Error(u||"Direct upload failed")}a+=1;const s=await l({file:t,sessionUrl:e,attempt:a,retries:o,retryDelay:p,onProgress:c});a=s.attempt,r=s.offset;continue}if(i.status===m){const s=w(i);if(s<=r)throw new Error("Direct upload did not advance");r=s,a=0,c(r,t.size);continue}if(!i.ok){const s=await i.text().catch(()=>"");throw new Error(s||"Direct upload failed")}if(a=0,c(t.size,t.size),(i.headers.get("content-type")||"").includes("application/json")){const s=await i.json();if(S(s))return s}return{}}return{}};function S(t){return t!==null&&typeof t=="object"&&!Array.isArray(t)&&(!("generation"in t)||typeof t.generation=="string"||typeof t.generation=="number")&&(!("name"in t)||typeof t.name=="string")}const b={route:h,createSession:_,upload:L};export{b as d};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request } from './foundation.js?v=b14914a4';
+
+const DEFAULT_DIRECT_UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
+const DEFAULT_DIRECT_UPLOAD_RETRIES = 3;
+const DEFAULT_DIRECT_UPLOAD_RETRY_DELAY_MS = 500;
+const RESUMABLE_UPLOAD_INCOMPLETE = 308;
+const RETRYABLE_DIRECT_UPLOAD_STATUSES = /* @__PURE__ */ new Set([
+  408,
+  429,
+  500,
+  502,
+  503,
+  504
+]);
+const directUploadRoute = (route) => {
+  if (!route) return null;
+  const url = new URL(route, window.location.origin);
+  url.pathname = `${url.pathname.replace(/\/$/, "")}/direct-upload`;
+  return `${url.pathname}${url.search}`;
+};
+const createDirectUploadSession = async ({
+  route,
+  file,
+  inputName,
+  replaceErrorPage = true
+}) => {
+  const url = directUploadRoute(route);
+  if (!url) throw new Error("Could not start direct upload");
+  const response = await request.post(
+    url,
+    {
+      filename: file.name,
+      content_type: file.type || "application/octet-stream",
+      size: file.size,
+      input_name: inputName
+    },
+    { replaceErrorPage }
+  );
+  if (!response?.ok) {
+    throw new Error(response?.error || "Could not start direct upload");
+  }
+  if (!isDirectUploadSession(response)) {
+    throw new Error("Could not start direct upload");
+  }
+  return response;
+};
+function isDirectUploadSession(response) {
+  const { session_url, token, chunk_size } = response;
+  return typeof session_url === "string" && session_url.length > 0 && typeof token === "string" && token.length > 0 && (chunk_size === void 0 || typeof chunk_size === "number" && Number.isInteger(chunk_size) && chunk_size > 0);
+}
+const directUploadRetryDelay = (attempt, baseDelay) => baseDelay * 2 ** Math.max(0, attempt - 1);
+const wait = (delayMs) => delayMs > 0 ? new Promise((resolve) => setTimeout(resolve, delayMs)) : Promise.resolve();
+const directUploadOffset = (response) => {
+  const range = response.headers.get("Range") || "";
+  const match = /^bytes=0-(\d+)$/i.exec(range.trim());
+  return match ? Number.parseInt(match[1], 10) + 1 : 0;
+};
+const directUploadStatusOffset = async ({ file, sessionUrl }) => {
+  const response = await fetch(sessionUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Range": `bytes */${file.size}`
+    }
+  });
+  if (response.status === RESUMABLE_UPLOAD_INCOMPLETE) {
+    return directUploadOffset(response);
+  }
+  if (response.ok) return file.size;
+  const message = await response.text().catch(() => "");
+  throw new Error(message || "Could not resume direct upload");
+};
+const shouldRetryDirectUpload = (response) => RETRYABLE_DIRECT_UPLOAD_STATUSES.has(response.status);
+const resumeDirectUpload = async ({
+  file,
+  sessionUrl,
+  attempt,
+  retries,
+  retryDelay,
+  onProgress
+}) => {
+  let statusAttempt = attempt;
+  let lastError = null;
+  while (statusAttempt <= retries) {
+    await wait(directUploadRetryDelay(statusAttempt, retryDelay));
+    try {
+      const offset = await directUploadStatusOffset({ file, sessionUrl });
+      onProgress(offset, file.size);
+      return { attempt: statusAttempt, offset };
+    } catch (error) {
+      lastError = error;
+      if (statusAttempt >= retries) break;
+      statusAttempt += 1;
+    }
+  }
+  throw lastError || new Error("Could not resume direct upload");
+};
+const directUploadChunk = ({ file, sessionUrl, offset, end }) => fetch(sessionUrl, {
+  method: "PUT",
+  headers: {
+    "Content-Type": file.type || "application/octet-stream",
+    "Content-Range": `bytes ${offset}-${end}/${file.size}`
+  },
+  body: file.slice(offset, end + 1)
+});
+const uploadDirectFile = async ({
+  file,
+  sessionUrl,
+  chunkSize = DEFAULT_DIRECT_UPLOAD_CHUNK_SIZE,
+  retries = DEFAULT_DIRECT_UPLOAD_RETRIES,
+  retryDelay = DEFAULT_DIRECT_UPLOAD_RETRY_DELAY_MS,
+  onProgress = () => {
+  }
+}) => {
+  if (!file.size) return {};
+  let offset = 0;
+  let retryAttempt = 0;
+  while (offset < file.size) {
+    const end = Math.min(offset + chunkSize, file.size) - 1;
+    let response;
+    try {
+      response = await directUploadChunk({ file, sessionUrl, offset, end });
+    } catch (error) {
+      if (retryAttempt >= retries) throw error;
+      retryAttempt += 1;
+      const resume = await resumeDirectUpload({
+        file,
+        sessionUrl,
+        attempt: retryAttempt,
+        retries,
+        retryDelay,
+        onProgress
+      });
+      retryAttempt = resume.attempt;
+      offset = resume.offset;
+      continue;
+    }
+    if (shouldRetryDirectUpload(response)) {
+      if (retryAttempt >= retries) {
+        const message = await response.text().catch(() => "");
+        throw new Error(message || "Direct upload failed");
+      }
+      retryAttempt += 1;
+      const resume = await resumeDirectUpload({
+        file,
+        sessionUrl,
+        attempt: retryAttempt,
+        retries,
+        retryDelay,
+        onProgress
+      });
+      retryAttempt = resume.attempt;
+      offset = resume.offset;
+      continue;
+    }
+    if (response.status === RESUMABLE_UPLOAD_INCOMPLETE) {
+      const nextOffset = directUploadOffset(response);
+      if (nextOffset <= offset) {
+        throw new Error("Direct upload did not advance");
+      }
+      offset = nextOffset;
+      retryAttempt = 0;
+      onProgress(offset, file.size);
+      continue;
+    }
+    if (!response.ok) {
+      const message = await response.text().catch(() => "");
+      throw new Error(message || "Direct upload failed");
+    }
+    retryAttempt = 0;
+    onProgress(file.size, file.size);
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const metadata = await response.json();
+      if (isUploadMetadata(metadata)) return metadata;
+    }
+    return {};
+  }
+  return {};
+};
+function isUploadMetadata(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) && (!("generation" in value) || typeof value.generation === "string" || typeof value.generation === "number") && (!("name" in value) || typeof value.name === "string");
+}
+const directUpload = {
+  route: directUploadRoute,
+  createSession: createDirectUploadSession,
+  upload: uploadDirectFile
+};
+
+export { directUpload as d };

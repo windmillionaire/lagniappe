@@ -1,2 +1,442 @@
-import{getOfflineMutations as E,deleteOfflineMutations as h,setOfflineMutation as k}from"./offline.js?v=baa4a64d";import{r as p}from"./foundation.js?v=baa4a64d";const l=Object.freeze({BLOCKED:"blocked",COMPLETED:"completed",REBASED:"rebased"});function c(n){return n!==null&&typeof n=="object"&&!Array.isArray(n)}function f(n){return n==null||typeof n=="string"}function O(n){return c(n)&&typeof n.name=="string"&&n.file instanceof Blob&&typeof n.filename=="string"&&(n.type===void 0||typeof n.type=="string")}function D(n){return f(n.action)&&f(n.method)&&typeof n.route=="string"&&(n.created_at==null||typeof n.created_at=="number")&&f(n.kind)&&f(n.client_key)&&f(n.target_key)&&f(n.fingerprint)&&f(n.modified)&&(n.fields==null||Array.isArray(n.fields)&&n.fields.every(e=>Array.isArray(e)&&typeof e[0]=="string"&&typeof e[1]=="string"))&&(n.files==null||Array.isArray(n.files)&&n.files.every(O))&&n.conflictResponse===void 0}function R(n){if(n.closest?.(".form-element")||!("_lp_combobox"in n))return null;const e=n._lp_combobox;if(!c(e)||typeof e.name!="string"||!e.name)return null;const{name:t,values:i}=e,s=Array.isArray(e.options)?e.options:[];return{name:t,options:s.filter(r=>c(r)&&i instanceof Set&&i.has(r.id))}}function q(){return globalThis.crypto?.randomUUID?globalThis.crypto.randomUUID():`offline-mutation-${Date.now()}-${Math.random().toString(16).slice(2)}`}function T(n){const e=document.implementation.createHTMLDocument("");return n&&e.body.appendChild(n),{ok:!0,html:e}}function y(n){const e=[],t=[];for(const[i,s]of n.entries())s instanceof File?s.size>0&&s.name&&t.push({name:i,file:s,filename:s.name,type:s.type}):e.push([i,s]);return{fields:e,files:t}}function S(n){const e=new FormData;for(const[t,i]of n.fields||[])e.append(t,i);for(const t of n.files||[])e.append(t.name,t.file,t.filename);return n.method!=="DELETE"&&(e.set("offline","True"),n.fingerprint&&e.set("offline-fingerprint",n.fingerprint)),e}function A(n,e){return(n.fields||[]).find(([t])=>t===e)?.[1]||""}class v{constructor(e){this.view=e,this.records=[],this._replaying=!1}async init(){this.records=(await E()).filter(D)}get widgets(){return Object.values(this.view.components).flatMap(e=>Object.values(e.widgets).filter(t=>t!==void 0))}get targets(){return this.widgets.filter(e=>typeof e?.handleOfflineQueue=="function")}async _dispatch(e,t=this.targets){return Promise.all([...new Set(t)].filter(Boolean).map(async i=>typeof i=="function"?i(e):i.handleOfflineQueue?.(e)))}async presentFor(e){if(!e?.key||typeof e.handleOfflineQueue!="function")return;const t=this._sortedRecords().find(i=>i.target_key===e.key);t&&await this._dispatch({phase:t.conflictResponse?"conflict":"queued",queue:this,record:t,response:t.conflictResponse},[e])}_responseFromResults(e){return e.find(t=>c(t)&&typeof t.ok=="boolean"&&(t.html===void 0||t.html instanceof Document)&&(t.removed===void 0||typeof t.removed=="boolean"))}async queueSubmit(e,t,i,s="POST"){const r=e.active,a=r?.target;if(!r||"standalone"in r||!a?.hasAttribute("lp-offline")||typeof r.offline!="function")return null;await this._destinationWidget(e);const u=s==="POST"?"create":"update",o=await r.offline({action:u,queue:this,component:e,data:t,method:s,route:i,widget:r});if(!o)return null;const d=o.fingerprint??a.closest?.("[lp-entity]")?.dataset?.fingerprint??this.view.elt?.dataset?.fingerprint??null,_=o.modified??a.closest?.("[lp-entity]")?.dataset?.modified??this.view.elt?.dataset?.modified??null,g=o.renderer_submission??r.form?.renderer?._packageSubmission?.()??null,b=Array.from(a.querySelectorAll?.("[data-combobox-id]")||[]).map(R).filter(w=>w!==null),m=await this.queue({action:u,method:s,route:i,data:t,...o,fingerprint:d,modified:_,renderer_submission:g,renderer_schema:o.renderer_schema??r.schema??null,form_controls:b});return m.response?{...m.response,queued:!0}:{ok:!0,queued:!0}}async _destinationWidget(e){const t=e.active?.target?.dataset.destination;if(!t)return null;const[i,s]=t.split(":");if(!s)return null;const r=i===e.name?e.elt:document.getElementById(i),a=this.view.getComponent(r);return a?a.widgets[s]||await a.loadWidget(s):null}async replay(){if(!this.view.online||this._replaying)return 0;this._replaying=!0;let e=0;try{for(const t of this._sortedRecords()){let i=t;for(;i;){const s=await this._replayRecord(i);if(s.state===l.REBASED){i=s.record;continue}if(s.state===l.BLOCKED)return e;if(s.state===l.COMPLETED){e+=1;break}throw new TypeError(`Unknown replay result: ${s.state}`)}}}finally{this._replaying=!1}return e}async _replayRecord(e){const t=await this._send(e);if(t?.conflict){const r=e.fingerprint;e.conflictResponse=t,await this._dispatch({phase:"conflict",queue:this,record:e,response:t});const a=this.records.find(u=>u.id===e.id);return!a||a.fingerprint===r?{state:l.BLOCKED}:{state:l.REBASED,record:a}}if(!t?.ok||t.error)return{state:l.BLOCKED};await h([e.id]),this.records=this.records.filter(r=>r.id!==e.id);const i=this.targets,s=e.method==="PUT"?this._mountedUpdateTargets(e,i):[];return this._finalize(e,t),await this._dispatch({phase:"replayed",queue:this,record:e,response:t},i.filter(r=>!s.includes(r))),e.method==="PUT"&&await this._pollMountedUpdate(e,s),{state:l.COMPLETED}}_mountedUpdateTargets(e,t=this.targets){return t.filter(i=>i?.key===e.target_key&&i.target?.matches?.("form[data-widget]"))}async _pollMountedUpdate(e,t=this._mountedUpdateTargets(e)){if(!t.length)return;await(this.view.EditWatcher||await this.view.ensureEditWatcher?.())?.invalidate?.(e.target_key)}async rebaseSubmit(e,t,{fingerprint:i,modified:s}={}){if(!e?.id||!t)return null;const r=t.component?.formData??t.formData;if(!(r instanceof FormData))return null;const a=y(r),u=new Set(a.files.map(d=>d.name));a.files.push(...(e.files||[]).filter(d=>!u.has(d.name)));const o={...e,fingerprint:i||e.fingerprint||null,modified:s||e.modified||null,renderer_submission:t.form?.renderer?._packageSubmission?.()??e.renderer_submission??null,renderer_schema:t.schema??e.renderer_schema??null,fields:a.fields,files:a.files};return delete o.conflictResponse,await this._store(o),await this._dispatch({phase:"queued",queue:this,record:o}),o}async queue(e){const t=this._queuedRecord(e);await this._store(t);const i=await this._dispatch({phase:"queued",queue:this,record:t});return{record:t,response:this._responseFromResults(i)}}_queuedRecord(e){const t=e.id||q(),i=e.data?y(e.data):{fields:e.fields||[],files:e.files||[]};return{id:t,action:e.action||(e.method==="DELETE"?"delete":"submit"),kind:e.kind,method:e.method||"POST",route:e.route,client_key:e.client_key||(e.action==="create"?`offline:${t}`:null),target_key:e.target_key,fingerprint:e.fingerprint||null,modified:e.modified||null,renderer_submission:e.renderer_submission??null,renderer_schema:e.renderer_schema??null,form_controls:e.form_controls||[],fields:i.fields,files:i.files,created_at:e.created_at||Date.now()}}response(e){return T(e)}field(e,t){return A(e,t)}recordsFor({kind:e=null,action:t=null}={}){return this._sortedRecords().filter(i=>!(e&&i.kind!==e||t&&i.action!==t))}async cancel(e){const t=this.records.filter(s=>this._recordMatches(s,e));if(t.length===0)return[];await h(t.map(s=>s.id));const i=new Set(t.map(s=>s.id));return this.records=this.records.filter(s=>!i.has(s.id)),await Promise.all(t.map(s=>this._dispatch({phase:"cancelled",queue:this,record:s}))),t}_recordMatches(e,t){return typeof t=="function"?t(e):typeof t=="string"?[e.id,e.client_key,e.target_key].includes(t):!t||typeof t!="object"?!1:Object.entries(t).every(([i,s])=>e[i]===s)}async _store(e){await k(e),this.records=[...this.records.filter(t=>t.id!==e.id),e]}_sortedRecords(){return[...this.records].sort((e,t)=>Number(e.created_at)-Number(t.created_at))}async _send(e){if(e.method==="DELETE")return p.delete(e.route);const t=S(e);return e.method==="PUT"?p.put(e.route,t,{acknowledgeEntities:!1}):p.post(e.route,t)}_finalize(e,t){const i=e.action==="create"?e.client_key:e.target_key;if(!i)return;const s=document.querySelector(`[data-key="${i}"]`);if(e.action==="create"){const a=(t.html||void 0)?.querySelector("li,[lp-entity]");s&&a?s.replaceWith(a):s&&t.removed&&s.remove();return}(e.action==="complete"||e.action==="delete")&&s&&s.remove()}}var M=Object.freeze({__proto__:null,OfflineQueue:v});const U=async(n,e=null)=>{try{if(n._destroyed)return 0;const t=e||await n.ensureOfflineQueue();if(!t||n._destroyed||!n.online)return 0;const i=await t.replay()||0;return i&&!n._destroyed&&await n.refresh(),i}catch(t){return n.reportStartupError(t,n.elt,"offline-replay"),0}};var F=Object.freeze({__proto__:null,replayOfflineQueue:U});export{F as a,M as o};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { getOfflineMutations, deleteOfflineMutations, setOfflineMutation } from './offline.js?v=b14914a4';
+import { r as request } from './foundation.js?v=b14914a4';
+
+const REPLAY_RESULT = Object.freeze({
+  BLOCKED: "blocked",
+  COMPLETED: "completed",
+  REBASED: "rebased"
+});
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function isOptionalText(value) {
+  return value === void 0 || value === null || typeof value === "string";
+}
+function isMutationFile(value) {
+  return isRecord(value) && typeof value.name === "string" && value.file instanceof Blob && typeof value.filename === "string" && (value.type === void 0 || typeof value.type === "string");
+}
+function isOfflineMutation(record) {
+  return isOptionalText(record.action) && isOptionalText(record.method) && typeof record.route === "string" && (record.created_at == null || typeof record.created_at === "number") && isOptionalText(record.kind) && isOptionalText(record.client_key) && isOptionalText(record.target_key) && isOptionalText(record.fingerprint) && isOptionalText(record.modified) && (record.fields == null || Array.isArray(record.fields) && record.fields.every(
+    (value) => Array.isArray(value) && typeof value[0] === "string" && typeof value[1] === "string"
+  )) && (record.files == null || Array.isArray(record.files) && record.files.every(isMutationFile)) && record.conflictResponse === void 0;
+}
+function selectedFormControl(control) {
+  if (control.closest?.(".form-element") || !("_lp_combobox" in control)) {
+    return null;
+  }
+  const combobox = control._lp_combobox;
+  if (!isRecord(combobox) || typeof combobox.name !== "string" || !combobox.name) {
+    return null;
+  }
+  const { name, values } = combobox;
+  const options = Array.isArray(combobox.options) ? combobox.options : [];
+  return {
+    name,
+    options: options.filter(
+      (option) => isRecord(option) && values instanceof Set && values.has(option.id)
+    )
+  };
+}
+function createId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `offline-mutation-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+function elementResponse(element) {
+  const html = document.implementation.createHTMLDocument("");
+  if (element) html.body.appendChild(element);
+  return {
+    ok: true,
+    html
+  };
+}
+function serializeFormData(data) {
+  const fields = [];
+  const files = [];
+  for (const [name, value] of data.entries()) {
+    if (value instanceof File) {
+      if (value.size > 0 && value.name) {
+        files.push({
+          name,
+          file: value,
+          filename: value.name,
+          type: value.type
+        });
+      }
+    } else {
+      fields.push([name, value]);
+    }
+  }
+  return { fields, files };
+}
+function formDataFromRecord(record) {
+  const data = new FormData();
+  for (const [name, value] of record.fields || []) {
+    data.append(name, value);
+  }
+  for (const file of record.files || []) {
+    data.append(file.name, file.file, file.filename);
+  }
+  if (record.method !== "DELETE") {
+    data.set("offline", "True");
+    if (record.fingerprint) {
+      data.set("offline-fingerprint", record.fingerprint);
+    }
+  }
+  return data;
+}
+function field(record, name) {
+  return (record.fields || []).find(([key]) => key === name)?.[1] || "";
+}
+class OfflineQueue {
+  constructor(view) {
+    this.view = view;
+    this.records = [];
+    this._replaying = false;
+  }
+  async init() {
+    this.records = (await getOfflineMutations()).filter(isOfflineMutation);
+  }
+  get widgets() {
+    return Object.values(this.view.components).flatMap((component) => {
+      return Object.values(component.widgets).filter(
+        (widget) => widget !== void 0
+      );
+    });
+  }
+  get targets() {
+    return this.widgets.filter(
+      (widget) => typeof widget?.handleOfflineQueue === "function"
+    );
+  }
+  async _dispatch(context, targets = this.targets) {
+    return Promise.all(
+      [...new Set(targets)].filter(Boolean).map(async (target) => {
+        if (typeof target === "function") return target(context);
+        return target.handleOfflineQueue?.(context);
+      })
+    );
+  }
+  /**
+   * A task form can mount after the first reconnect replay found its conflict.
+   * Give that form the retained record instead of requiring another replay.
+   *
+   */
+  async presentFor(target) {
+    if (!target?.key || typeof target.handleOfflineQueue !== "function") return;
+    const record = this._sortedRecords().find(
+      (candidate) => candidate.target_key === target.key
+    );
+    if (!record) return;
+    await this._dispatch(
+      {
+        phase: record.conflictResponse ? "conflict" : "queued",
+        queue: this,
+        record,
+        response: record.conflictResponse
+      },
+      [target]
+    );
+  }
+  _responseFromResults(results) {
+    return results.find(
+      (result) => isRecord(result) && typeof result.ok === "boolean" && (result.html === void 0 || result.html instanceof Document) && (result.removed === void 0 || typeof result.removed === "boolean")
+    );
+  }
+  async queueSubmit(component, data, route, method = "POST") {
+    const widget = component.active;
+    const target = widget?.target;
+    if (!widget || "standalone" in widget || !target?.hasAttribute("lp-offline"))
+      return null;
+    if (typeof widget.offline !== "function") return null;
+    await this._destinationWidget(component);
+    const action = method === "POST" ? "create" : "update";
+    const partial = await widget.offline({
+      action,
+      queue: this,
+      component,
+      data,
+      method,
+      route,
+      widget
+    });
+    if (!partial) return null;
+    const fingerprint = partial.fingerprint ?? target.closest?.("[lp-entity]")?.dataset?.fingerprint ?? this.view.elt?.dataset?.fingerprint ?? null;
+    const modified = partial.modified ?? target.closest?.("[lp-entity]")?.dataset?.modified ?? this.view.elt?.dataset?.modified ?? null;
+    const rendererSubmission = partial.renderer_submission ?? widget.form?.renderer?._packageSubmission?.() ?? null;
+    const formControls = Array.from(
+      target.querySelectorAll?.("[data-combobox-id]") || []
+    ).map(selectedFormControl).filter((control) => control !== null);
+    const result = await this.queue({
+      action,
+      method,
+      route,
+      data,
+      ...partial,
+      fingerprint,
+      modified,
+      renderer_submission: rendererSubmission,
+      renderer_schema: partial.renderer_schema ?? widget.schema ?? null,
+      form_controls: formControls
+    });
+    return result.response ? { ...result.response, queued: true } : { ok: true, queued: true };
+  }
+  async _destinationWidget(component) {
+    const destination = component.active?.target?.dataset.destination;
+    if (!destination) return null;
+    const [componentId, widgetName] = destination.split(":");
+    if (!widgetName) return null;
+    const componentElt = componentId === component.name ? component.elt : document.getElementById(componentId);
+    const destinationComponent = this.view.getComponent(componentElt);
+    if (!destinationComponent) return null;
+    return destinationComponent.widgets[widgetName] || await destinationComponent.loadWidget(widgetName);
+  }
+  async replay() {
+    if (!this.view.online || this._replaying) return 0;
+    this._replaying = true;
+    let completed = 0;
+    try {
+      for (const record of this._sortedRecords()) {
+        let current = record;
+        while (current) {
+          const result = await this._replayRecord(current);
+          if (result.state === REPLAY_RESULT.REBASED) {
+            current = result.record;
+            continue;
+          }
+          if (result.state === REPLAY_RESULT.BLOCKED) return completed;
+          if (result.state === REPLAY_RESULT.COMPLETED) {
+            completed += 1;
+            break;
+          }
+          throw new TypeError(`Unknown replay result: ${result.state}`);
+        }
+      }
+    } finally {
+      this._replaying = false;
+    }
+    return completed;
+  }
+  async _replayRecord(record) {
+    const response = await this._send(record);
+    if (response?.conflict) {
+      const attemptedFingerprint = record.fingerprint;
+      record.conflictResponse = response;
+      await this._dispatch({
+        phase: "conflict",
+        queue: this,
+        record,
+        response
+      });
+      const rebased = this.records.find((queued) => queued.id === record.id);
+      if (!rebased || rebased.fingerprint === attemptedFingerprint) {
+        return { state: REPLAY_RESULT.BLOCKED };
+      }
+      return { state: REPLAY_RESULT.REBASED, record: rebased };
+    }
+    if (!response?.ok || response.error) {
+      return { state: REPLAY_RESULT.BLOCKED };
+    }
+    await deleteOfflineMutations([record.id]);
+    this.records = this.records.filter((queued) => queued.id !== record.id);
+    const targets = this.targets;
+    const mountedUpdateTargets = record.method === "PUT" ? this._mountedUpdateTargets(record, targets) : [];
+    this._finalize(record, response);
+    await this._dispatch(
+      {
+        phase: "replayed",
+        queue: this,
+        record,
+        response
+      },
+      targets.filter((target) => !mountedUpdateTargets.includes(target))
+    );
+    if (record.method === "PUT") {
+      await this._pollMountedUpdate(record, mountedUpdateTargets);
+    }
+    return { state: REPLAY_RESULT.COMPLETED };
+  }
+  _mountedUpdateTargets(record, targets = this.targets) {
+    return targets.filter(
+      (target) => target?.key === record.target_key && target.target?.matches?.("form[data-widget]")
+    );
+  }
+  async _pollMountedUpdate(record, targets = this._mountedUpdateTargets(record)) {
+    if (!targets.length) return;
+    const watcher = this.view.EditWatcher || await this.view.ensureEditWatcher?.();
+    await watcher?.invalidate?.(record.target_key);
+  }
+  async rebaseSubmit(record, widget, {
+    fingerprint,
+    modified
+  } = {}) {
+    if (!record?.id || !widget) return null;
+    const data = widget.component?.formData ?? widget.formData;
+    if (!(data instanceof FormData)) return null;
+    const serialized = serializeFormData(data);
+    const currentFileNames = new Set(serialized.files.map((file) => file.name));
+    serialized.files.push(
+      ...(record.files || []).filter(
+        (file) => !currentFileNames.has(file.name)
+      )
+    );
+    const rebased = {
+      ...record,
+      fingerprint: fingerprint || record.fingerprint || null,
+      modified: modified || record.modified || null,
+      renderer_submission: widget.form?.renderer?._packageSubmission?.() ?? record.renderer_submission ?? null,
+      renderer_schema: widget.schema ?? record.renderer_schema ?? null,
+      fields: serialized.fields,
+      files: serialized.files
+    };
+    delete rebased.conflictResponse;
+    await this._store(rebased);
+    await this._dispatch({
+      phase: "queued",
+      queue: this,
+      record: rebased
+    });
+    return rebased;
+  }
+  async queue(record) {
+    const queued = this._queuedRecord(record);
+    await this._store(queued);
+    const results = await this._dispatch({
+      phase: "queued",
+      queue: this,
+      record: queued
+    });
+    return {
+      record: queued,
+      response: this._responseFromResults(results)
+    };
+  }
+  _queuedRecord(record) {
+    const id = record.id || createId();
+    const serialized = record.data ? serializeFormData(record.data) : {
+      fields: record.fields || [],
+      files: record.files || []
+    };
+    return {
+      id,
+      action: record.action || (record.method === "DELETE" ? "delete" : "submit"),
+      kind: record.kind,
+      method: record.method || "POST",
+      route: record.route,
+      client_key: record.client_key || (record.action === "create" ? `offline:${id}` : null),
+      target_key: record.target_key,
+      fingerprint: record.fingerprint || null,
+      modified: record.modified || null,
+      renderer_submission: record.renderer_submission ?? null,
+      renderer_schema: record.renderer_schema ?? null,
+      form_controls: record.form_controls || [],
+      fields: serialized.fields,
+      files: serialized.files,
+      created_at: record.created_at || Date.now()
+    };
+  }
+  response(element) {
+    return elementResponse(element);
+  }
+  field(record, name) {
+    return field(record, name);
+  }
+  recordsFor({
+    kind = null,
+    action = null
+  } = {}) {
+    return this._sortedRecords().filter((record) => {
+      if (kind && record.kind !== kind) return false;
+      if (action && record.action !== action) return false;
+      return true;
+    });
+  }
+  async cancel(match) {
+    const records = this.records.filter((record) => {
+      return this._recordMatches(record, match);
+    });
+    if (records.length === 0) return [];
+    await deleteOfflineMutations(records.map((record) => record.id));
+    const ids = new Set(records.map((record) => record.id));
+    this.records = this.records.filter((record) => !ids.has(record.id));
+    await Promise.all(
+      records.map((record) => {
+        return this._dispatch({
+          phase: "cancelled",
+          queue: this,
+          record
+        });
+      })
+    );
+    return records;
+  }
+  _recordMatches(record, match) {
+    if (typeof match === "function") return match(record);
+    if (typeof match === "string") {
+      return [record.id, record.client_key, record.target_key].includes(match);
+    }
+    if (!match || typeof match !== "object") return false;
+    return Object.entries(match).every(([key, value]) => record[key] === value);
+  }
+  async _store(record) {
+    await setOfflineMutation(record);
+    this.records = [
+      ...this.records.filter((existing) => existing.id !== record.id),
+      record
+    ];
+  }
+  _sortedRecords() {
+    return [...this.records].sort(
+      (a, b) => Number(a.created_at) - Number(b.created_at)
+    );
+  }
+  async _send(record) {
+    if (record.method === "DELETE") return request.delete(record.route);
+    const data = formDataFromRecord(record);
+    if (record.method === "PUT") {
+      return request.put(record.route, data, { acknowledgeEntities: false });
+    }
+    return request.post(record.route, data);
+  }
+  _finalize(record, response) {
+    const key = record.action === "create" ? record.client_key : record.target_key;
+    if (!key) return;
+    const current = document.querySelector(`[data-key="${key}"]`);
+    if (record.action === "create") {
+      const html = response.html || void 0;
+      const replacement = html?.querySelector("li,[lp-entity]");
+      if (current && replacement) current.replaceWith(replacement);
+      else if (current && response.removed) current.remove();
+      return;
+    }
+    if ((record.action === "complete" || record.action === "delete") && current) {
+      current.remove();
+    }
+  }
+}
+
+var offlineQueue = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	OfflineQueue: OfflineQueue
+});
+
+const replayOfflineQueue = async (view, existingQueue = null) => {
+  try {
+    if (view._destroyed) return 0;
+    const queue = existingQueue || await view.ensureOfflineQueue();
+    if (!queue || view._destroyed || !view.online) return 0;
+    const replayed = await queue.replay() || 0;
+    if (replayed && !view._destroyed) await view.refresh();
+    return replayed;
+  } catch (error) {
+    view.reportStartupError(error, view.elt, "offline-replay");
+    return 0;
+  }
+};
+
+var offlineReplay = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	replayOfflineQueue: replayOfflineQueue
+});
+
+export { offlineReplay as a, offlineQueue as o };

@@ -1,2 +1,101 @@
-import{w as f}from"../foundation.js?v=baa4a64d";import"../upstreamUnavailable.js?v=baa4a64d";import"../connectivity.js?v=baa4a64d";function p(t,e){const r=e.createElement("textarea");r.value=t,r.setAttribute("readonly",""),r.style.position="fixed",r.style.opacity="0",e.body.append(r),r.select();let a=!1;try{a=e.execCommand("copy")}finally{r.remove()}return a}async function h(t,e=document){try{if(navigator.clipboard?.writeText)return await navigator.clipboard.writeText(t),!0}catch{}return p(t,e)}function n(t,e){t&&f(()=>{t.textContent=e},{label:"public-share:feedback"})}async function y(t,e=document){const r=t.closest('[data-role="public-share"]'),a=r?.querySelector('[data-role="share-status"]'),l=r?.querySelector('[data-role="share-fallback"]'),s=l?.querySelector('[data-role="share-url"]'),i=t.querySelector?.('[data-role="share-label"]'),o={url:t.dataset.shareUrl};if(a&&(a.textContent=""),typeof navigator.share=="function"){let u=!0;try{u=typeof navigator.canShare!="function"||navigator.canShare(o)}catch{u=!1}if(u)try{await navigator.share(o),n(i,"Shared"),a&&(a.textContent="Page shared");return}catch(c){if(c&&typeof c=="object"&&"name"in c&&c.name==="AbortError"){n(i,"Share");return}}}if(o.url!==void 0&&await h(o.url,e)){n(i,"Copied"),a&&(a.textContent="Link copied");return}l&&s?(l.classList.remove("hidden"),s.focus(),s.select(),n(i,"Copy link"),a&&(a.textContent="Select and copy the page link")):n(i,"Share")}function b(t=document){const e=t.querySelector('[data-role="share-button"]');!e||e.dataset.shareInitialized==="true"||(e.dataset.shareInitialized="true",e.addEventListener("click",()=>{y(e,t)}))}function d(){b()}d();export{d as startPublicPage};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { w as withTransition } from '../foundation.js?v=b14914a4';
+import '../upstreamUnavailable.js?v=b14914a4';
+import '../connectivity.js?v=b14914a4';
+
+function legacyCopy(url, documentRef) {
+  const textarea = documentRef.createElement("textarea");
+  textarea.value = url;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  documentRef.body.append(textarea);
+  textarea.select();
+  let copied = false;
+  try {
+    copied = documentRef.execCommand("copy");
+  } finally {
+    textarea.remove();
+  }
+  return copied;
+}
+async function copyPublicUrl(url, root = document) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(url);
+      return true;
+    }
+  } catch {
+  }
+  return legacyCopy(url, root);
+}
+function updateShareLabel(label, text) {
+  if (!label) return;
+  void withTransition(
+    () => {
+      label.textContent = text;
+    },
+    { label: "public-share:feedback" }
+  );
+}
+async function sharePublicPage(button, root = document) {
+  const container = button.closest('[data-role="public-share"]');
+  const status = container?.querySelector('[data-role="share-status"]');
+  const fallback = container?.querySelector('[data-role="share-fallback"]');
+  const input = fallback?.querySelector(
+    '[data-role="share-url"]'
+  );
+  const label = button.querySelector?.('[data-role="share-label"]');
+  const payload = { url: button.dataset.shareUrl };
+  if (status) status.textContent = "";
+  if (typeof navigator.share === "function") {
+    let supported = true;
+    try {
+      supported = typeof navigator.canShare !== "function" || navigator.canShare(payload);
+    } catch {
+      supported = false;
+    }
+    if (supported) {
+      try {
+        await navigator.share(payload);
+        updateShareLabel(label, "Shared");
+        if (status) status.textContent = "Page shared";
+        return;
+      } catch (error) {
+        if (error && typeof error === "object" && "name" in error && error.name === "AbortError") {
+          updateShareLabel(label, "Share");
+          return;
+        }
+      }
+    }
+  }
+  if (payload.url !== void 0 && await copyPublicUrl(payload.url, root)) {
+    updateShareLabel(label, "Copied");
+    if (status) status.textContent = "Link copied";
+    return;
+  }
+  if (fallback && input) {
+    fallback.classList.remove("hidden");
+    input.focus();
+    input.select();
+    updateShareLabel(label, "Copy link");
+    if (status) status.textContent = "Select and copy the page link";
+  } else {
+    updateShareLabel(label, "Share");
+  }
+}
+function initializePublicSharing(root = document) {
+  const button = root.querySelector(
+    '[data-role="share-button"]'
+  );
+  if (!button || button.dataset.shareInitialized === "true") return;
+  button.dataset.shareInitialized = "true";
+  button.addEventListener("click", () => void sharePublicPage(button, root));
+}
+
+function startPublicPage() {
+  initializePublicSharing();
+}
+startPublicPage();
+
+export { startPublicPage };

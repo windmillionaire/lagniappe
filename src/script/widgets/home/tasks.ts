@@ -21,6 +21,7 @@ type TaskListAttributes = ListAttributes & {
 	component: ListAttributes["component"] & { elt: HTMLElement };
 	view: Pick<Core, "addFlash" | "offlineQueue" | "ensureOfflineQueue"> & {
 		online: boolean;
+		syncHomeSectionState?(component: TaskListAttributes["component"]): void;
 	};
 	endpoints: ReturnType<typeof ENDPOINTS.HomeTaskList>;
 };
@@ -607,6 +608,7 @@ export class HomeTaskList extends BaseList {
 	_updateVisibility() {
 		const count = this.target.querySelectorAll("[lp-entity]").length;
 		this.target.dataset.visible = count > 0 && this.visible ? "true" : "false";
+		this.view.syncHomeSectionState?.(this.component);
 	}
 
 	_showNotification(elt: HTMLElement, message: string) {

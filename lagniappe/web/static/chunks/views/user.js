@@ -1,2 +1,249 @@
-import{w as h,r as p}from"../foundation.js?v=baa4a64d";import{E as g}from"../index-foundation.js?v=baa4a64d";import"../upstreamUnavailable.js?v=baa4a64d";import"../connectivity.js?v=baa4a64d";import"../core-foundation.js?v=baa4a64d";class f extends g{constructor(t){super(t),this._publicModeClick=this._publicModeClick.bind(this),this._groupPanelChange=this._groupPanelChange.bind(this),this._loadingPublicMode=!1}async init(){await super.init(),this.elt.addEventListener("click",this._publicModeClick),this.elt.addEventListener("set-subcomponent",this._groupPanelChange),this._syncUserModeRoute(),this._syncPublicModeControls(),this._setCreateUserAvailability()}_click(t){const e=t.target,s=e?.closest?.("a[data-kind='group'][href]");if(s&&this.elt.contains(s)){const o=new URL(s.href,window.location.href).searchParams.get("group"),i=this._groupSelector(o);if(i){t.preventDefault(),i.click();return}}const r=e?.closest?.("button[lp-close='tools']");r&&this.elt.contains(r)&&this._replaceGroupUrl(),super._click(t)}_groupSelector(t){return t?Array.from(this.elt.querySelectorAll("#user-groups button[data-key][lp-show^='user-groups:GroupPermissions/']")).find(e=>e.dataset.key===t):null}_groupPanelChange(t){const e=t.detail?.subcomponent;if(e?.name!=="user-groups")return;const s=e.active;this._replaceGroupUrl(s&&"target"in s?s.target?.dataset.key:null)}_replaceGroupUrl(t=null){const e=new URL(window.location.href);t?(e.searchParams.set("group",t),e.searchParams.delete("tool")):e.searchParams.delete("group"),window.history.replaceState(window.history.state,"",e)}_defaultToolTarget(t){const s=this._groupSelector(this.queryParam("group"))?.getAttribute("lp-show");if(s){const[r,l]=s.split(":");return{componentId:r,widgetName:l}}return super._defaultToolTarget(t)}async refreshCollections(t=!1,e={}){this._syncUserModeRoute(),await super.refreshCollections(t,e)}async refreshSupplementalCollections(t=[]){const e=this.elt?.querySelector("[id='user-groups']"),r=(e?this.getComponent(e):null)?.active,l=r&&"target"in r?r.target?.dataset.key:void 0;l&&t.some(({type:o,key:i})=>o==="delete"&&i===l)&&await this._refreshGroups()}async _refreshGroups(){const t=this.elt?.querySelector("[id='user-groups']");if(!t)return;const e=this.getComponent(t);e&&(await e.activate("nav"),await e.prepareRender(!0),await h(()=>{Object.entries(e.widgets).forEach(([s,r])=>{e.elt.contains(r.target??null)||(r.destroy?.(),delete e.widgets[s])}),e.render(!0)},{label:"users:refresh-groups"}))}async _publicModeClick(t){const e=t.target?.closest?.("[data-role='public-users-toggle']");if(!e||!this.elt.contains(e)||(t.preventDefault(),t.stopPropagation(),this._loadingPublicMode||!this.online))return;const s=this.elt.dataset.userMode==="public"?"regular":"public";await this._loadUserMode(s,e)}async _loadUserMode(t,e){const s=this.getComponent(this.elt.querySelector("#table")),r=this._userModeRoute(t,e);if(!(!s||!r)){this._setPublicModeLoading(!0);try{const l=await p.get(r);if(!this.successfulResponse(l,s))return;const o=l?.html;if(!o)return;const i=o.querySelector("tbody[data-widget='IndexTable']");if(!i)return;let a=i.querySelector("tr[lp-load]");for(;a;){const n=a.dataset.route;if(!n)return;const u=await p.get(n);if(!this.successfulResponse(u,s))return;const c=u?.html;if(!c)return;const d=c.querySelector("tbody[data-widget='IndexTable']");if(!d)return;a.replaceWith(...d.children),a=i.querySelector("tr[lp-load]")}await h(()=>{this.elt.dataset.userMode=t,this._replaceUserRows(s,i,r),this._syncPublicModeControls(),this._setCreateUserAvailability(),s.render(!0)},{label:"users:change-index-mode"})}finally{this._setPublicModeLoading(!1)}}}_replaceUserRows(t,e,s=null){const r=s||e.dataset.route;r&&(e.dataset.route=r),e.setAttribute("loaded",""),t.elt.querySelector("tbody[data-widget='IndexTable']")?.replaceWith(e);const o=t.widgets.IndexTable;o&&(o.target=e,r&&(o.route=r),e._lp_widget=o,o.loaded=!0,o.loading=!1,o._created=[],o._updated=[],o.visible=!0,o.modified=!0,t.active=o);const i=t.widgets.TableSorting;i&&(i.disable(!0),i.reset())}_userModeRoute(t=this.elt.dataset.userMode,e=null){const s=e||this.elt.querySelector("[data-role='public-users-toggle']");return s?t==="public"?s.dataset.routePublic:s.dataset.routeRegular:null}_syncUserModeRoute(){const e=this.getComponent(this.elt.querySelector("#table"))?.widgets.IndexTable,s=this._userModeRoute();!e||!s||(e.route=s,e.target&&(e.target.dataset.route=s))}_syncPublicModeControls(){const t=this.elt.dataset.userMode==="public",e=t?"Show regular users":"Show public users",s=this.elt.querySelector("[data-role='title']");s&&(s.textContent=t?"Public User Index":"User Index"),this.elt.querySelectorAll("[data-role='public-users-toggle']").forEach(r=>{r.dataset.active=t?"true":"false",r.setAttribute("aria-label",e),r.setAttribute("title",e)})}_setCreateUserAvailability(){const t=this.elt.dataset.userMode==="public";this.elt.querySelectorAll("[data-role='create-user-toggle']").forEach(r=>{r.dataset.visible=t?"false":"true"});const e=this.elt.querySelector("#tools"),s=e?this.getComponent(e):null;t&&s?.active?.name==="CreateUser"&&s.deactivate(!1),this._refreshMobileToolsDropdown()}_refreshMobileToolsDropdown(){!this.mobile||!this.dropdown||(this.dropdown.destroy(),this.dropdown=null,this._createDropdown())}_setPublicModeLoading(t){this._loadingPublicMode=t,this.elt.querySelectorAll("[data-role='public-users-toggle']").forEach(e=>{e.disabled=t})}destroy(){this.elt.removeEventListener("click",this._publicModeClick),this.elt.removeEventListener("set-subcomponent",this._groupPanelChange),super.destroy()}}export{f as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { w as withTransition, r as request } from '../foundation.js?v=b14914a4';
+import { E as EntityIndex } from '../index-foundation.js?v=b14914a4';
+import '../upstreamUnavailable.js?v=b14914a4';
+import '../connectivity.js?v=b14914a4';
+import '../core-foundation.js?v=b14914a4';
+
+class Users extends EntityIndex {
+  constructor(node) {
+    super(node);
+    this._publicModeClick = this._publicModeClick.bind(this);
+    this._groupPanelChange = this._groupPanelChange.bind(this);
+    this._loadingPublicMode = false;
+  }
+  async init() {
+    await super.init();
+    this.elt.addEventListener("click", this._publicModeClick);
+    this.elt.addEventListener("set-subcomponent", this._groupPanelChange);
+    this._syncUserModeRoute();
+    this._syncPublicModeControls();
+    this._setCreateUserAvailability();
+  }
+  _click(e) {
+    const target = e.target;
+    const groupLink = target?.closest?.(
+      "a[data-kind='group'][href]"
+    );
+    if (groupLink && this.elt.contains(groupLink)) {
+      const route = new URL(groupLink.href, window.location.href);
+      const groupKey = route.searchParams.get("group");
+      const selector = this._groupSelector(groupKey);
+      if (selector) {
+        e.preventDefault();
+        selector.click();
+        return;
+      }
+    }
+    const closeTools = target?.closest?.("button[lp-close='tools']");
+    if (closeTools && this.elt.contains(closeTools)) this._replaceGroupUrl();
+    super._click(e);
+  }
+  _groupSelector(groupKey) {
+    if (!groupKey) return null;
+    return Array.from(
+      this.elt.querySelectorAll(
+        "#user-groups button[data-key][lp-show^='user-groups:GroupPermissions/']"
+      )
+    ).find((button) => button.dataset.key === groupKey);
+  }
+  _groupPanelChange(event) {
+    const component = event.detail?.subcomponent;
+    if (component?.name !== "user-groups") return;
+    const active = component.active;
+    this._replaceGroupUrl(
+      active && "target" in active ? active.target?.dataset.key : null
+    );
+  }
+  _replaceGroupUrl(groupKey = null) {
+    const route = new URL(window.location.href);
+    if (groupKey) {
+      route.searchParams.set("group", groupKey);
+      route.searchParams.delete("tool");
+    } else {
+      route.searchParams.delete("group");
+    }
+    window.history.replaceState(window.history.state, "", route);
+  }
+  _defaultToolTarget(tools) {
+    const selector = this._groupSelector(this.queryParam("group"));
+    const action = selector?.getAttribute("lp-show");
+    if (action) {
+      const [componentId, widgetName] = action.split(":");
+      return { componentId, widgetName };
+    }
+    return super._defaultToolTarget(tools);
+  }
+  async refreshCollections(navigation = false, options = {}) {
+    this._syncUserModeRoute();
+    await super.refreshCollections(navigation, options);
+  }
+  async refreshSupplementalCollections(changes = []) {
+    const groupsElt = this.elt?.querySelector("[id='user-groups']");
+    const groups = groupsElt ? this.getComponent(groupsElt) : null;
+    const active = groups?.active;
+    const activeGroupKey = active && "target" in active ? active.target?.dataset.key : void 0;
+    if (activeGroupKey && changes.some(
+      ({ type, key }) => type === "delete" && key === activeGroupKey
+    )) {
+      await this._refreshGroups();
+    }
+  }
+  async _refreshGroups() {
+    const groupsElt = this.elt?.querySelector("[id='user-groups']");
+    if (!groupsElt) return;
+    const groups = this.getComponent(groupsElt);
+    if (!groups) return;
+    await groups.activate("nav");
+    await groups.prepareRender(true);
+    await withTransition(
+      () => {
+        Object.entries(groups.widgets).forEach(([key, widget]) => {
+          if (!groups.elt.contains(widget.target ?? null)) {
+            widget.destroy?.();
+            delete groups.widgets[key];
+          }
+        });
+        groups.render(true);
+      },
+      { label: "users:refresh-groups" }
+    );
+  }
+  async _publicModeClick(e) {
+    const button = e.target?.closest?.(
+      "[data-role='public-users-toggle']"
+    );
+    if (!button || !this.elt.contains(button)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (this._loadingPublicMode || !this.online) return;
+    const nextMode = this.elt.dataset.userMode === "public" ? "regular" : "public";
+    await this._loadUserMode(nextMode, button);
+  }
+  async _loadUserMode(mode, button) {
+    const table = this.getComponent(this.elt.querySelector("#table"));
+    const route = this._userModeRoute(mode, button);
+    if (!table || !route) return;
+    this._setPublicModeLoading(true);
+    try {
+      const response = await request.get(route);
+      if (!this.successfulResponse(response, table)) return;
+      const html = response?.html;
+      if (!html) return;
+      const body = html.querySelector(
+        "tbody[data-widget='IndexTable']"
+      );
+      if (!body) return;
+      let continuation = body.querySelector("tr[lp-load]");
+      while (continuation) {
+        const nextRoute = continuation.dataset.route;
+        if (!nextRoute) return;
+        const next = await request.get(nextRoute);
+        if (!this.successfulResponse(next, table)) return;
+        const nextHtml = next?.html;
+        if (!nextHtml) return;
+        const nextBody = nextHtml.querySelector(
+          "tbody[data-widget='IndexTable']"
+        );
+        if (!nextBody) return;
+        continuation.replaceWith(...nextBody.children);
+        continuation = body.querySelector("tr[lp-load]");
+      }
+      await withTransition(
+        () => {
+          this.elt.dataset.userMode = mode;
+          this._replaceUserRows(table, body, route);
+          this._syncPublicModeControls();
+          this._setCreateUserAvailability();
+          table.render(true);
+        },
+        { label: "users:change-index-mode" }
+      );
+    } finally {
+      this._setPublicModeLoading(false);
+    }
+  }
+  _replaceUserRows(table, body, route = null) {
+    const refreshRoute = route || body.dataset.route;
+    if (refreshRoute) body.dataset.route = refreshRoute;
+    body.setAttribute("loaded", "");
+    const oldBody = table.elt.querySelector("tbody[data-widget='IndexTable']");
+    oldBody?.replaceWith(body);
+    const indexTable = table.widgets.IndexTable;
+    if (indexTable) {
+      indexTable.target = body;
+      if (refreshRoute) indexTable.route = refreshRoute;
+      body._lp_widget = indexTable;
+      indexTable.loaded = true;
+      indexTable.loading = false;
+      indexTable._created = [];
+      indexTable._updated = [];
+      indexTable.visible = true;
+      indexTable.modified = true;
+      table.active = indexTable;
+    }
+    const sorting = table.widgets.TableSorting;
+    if (sorting) {
+      sorting.disable(true);
+      sorting.reset();
+    }
+  }
+  _userModeRoute(mode = this.elt.dataset.userMode, button = null) {
+    const toggle = button || this.elt.querySelector(
+      "[data-role='public-users-toggle']"
+    );
+    if (!toggle) return null;
+    return mode === "public" ? toggle.dataset.routePublic : toggle.dataset.routeRegular;
+  }
+  _syncUserModeRoute() {
+    const table = this.getComponent(this.elt.querySelector("#table"));
+    const indexTable = table?.widgets.IndexTable;
+    const route = this._userModeRoute();
+    if (!indexTable || !route) return;
+    indexTable.route = route;
+    if (indexTable.target) indexTable.target.dataset.route = route;
+  }
+  _syncPublicModeControls() {
+    const publicMode = this.elt.dataset.userMode === "public";
+    const label = publicMode ? "Show regular users" : "Show public users";
+    const title = this.elt.querySelector("[data-role='title']");
+    if (title)
+      title.textContent = publicMode ? "Public User Index" : "User Index";
+    this.elt.querySelectorAll("[data-role='public-users-toggle']").forEach((button) => {
+      button.dataset.active = publicMode ? "true" : "false";
+      button.setAttribute("aria-label", label);
+      button.setAttribute("title", label);
+    });
+  }
+  _setCreateUserAvailability() {
+    const publicMode = this.elt.dataset.userMode === "public";
+    this.elt.querySelectorAll("[data-role='create-user-toggle']").forEach((button) => {
+      button.dataset.visible = publicMode ? "false" : "true";
+    });
+    const toolsElt = this.elt.querySelector("#tools");
+    const tools = toolsElt ? this.getComponent(toolsElt) : null;
+    if (publicMode && tools?.active?.name === "CreateUser") {
+      tools.deactivate(false);
+    }
+    this._refreshMobileToolsDropdown();
+  }
+  _refreshMobileToolsDropdown() {
+    if (!this.mobile || !this.dropdown) return;
+    this.dropdown.destroy();
+    this.dropdown = null;
+    this._createDropdown();
+  }
+  _setPublicModeLoading(loading) {
+    this._loadingPublicMode = loading;
+    this.elt.querySelectorAll("[data-role='public-users-toggle']").forEach((button) => {
+      button.disabled = loading;
+    });
+  }
+  destroy() {
+    this.elt.removeEventListener("click", this._publicModeClick);
+    this.elt.removeEventListener("set-subcomponent", this._groupPanelChange);
+    super.destroy();
+  }
+}
+
+export { Users as default };

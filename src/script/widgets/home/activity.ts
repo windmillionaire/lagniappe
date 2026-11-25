@@ -11,12 +11,15 @@ import { withTransition } from "../../shared/transitions.ts";
 import type Core from "../../views/base/core.ts";
 
 type ActivityListAttributes = ListAttributes & {
+	component: ListAttributes["component"] & { elt?: HTMLElement; name?: string };
 	view: Pick<Core, "addFlash" | "offlineQueue" | "ensureOfflineQueue"> & {
 		online: boolean;
+		syncHomeSectionState?(component: ActivityListAttributes["component"]): void;
 	};
 };
 
 export class HomeActivityList extends BaseList {
+	declare component: ActivityListAttributes["component"];
 	declare view: ActivityListAttributes["view"];
 
 	constructor(attributes: ActivityListAttributes) {
@@ -171,6 +174,7 @@ export class HomeActivityList extends BaseList {
 
 		if (list && list.querySelectorAll("li").length === 0) {
 			list.dataset.visible = "false";
+			this.view.syncHomeSectionState?.(this.component);
 		}
 	}
 

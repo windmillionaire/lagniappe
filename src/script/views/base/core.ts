@@ -360,6 +360,8 @@ export default class Core extends ShellView {
 		return Promise.resolve();
 	}
 
+	onComponentRendered(_component: ViewComponent): void {}
+
 	_applyStarState({ key, starred, type }: ReconcileChange = {}) {
 		if (!key) return;
 		const active = starred ?? type === "star";

@@ -316,11 +316,10 @@ def test_star_route_rejects_inaccessible_and_missing_targets(
     saved_user.db["starred"] = [target_after.key, deleted_key]
     saved_user.save()
 
-    home = restricted.go(SitePages.HOME)
+    with restricted.page.expect_response("**/l/get/starred"):
+        home = restricted.go(SitePages.HOME)
     expect(restricted.locate(home.STARRED_COUNT)).to_have_text("2")
     toggle = restricted.locate(home.STARRED_LIST_TOGGLE)
-    with restricted.page.expect_response("**/l/get/starred"):
-        toggle.click()
     starred = restricted.locate(home.STARRED_LIST)
     expect(starred).to_have_attribute("loaded", "")
     expect(starred).to_be_visible()

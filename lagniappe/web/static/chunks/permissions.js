@@ -1,2 +1,231 @@
-import{a as m}from"./forms.js?v=baa4a64d";import{w as f}from"./foundation.js?v=baa4a64d";class y{constructor(t,{readonly:e=!1,onChange:s=()=>{}}={}){this.root=t,this.readonly=e,this.onChange=s,this.selects=new Map,this._destroyed=!1,this._updated=this._updated.bind(this),this._change=this._change.bind(this)}async init(){if(this.setVisibility(),!this.readonly){for(const t of this.root.querySelectorAll("[data-section]")){const e=t.querySelector("[data-role='permission-picker']");if(!e)continue;const s=new m(e,t.dataset.section==="projects"?{models:!1}:{});if(this.selects.set(t,s),await s.init(),this._destroyed)return}this.root.addEventListener("updated",this._updated),this.root.addEventListener("change",this._change)}}_updated(t){const e=t.target;if(!(e instanceof Element))return;const s=e.closest("[data-section]");if(!s)return;const n=this.selects.get(s);if(!n||e!==n.element)return;const o=Object.values(t.detail.options)[0];o?.id&&f(()=>{if(this._destroyed)return;const a=s.querySelector("[data-role='permission-list']");if(!a)throw new Error("Permission list is missing");if(!Array.from(a.querySelectorAll("input[type='radio']")).some(i=>i.name===o.id)){const i=s.querySelector("template")?.content.firstElementChild?.cloneNode(!0);if(!(i instanceof Element))throw new Error("Permission row template is missing");const r=i.querySelector("[data-role='permission-name']");if(!r)throw new Error("Permission name field is missing");r.textContent=o.label||o.name;for(const c of i.querySelectorAll("input[type='radio']"))c.name=o.id;a.append(i),this.onChange()}n.clear({notify:!1}),this.setVisibility()},{label:"permissions:add-entry"})}_change(t){const e=t.target;!(e instanceof Element)||!e.closest("[data-section]")||f(()=>{this._destroyed||(e instanceof HTMLInputElement&&e.matches("[data-role='remove-permission']")&&!e.checked&&(e.closest("li")?.remove(),this.onChange()),this.setVisibility())},{label:"permissions:change"})}setVisibility(){const t=new Map(Array.from(this.root.querySelectorAll("[data-section]"),r=>[r.dataset.section??"",r])),e=r=>t.get(r)?.querySelector("input[type='radio']:checked")?.value,s=e("public")==="FALSE",n=e("models"),o=e("users"),a=n&&n!=="NONE",l=o&&!["NONE","VIEW"].includes(o),i=!!t.get("groups")?.querySelector("[data-role='permission-list'] li");for(const[r,c]of t)c.dataset.visible=String(!(s&&r!=="public"||a&&["categories","projects","pages"].includes(r)||r==="groups"&&l||r==="users"&&i))}destroy(){if(!this._destroyed){this._destroyed=!0,this.root.removeEventListener("updated",this._updated),this.root.removeEventListener("change",this._change);for(const t of this.selects.values())t.destroy();this.selects.clear()}}}var g=Object.freeze({__proto__:null,default:y});class _{constructor(t,{readonly:e=!1,onChange:s=()=>{}}={}){this.root=t,this.readonly=e,this.onChange=s,this.select=null,this._destroyed=!1,this._updated=this._updated.bind(this),this._change=this._change.bind(this),this._click=this._click.bind(this)}async init(){if(this.readonly)return;const t=this.root.querySelector("[data-role='restrict-group-input']");if(!t)throw new Error("Access restriction picker is missing");this.select=new m(t),await this.select.init(),!this._destroyed&&(this.root.addEventListener("updated",this._updated),this.root.addEventListener("change",this._change),this.root.addEventListener("click",this._click))}get list(){return this.root.querySelector("[data-role='restricted-group-list']")}_updated(t){const e=this.select;if(!e||t.target!==e.element)return;const s=Object.entries(t.detail.options);if(!s.length)return;const n=this.list,o=this.root.querySelector("[data-role='restriction-template']"),a=this.root.querySelector("[name='admin']");if(!n||!o||!a)throw new Error("Access restriction fields are missing");const l=new Set(Array.from(n.querySelectorAll("[name='group-key']"),i=>i.value));a.checked=!1;for(const[i,r]of s){if(l.has(i))continue;const c=o.content.firstElementChild?.cloneNode(!0);if(!(c instanceof Element))throw new Error("Access restriction row template is empty");const d=c.querySelector("[name='group-key']"),h=c.querySelector("[data-role='group-name']"),u=c.querySelector("button");if(!d||!h||!u)throw new Error("Access restriction row fields are missing");d.value=i,h.textContent=r.name,u.dataset.key=i,n.append(c),l.add(i)}e.clear({notify:!1}),this.onChange()}_change(t){const e=t.target;if(!(e instanceof HTMLInputElement)||e.name!=="admin"||!e.checked)return;const s=this.list;if(!s)throw new Error("Access restriction list is missing");s.replaceChildren(),this.select?.clear({notify:!1}),this.onChange()}_click(t){const e=t.target;if(!(e instanceof Element))return;const s=e.closest("[data-role='remove-restriction']");!s||!this.root.contains(s)||(t.preventDefault(),s.closest("li")?.remove(),this.onChange())}destroy(){this._destroyed||(this._destroyed=!0,this.root.removeEventListener("updated",this._updated),this.root.removeEventListener("change",this._change),this.root.removeEventListener("click",this._click),this.select?.destroy())}}var E=Object.freeze({__proto__:null,default:_});export{E as a,g as p};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { a as FacetsBox } from './forms.js?v=b14914a4';
+import { w as withTransition } from './foundation.js?v=b14914a4';
+
+class PermissionSections {
+  constructor(root, { readonly = false, onChange = () => {
+  } } = {}) {
+    this.root = root;
+    this.readonly = readonly;
+    this.onChange = onChange;
+    this.selects = /* @__PURE__ */ new Map();
+    this._destroyed = false;
+    this._updated = this._updated.bind(this);
+    this._change = this._change.bind(this);
+  }
+  async init() {
+    this.setVisibility();
+    if (this.readonly) return;
+    for (const section of this.root.querySelectorAll(
+      "[data-section]"
+    )) {
+      const input = section.querySelector(
+        "[data-role='permission-picker']"
+      );
+      if (!input) continue;
+      const select = new FacetsBox(
+        input,
+        section.dataset.section === "projects" ? { models: false } : {}
+      );
+      this.selects.set(section, select);
+      await select.init();
+      if (this._destroyed) return;
+    }
+    this.root.addEventListener("updated", this._updated);
+    this.root.addEventListener("change", this._change);
+  }
+  _updated(event) {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const section = target.closest("[data-section]");
+    if (!section) return;
+    const select = this.selects.get(section);
+    if (!select || target !== select.element) return;
+    const entry = Object.values(
+      event.detail.options
+    )[0];
+    if (!entry?.id) return;
+    void withTransition(
+      () => {
+        if (this._destroyed) return;
+        const list = section.querySelector("[data-role='permission-list']");
+        if (!list) throw new Error("Permission list is missing");
+        const exists = Array.from(
+          list.querySelectorAll("input[type='radio']")
+        ).some((input) => input.name === entry.id);
+        if (!exists) {
+          const item = section.querySelector("template")?.content.firstElementChild?.cloneNode(true);
+          if (!(item instanceof Element))
+            throw new Error("Permission row template is missing");
+          const name = item.querySelector("[data-role='permission-name']");
+          if (!name) throw new Error("Permission name field is missing");
+          name.textContent = entry.label || entry.name;
+          for (const input of item.querySelectorAll(
+            "input[type='radio']"
+          ))
+            input.name = entry.id;
+          list.append(item);
+          this.onChange();
+        }
+        select.clear({ notify: false });
+        this.setVisibility();
+      },
+      { label: "permissions:add-entry" }
+    );
+  }
+  _change(event) {
+    const target = event.target;
+    if (!(target instanceof Element) || !target.closest("[data-section]"))
+      return;
+    void withTransition(
+      () => {
+        if (this._destroyed) return;
+        if (target instanceof HTMLInputElement && target.matches("[data-role='remove-permission']") && !target.checked) {
+          target.closest("li")?.remove();
+          this.onChange();
+        }
+        this.setVisibility();
+      },
+      { label: "permissions:change" }
+    );
+  }
+  setVisibility() {
+    const sections = new Map(
+      Array.from(
+        this.root.querySelectorAll("[data-section]"),
+        (section) => [section.dataset.section ?? "", section]
+      )
+    );
+    const level = (name) => sections.get(name)?.querySelector("input[type='radio']:checked")?.value;
+    const publicOff = level("public") === "FALSE";
+    const modelLevel = level("models");
+    const userLevel = level("users");
+    const models = modelLevel && modelLevel !== "NONE";
+    const users = userLevel && !["NONE", "VIEW"].includes(userLevel);
+    const groups = !!sections.get("groups")?.querySelector("[data-role='permission-list'] li");
+    for (const [name, section] of sections) {
+      section.dataset.visible = String(
+        !(publicOff && name !== "public" || models && ["categories", "projects", "pages"].includes(name) || name === "groups" && users || name === "users" && groups)
+      );
+    }
+  }
+  destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
+    this.root.removeEventListener("updated", this._updated);
+    this.root.removeEventListener("change", this._change);
+    for (const select of this.selects.values()) select.destroy();
+    this.selects.clear();
+  }
+}
+
+var permissionSections = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	default: PermissionSections
+});
+
+class AccessRestrictions {
+  constructor(root, { readonly = false, onChange = () => {
+  } } = {}) {
+    this.root = root;
+    this.readonly = readonly;
+    this.onChange = onChange;
+    this.select = null;
+    this._destroyed = false;
+    this._updated = this._updated.bind(this);
+    this._change = this._change.bind(this);
+    this._click = this._click.bind(this);
+  }
+  async init() {
+    if (this.readonly) return;
+    const input = this.root.querySelector(
+      "[data-role='restrict-group-input']"
+    );
+    if (!input) throw new Error("Access restriction picker is missing");
+    this.select = new FacetsBox(input);
+    await this.select.init();
+    if (this._destroyed) return;
+    this.root.addEventListener("updated", this._updated);
+    this.root.addEventListener("change", this._change);
+    this.root.addEventListener("click", this._click);
+  }
+  get list() {
+    return this.root.querySelector(
+      "[data-role='restricted-group-list']"
+    );
+  }
+  _updated(event) {
+    const select = this.select;
+    if (!select || event.target !== select.element) return;
+    const options = Object.entries(
+      event.detail.options
+    );
+    if (!options.length) return;
+    const list = this.list;
+    const template = this.root.querySelector(
+      "[data-role='restriction-template']"
+    );
+    const admin = this.root.querySelector("[name='admin']");
+    if (!list || !template || !admin)
+      throw new Error("Access restriction fields are missing");
+    const selected = new Set(
+      Array.from(
+        list.querySelectorAll("[name='group-key']"),
+        (input) => input.value
+      )
+    );
+    admin.checked = false;
+    for (const [key, option] of options) {
+      if (selected.has(key)) continue;
+      const item = template.content.firstElementChild?.cloneNode(true);
+      if (!(item instanceof Element))
+        throw new Error("Access restriction row template is empty");
+      const input = item.querySelector("[name='group-key']");
+      const name = item.querySelector("[data-role='group-name']");
+      const button = item.querySelector("button");
+      if (!input || !name || !button)
+        throw new Error("Access restriction row fields are missing");
+      input.value = key;
+      name.textContent = option.name;
+      button.dataset.key = key;
+      list.append(item);
+      selected.add(key);
+    }
+    select.clear({ notify: false });
+    this.onChange();
+  }
+  _change(event) {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || input.name !== "admin" || !input.checked)
+      return;
+    const list = this.list;
+    if (!list) throw new Error("Access restriction list is missing");
+    list.replaceChildren();
+    this.select?.clear({ notify: false });
+    this.onChange();
+  }
+  _click(event) {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const button = target.closest("[data-role='remove-restriction']");
+    if (!button || !this.root.contains(button)) return;
+    event.preventDefault();
+    button.closest("li")?.remove();
+    this.onChange();
+  }
+  destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
+    this.root.removeEventListener("updated", this._updated);
+    this.root.removeEventListener("change", this._change);
+    this.root.removeEventListener("click", this._click);
+    this.select?.destroy();
+  }
+}
+
+var accessRestrictions = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	default: AccessRestrictions
+});
+
+export { accessRestrictions as a, permissionSections as p };

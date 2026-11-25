@@ -1,2 +1,136 @@
-import{r as d}from"./foundation.js?v=baa4a64d";const h="[data-action='logout'][data-route]";let f=!1;const _=async(t,{submitter:e=null,state:n=null}={})=>{if(n=n||e,n?.dataset?.submitting==="true")return;n?.dataset&&(n.dataset.submitting="true"),e&&"disabled"in e&&(e.disabled=!0);const o=await d.post(t);o?.redirect?window.location.href=o.redirect:o?.ok?window.location.href="/users/login":(n?.dataset&&(n.dataset.submitting="false"),e&&"disabled"in e&&(e.disabled=!1))},y=(t=document)=>{f||(f=!0,t.addEventListener("click",async e=>{const o=e.target?.closest?.(h),i=o?.dataset.route;!o||i===void 0||(e.preventDefault(),await _(i,{submitter:o,state:o}))}))};var w=Object.freeze({__proto__:null,initializeLogoutForms:y});let s=null,a=null;function g(){if(s)return s;const t=p().then(({retry:e,synced:n})=>(e&&s===t&&(s=null),n),e=>{throw s===t&&(s=null),e});return s=t,t}async function p({includeLocation:t=!1}={}){const e=Intl.DateTimeFormat().resolvedOptions().timeZone,n=sessionStorage.getItem("timezone_sent"),o=sessionStorage.getItem("userHash"),i=n!==e||!o,u=t?await z({enableHighAccuracy:!1,maximumAge:36e5,timeout:8e3}):null,l=u?{latitude:u.coords.latitude,longitude:u.coords.longitude}:null,r={};if(i&&(r.timezone=e),l&&(r.location=l),Object.keys(r).length===0)return{retry:!1,synced:!1};const c=await d.post("/l/update-session",r,{keepalive:!0});return c?.ok?(i&&sessionStorage.setItem("timezone_sent",e),c.userHash&&sessionStorage.setItem("userHash",c.userHash),{retry:!1,synced:t?!!l:i}):{retry:!0,synced:!1}}function z(t){return new Promise(e=>{if(!("geolocation"in navigator)){e(null);return}navigator.geolocation.getCurrentPosition(n=>e(n),()=>e(null),t)})}function m(){if(a)return a;const t=g().then(()=>p({includeLocation:!0})).then(({retry:e,synced:n})=>(e&&a===t&&(a=null),n),e=>{throw a===t&&(a=null),e});return a=t,t}var L=Object.freeze({__proto__:null,updateUserData:g,updateUserLocation:m});export{L as a,w as l,m as u};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request } from './foundation.js?v=b14914a4';
+
+const LOGOUT_BUTTON_SELECTOR = "[data-action='logout'][data-route]";
+let initialized = false;
+const submitLogout = async (route, { submitter = null, state = null } = {}) => {
+  state = state || submitter;
+  if (state?.dataset?.submitting === "true") return;
+  if (state?.dataset) state.dataset.submitting = "true";
+  if (submitter && "disabled" in submitter) {
+    submitter.disabled = true;
+  }
+  const response = await request.post(route);
+  if (response?.redirect) {
+    window.location.href = response.redirect;
+  } else if (response?.ok) {
+    window.location.href = "/users/login";
+  } else {
+    if (state?.dataset) state.dataset.submitting = "false";
+    if (submitter && "disabled" in submitter) {
+      submitter.disabled = false;
+    }
+  }
+};
+const initializeLogoutForms = (root = document) => {
+  if (initialized) return;
+  initialized = true;
+  root.addEventListener("click", async (event) => {
+    const target = event.target;
+    const button = target?.closest?.(LOGOUT_BUTTON_SELECTOR);
+    const route = button?.dataset.route;
+    if (!button || route === void 0) return;
+    event.preventDefault();
+    await submitLogout(route, {
+      submitter: button,
+      state: button
+    });
+  });
+};
+
+var logout = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	initializeLogoutForms: initializeLogoutForms
+});
+
+let userDataUpdate = null;
+let userLocationUpdate = null;
+function updateUserData() {
+  if (userDataUpdate) return userDataUpdate;
+  const update = _syncUserData().then(
+    ({ retry, synced }) => {
+      if (retry && userDataUpdate === update) userDataUpdate = null;
+      return synced;
+    },
+    (error) => {
+      if (userDataUpdate === update) userDataUpdate = null;
+      throw error;
+    }
+  );
+  userDataUpdate = update;
+  return update;
+}
+async function _syncUserData({ includeLocation = false } = {}) {
+  const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const sentThisSession = sessionStorage.getItem("timezone_sent");
+  const userHash = sessionStorage.getItem("userHash");
+  const timezoneChanged = sentThisSession !== currentTimezone || !userHash;
+  const position = includeLocation ? await _getCurrentPosition({
+    enableHighAccuracy: false,
+    maximumAge: 36e5,
+    // up to 1 hour old
+    timeout: 8e3
+  }) : null;
+  const location = position ? {
+    latitude: position.coords.latitude,
+    longitude: position.coords.longitude
+  } : null;
+  const payload = {};
+  if (timezoneChanged) payload.timezone = currentTimezone;
+  if (location) payload.location = location;
+  if (Object.keys(payload).length === 0) {
+    return { retry: false, synced: false };
+  }
+  const response = await request.post(
+    "/l/update-session",
+    payload,
+    { keepalive: true }
+  );
+  if (!response?.ok) return { retry: true, synced: false };
+  if (timezoneChanged) {
+    sessionStorage.setItem("timezone_sent", currentTimezone);
+  }
+  if (response.userHash) sessionStorage.setItem("userHash", response.userHash);
+  return {
+    retry: false,
+    synced: includeLocation ? Boolean(location) : timezoneChanged
+  };
+}
+function _getCurrentPosition(options) {
+  return new Promise((resolve) => {
+    if (!("geolocation" in navigator)) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve(pos),
+      () => resolve(null),
+      options
+    );
+  });
+}
+function updateUserLocation() {
+  if (userLocationUpdate) return userLocationUpdate;
+  const update = updateUserData().then(() => _syncUserData({ includeLocation: true })).then(
+    ({ retry, synced }) => {
+      if (retry && userLocationUpdate === update) {
+        userLocationUpdate = null;
+      }
+      return synced;
+    },
+    (error) => {
+      if (userLocationUpdate === update) userLocationUpdate = null;
+      throw error;
+    }
+  );
+  userLocationUpdate = update;
+  return update;
+}
+
+var user = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	updateUserData: updateUserData,
+	updateUserLocation: updateUserLocation
+});
+
+export { user as a, logout as l, updateUserLocation as u };

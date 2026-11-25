@@ -1,2 +1,202 @@
-import{s as r}from"../ui-resources.js?v=baa4a64d";import{w as l}from"../foundation.js?v=baa4a64d";import{E as p}from"../entity-foundation.js?v=baa4a64d";import"../upstreamUnavailable.js?v=baa4a64d";import"../connectivity.js?v=baa4a64d";import"../core-foundation.js?v=baa4a64d";class c extends p{async reconcilePollingSubscriptions(){await super.reconcilePollingSubscriptions();const t=this.components.tasks,e=Object.values(t?.widgets||{}).find(o=>o?.name==="PageTaskList"&&o.loaded);if(!t||!e||!this.PollingCoordinator){this._taskChannelUnsubscribe?.(),this._taskChannelUnsubscribe=null;return}this._taskChannelUnsubscribe||(this._taskChannelUnsubscribe=this.PollingCoordinator.subscribe({id:`page:tasks:${this.key}`,type:"channel",channel:"tasks",revision:this.elt.dataset.collectionRevision||null},{mode:"periodic",initial:"scheduled",onResult:async o=>{o.status==="changed"&&await this._refreshCollectionComponents([t])}}))}async init(){this.photoHasImage=this.elt.dataset.hasImage==="true",this.photoOpen=this.photoHasImage&&localStorage.getItem(`${this.hash}-photo-visible`)!=="false",this.photoToolsOpen=!1,this.photoGenerationReturnOpen=null,this.elt.addEventListener("click",o=>this._photoClick(o));const t=new URLSearchParams(window.location.search).get("task")||this.elt.dataset.focusTask;t&&(localStorage.setItem(`${this.hash}-active`,"tasks"),this.postRender=this._focusTask.bind(this,t)),await super.init();const e=this.elt.querySelector("#photo");if(e){const o=this.getComponent(e);(o?.active||this.isSecondaryCardVisible(e))&&o&&!o.active&&await o.activate("PagePhoto")}}get secondaryCard(){return(this.mobile?this.photoHasImage||this.photoToolsOpen:this.photoOpen)?this.elt.querySelector("#photo"):null}_initialTabId(){const t=super._initialTabId();return t==="photo"&&(!this.mobile||!this.secondaryCard)?"info":t}_tabChange(t){super._tabChange(t),t.detail.subcomponent.elt.dataset.tab==="true"&&this._syncPhotoControls(t.detail.subcomponent.name)}async updateLayout(t={}){return super.updateLayout({secondary:this.elt.querySelector("#photo"),secondaryActive:!!this.secondaryCard,...t})}_commitLayoutBody(t){const e=super._commitLayoutBody(t);return this._syncPhotoControls(e),e}_syncPhotoControls(t=this.photoActiveTab||this._initialTabId()||"info",e=this.elt.querySelector("[data-role='photo-prompt']")){if(this.photoActiveTab=t,!e)return;e.dataset.visible=!this.mobile||!this.photoHasImage&&t==="info"?"true":"false";const o=e.querySelector("[data-role='photo-upload']");if(!o)return;const a=this.photoHasImage?this.photoOpen?"visibility.visible":"visibility.hidden":"upload",s=this.photoHasImage?this.photoOpen?"Hide page image":"Show page image":this.photoOpen?"Close image upload":"Upload page image",n=o.querySelector("[data-icon]");n&&r(n,a),o.title=s,o.setAttribute("aria-label",s),o.setAttribute("aria-expanded",String(this.photoOpen)),e.querySelectorAll("button").forEach(i=>{i.disabled=!!this.photoBusy}),this.elt.querySelectorAll("button[lp-show='photo:active']").forEach(i=>{i.hidden=!this.photoHasImage&&!this.photoToolsOpen})}setPhotoBusy(t){this.photoBusy=t,this._syncPhotoControls()}async _photoClick(t){const e=t.target?.closest?.("[data-role='photo-upload'], [data-role='photo-generate']");if(!e||this.photoBusy)return;const o=e.closest("[data-role='photo-prompt']");if(!o)return;const a=o.querySelector("[data-role='photo-prompt-error']");if(a){a.dataset.visible="false",this.setPhotoBusy(!0);try{const s=e.dataset.role==="photo-generate",n=this.getComponent(this.elt.querySelector("#photo"));if(!n)return;const i=s||this.mobile||!this.photoOpen;i&&await n.activate("PagePhoto"),s&&(this.photoGenerationReturnOpen??=this.photoOpen),this.photoOpen=i,this.photoToolsOpen=i&&!this.photoHasImage,!s&&this.photoHasImage&&localStorage.setItem(`${this.hash}-photo-visible`,String(i)),await this.updateLayout({activeTabId:this.mobile?"photo":null,mutate:()=>()=>{const h=n.active;s?h?.showGenerateForm({transition:!1}):h?.hideGenerateForm({transition:!1})}})}catch(s){a.textContent=s instanceof Error&&s.message||"Unable to show image tools.",a.dataset.visible="true"}finally{this.setPhotoBusy(!1)}}}async cancelPhotoGeneration(t){this.photoOpen=this.photoGenerationReturnOpen??this.photoHasImage,this.photoToolsOpen=this.photoOpen&&!this.photoHasImage,this.photoGenerationReturnOpen=null,await this.updateLayout({activeTabId:this.mobile&&!this.secondaryCard?"info":null,mutate:()=>()=>t.hideGenerateForm({transition:!1})}),this.elt.querySelector(this.mobile&&this.secondaryCard?"#photo [data-role='upload-menu']":"[data-role='photo-generate']")?.focus()}async updatePhotoImage(t,e){this.photoHasImage=t,this.photoOpen=t,this.photoToolsOpen=!1,this.photoGenerationReturnOpen=null,localStorage.setItem(`${this.hash}-photo-visible`,String(t)),await this.updateLayout({activeTabId:!t&&this.mobile?"info":null,mutate:()=>()=>{e(),this.elt.dataset.hasImage=String(t)}})}async _focusTask(t){const e=this.getComponent(this.elt.querySelector("#tasks"));e&&(await e.activate("PageTaskList"),await e.prepareRender(!0),await l(()=>e.render(!0),{label:"page:focus-task-tab"}),await e.widgets.PageTaskList?.focusTask(t),this._replaceFocusedTaskUrl(),this.postRender=null)}_replaceFocusedTaskUrl(){const t=this.key?`/pages/${this.key}`:window.location.pathname;history.replaceState(null,"",t)}}export{c as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { s as setIcon } from '../ui-resources.js?v=b14914a4';
+import { w as withTransition } from '../foundation.js?v=b14914a4';
+import { E as Entity } from '../entity-foundation.js?v=b14914a4';
+import '../upstreamUnavailable.js?v=b14914a4';
+import '../connectivity.js?v=b14914a4';
+import '../core-foundation.js?v=b14914a4';
+
+class Page extends Entity {
+  async reconcilePollingSubscriptions() {
+    await super.reconcilePollingSubscriptions();
+    const component = this.components.tasks;
+    const list = Object.values(component?.widgets || {}).find(
+      (widget) => widget?.name === "PageTaskList" && widget.loaded
+    );
+    if (!component || !list || !this.PollingCoordinator) {
+      this._taskChannelUnsubscribe?.();
+      this._taskChannelUnsubscribe = null;
+      return;
+    }
+    if (this._taskChannelUnsubscribe) return;
+    this._taskChannelUnsubscribe = this.PollingCoordinator.subscribe(
+      {
+        id: `page:tasks:${this.key}`,
+        type: "channel",
+        channel: "tasks",
+        revision: this.elt.dataset.collectionRevision || null
+      },
+      {
+        mode: "periodic",
+        initial: "scheduled",
+        onResult: async (result) => {
+          if (result.status === "changed") {
+            await this._refreshCollectionComponents([component]);
+          }
+        }
+      }
+    );
+  }
+  async init() {
+    this.photoHasImage = this.elt.dataset.hasImage === "true";
+    this.photoOpen = this.photoHasImage && localStorage.getItem(`${this.hash}-photo-visible`) !== "false";
+    this.photoToolsOpen = false;
+    this.photoGenerationReturnOpen = null;
+    this.elt.addEventListener("click", (event) => this._photoClick(event));
+    const taskId = new URLSearchParams(window.location.search).get("task") || this.elt.dataset.focusTask;
+    if (taskId) {
+      localStorage.setItem(`${this.hash}-active`, "tasks");
+      this.postRender = this._focusTask.bind(this, taskId);
+    }
+    await super.init();
+    const photo = this.elt.querySelector("#photo");
+    if (photo) {
+      const component = this.getComponent(photo);
+      const initiallyVisible = component?.active || this.isSecondaryCardVisible(photo);
+      if (initiallyVisible && component && !component.active) {
+        await component.activate("PagePhoto");
+      }
+    }
+  }
+  get secondaryCard() {
+    const available = this.mobile ? this.photoHasImage || this.photoToolsOpen : this.photoOpen;
+    if (!available) return null;
+    return this.elt.querySelector("#photo");
+  }
+  _initialTabId() {
+    const tabId = super._initialTabId();
+    return tabId === "photo" && (!this.mobile || !this.secondaryCard) ? "info" : tabId;
+  }
+  _tabChange(event) {
+    super._tabChange(event);
+    if (event.detail.subcomponent.elt.dataset.tab === "true") {
+      this._syncPhotoControls(event.detail.subcomponent.name);
+    }
+  }
+  async updateLayout(options = {}) {
+    return super.updateLayout({
+      secondary: this.elt.querySelector("#photo"),
+      secondaryActive: Boolean(this.secondaryCard),
+      ...options
+    });
+  }
+  _commitLayoutBody(prepared) {
+    const tabId = super._commitLayoutBody(prepared);
+    this._syncPhotoControls(tabId);
+    return tabId;
+  }
+  _syncPhotoControls(tabId = this.photoActiveTab || this._initialTabId() || "info", controls = this.elt.querySelector(
+    "[data-role='photo-prompt']"
+  )) {
+    this.photoActiveTab = tabId;
+    if (!controls) return;
+    controls.dataset.visible = !this.mobile || !this.photoHasImage && tabId === "info" ? "true" : "false";
+    const toggle = controls.querySelector(
+      "[data-role='photo-upload']"
+    );
+    if (!toggle) return;
+    const icon = this.photoHasImage ? this.photoOpen ? "visibility.visible" : "visibility.hidden" : "upload";
+    const label = this.photoHasImage ? this.photoOpen ? "Hide page image" : "Show page image" : this.photoOpen ? "Close image upload" : "Upload page image";
+    const iconElement = toggle.querySelector("[data-icon]");
+    if (iconElement) setIcon(iconElement, icon);
+    toggle.title = label;
+    toggle.setAttribute("aria-label", label);
+    toggle.setAttribute("aria-expanded", String(this.photoOpen));
+    controls.querySelectorAll("button").forEach((button) => {
+      button.disabled = Boolean(this.photoBusy);
+    });
+    this.elt.querySelectorAll("button[lp-show='photo:active']").forEach((button) => {
+      button.hidden = !this.photoHasImage && !this.photoToolsOpen;
+    });
+  }
+  setPhotoBusy(busy) {
+    this.photoBusy = busy;
+    this._syncPhotoControls();
+  }
+  async _photoClick(event) {
+    const button = event.target?.closest?.(
+      "[data-role='photo-upload'], [data-role='photo-generate']"
+    );
+    if (!button || this.photoBusy) return;
+    const controls = button.closest("[data-role='photo-prompt']");
+    if (!controls) return;
+    const error = controls.querySelector(
+      "[data-role='photo-prompt-error']"
+    );
+    if (!error) return;
+    error.dataset.visible = "false";
+    this.setPhotoBusy(true);
+    try {
+      const generate = button.dataset.role === "photo-generate";
+      const component = this.getComponent(
+        this.elt.querySelector("#photo")
+      );
+      if (!component) return;
+      const open = generate || this.mobile || !this.photoOpen;
+      if (open) await component.activate("PagePhoto");
+      if (generate) this.photoGenerationReturnOpen ??= this.photoOpen;
+      this.photoOpen = open;
+      this.photoToolsOpen = open && !this.photoHasImage;
+      if (!generate && this.photoHasImage) {
+        localStorage.setItem(`${this.hash}-photo-visible`, String(open));
+      }
+      await this.updateLayout({
+        activeTabId: this.mobile ? "photo" : null,
+        mutate: () => () => {
+          const photo = component.active;
+          if (generate) photo?.showGenerateForm({ transition: false });
+          else photo?.hideGenerateForm({ transition: false });
+        }
+      });
+    } catch (failure) {
+      error.textContent = failure instanceof Error && failure.message || "Unable to show image tools.";
+      error.dataset.visible = "true";
+    } finally {
+      this.setPhotoBusy(false);
+    }
+  }
+  async cancelPhotoGeneration(widget) {
+    this.photoOpen = this.photoGenerationReturnOpen ?? this.photoHasImage;
+    this.photoToolsOpen = this.photoOpen && !this.photoHasImage;
+    this.photoGenerationReturnOpen = null;
+    await this.updateLayout({
+      activeTabId: this.mobile && !this.secondaryCard ? "info" : null,
+      mutate: () => () => widget.hideGenerateForm({ transition: false })
+    });
+    this.elt.querySelector(
+      this.mobile && this.secondaryCard ? "#photo [data-role='upload-menu']" : "[data-role='photo-generate']"
+    )?.focus();
+  }
+  async updatePhotoImage(hasImage, mutate) {
+    this.photoHasImage = hasImage;
+    this.photoOpen = hasImage;
+    this.photoToolsOpen = false;
+    this.photoGenerationReturnOpen = null;
+    localStorage.setItem(`${this.hash}-photo-visible`, String(hasImage));
+    await this.updateLayout({
+      activeTabId: !hasImage && this.mobile ? "info" : null,
+      mutate: () => () => {
+        mutate();
+        this.elt.dataset.hasImage = String(hasImage);
+      }
+    });
+  }
+  async _focusTask(taskId) {
+    const taskTab = this.getComponent(this.elt.querySelector("#tasks"));
+    if (!taskTab) return;
+    await taskTab.activate("PageTaskList");
+    await taskTab.prepareRender(true);
+    await withTransition(() => taskTab.render(true), {
+      label: "page:focus-task-tab"
+    });
+    await taskTab.widgets.PageTaskList?.focusTask(taskId);
+    this._replaceFocusedTaskUrl();
+    this.postRender = null;
+  }
+  _replaceFocusedTaskUrl() {
+    const pagePath = this.key ? `/pages/${this.key}` : window.location.pathname;
+    history.replaceState(null, "", pagePath);
+  }
+}
+
+export { Page as default };

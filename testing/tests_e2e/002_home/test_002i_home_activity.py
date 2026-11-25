@@ -296,7 +296,6 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
     )
 
     reloaded_home = user.go(SitePages.HOME)
-    user.locate(reloaded_home.NOTE_LIST_TOGGLE).click()
     expect(user.locate(reloaded_home.NOTE_LIST)).to_be_visible()
     expect(_activity_item(reloaded_home, private_body)).to_be_visible()
     expect(
