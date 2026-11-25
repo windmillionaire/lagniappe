@@ -69,7 +69,7 @@ def test_note_delete_completes_with_root_only_owners(get_admin, monkeypatch):
             after = json.loads(redis_cache.redis.hget(cache.Keys.ENTITY_HASHES.value, page.entity.hash))
             assert after == {**before, "revision_stale": True}
             assert cache.filter_cache.get(filter_key)[page.entity.hash] == {
-                "refresh": 1, "id": page.key,
+                "refresh": 1, "id": page.key, "cache_key": page.entity.hash,
             }
             for key, old in ((page.key, original_page), (owner.key, original_user)):
                 current = Entities.fetch_one(key, request=Fetch.root())

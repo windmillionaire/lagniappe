@@ -259,7 +259,7 @@ class CacheJSON:
 
     def create(self, key: str, mapping: dict[str, JsonType]) -> None:
         """Store a JSON document with an access hash and one-day expiry."""
-        parent_hash = key.split(":")[1]
+        parent_hash = key.rsplit(":", 2)[-2]
         mapping["access"] = {"hash": parent_hash}
         try:
             self.redis.json().set(key, "$", mapping)
@@ -290,7 +290,7 @@ class CacheJSON:
     def refresh_needed(self, cache_key: str) -> list[str]:
         """Get member IDs within a specific JSON object that have refresh stubs"""
         # Use JSON path to get all members where refresh=1, then extract their ids
-        refresh_members = self.redis.json().get(cache_key, "$..[?(@refresh == 1)].id")
+        refresh_members = self.redis.json().get(cache_key, "$[?(@.refresh == 1)].id")
         # This JSONPath selects only identifiers from persisted refresh markers.
         return cast(list[str], refresh_members) if refresh_members else []
 

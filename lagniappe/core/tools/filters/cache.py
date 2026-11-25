@@ -24,7 +24,8 @@ from .build import FilterExpression
 from .contract import CompiledFilter
 
 
-FILTER_CACHE_SCOPE = "all-v2"
+# Rebuild indexes populated before task updates tracked project membership.
+FILTER_CACHE_SCOPE = "all-v3"
 
 
 def _entity_ids(value: object) -> TypeGuard[list[str]]:
