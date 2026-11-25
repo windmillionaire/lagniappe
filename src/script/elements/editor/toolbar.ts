@@ -1,8 +1,10 @@
 import type { Editor, Range } from "@tiptap/core";
 import { STYLES } from "../../generated/styles.mjs";
+import { setIcon } from "../../shared/icons.ts";
 import type { Modal } from "../../shared/modal.ts";
 import { withTransition } from "../../shared/transitions.ts";
 import { debounce } from "../../shared/utilities.ts";
+import type { DocumentSaveState } from "../../types/sync.d.ts";
 import type { DropdownItem } from "../combobox/dropdown.ts";
 import {
 	type EditorDocumentAttributes,
@@ -105,6 +107,8 @@ export class Toolbar {
 	>;
 	declare userManager: UserManager | null;
 	declare markdownPastePrompt: MarkdownPastePrompt | null;
+	declare saveStatus: HTMLSpanElement | null;
+	declare _saveState: DocumentSaveState;
 
 	constructor(document: ToolbarDocument) {
 		this._destroyed = false;
@@ -124,6 +128,8 @@ export class Toolbar {
 		this.active = null;
 		this.userManager = null;
 		this.markdownPastePrompt = null;
+		this.saveStatus = null;
+		this._saveState = "idle";
 		this.editorState = debounce(
 			this._editorState.bind(this),
 			DEBOUNCE_DELAY_MS,
@@ -332,11 +338,24 @@ export class Toolbar {
 		menuTools.className = "contents";
 		menuTools.dataset.role = "toolbar-menus";
 		toolRow.appendChild(menuTools);
+		if (!this.document.draftOnly) {
+			const status = document.createElement("span");
+			status.dataset.role = "save-status";
+			status.dataset.saveState = "idle";
+			status.setAttribute("role", "status");
+			status.setAttribute("aria-live", "polite");
+			status.className = STYLES.editor.toolbar.saveStatus;
+			status.hidden = true;
+			this.saveStatus = status;
+			toolRow.appendChild(status);
+			if (this._saveState !== "idle") this.setSaveState(this._saveState);
+		}
 		this.element.appendChild(toolRow);
 
 		const buttons = await Promise.all(
 			TOOLBAR_TOOLS.map((tool) => this._createToolbarButton(tool)),
 		);
+		if (this._destroyed) return;
 		primaryTools.append(...buttons.filter((button) => button !== null));
 
 		const dropdownButtons = await Promise.all(
@@ -344,7 +363,57 @@ export class Toolbar {
 				return await this._createToolbarMenu(menu);
 			}),
 		);
+		if (this._destroyed) return;
 		menuTools.append(...dropdownButtons.filter((button) => button !== null));
+	}
+
+	setSaveState(state: DocumentSaveState) {
+		this._saveState = state;
+		const el = this.saveStatus;
+		if (!el) return;
+		el.dataset.saveState = state;
+		if (state === "idle") {
+			el.hidden = true;
+			el.replaceChildren();
+			return;
+		}
+		el.hidden = false;
+		if (state === "saved") {
+			const icon = document.createElement("span");
+			setIcon(icon, "check", "icon-xs");
+			const label = document.createElement("span");
+			label.textContent = "Saved";
+			el.replaceChildren(icon, label);
+			return;
+		}
+		if (state === "saving") {
+			const label = document.createElement("span");
+			label.textContent = "Saving…";
+			el.replaceChildren(label);
+			return;
+		}
+		if (state === "dirty") {
+			const label = document.createElement("span");
+			label.textContent = "Unsaved";
+			el.replaceChildren(label);
+			return;
+		}
+		if (state === "offline") {
+			const icon = document.createElement("span");
+			setIcon(icon, "offline", "icon-xs");
+			const prefix = document.createElement("span");
+			prefix.className = "hidden sm:inline";
+			prefix.textContent = "Saved ";
+			const label = document.createElement("span");
+			label.textContent = "offline";
+			el.replaceChildren(icon, prefix, label);
+			return;
+		}
+		const icon = document.createElement("span");
+		setIcon(icon, "offline", "icon-xs");
+		const label = document.createElement("span");
+		label.textContent = "Retrying…";
+		el.replaceChildren(icon, label);
 	}
 
 	_toolAllowed(tool: ToolbarTool) {

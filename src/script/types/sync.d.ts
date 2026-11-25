@@ -87,6 +87,14 @@ export interface SyncComponent {
 	widgets?: Record<string, ComponentWidget>;
 }
 
+export type DocumentSaveState =
+	| "idle"
+	| "dirty"
+	| "saving"
+	| "saved"
+	| "offline"
+	| "error";
+
 export interface SyncWidget {
 	syncId: string;
 	key: string;
@@ -98,6 +106,7 @@ export interface SyncWidget {
 	readonly?: boolean;
 	fingerprint?: string | null;
 	snapshot?: string | null;
+	setSaveState?(state: DocumentSaveState): void;
 	remote: DocumentState | null;
 	offlineRecord: PersistedSyncRecord | null;
 	readCache?: DocumentReadCache;

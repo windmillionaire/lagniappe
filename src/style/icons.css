@@ -232,6 +232,20 @@ button.tab-icon .icon {
 	--icon-offset-y: 1px;
 }
 
+/* @style toggle.tabAction */
+.tab-subtoggle .icon {
+	--icon-box-size: var(--icon-sm-box-size);
+	--icon-size: var(--icon-sm-glyph-size);
+	--icon-offset-y: 0;
+}
+
+/* @style editor.toolbar.saveStatus */
+.editor-save-status .icon {
+	--icon-box-size: var(--icon-xs-box-size);
+	--icon-size: var(--icon-xs-glyph-size);
+	--icon-offset-y: 0;
+}
+
 /* @style toggle.icon.taskHistory */
 .task-history-icon {
 	--icon-offset-y: 1px;

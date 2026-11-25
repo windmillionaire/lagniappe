@@ -517,8 +517,18 @@ export class SyncManager {
 		const batch = updates ?? this._collect(save, { touchSyncIds });
 		if (!batch.length) return null;
 		if (!this.view.online) {
-			for (const update of batch) await updateSyncRecord(update);
+			for (const update of batch) {
+				await updateSyncRecord(update);
+				if (update.save) {
+					this.widgets[update.sync_id]?.setSaveState?.("offline");
+				}
+			}
 			return null;
+		}
+		for (const update of batch) {
+			if (update.save) {
+				this.widgets[update.sync_id]?.setSaveState?.("saving");
+			}
 		}
 		const response = await request.post<SyncResponse>(
 			ENDPOINTS.sync,
@@ -533,6 +543,9 @@ export class SyncManager {
 				await updateSyncRecord(update);
 				this._checkpointRetries.add(update.sync_id);
 				this._checkpointPollFirst.delete(update.sync_id);
+				if (update.save) {
+					this.widgets[update.sync_id]?.setSaveState?.("error");
+				}
 			}
 			return response;
 		}
@@ -579,6 +592,7 @@ export class SyncManager {
 				this._checkpointRetries.add(acknowledgement.sync_id);
 				this._checkpointPollFirst.add(acknowledgement.sync_id);
 				await updateSyncRecord(update);
+				this.widgets[acknowledgement.sync_id]?.setSaveState?.("error");
 			}
 		}
 		return response;

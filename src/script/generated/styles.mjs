@@ -94,6 +94,7 @@ const STYLES = {
       },
       "divider": "mx-1 hidden h-6 w-px bg-base-light/50 md:block md:first:hidden md:last:hidden",
       "section": "flex flex-row flex-wrap items-center gap-2",
+      "saveStatus": "editor-save-status ml-auto inline-flex h-8 shrink-0 items-center gap-1 px-1.5 text-xs font-medium text-base-medium whitespace-nowrap",
       "tool": "grid size-8 place-items-center rounded-md bg-white outline outline-base-light/50 shadow-sm",
       "menu": "flex min-h-8 w-fit flex-row items-center gap-1 rounded-md bg-white outline outline-base-light/50 px-2 py-1 text-center text-base font-semibold shadow-sm",
       "optionHeader": "text-lg font-bold pt-2 text-kind-default pb-1",
@@ -110,7 +111,7 @@ const STYLES = {
       "menuIcon": "editor-toolbar-menu-icon",
       "caret": "editor-toolbar-caret opacity-50"
     },
-    "container": "html-content min-h-50 px-4 pt-6 pb-4 focus:outline-none sm:px-6 sm:pt-8 sm:pb-6"
+    "container": "html-content min-h-72 px-4 pt-6 pb-4 focus:outline-none sm:px-6 sm:pt-8 sm:pb-6"
   },
   "entity": {
     "cards": "flex flex-row flex-wrap items-start sm:flex-nowrap sm:gap-4 lg:gap-8",
@@ -292,7 +293,7 @@ const STYLES = {
       "mobile": "group/nav flex flex-row items-center justify-between gap-4 border-y border-base-light/50 bg-base-bg pr-4 py-1 text-lg",
       "flipper": "inline-grid place-items-center focus:outline-none text-kind-default sm:hidden text-lg",
       "group": "flex flex-row items-center",
-      "header": "gap-2 flex w-full flex-row items-center justify-between",
+      "header": "gap-2 flex min-w-0 flex-1 flex-row items-center justify-start",
       "title": "layout-nav-title gap-2 flex w-full flex-row items-center justify-between pl-4 py-3 sm:px-6 sm:py-5 text-lg font-semibold",
       "toggles": "flex flex-row items-center gap-3 pl-2 slide-left",
       "adminToggles": "flex flex-row items-center gap-3 pl-2 slide-left",
@@ -478,6 +479,7 @@ const STYLES = {
   "textarea": "form-input block w-full rounded-md px-3 py-2 text-base font-normal placeholder:text-base-medium sm:text-sm",
   "toggle": {
     "container": "group/toggle action-icon-button transition-colors duration-100 group-data-[visible=true]/form:shadow-sm group-data-[visible=true]/form:bg-white hover:bg-white shrink-0",
+    "tabAction": "tab-subtoggle group/toggle inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-kind-default transition-colors duration-100 hover:bg-black/5 hover:text-kind-dark focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-kind-default cursor-pointer",
     "plain": "group/toggle action-icon-button transition-colors duration-100 hover:bg-white",
     "icon": {
       "documentSettings": "page-document-settings-icon",

@@ -95,6 +95,41 @@ nav[data-role="page-header"] [data-role="title"] {
 	transform: translateY(0.125rem);
 }
 
+/* @style layout.nav.header */
+[lp-nav] > [data-role="header"] {
+	justify-content: flex-start;
+	min-width: 0;
+}
+
+/* @style layout.nav.header */
+[lp-nav]
+	[data-role="header"]
+	> :is(button, [data-role="controls"])[data-visible="true"] {
+	position: relative;
+	margin-left: 0.5rem;
+	&::before {
+		content: "";
+		position: absolute;
+		left: -0.5rem;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 1px;
+		height: 1rem;
+		background-color: color-mix(
+			in oklch,
+			var(--color-base-medium) 40%,
+			transparent
+		);
+		pointer-events: none;
+	}
+}
+
+/* @style toggle.tabAction */
+.tab-subtoggle > span:not(.icon) {
+	line-height: 1;
+	transform: translateY(1px);
+}
+
 /* @style nav.button nav.mobileButton nav.desktopButton */
 [data-role="actions"] {
 	align-items: flex-start;

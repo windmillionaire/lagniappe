@@ -111,7 +111,9 @@
             data-visible="false"
             aria-label="User info and settings"
             title="User info and settings"
-            class="{{ styles.toggle.container }}">{{ render_icon("user") }}</button>
+            class="{{ styles.toggle.tabAction }}">
+      {{ render_icon("user") }}<span class="hidden sm:inline">User settings</span>
+    </button>
   {% elif view_permissions %}
     <button type="button"
             lp-show="info:PagePermissions"
@@ -119,7 +121,9 @@
             data-visible="false"
             aria-label="Page restrictions"
             title="Page restrictions"
-            class="{{ styles.toggle.container }}">{{ render_icon("permissions") }}</button>
+            class="{{ styles.toggle.tabAction }}">
+      {{ render_icon("permissions") }}<span class="hidden sm:inline">Restrictions</span>
+    </button>
   {% endif %}
   {% if page.allowed(Action.PUBLISH) %}
     <button type="button"
@@ -128,8 +132,8 @@
             data-visible="false"
             aria-label="Document publishing settings"
             title="Document publishing settings"
-            class="{{ styles.toggle.container }}">
-      {{ render_icon("public", styles.toggle.icon.documentSettings) }}
+            class="{{ styles.toggle.tabAction }}">
+      {{ render_icon("public", styles.toggle.icon.documentSettings) }}<span class="hidden sm:inline">Publishing</span>
     </button>
   {% endif %}
   {% if page.allowed(Action.EDIT) %}
@@ -139,7 +143,9 @@
             data-visible="false"
             aria-label="Add task"
             title="Add task"
-            class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
+            class="{{ styles.toggle.tabAction }}">
+      {{ render_icon("add") }}<span class="hidden sm:inline">Add task</span>
+    </button>
   {% endif %}
   {% if page.allowed(Action.EDIT) and not is_public_user and render_files %}
     <button type="button"
@@ -148,7 +154,9 @@
             data-visible="false"
             aria-label="Upload file"
             title="Upload file"
-            class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
+            class="{{ styles.toggle.tabAction }}">
+      {{ render_icon("add") }}<span class="hidden sm:inline">Upload</span>
+    </button>
   {% endif %}
 {% endmacro %}
 

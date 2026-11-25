@@ -7,6 +7,7 @@ import {
 	waitForAttribute,
 } from "../../shared/utilities.ts";
 import type {
+	DocumentSaveState,
 	DocumentState,
 	PersistedSyncRecord,
 	SyncMention,
@@ -29,6 +30,8 @@ export function hasDocumentSyncId(
 ): document is CollaborativeDocument & { syncId: string } {
 	return Boolean(document.syncId);
 }
+
+export const IDLE_SAVE_DELAY_MS = 2000;
 
 export class CollaborativeDocument {
 	declare ydoc: Y.Doc;
@@ -62,6 +65,8 @@ export class CollaborativeDocument {
 	declare toolbar?: Toolbar;
 	declare loadingStatus?: HTMLDivElement;
 	declare _loadingTimer?: ReturnType<typeof setTimeout>;
+	declare _idleSaveTimer?: ReturnType<typeof setTimeout>;
+	declare _saveState: DocumentSaveState;
 	declare mentionSuggestions?: MentionSuggestions;
 
 	constructor(attributes: CollaborativeDocumentAttributes) {
@@ -80,6 +85,7 @@ export class CollaborativeDocument {
 		this._applyingRemote = false;
 		this._destroyed = false;
 		this._dirty = false;
+		this._saveState = "idle";
 
 		this.update = null;
 		this.offlineRecord = null;
@@ -219,8 +225,12 @@ export class CollaborativeDocument {
 						);
 					await this.waitForRender();
 					if (this._destroyed) return;
-					if (hadOfflineChanges) this._dirty = true;
-					else this._commitInitialBaseline();
+					if (hadOfflineChanges) {
+						this._dirty = true;
+						this.setSaveState("offline");
+					} else {
+						this._commitInitialBaseline();
+					}
 				} catch (error) {
 					this._initialStateError = true;
 					this.view?.reportStartupError?.(
@@ -243,15 +253,42 @@ export class CollaborativeDocument {
 			if (activeElement?.closest("[data-role='toolbar'], [role='listbox']")) {
 				return;
 			}
+			clearTimeout(this._idleSaveTimer);
 			window.dispatchEvent(new CustomEvent("sync-save"));
 		});
 
 		this.ydoc.on("update", (update, origin) => {
 			if (origin !== "remote" && !this._applyingRemote) {
 				this.updateQueue.push(update);
-				if (this.initialized) this._dirty = true;
+				if (this.initialized) {
+					this._dirty = true;
+					this.setSaveState("dirty");
+					this._scheduleIdleSave();
+				}
 			}
 		});
+	}
+
+	setSaveState(state: DocumentSaveState) {
+		this._saveState = state;
+		this.toolbar?.setSaveState(state);
+	}
+
+	_scheduleIdleSave() {
+		if (this.headless || this.readonly || this._destroyed) return;
+		clearTimeout(this._idleSaveTimer);
+		this._idleSaveTimer = setTimeout(() => {
+			if (
+				this._destroyed ||
+				!this._dirty ||
+				!this.initialized ||
+				typeof window === "undefined" ||
+				!this.target?.isConnected
+			) {
+				return;
+			}
+			window.dispatchEvent(new CustomEvent("sync-save"));
+		}, IDLE_SAVE_DELAY_MS);
 	}
 
 	_initToolbar() {
@@ -274,6 +311,8 @@ export class CollaborativeDocument {
 		this.snapshot = this._packageState();
 		this.updateQueue.length = 0;
 		this._dirty = false;
+		clearTimeout(this._idleSaveTimer);
+		this.setSaveState("idle");
 	}
 
 	/**
@@ -286,7 +325,10 @@ export class CollaborativeDocument {
 		for (const mention of mentions) {
 			this.pendingMentions?.delete(mention.occurrence_id);
 		}
-		if (this.updateQueue.length === 0) this._dirty = false;
+		if (this.updateQueue.length === 0) {
+			this._dirty = false;
+			this.setSaveState("saved");
+		}
 	}
 
 	waitForRender() {
@@ -454,6 +496,7 @@ export class CollaborativeDocument {
 		this._destroyed = true;
 		this.versions?.destroy();
 		clearTimeout(this._loadingTimer);
+		clearTimeout(this._idleSaveTimer);
 		this.loadingStatus?.remove();
 		this.mentionSuggestions?.destroy();
 		this.editor?.destroy();

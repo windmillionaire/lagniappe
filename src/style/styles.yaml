@@ -302,6 +302,12 @@ editor:
       classes: flex flex-row flex-wrap items-center gap-2
       intent: section presentation within editor toolbar
       surfaces: [frontend]
+    saveStatus:
+      classes: editor-save-status ml-auto inline-flex h-8 shrink-0 items-center gap-1 px-1.5 text-xs font-medium text-base-medium whitespace-nowrap
+      intent: subtle live autosave status indicator at the trailing end of the document toolbar
+      surfaces: [frontend]
+      hooks: [editor-save-status]
+      css: [src/style/editor.css, src/style/icons.css]
     tool:
       classes: grid size-8 place-items-center rounded-md bg-white outline outline-base-light/50 shadow-sm
       intent: tool presentation within editor toolbar
@@ -371,7 +377,7 @@ editor:
       hooks: [editor-toolbar-caret]
       css: [src/style/icons.css]
   container:
-    classes: "html-content min-h-50 px-4 pt-6 pb-4 focus:outline-none sm:px-6 sm:pt-8 sm:pb-6"
+    classes: "html-content min-h-72 px-4 pt-6 pb-4 focus:outline-none sm:px-6 sm:pt-8 sm:pb-6"
     intent: container presentation within editor
     surfaces: [frontend]
     hooks: [html-content]
@@ -941,9 +947,10 @@ layout:
           target: home.pagination.container
           reason: navigation grouping and pagination layout are separate semantic roles
     header:
-      classes: gap-2 flex w-full flex-row items-center justify-between
+      classes: gap-2 flex min-w-0 flex-1 flex-row items-center justify-start
       intent: header presentation within layout nav
       surfaces: [server]
+      css: [src/style/navigation.css]
     title:
       classes: layout-nav-title gap-2 flex w-full flex-row items-center justify-between pl-4 py-3 sm:px-6 sm:py-5 text-lg font-semibold
       intent: title presentation within layout nav
@@ -1543,6 +1550,12 @@ toggle:
     surfaces: [server, frontend]
     hooks: [action-icon-button]
     css: [src/style/buttons.css]
+  tabAction:
+    classes: tab-subtoggle group/toggle inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-kind-default transition-colors duration-100 hover:bg-black/5 hover:text-kind-dark focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-kind-default cursor-pointer
+    intent: borderless tab-scoped action button paired beside the tab title with a vertical divider
+    surfaces: [server]
+    hooks: [tab-subtoggle]
+    css: [src/style/navigation.css, src/style/icons.css]
   plain:
     classes: group/toggle action-icon-button transition-colors duration-100 hover:bg-white
     intent: plain presentation within toggle

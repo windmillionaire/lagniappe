@@ -33,6 +33,42 @@
 	overflow-wrap: break-word;
 }
 
+/* @style editor.container */
+.html-content > .ProseMirror[contenteditable="true"] {
+	min-height: 14rem;
+	cursor: text;
+}
+
+/* @style editor.container */
+.html-content:not([aria-busy="true"]) > .ProseMirror[contenteditable="true"] {
+	&:has(> p:only-child:empty)::before,
+	&:has(> p:only-child > br.ProseMirror-trailingBreak:only-child)::before {
+		content: "Start writing…";
+		position: absolute;
+		top: 0;
+		left: 0;
+		color: var(--color-base-medium);
+		opacity: 0.65;
+		font-style: italic;
+		pointer-events: none;
+	}
+}
+
+/* @style editor.toolbar.saveStatus */
+.editor-save-status {
+	& > span:not(.icon) {
+		line-height: 1;
+		transform: translateY(1px);
+	}
+	&[data-save-state="saved"] .icon {
+		color: var(--color-saved-default);
+	}
+	&[data-save-state="offline"],
+	&[data-save-state="error"] {
+		color: var(--color-task-default);
+	}
+}
+
 .html-content h1 {
 	font-size: 1.875rem;
 	line-height: 1.2;
