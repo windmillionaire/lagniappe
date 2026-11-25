@@ -7,6 +7,7 @@ from typing import Required, TYPE_CHECKING, TypedDict
 if TYPE_CHECKING:
     from lagniappe.core.entities import types as models
     from lagniappe.core.tools.ai.reporting.contracts.actions import ReportProposal
+    from .failures import ExecutionFailure
 
 
 import hashlib
@@ -36,6 +37,7 @@ class ActionRecord(TypedDict, total=False):
     before: dict[str, object]
     note: str
     error: str
+    failure: ExecutionFailure
     document_at: str
     document_after: dict[str, str | None]
     entity: dict[str, object]

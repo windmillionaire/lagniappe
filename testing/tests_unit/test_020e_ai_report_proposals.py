@@ -141,6 +141,31 @@ def test_validate_proposal_rejects_invalid_static_form_content(form_type, field)
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("field,diagnostic", [
+    ({"type": "status"}, "only on task forms"),
+    ({"type": "status", "status": None}, "status must be a list"),
+    ({"type": "table", "columns": [{"type": "text"}]}, "requires? a non-empty id"),
+    ({"type": "table", "columns": [{"id": "col_item", "type": "signature"}]}, "col_item.*unsupported type"),
+    ({"type": "table", "columns": [{"id": "col_item", "type": "text"}] * 2}, "duplicate column id 'col_item'"),
+    ({"type": "table", "columns": [{"id": "col_item", "type": "input", "input": ["text"]}]}, "unsupported input type"),
+    ({"type": "link", "location": ["out"]}, "unsupported link location"),
+    ({"type": "select", "options": [{"label": "First", "value": []}]}, "option values must be non-empty strings"),
+    ({"type": "select", "options": [{"label": "First", "value": "a"}] * 2}, "Option values must be unique"),
+    ({"type": "text", "visibility": [{"id": [], "value": True}]}, "unavailable field"),
+    ({"type": "text", "content_markdown": "Notice"}, "only on static HTML fields"),
+])
+def test_create_form_review_validates_complete_field_definitions(field, diagnostic):
+    proposal = {"summary": "Create a form", "confidence": 1, "actions": [
+        {"id": "page-form", "type": "create_form", "data": {
+            "name": "Details", "form_type": "page", "schema": [{"id": "field_custom", "title": "Details", **field}],
+        }},
+    ]}
+    with pytest.raises(exceptions.AIException, match=diagnostic) as raised:
+        proposal_validation.validate_proposal(proposal)
+    assert "page-form" in str(raised.value) and "field_custom" in str(raised.value)
+
+
+@pytest.mark.unit
 def test_validate_proposal_accepts_virtual_user_kind_as_personal_page(monkeypatch):
     personal_hash = "abc123def456"
     monkeypatch.setattr(

@@ -1,5 +1,6 @@
 """Entity creation, relationship, rename, and manual report actions."""
 
+from config.form_schema import normalize_form_schema
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, MutationIntent, Resource
 from lagniappe.core.entities import Entities
@@ -36,7 +37,8 @@ def _create_form(action, _report, user, _created, context=None):
             "Create form actions require at least one schema field."
         )
     form = Entities.FORM.create({"name": name, "form-type": form_type}, key=_prepared_output_key(context))
-    form.properties.schema.validate_ai(schema)
+    # Feed the reviewed column defaults and field aliases to the AI content writer.
+    form.properties.schema.validate_ai(normalize_form_schema(schema, form_type=form_type))
     form.ai_generated = True
     return form, [form]
 
