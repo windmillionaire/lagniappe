@@ -411,7 +411,12 @@ const STYLES = {
     "wrapper": "grid grid-cols-1 h-10",
     "default": "form-input col-start-1 row-start-1 h-10 w-full appearance-none rounded-md py-1.25 pr-8 pl-3 sm:text-sm placeholder:text-base-medium",
     "icon": "select-icon pointer-events-none col-start-1 row-start-1 mr-2.5 self-center justify-self-end z-25 text-base-medium",
-    "button": "select-button flex min-h-10 w-full flex-row items-center rounded-md bg-white p-2 px-3 font-semibold sm:grow focus-visible:outline-kind-default hover:outline-kind-default hover:outline-2 focus-visible:outline-2 disabled:pointer-events-none disabled:hover:outline-0 disabled:focus-visible:outline-0"
+    "button": "select-button group/toggle flex h-10 min-w-0 w-full flex-1 flex-row items-center gap-2 rounded-md bg-white px-3 text-left font-semibold focus-visible:outline-kind-default hover:outline-kind-default hover:outline-2 focus-visible:outline-2 disabled:pointer-events-none disabled:hover:outline-0 disabled:focus-visible:outline-0",
+    "heading": "flex items-center gap-1.5 sm:text-sm font-semibold text-base-dark mb-1",
+    "label": "min-w-0 flex-1 truncate text-left",
+    "row": "flex w-full items-center gap-2",
+    "expandIndicator": "ml-auto shrink-0 text-base-medium transition-transform duration-150 group-aria-expanded/toggle:rotate-180",
+    "action": "grid size-10 shrink-0 place-items-center rounded-md bg-white text-kind-default shadow-sm hover:outline-2 hover:outline-kind-default focus-visible:outline-2 focus-visible:outline-kind-default"
   },
   "signature": {
     "pad": "relative rounded-md w-full h-40 bg-white outline-base-light outline",

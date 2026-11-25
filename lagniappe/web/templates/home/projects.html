@@ -35,6 +35,8 @@
           <button type="button"
                   class="{{ styles.home.pagination.button }} bg-project-bg/50"
                   lp-control="previous"
+                  aria-label="First page of projects"
+                  title="First page of projects"
                   data-route='{{ url_for("internal.get", kind="projects", cursor=None) }}'>
             {{ render_icon("start") }}
           </button>
@@ -43,6 +45,8 @@
           <button type="button"
                   class="{{ styles.home.pagination.button }} bg-project-bg/50"
                   lp-control="next"
+                  aria-label="Next page of projects"
+                  title="Next page of projects"
                   data-route='{{ url_for("internal.get", kind="projects", cursor=projects.cursor) }}'>
             {{ render_icon("next") }}
           </button>

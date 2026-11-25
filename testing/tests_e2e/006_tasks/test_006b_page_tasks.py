@@ -236,24 +236,23 @@ def test_create_page_task_with_project(get_admin, get_user):
 
     settings_form = task.settings_form
     project_button = ProjectSelect(settings_form).button
-    leading_icon = project_button.locator(":scope > span > [data-icon]").first
-    clear_icon = project_button.locator(
+    project_row = project_button.locator(
+        "xpath=ancestor::*[@data-role='section-toggle-row'][1]"
+    )
+    clear_icon = project_row.locator(
         ":scope > [data-role='clear'] > [data-icon]"
     )
-    expect(leading_icon).to_be_visible()
+    expect(project_button).to_be_visible()
+    expect(project_button).to_have_attribute("title", project.definition.name)
     expect(clear_icon).to_be_visible()
+    expect(project_button.locator("button, a")).to_have_count(0)
 
     user.mobile = True
-    mobile_button = project_button.element_handle()
-    assert mobile_button is not None
-    user.page.wait_for_function(
-        "button => button.getBoundingClientRect().height > 40",
-        arg=mobile_button,
-    )
+    expect(project_button).to_have_css("height", "40px")
 
     user.mobile = False
     expect(project_button).to_have_css("height", "40px")
-    leading_icon.click()
+    project_button.click()
     project_input = settings_form.locator(
         "[data-role='project-select'] + input[role='combobox']"
     )
@@ -307,7 +306,9 @@ def test_create_page_task_with_model_task(get_admin, get_user):
         user.go(page).wait_for_interaction_readiness()
 
     settings = task.settings_form
-    model_link = settings.locator('[data-role="project-select"] a')
+    model_link = settings.locator(
+        '[data-role="section-toggle-row"]:has([data-role="project-select"]) a[data-role="open-link"]'
+    )
     expect(model_link).to_have_attribute("href", re.compile(re.escape(model_path) + "$"))
     with user.page.expect_navigation() as navigation:
         model_link.click()

@@ -21,8 +21,8 @@
           data-kind="saved"
           type="button"
           aria-disabled="true"
-          aria-label="Save form"
-          title="Save form">
+          aria-label="All changes saved"
+          title="All changes saved">
     {{ render_icon("builder.saved", "icon-2xl text-kind-default", "saved") }}
     {{ render_icon("builder.unsaved", "icon-2xl text-kind-default", "unsaved") }}
     {{ render_icon("spinner", "icon-2xl text-kind-default") }}
@@ -134,7 +134,9 @@
           data-controls="help"
           lp-help="{{ route }}"
           type="button"
-          data-kind="help">
+          data-kind="help"
+          aria-label="Help"
+          title="Help">
     {{ render_icon("help") }}
   </button>
 {% endmacro %}

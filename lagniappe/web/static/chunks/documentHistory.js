@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES } from './ui-resources.js?v=b74a2211';
-import { Modal } from './modal.js?v=b74a2211';
-import { r as request } from './foundation.js?v=b74a2211';
-import { D as Dropdown } from './combobox.js?v=b74a2211';
-import { c as createMenuButton } from './document.js?v=b74a2211';
-import './upstreamUnavailable.js?v=b74a2211';
-import './connectivity.js?v=b74a2211';
-import './ui-controls.js?v=b74a2211';
+import { S as STYLES } from './ui-resources.js?v=be84e1e9';
+import { Modal } from './modal.js?v=be84e1e9';
+import { r as request } from './foundation.js?v=be84e1e9';
+import { D as Dropdown } from './combobox.js?v=be84e1e9';
+import { c as createMenuButton } from './document.js?v=be84e1e9';
+import './upstreamUnavailable.js?v=be84e1e9';
+import './connectivity.js?v=be84e1e9';
+import './ui-controls.js?v=be84e1e9';
 
 class DocumentHistoryButton {
   constructor(toolbar) {

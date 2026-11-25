@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from './foundation.js?v=b74a2211';
-import { B as BaseUpload, u as uploadElement, U as UploadMenu, T as TaskUpload } from './uploads.js?v=b74a2211';
-import { p as primitives, b as buttons, f as formatting } from './ui-controls.js?v=b74a2211';
-import { S as STYLES, i as iconDefinition, s as setIcon } from './ui-resources.js?v=b74a2211';
-import { i as isFacetOption, a as FacetsBox } from './forms.js?v=b74a2211';
+import { w as withTransition } from './foundation.js?v=be84e1e9';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu, T as TaskUpload } from './uploads.js?v=be84e1e9';
+import { p as primitives, b as buttons, f as formatting } from './ui-controls.js?v=be84e1e9';
+import { S as STYLES, s as setIcon, i as iconDefinition } from './ui-resources.js?v=be84e1e9';
+import { i as isFacetOption, a as FacetsBox } from './forms.js?v=be84e1e9';
 
 const AUTOFILL_DROPZONE_TEXT = "Click or drop to add a related image or a pdf";
 class AutofillUpload extends BaseUpload {
@@ -806,18 +806,46 @@ class DueDate {
   }
 }
 
-const clearButton = (open) => {
-  const clearButton2 = document.createElement("button");
-  clearButton2.dataset.role = "clear";
-  clearButton2.dataset.kind = "delete";
-  clearButton2.type = "button";
-  clearButton2.className = STYLES.form.icon;
+const clearButton = (open, label, onClick) => {
+  const button = document.createElement("button");
+  button.dataset.role = "clear";
+  button.dataset.kind = "delete";
+  button.type = "button";
+  button.className = STYLES.select.action;
+  button.setAttribute("aria-label", label);
+  button.title = label;
   setIcon(
-    clearButton2.appendChild(document.createElement("span")),
+    button.appendChild(document.createElement("span")),
     open ? "x" : "clear",
     "icon-sm"
   );
-  return clearButton2;
+  button.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick();
+  });
+  return button;
+};
+const openLinkButton = (parent) => {
+  if (!parent.index || !parent.active || parent.open || !parent.details?.id) {
+    return null;
+  }
+  const details = {
+    kind: parent.kind,
+    index: parent.index,
+    ...parent.details
+  };
+  const href = formatting.url(details).toString();
+  const label = parent.details.name ? `Open ${parent.details.name}` : `Open ${parent.button?.dataset.title || "item"}`;
+  const link = document.createElement("a");
+  link.dataset.role = "open-link";
+  link.dataset.kind = String(details.kind || parent.kind || "default");
+  link.href = href;
+  link.className = STYLES.select.action;
+  link.setAttribute("aria-label", label);
+  link.title = label;
+  setIcon(link.appendChild(document.createElement("span")), "right", "icon-sm");
+  return link;
 };
 const dueDateText = (parent) => {
   if (!parent.active) {
@@ -852,7 +880,7 @@ const detailsText = (parent) => {
       text: parent.button?.dataset.title
     });
   }
-  return formatting.name({ ...parent.details, link: !parent.readonly });
+  return formatting.name({ ...parent.details, link: false });
 };
 const fileText = (parent) => {
   const firstAsset = Object.values(parent.assets || {})[0];
@@ -863,10 +891,9 @@ const fileText = (parent) => {
       text: "Attach File/Photo"
     });
   }
-  const display = filename.length > 20 ? `${filename.substring(0, 17)}...` : filename;
   return formatting.text({
     kind: parent.kind,
-    text: display
+    text: filename
   });
 };
 const detailsLinkRow = (details) => {
@@ -906,32 +933,40 @@ class SectionToggle {
     this.readonly = Boolean(
       widget?.readonly || parent?.readonly || parent?.button?.dataset.readonly === "true" || parent?.button?.disabled
     );
+    this.row = null;
     this.init();
   }
+  _ensureRow() {
+    const button = this.parent.button;
+    if (!button) return null;
+    const existing = button.parentElement;
+    if (existing?.dataset.role === "section-toggle-row") {
+      this.row = existing;
+      return this.row;
+    }
+    if (!existing) return null;
+    const row = document.createElement("div");
+    row.dataset.role = "section-toggle-row";
+    if (this.parent.kind) row.dataset.kind = this.parent.kind;
+    row.className = STYLES.select.row;
+    existing.insertBefore(row, button);
+    row.appendChild(button);
+    this.row = row;
+    return row;
+  }
   init() {
+    this._ensureRow();
     if (this.readonly) return;
     this.parent.button?.addEventListener("click", (e) => {
-      const { target } = e;
-      if (!(target instanceof Element) || target.closest("a")) {
-        return;
-      }
       e.preventDefault();
       e.stopPropagation();
-      if (target.closest("[data-role='clear']")) {
-        this.parent.clear();
-      } else {
-        this.parent.toggleVisibility();
-      }
+      this.parent.toggleVisibility();
     });
     this.parent.button?.addEventListener("keydown", (e) => {
-      if (!["Enter", "Escape"].includes(e.key)) return;
+      if (e.key !== "Escape" || !this.parent.open) return;
       e.preventDefault();
       e.stopPropagation();
-      if (e.target instanceof Element && e.target.closest("[data-role='clear']")) {
-        this.parent.clear();
-      } else {
-        this.parent.toggleVisibility();
-      }
+      this.parent.toggleVisibility();
     });
   }
   _setButtonReadonly() {
@@ -943,6 +978,9 @@ class SectionToggle {
     button.setAttribute("aria-disabled", "true");
   }
   display() {
+    const button = this.parent.button;
+    if (!button) return;
+    const row = this._ensureRow();
     let text = "";
     if (this.parent.action === "schedule") {
       text = dueDateText(this.parent);
@@ -951,21 +989,39 @@ class SectionToggle {
     } else if (this.parent.action === "uploadFile") {
       text = fileText(this.parent);
     }
-    const semanticIcon = this.parent.action === "schedule" ? "dueDate" : this.parent.icon || this.parent.index;
-    const icon = iconDefinition(semanticIcon) ? semanticIcon : this.parent.kind;
-    const title = formatting.iconLabel({
-      icon,
-      kind: this.parent.kind,
-      content: text,
-      classes: "flex-1 leading-normal",
-      iconClasses: "text-kind-default"
-    });
-    let action = null;
+    const label = document.createElement("span");
+    label.className = STYLES.select.label;
+    if (typeof text === "string") label.textContent = text;
+    else label.appendChild(text);
+    const fullText = label.textContent?.trim() || "";
+    if (fullText) button.title = fullText;
+    else button.removeAttribute("title");
+    const contents = [label];
     if (!this.readonly) {
-      action = this.parent.active || this.parent.open ? clearButton(this.parent.open) : null;
+      button.setAttribute("aria-expanded", String(Boolean(this.parent.open)));
+      const chevron = document.createElement("span");
+      setIcon(chevron, "down", STYLES.select.expandIndicator);
+      contents.push(chevron);
+    } else {
+      button.removeAttribute("aria-expanded");
     }
-    const contents = action ? [title, action] : [title];
-    this.parent.button?.replaceChildren(...contents);
+    button.replaceChildren(...contents);
+    if (row) {
+      for (const node of row.querySelectorAll(
+        ":scope > [data-role='open-link'], :scope > [data-role='clear']"
+      )) {
+        node.remove();
+      }
+      const link = openLinkButton(this.parent);
+      if (link) row.appendChild(link);
+      if (!this.readonly && (this.parent.active || this.parent.open)) {
+        const fieldTitle = button.dataset.title || "selection";
+        const clearLabel = this.parent.open ? `Close ${fieldTitle}` : `Clear ${fieldTitle}`;
+        row.appendChild(
+          clearButton(this.parent.open, clearLabel, () => this.parent.clear())
+        );
+      }
+    }
     this._setButtonReadonly();
   }
 }

@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { BaseList } from './baseList.js?v=b74a2211';
-import { b as FormWidget, I as InputElement, T as TextareaElement } from './forms.js?v=b74a2211';
-import { S as SectionToggle, s as sections } from './form-sections.js?v=b74a2211';
-import { r as request, w as withTransition } from './foundation.js?v=b74a2211';
-import './connectivity.js?v=b74a2211';
+import { BaseList } from './baseList.js?v=be84e1e9';
+import { b as FormWidget, I as InputElement, T as TextareaElement } from './forms.js?v=be84e1e9';
+import { S as SectionToggle, s as sections } from './form-sections.js?v=be84e1e9';
+import { r as request, w as withTransition } from './foundation.js?v=be84e1e9';
+import './connectivity.js?v=be84e1e9';
 
 class ModelTask extends FormWidget {
   get formSelectElement() {

@@ -19,6 +19,8 @@
           <button type="button"
                   class="{{ styles.home.pagination.button }}"
                   lp-control="previous"
+                  aria-label="First page of starred items"
+                  title="First page of starred items"
                   data-route='{{ url_for("internal.get", kind="starred", cursor=None) }}'>
             {{ render_icon("start") }}
           </button>
@@ -27,6 +29,8 @@
           <button type="button"
                   class="{{ styles.home.pagination.button }}"
                   lp-control="next"
+                  aria-label="Next page of starred items"
+                  title="Next page of starred items"
                   data-route='{{ url_for("internal.get", kind="starred", cursor=starred.cursor) }}'>
             {{ render_icon("next") }}
           </button>

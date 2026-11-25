@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { BaseList } from './baseList.js?v=b74a2211';
-import { b as buttons, p as primitives } from './ui-controls.js?v=b74a2211';
-import { r as request, w as withTransition } from './foundation.js?v=b74a2211';
-import { S as SelectBox, a as FacetsBox } from './forms.js?v=b74a2211';
-import './connectivity.js?v=b74a2211';
-import { E as EmbeddedTable } from './baseTable.js?v=b74a2211';
-import { S as STYLES } from './ui-resources.js?v=b74a2211';
+import { BaseList } from './baseList.js?v=be84e1e9';
+import { b as buttons, p as primitives } from './ui-controls.js?v=be84e1e9';
+import { r as request, w as withTransition } from './foundation.js?v=be84e1e9';
+import { S as SelectBox, a as FacetsBox } from './forms.js?v=be84e1e9';
+import './connectivity.js?v=be84e1e9';
+import { E as EmbeddedTable } from './baseTable.js?v=be84e1e9';
+import { S as STYLES } from './ui-resources.js?v=be84e1e9';
 
 class Filters {
   constructor(attributes) {

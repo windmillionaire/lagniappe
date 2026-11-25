@@ -81,6 +81,8 @@ export class Header {
 		this.saveButton.dataset.saved = "true";
 		this.saveButton.dataset.kind = "saved";
 		this.saveButton.setAttribute("aria-disabled", "true");
+		this.saveButton.setAttribute("aria-label", "All changes saved");
+		this.saveButton.title = "All changes saved";
 		if (!this.builder.pendingChange) this.clearMessage();
 	}
 
@@ -88,6 +90,8 @@ export class Header {
 		if (!this.saveButton) return;
 		this.saveButton.dataset.saved = "false";
 		this.saveButton.dataset.kind = "unsaved";
+		this.saveButton.setAttribute("aria-label", "Save form");
+		this.saveButton.title = "Save form";
 		this.saveButton.setAttribute(
 			"aria-disabled",
 			String(

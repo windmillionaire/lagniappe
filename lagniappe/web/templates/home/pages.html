@@ -45,6 +45,8 @@
           <button type="button"
                   class="{{ styles.home.pagination.button }} bg-page-bg/50"
                   lp-control="previous"
+                  aria-label="First page of pages"
+                  title="First page of pages"
                   data-route='{{ url_for("internal.get", kind="pages", cursor=None) }}'>
             {{ render_icon("start") }}
           </button>
@@ -53,6 +55,8 @@
           <button type="button"
                   class="{{ styles.home.pagination.button }} bg-page-bg/50"
                   lp-control="next"
+                  aria-label="Next page of pages"
+                  title="Next page of pages"
                   data-route='{{ url_for("internal.get", kind="pages", cursor=pages.cursor) }}'>
             {{ render_icon("next") }}
           </button>

@@ -1,17 +1,17 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request, c as captureError, E as ENDPOINTS } from './foundation.js?v=b74a2211';
-import { S as STYLES } from './ui-resources.js?v=b74a2211';
-import { i as independentEditor, a as Toolbar } from './document.js?v=b74a2211';
-import { C as Condition } from './builder-controls.js?v=b74a2211';
-import './upstreamUnavailable.js?v=b74a2211';
-import './connectivity.js?v=b74a2211';
-import './combobox.js?v=b74a2211';
-import './ui-controls.js?v=b74a2211';
-import './forms.js?v=b74a2211';
-import './modal.js?v=b74a2211';
-import './builder.js?v=b74a2211';
-import './directUpload.js?v=b74a2211';
-import './polling.js?v=b74a2211';
+import { r as request, c as captureError, E as ENDPOINTS } from './foundation.js?v=be84e1e9';
+import { S as STYLES } from './ui-resources.js?v=be84e1e9';
+import { i as independentEditor, a as Toolbar } from './document.js?v=be84e1e9';
+import { C as Condition } from './builder-controls.js?v=be84e1e9';
+import './upstreamUnavailable.js?v=be84e1e9';
+import './connectivity.js?v=be84e1e9';
+import './combobox.js?v=be84e1e9';
+import './ui-controls.js?v=be84e1e9';
+import './forms.js?v=be84e1e9';
+import './modal.js?v=be84e1e9';
+import './builder.js?v=be84e1e9';
+import './directUpload.js?v=be84e1e9';
+import './polling.js?v=be84e1e9';
 
 const EMPTY_HTML = /* @__PURE__ */ new Set(["", "<p></p>", "<p><br></p>"]);
 const KEEPALIVE_BODY_LIMIT = 64 * 1024;

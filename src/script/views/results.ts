@@ -26,22 +26,17 @@ export default class Results extends ShellView {
 
 		this.updateSelectionState();
 		this.facets.forEach((facet) => {
-			if (facet.dataset.kind && this.selected.has(facet.dataset.kind)) {
-				facet.dataset.selected = "true";
-			}
+			const isSelected = Boolean(
+				facet.dataset.kind && this.selected.has(facet.dataset.kind),
+			);
+			facet.dataset.selected = isSelected ? "true" : "false";
+			facet.setAttribute("aria-pressed", isSelected ? "true" : "false");
 		});
 
 		this.reset?.addEventListener("click", (e) => this.handleResetClick(e));
 
 		this.facets.forEach((facet) => {
 			facet.addEventListener("click", (e) => this.handleFacetClick(e, facet));
-
-			facet.addEventListener("keydown", (e) => {
-				if (e.key === "Enter" || e.key === " ") {
-					e.preventDefault();
-					this.handleFacetClick(e, facet);
-				}
-			});
 
 			facet.addEventListener("mouseleave", () => {
 				facet.blur();
@@ -123,6 +118,7 @@ export default class Results extends ShellView {
 			() => {
 				this.facets.forEach((facet) => {
 					facet.dataset.selected = "false";
+					facet.setAttribute("aria-pressed", "false");
 					delete facet.dataset.justSelected;
 				});
 				this.updateSelectionState();
@@ -162,6 +158,7 @@ export default class Results extends ShellView {
 			() => {
 				const selected = this.selected.has(kind);
 				facet.dataset.selected = selected ? "true" : "false";
+				facet.setAttribute("aria-pressed", selected ? "true" : "false");
 				if (selected && !wasSelected) facet.dataset.justSelected = "true";
 				this.updateSelectionState();
 				this.updateResults(html);

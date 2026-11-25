@@ -348,8 +348,11 @@
     {% endif %}
     {% set form_preload = page.properties.form.column_value if page.form else none %}
     {% if Resource.FORMS.allowed(Action.VIEW) and (page.allowed(Action.EDIT) or form_preload) %}
-      <div data-role="form-select" class="{{ styles.select.container }}">
-        <h3 class="{{ styles.label.sectionHeading }}">Attached Form</h3>
+      <div data-role="form-select" data-kind="form" class="{{ styles.select.container }}">
+        <h3 class="{{ styles.select.heading }}">
+          {{ render_icon("form", styles.icon.default) }}
+          <span>Attached Form</span>
+        </h3>
         <button type="button"
                 lp-select
                 data-action="select-form"

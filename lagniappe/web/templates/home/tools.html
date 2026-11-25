@@ -105,6 +105,7 @@
                   class="{{ styles.home.pagination.button }}"
                   lp-control="previous"
                   aria-label="First page of reports"
+                  title="First page of reports"
                   data-route='{{ url_for("internal.get", kind="tools", cursor=None) }}'>
             {{ render_icon("start") }}
           </button>
@@ -114,6 +115,7 @@
                   class="{{ styles.home.pagination.button }}"
                   lp-control="next"
                   aria-label="Next page of reports"
+                  title="Next page of reports"
                   data-route='{{ url_for("internal.get", kind="tools", cursor=reports.cursor) }}'>
             {{ render_icon("next") }}
           </button>

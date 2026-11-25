@@ -1,13 +1,13 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as EntityMenu, S as SearchBox } from './combobox.js?v=b74a2211';
-import { d as directUpload } from './directUpload.js?v=b74a2211';
-import { r as request, w as withTransition, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=b74a2211';
-import { c as connectivity } from './connectivity.js?v=b74a2211';
-import { OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b74a2211';
-import { PollingCoordinator } from './polling.js?v=b74a2211';
-import { S as STYLES, s as setIcon } from './ui-resources.js?v=b74a2211';
-import { p as primitives } from './ui-controls.js?v=b74a2211';
-import { F as FormController, h as FormRenderer } from './forms.js?v=b74a2211';
+import { E as EntityMenu, S as SearchBox } from './combobox.js?v=be84e1e9';
+import { d as directUpload } from './directUpload.js?v=be84e1e9';
+import { r as request, w as withTransition, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=be84e1e9';
+import { c as connectivity } from './connectivity.js?v=be84e1e9';
+import { OfflineModal, DeleteModal, HelpModal } from './modal.js?v=be84e1e9';
+import { PollingCoordinator } from './polling.js?v=be84e1e9';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=be84e1e9';
+import { p as primitives } from './ui-controls.js?v=be84e1e9';
+import { F as FormController, h as FormRenderer } from './forms.js?v=be84e1e9';
 
 class FormChangeStatus {
   constructor(builder) {
@@ -142,12 +142,12 @@ class FormChangeStatus {
 }
 
 const CONDITION_REGISTRY = {
-  modify: () => import('./builder-controls.js?v=b74a2211').then(function (n) { return n.m; }),
-  html: () => import('./html.js?v=b74a2211'),
-  status: () => import('./builder-controls.js?v=b74a2211').then(function (n) { return n.s; }),
-  visibility: () => import('./builder-controls.js?v=b74a2211').then(function (n) { return n.v; }),
-  columns: () => import('./builder-controls.js?v=b74a2211').then(function (n) { return n.c; }),
-  options: () => import('./builder-controls.js?v=b74a2211').then(function (n) { return n.o; })
+  modify: () => import('./builder-controls.js?v=be84e1e9').then(function (n) { return n.m; }),
+  html: () => import('./html.js?v=be84e1e9'),
+  status: () => import('./builder-controls.js?v=be84e1e9').then(function (n) { return n.s; }),
+  visibility: () => import('./builder-controls.js?v=be84e1e9').then(function (n) { return n.v; }),
+  columns: () => import('./builder-controls.js?v=be84e1e9').then(function (n) { return n.c; }),
+  options: () => import('./builder-controls.js?v=be84e1e9').then(function (n) { return n.o; })
 };
 const loadCondition = async (builder, condition) => {
   const module = await CONDITION_REGISTRY[condition]();
@@ -4212,12 +4212,16 @@ class Header {
     this.saveButton.dataset.saved = "true";
     this.saveButton.dataset.kind = "saved";
     this.saveButton.setAttribute("aria-disabled", "true");
+    this.saveButton.setAttribute("aria-label", "All changes saved");
+    this.saveButton.title = "All changes saved";
     if (!this.builder.pendingChange) this.clearMessage();
   }
   unsaved() {
     if (!this.saveButton) return;
     this.saveButton.dataset.saved = "false";
     this.saveButton.dataset.kind = "unsaved";
+    this.saveButton.setAttribute("aria-label", "Save form");
+    this.saveButton.title = "Save form";
     this.saveButton.setAttribute(
       "aria-disabled",
       String(
@@ -5278,7 +5282,7 @@ class FormBuilder {
     if (inputFocus) return restoreInput();
   }
   async prepareGeneratedDocuments(htmlFields) {
-    const { default: HtmlEditor } = await import('./html.js?v=b74a2211');
+    const { default: HtmlEditor } = await import('./html.js?v=be84e1e9');
     for (const [id, html] of Object.entries(htmlFields || {})) {
       const element = this.elements.get(id);
       if (this._destroyed || element?.schema.type !== "html" || this.htmlFields[id] === html)

@@ -31,21 +31,29 @@
       <button type="button"
               lp-show="model-tasks:ModelTaskList"
               data-kind="model-task"
+              aria-label="Model Tasks"
+              title="Model Tasks"
               class="{{ styles.entity.tabIcon }} sm:hidden">{{ render_icon("model") }}</button>
     {% endif %}
     {% if render_document %}
       <button type="button"
               lp-show="document:active"
               data-kind="project"
+              aria-label="Document"
+              title="Document"
               class="{{ styles.entity.tabIcon }}">{{ render_icon("document") }}</button>
     {% endif %}
     <button type="button"
             lp-show="info:active"
             data-kind="project"
+            aria-label="Info"
+            title="Info"
             class="{{ styles.entity.tabIcon }}">{{ render_icon("info") }}</button>
     <button type="button"
             lp-show="filters:active"
             data-kind="task"
+            aria-label="Filter Tasks"
+            title="Filter Tasks"
             class="{{ styles.entity.tabIcon }}">{{ render_icon("filter.list") }}</button>
   </nav>
 {% endmacro %}
@@ -61,11 +69,17 @@
         <button type="button"
                 lp-show="model-tasks:CreateModelTask"
                 data-kind="model-task"
+                aria-label="Add model task"
+                title="Add model task"
                 class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
       {% endif %}
     </div>
     <div class="{{ styles.layout.nav.group }}" data-flipped="false">
-      <button type="button" data-role="flipper" class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>
+      <button type="button"
+              data-role="flipper"
+              aria-label="Toggle tabs"
+              title="Toggle tabs"
+              class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>
       {{ toggles('mobile', true) }}
     </div>
     {{ controls.page_controls() }}
@@ -91,6 +105,8 @@
         {% if project.allowed(Action.EDIT) %}
           <button type="button"
                   lp-show="model-tasks:CreateModelTask"
+                  aria-label="Add model task"
+                  title="Add model task"
                   class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
         {% endif %}
       </nav>

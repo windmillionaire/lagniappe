@@ -13,8 +13,11 @@
         data-destination="model-tasks:ModelTaskList"
         class="{{ styles.form.default }} mt-4 sm:mt-0">
     {% if Resource.FORMS.allowed(Action.VIEW) %}
-      <div data-role="form-select" class="{{ styles.select.container }}">
-        <h3 class="{{ styles.label.sectionHeading }}">Add Form</h3>
+      <div data-role="form-select" data-kind="form" class="{{ styles.select.container }}">
+        <h3 class="{{ styles.select.heading }}">
+          {{ render_icon("form", styles.icon.default) }}
+          <span>Add Form</span>
+        </h3>
         <button lp-select
                 type="button"
                 data-action="select-form"
@@ -108,8 +111,11 @@
           data-route="{{ url_for('projects.update_model', key=project_key, task_key=task_key) }}"
           class="{{ styles.form.default }}">
       {% if Resource.FORMS.allowed(Action.VIEW) %}
-        <div data-role="form-select" class="{{ styles.select.container }}">
-          <h3 class="{{ styles.label.sectionHeading }}">Attached Form</h3>
+        <div data-role="form-select" data-kind="form" class="{{ styles.select.container }}">
+          <h3 class="{{ styles.select.heading }}">
+            {{ render_icon("form", styles.icon.default) }}
+            <span>Attached Form</span>
+          </h3>
           <button lp-select
                   type="button"
                   data-action="select-form"

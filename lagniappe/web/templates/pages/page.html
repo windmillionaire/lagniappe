@@ -76,20 +76,28 @@
       <button type="button"
               lp-show="document:active"
               data-kind="page"
+              aria-label="Document"
+              title="Document"
               class="{{ styles.entity.tabIcon }}">{{ render_icon("document") }}</button>
     {% endif %}
     <button type="button"
             lp-show="info:active"
             data-kind="page"
+            aria-label="Info"
+            title="Info"
             class="{{ styles.entity.tabIcon }}">{{ render_icon("info") }}</button>
     <button type="button"
             lp-show="tasks:active"
             data-kind="task"
+            aria-label="Tasks"
+            title="Tasks"
             class="{{ styles.entity.tabIcon }}">{{ render_icon("task") }}</button>
     {% if render_files %}
       <button type="button"
               lp-show="files:active"
               data-kind="file"
+              aria-label="Files"
+              title="Files"
               class="{{ styles.entity.tabIcon }}">{{ render_icon("files") }}</button>
     {% endif %}
   </nav>
@@ -101,12 +109,16 @@
             lp-show="info:UserSettings"
             data-kind="user"
             data-visible="false"
+            aria-label="User info and settings"
+            title="User info and settings"
             class="{{ styles.toggle.container }}">{{ render_icon("user") }}</button>
   {% elif view_permissions %}
     <button type="button"
             lp-show="info:PagePermissions"
             data-kind="user"
             data-visible="false"
+            aria-label="Page restrictions"
+            title="Page restrictions"
             class="{{ styles.toggle.container }}">{{ render_icon("permissions") }}</button>
   {% endif %}
   {% if page.allowed(Action.PUBLISH) %}
@@ -114,6 +126,8 @@
             lp-show="document:DocumentSettings"
             data-kind="default"
             data-visible="false"
+            aria-label="Document publishing settings"
+            title="Document publishing settings"
             class="{{ styles.toggle.container }}">
       {{ render_icon("public", styles.toggle.icon.documentSettings) }}
     </button>
@@ -123,6 +137,8 @@
             lp-show="tasks:CreateTask"
             data-kind="task"
             data-visible="false"
+            aria-label="Add task"
+            title="Add task"
             class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
   {% endif %}
   {% if page.allowed(Action.EDIT) and not is_public_user and render_files %}
@@ -130,6 +146,8 @@
             lp-show="files:FileUpload"
             data-kind="file"
             data-visible="false"
+            aria-label="Upload file"
+            title="Upload file"
             class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
   {% endif %}
 {% endmacro %}
@@ -145,7 +163,11 @@
       {{ controls.page_controls() }}
     </div>
     <div class="{{ styles.layout.nav.group }}" data-flipped="false">
-      <button type="button" data-role="flipper" class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>
+      <button type="button"
+              data-role="flipper"
+              aria-label="Toggle tabs"
+              title="Toggle tabs"
+              class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>
       {{ toggles('mobile', true) }}
     </div>
   </div>

@@ -4,7 +4,7 @@
     <span data-role="group-name" class="text-base font-semibold text-user-default truncate">{{ group.name if group else '' }}</span>
     <button class="{{ styles.toggle.plain }}" data-role="remove-restriction"
             data-key="{{ group.urlsafe_key if group else '' }}" data-kind="delete"
-            aria-label="Remove group restriction" type="button">
+            aria-label="Remove group restriction" title="Remove group restriction" type="button">
       {{ render_icon('x') }}
     </button>
   </li>

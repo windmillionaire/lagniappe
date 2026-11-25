@@ -19,8 +19,12 @@
     {% if current_user.access(AI.CREATE) %}{{ generate('category') }}{% endif %}
     {% if Resource.FORMS.allowed(Action.VIEW) %}
       <div data-role="form-select"
+           data-kind="form"
            class="{{ styles.select.container }} group-data-[mode=ai]/form:hidden">
-        <h3 class="{{ styles.label.sectionHeading }}">Default Form</h3>
+        <h3 class="{{ styles.select.heading }}">
+          {{ render_icon("form", styles.icon.default) }}
+          <span>Default Form</span>
+        </h3>
         <button lp-select
                 type="button"
                 data-action="select-form"
@@ -52,6 +56,8 @@
           <button type="button"
                   class="{{ styles.home.pagination.button }} bg-category-bg/50"
                   lp-control="previous"
+                  aria-label="First page of categories"
+                  title="First page of categories"
                   data-route='{{ url_for("internal.get", kind="categories", cursor=None) }}'>
             {{ render_icon("start") }}
           </button>
@@ -60,6 +66,8 @@
           <button type="button"
                   class="{{ styles.home.pagination.button }} bg-category-bg/50"
                   lp-control="next"
+                  aria-label="Next page of categories"
+                  title="Next page of categories"
                   data-route='{{ url_for("internal.get", kind="categories", cursor=categories.cursor) }}'>
             {{ render_icon("next") }}
           </button>

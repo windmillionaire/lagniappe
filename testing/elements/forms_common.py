@@ -145,7 +145,14 @@ class SelectButton:
             src/script/elements/sectionToggle.ts: select button behavior
         """
         expect(self._element).to_be_visible()
-        clear_button = self._element.locator(self.CLEAR_BUTTON)
+        row = self._element.locator(
+            "xpath=ancestor-or-self::*[@data-role='section-toggle-row'][1]"
+        )
+        clear_button = (
+            row.locator(self.CLEAR_BUTTON)
+            if row.count() > 0
+            else self._element.locator(self.CLEAR_BUTTON)
+        )
         expect(clear_button).to_be_visible()
         clear_button.click()
         expect(self._element).to_contain_text(self.default_text)

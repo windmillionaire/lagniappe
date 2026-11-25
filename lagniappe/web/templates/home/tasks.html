@@ -18,10 +18,16 @@
     </div>
     <div class="{{ styles.task.buttons }} {{ styles.task.actionIconContext }}"
          data-role="action-buttons">
-      <button type="button"
-              data-action="schedule"
-              data-title="Schedule"
-              class="{{ styles.select.button }}"></button>
+      <div class="{{ styles.select.container }}" data-kind="task">
+        <h3 class="{{ styles.select.heading }}">
+          {{ render_icon("dueDate", styles.icon.default) }}
+          <span>Schedule</span>
+        </h3>
+        <button type="button"
+                data-action="schedule"
+                data-title="Schedule"
+                class="{{ styles.select.button }}"></button>
+      </div>
     </div>
     <button type="submit" class="{{ styles.button.submit }}"></button>
   </form>
@@ -65,6 +71,8 @@
             <div class="{{ styles.task.home.complete }}">
               <input type="checkbox"
                      data-role="complete"
+                     aria-label="Mark {{ t.name }} complete"
+                     title="Mark complete"
                      class="{{ styles.checkbox.default }}">
               {{ render_icon("check", (styles.checkbox.icon)) }}
             </div>
@@ -74,6 +82,8 @@
         {% if can_edit %}
         <button type="button"
                 data-role="change-due-date"
+                aria-label="Change due date"
+                title="Change due date"
                 class="{{ styles.task.home.snooze }}">
           {{ render_icon("snooze") }}
         </button>

@@ -28,22 +28,30 @@
       <button type="button"
               class="{{ styles.nav.mobileButton }}"
               lp-show="table:MobileTableControls"
-              data-toggle="true">{{ render_icon("column") }}</button>
+              data-toggle="true"
+              aria-label="Table controls"
+              title="Table controls">{{ render_icon("column") }}</button>
       {{ public_users_toggle('mobile') }}
       {% if Resource.USERS.allowed(Action.CREATE) or Resource.USER_GROUPS.allowed(Action.VIEW) %}
         <button type="button"
                 class="{{ styles.nav.desktopButton }}"
                 lp-show="table:TableEditor"
-                data-toggle="true">{{ render_icon("tableEdit") }}</button>
+                data-toggle="true"
+                aria-label="Edit table"
+                title="Edit table">{{ render_icon("tableEdit") }}</button>
         {{ public_users_toggle('desktop') }}
         <button type="button"
                 class="{{ styles.nav.desktopButton }}"
                 lp-show="tools:default"
-                data-toggle="true">{{ render_icon("indexTools") }}</button>
+                data-toggle="true"
+                aria-label="User tools"
+                title="User tools">{{ render_icon("indexTools") }}</button>
         <button type="button"
                 class="{{ styles.nav.mobileButton }}"
                 data-role="tools-dropdown"
-                data-kind="user">{{ render_icon("columns") }}</button>
+                data-kind="user"
+                aria-label="User tools"
+                title="User tools">{{ render_icon("columns") }}</button>
       {% endif %}
     </div>
   </nav>

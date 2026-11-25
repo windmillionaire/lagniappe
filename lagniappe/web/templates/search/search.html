@@ -3,30 +3,31 @@
 {% from 'search/results.html' import search_results %}
 
 {% macro facet_button(facet) %}
-  <div data-role="attribute"
-       data-kind="{{ facet.kind }}"
-       data-selected="false"
-       tabindex="0"
-       class="{{ styles.attributes.button }} group group-data-[has-selection=true]/facets:data-[selected=false]:opacity-50 group-data-[has-selection=true]/facets:data-[selected=false]:hover:opacity-100">
-    <div data-role="attribute-icons" class="{{ styles.attributes.iconStack }}">
-      <div data-role="icon"
-           class="{{ styles.attributes.icon }}"
-           data-kind="{{ facet.kind }}">
+  <button type="button"
+          data-role="attribute"
+          data-kind="{{ facet.kind }}"
+          data-selected="false"
+          aria-pressed="false"
+          class="{{ styles.attributes.button }} group cursor-pointer group-data-[has-selection=true]/facets:data-[selected=false]:opacity-50 group-data-[has-selection=true]/facets:data-[selected=false]:hover:opacity-100">
+    <span data-role="attribute-icons" class="{{ styles.attributes.iconStack }}">
+      <span data-role="icon"
+            class="{{ styles.attributes.icon }}"
+            data-kind="{{ facet.kind }}">
         {{ render_icon((facet.icon)) }}
-      </div>
-      <div data-role="remove"
-           class="{{ styles.attributes.icon }}"
-           data-kind="delete">
+      </span>
+      <span data-role="remove"
+            class="{{ styles.attributes.icon }}"
+            data-kind="delete">
         {{ render_icon("attribute.remove") }}
-      </div>
-      <div data-role="add"
-           class="{{ styles.attributes.icon }}"
-           data-kind="{{ facet.kind }}">
+      </span>
+      <span data-role="add"
+            class="{{ styles.attributes.icon }}"
+            data-kind="{{ facet.kind }}">
         {{ render_icon("filter.active") }}
-      </div>
-    </div>
-    <div data-role="text" class="font-semibold">{{ facet.title }}</div>
-  </div>
+      </span>
+    </span>
+    <span data-role="text" class="font-semibold">{{ facet.title }}</span>
+  </button>
 {% endmacro %}
 
 {% macro main() %}
@@ -40,14 +41,16 @@
            data-role="facets"
            data-has-selection="false">
         {% for facet in facets %}{{ facet_button(facet.value) }}{% endfor %}
-        <div data-role="reset"
-             tabindex="0"
-             class="{{ styles.attributes.button }} group-data-[has-selection=false]/facets:hidden"
-             data-kind="delete">
-          <div data-role="remove" class="{{ styles.attributes.icon }}">
+        <button type="button"
+                data-role="reset"
+                aria-label="Clear filters"
+                title="Clear filters"
+                class="{{ styles.attributes.button }} cursor-pointer group-data-[has-selection=false]/facets:hidden"
+                data-kind="delete">
+          <span data-role="remove" class="{{ styles.attributes.icon }}">
             {{ render_icon("filter.inactive") }}
-          </div>
-        </div>
+          </span>
+        </button>
       </div>
       {{ search_results(results, pagination, query) }}
     </div>
