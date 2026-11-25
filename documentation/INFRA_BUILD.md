@@ -149,9 +149,9 @@ The production build enforces these startup limits.
 | --- | --- | ---: |
 | `main` | Main entry alone, including upstream failure recovery | 40 |
 | `shell` | Main plus a shell view | 64 |
-| `core` | Main plus a Core view other than Page | 128 |
-| `page` | Main plus the Page view | 132 |
-| `builder` | Builder view | 304 |
+| `core` | Main plus a Core view other than Page | 136 |
+| `page` | Main plus the Page view | 140 |
+| `builder` | Builder view | 316 |
 
 `build/startupBudget.mjs` measures deduplicated minified static imports and
 fails when a closure exceeds its budget. These limits are reviewable guardrails:
