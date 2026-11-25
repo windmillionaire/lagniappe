@@ -1,3 +1,10 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import abort, g
 
 from config import read_saved_app_settings
@@ -12,36 +19,25 @@ from lagniappe.web import responses
 from . import reference
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_form
-# @pair projects:create-help
 @reference.route("/section/<section>")
 @logged_in
-def section(section):
+def section(section: str) -> ResponseReturnValue:
     """Document settings help page."""
     return responses.reference_topic(section)
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_site_settings_requires_administrator
-# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @matrix admin : environment-variables site-settings
 @reference.route("/environment-variables")
 @permission(Resource.SITE)
-def environment_variables():
+def environment_variables() -> ResponseReturnValue:
     """Return environment variables as YAML formatted HTML."""
     env_data = read_saved_app_settings()
 
     return responses.reference_environment_variables(env_data)
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008f_site_administrators.py::test_additional_admin_cannot_access_owner_configuration
-# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @matrix admin owner : recovery-export
 @reference.route("/download-settings")
 @owner_only
-def download_settings():
+def download_settings() -> ResponseReturnValue:
     """Download the complete canonical recovery snapshot."""
     g.NO_CACHE = True
     try:

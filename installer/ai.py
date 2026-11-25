@@ -17,9 +17,6 @@ AI_API_TIMEOUT = 10
 VERTEX_AI_REGION = "us-central1"
 
 
-# @testable false
-# @covered-by installer/ai.py::_configure_ai_cache
-# @reason provider auth handshake is exercised through the live setup flow
 def _get_access_token():
     """Get OAuth2 access token for Vertex AI Management API."""
     from installer import FORMATTER
@@ -50,9 +47,6 @@ def _get_access_token():
     return credentials.token
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_gcp_domain_mapping_and_ai_cache_commands
-# @pair setup:ai-cache
 def _api_request(session, method, url, headers, json_data=None, allow_codes=None):
     """Make an API request, returning (response, json) or None on error."""
     from installer import FORMATTER
@@ -79,10 +73,7 @@ def _api_request(session, method, url, headers, json_data=None, allow_codes=None
     return None
 
 
-# @testable false
-# @covered-by installer/ai.py::_configure_ai_cache
-# @reason manual fallback instructions for the AI cache setup flow
-def print_ai_cache_instructions(project_id):
+def print_ai_cache_instructions(project_id: object) -> None:
     """Print a portable Python retry command for AI caching."""
     FORMATTER.initialize()
     print(
@@ -94,10 +85,6 @@ def print_ai_cache_instructions(project_id):
     print(ui.literal(setup_command("ai")))
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_gcp_domain_mapping_and_ai_cache_commands
-# @tests tests_tooling/test_001d_setup_drift.py::test_vertex_discovery_has_cache_config_disable_cache
-# @matrix setup : ai-cache api-drift
 def _configure_ai_cache(sp):
     """Disable AI data caching in Vertex AI."""
     from config import SETTINGS
@@ -154,10 +141,7 @@ def _configure_ai_cache(sp):
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_ai_setup_mode_configures_observability
-# @matrix ai-observability setup : ai-cache privacy-consent settings-save
-def configure_ai():
+def configure_ai() -> int:
     """Entry point for AI configuration.
 
     Verify the installation, configure caching, and expose observability.
@@ -184,10 +168,10 @@ def configure_ai():
             print(ui.success("AI access policy deployed"))
         else:
             print(
-                (
+
                     "Saved locally. Apply the policy with "
                     f"{ui.literal(setup_command('update'))}."
-                )
+
             )
         return 0
     print(wrap_text("\nThis will configure Vertex AI data retention settings."))

@@ -1,7 +1,7 @@
 """``Task.complete`` / ``Task.uncomplete`` and interaction with schedule queue."""
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
@@ -23,7 +23,23 @@ from testing.utility.test_entities import TestEntities
 _USER_TZ = "lagniappe.core.mixins.date.dates.user_timezone"
 
 
-# @matrix task-completion : assignee complete completed-by no-schedule
+@pytest.mark.unit
+@pytest.mark.parametrize("history_type", [TaskHistory, FormHistory, DocumentHistory])
+def test_unsaved_history_identity_and_immutable_modification_time(history_type):
+    history = history_type(testing=True)
+    assert history.hash is None
+    history.created = datetime(2025, 7, 1, 12, 0, 0, tzinfo=UTC)
+    assert history.modified == history.created
+    with pytest.raises(AttributeError):
+        history.modified = datetime.now(UTC)
+    if isinstance(history, DocumentHistory):
+        history.hash = "named-version"
+        assert history.hash == "named-version"
+    else:
+        with pytest.raises(AttributeError):
+            history.hash = "named-version"
+
+
 @pytest.mark.unit
 def test_task_complete_without_schedule(get_test_entities):
     """No schedule: completion status/date, assignee retained, due date cleared."""
@@ -37,12 +53,14 @@ def test_task_complete_without_schedule(get_test_entities):
         },
     )
 
-    task.due_date = datetime(2025, 7, 1, 12, 0, 0, tzinfo=timezone.utc)
+    task.due_date = datetime(2025, 7, 1, 12, 0, 0, tzinfo=UTC)
     assert task.properties.assigned_to.exists
 
-    with patch(_USER_TZ, return_value=ZoneInfo("UTC")):
-        with patch("lagniappe.core.entities.task.current_user", completer):
-            task.complete()
+    with (
+        patch(_USER_TZ, return_value=ZoneInfo("UTC")),
+        patch("lagniappe.core.entities.task.current_user", completer),
+    ):
+        task.complete()
 
     assert task.completed is True
     assert task.completed_on is not None
@@ -53,9 +71,9 @@ def test_task_complete_without_schedule(get_test_entities):
     assert task.due_date is None
 
 
-# @matrix submission task-completion : required-fields validation
 @pytest.mark.unit
-def test_task_complete_raises_when_required_submission_missing():
+@pytest.mark.parametrize(("field_label", "expected"), [("Required Field", "Required Field"), (None, "field-id")])
+def test_task_complete_raises_when_required_submission_missing(field_label, expected):
     """``TaskCompletionError`` when form exists and required fields are incomplete."""
     task = TestEntities.get(
         "TASK",
@@ -74,21 +92,20 @@ def test_task_complete_raises_when_required_submission_missing():
             "page": {"name": "Completer Page", "hash": "cpg002"},
         },
     )
-    missing = SimpleNamespace(label="Required Field")
+    missing = SimpleNamespace(label=field_label, id="field-id")
 
-    with patch(_USER_TZ, return_value=ZoneInfo("UTC")):
-        with patch.object(Task, "_check_required", return_value=[missing]):
-            with patch("lagniappe.core.entities.task.current_user", completer):
-                with pytest.raises(TaskCompletionError, match="Required Field"):
-                    task.complete()
+    with (
+        patch(_USER_TZ, return_value=ZoneInfo("UTC")),
+        patch.object(Task, "_check_required", return_value=[missing]),
+        patch("lagniappe.core.entities.task.current_user", completer),
+        pytest.raises(TaskCompletionError, match=expected),
+    ):
+        task.complete()
     assert task.completed is False
     assert task.completed_on is None
     assert "completed_submission" not in task.db
 
 
-# @source lagniappe/core/entities/task.py::Task._check_required
-# @source lagniappe/core/entities/task.py::Task.complete
-# @matrix submission task-completion : required-fields validation
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "field_type,required,value,can_complete",
@@ -151,7 +168,6 @@ def test_task_completion_distinguishes_negative_answers_and_acknowledgements(
     assert task.properties.submission.fields[field_id].value == value
 
 
-# @matrix signature task-completion : asset-cleanup history uncomplete
 @pytest.mark.unit
 def test_task_uncomplete_after_complete(get_test_entities):
     """``uncomplete`` clears completion state and reactivates; history entry is created when was completed."""
@@ -170,9 +186,11 @@ def test_task_uncomplete_after_complete(get_test_entities):
         "task-signature-field": {"type": "image", "path": "signature.png"}
     }
 
-    with patch(_USER_TZ, return_value=ZoneInfo("UTC")):
-        with patch("lagniappe.core.entities.task.current_user", completer):
-            task.complete()
+    with (
+        patch(_USER_TZ, return_value=ZoneInfo("UTC")),
+        patch("lagniappe.core.entities.task.current_user", completer),
+    ):
+        task.complete()
 
     assert task.completed is True
     assert task.completed_on is not None
@@ -206,7 +224,6 @@ def test_task_uncomplete_after_complete(get_test_entities):
     assert task.db.get("history") is True
 
 
-# @matrix task-completion : assignment field-reset uncomplete
 @pytest.mark.unit
 def test_task_uncomplete_clears_submission_and_legacy_defaults_preserving_assignment(get_schema):
     assignee = TestEntities.get(
@@ -248,7 +265,6 @@ def test_task_uncomplete_clears_submission_and_legacy_defaults_preserving_assign
     assert task.db["assigned_by"] == assigner.key
 
 
-# @matrix task-completion : description history legacy name
 @pytest.mark.unit
 def test_legacy_task_history_snapshot_text_defaults_to_none():
     """Legacy history rows without snapshot text remain readable."""
@@ -258,7 +274,6 @@ def test_legacy_task_history_snapshot_text_defaults_to_none():
     assert history.description is None
 
 
-# @pair task-completion:immutable-fingerprint
 @pytest.mark.unit
 def test_task_history_fingerprint_ignores_later_form_versions():
     """An immutable history row keeps its creation-based entity fingerprint."""
@@ -268,7 +283,7 @@ def test_task_history_fingerprint_ignores_later_form_versions():
     )
     form.version = 1
     history = TaskHistory(testing=True)
-    history.created = datetime(2026, 7, 23, 12, 0, tzinfo=timezone.utc)
+    history.created = datetime(2026, 7, 23, 12, 0, tzinfo=UTC)
     history.form = form
 
     original = history.fingerprint
@@ -278,7 +293,6 @@ def test_task_history_fingerprint_ignores_later_form_versions():
     assert history.fingerprint == original
 
 
-# @matrix tasks : attached-page history parent-details
 @pytest.mark.unit
 def test_task_history_attached_page_details_key_uses_parent():
     """Task history page details use the same parent payload key as live tasks."""
@@ -293,8 +307,6 @@ def test_task_history_attached_page_details_key_uses_parent():
     assert history.properties.page.column_value == page.reference_details
 
 
-# @matrix task-completion : asset-copy description history linked-pages name schema-version snapshot submission
-# @pair signature:asset-copy
 @pytest.mark.unit
 def test_task_history_create_snapshots_completed_task_state():
     """``TaskHistory.create`` snapshots the task state being archived."""
@@ -322,7 +334,7 @@ def test_task_history_create_snapshots_completed_task_state():
         },
         page=parent,
     )
-    completed_on = datetime(2025, 8, 5, 14, 30, tzinfo=timezone.utc)
+    completed_on = datetime(2025, 8, 5, 14, 30, tzinfo=UTC)
     submission = {"notes": "done", "score": 5}
     signature_asset = SimpleNamespace(
         type="image",
@@ -384,7 +396,6 @@ def test_task_history_create_snapshots_completed_task_state():
     copy_asset.assert_called_once_with(signature_asset, isolated=True)
 
 
-# @matrix task-combine : completed-on deterministic-tie modified winner
 @pytest.mark.unit
 def test_task_combine_selects_completed_then_modified_main():
     page = TestEntities.get("PAGE", {"name": "Combine Page", "hash": "pgcmb1"})
@@ -395,11 +406,11 @@ def test_task_combine_selects_completed_then_modified_main():
     newer = TestEntities.get(
         "TASK", {"name": "Newer completion", "hash": "tskcmb3"}, page=page
     )
-    active.modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    older.modified = datetime(2025, 6, 1, tzinfo=timezone.utc)
-    older.completed_on = datetime(2025, 5, 1, tzinfo=timezone.utc)
-    newer.modified = datetime(2024, 6, 1, tzinfo=timezone.utc)
-    newer.completed_on = datetime(2025, 7, 1, tzinfo=timezone.utc)
+    active.modified = datetime(2026, 1, 1, tzinfo=UTC)
+    older.modified = datetime(2025, 6, 1, tzinfo=UTC)
+    older.completed_on = datetime(2025, 5, 1, tzinfo=UTC)
+    newer.modified = datetime(2024, 6, 1, tzinfo=UTC)
+    newer.completed_on = datetime(2025, 7, 1, tzinfo=UTC)
 
     assert select_main_task((active, older, newer)) is newer
 
@@ -412,8 +423,6 @@ def test_task_combine_selects_completed_then_modified_main():
     assert select_main_task((newer, older, active)) is newer
 
 
-# @matrix task-combine : asset-copy attachments existing-history metadata schema-version source-snapshot
-# @pair signature:asset-copy
 @pytest.mark.unit
 def test_task_history_create_clones_another_task_and_existing_history():
     main_page = TestEntities.get("PAGE", {"name": "Main Page", "hash": "pgcmb2"})
@@ -429,7 +438,7 @@ def test_task_history_create_clones_another_task_and_existing_history():
     source = TestEntities.get(
         "TASK", {"name": "Source task", "hash": "tskcmb5"}, page=main_page
     )
-    completed_on = datetime(2025, 8, 1, tzinfo=timezone.utc)
+    completed_on = datetime(2025, 8, 1, tzinfo=UTC)
     source.description = "Source description"
     source.form = form
     source.completed_on = completed_on
@@ -450,7 +459,7 @@ def test_task_history_create_clones_another_task_and_existing_history():
         patch.object(TaskHistory, "copy_asset") as copy_asset,
     ):
         source_history = TaskHistory.create(source)
-        source_history.created = datetime(2024, 8, 1, tzinfo=timezone.utc)
+        source_history.created = datetime(2024, 8, 1, tzinfo=UTC)
         source_history.generation = 1
         form.generation = 3
         source_history._assets = {
@@ -479,7 +488,6 @@ def test_task_history_create_clones_another_task_and_existing_history():
     assert copy_asset.call_count == 3
 
 
-# @matrix asset-storage : copy metadata visibility
 @pytest.mark.unit
 def test_asset_mixin_copy_asset_copies_storage_and_updates_definition(monkeypatch):
     page = TestEntities.get("PAGE", {"name": "Parent Page", "hash": "pgasset1"})
@@ -548,7 +556,6 @@ def test_asset_mixin_copy_asset_copies_storage_and_updates_definition(monkeypatc
     assert target.assets["task-signature-field"]["path"] == second_attempt.path
 
 
-# @pair document-history:asset-copy
 @pytest.mark.unit
 def test_document_history_create_copies_document_asset():
     page = TestEntities.get(
@@ -582,7 +589,6 @@ def test_document_history_create_copies_document_asset():
     assert copied_name == DocumentHistory.DOCUMENT_ASSET
 
 
-# @matrix document-history : asset-path batch-delete current-content legacy named ordering validation
 @pytest.mark.unit
 def test_document_history_named_versions_order_and_delete_in_bounded_batches():
     page = TestEntities.get("PAGE", {"name": "Document Page", "hash": "pgdoch2"})
@@ -619,20 +625,23 @@ def test_document_history_named_versions_order_and_delete_in_bounded_batches():
     )
 
     legacy = DocumentHistory(testing=True)
-    legacy.created = datetime(2025, 1, 3, tzinfo=timezone.utc)
+    legacy.created = datetime(2025, 1, 3, tzinfo=UTC)
     automatic = DocumentHistory(testing=True)
-    automatic.created = datetime(2025, 1, 4, tzinfo=timezone.utc)
-    first.created = datetime(2025, 1, 1, tzinfo=timezone.utc)
-    second.created = datetime(2025, 1, 2, tzinfo=timezone.utc)
+    automatic.created = datetime(2025, 1, 4, tzinfo=UTC)
+    first.created = datetime(2025, 1, 1, tzinfo=UTC)
+    second.created = datetime(2025, 1, 2, tzinfo=UTC)
 
     assert legacy.name is None
     assert legacy.pinned is False
-    assert DocumentHistory.ordered([legacy, first, automatic, second]) == [
-        second,
-        first,
-        automatic,
-        legacy,
-    ]
+    tied_pin = DocumentHistory(testing=True)
+    tied_pin.name = "Another checkpoint"
+    tied_pin.created = first.created
+    tied_automatic = DocumentHistory(testing=True)
+    tied_automatic.created = automatic.created
+    histories = [legacy, tied_pin, first, automatic, second, tied_automatic]
+    expected = [second, tied_pin, first, automatic, tied_automatic, legacy]
+    assert DocumentHistory.ordered(histories) == expected
+    assert DocumentHistory.ordered(iter(histories)) == expected
 
     deleted_batches = []
     cleared = DocumentHistory.delete_unpinned(
@@ -644,7 +653,6 @@ def test_document_history_named_versions_order_and_delete_in_bounded_batches():
     assert deleted_batches == [[legacy], [automatic]]
 
 
-# @pair document-history:validation
 @pytest.mark.unit
 @pytest.mark.parametrize(
     ("name", "html"),
@@ -664,7 +672,6 @@ def test_document_history_named_version_rejects_invalid_name_or_content(name, ht
     assert str(error.value)
 
 
-# @matrix task-completion : attachments description explicit-overrides history live-task name submission
 @pytest.mark.unit
 def test_task_create_history_entry_accepts_completion_overrides(
     get_schema,
@@ -684,7 +691,7 @@ def test_task_create_history_entry_accepts_completion_overrides(
     task.form = form
     task.description = "Current completion"
     task.completed = True
-    task.completed_on = datetime(2025, 8, 5, 14, 30, tzinfo=timezone.utc)
+    task.completed_on = datetime(2025, 8, 5, 14, 30, tzinfo=UTC)
     task.files = [live_file]
 
     with patch(
@@ -692,7 +699,7 @@ def test_task_create_history_entry_accepts_completion_overrides(
         return_value="histth3",
     ):
         history = task.create_history_entry(
-            completed_on=datetime(2023, 6, 24, tzinfo=timezone.utc),
+            completed_on=datetime(2023, 6, 24, tzinfo=UTC),
             files=[event_file],
             submission={"input-textab12": "Older event"},
             name="Older inspection visit",
@@ -701,14 +708,14 @@ def test_task_create_history_entry_accepts_completion_overrides(
         )
 
     assert history.task is task
-    assert history.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
+    assert history.completed_on == datetime(2023, 6, 24, tzinfo=UTC)
     assert history.name == "Older inspection visit"
     assert history.description == "Older inspection"
     assert history.files == [event_file]
     assert history.form is form
     assert history.generation == 7
     assert history.submission == {"input-textab12": "Older event"}
-    assert task.completed_on == datetime(2025, 8, 5, 14, 30, tzinfo=timezone.utc)
+    assert task.completed_on == datetime(2025, 8, 5, 14, 30, tzinfo=UTC)
     assert task.name == "Inspection"
     assert task.description == "Current completion"
     assert task.files == [live_file]
@@ -735,8 +742,6 @@ def test_task_create_history_entry_accepts_completion_overrides(
     }
 
 
-# @matrix task-completion : complete next-due-date schedule-queue
-# @matrix task-scheduling : complete next-due-date schedule-queue
 @pytest.mark.unit
 def test_task_complete_with_schedule_queues_uncomplete():
     """With an active schedule, ``complete`` advances due date then queues uncomplete (patched)."""
@@ -763,20 +768,17 @@ def test_task_complete_with_schedule_queues_uncomplete():
     task.processes.pop("schedule", None)
     task.properties.schedule.unset()
 
-    task.due_date = datetime(2025, 6, 10, 12, 0, 0, tzinfo=timezone.utc)
+    task.due_date = datetime(2025, 6, 10, 12, 0, 0, tzinfo=UTC)
 
     mock_today = datetime(2025, 6, 15, 0, 0, 0, tzinfo=ZoneInfo("UTC"))
 
     with patch(
         "lagniappe.core.tools.tasks.scheduling.user_today",
         return_value=mock_today,
-    ):
-        with patch(_USER_TZ, return_value=ZoneInfo("UTC")):
-            with patch(
-                "lagniappe.core.entities.task.scheduling.add_uncomplete_task_to_queue"
-            ) as queue_mock:
-                with patch("lagniappe.core.entities.task.current_user", completer):
-                    task.complete()
+    ), patch(_USER_TZ, return_value=ZoneInfo("UTC")), patch(
+        "lagniappe.core.entities.task.scheduling.add_uncomplete_task_to_queue"
+    ) as queue_mock, patch("lagniappe.core.entities.task.current_user", completer):
+        task.complete()
 
     queue_mock.assert_called_once_with(task)
     assert task.completed is True
@@ -784,7 +786,6 @@ def test_task_complete_with_schedule_queues_uncomplete():
     assert task.due_date.isoformat() == "2025-06-16T00:00:00+00:00"
 
 
-# @matrix task-completion task-scheduling : complete schedule-queue
 @pytest.mark.unit
 def test_task_complete_with_near_term_schedule_uncompletes_immediately():
     """A near-term recurring completion reactivates immediately with its calculated next due date."""
@@ -844,9 +845,6 @@ def test_task_complete_with_near_term_schedule_uncompletes_immediately():
     assert task.db.get("postponed_from") is None
 
 
-# @matrix cloud-tasks : durable-uncomplete idempotency post-commit
-# @matrix task-scheduling : durable-uncomplete idempotency post-commit schedule-queue timezone
-# @pair task-completion:schedule-queue
 @pytest.mark.unit
 def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
     """A future recurrence persists intent before its tokenized queue dispatch."""
@@ -858,9 +856,9 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
             "page": {"name": "Parent Page", "hash": "pgtcl5"},
         },
     )
-    next_due = datetime(2025, 7, 1, 0, 0, 0, tzinfo=timezone.utc)
+    next_due = datetime(2025, 7, 1, 0, 0, 0, tzinfo=UTC)
     task.completed = True
-    task.completed_on = datetime(2025, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
+    task.completed_on = datetime(2025, 6, 15, 12, 0, 0, tzinfo=UTC)
     task.due_date = next_due
 
     with (
@@ -879,7 +877,7 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
             return_value="queued-task",
         ) as create_task,
     ):
-        instant = datetime(2025, 6, 16, 4, 30, tzinfo=timezone.utc)
+        instant = datetime(2025, 6, 16, 4, 30, tzinfo=UTC)
         clock.now.side_effect = lambda tz=None: instant.astimezone(tz)
         token = dates.add_uncomplete_task_to_queue(task)
         create_task.assert_not_called()
@@ -889,7 +887,7 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
     assert token
     assert any(intent.intent is MutationIntentType.SCHEDULED_UNCOMPLETE_DISPATCH for intent in task.mutation_intents)
     assert task.scheduled_uncomplete_at == datetime(
-        2025, 6, 16, 5, tzinfo=timezone.utc
+        2025, 6, 16, 5, tzinfo=UTC
     )
     assert task_name == "queued-task"
     create_task.assert_called_once_with(
@@ -898,7 +896,7 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
             "key": task.urlsafe_key,
             "token": token,
         },
-        schedule_at=datetime(2025, 6, 16, 5, tzinfo=timezone.utc),
+        schedule_at=datetime(2025, 6, 16, 5, tzinfo=UTC),
         task_id=create_task.call_args.kwargs["task_id"],
     )
     assert create_task.call_args.kwargs["task_id"].startswith("task-uncomplete-")
@@ -915,7 +913,6 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
     assert task.due_date == next_due
 
 
-# @matrix task-completion task-scheduling : idempotency stale-delivery
 @pytest.mark.unit
 def test_manual_uncomplete_clears_pending_scheduled_delivery():
     task = TestEntities.get(
@@ -927,8 +924,8 @@ def test_manual_uncomplete_clears_pending_scheduled_delivery():
         },
     )
     task.completed = True
-    task.due_date = datetime(2025, 7, 1, tzinfo=timezone.utc)
-    task._defer_scheduled_uncomplete(datetime(2025, 6, 16, tzinfo=timezone.utc))
+    task.due_date = datetime(2025, 7, 1, tzinfo=UTC)
+    task._defer_scheduled_uncomplete(datetime(2025, 6, 16, tzinfo=UTC))
 
     with patch.object(task, "create_history_entry"):
         task.uncomplete()
@@ -941,7 +938,6 @@ def test_manual_uncomplete_clears_pending_scheduled_delivery():
     )
 
 
-# @matrix form-schema html-field : history content-version
 @pytest.mark.unit
 @pytest.mark.parametrize("content_flag", [None, 1])
 def test_form_history_create_copies_explicit_saved_definition_without_asset_copy(content_flag):

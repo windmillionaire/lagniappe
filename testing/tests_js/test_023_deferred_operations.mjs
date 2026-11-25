@@ -25,21 +25,18 @@ async function loadManager() {
 	const createIcon = () => document.createElement("span");
 	const withTransition = (callback) => callback();
 	const { DeferredOperationManager } = await esmock.strict(
-		"../../src/script/shared/deferredOperations.mjs",
+		"../../src/script/shared/deferredOperations.ts",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError: (...args) => capturedErrors.push(args),
 			},
-			"../../src/script/shared/icons.mjs": { createIcon },
-			"../../src/script/shared/transitions.mjs": { withTransition },
+			"../../src/script/shared/icons.ts": { createIcon },
+			"../../src/script/shared/transitions.ts": { withTransition },
 		},
 	);
 	return { capturedErrors, DeferredOperationManager };
 }
 
-/**
- * @matrix deferred-jobs : backoff decoration-opt-out lazy-watcher polling progress rendered-visibility revision status teardown terminal-ownership timing visible-blur
- */
 test("test_deferred_operation_manager_batches_orders_and_renders_status", async (t) => {
 	createBrowser(t);
 	const first = operationNode("operation-a");
@@ -254,7 +251,6 @@ test("test_deferred_operation_manager_batches_orders_and_renders_status", async 
 	assert.equal(subscriptions.size, 0);
 });
 
-/** @matrix deferred-jobs : terminal-ownership revision */
 test("test_deferred_operation_manager_reconciles_server_rendered_terminal_status", async (t) => {
 	createBrowser(t);
 	const operation = operationNode("operation-complete");
@@ -338,7 +334,6 @@ test("test_deferred_operation_manager_reconciles_server_rendered_terminal_status
 	assert.equal(subscriptions.size, 0);
 });
 
-/** @matrix deferred-jobs : rendered-autofill rendered-visibility */
 test("test_cold_task_operations_wait_for_activation_and_completed_reviews_need_no_poll", async (t) => {
 	createBrowser(t);
 	const running = operationNode("task-running").node;
@@ -405,10 +400,6 @@ test("test_cold_task_operations_wait_for_activation_and_completed_reviews_need_n
 	manager.destroy();
 });
 
-/**
- * @source src/script/shared/deferredOperations.mjs::DeferredOperationManager
- * @pair deferred-jobs:review-probe
- */
 test("test_successful_autofill_waits_for_active_form_review_before_retiring", async (t) => {
 	createBrowser(t);
 	const form = document.createElement("form");

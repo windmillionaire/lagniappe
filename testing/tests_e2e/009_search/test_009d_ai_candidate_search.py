@@ -13,7 +13,6 @@ from lagniappe.core.tools.cache.keys import Keys, Search
 pytestmark = pytest.mark.e2e
 
 
-# @matrix search : candidate-ranking term-relaxation permissions bounded-query cached-details
 def test_candidate_search_keeps_redis_scope_and_ranks_partial_names(monkeypatch):
     token = uuid4().hex[:12]
     rain, garden, work = (f"{word}{token}" for word in ("rain", "garden", "work"))

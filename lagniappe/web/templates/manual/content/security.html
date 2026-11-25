@@ -111,7 +111,10 @@
       or downloads installation configuration. That configuration can contain
       Redis passwords, API keys, SMTP credentials, and recovery material, so
       the <b>Maintenance / Configuration</b> control is not rendered for additional
-      Administrators and its server routes reject them as well.
+      Administrators and its server routes reject them as well. Installations
+      can optionally store those runtime secrets in Google Cloud Secret Manager
+      (<code>./setup.sh secrets migrate</code>) so the local settings file
+      keeps only non-secret configuration.
     </p>
     <p class="text-base-medium">
       During a delegated installation, one exact saved installer email may use

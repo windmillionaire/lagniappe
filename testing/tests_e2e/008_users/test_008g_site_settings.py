@@ -72,7 +72,6 @@ def _assert_site_image_links(site_image, image_data):
         expect(link).to_have_attribute("href", url)
 
 
-# @matrix admin : configuration-display configuration-modal environment-variables external-links recovery-export secrets sections service-providers site-settings web-headers
 # @template home/admin.html::main
 # @template home/site_settings.html::site_settings
 @pytest.mark.e2e_group("owner")
@@ -147,16 +146,18 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     modal = Modal(owner.page).open(
         settings_panel.locator("[data-role='configuration']")
     )
-    expect(modal.element).to_contain_text("including credentials and other secrets")
+    expect(modal.element).to_contain_text("credentials and other secrets")
     expect(modal.element).to_contain_text("APP_NAME")
     expect(
         modal.element.get_by_role("link", name="Download Settings File")
     ).to_be_visible()
     expect(modal.element).to_contain_text(recovery.REDACTED_VALUE)
     download_link = modal.element.get_by_role("link", name="Download Settings File")
-    with owner.page.expect_response("**/reference/download-settings") as response_info:
-        with owner.page.expect_download() as download_info:
-            download_link.click()
+    with (
+        owner.page.expect_response("**/reference/download-settings") as response_info,
+        owner.page.expect_download() as download_info,
+    ):
+        download_link.click()
     response = response_info.value
     download = download_info.value
     downloaded = yaml.safe_load(Path(download.path()).read_text())
@@ -178,7 +179,6 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     modal.close()
 
 
-# @matrix admin : deployment-settings metadata scaling-controls validation
 # @template home/site_settings.html::site_settings
 @pytest.mark.e2e_group("owner")
 def test_site_settings_deployment_form_saves_and_updates_summary(
@@ -247,7 +247,6 @@ def test_site_settings_deployment_form_saves_and_updates_summary(
     assert "Worker count" in rejected["text"]
 
 
-# @matrix admin : ai-settings metadata model-selection saved-values validation
 # @template home/site_settings.html::site_settings
 @pytest.mark.e2e_group("owner")
 def test_site_settings_ai_form_saves_current_models_through_route(
@@ -282,17 +281,19 @@ def test_site_settings_ai_form_saves_current_models_through_route(
         )
     }
 
+    auto_execute = form.locator('[name="AI_AUTO_EXECUTE"]').is_checked()
     with owner.page.expect_response("**/l/set-ai-settings") as response_info:
         form.locator("button[type='submit']").click()
 
     response = response_info.value
     assert response.status == 200
-    assert response.json()["ai_settings"] == expected
+    expected_settings = {**expected, "AI_AUTO_EXECUTE": auto_execute}
+    assert response.json()["ai_settings"] == expected_settings
     expect(form.locator("button[type='submit']")).to_contain_text(
         "AI Model Settings Saved"
     )
     saved = dict(site_database.ai())
-    assert {name: saved[name] for name in expected} == expected
+    assert {name: saved[name] for name in expected_settings} == expected_settings
 
     owner.page.reload(wait_until="domcontentloaded")
     reloaded_settings_panel = owner.locate(admin.SITE_SETTINGS_FORM)
@@ -302,6 +303,7 @@ def test_site_settings_ai_form_saves_current_models_through_route(
         "ai-models",
     )
     reloaded_form = reloaded_ai_models.locator("[data-role='ai-settings']")
+    expect(reloaded_form.locator('[name="AI_AUTO_EXECUTE"]')).to_be_checked(checked=auto_execute)
     for name, value in expected.items():
         expect(reloaded_form.locator(f"[name='{name}']")).to_have_value(value)
 
@@ -319,9 +321,6 @@ def test_site_settings_ai_form_saves_current_models_through_route(
     assert "global" in rejected["text"]
 
 
-# @matrix admin public-pages : live-settings sitemap-invalidation validation
-# @matrix public-pages sitemap : disabled enabled redis-cache
-# @matrix robots : disabled enabled
 # @template home/site_settings.html::site_settings
 @pytest.mark.e2e_group("owner")
 def test_site_settings_public_page_indexing_saves_live_setting(
@@ -394,8 +393,6 @@ def test_site_settings_public_page_indexing_saves_live_setting(
             save(original)
 
 
-# @matrix admin : site-update success
-# @pair cache:current
 # @template home/site_settings.html::site_settings
 # Rebuild clears the entire test cache, including active document write locks.
 @pytest.mark.e2e_serial
@@ -419,7 +416,6 @@ def test_site_maintenance_update_and_cache_refresh_use_real_routes(get_user):
     expect(maintenance.locator("[data-role='cache-status-summary']")).to_contain_text("records processed")
 
 
-# @matrix admin : generated-images lazy-initialization metadata public-preview site-image-upload
 # @template home/site_settings.html::site_settings
 @pytest.mark.e2e_group("owner")
 def test_site_settings_image_upload_generates_and_persists_site_images(get_user):

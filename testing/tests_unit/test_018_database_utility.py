@@ -14,7 +14,6 @@ from lagniappe.core.tools.database import filter as database_filter
 from lagniappe.core.tools.database.filter import Filter, Query, Results
 
 
-# @matrix database : id-allocation batching parent
 def test_create_keys_retains_kind_parent_and_numeric_ids(monkeypatch):
     client = Client(project="unit-project", credentials=AnonymousCredentials())
     calls = []
@@ -88,7 +87,6 @@ def reference_datastore(monkeypatch):
     return SimpleNamespace(client=client, add=add, queries=queries, lookups=lookups)
 
 
-# @matrix forms database : reference-query primary-secondary owner-deduplication
 def test_form_users_filters_references_and_preserves_owner_set(reference_datastore):
     db = reference_datastore
     form = SimpleNamespace(key=db.client.key("models", "requested"))
@@ -113,7 +111,6 @@ def test_form_users_filters_references_and_preserves_owner_set(reference_datasto
     assert db.lookups == [[project.key]]
 
 
-# @matrix forms database : reference-query batching owner-deduplication
 @pytest.mark.parametrize(("count", "query_count"), [(15, 1), (25, 2), (31, 3)])
 def test_form_users_bounds_batches_and_deduplicates_owners(reference_datastore, count, query_count):
     from math import prod
@@ -144,14 +141,12 @@ def test_form_users_bounds_batches_and_deduplicates_owners(reference_datastore, 
     assert all(0 < disjunctions(query.filter) <= 30 for query in db.queries)
 
 
-# @matrix forms database : reference-query empty-input
 def test_form_users_empty_input_does_not_read(reference_datastore):
     assert get.form_users() == []
     assert reference_datastore.queries == []
     assert reference_datastore.lookups == []
 
 
-# @matrix cache user : invalidation acknowledgement concurrency property-mask
 @pytest.mark.parametrize("revision", ["new", "legacy"])
 def test_cache_acknowledgement_is_revision_checked_and_masked(monkeypatch, revision):
     from contextlib import nullcontext
@@ -192,7 +187,6 @@ def test_cache_acknowledgement_is_revision_checked_and_masked(monkeypatch, revis
     assert len(transaction.mutations) == 1
 
 
-# @matrix database : empty-page restricted-results
 @pytest.mark.unit
 def test_empty_results_has_no_items_or_cursor():
     results = get._empty_results()
@@ -201,7 +195,6 @@ def test_empty_results_has_no_items_or_cursor():
     assert results.next_cursor is None
 
 
-# @matrix database : indexing pagination query-results slicing
 @pytest.mark.unit
 def test_results_use_normal_list_indexing_and_keep_cursor_metadata():
     results = Results(["first", "second", "third"], "next-page")
@@ -213,7 +206,6 @@ def test_results_use_normal_list_indexing_and_keep_cursor_metadata():
     assert results.next_cursor == "next-page"
 
 
-# @matrix database permissions : deny-all filter-composition
 @pytest.mark.unit
 def test_filter_preserves_explicit_deny_all_through_composition():
     denied = Filter().requires([])
@@ -236,7 +228,6 @@ def test_filter_preserves_explicit_deny_all_through_composition():
     assert only_denied.build() is not None
 
 
-# @matrix database permissions : deny-all query-short-circuit terminal-results
 @pytest.mark.unit
 def test_denied_query_terminals_do_not_create_datastore_query(monkeypatch):
     class Datastore:
@@ -273,7 +264,6 @@ def aggregation_datastore(monkeypatch):
     return client
 
 
-# @matrix database : count aggregation
 @pytest.mark.unit
 @pytest.mark.parametrize("count", [0, 4, 1_000_000])
 def test_query_count_uses_aggregation_without_fetching_entities(aggregation_datastore, count):
@@ -331,8 +321,6 @@ def test_query_count_uses_aggregation_without_fetching_entities(aggregation_data
     assert ancestor.value.key_value.path[-1].name == "parent"
 
 
-# @source lagniappe/core/tools/database/filter.py::Query.count
-# @matrix database : count aggregation
 @pytest.mark.unit
 def test_query_count_propagates_aggregation_failure(aggregation_datastore):
     api = aggregation_datastore._datastore_api
@@ -344,7 +332,6 @@ def test_query_count_propagates_aggregation_failure(aggregation_datastore):
     api.run_query.assert_not_called()
 
 
-# @matrix database permissions : deny-all group-query
 @pytest.mark.unit
 def test_groups_with_denied_hashes_does_not_query_datastore(monkeypatch):
     class Datastore:
@@ -360,7 +347,6 @@ def test_groups_with_denied_hashes_does_not_query_datastore(monkeypatch):
     assert get.groups([]) == []
 
 
-# @matrix caching users : save site-fingerprint
 @pytest.mark.unit
 def test_save_persists_user_and_users_fingerprint_record(monkeypatch):
     saved = []
@@ -392,7 +378,6 @@ def test_save_persists_user_and_users_fingerprint_record(monkeypatch):
     ]
 
 
-# @matrix database migrations : raw-save site-fingerprint
 @pytest.mark.unit
 def test_save_raw_persists_datastore_entities_without_typed_save_hooks(
     monkeypatch,
@@ -429,7 +414,6 @@ def test_save_raw_persists_datastore_entities_without_typed_save_hooks(
     ]
 
 
-# @matrix caching users : invalidation site-fingerprint
 @pytest.mark.unit
 def test_update_site_fingerprints_upserts_missing_users_fingerprint(monkeypatch):
     missing_record = {"key": ("site", "users")}
@@ -452,7 +436,6 @@ def test_update_site_fingerprints_upserts_missing_users_fingerprint(monkeypatch)
     assert records == [{"key": ("site", "users"), "fingerprint": "users-fingerprint"}]
 
 
-# @matrix polling : batching channel mounted-scope
 @pytest.mark.unit
 def test_site_fingerprints_batch_reads_only_resolved_paths(monkeypatch):
     class Record(dict):
@@ -491,7 +474,6 @@ def test_site_fingerprints_batch_reads_only_resolved_paths(monkeypatch):
     assert [record.key for record in saved] == [("site", "tasks")]
 
 
-# @matrix polling : batching channel mounted-scope
 def test_site_fingerprints_reuses_supplied_records(monkeypatch):
     client = Client(project="unit-project", credentials=AnonymousCredentials())
     saved = []
@@ -510,7 +492,6 @@ def test_site_fingerprints_reuses_supplied_records(monkeypatch):
     assert utility.site_fingerprints([], records={}) == {}
 
 
-# @matrix notifications : mutation site-fingerprint-isolation
 @pytest.mark.unit
 def test_notification_save_and_delete_skip_site_fingerprints(monkeypatch):
     fingerprinted = []
@@ -551,7 +532,6 @@ def test_notification_save_and_delete_skip_site_fingerprints(monkeypatch):
     ]
 
 
-# @matrix database mutations : document-checkpoint full-upsert property-mask site-fingerprint update
 @pytest.mark.unit
 def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
     class Mutation:
@@ -644,7 +624,6 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
     assert batch.mutations[5].upsert is fingerprint
 
 
-# @matrix forms mutations : archive atomic-delete concurrency
 @pytest.mark.unit
 @pytest.mark.parametrize("source_changed", [False, True])
 def test_form_archive_and_deletion_share_the_guarded_transaction(monkeypatch, source_changed):
@@ -711,7 +690,6 @@ def test_form_archive_and_deletion_share_the_guarded_transaction(monkeypatch, so
     assert fingerprinted == [archive_row, form_row]
 
 
-# @matrix permissions mutations : channel-invalidation no-descendant-writes
 @pytest.mark.unit
 @pytest.mark.parametrize("kind", ["page", "form"])
 @pytest.mark.parametrize("changed,mask", [(True, None), (False, None), (True, ("modified",))])
@@ -729,7 +707,6 @@ def test_permission_source_save_invalidates_tasks_without_descendant_writes(monk
     assert fingerprints == [source.db] + ([{"type": "task"}] if changed and mask is None else [])
 
 
-# @pair database:named-key-encoding
 @pytest.mark.unit
 def test_database_aware_urlsafe_key_round_trip():
     from config.datastore import decode_urlsafe_key, encode_urlsafe_key
@@ -761,7 +738,6 @@ def test_database_aware_urlsafe_key_round_trip():
     assert default_decoded.database is None
 
 
-# @pair database:named-key-encoding
 @pytest.mark.unit
 def test_datastore_key_decodes_without_runtime_rebinding():
     from config.datastore import encode_urlsafe_key

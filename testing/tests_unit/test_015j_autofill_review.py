@@ -9,22 +9,19 @@ from lagniappe.core.tools.ai.guidelines.field_types import (
     schema_guidance,
     schema_type_guidance,
 )
+from datetime import UTC
 
 pytestmark = pytest.mark.unit
 
 
-# @source lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.committed_result
-# @source lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
-# @matrix deferred-jobs : recovery checkpoint
-# @pair ai:autofill
 @pytest.mark.parametrize("age,committed", [(121, True), (10801, True), (121, False)])
 def test_committed_autofill_recovers_after_deadline_without_input_or_generation(monkeypatch, age, committed):
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
     from lagniappe.core import exceptions
     from lagniappe.core.tools.deferred_jobs.adapters.autofill import AutofillAdapter
     from testing.utility.deferred_job_fakes import RecordingAdapter, RunnerJob, runner
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     job = RunnerJob(attempt=2, checkpoint={"prepared": True})
     job.created = now - timedelta(seconds=age)
     saved_result = {"target_key": "deleted-task", "applied_fields": ["title"]}
@@ -52,9 +49,6 @@ def test_committed_autofill_recovers_after_deadline_without_input_or_generation(
         assert "prepare" not in adapter.calls and "apply" not in adapter.calls
 
 
-# @source lagniappe/core/tools/ai/guidelines/field_types.py::schema_guidance
-# @source lagniappe/core/tools/ai/guidelines/field_types.py::schema_type_guidance
-# @pair ai:autofill
 def test_guidance_includes_nested_types_only():
     guidance = schema_guidance([
         {"id": "table-books", "type": "table", "columns": [
@@ -72,8 +66,6 @@ def test_guidance_includes_nested_types_only():
     assert "####" not in schema_guidance([])
 
 
-# @source lagniappe/core/tools/forms/review.py::merge_proposal
-# @pair ai:autofill
 def test_merge_preserves_concurrent_answers_and_supports_collections():
     from lagniappe.core.tools.forms.review import merge_proposal
 
@@ -96,8 +88,6 @@ def test_merge_preserves_concurrent_answers_and_supports_collections():
     assert conflicts["title"] == "Corrected title"
 
 
-# @source lagniappe/core/tools/forms/review.py::stage_submission_guard
-# @pair ai:autofill
 def test_answer_revision_guard_is_tied_to_loaded_baseline():
     from lagniappe.core.tools.forms.review import stage_submission_guard
 
@@ -105,13 +95,14 @@ def test_answer_revision_guard_is_tied_to_loaded_baseline():
     assert not stage_submission_guard(target, {})
     assert not stage_submission_guard(target, {"form-revision": "old"})
     assert not hasattr(target, "_form_additional_guards")
+    unsaved = SimpleNamespace(key=None, db={}, autofill_revision="r1")
+    assert not stage_submission_guard(unsaved, {"form-revision": "r1"})
+    assert not hasattr(unsaved, "_form_additional_guards")
     assert stage_submission_guard(target, {"form-revision": "r1"})
     target.db["submission"] = '{"a":2}'
     assert target._form_additional_guards[0][1]["submission"] == '{"a":1}'
 
 
-# @source lagniappe/core/tools/forms/review.py::acknowledge_reviews
-# @pair ai:autofill
 def test_review_acknowledgement_does_not_clear_another_users_draft():
     from lagniappe.core.tools.forms.review import acknowledge_reviews
 
@@ -120,8 +111,6 @@ def test_review_acknowledgement_does_not_clear_another_users_draft():
     assert json.loads(target.db["autofill_reviews"]) == {"other": "o"}
 
 
-# @source lagniappe/core/tools/forms/review.py::launch_snapshot
-# @pair ai:autofill
 def test_snapshot_captures_current_answers_and_is_detached(monkeypatch):
     from lagniappe.core.tools.forms import review
 
@@ -145,8 +134,6 @@ def test_snapshot_captures_current_answers_and_is_detached(monkeypatch):
     assert snapshot["revision"] == "edited" and snapshot["generation"] == 3
 
 
-# @source lagniappe/core/tools/forms/review.py::prepare_proposal
-# @pair ai:autofill
 def test_proposal_validates_populated_tables_and_todos():
     from lagniappe.core.tools.forms.review import prepare_proposal
 
@@ -163,8 +150,6 @@ def test_proposal_validates_populated_tables_and_todos():
     assert target.properties.submission.value == {"table-books": {"rows": [{"input-title": "One"}]}}
 
 
-# @source lagniappe/core/tools/forms/review.py::review_projection
-# @pair ai:autofill
 def test_review_projection_is_actor_scoped(monkeypatch):
     from lagniappe.core.tools.forms import review
 
@@ -195,8 +180,6 @@ def test_review_projection_is_actor_scoped(monkeypatch):
     assert review.review_projection(target, me) == []
 
 
-# @source lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.prepare_snapshot
-# @pair ai:autofill
 def test_autofill_preparation_uses_snapshot_and_original_file(monkeypatch):
     from lagniappe.core.tools.deferred_jobs.adapters import autofill as adapter
 
@@ -220,8 +203,6 @@ def test_autofill_preparation_uses_snapshot_and_original_file(monkeypatch):
     assert "user" not in snapshot["prompt"]
 
 
-# @source lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.start_writes
-# @pair ai:autofill
 def test_autofill_start_writes_only_operation_reference_with_answer_guard(monkeypatch):
     from lagniappe.core.tools.deferred_jobs.adapters import autofill as adapter
 
@@ -237,8 +218,6 @@ def test_autofill_start_writes_only_operation_reference_with_answer_guard(monkey
     assert guards == [("task", {"submission": "old"})]
 
 
-# @source lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.apply_proposal
-# @pair ai:autofill
 @pytest.mark.parametrize("with_form", [False, True])
 def test_autofill_apply_is_guarded_and_retains_conflicts(monkeypatch, with_form):
     from lagniappe.core.tools.deferred_jobs.adapters import autofill as adapter
@@ -270,9 +249,6 @@ def test_autofill_apply_is_guarded_and_retains_conflicts(monkeypatch, with_form)
         assert isinstance(saved[0][2][1], adapter.database_utility.ExactEntityState)
 
 
-# @source lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.apply_proposal
-# @source lagniappe/core/tools/forms/review.py::snapshot_matches_form
-# @pair ai:autofill
 @pytest.mark.parametrize("drift", ["answers", "schema", "definition", "form", "metadata", "private"])
 def test_autofill_context_or_schema_drift_keeps_suggestions_for_review(monkeypatch, drift):
     from lagniappe.core.tools.deferred_jobs.adapters import autofill as adapter

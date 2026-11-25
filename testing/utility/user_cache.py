@@ -4,8 +4,6 @@ from lagniappe.core.entities import Entities
 from testing.definitions import SitePages
 
 
-# @testable false
-# @reason Reusable E2E cache protocol; consuming tests assert product outcomes.
 def acknowledge_user_cache_invalidation(user, destination=None):
     """Consume a permission mutation through the browser-owned protocol."""
     pending = Entities.USER.load(user.email).invalidate_cache

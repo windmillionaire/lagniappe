@@ -16,7 +16,6 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.test_entities import TestEntities
 
 
-# @matrix ai-report : attachments create-order default-category deterministic-run execute file-summary grouping partial-result persistence result skip-action
 @pytest.mark.unit
 def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -269,7 +268,6 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
 
 
 
-# @matrix ai-report form-schema submission : deterministic-run stale-proposal validation
 @pytest.mark.unit
 def test_run_report_rejects_saved_pending_submissions_before_execution():
     user = _test_user("runner-pending-submission-owner")
@@ -310,7 +308,6 @@ def test_run_report_rejects_saved_pending_submissions_before_execution():
 
 
 
-# @matrix ai-report : deterministic-run persistence submission-completion
 @pytest.mark.unit
 def test_run_report_uses_category_form_from_stored_key_for_page_submission(
     monkeypatch,
@@ -393,7 +390,6 @@ def test_run_report_uses_category_form_from_stored_key_for_page_submission(
 
 
 
-# @matrix ai-report form-schema : deterministic-run permission-failure schema-update
 @pytest.mark.unit
 def test_run_report_rejects_schema_update_without_form_edit_permission(monkeypatch):
     user = _permissioned_user(

@@ -42,7 +42,13 @@
           </p>
           <div class="space-y-4 mb-6 text-sm leading-6">
             <p>{{ client_name }} can read workspace information within your permissions, upload files you choose, answer questions, and prepare Create and Organize plans.</p>
-            <p class="font-semibold">Workspace changes require your review in Lagniappe.</p>
+            <p class="font-semibold">
+              {% if auto_execute_site_enabled() and current_user.allow_auto_execute %}
+                Safe workspace plans may run automatically under your account setting; you can turn this off in Settings or per request.
+              {% else %}
+                Workspace changes require your review in Lagniappe unless you enable automatic plan execution in Settings.
+              {% endif %}
+            </p>
             <p class="text-base-medium">You can revoke access from your Lagniappe Settings. Connecting again replaces this account's previous {{ client_name }} connection. Other AI clients stay connected.</p>
           </div>
           <form data-oauth-form method="post" action="{{ url_for('oauth.authorize') }}" class="space-y-3">

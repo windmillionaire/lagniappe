@@ -1,11 +1,16 @@
 """Bound and sanitize request context used in error reports."""
 
+from __future__ import annotations
+
 from collections.abc import Mapping
+from typing import TYPE_CHECKING, cast, overload
+
+if TYPE_CHECKING:
+    from sentry_sdk._types import Event, Hint
 import re
 from urllib.parse import urlsplit
 
 from flask import has_request_context, request
-
 
 REDACTED = "[REDACTED]"
 MAX_CONTEXT_DEPTH = 8
@@ -120,17 +125,11 @@ _SECRET_ASSIGNMENT_PATTERN = re.compile(
 )
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/request.py::sanitize_error_context
-# @reason canonical key matching is exercised through recursive context sanitization
 def _normalized_key(key):
     expanded = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", str(key))
     return re.sub(r"[^a-z0-9]+", "_", expanded.lower()).strip("_")
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/request.py::sanitize_error_context
-# @reason sensitive-key classification is exercised through recursive context sanitization
 def _is_sensitive_key(key):
     normalized = _normalized_key(key)
     if normalized in _DIRECT_SENSITIVE_KEYS or normalized in _PAYLOAD_KEYS:
@@ -160,9 +159,6 @@ def _is_sensitive_key(key):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/request.py::sanitize_error_context
-# @reason text redaction and bounds are exercised through recursive context sanitization
 def _sanitize_text(value, *, limit=MAX_CONTEXT_STRING_LENGTH):
     text = str(value)
     if "-----BEGIN" in text.upper() and "PRIVATE KEY-----" in text.upper():
@@ -177,11 +173,8 @@ def _sanitize_text(value, *, limit=MAX_CONTEXT_STRING_LENGTH):
     return text
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/request.py::sanitize_error_context
-# @reason URL parsing is exercised through the public context sanitizer
-def _sanitize_url(value):
-    metadata = {
+def _sanitize_url(value: object) -> dict[str, str | int | bool]:
+    metadata: dict[str, str | int | bool] = {
         "parseable": False,
         "has_path": False,
         "has_query": False,
@@ -217,9 +210,6 @@ def _sanitize_url(value):
     return metadata
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/request.py::sanitize_error_context
-# @reason recursion details are owned by the public context sanitizer
 def _sanitize_value(value, *, key=None, depth=0):
     if key is not None and _normalized_key(key) in {"url", "http_url", "url_full"}:
         return _sanitize_url(value)
@@ -256,18 +246,19 @@ def _sanitize_value(value, *, key=None, depth=0):
     return f"<{type(value).__name__}>"
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_error_context_sanitizer_redacts_nested_secrets_and_bounds_payloads
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_error_context_sanitizer_replaces_urls_with_bounded_metadata
-# @matrix error-reporting : payload-bounds privacy redaction url-metadata
-def sanitize_error_context(value):
+@overload
+def sanitize_error_context(value: Mapping[str, object]) -> dict[str, object]: ...
+
+
+@overload
+def sanitize_error_context(value: object) -> object: ...
+
+
+def sanitize_error_context(value: object) -> object:
     """Return a bounded, serialization-safe copy with sensitive values removed."""
     return _sanitize_value(value)
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/request.py::extract_request_info
-# @reason query shape is exercised through the request-context allowlist
 def _summarize_parameters(parameters):
     fields = []
     for name in list(parameters.keys())[:MAX_CONTEXT_ITEMS]:
@@ -284,9 +275,6 @@ def _summarize_parameters(parameters):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/request.py::extract_request_info
-# @reason content-length bounds are exercised through the request-context allowlist
 def _bounded_content_length(content_length):
     if content_length is None:
         return None, False
@@ -294,10 +282,7 @@ def _bounded_content_length(content_length):
     return min(value, MAX_REPORTED_CONTENT_LENGTH), value > MAX_REPORTED_CONTENT_LENGTH
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_request_info_uses_bounded_structural_allowlist
-# @matrix error-reporting : payload-bounds privacy request-context
-def extract_request_info():
+def extract_request_info() -> dict[str, object] | None:
     """Extract bounded request structure without payload or identifier values."""
     if not has_request_context():
         return None
@@ -337,10 +322,7 @@ def extract_request_info():
     return info
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_sentry_event_sanitizer_removes_sdk_request_payloads
-# @matrix error-reporting : payload-bounds privacy redaction request-context sentry-event
-def sanitize_sentry_event(event, _hint=None):
+def sanitize_sentry_event(event: Event, _hint: Hint | None = None) -> Event:
     """Apply the privacy boundary to SDK-generated Sentry event fields."""
     if not isinstance(event, Mapping):
         return event
@@ -384,12 +366,9 @@ def sanitize_sentry_event(event, _hint=None):
         if key in sanitized:
             sanitized[key] = sanitize_error_context(sanitized[key])
 
-    return sanitized
+    return cast("Event", sanitized)
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/request.py::filter_sentry_event
-# @reason exact exception matching is asserted through the public before-send filter
 def _is_expected_ai_document_limit(event):
     exception = event.get("exception") if isinstance(event, Mapping) else None
     values = exception.get("values") if isinstance(exception, Mapping) else None
@@ -404,10 +383,7 @@ def _is_expected_ai_document_limit(event):
     )
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_sentry_filter_drops_only_expected_ai_document_page_limit
-# @matrix ai error-reporting files : expected-provider-failure pdf-page-limit privacy
-def filter_sentry_event(event, hint=None):
+def filter_sentry_event(event: Event, hint: Hint | None = None) -> Event | None:
     """Drop known user-input limits, then sanitize every reported error."""
     if _is_expected_ai_document_limit(event):
         return None

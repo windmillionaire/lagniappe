@@ -1,0 +1,117 @@
+import type { ChainedCommands } from "@tiptap/core";
+import { STYLES } from "../../../generated/styles.mjs";
+import { setIcon } from "../../../shared/icons.ts";
+
+import type { ToolArgument, ToolSettings } from "../config.ts";
+import type { Toolbar } from "../toolbar.ts";
+
+// ToolSettings pairs each argument with the command that accepts it.
+export const runToolCommand = (
+	chain: ChainedCommands,
+	command: ToolSettings["command"],
+	args: ToolArgument,
+	passUndefined = false,
+) => {
+	const invoke = chain[command as keyof ChainedCommands] as (
+		args?: ToolArgument,
+	) => ChainedCommands;
+	const result =
+		passUndefined || args !== undefined
+			? invoke.call(chain, args)
+			: invoke.call(chain);
+	return result.run();
+};
+
+class ToolbarButton {
+	declare button: HTMLButtonElement;
+	declare toolbar: Toolbar;
+	declare active: boolean;
+	declare command: ToolSettings["command"];
+	declare args: ToolArgument;
+	declare title: string;
+	declare icon: string;
+	declare name?: string;
+
+	constructor(toolbar: Toolbar) {
+		this.toolbar = toolbar;
+		this.active = false;
+		this.button = document.createElement("button");
+	}
+
+	_isInlineMarkToggle() {
+		return [
+			"bold",
+			"italic",
+			"underline",
+			"strike",
+			"superscript",
+			"subscript",
+		].includes(this.name || "");
+	}
+
+	_addButtonIcon(icon: string) {
+		const iconElement = document.createElement("span");
+		setIcon(iconElement, icon);
+		this.button.replaceChildren(iconElement);
+	}
+
+	init(settings: ToolSettings) {
+		Object.assign(this, settings);
+		this.button.title = this.title;
+		this.button.type = "button";
+		this.button.dataset.active = "false";
+		if (this.name) {
+			this.button.className = `${STYLES.editor.toolbar.tool} data-[active=true]:bg-slate-300`;
+		} else {
+			this.button.className = `${STYLES.editor.toolbar.tool}`;
+		}
+		this._addButtonIcon(this.icon);
+		this.button.addEventListener("click", () => this.onClick());
+	}
+
+	onClick() {
+		const editor = this.toolbar.editor;
+		const chain = editor.chain().focus();
+		const shouldCollapseEmptySelection =
+			editor.isEmpty && this._isInlineMarkToggle();
+		if (shouldCollapseEmptySelection) chain.setTextSelection(1);
+		runToolCommand(chain, this.command, this.args, true);
+		this.active ? this.disable() : this.enable();
+	}
+
+	enable() {
+		if (!this.name) return;
+		this.active = true;
+		this.button.dataset.active = "true";
+	}
+
+	disable() {
+		if (!this.name) return;
+		this.active = false;
+		this.button.dataset.active = "false";
+	}
+}
+
+class ToggleFocusButton extends ToolbarButton {
+	onClick() {
+		this.active = !this.active;
+		const editorContainer = this.button.closest<HTMLElement>("[data-widget]");
+		if (!editorContainer) return;
+		if (this.active) {
+			editorContainer.dataset.fullscreen = "true";
+			this._addButtonIcon("minimize");
+		} else {
+			editorContainer.dataset.fullscreen = "false";
+			this._addButtonIcon("maximize");
+		}
+	}
+}
+
+export {
+	ToggleFocusButton as toggleFocus,
+	ToolbarButton,
+	ToolbarButton as toggleBold,
+	ToolbarButton as toggleItalic,
+	ToolbarButton as undo,
+	ToolbarButton as redo,
+};

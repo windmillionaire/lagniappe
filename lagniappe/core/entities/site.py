@@ -1,4 +1,11 @@
+from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING, Never, Self, cast
+
 from google.cloud import datastore
+from google.cloud.datastore import Key
+
+if TYPE_CHECKING:
+    from .entity import Entity
 
 from ..exceptions import PropertyError
 from lagniappe.core.tools.database import get as database_get
@@ -6,10 +13,6 @@ from lagniappe.core.tools.database import utility as database_utility
 from ..tools.database import site as site_database
 
 
-# @testable true
-# @tests tests_unit/test_002_entity_general_properties.py::test_site_lazy_properties_database_key_and_error_context
-# @tests tests_unit/test_002_entity_general_properties.py::test_site_missing_key_raises_runtime_error
-# @matrix site : db-key error-wrapping lazy-properties validation
 class Site:
     """Base class for non-Entity site-level objects (Home, Index).
 
@@ -18,22 +21,27 @@ class Site:
     and lazy property instantiation.
     """
 
-    _site_id = None
-    _key = None
-    _kind = None
-    _entity = None
+    _site_id: str | None = None
+    _key: Key | None = None
+    _kind: str | None = None
+    _urlsafe_key: str
+    _entity: Entity | Self | None = None
+    if TYPE_CHECKING:
+        def _get_properties(self) -> Mapping[str, Callable[..., object]]: ...
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, entity: Entity | None = None, **kwargs: object) -> None:
         identifier = args[0] if args and args[0] else None
-        self._db = identifier if isinstance(identifier, datastore.Entity) else {}
-        self._instances = {}
+        self._db: datastore.Entity | dict[Never, Never] = (
+            identifier if isinstance(identifier, datastore.Entity) else {}
+        )
+        self._instances: dict[str, object] = {}
         self._properties = self._get_properties()
-        self._entity = kwargs.get("entity") or self
+        self._entity = entity or self
 
         if isinstance(identifier, str):
             self._site_id = identifier
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> object:
         if name in self._instances:
             return self._instances[name]
         elif name in self._properties:
@@ -52,17 +60,17 @@ class Site:
             raise AttributeError(f"Property {name} not found")
 
     @property
-    def entity(self):
-        return getattr(self, "_entity", None)
+    def entity(self) -> Entity | Self | None:
+        return self._entity
 
     @property
-    def kind(self):
+    def kind(self) -> str | None:
         return self._kind
 
     @property
-    def key(self):
+    def key(self) -> Key | None:
         if self._db and not self._key:
-            self._key = self._db.key
+            self._key = cast(datastore.Entity, self._db).key
         elif self._site_id:
             self._key = site_database.key(self._site_id)
         else:
@@ -71,27 +79,27 @@ class Site:
         return self._key
 
     @property
-    def urlsafe_key(self):
-        if not self.key:
+    def urlsafe_key(self) -> str:
+        if not (key := self.key):
             raise RuntimeError("no key assigned")
 
         if getattr(self, "_urlsafe_key", None):
             return self._urlsafe_key
 
-        self._urlsafe_key = database_get.urlsafe_key(self.key)
+        self._urlsafe_key = database_get.urlsafe_key(key)
         return self._urlsafe_key
 
     @property
-    def db(self):
+    def db(self) -> datastore.Entity:
         if self._db:
-            return self._db
+            return cast(datastore.Entity, self._db)
 
-        if not self.key:
+        if not (key := self.key):
             raise RuntimeError("no key assigned")
 
-        self._db = site_database.get_or_create(self.key)
+        self._db = site_database.get_or_create(key)
 
         return self._db
 
-    def save(self):
+    def save(self) -> None:
         database_utility.save(self)

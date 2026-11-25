@@ -1,6 +1,11 @@
 """Execute authoritative mutation effects in durable-first order."""
-
 import json
+from collections.abc import Iterable, Mapping
+from contextlib import suppress
+from typing import TYPE_CHECKING, NotRequired, Protocol, TypedDict, cast
+
+from lagniappe.core.tools.database import utility as database_utility
+from lagniappe.core.tools.database.assets import cleanup_rejected_attempt
 from lagniappe.core.tools.measurements import timed
 
 from ..definitions import (
@@ -11,51 +16,69 @@ from ..definitions import (
 )
 from ..exceptions import MutationConflict, capture
 from ..tools import cache
-from lagniappe.core.tools.database import utility as database_utility
-from lagniappe.core.tools.database.assets import cleanup_rejected_attempt
 from ..tools.notifications import service as notification_service
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+
+    from ..definitions import MutationEffect
+    from ..entities.entity import Entity
+    from ..entities.types import Notification, Task
+
+    class PreparedWrite(MutationEffect):
+        """A durable write after the executor has verified its target."""
+        entity: Entity
 
 
 WRITE_EFFECTS = {MutationEffectType.UPSERT, MutationEffectType.UNLINK}
 
 
-# @testable true
-# @tests tests_unit/test_002_entity_general_properties.py::test_save_entities_updates_hash_before_requires
-# @tests tests_unit/test_002_entity_general_properties.py::test_save_entities_updates_and_persists_user_before_owned_page
-# @tests tests_unit/test_002_entity_general_properties.py::test_save_preparation_discards_retired_entity_fields
-# @matrix requires : hash-before-requires persisted-requires
-# @matrix entity mutations : retired-field save-time-cleanup
-# @pairs entities:save-order users:user-before-page
-def _prepare_write(effect):
-    entity = effect.entity
+class _ProjectionChanges(TypedDict):
+    upserts: list[Notification]
+    deletes: list[Notification]
+    aggregates: NotRequired[Mapping[str, Mapping[str, object]]]
+
+
+class _Updatable(Protocol):
+    def update(self) -> object: ...
+
+
+class _IndexedRow(Protocol):
+    exclude_from_indexes: Iterable[str]
+
+
+class _WriteOptions(TypedDict, total=False):
+    guards: list[tuple[Key, Mapping[str, object] | None]]
+    deletes: list[Entity]
+
+
+def _subject(effect: MutationEffect) -> Entity:
+    """Read the required entity from a durable or entity-scoped cache effect."""
+    if effect.entity is None:
+        raise ValueError(f"{effect.effect.value} effect requires an entity")
+    return effect.entity
+
+
+def _prepare_write(effect: MutationEffect) -> None:
+    entity = _subject(effect)
     if effect.property_mask is None:
         for name in getattr(entity, "retired_fields", ()):
             entity.db.pop(name, None)
 
     for name in effect.property_updates:
         if name in entity.properties:
-            entity.properties[name].update()
+            cast(_Updatable, entity.properties[name]).update()
 
     if effect.serialize_processes:
         processes = {key: value for key, value in entity.processes.items() if value}
         for key, updates in processes.items():
             entity.db[key] = json.dumps(updates)
 
-    try:
-        entity.db.exclude_from_indexes = entity.exclude_from_index
-    except AttributeError:
-        pass
+    with suppress(AttributeError):
+        cast(_IndexedRow, entity.db).exclude_from_indexes = entity.exclude_from_index
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_permission_source_marker_is_consumed_only_after_durable_success
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_cold_source_details_preserve_programmatic_restriction_changes
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_form_creation_and_content_edits_do_not_queue_reconciliation
-# @matrix permissions : invalidation-retry
-# @matrix permissions cache : cache-miss source-intent programmatic-save
-# @matrix permissions cache : new-form content-only no-queue
-# @matrix mutations : repeated-save property-mask guards
-def consume_mutation_intents(plan):
+def consume_mutation_intents(plan: MutationPlan) -> None:
     for owner, captured in plan.consumed_intents:
         current = list(getattr(owner, "mutation_intents", ()))
         captured_ids = {id(intent) for intent in captured}
@@ -63,36 +86,36 @@ def consume_mutation_intents(plan):
             intent for intent in current if id(intent) not in captured_ids
         ]
     for effect in plan.effects:
-        if effect.effect is MutationEffectType.UPSERT:
-            effect.entity._form_additional_guards = []
-        if effect.effect is MutationEffectType.UPSERT and effect.property_mask is None:
+        if effect.effect is not MutationEffectType.UPSERT:
+            continue
+        entity = _subject(effect)
+        entity._form_additional_guards = []
+        if effect.property_mask is None:
             # Form publication distinguishes restriction changes from content
             # changes; both invalidate submissions, but only restrictions queue work.
-            if effect.entity.kind != "form" and getattr(effect.entity, "_permission_sources_changed", False):
-                effect.entity._reconcile_restrictions = True
-            effect.entity._permission_sources_changed = False
-            if effect.entity.kind == "task":
-                effect.entity._page_changed = False
-            if effect.entity.kind in {"task", "task_history"}:
-                effect.entity._completion_transition = None
-                effect.entity._completion_write_guards = []
-            if effect.entity.kind == "form":
-                effect.entity._pending_html = {}
-                effect.entity._form_save_guard = None
-                effect.entity._form_additional_guards = []
-                effect.entity._form_attempt_assets = []
-            if effect.entity.kind in {"form_history", "task_history"}:
-                effect.entity._form_attempt_assets = []
+            if entity.kind != "form" and getattr(entity, "_permission_sources_changed", False):
+                entity._reconcile_restrictions = True
+            entity._permission_sources_changed = False
+            if entity.kind == "task":
+                entity._page_changed = False
+            if entity.kind in {"task", "task_history"}:
+                entity._completion_transition = None
+                entity._completion_write_guards = []
+            if entity.kind == "form":
+                entity._pending_html = {}
+                entity._form_save_guard = None
+                entity._form_additional_guards = []
+                entity._form_attempt_assets = []
+            if entity.kind in {"form_history", "task_history"}:
+                entity._form_attempt_assets = []
 
 
-# @testable infrastructure
-def _completed(outcome, effect_type):
+def _completed(outcome: MutationOutcome, effect_type: MutationEffectType) -> None:
     if effect_type not in outcome.completed_effects:
         outcome.completed_effects.append(effect_type)
 
 
-# @testable infrastructure
-def prepare_durable_writes(plan):
+def prepare_durable_writes(plan: MutationPlan) -> list[PreparedWrite]:
     writes = [
         effect
         for effect in plan.effects
@@ -100,23 +123,18 @@ def prepare_durable_writes(plan):
     ]
     for effect in writes:
         _prepare_write(effect)
-    return writes
+    # _prepare_write checked that every write has a concrete subject.
+    return cast("list[PreparedWrite]", writes)
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_public_discovery_invalidation_runs_after_durable_write
-# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_note_delete_completes_with_root_only_owners
-# @matrix mutations : durable-first
-# @matrix mutations : full-root masked-touch cache
-# @matrix mutations notes : delete photo-cleanup post-commit
-# @matrix public-pages public-directory sitemap : invalidation
-def execute_post_commit(plan):
+def execute_post_commit(
+    plan: MutationPlan,
+) -> tuple[list[MutationEffectType], list[str]]:
     """Execute declared post-commit effects and return types plus errors."""
     completed = []
     errors = []
 
-    # @testable infrastructure
-    def complete(effect_type):
+    def complete(effect_type: MutationEffectType) -> None:
         if effect_type not in completed:
             completed.append(effect_type)
 
@@ -124,7 +142,7 @@ def execute_post_commit(plan):
         effect for effect in plan.effects if effect.phase is MutationPhase.POST_COMMIT
     ]
     refresh = [
-        effect.entity
+        _subject(effect)
         for effect in post_commit
         if effect.effect is MutationEffectType.CACHE_REFRESH
     ]
@@ -138,9 +156,9 @@ def execute_post_commit(plan):
 
     refreshed = {entity.key for entity in refresh}
     invalidated = [
-        effect.entity for effect in post_commit
+        _subject(effect) for effect in post_commit
         if effect.effect is MutationEffectType.CACHE_INVALIDATE
-        and effect.entity.key not in refreshed
+        and _subject(effect).key not in refreshed
     ]
     if invalidated:
         cache.invalidate_revisions(*invalidated)
@@ -148,7 +166,7 @@ def execute_post_commit(plan):
         complete(MutationEffectType.CACHE_INVALIDATE)
 
     deleted = [
-        effect.entity
+        _subject(effect)
         for effect in post_commit
         if effect.effect is MutationEffectType.CACHE_DELETE
     ]
@@ -158,19 +176,19 @@ def execute_post_commit(plan):
 
     for effect in post_commit:
         if effect.effect is MutationEffectType.CACHE_STATE_DELETE:
-            cache.clear_document(effect.cache_key)
+            cache.clear_document(cast(str, effect.cache_key))
             complete(MutationEffectType.CACHE_STATE_DELETE)
         elif effect.effect is MutationEffectType.CACHE_SEARCH_DELETE:
-            cache.delete_entity_from_search(effect.cache_kind, effect.entity)
+            cache.delete_entity_from_search(cast(str, effect.cache_kind), _subject(effect))
             complete(MutationEffectType.CACHE_SEARCH_DELETE)
 
     notification_upserts = [
-        effect.entity
+        cast("Notification", _subject(effect))
         for effect in post_commit
         if effect.effect is MutationEffectType.NOTIFICATION_UPSERT
     ]
     notification_deletes = [
-        effect.entity
+        cast("Notification", _subject(effect))
         for effect in post_commit
         if effect.effect is MutationEffectType.NOTIFICATION_DELETE
     ]
@@ -179,7 +197,7 @@ def execute_post_commit(plan):
             upserts=notification_upserts,
             deletes=notification_deletes,
         )
-        projection_changes = {
+        projection_changes: _ProjectionChanges = {
             "upserts": notification_upserts,
             "deletes": notification_deletes,
         }
@@ -205,12 +223,12 @@ def execute_post_commit(plan):
             complete(MutationEffectType.NOTIFICATION_DELETE)
 
     operation_upserts = [
-        effect.entity
+        _subject(effect)
         for effect in post_commit
         if effect.effect is MutationEffectType.OPERATION_UPSERT
     ]
     operation_deletes = [
-        effect.entity
+        _subject(effect)
         for effect in post_commit
         if effect.effect is MutationEffectType.OPERATION_DELETE
     ]
@@ -232,12 +250,12 @@ def execute_post_commit(plan):
                 [
                     effect.path
                     for effect in blob_effects
-                    if effect.visibility == "private"
+                    if effect.path is not None and effect.visibility == "private"
                 ],
                 [
                     effect.path
                     for effect in blob_effects
-                    if effect.visibility == "public"
+                    if effect.path is not None and effect.visibility == "public"
                 ],
             )
             or []
@@ -245,7 +263,7 @@ def execute_post_commit(plan):
         complete(MutationEffectType.BLOB_DELETE)
 
     scheduled_uncomplete = [
-        effect.entity
+        cast("Task", _subject(effect))
         for effect in post_commit
         if effect.effect is MutationEffectType.SCHEDULED_UNCOMPLETE_DISPATCH
     ]
@@ -265,12 +283,12 @@ def execute_post_commit(plan):
     return completed, errors
 
 
-# @testable true
-# @tests tests_unit/test_022_mutation_contracts.py::test_save_executes_datastore_before_cache_and_reports_cache_failure
-# @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
-# @matrix mutations : cache-failure durable-first mutation-plan post-commit-outcome save typed-intent-preservation
 @timed("entity", "mutation")
-def execute_mutation(plan, *, guards=None):
+def execute_mutation(
+    plan: MutationPlan,
+    *,
+    guards: Iterable[tuple[Key, Mapping[str, object] | None]] | None = None,
+) -> MutationOutcome:
     """Execute durable effects before rebuildable cache and blob effects."""
     if not isinstance(plan, MutationPlan):
         raise TypeError("execute_mutation requires a MutationPlan")
@@ -295,18 +313,18 @@ def execute_mutation(plan, *, guards=None):
                 mutation_guards.append(guard)
             for attribute in ("_completion_write_guards", "_form_additional_guards"):
                 mutation_guards.extend(getattr(effect.entity, attribute, None) or [])
-        options = {"guards": mutation_guards} if mutation_guards else {}
-        form_deletes = deletes if mutation_guards else [effect for effect in deletes if effect.entity.entity_kind == "form"]
+        options: _WriteOptions = {"guards": mutation_guards} if mutation_guards else {}
+        form_deletes = deletes if mutation_guards else [effect for effect in deletes if _subject(effect).entity_kind == "form"]
         if form_deletes:
             # A Form's last generation and its deletion must commit together.
-            options["deletes"] = [effect.entity for effect in form_deletes]
+            options["deletes"] = [_subject(effect) for effect in form_deletes]
         try:
             database_utility.save_mutations(
-                ((effect.entity, effect.property_mask) for effect in writes), **options
+                ((_subject(effect), effect.property_mask) for effect in writes), **options
             )
         except MutationConflict:
             for effect in writes:
-                cleanup_rejected_attempt(effect.entity)
+                cleanup_rejected_attempt(_subject(effect))
             raise
         for effect in writes:
             _completed(outcome, effect.effect)
@@ -315,7 +333,7 @@ def execute_mutation(plan, *, guards=None):
             deletes = [effect for effect in deletes if effect not in form_deletes]
 
     if deletes:
-        database_utility.delete_entities(effect.entity for effect in deletes)
+        database_utility.delete_entities(_subject(effect) for effect in deletes)
         _completed(outcome, MutationEffectType.DELETE)
 
     consume_mutation_intents(plan)

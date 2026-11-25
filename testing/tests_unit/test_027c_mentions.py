@@ -15,7 +15,6 @@ from testing.utility.messaging_fakes import MemoryDatastore, managed_user
 pytestmark = pytest.mark.unit
 
 
-# @matrix mentions : document-view idempotency payload-validation permission public-sanitization saved-occurrence
 def test_mentions_validate_saved_occurrences_dedupe_and_sanitize(monkeypatch):
     occurrence = {
         "occurrence_id": "mention_1234",
@@ -94,8 +93,6 @@ def test_mentions_validate_saved_occurrences_dedupe_and_sanitize(monkeypatch):
     assert email_deliveries == []
 
 
-# @matrix mentions : delivery-ledger idempotency
-# @pair notifications:aggregate-count
 def test_mention_delivery_ledger_survives_notification_replay(monkeypatch):
     store = MemoryDatastore()
     monkeypatch.setattr(mention_database.DATA, "_datastore_client", store)

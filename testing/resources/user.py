@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from urllib.parse import urlencode
 
 
@@ -92,7 +92,7 @@ class User(SiteResource):
             entity.ai_access = self.definition.ai_access.name
 
         if self.definition.email == SETTINGS.test_config["ADMIN_EMAIL"]:
-            entity.last_login = datetime.now(timezone.utc)
+            entity.last_login = datetime.now(UTC)
 
         entity.save()
 

@@ -27,13 +27,10 @@ if len({item.action_type for item in REGISTERED_ACTION_DISPLAYS}) != len(REGISTE
     raise RuntimeError("Duplicate AI-report proposal display action registration")
 
 
-# @testable true
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_display_registry_covers_action_contracts
-# @matrix ai-report : action-contracts display-registry
-def proposal_action_display(action_type):
+def proposal_action_display(action_type: str | None) -> ProposalActionDisplay:
     """Return registered behavior or a conservative unknown-action fallback."""
 
     return ACTION_DISPLAY_REGISTRY.get(
-        action_type,
+        action_type or "",
         ProposalActionDisplay(action_type or "", ""),
     )

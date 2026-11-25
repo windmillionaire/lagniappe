@@ -1,7 +1,16 @@
 """Validated task-schedule contracts shared by AI report planning and execution."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities import types as models
+
+
 from datetime import date
 
+from lagniappe.core.properties.task_scheduling import ScheduleType
 from lagniappe.core import exceptions
 
 
@@ -13,10 +22,7 @@ SCHEDULE_PATTERN_TYPES = frozenset(
 )
 
 
-# @testable true
-# @tests tests_unit/test_032f_task_due_date_action.py::test_due_date_contract_validates_calendar_dates
-# @matrix ai-report task-scheduling : due-date validation
-def validate_task_due_date(value):
+def validate_task_due_date(value: object) -> str | None:
     """Accept an explicit calendar date or an explicit request to clear it."""
     if value is None:
         return None
@@ -29,10 +35,7 @@ def validate_task_due_date(value):
     raise exceptions.AIException("due_date must be a valid YYYY-MM-DD date or null to clear it.")
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_report_task_schedule_contract_validates_supported_patterns
-# @matrix ai-report task-scheduling : periodic recurring scheduled structured-output validation
-def task_schedule_response_schema():
+def task_schedule_response_schema() -> dict[str, object]:
     """Return the provider schema for one reviewed task schedule."""
     return {
         "type": "object",
@@ -78,9 +81,6 @@ def task_schedule_response_schema():
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/schedules.py::validate_task_schedule
-# @reason numeric validation is exercised through the public schedule contract
 def _positive_integer(value, label):
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise exceptions.AIException(
@@ -89,9 +89,6 @@ def _positive_integer(value, label):
     return value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/schedules.py::validate_task_schedule
-# @reason bounded numeric validation is exercised through the public schedule contract
 def _bounded_integer(value, label, minimum, maximum, *, allowed=None):
     if isinstance(value, bool) or not isinstance(value, int):
         raise exceptions.AIException(f"Task schedule {label} must be an integer.")
@@ -102,9 +99,6 @@ def _bounded_integer(value, label, minimum, maximum, *, allowed=None):
     return value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/schedules.py::validate_task_schedule
-# @reason text normalization is exercised through the public schedule contract
 def _optional_text(schedule, key):
     value = schedule.get(key)
     if value is None:
@@ -114,10 +108,7 @@ def _optional_text(schedule, key):
     return value.strip()
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_report_task_schedule_contract_validates_supported_patterns
-# @matrix ai-report task-scheduling : normalization periodic recurring scheduled validation
-def validate_task_schedule(schedule):
+def validate_task_schedule(schedule: object) -> dict[str, str | int | list[int]]:
     """Validate and normalize a report ``create_task.data.schedule`` object."""
     if not isinstance(schedule, dict):
         raise exceptions.AIException("Task schedule must be an object.")
@@ -195,16 +186,16 @@ def validate_task_schedule(schedule):
     return normalized
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_creates_task_with_reviewed_schedule
-# @matrix ai-report task-scheduling : persistence recurring
-def apply_task_schedule(task, schedule):
+def apply_task_schedule(task: models.Task, schedule: object) -> dict[str, object]:
     """Apply an already validated schedule without making another model call."""
     normalized = validate_task_schedule(schedule)
     kind = normalized.pop("kind")
     if "pattern_type" in normalized:
         normalized["type"] = normalized.pop("pattern_type")
+    assert isinstance(kind, str)
     process = task.properties[kind]
+    if not isinstance(process, ScheduleType):
+        raise exceptions.AIException("Task schedule kind is invalid.")
     for key, value in normalized.items():
         setattr(process, key, value)
     process.complete = True

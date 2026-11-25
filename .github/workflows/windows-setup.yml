@@ -1,0 +1,51 @@
+name: Windows setup
+
+on:
+  push:
+    branches: ["next/**", "hotfix/**"]
+    paths: &launcher_paths
+      - setup.cmd
+      - installer/**
+      - runner/context.py
+      - .github/workflows/windows-setup.yml
+  pull_request:
+    paths: *launcher_paths
+
+permissions:
+  contents: read
+
+jobs:
+  launcher:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prepare an unsupported environment for the rejection test
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - shell: pwsh
+        run: |
+          python -m venv venv
+          if ($LASTEXITCODE -ne 0) { throw "Could not prepare the fixture" }
+          Set-Content venv/fixture.txt preserved
+          $output = .\setup.cmd --help
+          if ($LASTEXITCODE -ne 1 -or "$output" -notmatch 'venv must use Python 3\.14') {
+            throw "Setup did not reject the unsupported environment"
+          }
+          if ((Get-Content venv/fixture.txt) -ne 'preserved') { throw "Setup replaced the fixture" }
+          Move-Item venv "$env:RUNNER_TEMP\old-lagniappe-venv"
+          # The expected setup failure remains the last native command's exit code.
+          exit 0
+      - name: Select the supported runtime
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Launch setup from a fresh checkout environment
+        shell: cmd
+        run: |
+          call setup.cmd --help || exit /b 1
+          venv\Scripts\python -c "import sys; assert sys.version_info[:2] == (3, 14) and sys.prefix != sys.base_prefix"

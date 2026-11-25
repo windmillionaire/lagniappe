@@ -1,6 +1,6 @@
 """Notification-email digest query, grouping, and delivery contracts."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 
 from google.cloud.datastore import Entity as DatastoreEntity
@@ -26,7 +26,6 @@ from testing.utility.test_entities import TestEntities
 pytestmark = pytest.mark.unit
 
 
-# @matrix notification-email : digest-query recipient-scope
 def test_daily_digest_query_retains_recipient_and_bucket_scope(monkeypatch):
     captured = {}
 
@@ -74,9 +73,8 @@ def test_daily_digest_query_retains_recipient_and_bucket_scope(monkeypatch):
     }
 
 
-# @matrix notification-email : digest message-grouping target-link target-title
 def test_daily_digest_groups_messages_and_uses_named_completion_links(monkeypatch):
-    now = datetime(2026, 8, 15, 14, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 15, 14, tzinfo=UTC)
     store = MemoryDatastore()
     monkeypatch.setattr(email_database.DATA, "_datastore_client", store)
     tasks = task_recorder(monkeypatch)
@@ -256,9 +254,8 @@ def test_daily_digest_groups_messages_and_uses_named_completion_links(monkeypatc
     assert report_url in html_body
 
 
-# @matrix notification-email : digest full-roundup future-only-switch item-cap opt-out-suppression timezone
 def test_daily_digest_uses_next_local_eight_and_batches(monkeypatch):
-    now = datetime(2026, 8, 15, 14, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 15, 14, tzinfo=UTC)
     store = MemoryDatastore()
     monkeypatch.setattr(email_database.DATA, "_datastore_client", store)
     tasks = task_recorder(monkeypatch)
@@ -290,7 +287,7 @@ def test_daily_digest_uses_next_local_eight_and_batches(monkeypatch):
     )
 
     assert first["bucket"] == second["bucket"]
-    assert first["due_at"] == datetime(2026, 8, 15, 15, tzinfo=timezone.utc)
+    assert first["due_at"] == datetime(2026, 8, 15, 15, tzinfo=UTC)
     batch_key = Key.from_legacy_urlsafe(tasks[0]["payload"]["delivery_key"])
     batch = store.get(batch_key)
     digest_rows = [store.get(first.key), store.get(second.key)]

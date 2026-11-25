@@ -1,28 +1,45 @@
 """Cached entity detail retrieval and parent hydration."""
 
+from collections.abc import Iterable
+from typing import Any, TypedDict, cast
+
 import json
 
 from .core import cache
 from .keys import Keys
+
+class CachedDetail(TypedDict, total=False):
+    id: str
+    kind: str
+    name: str
+    hash: str
+    fingerprint: str
+    parent_key: str
+    form_hash: str | None
+    parent: CachedDetail
+    requires: list[str]
+    restricted_to: dict[str, list[str]]
+    form_version: str
+    modified: str
+    revision_stale: bool
+
+
+# Entity-specific fields and Redis snippets extend the shared search projection.
+type SearchRecord = dict[str, Any]
+
 
 DETAIL_HASH_DISALLOWED = frozenset(
     {"users", "models", "forms", "categories", "projects", "tasks"}
 )
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_user_page_cache_identity_preserves_permission_projection
-# @matrix permissions cache : identity user-page form-version no-extra-read
-def identify_entity(details):
+def identify_entity(details: CachedDetail) -> tuple[str | None, str | None]:
     """Identify the stored entity represented by a cached display projection."""
     kind = details.get("kind")
     return details.get("id"), "page" if kind == "user" else kind
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_get_details_by_hash_hydrates_parent_and_hides_internal_keys
-# @matrix cache : details-hydration missing-parent parent-key string-input
-def get_details_by_hash(hashes):
+def get_details_by_hash(hashes: Iterable[str | None] | None) -> dict[str, CachedDetail]:
     """Return cached entity details by hash, hydrating parent pointers."""
     requested_hashes = _detail_hashes(hashes)
     if not requested_hashes:
@@ -41,9 +58,6 @@ def get_details_by_hash(hashes):
     return _hydrate_details(details, requested_hashes)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/details.py::get_details_by_hash
-# @reason hash normalization is owned by cached detail lookup
 def _detail_hashes(hashes):
     """Return a stable list of real entity hashes from hash input."""
     if hashes is None:
@@ -58,31 +72,23 @@ def _detail_hashes(hashes):
     ]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/details.py::get_details_by_hash
-# @reason raw Redis reads are normalized and hydrated by cached detail lookup
-def _load_cached_details(hashes):
+def _load_cached_details(hashes: Iterable[str]) -> dict[str, CachedDetail]:
     if not hashes:
         return {}
 
     names = cache.hmget(Keys.ENTITY_HASHES.value, hashes)
     return {
-        h: _redis_detail(json.loads(names[i]))
+        h: _redis_detail(json.loads(raw))
         for i, h in enumerate(hashes)
-        if names[i]
+        if (raw := names[i])
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/details.py::get_details_by_hash
-# @reason Redis detail storage is parent-free after cache rebuilds
-def _redis_detail(details):
-    return dict(details)
+def _redis_detail(details) -> CachedDetail:
+    # Redis stores the serialized entity detail projection plus optional kind-specific fields.
+    return cast(CachedDetail, dict(details))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/cache/details.py::get_details_by_hash
-# @reason parent hydration is owned by cached detail lookup
 def _hydrate_details(details, requested_hashes):
     hydrated = {}
     for h in requested_hashes:
@@ -107,11 +113,7 @@ def _hydrate_details(details, requested_hashes):
     return hydrated
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_search_results_are_hydrated_from_details_hashes
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_search_result_parent_details_refresh_after_category_rename
-# @matrix cache search : details-hydration parent-key parent-refresh snippets
-def hydrate_search_results(results):
+def hydrate_search_results(results: list[SearchRecord]) -> list[SearchRecord]:
     """Attach hydrated details to formatted search results."""
     detail_hashes = []
 

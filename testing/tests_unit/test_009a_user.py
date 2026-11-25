@@ -1,7 +1,7 @@
 """Unit tests for User entity properties."""
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
@@ -24,7 +24,6 @@ from lagniappe.core.properties.user_related import Starred
 from testing.utility.test_entities import TestEntities
 
 
-# @matrix user : column email sort
 @pytest.mark.unit
 def test_user_email(get_test_entities):
     """Test Email property with ColumnMixin.
@@ -47,11 +46,10 @@ def test_user_email(get_test_entities):
         assert user.column("email").column_value == test_value
 
         # sort_value is True if email exists, False otherwise
-        expected_sort = True if test_value else False
+        expected_sort = bool(test_value)
         assert user.properties.email.sort_value == expected_sort
 
 
-# @matrix user : column date last-login
 @pytest.mark.unit
 def test_user_last_login(get_test_entities):
     """Test LastLogin property with DateMixin, ColumnMixin.
@@ -66,7 +64,7 @@ def test_user_last_login(get_test_entities):
 
         with patch("lagniappe.core.tools.dates.user_timezone", return_value=test_tz):
             # Set a datetime in UTC
-            utc_dt = datetime(2024, 6, 15, 19, 30, 0, tzinfo=timezone.utc)
+            utc_dt = datetime(2024, 6, 15, 19, 30, 0, tzinfo=UTC)
             user.last_login = utc_dt
 
             # property value - stored in UTC
@@ -79,7 +77,6 @@ def test_user_last_login(get_test_entities):
             assert user.db["last_login"].isoformat() == "2024-06-15T19:30:00+00:00"
 
 
-# @matrix cache user : invalidation test-user
 @pytest.mark.unit
 def test_user_invalidate_cache(get_test_entities):
     """Test InvalidateCache property.
@@ -105,7 +102,6 @@ def test_user_invalidate_cache(get_test_entities):
         assert user.invalidate_cache is False
 
 
-# @pair user:public
 @pytest.mark.unit
 def test_user_is_public(get_test_entities):
     """Test IsPublic property with FilterMixin.
@@ -130,7 +126,6 @@ def test_user_is_public(get_test_entities):
             user.is_public = "yes"
 
 
-# @matrix user : owner property
 @pytest.mark.unit
 def test_user_is_owner(get_test_entities):
     """Test IsOwner property.
@@ -152,8 +147,6 @@ def test_user_is_owner(get_test_entities):
         assert user.properties.is_owner.value is False
 
 
-# @matrix admin : ai-independent legacy-default role
-# @pairs cache:cache-invalidation owner:singleton user:property
 @pytest.mark.unit
 def test_user_admin_role_is_separate_from_owner_and_invalidates_cache():
     """An additional Admin never becomes Owner and keeps independent AI access."""
@@ -203,12 +196,10 @@ def test_user_admin_role_is_separate_from_owner_and_invalidates_cache():
     with patch(
         "lagniappe.core.entities.user.CONFIG",
         SimpleNamespace(ADMIN_EMAIL="owner@example.test"),
-    ):
-        with pytest.raises(ValueError, match="configured primary Owner"):
-            other.is_owner = True
+    ), pytest.raises(ValueError, match="configured primary Owner"):
+        other.is_owner = True
 
 
-# @matrix user : asset-lifecycle default-image google-download profile-photo
 @pytest.mark.unit
 def test_user_profile_photo_value_asset_lifecycle_and_google_download():
     """ProfilePhoto handles fallback image, asset save/delete, and Google import."""
@@ -258,7 +249,6 @@ def test_user_profile_photo_value_asset_lifecycle_and_google_download():
     assert (name, asset_type) == ("photo", "image")
 
 
-# @matrix user-groups : membership-change permission-recalc relation-storage
 @pytest.mark.unit
 def test_user_groups_membership_changes_recalculate_permissions():
     """User group changes persist keys and recalculate permissions once per change."""
@@ -290,7 +280,6 @@ def test_user_groups_membership_changes_recalculate_permissions():
     assert create_permissions.call_count == 2
 
 
-# @matrix user-groups : relation-storage validation
 @pytest.mark.unit
 def test_user_groups_reject_invalid_relation_inputs():
     user = User(testing=True)
@@ -316,7 +305,6 @@ def test_user_groups_reject_invalid_relation_inputs():
     user.properties.permissions.create.assert_not_called()
 
 
-# @matrix user-groups : public-group-only public-user sync
 @pytest.mark.unit
 def test_public_user_groups_force_public_group_only():
     user = User(testing=True)
@@ -355,7 +343,6 @@ def test_public_user_groups_force_public_group_only():
         assert user.db["groups"] == [public_group.key]
 
 
-# @matrix permissions public-users : no-group-mutation own-page public-group-defaults
 @pytest.mark.unit
 def test_public_user_permissions_inherit_public_group_defaults_without_mutating_group():
     page = TestEntities.get(
@@ -390,9 +377,6 @@ def test_public_user_permissions_inherit_public_group_defaults_without_mutating_
     assert page.hash not in public_group.db["permissions"]
 
 
-# @matrix notification-email : preference user-only
-# @matrix user-settings : ai-access email-edit owner-other-page owner-own-page page-preservation page-reassign
-# @pairs permissions:permission-recalc public-users:email-consent
 @pytest.mark.unit
 def test_page_update_user_authorization_rules():
     group = TestEntities.get("USER_GROUP", {"name": "Editors", "hash": "grp009u"})
@@ -612,7 +596,6 @@ def test_page_update_user_authorization_rules():
     assert public_user.page is public_page
 
 
-# @matrix user-settings : default-form email-canonical submission-preservation
 @pytest.mark.unit
 def test_user_page_default_form_submission_keeps_email_on_user():
     users_model = TestEntities.get(
@@ -666,7 +649,6 @@ def test_user_page_default_form_submission_keeps_email_on_user():
     assert submission["email"] == "form-only@example.test"
 
 
-# @matrix public-users user : auto-create lazy-load owner-link personal-page public-user
 @pytest.mark.unit
 def test_user_page_auto_create_lazy_load_and_owner_link():
     """UserPage auto-creates missing pages and links loaded pages back to the user."""
@@ -764,7 +746,6 @@ def test_user_page_auto_create_lazy_load_and_owner_link():
     assert loaded_page.user is loaded_user
 
 
-# @matrix user : personal-page validation
 @pytest.mark.unit
 def test_user_page_missing_key_raises_runtime_error():
     user = User(testing=True)
@@ -773,7 +754,6 @@ def test_user_page_missing_key_raises_runtime_error():
         _ = user.page
 
 
-# @pair starred:key-removal
 @pytest.mark.unit
 def test_user_starred_key_removal_preserves_order():
     user = SimpleNamespace(
@@ -786,32 +766,37 @@ def test_user_starred_key_removal_preserves_order():
     assert user.db["starred"] == ["keep-before", "keep-after"]
 
 
-# @matrix user : create entity-lifecycle groups load owner page page-canonical save search-cache
 @pytest.mark.unit
 def test_user_entity_create_save_load_owner_page_and_groups():
     """User create/save/load handles owner, page, groups, photo import, and reuse."""
-    with patch("lagniappe.core.entities.user.database_get.user") as get_user:
-        with pytest.raises(ValueError, match="name is required"):
-            User.create({"email": "missing-name@example.com"})
+    with (
+        patch("lagniappe.core.entities.user.database_get.user") as get_user,
+        pytest.raises(ValueError, match="name is required"),
+    ):
+        User.create({"email": "missing-name@example.com"})
     get_user.assert_not_called()
 
-    with patch("lagniappe.core.entities.user.database_get.user") as get_user:
-        with pytest.raises(ValueError, match="email is required"):
-            User.create({"name": "Missing Email"})
+    with (
+        patch("lagniappe.core.entities.user.database_get.user") as get_user,
+        pytest.raises(ValueError, match="email is required"),
+    ):
+        User.create({"name": "Missing Email"})
     get_user.assert_not_called()
 
     existing_key = Key("users", "existing", project="test")
     existing = Entity(existing_key)
     existing.update({"type": "user", "email": "exists@example.com", "page": "pg009c"})
 
-    with patch(
-        "lagniappe.core.entities.user.database_get.user",
-        return_value=existing,
+    with (
+        patch(
+            "lagniappe.core.entities.user.database_get.user",
+            return_value=existing,
+        ),
+        patch("lagniappe.core.entities.entity.database_utility.create_key") as create_key,
     ):
-        with patch("lagniappe.core.entities.entity.database_utility.create_key") as create_key:
-            reused = User.create(
-                {"name": "Existing User", "email": "exists@example.com"}
-            )
+        reused = User.create(
+            {"name": "Existing User", "email": "exists@example.com"}
+        )
 
     create_key.assert_not_called()
     assert isinstance(reused, User)
@@ -833,44 +818,46 @@ def test_user_entity_create_save_load_owner_page_and_groups():
     new_key = Key("users", "new", project="test")
     new_entity = Entity(new_key)
 
-    with patch(
-        "lagniappe.core.entities.user.CONFIG",
-        SimpleNamespace(ADMIN_EMAIL="admin@example.com"),
-    ):
-        with patch(
+    with (
+        patch(
+            "lagniappe.core.entities.user.CONFIG",
+            SimpleNamespace(ADMIN_EMAIL="admin@example.com"),
+        ),
+        patch(
             "lagniappe.core.entities.user.database_get.user",
             return_value=None,
-        ):
-            with patch(
-                "lagniappe.core.entities.entity.database_utility.create_key",
-                return_value=new_key,
-            ):
-                with patch(
-                    "lagniappe.core.entities.entity.database_get.entity",
-                    return_value=None,
-                ):
-                    with patch(
-                        "lagniappe.core.entities.entity.database_utility.create_entity",
-                        return_value=new_entity,
-                    ):
-                        with patch(
-                            "lagniappe.core.properties.user_permissions.UserPermissions.create"
-                        ) as create_permissions:
-                            with patch(
-                                "lagniappe.core.properties.user_related.Entities.USERS.get",
-                                return_value=users_model,
-                            ):
-                                created = User.create(
-                                    {
-                                        "name": "Admin User",
-                                        "email": "admin@example.com",
-                                        "page": page,
-                                        "picture": "https://example.test/photo.jpg",
-                                        "groups": [group],
-                                        "is_public": False,
-                                        "test_user": True,
-                                    }
-                                )
+        ),
+        patch(
+            "lagniappe.core.entities.entity.database_utility.create_key",
+            return_value=new_key,
+        ),
+        patch(
+            "lagniappe.core.entities.entity.database_get.entity",
+            return_value=None,
+        ),
+        patch(
+            "lagniappe.core.entities.entity.database_utility.create_entity",
+            return_value=new_entity,
+        ),
+        patch(
+            "lagniappe.core.properties.user_permissions.UserPermissions.create"
+        ) as create_permissions,
+        patch(
+            "lagniappe.core.properties.user_related.Entities.USERS.get",
+            return_value=users_model,
+        ),
+    ):
+        created = User.create(
+            {
+                "name": "Admin User",
+                "email": "admin@example.com",
+                "page": page,
+                "picture": "https://example.test/photo.jpg",
+                "groups": [group],
+                "is_public": False,
+                "test_user": True,
+            }
+        )
 
     assert created.kind == "user"
     assert created.name == "Admin User"
@@ -922,19 +909,17 @@ def test_user_entity_create_save_load_owner_page_and_groups():
     with patch(
         "lagniappe.core.entities.user.database_get.user",
         return_value=raw,
-    ) as get_user:
-        with patch(
-            "lagniappe.core.entities.user.Entities.fetch_one",
-            return_value=loaded,
-        ) as get_entity:
-            result = User.load("loaded@example.com")
+    ) as get_user, patch(
+        "lagniappe.core.entities.user.Entities.fetch_one",
+        return_value=loaded,
+    ) as get_entity:
+        result = User.load("loaded@example.com")
 
     get_user.assert_called_once_with("loaded@example.com")
     get_entity.assert_called_once_with(raw, request=Fetch.direct())
     assert result is loaded
 
 
-# @matrix user : cache-invalidation create
 @pytest.mark.unit
 def test_user_create_does_not_leave_initial_cache_invalidation():
     page = TestEntities.get(
@@ -954,41 +939,35 @@ def test_user_create_does_not_leave_initial_cache_invalidation():
     with patch(
         "lagniappe.core.entities.user.CONFIG",
         SimpleNamespace(ADMIN_EMAIL="initial-cache@example.test"),
+    ), patch(
+        "lagniappe.core.entities.user.database_get.user",
+        return_value=None,
+    ), patch(
+        "lagniappe.core.entities.entity.database_utility.create_key",
+        return_value=new_key,
+    ), patch(
+        "lagniappe.core.entities.entity.database_get.entity",
+        return_value=None,
+    ), patch(
+        "lagniappe.core.entities.entity.database_utility.create_entity",
+        return_value=new_entity,
+    ), patch(
+        "lagniappe.core.properties.user_related.Entities.USERS.get",
+        return_value=users_model,
     ):
-        with patch(
-            "lagniappe.core.entities.user.database_get.user",
-            return_value=None,
-        ):
-            with patch(
-                "lagniappe.core.entities.entity.database_utility.create_key",
-                return_value=new_key,
-            ):
-                with patch(
-                    "lagniappe.core.entities.entity.database_get.entity",
-                    return_value=None,
-                ):
-                    with patch(
-                        "lagniappe.core.entities.entity.database_utility.create_entity",
-                        return_value=new_entity,
-                    ):
-                        with patch(
-                            "lagniappe.core.properties.user_related.Entities.USERS.get",
-                            return_value=users_model,
-                        ):
-                            user = User.create(
-                                {
-                                    "name": "Initial Cache User",
-                                    "email": "initial-cache@example.test",
-                                    "page": page,
-                                }
-                            )
+        user = User.create(
+            {
+                "name": "Initial Cache User",
+                "email": "initial-cache@example.test",
+                "page": page,
+            }
+        )
 
     assert user.is_owner is True
     assert user.ai_access == "CREATE"
     assert user.invalidate_cache is False
 
 
-# @matrix public-users user : create personal-page public-group public-user
 @pytest.mark.unit
 def test_user_create_public_user_assigns_public_group():
     page = TestEntities.get("PAGE", {"name": "Public Page", "hash": "pg009f"})
@@ -1006,47 +985,49 @@ def test_user_create_public_user_assigns_public_group():
     new_key = Key("users", "public-new", project="test")
     new_entity = Entity(new_key)
 
-    with patch(
-        "lagniappe.core.entities.user.database_get.user",
-        return_value=None,
-    ):
-        with patch(
+    with (
+        patch(
+            "lagniappe.core.entities.user.database_get.user",
+            return_value=None,
+        ),
+        patch(
             "lagniappe.core.entities.entity.database_utility.create_key",
             return_value=new_key,
-        ):
-            with patch(
-                "lagniappe.core.entities.entity.database_get.entity",
-                return_value=None,
-            ):
-                with patch(
-                    "lagniappe.core.entities.entity.database_utility.create_entity",
-                    return_value=new_entity,
-                ):
-                    with patch(
-                        "lagniappe.core.entities.user.Entities.PUBLIC_GROUP.get",
-                        return_value=public_group,
-                    ):
-                        with patch(
-                            "lagniappe.core.properties.user_related.Entities.PUBLIC_GROUP.get",
-                            return_value=public_group,
-                        ):
-                            with patch(
-                                "lagniappe.core.properties.user_permissions.UserPermissions.create"
-                            ) as create_permissions:
-                                with patch(
-                                    "lagniappe.core.properties.user_related.Entities.USERS.get",
-                                    return_value=users_model,
-                                ):
-                                    created = User.create(
-                                        {
-                                            "name": "Public User",
-                                            "email": "public@example.com",
-                                            "page": page,
-                                            "groups": [normal_group],
-                                            "is_public": True,
-                                            "test_user": True,
-                                        }
-                                    )
+        ),
+        patch(
+            "lagniappe.core.entities.entity.database_get.entity",
+            return_value=None,
+        ),
+        patch(
+            "lagniappe.core.entities.entity.database_utility.create_entity",
+            return_value=new_entity,
+        ),
+        patch(
+            "lagniappe.core.entities.user.Entities.PUBLIC_GROUP.get",
+            return_value=public_group,
+        ),
+        patch(
+            "lagniappe.core.properties.user_related.Entities.PUBLIC_GROUP.get",
+            return_value=public_group,
+        ),
+        patch(
+            "lagniappe.core.properties.user_permissions.UserPermissions.create"
+        ) as create_permissions,
+        patch(
+            "lagniappe.core.properties.user_related.Entities.USERS.get",
+            return_value=users_model,
+        ),
+    ):
+        created = User.create(
+            {
+                "name": "Public User",
+                "email": "public@example.com",
+                "page": page,
+                "groups": [normal_group],
+                "is_public": True,
+                "test_user": True,
+            }
+        )
 
     assert created.is_public is True
     assert created.ai_access == "NONE"

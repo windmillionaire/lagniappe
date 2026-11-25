@@ -1,32 +1,23 @@
 """Shared Redis connection configuration for setup and application runtime."""
 
-from collections.abc import Mapping
-from pathlib import Path
 import ssl
+from collections.abc import Mapping
+from os import PathLike
+from pathlib import Path
+from typing import NotRequired, TypedDict, Unpack, cast
 
 
-# @testable false
-# @covered-by config/redis.py::validate_redis_ca_cert
-# @covered-by config/redis.py::redis_tls_enabled
-# @reason configuration-specific ValueError type exercised through its raisers
 class RedisTLSConfigurationError(ValueError):
     """Raised when Redis TLS settings cannot produce a verified connection."""
 
 
-# @testable false
-# @covered-by config/redis.py::redis_client_kwargs
-# @covered-by config/redis.py::redis_tls_enabled
-# @reason mapping/object compatibility helper owned by public Redis config builders
 def _setting(settings, name, default=None):
     if isinstance(settings, Mapping):
         return settings.get(name, default)
     return getattr(settings, name, default)
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_redis_client_kwargs_support_verified_tls
-# @matrix config : redis-tls settings
-def redis_tls_enabled(settings):
+def redis_tls_enabled(settings: object) -> bool:
     """Return the normalized Redis TLS flag from a mapping or config object."""
     value = _setting(settings, "REDIS_TLS", False)
     if isinstance(value, bool):
@@ -44,17 +35,15 @@ def redis_tls_enabled(settings):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_redis_client_kwargs_support_verified_tls
-# @tests tests_tooling/test_003_config.py::test_redis_tls_requires_a_valid_ca_bundle
-# @matrix config : certificate-validation failure redis-tls
-def validate_redis_ca_cert(path, *, app_dir=None):
+def validate_redis_ca_cert(path: object, *, app_dir: str | Path | None = None) -> Path:
     """Resolve and validate a PEM CA bundle, returning its absolute path."""
     if not path:
         raise RedisTLSConfigurationError(
             "REDIS_TLS is enabled but REDIS_CA_CERT is not configured."
         )
 
+    if not isinstance(path, (str, PathLike)):
+        raise RedisTLSConfigurationError("Redis CA certificate must be a filesystem path.")
     cert_path = Path(path).expanduser()
     if not cert_path.is_absolute():
         if app_dir is None:
@@ -79,11 +68,9 @@ def validate_redis_ca_cert(path, *, app_dir=None):
     return cert_path
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_redis_client_kwargs_support_verified_tls
-# @tests tests_tooling/test_003_config.py::test_redis_tls_requires_a_valid_ca_bundle
-# @matrix config : redis-connection redis-tls
-def redis_client_kwargs(settings, *, app_dir=None, **connection_options):
+def redis_client_kwargs(
+    settings: object, *, app_dir: str | Path | None = None, **connection_options: object
+) -> dict[str, object]:
     """Build redis-py client options shared by setup and runtime clients."""
     options = {
         "host": _setting(settings, "REDIS_HOST"),
@@ -106,3 +93,46 @@ def redis_client_kwargs(settings, *, app_dir=None, **connection_options):
         )
 
     return options
+
+
+class RedisConnectionOptions(TypedDict, total=False):
+    """redis-py overrides used by Lagniappe's connection constructors."""
+
+    socket_timeout: float | None
+    socket_connect_timeout: float | None
+    retry_on_timeout: bool
+    decode_responses: bool
+
+
+class RedisConnectionKwargs(RedisConnectionOptions):
+    host: str
+    port: int
+    password: str | None
+    ssl: NotRequired[bool]
+    ssl_ca_certs: NotRequired[str]
+    ssl_cert_reqs: NotRequired[str]
+    ssl_check_hostname: NotRequired[bool]
+
+
+def redis_connection_kwargs(
+    settings: object,
+    *,
+    app_dir: str | Path | None = None,
+    **connection_options: Unpack[RedisConnectionOptions],
+) -> RedisConnectionKwargs:
+    """Return redis-py constructor arguments for a configured endpoint."""
+    options = redis_client_kwargs(settings, app_dir=app_dir, **connection_options)
+    host = options["host"]
+    port = options["port"]
+    password = options["password"]
+    if not isinstance(host, str) or not host:
+        raise ValueError("REDIS_HOST is required when connecting to Redis.")
+    if not isinstance(port, (str, int)):
+        raise ValueError("REDIS_PORT must be an integer when connecting to Redis.")
+    if password is not None and not isinstance(password, str):
+        raise ValueError("REDIS_PASSWORD must be text when connecting to Redis.")
+    options["port"] = int(port)
+    # The remaining keys are the typed overrides above and the verified TLS
+    # settings added by redis_client_kwargs; that helper also serves setup
+    # preflight, where the endpoint can still be incomplete.
+    return cast(RedisConnectionKwargs, options)

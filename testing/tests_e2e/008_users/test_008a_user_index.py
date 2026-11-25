@@ -88,7 +88,6 @@ def _post_form_status(user, path, data):
     )
 
 
-# @matrix users : disabled index-mode-toggle
 # @template users/index.html::public_users_toggle
 @pytest.mark.e2e_group("owner")
 def test_users_index_public_toggle_hidden_when_public_users_disabled(get_user):
@@ -100,9 +99,6 @@ def test_users_index_public_toggle_hidden_when_public_users_disabled(get_user):
     expect(owner.locate(user_index.PUBLIC_USERS_TOGGLE)).to_have_count(0)
 
 
-# @matrix reconnect-refresh : batched-request root-fingerprint
-# @matrix users : index-mode-toggle refresh table-row pagination
-# @pair permissions:authorization
 # @template users/index.html::public_users_toggle
 @pytest.mark.e2e_group("owner")
 def test_users_index_public_toggle_shows_public_users(get_user, browser_failures):
@@ -179,7 +175,6 @@ def _create_user(user, create_form, definition):
     return new_row
 
 
-# @matrix users : ai-access create-form create-form-reset create-submit created-row
 # @template users/index.html::tools_section
 # @template users/tools.html::create_user
 @pytest.mark.e2e_group("owner")
@@ -221,8 +216,6 @@ def test_create_user_from_index(get_user):
     ).to_be_checked()
 
 
-# @matrix user : page-reassign public-adoption submitted-create-data
-# @matrix users : create-form-reset public-user-adoption submitted-form-data
 # @template users/tools.html::create_user
 @pytest.mark.e2e_group("owner")
 def test_owner_create_adopts_public_user_and_resets_form(get_user):
@@ -299,7 +292,6 @@ def test_owner_create_adopts_public_user_and_resets_form(get_user):
     expect(reset_group_select.input).to_have_value("")
 
 
-# @pair users:owner-only
 # @template users/tools.html::create_user
 @pytest.mark.e2e_group("owner")
 def test_non_owner_cannot_set_ai_access_when_creating_user(
@@ -333,7 +325,6 @@ def test_non_owner_cannot_set_ai_access_when_creating_user(
     assert Entities.USER.load(email) is None
 
 
-# @matrix users : group-selector multiple
 # @template users/tools.html::create_user
 @pytest.mark.e2e_group("owner")
 def test_create_user_group_selector_accepts_multiple_groups(get_user):
@@ -388,7 +379,6 @@ def test_create_user_group_selector_accepts_multiple_groups(get_user):
         )
 
 
-# @matrix table-controls : mobile-startup mobile-tools sorting
 # @template users/index.html::view_header
 # @template table.html::mobile_toggles
 @pytest.mark.e2e_group("owner")
@@ -417,7 +407,6 @@ def test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load(get_user
     ).to_be_visible()
 
 
-# @matrix users : attach-existing-page page-form-preserved
 @pytest.mark.e2e_group("owner")
 def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user):
     owner = get_user(Users.OWNER)
@@ -478,10 +467,6 @@ def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user
     )
 
 
-# @matrix pages : category-fallback default-cascade delete preserve-page
-# @matrix users : category-fallback default-cascade delete options preserve-page
-# @matrix user-index : page-canonical delete
-# @pair user-groups:unrelated-delete
 # @template table.html::row
 # @template controls.html::delete
 # @template cell.html::format_table_cell

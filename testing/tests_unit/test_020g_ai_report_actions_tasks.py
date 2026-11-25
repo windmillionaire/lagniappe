@@ -1,6 +1,6 @@
 """Focused AI-report characterization coverage."""
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 import json
 from zoneinfo import ZoneInfo
 
@@ -28,10 +28,6 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.test_entities import TestEntities
 
 
-# @source lagniappe/core/tools/ai/reporting/contracts/permissions.py::allowed_report_actions
-# @source lagniappe/core/tools/ai/reporting/execution/actions/entities.py::_move_task
-# @matrix ai-report : action-capabilities permissions
-# @pair ai-report:moves
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "source_permission,target_permission,error",
@@ -70,8 +66,6 @@ def test_task_move_catalog_preserves_exact_source_and_destination_permissions(
             assert metadata["moved"]["to"]["id"] == target.urlsafe_key
 
 
-# @matrix ai-report : created-task deterministic-run persistence submission-completion task-attachment
-# @matrix files tasks : task-attachment
 @pytest.mark.unit
 def test_run_report_attach_file_targets_created_task(monkeypatch, get_schema):
     _patch_fake_keys(monkeypatch)
@@ -162,7 +156,6 @@ def test_run_report_attach_file_targets_created_task(monkeypatch, get_schema):
 
 
 
-# @matrix ai-report task-scheduling : normalization periodic recurring scheduled structured-output validation
 @pytest.mark.unit
 def test_report_task_schedule_contract_validates_supported_patterns():
     schema = report_proposal_response_schema(("create_task",))
@@ -204,7 +197,6 @@ def test_report_task_schedule_contract_validates_supported_patterns():
 
 
 
-# @matrix ai-report task-scheduling : persistence recurring
 @pytest.mark.unit
 def test_run_report_creates_task_with_reviewed_schedule(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -278,7 +270,6 @@ def test_run_report_creates_task_with_reviewed_schedule(monkeypatch):
 
 
 
-# @matrix ai-report task-completion tasks : attachments completed-task description name older-event submission
 @pytest.mark.unit
 def test_run_report_records_older_completed_event_without_mutating_live_task(
     monkeypatch,
@@ -304,8 +295,8 @@ def test_run_report_records_older_completed_event_without_mutating_live_task(
     live_attachment = _test_file("current-task-note.pdf", "application/pdf")
     task.files = [live_attachment]
     task.completed = True
-    task.completed_on = datetime(2024, 1, 1, tzinfo=timezone.utc)
-    task.due_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    task.completed_on = datetime(2024, 1, 1, tzinfo=UTC)
+    task.due_date = datetime(2024, 1, 1, tzinfo=UTC)
     task.description = "Current registration details."
     page._completed = [task]
     file_one = _test_file("2023-06-24 jeep registration.pdf", "application/pdf")
@@ -386,8 +377,8 @@ def test_run_report_records_older_completed_event_without_mutating_live_task(
     history = histories[0]
     assert history.task is task
     assert history.page is page
-    assert history.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
-    assert history.db["completed_on"] == datetime(2023, 6, 24, tzinfo=timezone.utc)
+    assert history.completed_on == datetime(2023, 6, 24, tzinfo=UTC)
+    assert history.db["completed_on"] == datetime(2023, 6, 24, tzinfo=UTC)
     assert "completed" not in history.db
     assert history.name == "Registration"
     assert history.description == "Archived registration renewal."
@@ -402,8 +393,8 @@ def test_run_report_records_older_completed_event_without_mutating_live_task(
         "input-textab12": "Registration renewed at DMV."
     }
     assert task.completed is True
-    assert task.completed_on == datetime(2024, 1, 1, tzinfo=timezone.utc)
-    assert task.due_date == datetime(2024, 1, 1, tzinfo=timezone.utc)
+    assert task.completed_on == datetime(2024, 1, 1, tzinfo=UTC)
+    assert task.due_date == datetime(2024, 1, 1, tzinfo=UTC)
     assert task.name == "Registration"
     assert task.description == "Current registration details."
     assert task.files == [live_attachment]
@@ -452,7 +443,6 @@ def test_run_report_records_older_completed_event_without_mutating_live_task(
 
 
 
-# @matrix ai-report : attachments completed-task
 @pytest.mark.unit
 def test_run_report_records_dateless_historical_task_completion(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -536,7 +526,6 @@ def test_run_report_records_dateless_historical_task_completion(monkeypatch):
 
 
 
-# @matrix ai-report task-completion tasks : completed-task history-name live-task newest-completion
 @pytest.mark.unit
 def test_run_report_promotes_newer_completed_event_to_live_task(
     monkeypatch,
@@ -561,7 +550,7 @@ def test_run_report_promotes_newer_completed_event_to_live_task(
     task.description = "Previous registration details."
     task.ai_submission({"input-textab12": "Previous registration."})
     task.complete(user=user)
-    task.completed_on = datetime(2020, 6, 24, tzinfo=timezone.utc)
+    task.completed_on = datetime(2020, 6, 24, tzinfo=UTC)
     page._completed = [task]
     new_file = _test_file("2023-06-24 jeep registration.pdf", "application/pdf")
     report = TestEntities.get(
@@ -636,14 +625,14 @@ def test_run_report_promotes_newer_completed_event_to_live_task(
     assert len(histories) == 1
     history = histories[0]
     assert history.task is task
-    assert history.completed_on == datetime(2020, 6, 24, tzinfo=timezone.utc)
+    assert history.completed_on == datetime(2020, 6, 24, tzinfo=UTC)
     assert history.name == "Registration"
     assert history.description == "Previous registration details."
     assert history.files == [old_file]
     assert history.submission == {"input-textab12": "Previous registration."}
     assert old_file.db["task"] == task.key
     assert task.completed is True
-    assert task.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
+    assert task.completed_on == datetime(2023, 6, 24, tzinfo=UTC)
     assert task.due_date is None
     assert task.files == [new_file]
     assert task.submission == {"input-textab12": "Registration renewed again."}
@@ -663,7 +652,6 @@ def test_run_report_promotes_newer_completed_event_to_live_task(
 
 
 
-# @matrix ai-report task-completion tasks : completed-task duplicate-task-prevention explicit-task-identity
 @pytest.mark.unit
 @pytest.mark.parametrize("actor_zone", ["UTC", "America/Los_Angeles"])
 def test_run_report_reuses_one_created_task_for_multiple_completed_events(
@@ -811,13 +799,13 @@ def test_run_report_reuses_one_created_task_for_multiple_completed_events(
     assert tracker_task.completed is True
     assert tracker_task.completed_on == datetime(
         2023, 6, 24, tzinfo=ZoneInfo(actor_zone)
-    ).astimezone(timezone.utc)
+    ).astimezone(UTC)
     assert tracker_task.due_date is None
     assert tracker_task.files == [file_one]
     assert tracker_task.submission == {"input-textab12": "2023 event"}
     assert histories[0].completed_on == datetime(
         2018, 6, 7, tzinfo=ZoneInfo(actor_zone)
-    ).astimezone(timezone.utc)
+    ).astimezone(UTC)
     assert histories[0].name == "Registration"
     assert histories[0].description == "Vehicle registration renewal payment."
     assert histories[0].submission == {"input-textab12": "2018 event"}
@@ -844,7 +832,6 @@ def test_run_report_reuses_one_created_task_for_multiple_completed_events(
 
 
 
-# @matrix ai-report task-completion tasks : completed-task distinct-task explicit-task-identity same-model
 @pytest.mark.unit
 def test_run_report_keeps_untargeted_same_model_tasks_distinct(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -947,7 +934,6 @@ def test_run_report_keeps_untargeted_same_model_tasks_distinct(monkeypatch):
 
 
 
-# @matrix ai-report task-completion tasks : completed-task lazy-load model-form submission
 @pytest.mark.unit
 def test_run_report_loads_model_task_form_from_stored_key_for_history(
     monkeypatch,
@@ -1084,7 +1070,6 @@ def test_run_report_loads_model_task_form_from_stored_key_for_history(
 
 
 
-# @matrix ai-report task-completion tasks : completed-task existing-task explicit-task-identity
 @pytest.mark.unit
 def test_run_report_reuses_existing_task_for_completed_event(
     monkeypatch,
@@ -1171,7 +1156,7 @@ def test_run_report_reuses_existing_task_for_completed_event(
     assert result["actions"][1]["target"]["id"] == "registration-task"
     assert len(histories) == 0
     assert task.completed is True
-    assert task.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
+    assert task.completed_on == datetime(2023, 6, 24, tzinfo=UTC)
     assert task.files == [file]
     assert file.db["task"] == task.key
     assert file.task is task
@@ -1183,7 +1168,6 @@ def test_run_report_reuses_existing_task_for_completed_event(
 
 
 
-# @matrix ai-report task-completion tasks : automatic-task-family completed-task period-name same-report
 @pytest.mark.unit
 def test_run_report_automatically_reuses_dated_completed_task_family(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -1276,16 +1260,15 @@ def test_run_report_automatically_reuses_dated_completed_task_family(monkeypatch
     assert result["actions"][0]["target"]["id"] == task.urlsafe_key
     assert result["actions"][1]["target"]["id"] == task.urlsafe_key
     assert task.name == "Pay Property Tax"
-    assert task.completed_on == datetime(2026, 4, 1, tzinfo=timezone.utc)
+    assert task.completed_on == datetime(2026, 4, 1, tzinfo=UTC)
     assert len(histories) == 1
     assert histories[0].task is task
     assert histories[0].name == "Pay Property Tax"
-    assert histories[0].completed_on == datetime(2024, 7, 1, tzinfo=timezone.utc)
+    assert histories[0].completed_on == datetime(2024, 7, 1, tzinfo=UTC)
 
 
 
 
-# @matrix ai-report task-completion tasks : ambiguity automatic-task-family completed-task
 @pytest.mark.unit
 def test_run_report_keeps_ambiguous_completed_task_families_distinct(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -1374,7 +1357,6 @@ def test_run_report_keeps_ambiguous_completed_task_families_distinct(monkeypatch
 
 
 
-# @matrix ai-report task-completion tasks : completed-task explicit-task-identity page-validation
 @pytest.mark.unit
 def test_run_report_rejects_completed_task_target_from_another_page(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -1443,7 +1425,6 @@ def test_run_report_rejects_completed_task_target_from_another_page(monkeypatch)
 
 
 
-# @matrix ai-report task-completion tasks : completed-task continue missing-submission task-form
 @pytest.mark.unit
 def test_run_report_warns_but_continues_when_task_form_submission_missing(
     monkeypatch,
@@ -1572,7 +1553,6 @@ def test_run_report_warns_but_continues_when_task_form_submission_missing(
 
 
 
-# @matrix ai-report forms tasks : continue deterministic-run mismatched-form recoverable
 @pytest.mark.unit
 def test_run_report_skips_task_that_references_page_form_and_continues(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -1648,7 +1628,6 @@ def test_run_report_skips_task_that_references_page_form_and_continues(monkeypat
 
 
 
-# @matrix ai-report task-completion tasks : page-reference repair task-history
 @pytest.mark.unit
 def test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wrong_kind(
     monkeypatch,
@@ -1741,7 +1720,7 @@ def test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wron
     assert created_task.page is page
     assert created_task.name == "Registration"
     assert created_task.completed is True
-    assert created_task.completed_on == datetime(2023, 6, 24, tzinfo=timezone.utc)
+    assert created_task.completed_on == datetime(2023, 6, 24, tzinfo=UTC)
     assert created_task.files == [file]
     assert file.db["task"] == created_task.key
     assert len(histories) == 0
@@ -1753,7 +1732,6 @@ def test_run_report_resolves_task_page_by_exact_page_name_when_reference_is_wron
 
 
 
-# @matrix ai-report files : attachment page-reference prior-task-page repair
 @pytest.mark.unit
 def test_run_report_rejects_file_as_attachment_target_without_guessing_prior_page(
     monkeypatch,
@@ -1878,7 +1856,6 @@ def test_run_report_rejects_file_as_attachment_target_without_guessing_prior_pag
 
 
 
-# @matrix ai-report : completed-task continue recoverable validation
 @pytest.mark.unit
 def test_run_report_skips_invalid_completed_task_events_and_continues(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -1960,7 +1937,6 @@ def test_run_report_skips_invalid_completed_task_events_and_continues(monkeypatc
         assert result["actions"][1]["entity"]["name"] == "Still Runs"
 
 
-# @matrix ai-report : completed-task validation
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "date_text,utc_hour",
@@ -1980,6 +1956,6 @@ def test_completed_event_dates_use_actor_timezone_without_request(date_text, utc
     actor = _test_user("date-actor")
     actor.db["timezone"] = "America/Los_Angeles"
     actual = _parse_completed_task_completed_on({"completed_on": date_text}, user=actor)
-    expected = datetime.fromisoformat(date_text).replace(hour=utc_hour, tzinfo=timezone.utc)
+    expected = datetime.fromisoformat(date_text).replace(hour=utc_hour, tzinfo=UTC)
     assert actual == expected
     assert actual.astimezone(ZoneInfo("America/Los_Angeles")).date().isoformat() == date_text

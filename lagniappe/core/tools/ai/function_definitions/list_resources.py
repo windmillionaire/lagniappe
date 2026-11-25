@@ -1,5 +1,11 @@
 """Function declaration and handler for listing workspace model resources."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 import json
 from collections import defaultdict
 from datetime import timedelta
@@ -33,7 +39,7 @@ LIST_WORKSPACE_RESOURCES = types.FunctionDeclaration(
         "Supply category_id and/or project_id when their references are already known "
         "to omit unrelated resources; without a scope, return the full inventory."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "category_id": {
@@ -45,14 +51,11 @@ LIST_WORKSPACE_RESOURCES = types.FunctionDeclaration(
                 "description": "Known Project hash reference to include.",
             },
         },
-    },
+    }),
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_list_workspace_resources_caches_inventory
-# @matrix ai : redis-cache resource-inventory
-def execute_list_workspace_resources(args, user):
+def execute_list_workspace_resources(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     """Return a cached, permission-filtered inventory of model resources."""
     cache_key = _resource_cache_key(user)
     cached = redis_cache.get(cache_key)
@@ -77,22 +80,28 @@ def execute_list_workspace_resources(args, user):
             ("project_id", Entities.PROJECT, "projects"),
         ):
             if identifier := args.get(argument):
+                if not isinstance(identifier, str):
+                    return {"error": "Requested workspace scope is unavailable"}
                 entity = Entities.fetch_one(identifier, request=Fetch.direct())
                 if not isinstance(entity, kind) or not _can_list(entity, user):
                     return {"error": "Requested workspace scope is unavailable"}
                 selected[collection] = [
                     item
-                    for item in inventory[collection]
+                    for item in (inventory["categories"] if collection == "categories" else inventory["projects"])
                     if item["hash"] == hash_reference(entity)
                 ]
         return selected
     return inventory
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_list_workspace_resources_caches_inventory
-# @matrix ai : categories forms projects resource-inventory
-def build_workspace_resource_inventory(user):
+class WorkspaceResourceInventory(TypedDict):
+    personal_page: dict[str, object]
+    categories: list[dict[str, object]]
+    projects: list[dict[str, object]]
+    standalone_forms: list[dict[str, str | None]]
+
+
+def build_workspace_resource_inventory(user: User) -> WorkspaceResourceInventory:
     """Build a compact inventory of viewable model resources for an AI prompt."""
     models = [
         entity
@@ -131,9 +140,6 @@ def build_workspace_resource_inventory(user):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/list_resources.py::execute_list_workspace_resources
-# @reason cache-key fallback behavior is covered through cached handler behavior
 def _resource_cache_key(user):
     user_key = (
         getattr(user, "hash", None)
@@ -144,9 +150,6 @@ def _resource_cache_key(user):
     return Keys.AI_RESOURCE_INVENTORY.value.format(user_key)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/list_resources.py::build_workspace_resource_inventory
-# @reason permission filtering is exercised through inventory shape tests
 def _can_list(entity, user):
     return (
         entity
@@ -156,16 +159,10 @@ def _can_list(entity, user):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/list_resources.py::build_workspace_resource_inventory
-# @reason deterministic ordering is observable in inventory tests
 def _sort_name(entity):
     return (getattr(entity, "name", "") or "").lower()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/list_resources.py::build_workspace_resource_inventory
-# @reason model-task grouping is exercised through inventory shape tests
 def _model_tasks_by_project(model_tasks, user):
     tasks_by_project = defaultdict(list)
     for model_task in model_tasks:
@@ -175,9 +172,6 @@ def _model_tasks_by_project(model_tasks, user):
     return tasks_by_project
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/list_resources.py::build_workspace_resource_inventory
-# @reason category projection is exercised through inventory shape tests
 def _format_category(category, user, attached_form_keys):
     forms = _category_forms(category, user)
     attached_form_keys.update(form.key for form in forms)
@@ -189,9 +183,6 @@ def _format_category(category, user, attached_form_keys):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/list_resources.py::build_workspace_resource_inventory
-# @reason project projection is exercised through inventory shape tests
 def _format_project(project, user, attached_form_keys, tasks_by_project):
     model_tasks = tasks_by_project.get(project.key, [])
     return {
@@ -205,9 +196,6 @@ def _format_project(project, user, attached_form_keys, tasks_by_project):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/list_resources.py::build_workspace_resource_inventory
-# @reason model task projection is exercised through inventory shape tests
 def _format_model_task(model_task, user, attached_form_keys):
     form = _attached_form(model_task)
     form = form if form and _can_list(form, user) else None
@@ -221,9 +209,6 @@ def _format_model_task(model_task, user, attached_form_keys):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/list_resources.py::build_workspace_resource_inventory
-# @reason category form selection is exercised through inventory shape tests
 def _category_forms(category, user):
     forms = []
     seen = set()
@@ -237,9 +222,6 @@ def _category_forms(category, user):
     return forms
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/list_resources.py::build_workspace_resource_inventory
-# @reason stored form relation recovery is exercised through inventory shape tests
 def _attached_form(entity):
     form_property = getattr(getattr(entity, "properties", None), "form", None)
     if form_property:
@@ -265,9 +247,6 @@ def _attached_form(entity):
     return loaded if isinstance(loaded, Entities.FORM) else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/list_resources.py::build_workspace_resource_inventory
-# @reason form projection is exercised through inventory shape tests
 def _format_form(form):
     return {
         "hash": hash_reference(form),
@@ -276,9 +255,6 @@ def _format_form(form):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/list_resources.py::build_workspace_resource_inventory
-# @reason model-task form schema handles are asserted through inventory shape tests
 def _format_model_task_form(model_task, form):
     formatted = _format_form(form)
     formatted["schema_ref"] = hash_reference(model_task)

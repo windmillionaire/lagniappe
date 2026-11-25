@@ -9,9 +9,9 @@ Related Files:
         - lagniappe/web/routes/tasks/main.py: Task routes (including personal POST)
         - lagniappe/web/routes/home/main.py: Home route and task-related responses
         - lagniappe/web/templates/home/tasks.html: CreateUserTask, HomeTaskList
-        - src/script/widgets/home/tasks.mjs: HomeTaskList
-        - src/script/widgets/taskSettings.mjs: CreateUserTask (BaseTaskSettings)
-        - src/script/views/home.mjs: Task initialization
+        - src/script/widgets/home/tasks.ts: HomeTaskList
+        - src/script/widgets/taskSettings.ts: CreateUserTask (BaseTaskSettings)
+        - src/script/views/home.ts: Task initialization
 
     Core Entity:
         - lagniappe/core/entities/task.py: Task entity
@@ -108,7 +108,6 @@ def _make_recurring_daily(task):
     entity.save()
 
 
-# @matrix tasks : create-form due-date
 @pytest.mark.e2e
 def test_create_task_form(get_admin, get_user):
     """
@@ -139,7 +138,6 @@ def test_create_task_form(get_admin, get_user):
     expect(form).not_to_be_visible()
 
 
-# @matrix tasks : create-personal due-date
 @pytest.mark.e2e
 def test_create_personal_task_due_today(get_admin, get_user):
     """
@@ -164,7 +162,6 @@ def test_create_personal_task_due_today(get_admin, get_user):
     expect(task_item).to_have_attribute("data-due-date", local_date_iso())
 
 
-# @matrix tasks : create-personal due-date
 @pytest.mark.e2e
 def test_create_personal_task_due_in_four_days(get_admin, get_user):
     """
@@ -184,7 +181,6 @@ def test_create_personal_task_due_in_four_days(get_admin, get_user):
     expect(task_item).to_have_attribute("data-due-date", expected)
 
 
-# @pair tasks:complete
 @pytest.mark.e2e
 def test_complete_task_from_home_page(get_admin, get_user):
     """
@@ -228,7 +224,6 @@ def test_complete_task_from_home_page(get_admin, get_user):
     expect(task_item).to_have_attribute("data-due-date", local_date_iso())
 
 
-# @matrix tasks : complete recurring
 @pytest.mark.e2e
 def test_complete_recurring_task_from_home_page_reappears(get_admin, get_user):
     """Completing a near-term recurring home task replaces it with the next occurrence."""
@@ -257,7 +252,6 @@ def test_complete_recurring_task_from_home_page_reappears(get_admin, get_user):
     )
 
 
-# @matrix tasks : due-date postpone
 @pytest.mark.e2e
 def test_postpone_task_due_date_to_tomorrow(get_admin, get_user):
     """
@@ -284,7 +278,6 @@ def test_postpone_task_due_date_to_tomorrow(get_admin, get_user):
     expect(postponed_task).to_have_attribute("data-due-date", tomorrow)
 
 
-# @matrix tasks : due-date postpone
 @pytest.mark.e2e
 def test_postpone_task_due_date_to_this_week(get_admin, get_user):
     """Choose any remaining calendar date through Sunday from 'This Week…'."""
@@ -328,7 +321,6 @@ def test_postpone_task_due_date_to_this_week(get_admin, get_user):
     expect(postponed).to_have_attribute("data-due-date", expected)
 
 
-# @matrix tasks : due-date postpone
 @pytest.mark.e2e
 def test_postpone_task_due_date_to_next_week(get_admin, get_user):
     """Choose a dated weekday from the progressive next-week postpone menu."""
@@ -357,7 +349,6 @@ def test_postpone_task_due_date_to_next_week(get_admin, get_user):
     assert local_date_from_utc_datetime(postponed.due_date).date().isoformat() == expected
 
 
-# @matrix tasks : due-date postpone
 @pytest.mark.e2e
 def test_postpone_task_due_date_to_no_due_date(get_admin, get_user):
     """

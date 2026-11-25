@@ -12,7 +12,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
 from testing.utility.artifacts import (
     markdown_code,
@@ -36,7 +36,7 @@ DEFAULT_SOURCE_ROOTS = (Path("src"), Path("lagniappe/web/templates"))
 DEFAULT_LONG_CLASS_LIMIT = 6
 DEFAULT_REPEAT_LIMIT = 2
 MARKDOWN_SECTION_LIMIT = 30
-SCRIPT_EXTENSIONS = {".js", ".mjs"}
+SCRIPT_EXTENSIONS = {".js", ".mjs", ".ts", ".mts"}
 TEMPLATE_EXTENSIONS = {".html", ".jinja", ".j2"}
 STYLE_REF_RE = re.compile(
     r"\b(?P<root>STYLES|styles)"
@@ -197,7 +197,7 @@ def iter_source_files(repo_root: Path, source_roots: Iterable[Path]) -> Iterable
 def source_surface(path: Path) -> str | None:
     if path.suffix in TEMPLATE_EXTENSIONS:
         return "template"
-    if path.suffix in SCRIPT_EXTENSIONS:
+    if path.suffix in SCRIPT_EXTENSIONS and not path.name.endswith((".d.ts", ".d.mts")):
         return "javascript"
     return None
 

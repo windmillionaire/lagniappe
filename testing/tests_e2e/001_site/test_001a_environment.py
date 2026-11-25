@@ -59,8 +59,6 @@ pytestmark = pytest.mark.e2e
 PREFIX = SETTINGS.test_config["PREFIX"]
 
 
-# @matrix test-session : health-nonce readiness server-identity
-# @matrix hosted-e2e : readiness server-identity
 def test_testing_health_identifies_the_exact_session(setup_test_server):
     response = requests.get(f"{CONFIG.BASE_URL}/testing/health", timeout=5)
     response.raise_for_status()
@@ -111,7 +109,6 @@ def test_database_setup():
     assert database_core.datastore is not None
 
 
-# @matrix cache : cleanup index-recreation redis-connection
 @pytest.mark.e2e_serial(phase="before")
 def test_cache_setup():
     """
@@ -179,7 +176,6 @@ def test_storage_setup():
         assert bucket.name == bucket_name
 
 
-# @pair server:initialization
 def test_server_running(get_user):
     """
     Verify Flask test server is running and responding.
@@ -203,8 +199,6 @@ def test_server_running(get_user):
     expect(user.locate("body")).to_contain_text("pong")
 
 
-# @matrix notifications : ping redis-projection
-# @pair web-headers:notification-state
 @pytest.mark.e2e_group("owner")
 def test_ping_notification_state_is_redis_only_and_optional(get_user):
     """A real notification reaches a reloaded page through the ping header."""
@@ -257,8 +251,6 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
     assert notification_requests == []
 
 
-# @matrix cache : build-id etag missing-fingerprint standard-header
-# @matrix web-headers : conditional-request etag missing-fingerprint security
 @pytest.mark.e2e_serial
 def test_authenticated_home_response_headers_include_etag(get_admin, browser_failures):
     """Authenticated app responses should carry the common header envelope."""
@@ -366,7 +358,6 @@ def test_authenticated_home_response_headers_include_etag(get_admin, browser_fai
     assert '<div lp-view data-kind="home"' in uncached.text
 
 
-# @matrix cache : deployment-id etag
 def test_dynamic_etag_changes_with_deployment_identity(monkeypatch):
     """Backend/template-only deploys must invalidate dynamic response ETags."""
     from lagniappe.web import auth
@@ -381,7 +372,6 @@ def test_dynamic_etag_changes_with_deployment_identity(monkeypatch):
     assert first != second
 
 
-# @matrix cache session timezone : permissions-preserved
 def test_timezone_update_preserves_permissions_and_cache_revision(get_admin, setup_test_server):
     owner = get_admin()
     actor = User(user=owner, definition=UserDefinition(
@@ -425,7 +415,6 @@ def test_timezone_update_preserves_permissions_and_cache_revision(get_admin, set
         persisted.save()
 
 
-# @matrix location session timezone : atomic-update coordinates validation
 def test_update_session_rejects_invalid_timezone_and_location_atomically(
     get_admin, browser_failures
 ):
@@ -505,7 +494,6 @@ def test_update_session_rejects_invalid_timezone_and_location_atomically(
     persisted.save()
 
 
-# @matrix privacy public-pages : anonymous-access document-load
 def test_privacy_policy_is_public(get_user):
     """Verify anonymous visitors can load the public privacy policy."""
     user = get_user(Users.ANONYMOUS)
@@ -518,7 +506,6 @@ def test_privacy_policy_is_public(get_user):
     expect(body).to_contain_text("Optional Analytics and Error Reporting")
 
 
-# @matrix error-reporting privacy public-pages : anonymous-access document-load maintainer-destination
 def test_reporting_privacy_notice_is_public(get_user):
     """Verify anonymous visitors can load the maintainer reporting notice."""
     user = get_user(Users.ANONYMOUS)
@@ -536,7 +523,6 @@ def test_reporting_privacy_notice_is_public(get_user):
     expect(body).to_contain_text("supplies a Sentry DSN")
 
 
-# @matrix error-handling : error-page http-404
 def test_error_handling(get_user, browser_failures):
     """
     Verify 404 error page renders correctly.
@@ -589,7 +575,6 @@ def test_browser_failure_guard_detects_unhandled_page_errors(
             browser_failures.assert_clean()
 
 
-# @matrix e2e : navigation static-assets bounded-retry failure-reporting
 def test_setup_navigation_recovers_a_static_503(get_admin, browser_failures):
     """A failed cold module fetch gets one reload, then the real Home works."""
     user = get_admin()

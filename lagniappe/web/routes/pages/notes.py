@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 from flask import request
 from flask_login import current_user
 
@@ -6,17 +16,16 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.web import responses
-from lagniappe.web.auth import permission
+from lagniappe.web.auth import authenticated_user, permission
 
 from . import pages
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_notes_visibility_and_title_menu
-# @matrix notes pages permissions : load owner private shared viewer
 @pages.route("<key>/notes", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
-def get_notes(key, **kwargs):
+def get_notes(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
 
     rows = database_get.page_notes(page)
@@ -36,12 +45,11 @@ def get_notes(key, **kwargs):
     return responses.page_notes(notes, page)
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_note_text_photo_and_delete_modal
-# @matrix notes pages : body create photo scope validation visibility
 @pages.route("<key>/notes", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
-def create_note(key, **kwargs):
+def create_note(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
 
     body = (request.form.get("body") or "").strip()
@@ -57,7 +65,7 @@ def create_note(key, **kwargs):
     note = Entities.NOTE.create(
         {
             "parent": page,
-            "user": current_user,
+            "user": authenticated_user(),
             "body": body,
             "photo": photo if has_photo else None,
             "visibility": visibility,

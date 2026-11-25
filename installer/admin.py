@@ -1,3 +1,9 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Protocol
+
+
+from contextlib import suppress
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 import json
@@ -17,6 +23,15 @@ from runner.context import REPOSITORY_ROOT, setup_command
 from .utils import validate_input
 
 
+if TYPE_CHECKING:
+    from requests import Response
+
+class _OAuthGet(Protocol):
+    def __call__(
+        self, url: str, /, *, params: dict[str, str], allow_redirects: bool, timeout: float
+    ) -> Response: ...
+
+
 GOOGLE_OAUTH_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 OAUTH_CLIENT_PROBE_TIMEOUT = 10
 OAUTH_CLIENT_FILE_MAX_BYTES = 64 * 1024
@@ -25,10 +40,7 @@ OAUTH_CLIENT_FILE = (
 )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_instructions_open_current_project_clients_page
-# @matrix setup : browser oauth provider-apis
-def print_oauth_instructions():
+def print_oauth_instructions() -> None:
     """Print instructions for setting up OAuth credentials."""
     from config import SETTINGS
 
@@ -64,66 +76,64 @@ def print_oauth_instructions():
                 "  Required browser account", f"{ui.literal(account)}", verbatim=True
             )
         )
-    try:
+    with suppress(webbrowser.Error):
         webbrowser.open_new_tab(clients_url)
-    except webbrowser.Error:
-        pass
 
     if account:
         print(
             wrap_text(
-                (
+
                     "\nBefore continuing, confirm the Google Cloud Console profile is '"
                     f"{ui.literal(account)}'. If Google says you need additional access, "
                     "switch the browser to this account and reload the page; setup already "
                     "verified this account's project permissions."
-                )
+
             )
         )
 
     print(
         wrap_text(
-            (
+
                 f"\n{ui.literal('1.')} If Google says the Auth Platform is not "
                 f"configured, click '{ui.literal('Get started')}':"
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 f"   - {ui.literal('App information')}: use '{ui.literal(app_name)}' and "
                 "select a support email"
-            )
+
         )
     )
-    print(wrap_text((f"   - Audience: choose '{ui.literal('External')}'")))
+    print(wrap_text(f"   - Audience: choose '{ui.literal('External')}'"))
     print(
         wrap_text(
-            (
+
                 f"   - {ui.literal('Contact information')}: enter your email and finish "
                 "registration"
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('2.')} For a new or replacement client, click '"
                 f"{ui.literal('Create client')}'. For secret rotation, open the existing "
                 f"{ui.literal('Web application')} client and create a new "
                 f"{ui.literal('Client secret')} instead."
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('3.')} For a new client, choose '"
                 f"{ui.literal('Web application')}' and enter the values below. The "
                 f"client type must say '{ui.literal('Web application')}'; a 'Desktop "
                 "app' client will not work."
-            )
+
         )
     )
     print(ui.value("   Name", app_name, action=True, verbatim=True))
@@ -142,40 +152,35 @@ def print_oauth_instructions():
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('4.')} Click '{ui.literal('Create')}'. Under "
                 f"{ui.literal('Client secrets')}, click '{ui.literal('Download JSON')}'. "
                 "Move the downloaded file to the exact path below, renaming it '"
                 f"{ui.literal('google_oauth_credentials.json')}':"
-            )
+
         )
     )
     print(f"   {ui.literal(OAUTH_CLIENT_FILE)}")
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('5.')} Return to setup and press Enter. Setup will verify "
                 "the Web client type, project, JavaScript origin, and redirect URI from "
                 "that file before sending its client ID and secret to Identity Platform. "
                 "The secret will not be saved in Lagniappe settings.\n"
-            )
+
         )
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_validators_cover_expected_inputs
-# @pair setup:validation
-def validate_oauth_client_id(client_id):
+def validate_oauth_client_id(client_id: str) -> bool:
     """Validate OAuth client ID format."""
     return bool(re.match(r"^\d+[-\w]+\.apps\.googleusercontent\.com$", client_id))
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_web_client_probe_accepts_exact_callback
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_web_client_probe_rejects_redirect_mismatch
-# @matrix setup : client-type failure-isolation oauth provider-apis redirect-uri validation
-def verify_oauth_web_client(client_id, redirect_uri, *, request_get=None):
+def verify_oauth_web_client(
+    client_id: str, redirect_uri: str, *, request_get: _OAuthGet | None = None
+) -> bool:
     """Verify that Google accepts Lagniappe's callback for an OAuth client."""
     client_id = str(client_id or "").strip()
     redirect_uri = str(redirect_uri or "").strip()
@@ -274,9 +279,6 @@ def verify_oauth_web_client(client_id, redirect_uri, *, request_get=None):
     return True
 
 
-# @testable false
-# @covered-by installer/admin.py::load_oauth_client_credentials
-# @reason downloaded OAuth JSON list normalization is exercised by file validation
 def _oauth_uri_values(value):
     """Return the nonempty URI strings from one downloaded OAuth JSON field."""
     if isinstance(value, str):
@@ -286,16 +288,13 @@ def _oauth_uri_values(value):
     return tuple(str(item).strip() for item in value if str(item).strip())
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_credentials_file_requires_web_project_and_exact_urls
-# @matrix setup : client-type credential-file javascript-origin oauth project-isolation redirect-uri secrets validation
 def load_oauth_client_credentials(
-    credential_path,
+    credential_path: str | Path,
     *,
-    project_id,
-    javascript_origin,
-    redirect_uri,
-):
+    project_id: str,
+    javascript_origin: str,
+    redirect_uri: str,
+) -> tuple[str, str]:
     """Validate downloaded Web-client JSON and return its in-memory credentials."""
     credential_path = Path(credential_path)
     try:
@@ -363,9 +362,6 @@ def load_oauth_client_credentials(
     return client_id, client_secret
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_credentials_file_retry_reloads_or_waits_for_propagation
-# @matrix setup : credential-file interactive-retry oauth propagation secrets
 def _get_verified_oauth_credentials(settings, credential_path=OAUTH_CLIENT_FILE):
     """Load exact local OAuth settings and keep setup active through propagation."""
     from installer import FORMATTER
@@ -466,9 +462,6 @@ def _get_verified_oauth_credentials(settings, credential_path=OAUTH_CLIENT_FILE)
                 credentials = None
 
 
-# @testable false
-# @covered-by installer/admin.py::setup_admin_and_oauth
-# @reason existing-client propagation retry is covered by the admin setup boundary
 def _verify_saved_oauth_client(client_id, redirect_uri):
     """Keep an existing setup run at OAuth while Google applies saved state."""
     from installer import FORMATTER
@@ -494,45 +487,33 @@ def _verify_saved_oauth_client(client_id, redirect_uri):
                 raise
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_credential_retention_message
-# @matrix setup : credential-file oauth retention rotation secrets
 def _print_oauth_file_retention_message(credential_path=OAUTH_CLIENT_FILE):
     """Explain the local credential file's post-setup retention choices."""
     print(
         wrap_text(
-            (
+
                 "Identity Platform now stores the OAuth client secret. Lagniappe runtime "
                 f"does not need {ui.literal(credential_path)}. You may delete the local JSON "
                 "or move it to secure storage. The config/files path is excluded from Git "
                 "and App Engine uploads, but the JSON still contains a secret. To replace or "
                 "rotate Google OAuth later, place the new downloaded JSON at that path and "
                 f"run {ui.literal(setup_command('oauth'))}."
-            )
+
         )
     )
 
 
-# @testable false
-# @covered-by installer/admin.py::setup_admin_and_oauth
-# @reason interactive input wrapper owned by the admin/OAuth setup flow
 @validate_input("Enter permanent site Owner name", default="Owner")
-def _get_admin_name(value):
+def _get_admin_name(value: str) -> str:
     return value
 
 
-# @testable false
-# @covered-by installer/admin.py::setup_admin_and_oauth
-# @reason interactive input wrapper owned by the admin/OAuth setup flow
 @validate_input("Enter permanent site Owner Google account email")
-def _get_admin_email(value):
+def _get_admin_email(value: str) -> str:
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_google_signin_is_an_explicit_preserved_setup_choice
-# @matrix setup : google-oauth optional rerun settings-save
-def configure_google_signin_choice():
+def configure_google_signin_choice() -> bool:
     """Read or collect the persisted operator choice for Google sign-in."""
     from config import SETTINGS
 
@@ -568,11 +549,7 @@ def configure_google_signin_choice():
     return enabled
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_setup_automatically_enables_google_and_installer_bootstrap
-# @matrix admin : google-oauth interactive-input prompt-clarity
-# @matrix setup : owner preconfirmation
-def collect_owner_and_signin_choice(installer_email=None):
+def collect_owner_and_signin_choice(installer_email: str | None = None) -> bool:
     """Collect permanent ownership and resolve the Google sign-in requirement."""
     from config import SETTINGS
 
@@ -604,13 +581,7 @@ def collect_owner_and_signin_choice(installer_email=None):
     return configure_google_signin_choice()
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_disabled_google_signin_skips_oauth_setup
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_admin_oauth_rejection_precedes_provider_update
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_existing_admin_oauth_can_replace_rejected_saved_client
-# @matrix setup : admin client-type disabled-provider failure-isolation identity-platform interactive-retry oauth optional redirect-uri settings-save
-def setup_admin_and_oauth():
+def setup_admin_and_oauth() -> bool | None:
     """Configure the admin and Identity Platform's Google provider."""
     from config import SETTINGS
     from installer.identity import setup_google_provider
@@ -646,6 +617,8 @@ def setup_admin_and_oauth():
             saved_client_id,
             SETTINGS.APP["GOOGLE_LOGIN_URI"],
         )
+        if not isinstance(saved_client_id, str):
+            raise ProviderInvalidInput("The saved OAuth client ID must be a string.")
         client_id = saved_client_id
         try:
             setup_google_provider(client_id)
@@ -667,10 +640,7 @@ def setup_admin_and_oauth():
             SETTINGS.save()
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_cli_replaces_settings_and_deploys
-# @matrix setup : cli client-type deploy identity-platform oauth redirect-uri settings-save
-def configure_oauth():
+def configure_oauth() -> int:
     """Replace Google Sign-In OAuth settings for an existing installation."""
     from .verify import prepare_existing_installation
 
@@ -717,10 +687,6 @@ def configure_oauth():
     return 0
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_setup_automatically_enables_google_and_installer_bootstrap
-# @matrix admin : bootstrap-email google-signin
-# @matrix setup : billing delegated-install existing-project project-iam
 def _configure_delegated_bootstrap(
     preflight,
     account,

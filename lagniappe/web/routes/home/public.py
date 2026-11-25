@@ -1,5 +1,12 @@
 """Anonymous directory and crawler discovery endpoints."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import Response, abort, make_response, redirect, render_template, url_for
 from flask_login import current_user
 
@@ -12,19 +19,15 @@ from lagniappe.core.tools.site import public_pages
 from . import home
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002h_home_permissions.py::test_public_directory_renders_cached_page_groups
-# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_directory_lists_manual_in_collapsed_group
-# @matrix public-directory : anonymous-access collapsible empty-state login manual metadata page-cards redis-cache
 @home.route("/public/", methods=["GET"])
-def public_directory():
+def public_directory() -> ResponseReturnValue:
     snapshot = cache.cached_public_directory(
         public_pages.public_directory_snapshot
     )
     groups = list(snapshot["groups"])
     if CONFIG.PUBLIC_MANUAL:
         groups.append(public_pages.manual_directory_group())
-    groups.sort(key=lambda group: group["name"].casefold())
+    groups.sort(key=public_pages.directory_group_sort_key)
 
     has_content = any(group["pages"] for group in groups)
     if not has_content and not current_user.is_authenticated:
@@ -56,13 +59,8 @@ def public_directory():
     return response
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_public_page_indexing_saves_live_setting
-# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_discovery_follows_live_setting
-# @matrix public-pages robots : disabled enabled
-# @matrix manual robots : disabled enabled fragment
 @home.route("/robots.txt", methods=["GET"])
-def robots():
+def robots() -> ResponseReturnValue:
     indexing = public_pages.runtime_settings()["PUBLIC_PAGE_INDEXING"]
     content = public_pages.robots_text(
         indexing,
@@ -72,13 +70,8 @@ def robots():
     return Response(content, mimetype="text/plain")
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_public_page_indexing_saves_live_setting
-# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_discovery_follows_live_setting
-# @matrix public-pages sitemap : disabled enabled redis-cache
-# @matrix manual sitemap : disabled enabled public-url
 @home.route("/sitemap.xml", methods=["GET"])
-def sitemap():
+def sitemap() -> ResponseReturnValue:
     snapshot = cache.cached_public_directory(
         public_pages.public_directory_snapshot
     )

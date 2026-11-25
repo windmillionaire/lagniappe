@@ -24,7 +24,7 @@ placeholder display. `SelectBox` uses `Submitter(Combobox)`, while `FacetsBox`
 wraps `RemoteQueryCombobox` so it gets both selection and remote-query
 lifecycle behavior.
 
-## Combobox Base (`combobox.mjs`)
+## Combobox Base (`combobox.ts`)
 
 ### Construction
 
@@ -70,7 +70,7 @@ reference. Title action menus use these options to anchor the panel's
 
 **`hidePanel()`** closes the panel, removes panel handlers, and stops auto-update.
 
-## Remote Query Lifecycle (`remote.mjs`, `shared/queryLifecycle.mjs`)
+## Remote Query Lifecycle (`remote.ts`, `shared/queryLifecycle.ts`)
 
 `RemoteQueryCombobox` owns the exact input listener, a cancellable 200ms
 debounce, and a `QueryLifecycle`. Raw input invalidates the active epoch and
@@ -113,7 +113,7 @@ Pointer hover makes an option active, pointer down is cancelled to preserve
 focus on the trigger, and click selects the option. Clicking outside the
 trigger and panel closes and deactivates the combobox.
 
-## Submitter Mixin (`submitter.mjs`)
+## Submitter Mixin (`submitter.ts`)
 
 Wraps a `Combobox` subclass to add value management. Used by `SelectBox` and `FacetsBox`.
 
@@ -132,7 +132,7 @@ Wraps a `Combobox` subclass to add value management. Used by `SelectBox` and `Fa
 
 For single-select: clears previous, adds new value, closes panel. For multi-select: toggles the value and its checkbox, keeps panel open.
 
-## Results (`results.mjs`)
+## Results (`results.ts`)
 
 Manages recent selections in `localStorage` and generates option HTML.
 
@@ -152,7 +152,7 @@ Three rendering modes based on the `index`:
 
 ## Subclass Details
 
-### SelectBox (`select.mjs`)
+### SelectBox (`select.ts`)
 
 Used by the `SelectElement` form element for dropdown selects. Replaces the native `<select>` with a typeahead combobox input.
 
@@ -166,7 +166,7 @@ activation rather than submitting an unavailable choice.
 
 **`addOption(option)`** dynamically adds a new option to the items list and refreshes the panel.
 
-### FacetsBox (`facets.mjs`)
+### FacetsBox (`facets.ts`)
 
 Used by the `LinkElement` for internal entity links. Searches the server index on input.
 
@@ -190,7 +190,7 @@ and `page`; users and model tasks are intentionally excluded.
 
 **`selectOption(option)`** calls the `Submitter` base (adds to values), then saves to recent results.
 
-### LocationBox (`location.mjs`)
+### LocationBox (`location.ts`)
 
 Used by the `LocationElement` for Google Places autocomplete. Ordinary authenticated page startup updates only the user's timezone and does not touch browser geolocation. `LocationBox.init()` starts the retryable, per-page location update, so the browser permission prompt appears only on a view that actually loads a location control. Clicking the control joins or retries that update as a fallback.
 
@@ -200,7 +200,7 @@ location update before its request so the server session can bias the first
 Places result set. A current response always retains the manual-address row,
 including when the remote request has no matches.
 
-### SearchBox (`search.mjs`)
+### SearchBox (`search.ts`)
 
 The global search bar, mounted by the observer on `[lp-search]` elements. Does **not** use `Submitter` -- it navigates to results instead of selecting values.
 
@@ -223,7 +223,7 @@ results as `SearchBox`, but selecting an option applies `option.dataset.url` to
 the current editor link instead of navigating. URLs and queries shorter than
 three characters clear remote rows and invalidate active reads.
 
-### Dropdown (`dropdown.mjs`)
+### Dropdown (`dropdown.ts`)
 
 A general-purpose dropdown menu used by title actions, the editor toolbar, and
 compact navigation/tools menus. It does not use `Submitter`.

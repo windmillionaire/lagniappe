@@ -5,15 +5,14 @@ import { createBrowser } from "../utility/js/environment.mjs";
 async function setup(t) {
 	createBrowser(t, { url: "https://example.test/" });
 	const [{ formatting }, { Results }, { STYLES }] = await Promise.all([
-		import("../../src/script/elements/formatting.mjs"),
-		import("../../src/script/elements/combobox/results.mjs"),
+		import("../../src/script/elements/formatting.ts"),
+		import("../../src/script/elements/combobox/results.ts"),
 		import("../../src/script/generated/styles.mjs"),
 	]);
 	return { formatting, Results, STYLES };
 }
 
 /**
- * @matrix entity-name : accessibility parent-separator wrapping
  * @styles entity.name.wrapper entity.name.parent entity.name.separator
  */
 test("test_formatting_name_uses_a_text_separator_and_shared_wrapping_structure", async (t) => {
@@ -77,7 +76,6 @@ test("test_formatting_name_uses_a_text_separator_and_shared_wrapping_structure",
 	);
 });
 
-/** @pair user-groups:query-route */
 test("test_group_name_uses_canonical_user_index_url", async (t) => {
 	const { formatting } = await setup(t);
 	const formatted = formatting.name({
@@ -94,7 +92,6 @@ test("test_group_name_uses_canonical_user_index_url", async (t) => {
 	);
 });
 
-/** @pair model-task:reference-links */
 test("test_model_task_link_opens_in_progress_filter", async (t) => {
 	const { formatting } = await setup(t);
 	const project = { id: "project-1", kind: "project", name: "Project" };
@@ -112,7 +109,6 @@ test("test_model_task_link_opens_in_progress_filter", async (t) => {
 });
 
 /**
- * @matrix combobox entity-name : parent-separator recent-results
  * @styles entity.name.wrapper entity.name.parent entity.name.separator
  */
 test("test_recent_combobox_results_reuse_shared_parent_name_formatting", async (t) => {
@@ -161,7 +157,6 @@ test("test_recent_combobox_results_reuse_shared_parent_name_formatting", async (
 	);
 });
 
-/** @pair search:snippet-safety */
 test("test_recent_search_snippets_allow_only_highlight_markup", async (t) => {
 	const { Results } = await setup(t);
 	const recentHtml = new Results("search").create([

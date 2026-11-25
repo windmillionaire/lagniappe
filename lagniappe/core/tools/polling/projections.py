@@ -1,5 +1,19 @@
 """Runtime-safe projections for the adaptive browser polling contract."""
 
+from collections.abc import Callable, Iterable, Mapping
+from enum import Enum
+from typing import TYPE_CHECKING, Protocol, cast
+
+if TYPE_CHECKING:
+    from ...entities.entity import Entity
+    from ...entities.page import Page
+    from ...entities.user import User
+    from ...properties.deferred_job_lifecycle import JobStatus
+    from ..cache.notification_state import NotificationState
+    from ..cache.operations import OperationState
+    from ..deferred_jobs.locks import ActiveLock
+    from .contract import KeyDescriptor, OperationDescriptor
+
 import hashlib
 import json
 
@@ -9,6 +23,17 @@ from lagniappe.core.tools import cache
 from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
+
+
+type StatusLoader = Callable[[list[str], User], list[JobStatus]]
+
+
+class StatusWriter(Protocol):
+    def __call__(self, *statuses: JobStatus) -> object: ...
+
+
+class _Unspecified(Enum):
+    NOTIFICATION_STATE = "notification_state"
 
 
 PERSONAL_CHANNELS = frozenset({"starred", "tool-reports"})
@@ -34,55 +59,38 @@ CHANNEL_REVISION_PATHS = {
 }
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_filter_revision_tracks_parent_definition_and_viewer_permissions
-# @matrix filters polling : saved-filter permissions revision
-def filter_revision(entity, user):
+def filter_revision(entity: Entity, user: User) -> str:
     """Scope a saved Filter's parent/definition revision to its viewer."""
     return f"{entity.fingerprint}:{user.authorization_fingerprint}"
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_filter_result_revision_includes_tasks_only_for_projects
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
-# @matrix filters polling : saved-filter permissions revision
-def filter_result_revision(entity, user):
+def filter_result_revision(entity: Entity, user: User) -> str:
     """Include every durable authority used by a preview or saved result page."""
-    parent = entity.parent if entity.entity_kind == "filter" else entity
+    parent = cast("Entity", entity.parent) if entity.entity_kind == "filter" else entity
     revision = filter_revision(entity, user)
     if parent.entity_kind == "project":
         revision += f":{database_utility.site_fingerprint('/tasks/index')}"
     return revision
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_page_tasks_revision_changes_with_saved_forms_without_loading_tasks
-# @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_saved_relabels_preserve_active_task_answers_and_conditions
-# @matrix tasks forms : cache-invalidation live-metadata
-def page_tasks_revision(page, user):
+def page_tasks_revision(page: Page, user: User) -> str:
     """Include saved Task Form definitions without reading the Page's Tasks."""
     return f"{page.fingerprint}:{database_utility.site_fingerprint('/forms/index')}"
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
-# @matrix polling : channel mounted-scope permissions revision
-def channel_paths(channel):
+def channel_paths(channel: str) -> tuple[str, ...]:
     """Return the durable fingerprint paths owned by one polling channel."""
     return CHANNEL_REVISION_PATHS.get(channel, (f"/{channel}/index",))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/projections.py::channel_revisions
-# @reason single-channel hashing is exercised through the batched public projection
 def channel_revision(
-    channel,
-    user,
+    channel: str,
+    user: User,
     *,
-    site_fingerprint=None,
-    site_fingerprints=None,
-    notification_state=None,
-):
+    site_fingerprint: Callable[[str], str | None] | None = None,
+    site_fingerprints: Mapping[str, str | None] | None = None,
+    notification_state: NotificationState | None = None,
+) -> str:
     """Return an opaque durable revision scoped to the supplied viewer."""
     site_fingerprint = site_fingerprint or database_utility.site_fingerprint
     entity_revision = getattr(user, "fingerprint", None)
@@ -122,21 +130,17 @@ def channel_revision(
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
-_NOTIFICATION_STATE_UNSET = object()
+_NOTIFICATION_STATE_UNSET = _Unspecified.NOTIFICATION_STATE
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
-# @matrix polling : batching channel mounted-scope
-# @pair messaging:polling-revision
 def channel_revisions(
-    channels,
-    user,
+    channels: Iterable[str],
+    user: User,
     *,
-    fingerprint_loader=None,
-    notification_state=_NOTIFICATION_STATE_UNSET,
-    notification_loader=None,
-):
+    fingerprint_loader: Callable[[tuple[str, ...]], Mapping[str, str | None]] | None = None,
+    notification_state: NotificationState | None | _Unspecified = _NOTIFICATION_STATE_UNSET,
+    notification_loader: Callable[[User], NotificationState | None] | None = None,
+) -> dict[str, str]:
     """Resolve requested channel cursors through one site-fingerprint batch."""
     channels = tuple(dict.fromkeys(channels))
     paths = tuple(
@@ -161,7 +165,7 @@ def channel_revisions(
             site_fingerprints=fingerprints,
             notification_state=(
                 notification_state
-                if notification_state is not _NOTIFICATION_STATE_UNSET
+                if not isinstance(notification_state, _Unspecified)
                 else None
             ),
         )
@@ -169,19 +173,15 @@ def channel_revisions(
     }
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_operation_statuses_skip_fresh_cached_jobs_and_batch_stale_jobs
-# @matrix deferred-jobs : cache-failure-isolation owner redis-projection
-# @matrix polling : batching permissions revision
 def operation_statuses(
-    descriptors,
-    user,
+    descriptors: list[OperationDescriptor],
+    user: User,
     *,
-    status_loader=None,
-    state_loader=None,
-    state_writer=None,
-    now=None,
-):
+    status_loader: StatusLoader | None = None,
+    state_loader: Callable[[list[str]], dict[str, OperationState | None]] | None = None,
+    state_writer: StatusWriter | None = None,
+    now: float | None = None,
+) -> tuple[dict[str, JobStatus], set[str]]:
     """Load only operations missing a fresh owner-safe Redis revision."""
     status_loader = status_loader or DeferredJobs.statuses
     state_loader = state_loader or cache.peek_operation_states
@@ -234,11 +234,7 @@ def operation_statuses(
     return statuses, unchanged
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_render_operation_statuses_batches_and_attaches_known_jobs
-# @matrix deferred-jobs : server-render status
-# @pair polling:batching
-def render_operation_statuses(entities, user, *, status_loader=None):
+def render_operation_statuses(entities: Iterable[Entity] | None, user: User, *, status_loader: StatusLoader | None = None) -> dict[str, JobStatus]:
     """Attach current status projections to server-rendered operation owners."""
     status_loader = status_loader or DeferredJobs.statuses
     entities = list(entities or ())
@@ -268,9 +264,6 @@ def render_operation_statuses(entities, user, *, status_loader=None):
     return statuses
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/projections.py::lock_result
-# @reason result envelope construction is asserted through the public lock projection
 def _result(descriptor, status, *, revision=None, payload=None):
     result = {
         "id": descriptor["id"],
@@ -285,9 +278,6 @@ def _result(descriptor, status, *, revision=None, payload=None):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/projections.py::lock_result
-# @reason revision comparison is asserted through the public lock projection
 def _revision_result(descriptor, revision, payload=None):
     changed = descriptor["revision"] != revision
     return _result(
@@ -298,10 +288,7 @@ def _revision_result(descriptor, revision, payload=None):
     )
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_form_lock_revision_is_independent_of_entity_fingerprint
-# @pairs deferred-jobs:form-lock polling:revision
-def lock_result(descriptor, entity, active_locks, *, user):
+def lock_result(descriptor: KeyDescriptor, entity: Entity | None, active_locks: Mapping[str, ActiveLock], *, user: User) -> dict[str, object]:
     """Project one form lock without reading Flask's process-global actor."""
     if not entity or not entity.allowed(Action.VIEW, user=user):
         return _result(descriptor, "unavailable")

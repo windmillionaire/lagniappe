@@ -17,18 +17,17 @@ function replaceGlobal(t, name, value) {
 }
 
 async function loadTaskSettings({ FormWidget, SectionToggle = {} }) {
-	return await esmock.strict("../../src/script/widgets/taskSettings.mjs", {
-		"../../src/script/elements/input.mjs": { InputElement: class {} },
-		"../../src/script/elements/sectionToggle.mjs": { SectionToggle },
-		"../../src/script/elements/textarea.mjs": { TextareaElement: class {} },
-		"../../src/script/shared/transitions.mjs": {
+	return await esmock.strict("../../src/script/widgets/taskSettings.ts", {
+		"../../src/script/elements/input.ts": { InputElement: class {} },
+		"../../src/script/elements/sectionToggle.ts": { SectionToggle },
+		"../../src/script/elements/textarea.ts": { TextareaElement: class {} },
+		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
-		"../../src/script/widgets/base/formWidget.mjs": { FormWidget },
+		"../../src/script/widgets/base/formWidget.ts": { FormWidget },
 	});
 }
 
-/** @matrix tasks : attach-form model-task-link retained-draft manual-form-choice */
 test("test_model_task_selection_replaces_form_and_preserves_later_manual_choice", async () => {
 	class FormWidget {
 		constructor(attributes) {
@@ -86,23 +85,22 @@ test("test_model_task_selection_replaces_form_and_preserves_later_manual_choice"
 	choose("project", { id: "first-model", kind: "model", form: first });
 });
 
-/** @matrix tasks : active-widget complete uncomplete update-state */
 test("test_closed_task_errors_persist_while_waiting_and_retrying", async (t) => {
 	createBrowser(t);
 	t.mock.timers.enable({ apis: ["setTimeout"], now: 0 });
 	const { default: ViewComponent } = await esmock.strict(
-		"../../src/script/views/base/component.mjs",
+		"../../src/script/views/base/component.ts",
 		{
-			"../../src/script/elements/nav.mjs": { NavElement: class {} },
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/elements/nav.ts": { NavElement: class {} },
+			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
 				},
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
-			"../../src/script/widgets/loader.mjs": {
+			"../../src/script/widgets/loader.ts": {
 				loadWidget: async () => null,
 			},
 		},
@@ -150,7 +148,6 @@ test("test_closed_task_errors_persist_while_waiting_and_retrying", async (t) => 
 	}
 });
 
-/** @matrix tasks : history-fill latest-submission incompatible-value stale-response */
 test("test_task_history_fill_reports_incompatible_values_and_ignores_stale_responses", async () => {
 	class FormWidget {
 		constructor(attributes) {
@@ -162,17 +159,17 @@ test("test_task_history_fill_reports_incompatible_values_and_ignores_stale_respo
 		get: () => new Promise((resolve) => pending.push(resolve)),
 	};
 	const { TaskForm } = await esmock.strict(
-		"../../src/script/widgets/taskForm.mjs",
+		"../../src/script/widgets/taskForm.ts",
 		{
-			"../../src/script/elements/sections.mjs": { sections: {} },
-			"../../src/script/forms/controller.mjs": { FormController: class {} },
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/elements/sections.ts": { sections: {} },
+			"../../src/script/forms/controller.ts": { FormController: class {} },
+			"../../src/script/shared/index.ts": {
 				captureError() {
 					throw new Error("unexpected request error");
 				},
 				request,
 			},
-			"../../src/script/widgets/base/formWidget.mjs": { FormWidget },
+			"../../src/script/widgets/base/formWidget.ts": { FormWidget },
 		},
 	);
 	const errors = [];
@@ -234,7 +231,6 @@ test("test_task_history_fill_reports_incompatible_values_and_ignores_stale_respo
 	assert.equal(controls.length, 2);
 });
 
-/** @matrix tasks : history-fill stale-response */
 test("test_history_fill_waits_without_overwriting_new_input", async (t) => {
 	const fakeDocument = {
 		createElement: () => ({
@@ -250,13 +246,13 @@ test("test_history_fill_waits_without_overwriting_new_input", async (t) => {
 	};
 	replaceGlobal(t, "document", fakeDocument);
 	const { BaseElement } = await esmock.strict(
-		"../../src/script/elements/base/baseElement.mjs",
+		"../../src/script/elements/base/baseElement.ts",
 		{
 			"../../src/script/generated/styles.mjs": {
 				STYLES: { form: { icon: "icon" } },
 			},
-			"../../src/script/shared/icons.mjs": { setIcon() {} },
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
+			"../../src/script/shared/icons.ts": { setIcon() {} },
+			"../../src/script/elements/primitives.ts": { primitives: {} },
 		},
 	);
 	const filled = [];
@@ -298,7 +294,6 @@ test("test_history_fill_waits_without_overwriting_new_input", async (t) => {
 	assert.deepEqual(filled, ["7"]);
 });
 
-/** @matrix tasks : active-widget complete history-refresh uncomplete */
 test("test_task_completion_replaces_closed_row_in_one_transition", async () => {
 	const transitions = [];
 	let committing = false;
@@ -314,29 +309,29 @@ test("test_task_completion_replaces_closed_row_in_one_transition", async () => {
 		}
 	};
 	const { default: ViewComponent } = await esmock.strict(
-		"../../src/script/views/base/component.mjs",
+		"../../src/script/views/base/component.ts",
 		{
-			"../../src/script/elements/nav.mjs": { NavElement: class {} },
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/elements/nav.ts": { NavElement: class {} },
+			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
 				},
 			},
-			"../../src/script/shared/transitions.mjs": { withTransition },
-			"../../src/script/widgets/loader.mjs": {
+			"../../src/script/shared/transitions.ts": { withTransition },
+			"../../src/script/widgets/loader.ts": {
 				loadWidget: async () => null,
 			},
 		},
 	);
-	const { Task } = await esmock.strict("../../src/script/views/base/task.mjs", {
-		"../../src/script/shared/transitions.mjs": { withTransition },
-		"../../src/script/views/base/component.mjs": { default: ViewComponent },
+	const { Task } = await esmock.strict("../../src/script/views/base/task.ts", {
+		"../../src/script/shared/transitions.ts": { withTransition },
+		"../../src/script/views/base/component.ts": { default: ViewComponent },
 	});
 	const { PageTaskList } = await esmock.strict(
-		"../../src/script/widgets/pageTaskList.mjs",
+		"../../src/script/widgets/pageTaskList.ts",
 		{
-			"../../src/script/elements/base/baseList.mjs": { BaseList: class {} },
-			"../../src/script/shared/transitions.mjs": { withTransition },
+			"../../src/script/elements/base/baseList.ts": { BaseList: class {} },
+			"../../src/script/shared/transitions.ts": { withTransition },
 		},
 	);
 
@@ -498,7 +493,6 @@ test("test_task_completion_replaces_closed_row_in_one_transition", async () => {
 	await updateTask({ completed: true, nextCompleted: false, cancel: true });
 });
 
-/** @matrix tasks : action-control-lifecycle teardown */
 test("test_task_settings_awaits_action_controls_and_cleans_up", async () => {
 	const events = [];
 	let resolveUpload;
@@ -613,20 +607,19 @@ test("test_task_settings_awaits_action_controls_and_cleans_up", async () => {
 	assert.equal(updatedListener, null);
 });
 
-/** @matrix forms : schema-ownership sibling-widgets */
 test("test_form_response_metadata_stays_with_renderer_widget", async () => {
 	class FormController {}
 	const { FormWidget } = await esmock.strict(
-		"../../src/script/widgets/base/formWidget.mjs",
+		"../../src/script/widgets/base/formWidget.ts",
 		{
-			"../../src/script/forms/controller.mjs": { FormController },
-			"../../src/script/forms/migrationNotice.mjs": {
+			"../../src/script/forms/controller.ts": { FormController },
+			"../../src/script/forms/migrationNotice.ts": {
 				installMigrationNotice: () => null,
 			},
-			"../../src/script/forms/representation.mjs": {
+			"../../src/script/forms/representation.ts": {
 				compatibleField: () => true,
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 		},

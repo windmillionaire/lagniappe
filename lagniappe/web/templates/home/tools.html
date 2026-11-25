@@ -36,6 +36,24 @@
         <p class="text-xs text-base-medium">Send questions, requests, or files here. Proposed changes require review.</p>
       </div>
     {% endif %}
+    {% if CONFIG.AI_ENABLED and current_user.access(AI.CREATE) and auto_execute_site_enabled() %}
+      <label data-role="auto-execute-control"
+             class="{{ styles.checkbox.label }} -mt-2 cursor-pointer">
+        <div class="{{ styles.checkbox.container }} mt-0.5">
+          <input type="checkbox"
+                 name="auto_execute"
+                 value="true"
+                 data-default-checked="{{ current_user.allow_auto_execute|yesno }}"
+                 {% if current_user.allow_auto_execute %}checked{% endif %}
+                 class="{{ styles.checkbox.default }}">
+          {{ render_icon("check", styles.checkbox.icon) }}
+        </div>
+        <span class="flex flex-col gap-0.5 font-normal">
+          <strong class="font-semibold text-base-dark">Run safe changes automatically</strong>
+          <span class="text-xs text-base-medium">Form schema changes and flagged items still pause for review.</span>
+        </span>
+      </label>
+    {% endif %}
     <div class="{{ styles.form.submit.group }} -mt-2 flex flex-col gap-2"
          data-role="submit-group">
       <button type="submit"
@@ -48,8 +66,9 @@
 
 {% macro report_list(reports) %}
   <div data-widget="ToolReportList"
-      data-visible="false"
-      class="flex flex-col gap-3">
+       data-route='{{ url_for("internal.get", kind="tools") }}'
+       data-visible="false"
+       class="flex flex-col gap-3">
     <div role="group" aria-label="Report types" class="flex flex-wrap gap-2">
       {% for value, label in [("active", "Active"), ("executed", "Executed"), ("answers", "Answers")] %}
         <button type="button"
@@ -72,13 +91,35 @@
               class="{{ styles.home.reportClear }}"
               hidden>
         {{ render_icon("trash.inactive", styles.icon.default) }}
-        <span>Delete all executed proposals</span>
+        <span data-role="delete-executed-label">Delete all executed proposals</span>
       </button>
       <p data-role="report-empty" class="p-3 text-sm text-base-medium" hidden></p>
       <ul data-role="report-items" class="divide-y divide-base-light/50">
         {% for report in reports.list %}{{ report_item(report) }}{% endfor %}
       </ul>
     </div>
+    {% if reports.cursor or reports.back %}
+      <div class="{{ styles.home.pagination.container }}">
+        {% if reports.back %}
+          <button type="button"
+                  class="{{ styles.home.pagination.button }}"
+                  lp-control="previous"
+                  aria-label="First page of reports"
+                  data-route='{{ url_for("internal.get", kind="tools", cursor=None) }}'>
+            {{ render_icon("start") }}
+          </button>
+        {% endif %}
+        {% if reports.cursor %}
+          <button type="button"
+                  class="{{ styles.home.pagination.button }}"
+                  lp-control="next"
+                  aria-label="Next page of reports"
+                  data-route='{{ url_for("internal.get", kind="tools", cursor=reports.cursor) }}'>
+            {{ render_icon("next") }}
+          </button>
+        {% endif %}
+      </div>
+    {% endif %}
     <template data-role="report-delete-template">
       {% include "delete/executed_reports.html" %}
     </template>
@@ -193,10 +234,16 @@
       <div class="{{ styles.home.card.actions }} translate-y-0.5">{{ controls.delete(label='Delete ' ~ report.name) }}</div>
     </div>
     <div class="{{ styles.home.ingress.details }}">
-      <p data-role="report-snippet" class="line-clamp-5 break-words font-normal">
-        {% if report.pending %}{{ render_icon("spinner", "mr-1") }}{% endif %}
-        <span>{{ report.note|format_markdown_text }}</span>
-      </p>
+      {% if report.pending %}
+        <p data-role="report-snippet" class="flex items-center gap-1.5 break-words font-normal">
+          {{ render_icon("spinner", "icon-sm shrink-0") }}
+          <span>{{ report.note|format_markdown_text }}</span>
+        </p>
+      {% else %}
+        <p data-role="report-snippet" class="line-clamp-5 break-words font-normal">
+          <span>{{ report.note|format_markdown_text }}</span>
+        </p>
+      {% endif %}
       {{ generation_controls(report) }}
     </div>
   </li>
@@ -205,7 +252,7 @@
 
 {% macro generation_controls(report) %}
   {% if report.available and report.pending and report.status in ['pending', 'revising'] and report.deferred_job %}
-    <form method="post" action="{{ url_for('tools.cancel_generation', job_key=report.deferred_job.key) }}" data-role="cancel-generation-form">
+    <form method="post" action="{{ url_for('tools.cancel_generation', job_key=report.deferred_job.key) }}" data-role="cancel-generation-form" class="mt-2">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
       <input type="hidden" name="operation-id" value="{{ report.deferred_job.idempotency_key }}" />
       <button type="submit" class="{{ styles.button.submit }}">Cancel</button>

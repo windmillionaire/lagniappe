@@ -5,7 +5,7 @@ The filter system lets users create saved filter conditions on categories and pr
 ## Architecture
 
 ```
-Frontend (filters.mjs widget)
+Frontend (filters.ts widget)
   │
   ├── GET  /filters/{key}/condition  → Build condition UI
   ├── GET  /filters/{key}/options    → Get comparator + value inputs
@@ -246,7 +246,7 @@ All routes are on the `filters` blueprint (`/filters` prefix).
 
 ## Frontend Integration
 
-The `Filters` widget (`src/script/widgets/filters.mjs`) manages the filter builder
+The `Filters` widget (`src/script/widgets/filters.ts`) manages the filter builder
 UI. Server-rendered badges contain explicit condition DTOs; preview/save wraps
 them in one v1 `contract` form value. The test endpoint returns a rendered table
 for preview, while save returns a filter list item. Saved filters can be loaded

@@ -1,12 +1,9 @@
 """Filter field types, comparators, options, and serializable definitions."""
 
-from enum import Enum
 import json
+from enum import Enum
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/entities/condition.py::Condition.set_value
-# @covered-by lagniappe/core/entities/filter.py::Filter.conditions
 class FieldType(Enum):
     """Data types for filter fields. Determines available comparators."""
 
@@ -17,9 +14,6 @@ class FieldType(Enum):
     LIST = "list"
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/entities/condition.py::Condition.set_value
-# @covered-by lagniappe/core/entities/filter.py::Filter.conditions
 class Comparator(Enum):
     """Comparison operators for filter conditions."""
 
@@ -160,9 +154,6 @@ class CheckboxOptions(Enum):
     IS_FALSE = "not checked"
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/entities/condition.py::Condition.set_value
-# @covered-by lagniappe/core/properties/form.py::FormFilters.conditions
 class FilterOptions(Enum):
     """Maps field types to their available comparator option enums."""
 
@@ -183,10 +174,6 @@ class FilterOptions(Enum):
     CHECKBOX = CheckboxOptions
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/condition.py::Condition.set_value
-# @covered-by lagniappe/core/entities/filter.py::Filter.conditions
-# @reason serialized filter definitions are owned by condition creation workflows
 class FilterDefinition:
     """Serializable filter condition (entity_hash, field, type, comparator, value).
 
@@ -195,8 +182,14 @@ class FilterDefinition:
     """
 
     def __init__(
-        self, entity_hash, field, field_type, comparator, value, is_entity_valued
-    ):
+        self,
+        entity_hash: str,
+        field: str,
+        field_type: FieldType | str,
+        comparator: Comparator | str,
+        value: object,
+        is_entity_valued: bool,
+    ) -> None:
         self.entity_hash = entity_hash
         self.field = field
         self.field_type = FieldType(field_type)
@@ -204,14 +197,11 @@ class FilterDefinition:
         self.value = value
         self.is_entity_valued = is_entity_valued
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.entity_hash} {self.field} {self.field_type.value} {self.comparator.value} {self.value} {self.is_entity_valued}"
 
-    # @testable true
-    # @tests tests_unit/test_012b_form_conditions.py::test_zero_number_condition_survives_saved_filter_serialization
-    # @matrix filters : condition-definition number round-trip zero
     @property
-    def description(self):
+    def description(self) -> list[object]:
         """Serializable list representation for storage."""
         if self.is_entity_valued:
             return [
@@ -239,11 +229,16 @@ class FilterDefinition:
             ]
 
     @classmethod
-    def load(cls, definition):
+    def load(cls, definition: str | list[object]) -> FilterDefinition:
         """Create from a serialized description (JSON string or list)."""
         attrs = json.loads(definition) if isinstance(definition, str) else definition
+        if len(attrs) < 4:
+            raise TypeError("Filter definitions require an entity, field, type and comparator")
+        entity_hash, field, field_type, comparator = attrs[:4]
+        if not isinstance(entity_hash, str) or not isinstance(field, str):
+            raise TypeError("Filter entity and field identifiers must be strings")
         return cls(
-            *attrs[0:4],
+            entity_hash, field, FieldType(field_type), Comparator(comparator),
             attrs[4] if len(attrs) > 4 else None,
-            attrs[5] if len(attrs) > 5 else False,
+            bool(attrs[5]) if len(attrs) > 5 else False,
         )

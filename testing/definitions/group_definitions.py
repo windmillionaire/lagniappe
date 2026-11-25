@@ -1,12 +1,11 @@
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
 class GroupDefinition:
     name: str = ""
-    public: Optional[bool] = False
-    permission_definition: Optional[str] = None
+    public: bool | None = False
+    permission_definition: str | None = None
 
 
 set_general = GroupDefinition(

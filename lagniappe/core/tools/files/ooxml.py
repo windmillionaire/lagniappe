@@ -1,9 +1,10 @@
 """Bounded text extraction for Office Open XML files."""
 
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
+from typing import Protocol
 import os
 import posixpath
 import re
@@ -14,6 +15,10 @@ import zipfile
 from xml.parsers import expat
 
 from ...definitions.file_consumers import LARGE_ASSET_BYTES
+
+
+class BinaryReader(Protocol):
+    def read(self, size: int = -1, /) -> bytes: ...
 
 
 DOCX_MIMETYPE = (
@@ -86,9 +91,6 @@ class OOXMLTruncationReason(Enum):
     DEADLINE = "deadline"
 
 
-# @testable true
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_output_budget_returns_typed_partial_result
-# @pair files:partial-result
 @dataclass(frozen=True)
 class OOXMLExtractionResult:
     """Extracted text and explicit partial-result metadata."""
@@ -96,11 +98,8 @@ class OOXMLExtractionResult:
     text: str
     truncation_reason: OOXMLTruncationReason | None = None
 
-    # @testable true
-    # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_output_budget_returns_typed_partial_result
-    # @pair files:partial-result
     @property
-    def truncated(self):
+    def truncated(self) -> bool:
         return self.truncation_reason is not None
 
 
@@ -112,8 +111,6 @@ class _OOXMLPolicyError(ValueError):
     """Internal package or parser policy failure."""
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
 class _PartialExtraction(Exception):
     """Internal bounded traversal stop with a visible reason."""
 
@@ -122,10 +119,6 @@ class _PartialExtraction(Exception):
         self.reason = reason
 
 
-# @testable true
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_returns_partial_text_for_worksheet_work_limits
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_production_policy_defaults_are_fixed
-# @matrix files : ooxml partial-result policy
 @dataclass
 class _ExtractionBudget:
     policy: OOXMLPolicy
@@ -137,22 +130,16 @@ class _ExtractionBudget:
     rows: int = 0
     cells: int = 0
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def check_deadline(self):
         if time.monotonic() - self.started_at > self.policy.seconds:
             raise _PartialExtraction(OOXMLTruncationReason.DEADLINE)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def add_xml_bytes(self, size):
         if self.xml_bytes + size > self.policy.xml_bytes:
             raise _PartialExtraction(OOXMLTruncationReason.XML_BYTES)
         self.xml_bytes += size
         self.check_deadline()
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def add_element(self):
         self.elements += 1
         if self.elements > self.policy.xml_elements:
@@ -160,32 +147,23 @@ class _ExtractionBudget:
         if self.elements % 256 == 0:
             self.check_deadline()
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def add_sheet(self):
         self.sheets += 1
         if self.sheets > self.policy.sheets:
             raise _PartialExtraction(OOXMLTruncationReason.SHEETS)
         self.check_deadline()
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def add_row(self):
         self.rows += 1
         if self.rows > self.policy.rows:
             raise _PartialExtraction(OOXMLTruncationReason.ROWS)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def add_cell(self):
         self.cells += 1
         if self.cells > self.policy.cells:
             raise _PartialExtraction(OOXMLTruncationReason.CELLS)
 
 
-# @testable true
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_output_limit_does_not_parse_later_worksheets
-# @matrix files : ooxml output-budget partial-result
 class _TextOutput:
     def __init__(self, max_characters):
         self.max_characters = max_characters
@@ -193,8 +171,6 @@ class _TextOutput:
         self.length = 0
         self.has_lines = False
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def _append(self, value):
         if not value:
             return
@@ -208,8 +184,6 @@ class _TextOutput:
         self.parts.append(value)
         self.length += len(value)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def add_line(self, line):
         if not line or not line.strip():
             return
@@ -217,23 +191,17 @@ class _TextOutput:
         self.has_lines = True
         self._append(f"{prefix}{line}")
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     @property
     def text(self):
         return "".join(self.parts).strip()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
 class _CappedText:
     def __init__(self, limit):
         self.limit = limit
         self.parts = []
         self.length = 0
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def append(self, value):
         if not value:
             return
@@ -244,29 +212,20 @@ class _CappedText:
         self.parts.append(kept)
         self.length += len(kept)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     @property
     def text(self):
         return "".join(self.parts)
 
 
-# @testable true
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_summary_generation_uses_docx_text_fallback
-# @tests tests_unit/test_015_ai_tools.py::test_ooxml_xlsx_extraction_preserves_rows_tabs_and_shared_strings
-# @matrix ai files : ooxml summary-fallback
-def is_supported_ooxml(filename=None, mimetype=None):
+def is_supported_ooxml(filename: str | None = None, mimetype: str | None = None) -> bool:
     """Return whether filename or MIME type identifies a supported OOXML file."""
     return _ooxml_kind(filename=filename, mimetype=mimetype) is not None
 
 
-# @testable true
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_happy_paths_preserve_docx_and_xlsx_order
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_output_budget_returns_typed_partial_result
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_unsafe_archive_members_before_parsing
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_forbidden_or_malformed_xml
-# @matrix files : bounded-resources docx ooxml partial-result xlsx
-def extract_ooxml(content, filename=None, mimetype=None, *, max_characters=None):
+def extract_ooxml(
+    content: bytes | bytearray | memoryview | BinaryReader | None,
+    filename: str | None = None, mimetype: str | None = None, *, max_characters: int | None = None,
+) -> OOXMLExtractionResult | None:
     """Extract bounded rough text and partial-result metadata from DOCX/XLSX."""
     kind = _ooxml_kind(filename=filename, mimetype=mimetype)
     if kind is None:
@@ -320,23 +279,15 @@ def extract_ooxml(content, filename=None, mimetype=None, *, max_characters=None)
     return OOXMLExtractionResult(output.text)
 
 
-# @testable true
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_summary_generation_uses_docx_text_fallback
-# @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_reports_ooxml_extraction_errors
-# @tests tests_unit/test_015_ai_tools.py::test_ooxml_xlsx_extraction_preserves_rows_tabs_and_shared_strings
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_happy_paths_preserve_docx_and_xlsx_order
-# @matrix ai files : compatibility docx ooxml rows shared-strings summary-fallback tabs xlsx
-# @pair ai:ooxml
-def extract_ooxml_text(content, filename=None, mimetype=None):
+def extract_ooxml_text(
+    content: bytes | bytearray | memoryview | BinaryReader | None,
+    filename: str | None = None, mimetype: str | None = None,
+) -> str | None:
     """Compatibility wrapper returning only bounded extracted text."""
     result = extract_ooxml(content, filename=filename, mimetype=mimetype)
     return result.text if result is not None else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::is_supported_ooxml
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
-# @reason type routing is owned by the public OOXML helpers
 def _ooxml_kind(filename=None, mimetype=None):
     mimetype = (mimetype or "").lower()
     if mimetype in OOXML_MIMETYPES:
@@ -346,9 +297,6 @@ def _ooxml_kind(filename=None, mimetype=None):
     return OOXML_EXTENSIONS.get(extension)
 
 
-# @testable true
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_bounds_input_streams_and_preserves_seekable_ownership
-# @matrix files : compressed-limit input-stream ooxml
 @contextmanager
 def _content_source(content, budget):
     policy = budget.policy
@@ -373,24 +321,18 @@ def _content_source(content, budget):
         content.seek(0)
     except (AttributeError, OSError, TypeError, ValueError):
         if original_position is not None:
-            try:
+            with suppress(AttributeError, OSError, TypeError, ValueError):
                 content.seek(original_position)
-            except (AttributeError, OSError, TypeError, ValueError):
-                pass
     else:
         if size < 0 or size > policy.compressed_bytes:
-            try:
+            with suppress(AttributeError, OSError, TypeError, ValueError):
                 content.seek(original_position)
-            except (AttributeError, OSError, TypeError, ValueError):
-                pass
             raise _OOXMLPolicyError("Compressed OOXML input exceeds its byte limit.")
         try:
             yield content, size
         finally:
-            try:
+            with suppress(AttributeError, OSError, TypeError, ValueError):
                 content.seek(original_position)
-            except (AttributeError, OSError, TypeError, ValueError):
-                pass
         return
 
     with tempfile.SpooledTemporaryFile(max_size=SPOOL_MEMORY_BYTES, mode="w+b") as spool:
@@ -412,9 +354,6 @@ def _content_source(content, budget):
         yield spool, size
 
 
-# @testable true
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_central_directory_count_mismatch
-# @matrix files : archive-safety central-directory ooxml
 def _preflight_central_directory(stream, size, budget):
     policy = budget.policy
     if size < EOCD_STRUCT.size:
@@ -505,11 +444,6 @@ def _preflight_central_directory(stream, size, budget):
     return counted_entries
 
 
-# @testable true
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_unsafe_archive_members_before_parsing
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_unsupported_compression_and_expansion
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_stream_reader_rejects_bytes_beyond_member_declaration
-# @matrix files : archive-safety expansion ooxml streamed-member
 def _inspect_archive(archive, expected_count, budget):
     policy = budget.policy
     infos = archive.infolist()
@@ -550,9 +484,6 @@ def _inspect_archive(archive, expected_count, budget):
     return members
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
-# @reason path normalization is exercised through public archive tests
 def _canonical_member_name(info):
     original = str(getattr(info, "orig_filename", info.filename))
     filename = str(info.filename)
@@ -569,25 +500,15 @@ def _canonical_member_name(info):
     return candidate
 
 
-# @testable true
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_forbidden_or_malformed_xml
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_excessive_xml_depth
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_returns_partial_text_for_xml_work_limits
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_returns_partial_text_when_deadline_expires
-# @matrix files : deadline ooxml partial-result xml-safety
 def _parse_xml_member(archive, info, handler, budget):
     policy = budget.policy
     parser = expat.ParserCreate(namespace_separator="}")
     parser.buffer_text = True
     depth = 0
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def reject_xml_feature(*_args):
         raise _OOXMLPolicyError("OOXML XML contains a forbidden declaration.")
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def start_element(name, attributes):
         nonlocal depth
         depth += 1
@@ -596,8 +517,6 @@ def _parse_xml_member(archive, info, handler, budget):
         budget.add_element()
         handler.start(name, attributes)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def end_element(name):
         nonlocal depth
         handler.end(name)
@@ -633,14 +552,10 @@ def _parse_xml_member(archive, info, handler, budget):
     return handler.finish()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
 def _w_tag(local_name):
     return f"{W_NS}}}{local_name}"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
 def _s_tag(local_name):
     return f"{S_NS}}}{local_name}"
 
@@ -685,8 +600,6 @@ class _RowState:
     descendants: _CappedText
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
 class _DocxHandler:
     def __init__(self, output, budget):
         self.output = output
@@ -698,15 +611,11 @@ class _DocxHandler:
         self.rows = []
         self.text_depth = 0
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def _top_body_child(self):
         if self.body_index is None or len(self.stack) <= self.body_index + 1:
             return None
         return self.stack[self.body_index + 1]
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def start(self, name, _attributes):
         parent = self.stack[-1] if self.stack else None
         self.stack.append(name)
@@ -739,8 +648,6 @@ class _DocxHandler:
         elif name in {W_BREAK, W_CARRIAGE_RETURN} and self.paragraphs:
             self.paragraphs[-1].text.append("\n")
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def end(self, name):
         depth = len(self.stack)
         top = self._top_body_child()
@@ -788,28 +695,20 @@ class _DocxHandler:
             self.body_index = None
         self.stack.pop()
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def data(self, value):
         if self.text_depth and self.paragraphs:
             self.paragraphs[-1].text.append(value)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def finish(self):
         return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
 class _WorkbookHandler:
     def __init__(self, policy):
         self.policy = policy
         self.relationship_ids = []
         self.seen = set()
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def start(self, name, attributes):
         if name != S_SHEET:
             return
@@ -822,31 +721,21 @@ class _WorkbookHandler:
         if len(self.relationship_ids) <= self.policy.sheets:
             self.relationship_ids.append(relationship_id)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def end(self, _name):
         return None
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def data(self, _value):
         return None
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def finish(self):
         return self.relationship_ids
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
 class _RelationshipsHandler:
     def __init__(self, wanted_ids):
         self.wanted_ids = set(wanted_ids)
         self.relationships = {}
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def start(self, name, attributes):
         if name != RELATIONSHIP:
             return
@@ -861,24 +750,16 @@ class _RelationshipsHandler:
             "target_mode": attributes.get("TargetMode"),
         }
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def end(self, _name):
         return None
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def data(self, _value):
         return None
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def finish(self):
         return self.relationships
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
 class _SharedStringsHandler:
     def __init__(self, policy):
         self.policy = policy
@@ -887,8 +768,6 @@ class _SharedStringsHandler:
         self.text_depth = 0
         self.characters = 0
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def start(self, name, _attributes):
         if name == S_SHARED_ITEM:
             if self.current is not None:
@@ -897,8 +776,6 @@ class _SharedStringsHandler:
         elif name == S_TEXT and self.current is not None:
             self.text_depth += 1
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def end(self, name):
         if name == S_TEXT and self.text_depth:
             self.text_depth -= 1
@@ -908,8 +785,6 @@ class _SharedStringsHandler:
             self.strings.append("".join(self.current))
             self.current = None
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def data(self, value):
         if not self.text_depth or self.current is None or not value:
             return
@@ -918,8 +793,6 @@ class _SharedStringsHandler:
         self.current.append(value)
         self.characters += len(value)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def finish(self):
         return self.strings
 
@@ -935,8 +808,6 @@ class _WorksheetCell:
     inline_depth: int = 0
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
 class _WorksheetHandler:
     def __init__(self, shared_strings, output, budget):
         self.shared_strings = shared_strings
@@ -948,8 +819,6 @@ class _WorksheetHandler:
         self.row_length = 0
         self.cell = None
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def start(self, name, attributes):
         self.depth += 1
         if name == S_ROW and self.row_values is None:
@@ -972,8 +841,6 @@ class _WorksheetHandler:
         elif name == S_TEXT and self.cell is not None:
             self.cell.inline_depth += 1
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def end(self, name):
         if name == S_VALUE and self.cell is not None and self.cell.value_depth:
             self.cell.value_depth -= 1
@@ -985,8 +852,6 @@ class _WorksheetHandler:
             self._finish_row()
         self.depth -= 1
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def data(self, value):
         if self.cell is None:
             return
@@ -995,10 +860,9 @@ class _WorksheetHandler:
         elif self.cell.inline_depth:
             self.cell.inline.append(value)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def _finish_cell(self):
         cell = self.cell
+        assert cell is not None and self.row_values is not None
         index = _column_index(cell.reference)
         if index is None:
             index = self.row_length
@@ -1006,19 +870,16 @@ class _WorksheetHandler:
                 raise _OOXMLPolicyError("OOXML row exceeds the Excel column limit.")
         value = cell.inline.text if cell.cell_type == "inlineStr" else cell.value.text
         if cell.cell_type == "s" and value:
-            try:
+            with suppress(ValueError, IndexError):
                 value = self.shared_strings[int(value)]
-            except (ValueError, IndexError):
-                pass
         self.row_values[index] = value
         self.row_length = max(self.row_length, index + 1)
         self.cell = None
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def _finish_row(self):
         line = _CappedText(self.budget.max_characters + 1)
         previous_index = None
+        assert self.row_values is not None
         for index, value in sorted(self.row_values.items()):
             if value == "":
                 continue
@@ -1031,15 +892,10 @@ class _WorksheetHandler:
         self.row_values = None
         self.row_length = 0
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
     def finish(self):
         return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
-# @reason DOCX streaming behavior is exercised through public extraction tests
 def _extract_docx_text(archive, members, output, budget):
     info = members.get("word/document.xml")
     if info is None:
@@ -1047,9 +903,6 @@ def _extract_docx_text(archive, members, output, budget):
     _parse_xml_member(archive, info, _DocxHandler(output, budget), budget)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
-# @reason XLSX package traversal is exercised through public extraction tests
 def _extract_xlsx_text(archive, members, output, budget):
     sheet_paths = _workbook_sheet_paths(archive, members, budget)
     shared_strings = _shared_strings(archive, members, budget)
@@ -1066,11 +919,6 @@ def _extract_xlsx_text(archive, members, output, budget):
         )
 
 
-# @testable true
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_unsafe_worksheet_relationships
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_fallback_worksheets_use_natural_order
-# @matrix files : fallback ooxml relationships xlsx
-# @reason workbook relationship policy is exercised through XLSX extraction tests
 def _workbook_sheet_paths(archive, members, budget):
     workbook_info = members.get("xl/workbook.xml")
     relationships_info = members.get("xl/_rels/workbook.xml.rels")
@@ -1109,9 +957,6 @@ def _workbook_sheet_paths(archive, members, budget):
     return paths
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
-# @reason fallback ordering is part of XLSX extraction behavior
 def _fallback_sheet_paths(members):
     paths = [
         name
@@ -1121,9 +966,6 @@ def _fallback_sheet_paths(members):
     return sorted(paths, key=_natural_key)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
-# @reason relationship target normalization is exercised through extraction tests
 def _worksheet_target_path(target):
     if (
         not target
@@ -1145,9 +987,6 @@ def _worksheet_target_path(target):
     return path
 
 
-# @testable true
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_bounds_shared_string_storage_and_fanout
-# @matrix files : ooxml shared-strings xlsx
 def _shared_strings(archive, members, budget):
     info = members.get("xl/sharedStrings.xml")
     if info is None:
@@ -1160,17 +999,10 @@ def _shared_strings(archive, members, budget):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/ooxml.py::extract_ooxml
-# @reason natural sorting is support logic for XLSX fallback paths
 def _natural_key(value):
     return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", value)]
 
 
-# @testable true
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_out_of_domain_cell_references
-# @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_accepts_xfd_without_unbounded_padding
-# @matrix files : cell-reference ooxml sparse-row xlsx
 def _column_index(cell_ref):
     if cell_ref in (None, ""):
         return None

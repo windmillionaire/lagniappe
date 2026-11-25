@@ -26,7 +26,7 @@ places where a real user would wonder what happens next.
 
    ```bash
    rg --files testing/tests_e2e -g 'test_*.py'
-   rg -n "def test_|@matrix|@pairs?|@todo|unfinished" \
+   rg -n "def test_|@template|@style|@todo|unfinished" \
      testing/tests_e2e/002_home testing/tests_e2e/004_projects
    ```
 

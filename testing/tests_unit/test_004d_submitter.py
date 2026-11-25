@@ -58,7 +58,6 @@ def _links_import_entity(get_schema, name, hash_suffix):
     return entity
 
 
-# @matrix submission : multiple-fields patch
 @pytest.mark.unit
 def test_patch_submission_merges_multiple_fields(get_test_entities, get_schema):
     for entity in get_test_entities():
@@ -69,7 +68,6 @@ def test_patch_submission_merges_multiple_fields(get_test_entities, get_schema):
         assert json.loads(entity.db["submission"]) == spec["expected_submission"]
 
 
-# @matrix submission : reconciliation
 @pytest.mark.unit
 def test_save_submission_discards_legacy_defaults_and_keeps_current_answers(get_schema):
     task = TestEntities.get(
@@ -101,7 +99,6 @@ def test_save_submission_discards_legacy_defaults_and_keeps_current_answers(get_
     assert task.submission == {"input-textab12": "unchanged", "input-numgh78": 7}
 
 
-# @matrix form-table submission : error-message import validation
 @pytest.mark.unit
 def test_import_submission_validation_error_includes_field_and_payload(
     get_test_entities, get_schema
@@ -119,7 +116,6 @@ def test_import_submission_validation_error_includes_field_and_payload(
         assert "Row length does not match number of columns" in msg
 
 
-# @matrix submission text-input : import list-normalization save
 @pytest.mark.unit
 def test_import_submission_space_joins_input_list_values():
     entity = TestEntities.get(
@@ -145,7 +141,6 @@ def test_import_submission_space_joins_input_list_values():
     assert entity.name == "Ada Lovelace"
 
 
-# @matrix link submission : entity-resolution import internal
 @pytest.mark.unit
 def test_import_submission_internal_link_exact_match(get_schema, monkeypatch):
     entity = _links_import_entity(get_schema, "Import exact link", "exact")
@@ -179,7 +174,6 @@ def test_import_submission_internal_link_exact_match(get_schema, monkeypatch):
     }
 
 
-# @matrix link submission : ai-value entity-resolution internal
 @pytest.mark.unit
 def test_ai_submission_internal_link_plaintext_resolves(get_schema, monkeypatch):
     entity = _links_import_entity(get_schema, "AI exact link", "ai_exact")
@@ -209,7 +203,6 @@ def test_ai_submission_internal_link_plaintext_resolves(get_schema, monkeypatch)
     }
 
 
-# @matrix link submission : ai-value entity-resolution fallback internal
 @pytest.mark.unit
 def test_ai_submission_internal_link_falls_back_to_value_setter(
     get_schema,
@@ -242,7 +235,6 @@ def test_ai_submission_internal_link_falls_back_to_value_setter(
     }
 
 
-# @matrix link submission : fuzzy-match import internal weak-match
 @pytest.mark.unit
 def test_import_submission_internal_link_fuzzy_match_warning(
     get_schema, monkeypatch
@@ -275,7 +267,6 @@ def test_import_submission_internal_link_fuzzy_match_warning(
     assert field.value["hash"] == "target_a"
 
 
-# @matrix link submission : import internal no-match
 @pytest.mark.unit
 def test_import_submission_internal_link_no_match_records_error(
     get_schema, monkeypatch
@@ -301,7 +292,6 @@ def test_import_submission_internal_link_no_match_records_error(
     assert "submission" not in entity.db
 
 
-# @matrix form-table link submission : entity-resolution import internal
 @pytest.mark.unit
 def test_import_submission_table_internal_link_exact_match(get_schema, monkeypatch):
     entity = _links_import_entity(get_schema, "Import table exact link", "table_exact")
@@ -341,7 +331,6 @@ def test_import_submission_table_internal_link_exact_match(get_schema, monkeypat
     }
 
 
-# @matrix form-table link submission : fuzzy-match import internal weak-match
 @pytest.mark.unit
 def test_import_submission_table_internal_link_fuzzy_match_warning(
     get_schema, monkeypatch
@@ -374,7 +363,6 @@ def test_import_submission_table_internal_link_fuzzy_match_warning(
     assert field.value["rows"][0]["row_rel"]["hash"] == "target_b"
 
 
-# @matrix form-table link submission : import internal no-match
 @pytest.mark.unit
 def test_import_submission_table_internal_link_no_match_records_error(
     get_schema, monkeypatch
@@ -400,8 +388,6 @@ def test_import_submission_table_internal_link_no_match_records_error(
     assert "submission" not in entity.db
 
 
-# @matrix form-table submission : import list-normalization
-# @matrix text-input : import list-normalization
 @pytest.mark.unit
 def test_import_submission_preserves_table_row_lists_during_input_list_normalization(
     get_schema,

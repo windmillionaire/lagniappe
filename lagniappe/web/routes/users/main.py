@@ -1,3 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import UserCreationData
+    from flask import Request
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 from flask import abort, request
 from flask_login import current_user
 
@@ -6,53 +18,41 @@ from lagniappe.core.entities import Entities, index
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.core.tools.services import identity_platform
 from lagniappe.web.auth import permission
+from lagniappe.web.pagination import pagination_options
 from lagniappe.web import responses
 
 from . import users
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
-# @matrix users : index-mode-toggle refresh table-row
 @users.route("/index", methods=["GET"])
 @permission(Resource.USERS, Action.RESTRICTED)
-def user_index():
+def user_index() -> ResponseReturnValue:
     user_index = index.UserIndex()
 
     return responses.index("users", user_index)
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
-# @tests tests_unit/test_009_user_index.py::test_user_index_loads_users_groups_public_group_and_append_cursor
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
-# @matrix users : index-mode-toggle refresh table-row
-# @pair user-index:page-canonical
-# @pair user-index:public-group
 @users.route("/rows", methods=["GET"])
 @permission(Resource.USERS, Action.VIEW)
-def rows():
-    user_index = index.UserIndex(**request.values)
+def rows() -> ResponseReturnValue:
+    user_index = index.UserIndex(mode=request.args.get("mode"), **pagination_options())
     users = user_index.users
 
     return responses.rows(users, user_index)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/users/main.py::create
-# @reason form parsing helper owned by user create route
-def user_data(request):
+def user_data(request: Request) -> UserCreationData:
     if "ai_access" in request.form and not current_user.is_admin:
         abort(403)
 
-    data = {
+    selected_page = request.form.get("page")
+    page = Entities.fetch_one(selected_page, request=Fetch.direct()) if selected_page else None
+    if page is not None and not isinstance(page, Entities.PAGE):
+        raise ValueError("Selected page is unavailable.")
+    data: UserCreationData = {
         "name": request.form.get("name"),
         "email": request.form.get("email"),
-        "page": (
-            Entities.fetch_one(request.form.get("page"), request=Fetch.direct())
-            if request.form.get("page")
-            else None
-        ),
+        "page": page,
         "groups": [Entities.USER_GROUP(g) for g in request.form.getlist("group") if g],
     }
     if "ai_access" in request.form:
@@ -60,10 +60,6 @@ def user_data(request):
     return data
 
 
-# @testable false
-# @manual true
-# @covered-by lagniappe/web/routes/users/main.py::delete
-# @reason Identity Platform cleanup is provider-facing route glue; missing accounts are a valid no-op
 def _delete_identity_login_account(user):
     if not user or CONFIG.testing or getattr(user, "is_test_user", False):
         return
@@ -75,15 +71,9 @@ def _delete_identity_login_account(user):
     identity_platform.delete_account_by_email(email)
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_from_index
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_owner_create_adopts_public_user_and_resets_form
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_non_owner_cannot_set_ai_access_when_creating_user
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_attached_to_existing_page_preserves_page_info_form
-# @matrix users : ai-access attach-existing-page create-submit created-row owner-only page-form-preserved public-user-adoption submitted-form-data
 @users.route("/create", methods=["POST"])
 @permission(Resource.USERS, Action.CREATE)
-def create():
+def create() -> ResponseReturnValue:
     requested_email = str(request.form.get("email") or "").strip().casefold()
     owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().casefold()
     if requested_email and requested_email == owner_email:
@@ -101,13 +91,11 @@ def create():
     return responses.rows(new_user, index.UserIndex())
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
-# @matrix pages users : category-fallback default-cascade delete preserve-page
-# @pair user-index:delete
 @users.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.USERS, Action.DELETE)
-def delete(key, **kwargs):
+def delete(
+    key: str, **kwargs: Unpack[EntityContext[models.User | models.Page]]
+) -> ResponseReturnValue:
     entity = kwargs["entity"]
     if not entity:
         return responses.not_found("User not found")
@@ -131,6 +119,8 @@ def delete(key, **kwargs):
 
     options = request.get_json(silent=True) or {}
     if options.get("delete-page", True) is False:
+        if user is None:
+            return responses.not_found("User not found")
         Entities.delete(user, preserve_user_pages=True)
     else:
         Entities.delete(page)
@@ -138,18 +128,19 @@ def delete(key, **kwargs):
     return responses.ok()
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
-# @tests tests_unit/test_009a_user.py::test_user_groups_membership_changes_recalculate_permissions
-# @pairs user-groups:membership-change user-settings:owner-other-page
 @users.route("<key>/add-groups", methods=["PUT"])
 @permission(Resource.USER, Action.PERMISSIONS)
-def add_groups(key, **kwargs):
+def add_groups(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
 
     groups = [Entities.USER_GROUP(g) for g in request.form.getlist("group") if g]
-    page.user.groups = groups
-    page.user.properties.permissions.create()
-    page.user.save()
+    user = page.user
+    if user is None:
+        return responses.not_found("User not found")
+    user.groups = groups
+    user.properties.permissions.create()
+    user.save()
 
     return responses.ok()

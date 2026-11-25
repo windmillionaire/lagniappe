@@ -1,5 +1,11 @@
 """Cloud Task dispatch for queued notification-email rows."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from datetime import datetime
+    from google.cloud.datastore import Entity as DatastoreRow
+
 from math import ceil
 
 from ....exceptions import capture
@@ -9,10 +15,7 @@ from .links import identity, origin
 from .policy import utc
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason one-off task dispatch is exercised through public capture APIs
-def schedule(row, *, task_suffix=None, now=None):
+def schedule(row: DatastoreRow, *, task_suffix: str | None = None, now: datetime | None = None) -> str | None:
     now = utc(now)
     encoded = email_database.encoded_key(row.key)
     suffix = task_suffix or row.get("bucket") or row.get("source_key") or encoded

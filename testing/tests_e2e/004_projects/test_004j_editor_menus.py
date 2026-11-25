@@ -22,7 +22,6 @@ def open_editor(get_admin, mobile):
     return user, project, project.editor
 
 
-# @matrix editor : compact-menus
 # @style editor.toolbar.menu
 # @style editor.toolbar.menuIcon
 # @style editor.toolbar.caret
@@ -101,7 +100,6 @@ def test_compact_editor_menus(get_admin, mobile):
     expect(editor.toolbar.locator('button[title="Task List"]')).to_have_count(0)
 
 
-# @matrix editor : list-menu selection toggle
 @pytest.mark.parametrize("mobile", [False, True], ids=["desktop", "mobile"])
 def test_list_menu_formats_selection(get_admin, mobile):
     user, project, editor = open_editor(get_admin, mobile)
@@ -138,7 +136,6 @@ def test_list_menu_formats_selection(get_admin, mobile):
         )
 
 
-# @matrix editor : table-menu
 @pytest.mark.parametrize("mobile", [False, True], ids=["desktop", "mobile"])
 def test_table_menu_creates_edits_and_saves(get_admin, mobile):
     user, project, editor = open_editor(get_admin, mobile)
@@ -229,7 +226,6 @@ def test_table_menu_creates_edits_and_saves(get_admin, mobile):
     expect(editor.get_element("table")).to_contain_text("Keep this cell")
 
 
-# @matrix editor : table-menu
 def test_table_menu_edits_pasted_table(get_admin):
     user, project, editor = open_editor(get_admin, False)
     user.page.context.grant_permissions(["clipboard-read", "clipboard-write"])

@@ -1,9 +1,21 @@
 """Function declaration and handler for loading entity details by ID."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.entities.page import Page
+    from lagniappe.core.entities.task import Task
+    from lagniappe.core.entities.model_task import ModelTask
+    from lagniappe.core.entities.project import Project
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
+from ..references import stored_file_identifiers
 
 
 GET_ENTITY = types.FunctionDeclaration(
@@ -19,7 +31,7 @@ GET_ENTITY = types.FunctionDeclaration(
         "form-bearing pages, tasks, or model tasks, the result includes the "
         "schema needed to create valid submission objects."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "view": {"type": "string", "enum": ["default", "edit"]},
@@ -29,21 +41,13 @@ GET_ENTITY = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_entity_returns_full_form_schema_for_ai_autofill
-# @tests tests_unit/test_015_ai_tools.py::test_get_entity_returns_model_task_form_schema_for_ai_autofill
-# @tests tests_unit/test_015_ai_tools.py::test_get_entity_loads_model_task_form_schema_from_stored_key
-# @matrix ai : attached-form autofill model-task stored-key tool-context
-# @matrix form-schema : attached-form autofill model-task schema stored-key
-# @matrix ai : edit-view exact-answers shared-schema
-# @matrix entity-patch : preservation validation preparation permissions
-def execute_get_entity(args, user):
+def execute_get_entity(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
-    if not identifier:
+    if not isinstance(identifier, str) or not identifier:
         return {"error": "id is required"}
 
     entity = _load_entity(identifier)
@@ -60,16 +64,13 @@ def execute_get_entity(args, user):
     return entity_data
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
-# @reason entity lookup shape is exercised through the public get_entity tool
 def _load_entity(identifier):
     entity = Entities.fetch_one(identifier, request=Fetch.root())
     if isinstance(entity, (Entities.TASK, Entities.FILE)):
         Entities.fetch_one(entity, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
     elif isinstance(entity, Entities.TASK_HISTORY):
         Entities.fetch(
-            entity, entity.properties.task.key, *entity.db.get("files", []),
+            entity, entity.properties.task.key, *stored_file_identifiers(entity),
             request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
         )
     elif entity is not None:
@@ -77,9 +78,6 @@ def _load_entity(identifier):
     return entity
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
-# @reason stored-key form fallback is exercised through model-task schema tests
 def _ensure_attached_form(entity):
     form_property = getattr(getattr(entity, "properties", None), "form", None)
     if not form_property:
@@ -96,10 +94,7 @@ def _ensure_attached_form(entity):
         entity.form = form
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
-# @reason edit projection shares authorization with the public entity and task readers
-def edit_entity(entity, user, schemas=None):
+def edit_entity(entity: Entity, user: User, schemas: dict[str, list[dict[str, object]]] | None = None) -> dict[str, object]:
     from copy import deepcopy
     from ..references import hash_reference
     from lagniappe.core.tools.entity_patches import PATCH_FIELDS
@@ -113,17 +108,19 @@ def edit_entity(entity, user, schemas=None):
     if entity.entity_kind in {"page", "task"}:
         result["answers"] = deepcopy(entity.submission or {})
         result["generation"] = entity.generation
-    if entity.entity_kind in {"task", "page", "model"} and entity.form and entity.form.allowed(Action.VIEW, user=user):
-        form = entity.form
-        result.pop(entity.properties.form.ai_key, None)
+    form_owner = cast("Task | Page | ModelTask", entity)
+    if entity.entity_kind in {"task", "page", "model"} and (form := form_owner.form) and form.allowed(Action.VIEW, user=user):
+        if ai_key := form_owner.properties.form.ai_key:
+            result.pop(ai_key, None)
         reference = hash_reference(form)
-        result["form"] = {"hash": reference, "name": form.name, "generation": form.generation, "revision": form.version}
+        assert reference is not None
+        result["form"] = form_details = {"hash": reference, "name": form.name, "generation": form.generation, "revision": form.version}
         schema = deepcopy(form.schema)
         if schemas is None:
-            result["form"]["schema"] = schema
+            form_details["schema"] = schema
         else:
             result.pop("schema", None)
             schemas[reference] = schema
     if entity.entity_kind == "project":
-        result["model_tasks"] = [{"hash": hash_reference(model), "name": model.name, "order": model.order, "form": hash_reference(model.form) if model.form and model.form.allowed(Action.VIEW, user=user) else None} for model in entity.model_tasks if model.allowed(Action.VIEW, user=user)]
+        result["model_tasks"] = [{"hash": hash_reference(model), "name": model.name, "order": model.order, "form": hash_reference(model.form) if model.form and model.form.allowed(Action.VIEW, user=user) else None} for model in cast("Project", entity).model_tasks if model.allowed(Action.VIEW, user=user)]
     return result

@@ -9,7 +9,7 @@ Related Files:
         - lagniappe/core/entities/project.py: Project entity
         - lagniappe/web/routes/projects/main.py: Project routes
         - lagniappe/web/templates/projects/: Project page templates
-        - src/script/views/project.mjs: Project page JavaScript
+        - src/script/views/project.ts: Project page JavaScript
 
     Test Framework:
         - testing/definitions/projects.py: Projects enum using this resource

@@ -114,9 +114,6 @@ def _quick_create_from_combobox(user, combobox, label, name, response_glob):
     expect(combobox.input).to_have_attribute("placeholder", re.compile(re.escape(name)))
 
 
-# @matrix facets : command-row permissions
-# @matrix quick-create : command-row opt-in permissions
-# @matrix search : permissions search-results
 def test_quick_create_command_requires_opt_in_and_create_permission(get_admin, get_user):
     owner = get_admin()
     owner.go(SitePages.HOME)
@@ -145,7 +142,6 @@ def test_quick_create_command_requires_opt_in_and_create_permission(get_admin, g
     assert "No Results" in denied["json"]["results"]
 
 
-# @pairs permissions:category-edit search:permission-filter
 def test_category_search_permission_filter_returns_editable_categories(get_admin, get_user):
     owner = get_admin()
     allowed = Categories.acl_create_allowed.get(owner)
@@ -165,8 +161,6 @@ def test_category_search_permission_filter_returns_editable_categories(get_admin
     assert denied.name not in html
 
 
-# @matrix combobox search : permission-filter
-# @pair permissions:assign
 # @template pages/tasks.html::action_buttons
 def test_user_assign_search_permission_filter_returns_assignable_users(get_admin, get_user):
     owner = get_admin()
@@ -207,7 +201,6 @@ def test_user_assign_search_permission_filter_returns_assignable_users(get_admin
     ).not_to_be_attached()
 
 
-# @pair task-assignment:owner-opt-in
 # @template pages/tasks.html::action_buttons
 # @template pages/info.html::user_settings
 @pytest.mark.e2e_group("owner")
@@ -250,7 +243,6 @@ def test_owner_assignment_opt_in_enables_managed_user_combobox(get_user):
         _set_owner_task_assignment_opt_in(owner, original_opt_in)
 
 
-# @matrix quick-create : create-entity create-route created-option default-category
 def test_page_quick_create_uses_visible_uncategorized_pages_category(get_admin, get_user):
     user = get_admin()
     user.go(SitePages.HOME)
@@ -283,7 +275,6 @@ def test_page_quick_create_uses_visible_uncategorized_pages_category(get_admin, 
     assert second_page.model.key == first_page.model.key
 
 
-# @matrix quick-create : create-entity create-route created-option
 # @template pages/tasks.html::action_buttons
 def test_project_combobox_quick_create_selects_new_project(get_admin, get_user):
     user = get_admin()
@@ -304,7 +295,6 @@ def test_project_combobox_quick_create_selects_new_project(get_admin, get_user):
     expect(project_select.button).to_contain_text(project_name)
 
 
-# @matrix quick-create : create-entity create-route created-option form-type
 # @template projects/model_tasks.html::create_model_task
 def test_model_task_form_selector_quick_creates_form(get_admin, get_user):
     user = get_admin()
@@ -333,7 +323,6 @@ def test_model_task_form_selector_quick_creates_form(get_admin, get_user):
     assert model_task.form.form_type == "task"
 
 
-# @matrix quick-create : create-entity create-route created-option form-type
 # @template home/categories.html::create
 def test_home_create_category_form_selector_quick_creates_form(get_admin, get_user):
     user = get_admin()
@@ -360,7 +349,6 @@ def test_home_create_category_form_selector_quick_creates_form(get_admin, get_us
     assert category.form.form_type == "page"
 
 
-# @matrix quick-create : create-entity create-route created-option
 # @template pages/info.html::info_form
 def test_page_info_category_multiselect_quick_creates_category(get_admin, get_user):
     user = get_admin()

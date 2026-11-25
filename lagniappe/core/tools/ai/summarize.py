@@ -1,5 +1,12 @@
 """AI-powered file summarization with async task queue support."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ...entities.file import File
+    from ...entities.user import User
+    from ...properties.file_options import Summarize
+
 from ... import exceptions
 from ...definitions import FileConsumer, enforce_file_consumer
 from ..database import assets as storage_assets
@@ -47,10 +54,7 @@ PDF_PAGE_LIMIT_SUMMARY_ERROR = (
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_summary_eligibility_includes_ooxml_fallback
-# @matrix ai : eligibility ooxml summary-prompt
-def can_summarize_file(file):
+def can_summarize_file(file: File) -> bool:
     """Return whether a file has an AI-readable original or OOXML fallback."""
     if _file_part(file):
         return True
@@ -61,24 +65,16 @@ def can_summarize_file(file):
     )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_summary_eligibility_includes_ooxml_fallback
-# @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-# @matrix ai : eligibility ooxml summary-prompt task-queue
-# @pair file:summary-first
-# @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatch_uses_explicit_actor
-# @tests tests_unit/test_006_file_properties.py::test_file_dispatch_rejects_missing_actor_before_changing_status
-# @matrix file deferred-jobs : explicit-actor validation
 def summarize_file(
-    file,
+    file: File,
     *,
-    actor=None,
-    dispatch=True,
-    parameters=None,
-    idempotency_key=None,
-):
+    actor: User | None = None,
+    dispatch: bool = True,
+    parameters: dict[str, object] | None = None,
+    idempotency_key: str | None = None,
+) -> Summarize:
     """Prepare summary status and optionally queue work for an explicit actor."""
-    if dispatch and not getattr(actor, "is_authenticated", False):
+    if dispatch and (actor is None or not getattr(actor, "is_authenticated", False)):
         raise exceptions.ValidationError("File processing requires an authenticated actor.")
     summarize = file.properties.summarize
     eligible = can_summarize_file(file)
@@ -86,6 +82,7 @@ def summarize_file(
     if eligible:
         summarize.status = "Summarizing file..."
         if dispatch:
+            assert actor is not None
             from ...definitions import DeferredJobSpec, DeferredJobType
             from ..deferred_jobs.service import DeferredJobs
 
@@ -107,10 +104,6 @@ def summarize_file(
     return summarize
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/summarize.py::can_summarize_file
-# @covered-by lagniappe/core/tools/ai/summarize.py::generate_summary
-# @reason file part lookup is exercised through public summarization helpers
 def _file_part(file):
     try:
         return file.properties.file.uri_to_ai
@@ -118,17 +111,11 @@ def _file_part(file):
         return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/summarize.py::generate_summary
-# @reason prompt truncation is part of the OOXML fallback prompt contract
 def _extracted_context_header(filename):
     label = filename or "the uploaded file"
     return f"{EXTRACTED_CONTEXT_NOTE.format(filename=label)}\n\n"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/summarize.py::generate_summary
-# @reason typed OOXML truncation metadata is formatted through summary generation
 def _extracted_context(filename, result):
     header = _extracted_context_header(filename)
     text = result.text.strip()
@@ -143,9 +130,6 @@ def _extracted_context(filename, result):
     return context[:EXTRACTED_CONTEXT_LIMIT].rstrip()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/summarize.py::generate_summary
-# @reason asset download and parser errors are surfaced through summary generation
 def _add_ooxml_context(prompt, file):
     filename = getattr(file, "filename", None)
     mimetype = getattr(file, "mimetype", None)
@@ -188,9 +172,6 @@ def _add_ooxml_context(prompt, file):
     return True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/summarize.py::generate_summary
-# @reason provider classification is exercised through summary error handling
 def _is_unreadable_pdf_error(file, error):
     """Return whether Gemini rejected a PDF because it has no readable pages."""
     if getattr(file, "mimetype", None) != "application/pdf":
@@ -203,9 +184,6 @@ def _is_unreadable_pdf_error(file, error):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/summarize.py::generate_summary
-# @reason exact provider classification is exercised through summary error handling
 def _is_pdf_page_limit_error(file, error):
     """Return whether Gemini rejected a PDF for exceeding its page limit."""
     if getattr(file, "mimetype", None) != "application/pdf":
@@ -218,22 +196,12 @@ def _is_pdf_page_limit_error(file, error):
     )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_updates_file_status_from_model_result
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_summary_generation_uses_docx_text_fallback
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_summary_generation_marks_partial_ooxml_context
-# @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_reports_ooxml_extraction_errors
-# @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_marks_unreadable_pdf_without_capture
-# @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_marks_pdf_page_limit_without_capture
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_summary_generation_rejects_oversized_ooxml_before_download
-# @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_populates_file_search_cache
-# @matrix ai : cache docx errors ooxml pdf-page-limit quota status summary-prompt unreadable-pdf
 def generate_summary(
-    file,
-    raise_quota=False,
-    raise_errors=False,
-    service_tier=None,
-):
+    file: File,
+    raise_quota: bool = False,
+    raise_errors: bool = False,
+    service_tier: str | None = None,
+) -> Summarize:
     """Generate a summary and two reusable workspace retrieval terms."""
     summarize = file.properties.summarize
 
@@ -298,9 +266,6 @@ def generate_summary(
         return summarize
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/summarize.py::generate_summary
-# @reason provider schema and term cardinality are asserted through summary generation
 def _summary_response_schema():
     return {
         "type": "object",
@@ -319,9 +284,6 @@ def _summary_response_schema():
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/summarize.py::generate_summary
-# @reason response cleanup is observed through stored summary and retrieval terms
 def _summary_and_retrieval_terms(response):
     if isinstance(response, str):
         summary = response.strip()
@@ -337,9 +299,6 @@ def _summary_and_retrieval_terms(response):
     return summary, terms
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/summarize.py::generate_summary
-# @reason term cleanup is observed through stored summary retrieval metadata
 def _clean_retrieval_terms(values):
     if not isinstance(values, list):
         return []

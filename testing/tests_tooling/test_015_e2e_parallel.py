@@ -19,7 +19,6 @@ from runner.e2e_claims import reserve_resources
 pytestmark = pytest.mark.tooling
 
 
-# @matrix testing : parallel-e2e collection browser-parameters
 def test_pilot_targets_resolve_collected_browser_parameters():
     records = [{"nodeid": name} for name in (
         "tests_e2e/test_worker.py::test_worker[chromium-independent-a]",
@@ -39,7 +38,6 @@ def test_pilot_targets_resolve_collected_browser_parameters():
             resolve_pilot_targets(invalid_records, (target,))
 
 
-# @matrix testing : parallel-e2e
 def test_collection_preserves_group_and_serial_markers(tmp_path, monkeypatch):
     destination = tmp_path / "collection.json"
     monkeypatch.setenv("LAGNIAPPE_E2E_COLLECTION", str(destination))
@@ -58,7 +56,6 @@ def test_collection_preserves_group_and_serial_markers(tmp_path, monkeypatch):
             pytest_collection_finish(session)
 
 
-# @matrix testing : parallel-e2e
 def test_inventory_follows_helpers_constants_and_fixtures(tmp_path):
     helpers = tmp_path / "testing/utility"
     helpers.mkdir(parents=True)
@@ -89,7 +86,6 @@ def fixture():
     }
 
 
-# @matrix testing : parallel-e2e
 def test_inventory_balances_cases_without_transitive_resource_groups(tmp_path):
     folder = tmp_path / "testing/tests_e2e"
     folder.mkdir(parents=True)
@@ -107,7 +103,7 @@ def test_reset(): pass
                for name in "abcd"]
     records.append({"nodeid": "tests_e2e/test_story.py::test_reset", "fixtures": [],
                     "serial": True, "serial_phase": "before"})
-    durations = {f"tests_e2e/test_story.py::test_{name}": value for name, value in zip("abc", (8, 5, 3))}
+    durations = {f"tests_e2e/test_story.py::test_{name}": value for name, value in zip("abc", (8, 5, 3), strict=True)}
     batches, inventory = story_batches(tmp_path, records, workers=2, durations=durations)
     assert len(batches) == 4
     assert batches[0].exclusive and batches[0].nodeid.endswith("test_reset")
@@ -119,7 +115,6 @@ def test_reset(): pass
     assert inventory[2]["estimated_seconds"] == 3
 
 
-# @matrix testing : parallel-e2e
 @pytest.mark.parametrize("workers", [1, 3, 6])
 def test_marked_groups_stay_on_one_worker_without_becoming_exclusive(tmp_path, workers):
     folder = tmp_path / "testing/tests_e2e"
@@ -151,7 +146,6 @@ def test_quiet(): pass
     assert inventory[0]["resources"] == ["Users.OWNER"]
 
 
-# @matrix testing : parallel-e2e
 def test_duration_estimates_use_only_valid_passed_e2e_results(tmp_path, monkeypatch):
     monkeypatch.delenv("LAGNIAPPE_E2E_DURATIONS", raising=False)
     assert duration_estimates(tmp_path) == {}
@@ -172,7 +166,6 @@ def test_duration_estimates_use_only_valid_passed_e2e_results(tmp_path, monkeypa
     assert duration_estimates(tmp_path) == {"tests_e2e/test_hosted.py::test_story": 7.5}
 
 
-# @matrix testing : parallel-e2e
 def test_case_claims_overlap_independent_work_and_release_after_failure(tmp_path):
     script = '''
 from pathlib import Path
@@ -223,26 +216,30 @@ with reserve_resources(root / 'claims', resources, lambda: None, timeout=5):
             process.wait(timeout=5)
 
 
-# @matrix testing : parallel-e2e
 def test_case_claims_stop_waiting_on_timeout_or_lost_authority(tmp_path):
     def lost():
         raise RuntimeError("lease lost")
 
     with reserve_resources(tmp_path, ["shared"], lambda: None):
-        with pytest.raises(RuntimeError, match="Timed out"):
-            with reserve_resources(tmp_path, ["shared"], lambda: None, timeout=0):
-                pytest.fail("A conflicting claim was admitted")
-        with pytest.raises(RuntimeError, match="lease lost"):
-            with reserve_resources(tmp_path, ["shared"], lost):
-                pytest.fail("Lost authority was ignored")
-    with pytest.raises(ValueError):
-        with reserve_resources(tmp_path, ["shared"], lambda: None):
-            raise ValueError("fixture failed")
+        with (
+            pytest.raises(RuntimeError, match="Timed out"),
+            reserve_resources(tmp_path, ["shared"], lambda: None, timeout=0),
+        ):
+            pytest.fail("A conflicting claim was admitted")
+        with (
+            pytest.raises(RuntimeError, match="lease lost"),
+            reserve_resources(tmp_path, ["shared"], lost),
+        ):
+            pytest.fail("Lost authority was ignored")
+    with (
+        pytest.raises(ValueError),
+        reserve_resources(tmp_path, ["shared"], lambda: None),
+    ):
+        raise ValueError("fixture failed")
     with reserve_resources(tmp_path, ["shared"], lambda: None, timeout=0):
         pass
 
 
-# @matrix testing : parallel-e2e
 def test_case_claim_hook_covers_fixture_teardown_and_continues_after_failure(tmp_path, monkeypatch):
     (tmp_path / "pytest.ini").write_text("[pytest]\n")
     (tmp_path / "conftest.py").write_text('''
@@ -285,7 +282,6 @@ def test_two():
         pass
 
 
-# @matrix testing : parallel-e2e
 def test_worker_progress_counts_cases_without_double_counting_phases(tmp_path, monkeypatch):
     from testing.utility.e2e_worker import write_progress
 
@@ -294,15 +290,33 @@ def test_worker_progress_counts_cases_without_double_counting_phases(tmp_path, m
     monkeypatch.setenv("LAGNIAPPE_E2E_WORKER_CONTEXT", str(record))
     outcomes = {"a": {"outcome": "passed"}, "b": {"outcome": "skipped"}}
     write_progress(outcomes, "b")
-    outcomes["a"]["outcome"] = "failed"  # A teardown failure changes the same case.
-    write_progress(outcomes, "a")
     assert json.loads((tmp_path / "progress.json").read_text()) == {
-        "passed": 0, "failed": 1, "skipped": 1, "completed": 2, "total": 3, "last_nodeid": "a",
+        "passed": 1, "failed": 0, "skipped": 1, "completed": 2, "total": 3, "last_nodeid": "b",
     }
+    outcomes["a"] = {
+        "outcome": "failed",
+        "failed_phase": "teardown",
+        "traceback": "E   AssertionError: Authorization: Bearer secret-token at https://example.test/x",
+    }  # A teardown failure changes the same case.
+    write_progress(outcomes, "a")
+    outcomes["c"] = {"outcome": "passed"}
+    write_progress(outcomes, "c")
+    progress = json.loads((tmp_path / "progress.json").read_text())
+    assert progress == {
+        "passed": 1,
+        "failed": 1,
+        "skipped": 1,
+        "completed": 3,
+        "total": 3,
+        "last_nodeid": "c",
+        "first_failed_nodeid": "testing/a",
+        "first_failed_diagnostic": "AssertionError: Authorization: [redacted] at [redacted]",
+        "first_failed_rerun": "venv/bin/python run.py hosted-e2e execute --target testing/a",
+    }
+    assert "secret-token" not in progress["first_failed_diagnostic"]
     assert not (tmp_path / "progress.tmp").exists()
 
 
-# @matrix testing : parallel-e2e
 def test_merge_preserves_each_parameter_and_reports_missing_batch_cases(tmp_path):
     targets = tuple(f"testing/tests_e2e/test_story.py::test_story[{i}]" for i in range(3))
     batch = Batch("stories", targets[0], additional_nodeids=targets[1:])
@@ -324,7 +338,6 @@ def test_merge_preserves_each_parameter_and_reports_missing_batch_cases(tmp_path
     assert errors and len(result) == 3 and all(row["outcome"] == "failed" for row in result.values())
 
 
-# @matrix testing : parallel-e2e
 @pytest.mark.parametrize("variant", ["valid", "wrong-module", "swapped-outcomes"])
 def test_merge_checks_each_case_identity_and_outcome(tmp_path, variant):
     targets = tuple(f"testing/tests_e2e/test_{name}.py::test_story" for name in ("a", "b"))
@@ -353,7 +366,6 @@ def test_merge_checks_each_case_identity_and_outcome(tmp_path, variant):
         assert errors and all(row["failed_phase"] == "worker" for row in outcomes.values())
 
 
-# @matrix testing : parallel-e2e
 @pytest.mark.parametrize("name", ["ready.json", "outcomes.json"])
 def test_worker_messages_allow_publication_during_completion(tmp_path, monkeypatch, name):
     path = tmp_path / name
@@ -373,14 +385,12 @@ def test_worker_messages_allow_publication_during_completion(tmp_path, monkeypat
     assert await_worker_file(path) == {"ready": True}
 
 
-# @matrix testing : parallel-e2e
 def test_worker_messages_reject_missing_completed_messages(tmp_path):
     (tmp_path / "outcomes.json").write_text('{}')
     with pytest.raises(AssertionError, match="finished without ready.json"):
         await_worker_file(tmp_path / "ready.json")
 
 
-# @matrix testing : parallel-e2e
 def test_pilot_arguments_are_bounded_and_keep_normal_runs_unchanged(monkeypatch):
     monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E_WORKERS", raising=False)
     assert pilot_arguments(["unit"]) == (False, 3, ["unit"])
@@ -408,7 +418,6 @@ def test_pilot_arguments_are_bounded_and_keep_normal_runs_unchanged(monkeypatch)
     assert pilot_arguments(["--experiments=all"]) == ("all", 6, ["e2e"])
 
 
-# @matrix testing : parallel-e2e
 def test_scheduler_overlaps_independent_work_and_serializes_conflicts(tmp_path):
     script = tmp_path / "worker.py"
     script.write_text('''
@@ -438,7 +447,6 @@ while peer and not (root / peer).exists():
     assert index["e", "finish"] < index["f", "start"]
 
 
-# @matrix testing : parallel-e2e
 @pytest.mark.parametrize("failure", [RuntimeError("lease lost"), KeyboardInterrupt("cancelled")])
 def test_scheduler_stops_children_before_returning_on_lost_authority(failure, tmp_path):
     processes = []
@@ -479,7 +487,6 @@ def test_scheduler_stops_children_before_returning_on_lost_authority(failure, tm
             time.sleep(.01)
 
 
-# @matrix testing : parallel-e2e
 def test_scheduler_reaps_a_crashed_workers_remaining_children(tmp_path):
     pid_file = tmp_path / "child.pid"
     code = ("import subprocess, sys, os; from pathlib import Path; "
@@ -501,9 +508,8 @@ def test_scheduler_reaps_a_crashed_workers_remaining_children(tmp_path):
         time.sleep(.01)
 
 
-# @matrix testing : parallel-e2e
 @pytest.mark.parametrize("variant", ["pass", "setup", "teardown", "missing", "corrupt", "duplicate",
-                                      "wrong-source", "wrong-selection", "crash", "missing-junit"])
+                                      "wrong-source", "wrong-selection", "incomplete", "crash", "missing-junit"])
 def test_merge_preserves_failures_and_rejects_missing_corrupt_or_duplicate_evidence(tmp_path, variant):
     batches = [Batch("a", "testing/tests_e2e/test_example.py::test_a"),
                Batch("b", "testing/tests_e2e/test_example.py::test_b")]
@@ -530,6 +536,10 @@ def test_merge_preserves_failures_and_rejects_missing_corrupt_or_duplicate_evide
         statuses["b"] = -9 if variant == "crash" else 0
     elif variant == "corrupt":
         path.write_text("{")
+    elif variant == "incomplete":
+        payload = json.loads(path.read_text())
+        payload["outcomes"] = {}
+        path.write_text(json.dumps(payload))
     elif variant == "missing-junit":
         (tmp_path / "b" / "junit.xml").unlink()
     elif variant == "duplicate":

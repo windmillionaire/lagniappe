@@ -1,5 +1,11 @@
 """Read canonical application guidance without creating a Plan or calling AI."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 from redis.exceptions import RedisError
 
@@ -18,21 +24,17 @@ GET_HELP = types.FunctionDeclaration(
         "guidance does not establish access to a particular workspace record. "
         "No Plan, provider call or workspace change is needed."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "query": {"type": "string", "description": "Short help search keywords."},
             "topic_id": {"type": "string", "description": "Exact canonical help topic ID."},
         },
-    },
+    }),
 )
 
 
-# @testable true
-# @tests tests_unit/test_035_help.py::test_help_tool_is_bounded_source_backed_and_shared
-# @tests tests_unit/test_035_help.py::test_help_tool_rejects_invalid_requests_and_reports_search_failure
-# @matrix help : ai-lookup validation provider-failure
-def execute_get_help(args, user):
+def execute_get_help(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     provided = [key for key in ("query", "topic_id") if key in args]
     if len(provided) != 1 or set(args) - {"query", "topic_id"}:
         return {"error": "Supply exactly one of query or topic_id."}

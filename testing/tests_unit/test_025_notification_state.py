@@ -140,7 +140,6 @@ class NotificationKey:
         return self.value.encode("utf-8")
 
 
-# @matrix notifications : cold-seed keys-only race-safety
 def test_cold_seed_runs_one_keys_only_query_and_is_race_safe(redis):
     queries = []
     owner = user()
@@ -174,7 +173,6 @@ def test_cold_seed_runs_one_keys_only_query_and_is_race_safe(redis):
     assert raced["revision"] == 1
 
 
-# @matrix notifications : datastore-read-isolation redis-projection ttl
 def test_warm_notification_state_is_redis_only_and_refreshes_ttl(redis):
     owner = user()
     notifications.seed_notification_state(
@@ -190,7 +188,6 @@ def test_warm_notification_state_is_redis_only_and_refreshes_ttl(redis):
     assert redis.expirations[epoch_key] == notifications.NOTIFICATION_TTL_SECONDS
 
 
-# @matrix notifications : cold-seed expiry generation
 def test_expired_notification_state_gets_a_new_generation(redis):
     owner = user()
     first = notifications.seed_notification_state(owner, notification_keys=[])
@@ -206,7 +203,6 @@ def test_expired_notification_state_gets_a_new_generation(redis):
     assert second["generation"] != first["generation"]
 
 
-# @matrix notifications : idempotent-count mutation revision
 def test_notification_mutations_are_idempotent_and_advance_once(redis):
     owner = user()
     first = item("notification-a", owner)
@@ -232,7 +228,6 @@ def test_notification_mutations_are_idempotent_and_advance_once(redis):
     assert (deleted["revision"], deleted["count"]) == (4, 0)
 
 
-# @matrix notifications : cold-cache datastore-read-isolation mutation
 def test_absent_projection_mutation_updates_epoch_without_querying(redis):
     owner = user()
     result = notifications.update_notification_projection(
@@ -245,7 +240,6 @@ def test_absent_projection_mutation_updates_epoch_without_querying(redis):
     assert redis.values[epoch_key] == "1"
 
 
-# @matrix notifications : aggregate-count redis-projection revision
 def test_durable_aggregate_publish_preserves_members_and_exact_combined_count(redis):
     owner = user()
     existing = item("notification-a", owner)
@@ -277,7 +271,6 @@ def test_durable_aggregate_publish_preserves_members_and_exact_combined_count(re
     assert state["revision"] >= 4
 
 
-# @matrix notifications : authoritative-repair membership revision
 def test_notification_list_keys_repair_warm_projection(redis):
     owner = user()
     first = item("notification-a", owner)

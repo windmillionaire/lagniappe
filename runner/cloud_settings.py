@@ -5,11 +5,12 @@ import base64
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import ssl
 import subprocess
 import sys
+from pathlib import Path
+from typing import TypedDict, Unpack
 
 import google_crc32c
 import requests
@@ -18,6 +19,7 @@ import yaml
 from config import (
     APP_DIR,
     File,
+    SettingsDraft,
     _atomic_write_text,
     decode_app_settings,
     write_generation_manifest,
@@ -25,13 +27,31 @@ from config import (
 from config.constants import REDIS_CA_CERT_RELATIVE_PATH
 from config.recovery import validate_recovery_document
 from config.redis import redis_tls_enabled
+from config.secrets import uses_secret_manager
 from installer.config_builders import (
     build_deploy_yaml,
     build_index_yaml,
     build_manifest,
 )
+from installer.errors import SetupError
 from installer.state import SetupProcessLock
 from runner.context import GCLOUD_CLI, GIT_CLI
+
+class DeveloperSettings(TypedDict):
+    gcloud_config: dict[str, str]
+
+
+class RequestOptions(TypedDict, total=False):
+    json: dict[str, str | dict[str, str]]
+    params: dict[str, str]
+
+
+class SecretResponse(TypedDict, total=False):
+    name: str
+    etag: str
+    versionAliases: dict[str, str]
+    payload: dict[str, str]
+
 
 SECRET = "lagniappe-cloud-settings"
 FILES = Path("config/files")
@@ -46,18 +66,15 @@ SHA = re.compile(r"[0-9a-f]{40}")
 VERSION = re.compile(r"[1-9][0-9]*")
 
 
-# @testable infrastructure
 class CloudSettingsError(RuntimeError):
     """A secret-free diagnostic suitable for an operator console."""
 
 
-# @testable infrastructure
 def _json(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-# @testable infrastructure
-def _read(root, path):
+def _read(root: Path, path: Path) -> str | None:
     target = root / path
     if target.resolve() != target:
         raise CloudSettingsError(f"Expected an installation-owned file at {path}.")
@@ -67,16 +84,14 @@ def _read(root, path):
         return None
 
 
-# @testable infrastructure
 def _receipt(root):
     raw = _read(root, RECEIPT)
     return json.loads(raw) if raw is not None else {}
 
 
-# @testable infrastructure
-def _source(root):
+def _source(root: Path) -> str:
     result = subprocess.run(
-        [GIT_CLI, "-C", str(root), "rev-parse", "HEAD"],
+        [GIT_CLI or "git", "-C", str(root), "rev-parse", "HEAD"],
         capture_output=True,
         text=True,
         check=False,
@@ -89,10 +104,9 @@ def _source(root):
     return sha
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_bundle_round_trip
-# @matrix config setup : secrets project-identity redis-tls
-def validate_bundle(bundle, project):
+def validate_bundle(
+    bundle: object, project: str
+) -> tuple[dict[str, object], DeveloperSettings]:
     """Validate all documents together before staging any changes."""
     if (
         not PROJECT.fullmatch(project)
@@ -116,7 +130,7 @@ def validate_bundle(bundle, project):
         if (
             app["GOOGLE_CLOUD_PROJECT"] != project
             or target["PROJECT"] != project
-            or not app.get("SECRET_KEY")
+            or (not uses_secret_manager(app) and not app.get("SECRET_KEY"))
             or not target["ACCOUNT"]
             or not target["NAME"]
             or not all(
@@ -147,7 +161,6 @@ def validate_bundle(bundle, project):
     return app, dev
 
 
-# @testable infrastructure
 def _local_bundle(root, project, receipt):
     bundle = {
         "schema": 1,
@@ -177,7 +190,6 @@ def _local_bundle(root, project, receipt):
     return bundle
 
 
-# @testable infrastructure
 def _same_settings(left, right):
     return (
         left["schema"] == right["schema"]
@@ -190,16 +202,16 @@ def _same_settings(left, right):
     )
 
 
-# @testable infrastructure
-def _snapshot(root):
+def _snapshot(root: Path) -> str:
     return hashlib.sha256(
         _json([_read(root, path) for path in (APP, DEV, CA)]).encode()
     ).hexdigest()
 
 
-# @testable infrastructure
-def _record(root, project, version, source, **extra):
-    receipt = dict(
+def _record(
+    root: Path, project: str, version: str, source: str, **extra: object
+) -> dict[str, object]:
+    receipt: dict[str, object] = dict(
         project=project,
         secret=SECRET,
         version=version,
@@ -211,8 +223,9 @@ def _record(root, project, version, source, **extra):
     return receipt
 
 
-# @testable infrastructure
-def cli_token(project, configuration, account, *, env=None):
+def cli_token(
+    project: str, configuration: str, account: str, *, env: dict[str, str] | None = None
+) -> str:
     """Get a short-lived token for the project's explicitly selected CLI identity."""
     if (
         not GCLOUD_CLI
@@ -263,18 +276,19 @@ def cli_token(project, configuration, account, *, env=None):
     return auth.stdout.strip()
 
 
-# @testable infrastructure
 class SecretManager:
     """Use only the explicitly selected CLI identity. Never log provider bodies."""
 
-    def __init__(self, project, configuration, account):
+    def __init__(self, project: str, configuration: str, account: str) -> None:
         self.url = f"https://secretmanager.googleapis.com/v1/projects/{project}/secrets/{SECRET}"
         self.session = requests.Session()
         self.session.headers["Authorization"] = "Bearer " + cli_token(
             project, configuration, account
         )
 
-    def request(self, method, suffix="", **kwargs):
+    def request(
+        self, method: str, suffix: str = "", **kwargs: Unpack[RequestOptions]
+    ) -> SecretResponse:
         response = self.session.request(
             method, self.url + suffix, timeout=30, allow_redirects=False, **kwargs
         )
@@ -284,10 +298,12 @@ class SecretManager:
             )
         return response.json()
 
-    def access(self, version):
+    def access(self, version: str) -> tuple[str, dict[str, object]]:
         if not (VERSION.fullmatch(version) or version == "current"):
             raise CloudSettingsError("Use a numeric secret version or current.")
         data = self.request("GET", f"/versions/{version}:access")
+        if "name" not in data or "payload" not in data:
+            raise CloudSettingsError("Secret Manager returned an incomplete version.")
         number = data["name"].rsplit("/", 1)[-1]
         raw = base64.b64decode(data["payload"]["data"], validate=True)
         if (
@@ -302,10 +318,13 @@ class SecretManager:
         return number, json.loads(raw)
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_publish_rejects_stale_writers
-# @matrix config setup : secrets transactional-state
-def publish(root, project, store, receipt, source):
+def publish(
+    root: Path,
+    project: str,
+    store: SecretManager,
+    receipt: dict[str, object],
+    source: str,
+) -> dict[str, object]:
     bundle = _local_bundle(root, project, receipt)
     metadata = store.request("GET")
     aliases = metadata.get("versionAliases", {})
@@ -325,6 +344,8 @@ def publish(root, project, store, receipt, source):
             "dataCrc32c": str(google_crc32c.value(raw)),
         }
         response = store.request("POST", ":addVersion", json={"payload": payload})
+        if "name" not in response or "etag" not in metadata:
+            raise CloudSettingsError("Secret Manager returned incomplete version metadata.")
         version = response["name"].rsplit("/", 1)[-1]
         if not VERSION.fullmatch(version) or store.access(version)[1] != bundle:
             raise CloudSettingsError(
@@ -346,10 +367,7 @@ def publish(root, project, store, receipt, source):
     return _record(root, project, version, source, **overlay)
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_deploy_requires_pinned_experiments_target
-# @matrix deploy setup : project-identity
-def verify_operator_target(root, project, draft):
+def verify_operator_target(root: Path, project: str, draft: SettingsDraft) -> None:
     from config.experiments import normalize_experiments_config
 
     receipt = _receipt(root)
@@ -371,7 +389,6 @@ def verify_operator_target(root, project, draft):
         )
 
 
-# @testable infrastructure
 def _restore_paths():
     # Use the same output locations and permissions as installer generation.
     generated = (
@@ -390,7 +407,6 @@ def _restore_paths():
     return paths
 
 
-# @testable infrastructure
 def _recover(root):
     raw = _read(root, JOURNAL)
     if raw is None:
@@ -410,10 +426,16 @@ def _recover(root):
     (root / JOURNAL).unlink()
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_restore_preserves_previous_installation
-# @matrix config deploy : config-files transactional-state recovery
-def restore(root, project, version, bundle, receipt, source, operator, replace=False):
+def restore(
+    root: Path,
+    project: str,
+    version: str,
+    bundle: dict[str, object],
+    receipt: dict[str, object],
+    source: str,
+    operator: dict[str, str] | None,
+    replace: bool = False,
+) -> dict[str, object]:
     app, dev = validate_bundle(bundle, project)
     local_app = _read(root, APP)
     local_dev = _read(root, DEV)
@@ -430,13 +452,19 @@ def restore(root, project, version, bundle, receipt, source, operator, replace=F
         raise CloudSettingsError(
             "This checkout's developer settings belong to another project."
         )
-    if any(_read(root, path) is not None for path in (APP, DEV, CA)):
-        if _snapshot(root) != receipt.get("fingerprint") and not replace:
-            raise CloudSettingsError(
-                "Local settings have unrecorded edits. Publish them or explicitly --replace after review."
-            )
+    if (
+        any(_read(root, path) is not None for path in (APP, DEV, CA))
+        and _snapshot(root) != receipt.get("fingerprint")
+        and not replace
+    ):
+        raise CloudSettingsError(
+            "Local settings have unrecorded edits. Publish them or explicitly --replace after review."
+        )
     extra = {}
     app_text = bundle["app"]
+    ca_text = bundle["ca"]
+    if not isinstance(app_text, str) or (ca_text is not None and not isinstance(ca_text, str)):
+        raise CloudSettingsError("The settings documents must contain text.")
     if operator:
         if not operator["ACCOUNT"].endswith(f"@{project}.iam.gserviceaccount.com"):
             raise CloudSettingsError(
@@ -447,7 +475,10 @@ def restore(root, project, version, bundle, receipt, source, operator, replace=F
             "author_target": {k: dev["gcloud_config"][k] for k in operator},
         }
         dev["gcloud_config"].update(operator)
-        version_from_source = json.loads(_read(root, Path("package.json")))["version"]
+        package = _read(root, Path("package.json"))
+        if package is None:
+            raise CloudSettingsError("The checkout has no package.json.")
+        version_from_source = json.loads(package)["version"]
         if not isinstance(version_from_source, str) or not re.fullmatch(
             r"\d+\.\d+\.\d+", version_from_source
         ):
@@ -471,7 +502,7 @@ def restore(root, project, version, bundle, receipt, source, operator, replace=F
     backup = {path.as_posix(): _read(root, path) for path in _restore_paths()}
     _atomic_write_text(root / JOURNAL, _json(backup), owner_only=True)
     try:
-        for path, value in ((APP, app_text), (DEV, dev_text), (CA, bundle["ca"])):
+        for path, value in ((APP, app_text), (DEV, dev_text), (CA, ca_text)):
             if value is None:
                 (root / path).unlink(missing_ok=True)
             else:
@@ -488,10 +519,35 @@ def restore(root, project, version, bundle, receipt, source, operator, replace=F
         raise
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_cloud_settings_cli
-# @matrix config setup : cli-routing project-identity
-def main(arguments):
+def _restore_already_current(
+    root: Path,
+    project: str,
+    requested_version: str,
+    resolved_version: str,
+    source: str,
+    operator: dict[str, str] | None,
+    receipt: dict[str, object],
+) -> bool:
+    """Return True when this worktree already has the exact requested restore."""
+    if not receipt:
+        return False
+    if (
+        receipt.get("project") != project
+        or receipt.get("secret") != SECRET
+        or receipt.get("source") != source
+        or receipt.get("fingerprint") != _snapshot(root)
+    ):
+        return False
+    if requested_version != "current" and receipt.get("version") != requested_version:
+        return False
+    if receipt.get("version") != resolved_version:
+        return False
+    if operator is not None and receipt.get("operator_target") != operator:
+        return False
+    return all((root / path).is_file() for path in (APP, DEV))
+
+
+def main(arguments: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="run.py cloud-settings")
     commands = parser.add_subparsers(dest="action", required=True)
     for action in ("publish", "restore", "check"):
@@ -533,7 +589,23 @@ def main(arguments):
             raise CloudSettingsError(
                 "The settings directory must belong to the checkout."
             )
-        with SetupProcessLock(root / FILES / ".lagniappe_setup.lock"):
+        lock_wait = 30.0 if args.action in {"restore", "check"} else 0.0
+        try:
+            lock = SetupProcessLock(
+                root / FILES / ".lagniappe_setup.lock",
+                wait_seconds=lock_wait,
+            )
+            lock.acquire()
+        except SetupError as error:
+            retry = (
+                f"venv/bin/python run.py cloud-settings {args.action} "
+                f"--project {args.project}"
+            )
+            raise CloudSettingsError(
+                f"Another settings operation is still active in {root}: {error} "
+                f"Retry with: {retry}"
+            ) from None
+        try:
             _recover(root)
             receipt = _receipt(root)
             if receipt and (
@@ -547,38 +619,72 @@ def main(arguments):
             target = yaml.safe_load(local)["gcloud_config"] if local else {}
             account = args.account or target.get("ACCOUNT")
             name = args.configuration or target.get("NAME")
+            if not name or not account:
+                raise CloudSettingsError("Select a valid project, gcloud configuration, and account.")
             store = SecretManager(args.project, name, account)
             source = _source(root)
             if args.action == "publish":
                 result = publish(root, args.project, store, receipt, source)
                 version = result["version"]
             else:
-                version, bundle = store.access(args.version)
-                validate_bundle(bundle, args.project)
-                if args.action == "restore":
-                    operator = (
-                        {"NAME": name, "ACCOUNT": account} if args.operator else None
-                    )
-                    restore(
+                operator = (
+                    {"NAME": name, "ACCOUNT": account}
+                    if args.action == "restore" and args.operator
+                    else None
+                )
+                if (
+                    args.action == "restore"
+                    and not args.replace
+                    and args.version != "current"
+                    and receipt
+                    and _restore_already_current(
                         root,
                         args.project,
-                        version,
-                        bundle,
-                        receipt,
+                        args.version,
+                        str(receipt.get("version") or ""),
                         source,
                         operator,
-                        args.replace,
-                    )
-                elif (
-                    not receipt
-                    or receipt.get("version") != version
-                    or not _same_settings(
-                        _local_bundle(root, args.project, receipt), bundle
+                        receipt,
                     )
                 ):
-                    raise CloudSettingsError(
-                        "This checkout does not match the selected secret version."
-                    )
+                    version = str(receipt["version"])
+                else:
+                    version, bundle = store.access(args.version)
+                    validate_bundle(bundle, args.project)
+                    if args.action == "restore":
+                        if not args.replace and _restore_already_current(
+                            root,
+                            args.project,
+                            args.version,
+                            version,
+                            source,
+                            operator,
+                            receipt,
+                        ):
+                            pass
+                        else:
+                            restore(
+                                root,
+                                args.project,
+                                version,
+                                bundle,
+                                receipt,
+                                source,
+                                operator,
+                                args.replace,
+                            )
+                    elif (
+                        not receipt
+                        or receipt.get("version") != version
+                        or not _same_settings(
+                            _local_bundle(root, args.project, receipt), bundle
+                        )
+                    ):
+                        raise CloudSettingsError(
+                            "This checkout does not match the selected secret version."
+                        )
+        finally:
+            lock.release()
         print(
             f"{args.action} succeeded for {args.project}/{SECRET} version {version} at checkout {source}."
         )

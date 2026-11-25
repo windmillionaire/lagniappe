@@ -1,7 +1,7 @@
 """Small shared helpers for deferred-job tool services."""
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason
@@ -11,11 +11,6 @@ from lagniappe.core.tools import cache
 
 
 
-# @testable true
-# @tests tests_unit/test_023b_deferred_job_service.py::test_cancel_deletes_tasks_and_persists_a_tombstone
-# @tests tests_unit/test_023b_deferred_job_service.py::test_operation_projection_failure_is_nonfatal
-# @matrix deferred-jobs : cache-failure-isolation redis-projection
-# @pair deferred-jobs:deterministic-task-id
 def _publish_operation_projection(job, *, operation):
     """Publish disposable polling state without changing a durable outcome."""
     try:
@@ -35,9 +30,6 @@ def _publish_operation_projection(job, *, operation):
 
 
 
-# @testable true
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_phases_reuse_current_report_without_loading_input_files
-# @matrix ai-report : input-files no-extra-read fresh-read
 def _load_reference(reference):
     if reference is None:
         return None
@@ -60,21 +52,18 @@ def _load_reference(reference):
 
 
 
-# @testable infrastructure
 def _json_copy(value):
     return json.loads(json.dumps(value, default=str))
 
 
 
 
-# @testable infrastructure
-def _utc(value=None):
-    return value or datetime.now(timezone.utc)
+def _utc(value: datetime | None = None) -> datetime:
+    return value or datetime.now(UTC)
 
 
 
 
-# @testable infrastructure
 def _error_record(error, *, retryable, attempt):
     return {
         "type": type(error).__name__,

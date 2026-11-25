@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
 
-/** @matrix home polling : foreground lazy-widget mounted-scope targeted-refresh */
 test("test_home_polling_subscribes_loaded_widgets_and_refreshes_only_owner", async () => {
 	class Core {
 		constructor(element) {
@@ -20,12 +19,12 @@ test("test_home_polling_subscribes_loaded_widgets_and_refreshes_only_owner", asy
 		}
 	}
 	const { default: Home } = await esmock.strict(
-		"../../src/script/views/home.mjs",
+		"../../src/script/views/home.ts",
 		{
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
-			"../../src/script/views/base/core.mjs": { default: Core },
+			"../../src/script/views/base/core.ts": { default: Core },
 		},
 	);
 	const descriptors = new Map();

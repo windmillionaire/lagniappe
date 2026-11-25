@@ -1,6 +1,14 @@
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.page import Page
+    from lagniappe.core.entities.task import Task
+    from lagniappe.core.entities.user import User
+
 import hashlib
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 from ...definitions import Action, Fetch, FetchReason
 from ...entities import Entities
@@ -10,23 +18,16 @@ from lagniappe.core.tools.database import utility as database_utility
 from .ordering import page_task_roots
 
 
-_MIN_DATETIME = datetime.min.replace(tzinfo=timezone.utc)
+_MIN_DATETIME = datetime.min.replace(tzinfo=UTC)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/combine.py::combine_tasks
-# @reason immutable result only carries the persisted combine outcome
 @dataclass(frozen=True)
 class TaskCombineResult:
-    main: object
-    removed: tuple
+    main: Task
+    removed: tuple[Task, ...]
     histories: tuple
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/combine.py::compatible_tasks
-# @covered-by lagniappe/core/tools/tasks/combine.py::combine_tasks
-# @reason exact page/model identity is exercised through both public combine boundaries
 def _compatible(source, candidate, page):
     if not isinstance(source, Entities.TASK) or not isinstance(
         candidate, Entities.TASK
@@ -44,10 +45,7 @@ def _compatible(source, candidate, page):
     return source.properties.model.key == candidate.properties.model.key
 
 
-# @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_combine_selects_completed_then_modified_main
-# @matrix task-combine : completed-on deterministic-tie modified winner
-def select_main_task(tasks):
+def select_main_task(tasks: Iterable[Task]) -> Task:
     """Choose the task whose current state remains after a combination."""
     tasks = tuple(task for task in tasks if isinstance(task, Entities.TASK))
     if not tasks:
@@ -74,10 +72,7 @@ def select_main_task(tasks):
     )
 
 
-# @testable true
-# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
-# @matrix task-combine : compatible linked-page no-model same-model same-page view-page
-def compatible_tasks(task, page, user):
+def compatible_tasks(task: Task, page: Page, user: User) -> tuple[Task, ...]:
     """Return delete-permitted peers owned by the page displaying ``task``."""
     if not isinstance(task, Entities.TASK) or not isinstance(page, Entities.PAGE):
         return ()
@@ -100,9 +95,6 @@ def compatible_tasks(task, page, user):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/combine.py::combine_tasks
-# @reason stable destination identities make the public two-phase combine retry-safe
 def _history_key(main, source):
     source_key = source.urlsafe_key.encode("utf-8")
     digest = hashlib.sha256(source_key).hexdigest()
@@ -110,9 +102,6 @@ def _history_key(main, source):
     return database_utility.create_named_key("task_history", identifier, parent=main)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/combine.py::combine_tasks
-# @reason source history expansion is part of the public migration operation
 def _source_histories(tasks):
     keys = [
         history_key
@@ -131,10 +120,7 @@ def _source_histories(tasks):
     )
 
 
-# @testable true
-# @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
-# @matrix task-combine : attachments completed-on current-snapshot delete existing-history migrate-history winner
-def combine_tasks(task, selected_keys, page, user):
+def combine_tasks(task: Task, selected_keys: Iterable[str] | None, page: Page, user: User) -> TaskCombineResult:
     """Combine ``task`` with selected compatible peers and return the outcome."""
     selected_keys = tuple(selected_keys or ())
     if not selected_keys:
@@ -158,8 +144,7 @@ def combine_tasks(task, selected_keys, page, user):
         if isinstance(candidate, Entities.TASK)
     }
     current = loaded_by_key.get(task.urlsafe_key)
-    selected = tuple(loaded_by_key.get(key) for key in selected_keys)
-    if not current or any(candidate is None for candidate in selected):
+    if not current or any(key not in loaded_by_key for key in selected_keys):
         raise ValidationError("One or more selected tasks can no longer be combined")
 
     if not isinstance(page, Entities.PAGE) or not any(
@@ -167,6 +152,7 @@ def combine_tasks(task, selected_keys, page, user):
     ):
         raise ValidationError("One or more selected tasks can no longer be combined")
 
+    selected = tuple(loaded_by_key[key] for key in selected_keys)
     combined = (current, *selected)
     if not current.allowed(Action.DELETE, user=user) or any(
         not _compatible(current, candidate, page)

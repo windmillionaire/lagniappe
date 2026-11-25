@@ -1,3 +1,6 @@
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Literal, TypedDict, cast
+
 from flask import has_request_context, session
 from flask_login import current_user
 
@@ -5,16 +8,45 @@ from ..definitions import Action, Resource, Restriction
 from ..tools import cache
 from .base_property import Property
 
+if TYPE_CHECKING:
+    from ..restrictions import QueryHashes
+    from ..entities.category import Category
+    from ..entities.user import User as User
+    from ..tools.cache.details import CachedDetail
 
-# @testable false
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.value
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.search
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.task
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.form
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.user_assign_restrictions
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.can_initiate_messages
-# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.users
-class Restrictions(Property):
+
+type GroupMembership = list[str] | Literal[Restriction.BELONGS_TO_ALL, Restriction.BELONGS_TO_NONE]
+type AccessField = Literal['search', 'task', 'form', 'project', 'models', 'page', 'users', 'category', 'user_assign', 'category_edit', 'user_message']
+type PermissionDetails = Mapping[str, CachedDetail]
+
+
+def _detail_hash(detail: CachedDetail) -> str:
+    if "hash" not in detail:
+        raise KeyError("hash")
+    return detail["hash"]
+
+
+class RestrictionState(TypedDict):
+    version: int
+    fingerprint: str
+    value: list[str]
+    belongs_to: GroupMembership
+    pages_by_category: dict[str, list[str]]
+    can_initiate_messages: bool
+    search: QueryHashes
+    task: QueryHashes
+    form: QueryHashes
+    project: QueryHashes
+    models: QueryHashes
+    page: QueryHashes
+    users: QueryHashes
+    category: QueryHashes
+    user_assign: QueryHashes
+    category_edit: QueryHashes
+    user_message: QueryHashes
+
+
+class Restrictions(Property[list[str], "User"]):
     """Computed access restrictions for a user.
 
     Determines which resource types (models, forms, users) and specific entity
@@ -30,6 +62,9 @@ class Restrictions(Property):
     """
 
     _id = "restrictions"
+    _state: RestrictionState | None = None
+    _permission_details: dict[str, CachedDetail]
+    _value_details: dict[str, CachedDetail]
     _session_version = 12
     _session_key = "restrictions"
     _access_fields = (
@@ -56,129 +91,77 @@ class Restrictions(Property):
         }
     ) | frozenset(_access_fields)
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @matrix permissions restrictions : facets
     @property
-    def value(self):
+    def value(self) -> list[str]:  # pyright: ignore[reportIncompatibleMethodOverride] -- access restrictions are computed and read-only.
         self._ensure_loaded()
-        return self._value
+        return cast(list[str], self._value)
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_only_project_permissions_that_imply_view
-    # @tests tests_unit/test_009d_user_restrictions.py::test_administrator_search_membership_bypasses_restrictions
-    # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_one_category_permissions
-    # @matrix permissions restrictions : search
     @property
-    def search(self):
+    def search(self) -> QueryHashes:
         return self._state_value("search")
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @matrix permissions restrictions : facets
     @property
-    def task(self):
+    def task(self) -> QueryHashes:
         return self._state_value("task")
 
-    def unrestricted_pages(self, category):
+    def unrestricted_pages(self, category: Category) -> QueryHashes:
         if self.entity.has_permission(category, Action.VIEW):
             return Restriction.UNRESTRICTED
 
-        self._ensure_loaded()
-        return self._state.get("pages_by_category", {}).get(category.hash, [])
+        return self._ensure_loaded()["pages_by_category"].get(category.hash, [])
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @matrix permissions restrictions : facets
     @property
-    def form(self):
+    def form(self) -> QueryHashes:
         return self._state_value("form")
 
     @property
-    def project(self):
+    def project(self) -> QueryHashes:
         return self._state_value("project")
 
     @property
-    def models(self):
+    def models(self) -> QueryHashes:
         return self._state_value("models")
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @pair restrictions:page-list
     @property
-    def page(self):
+    def page(self) -> QueryHashes:
         return self._state_value("page")
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_user_assign_search_permission_filter_returns_assignable_users
-    # @matrix permissions restrictions : assign search
     @property
-    def user_assign_restrictions(self):
+    def user_assign_restrictions(self) -> QueryHashes:
         return self._state_value("user_assign")
 
     @property
-    def user_message_restrictions(self):
+    def user_message_restrictions(self) -> QueryHashes:
         """Users eligible for direct messages and mention suggestions."""
         return self._state_value("user_message")
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_session_blob_and_fingerprint
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_empty_list_is_loaded_state
-    # @pair messaging:compose-eligibility
     @property
-    def can_initiate_messages(self):
+    def can_initiate_messages(self) -> bool:
         """Session-backed capability for rendering new-message entry points."""
-        self._ensure_loaded()
-        return self._state["can_initiate_messages"]
+        return self._ensure_loaded()["can_initiate_messages"]
 
-    # @testable true
-# @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_category_search_permission_filter_returns_editable_categories
-# @tests tests_e2e/002_home/test_002k_home_pages.py::test_home_page_create_visible_for_category_editor
-    # @matrix permissions restrictions : category-edit search
     @property
-    def category_edit_restrictions(self):
+    def category_edit_restrictions(self) -> QueryHashes:
         return self._state_value("category_edit")
 
-    # @testable true
-    # @tests tests_unit/test_020b_ai_planner.py::test_action_catalog_uses_create_update_delete_permissions
-    # @matrix ai-report : action-capabilities permissions
-    # @pair permissions:own-page
     @property
-    def ai_action_capabilities(self):
+    def ai_action_capabilities(self) -> dict[str, bool]:
         """Live create/update/delete hints for action discovery, never target authorization."""
         return self._ai_action_capabilities()
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @matrix permissions restrictions : facets
     @property
-    def users(self):
+    def users(self) -> QueryHashes:
         return self._state_value("users")
 
     @property
-    def category(self):
+    def category(self) -> QueryHashes:
         return self._state_value("category")
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_builds_group_membership_from_stored_requires
-    # @tests tests_unit/test_009d_user_restrictions.py::test_administrator_search_membership_bypasses_restrictions
-    # @tests tests_unit/test_009d_user_restrictions.py::test_session_membership_refreshes_without_permission_map_change
-    # @matrix permissions restrictions : group-membership session-blob
-    # @matrix permissions : group-membership stored-requires
-    # @pair restrictions:search
-    # @pair restrictions:root-fetch
     @property
-    def belongs_to(self):
-        self._ensure_loaded()
-        return self._state["belongs_to"]
+    def belongs_to(self) -> GroupMembership:
+        return self._ensure_loaded()["belongs_to"]
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_clear_removes_session_blob
-    # @matrix permissions restrictions : clear session-blob
-    def clear(self):
+    def clear(self) -> None:
         if has_request_context():
             session.pop(self._session_key, None)
         self.unset()
@@ -186,24 +169,22 @@ class Restrictions(Property):
         self._permission_details = {}
         self._value_details = {}
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_empty_list_is_loaded_state
-    # @matrix permissions restrictions : empty-access loaded-state
-    def _ensure_loaded(self):
-        if getattr(self, "_state", None) is not None and self.is_set:
-            return
+    def _ensure_loaded(self) -> RestrictionState:
+        if self._state is not None and self.is_set:
+            return self._state
 
         state = self._session_state()
         if state:
             self._load_state(state)
         else:
             self._create()
+        assert self._state is not None
+        return self._state
 
-    def _state_value(self, key):
-        self._ensure_loaded()
-        return self._state[key]
+    def _state_value(self, key: AccessField) -> QueryHashes:
+        return self._ensure_loaded()[key]
 
-    def _session_enabled(self):
+    def _session_enabled(self) -> bool:
         if not has_request_context():
             return False
 
@@ -214,10 +195,7 @@ class Restrictions(Property):
         except RuntimeError:
             return False
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_session_blob_and_fingerprint
-    # @matrix permissions restrictions : empty-access session-blob stale-session
-    def _session_state(self):
+    def _session_state(self) -> RestrictionState | None:
         if not self._session_enabled():
             return None
 
@@ -231,7 +209,9 @@ class Restrictions(Property):
             return None
         return state
 
-    def _deserialize_session_state(self, stored):
+    def _deserialize_session_state(
+        self, stored: Mapping[str, object]
+    ) -> RestrictionState | None:
         if not self._session_required_fields <= stored.keys():
             return None
         if stored["version"] != self._session_version:
@@ -244,13 +224,10 @@ class Restrictions(Property):
         state = dict(stored)
         for key in (*self._access_fields, "belongs_to"):
             state[key] = Restriction.from_session(state[key])
-        return state
+        return cast(RestrictionState, state)
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restriction_session_markers_validate_their_own_scope
-    # @matrix permissions restrictions : session-blob validation
     @classmethod
-    def _session_blob_types_valid(cls, stored):
+    def _session_blob_types_valid(cls, stored: Mapping[str, object]) -> bool:
         return (
             isinstance(stored["value"], list)
             and (
@@ -269,74 +246,71 @@ class Restrictions(Property):
             and isinstance(stored["can_initiate_messages"], bool)
         )
 
-    def _load_state(self, state):
+    def _load_state(self, state: RestrictionState) -> None:
         self._state = state
         self._value = list(state["value"])
         self._permission_details = {}
         self._value_details = {}
 
-    def _save_state(self):
+    def _save_state(self) -> None:
         if not self._session_enabled():
             return
 
         session[self._session_key] = self._session_blob()
 
-    def _session_blob(self):
-        blob = dict(self._state)
+    def _session_blob(self) -> dict[str, object]:
+        assert self._state is not None
+        blob: dict[str, object] = dict(self._state)
         for key in (*self._access_fields, "belongs_to"):
             blob[key] = Restriction.to_session(blob[key])
         return blob
 
-    # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_session_membership_refreshes_without_permission_map_change
-    # @matrix permissions restrictions : group-membership session-blob
-    def _fingerprint(self):
+    def _fingerprint(self) -> str:
         return self.entity.authorization_fingerprint
 
     @staticmethod
-    def _sorted_hashes(details, *kinds):
+    def _sorted_hashes(details: PermissionDetails, *kinds: str) -> list[str]:
         return sorted(
-            {item["hash"] for item in details.values() if item.get("kind") in kinds}
+            {_detail_hash(item) for item in details.values() if item.get("kind") in kinds}
         )
 
     @staticmethod
-    def _has_access(restrictions):
+    def _has_access(restrictions: QueryHashes) -> bool:
         return Restriction.is_unrestricted(restrictions) or bool(restrictions)
 
-    def _permission_hashes(self, details, kind, action):
+    def _permission_hashes(
+        self, details: PermissionDetails, kind: str, action: Action
+    ) -> list[str]:
         return sorted(
-            details_item["hash"]
+            _detail_hash(details_item)
             for details_item in details.values()
             if details_item.get("kind") == kind
-            and Action[self.entity.permissions.get(details_item["hash"])].implies(
+            and Action[self.entity.permissions.get(_detail_hash(details_item), Action.NONE.name)].implies(
                 action
             )
         )
 
-    def _pages_by_category(self, details):
+    def _pages_by_category(self, details: PermissionDetails) -> dict[str, list[str]]:
         pages = {}
         for item in details.values():
             if item.get("kind") != "page":
                 continue
             for parent_hash in item.get("requires", []):
-                pages.setdefault(parent_hash, []).append(item["hash"])
+                pages.setdefault(parent_hash, []).append(_detail_hash(item))
         return {key: sorted(value) for key, value in pages.items()}
 
     @staticmethod
-    def _page_restrictions(models):
+    def _page_restrictions(models: QueryHashes) -> QueryHashes:
         return ["models"] if Restriction.is_unrestricted(models) else models
 
-    def _task_restrictions(self, can_view_models):
+    def _task_restrictions(self, can_view_models: bool) -> QueryHashes:
         if self.entity.is_admin:
             return Restriction.UNRESTRICTED
         if can_view_models:
             return ["models"]
         return self._sorted_hashes(self._value_details, "page", "category")
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.ai_action_capabilities
-    # @reason resource-level hints are exercised through action discovery and session tests
-    def _ai_action_capabilities(self):
+    def _ai_action_capabilities(self) -> dict[str, bool]:
         self._ensure_loaded()
         self._ensure_permission_details()
         can_create_models = self.entity.has_permission(Resource.MODELS, Action.CREATE)
@@ -360,6 +334,20 @@ class Restrictions(Property):
         can_delete_categories = can_delete_models or self._has_permission_kind(
             self._permission_details, "category", Action.DELETE
         )
+        can_delete_projects = can_delete_models or self._has_permission_kind(
+            self._permission_details, "project", Action.DELETE
+        )
+        can_delete_pages = can_delete_categories or self._has_permission_kind(
+            self._permission_details,
+            "page",
+            Action.DELETE,
+        )
+        can_delete_tasks = (
+            can_delete_pages
+            or can_delete_projects
+            or self._has_permission_kind(self._permission_details, "task", Action.DELETE)
+        )
+        can_delete_files = can_delete_pages or can_delete_tasks
         can_edit_forms = self.entity.has_permission(Resource.FORMS, Action.EDIT)
 
         return {
@@ -371,17 +359,14 @@ class Restrictions(Property):
             "can_update_pages": can_edit_pages,
             "can_update_tasks": can_edit_tasks,
             "can_update_forms": can_edit_forms,
-            "can_delete_pages": (
-                can_delete_categories
-                or self._has_permission_kind(
-                    self._permission_details,
-                    "page",
-                    Action.DELETE,
-                )
-            ),
+            "can_delete_pages": can_delete_pages,
+            "can_delete_categories": can_delete_categories,
+            "can_delete_projects": can_delete_projects,
+            "can_delete_tasks": can_delete_tasks,
+            "can_delete_files": can_delete_files,
         }
 
-    def _ensure_permission_details(self):
+    def _ensure_permission_details(self) -> None:
         if self._permission_details or not self.entity.permissions:
             return
         permission_hashes = list(self.entity.permissions.keys())
@@ -389,16 +374,18 @@ class Restrictions(Property):
             cache.get_details_by_hash(permission_hashes) if permission_hashes else {}
         )
 
-    def _has_permission_kind(self, details, kind, action):
+    def _has_permission_kind(
+        self, details: PermissionDetails, kind: str, action: Action
+    ) -> bool:
         for item in details.values():
             if item.get("kind") != kind:
                 continue
-            level = Action[self.entity.permissions.get(item.get("hash"))]
+            level = Action[self.entity.permissions.get(item.get("hash", ""), Action.NONE.name)]
             if level.implies(action):
                 return True
         return False
 
-    def _create(self):
+    def _create(self) -> None:
         if self.entity.is_admin:
             restricted_to = ["forms", "models", "users"]
             belongs_to = []

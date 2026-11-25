@@ -27,15 +27,12 @@ USER_AGENT = "Mozilla/5.0 AppleWebKit/537.36 Chrome/126 Safari/537.36"
 FONT_URL_RE = re.compile(r"src:\s*url\((https://fonts\.gstatic\.com/[^)]+)\)")
 
 
-# @testable true
-# @tests tests_tooling/test_icons.py::test_material_symbol_subset_request_uses_unique_sorted_registry_glyphs
-# @pair icons:subset-request
-def subset_request(icons_path=ICONS_PATH):
+def subset_request(icons_path: Path = ICONS_PATH) -> tuple[str, list[str]]:
     registry = yaml.safe_load(Path(icons_path).read_text(encoding="utf-8")) or {}
     definitions = flatten_icon_definitions(
         registry, schema=load_icons_schema(REPOSITORY_ROOT)
     )
-    icon_names = sorted({definition["glyph"] for definition in definitions.values()})
+    icon_names = sorted({str(definition["glyph"]) for definition in definitions.values()})
     query = urlencode(
         {
             "family": FONT_FAMILY_QUERY,
@@ -46,18 +43,12 @@ def subset_request(icons_path=ICONS_PATH):
     return f"{GOOGLE_FONTS_CSS_URL}?{query}", icon_names
 
 
-# @testable false
-# @covered-by runner/icons.py::update_icons
-# @reason network transport is isolated behind tested response parsing
 def _download(url):
     request = Request(url, headers={"User-Agent": USER_AGENT})
     with urlopen(request, timeout=60) as response:
         return response.read()
 
 
-# @testable true
-# @tests tests_tooling/test_icons.py::test_update_icons_writes_official_subset_metadata_and_rebuilds
-# @pair icons:subset-update
 def _font_url(css):
     match = FONT_URL_RE.search(css)
     if not match:
@@ -67,9 +58,6 @@ def _font_url(css):
     return match.group(1)
 
 
-# @testable true
-# @tests tests_tooling/test_icons.py::test_update_icons_writes_official_subset_metadata_and_rebuilds
-# @pair icons:subset-update
 def _write_subset(font, css_url, font_url, icon_names, font_path, metadata_path):
     if not font.startswith(b"wOF2"):
         raise ValueError("Google Fonts response is not a WOFF2 font")
@@ -92,7 +80,7 @@ def _write_subset(font, css_url, font_url, icon_names, font_path, metadata_path)
         "sha256": hashlib.sha256(font).hexdigest(),
     }
     payload = json.dumps(metadata, indent="\t")
-    outputs = ((font_path, font), (metadata_path, f"{payload}\n".encode("utf-8")))
+    outputs = ((font_path, font), (metadata_path, f"{payload}\n".encode()))
     directories = []
     prepared = []
     published = []
@@ -142,16 +130,13 @@ def _write_subset(font, css_url, font_url, icon_names, font_path, metadata_path)
                 shutil.rmtree(directory)
 
 
-# @testable true
-# @tests tests_tooling/test_icons.py::test_update_icons_writes_official_subset_metadata_and_rebuilds
-# @pair icons:subset-update
 def update_icons(
     *,
-    rebuild=True,
-    icons_path=ICONS_PATH,
-    font_path=FONT_PATH,
-    metadata_path=METADATA_PATH,
-):
+    rebuild: bool = True,
+    icons_path: Path = ICONS_PATH,
+    font_path: Path = FONT_PATH,
+    metadata_path: Path = METADATA_PATH,
+) -> None:
     css_url, icon_names = subset_request(icons_path)
     css = _download(css_url).decode("utf-8")
     font_url = _font_url(css)
@@ -170,7 +155,7 @@ def update_icons(
     )
     if rebuild:
         try:
-            run_command([NPM_CLI, "run", "dev"], check=True)
+            run_command([NPM_CLI or "npm", "run", "dev"], check=True)
         except (Exception, KeyboardInterrupt):
             print(
                 "Frontend rebuild did not complete; refreshed icon sources are "

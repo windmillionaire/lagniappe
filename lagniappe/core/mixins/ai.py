@@ -1,8 +1,6 @@
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_entity.py::Name.ai_key
-# @covered-by lagniappe/core/properties/form_inputs.py::TextInput
-# @covered-by lagniappe/core/properties/form_textarea.py::Textarea
-class AIMixin:
+from .field_host import FieldHost
+
+class AIMixin(FieldHost):
     """Adds AI context output. Collected by Entity.to_ai().
 
     Provides:
@@ -11,10 +9,10 @@ class AIMixin:
     """
 
     @property
-    def ai_value(self):
+    def ai_value(self) -> object:
         val = self.value
         return None if val is None else val
 
     @property
-    def ai_key(self):
+    def ai_key(self) -> str | None:
         return self.label

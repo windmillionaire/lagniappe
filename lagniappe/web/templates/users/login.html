@@ -136,6 +136,18 @@
       {{ divider("Or") }}
     {% endif %}
     {{ button("Sign in with email", role="show-email-check") }}
+    {% if demo_guest_enabled %}
+      {{ divider("Or") }}
+      <form method="post"
+            action="{{ url_for('users.demo_login') }}"
+            data-role="demo-guest-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+        <button type="submit"
+                data-role="demo-guest-login"
+                class="w-full rounded-md border border-base-light bg-white px-3 py-2 text-center text-sm font-semibold text-base-dark shadow-sm hover:bg-base-bg focus-visible:outline-2">Explore read-only demo</button>
+      </form>
+    {% endif %}
   </div>
   <!-- Email Check Form -->
   <div id="emailCheck"
@@ -232,4 +244,20 @@
       </div>
     </div>
   </div>
+  {% if login_notice_segments and not owner_setup %}
+    <aside data-role="login-notice"
+           class="max-w-md mx-auto mt-4 rounded-md border border-base-light bg-base-bg px-4 py-3 text-center text-sm leading-6 text-base-medium">
+      {% for segment in login_notice_segments %}
+        {%- if segment.kind == "link" -%}
+          <a href="{{ segment.href }}"
+             class="{{ styles.link.default }}"
+             {% if segment.external %}target="_blank" rel="noopener noreferrer"{% endif %}>{{ segment.text }}</a>
+        {%- elif segment.kind == "break" -%}
+          <br>
+        {%- else -%}
+          {{ segment.text }}
+        {%- endif -%}
+      {% endfor %}
+    </aside>
+  {% endif %}
 {% endblock content %}

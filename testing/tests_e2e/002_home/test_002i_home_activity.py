@@ -194,8 +194,6 @@ def _warm_offline_create_widgets(home, *, note=True, task=True):
         )
 
 
-# @matrix activity : cached-response load notes-exclusion notes-only
-# @matrix notes : cached-response load notes-only
 # @template home/notes.html::list
 # @template home/notes.html::note_item
 def test_home_notes_exclude_notifications(get_admin, get_user):
@@ -213,8 +211,6 @@ def test_home_notes_exclude_notifications(get_admin, get_user):
     expect(_activity_item(home, notification_body)).not_to_be_attached()
 
 
-# @matrix activity : asset-lifecycle body create html-stripping parent photo scope visibility
-# @matrix notes : asset-lifecycle body create html-stripping parent photo private-default scope visibility
 # @template home/notes.html::add_note_form
 # @template notes.html::note_item
 def test_create_note_body_and_photo_from_home(get_admin, get_user):
@@ -251,7 +247,6 @@ def test_create_note_body_and_photo_from_home(get_admin, get_user):
     expect(photo_item).to_contain_text("Everyone")
 
 
-# @matrix activity notes permissions : owner-only-shared
 # @template home/home.html::create
 # @template notes.html::composer
 def test_home_note_shared_visibility_is_owner_only(get_user):
@@ -311,7 +306,6 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
     ).to_have_count(0)
 
 
-# @matrix activity notes notifications : delete ownership
 # @template notes.html::note_item
 def test_delete_activity_item_from_home(get_admin, get_user):
     user = get_admin()
@@ -345,7 +339,6 @@ def test_delete_activity_item_from_home(get_admin, get_user):
     expect(activity_list).to_contain_text(other_body)
 
 
-# @matrix activity notes permissions : home owner private shared
 # @template notes.html::note_item
 @pytest.mark.e2e_group("owner")
 def test_home_note_visibility_across_users(get_user):
@@ -358,22 +351,20 @@ def test_home_note_visibility_across_users(get_user):
     _save_note(author, private_body, visibility="private")
 
     viewer_home = viewer.go(SitePages.HOME)
-    viewer_home.activity_list
+    _ = viewer_home.activity_list
     expect(_activity_item(viewer_home, shared_body)).to_be_visible()
     expect(_activity_item(viewer_home, private_body)).not_to_be_attached()
 
     author_home = author.go(SitePages.HOME)
-    author_home.activity_list
+    _ = author_home.activity_list
     expect(_activity_item(author_home, shared_body)).to_be_visible()
     expect(_activity_item(author_home, private_body)).to_be_visible()
 
     owner_home = owner.go(SitePages.HOME)
-    owner_home.activity_list
+    _ = owner_home.activity_list
     expect(_activity_item(owner_home, private_body)).to_be_visible()
 
 
-# @matrix notifications : dropdown-refresh long-text-wrap pending target target-link
-# @matrix notifications : body create
 # @template notifications.html::item
 def test_notification_menu_renders_target_and_preserves_pending_state(get_admin, get_user):
     user = get_admin()
@@ -445,7 +436,6 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_admin,
     ) <= 2
 
 
-# @matrix notifications : accessible-state clear-all delete dropdown-refresh menu-open ownership reconnect
 # @template nav.html::navbar
 @pytest.mark.parametrize("reconnect_before_open", [False, True])
 def test_notification_menu_deletes_and_clears(
@@ -528,7 +518,6 @@ def test_notification_menu_deletes_and_clears(
     assert Entities.fetch_one(second.urlsafe_key, request=Fetch.root()) is None
 
 
-# @matrix offline : queue-create reload
 # @template home/notes.html::note_item
 # @template home/tasks.html::task
 def test_offline_home_create_mutations_persist_after_reload(get_admin, get_user, browser_failures):
@@ -549,74 +538,70 @@ def test_offline_home_create_mutations_persist_after_reload(get_admin, get_user,
         path=FONTS["source-sans-italic-latin"],
         count=0,
         max_count=1,
+    ), browser_failures.expect_http_error(
+        user,
+        status=503,
+        path="/analytics/track",
+    ), browser_failures.expect_offline(
+        user,
+        ping_count=2,
+        max_ping_count=3,
     ):
-        with browser_failures.expect_http_error(
-            user,
-            status=503,
-            path="/analytics/track",
-        ):
-            with browser_failures.expect_offline(
-                user,
-                ping_count=2,
-                max_ping_count=3,
-            ):
-                user.offline = True
-                expect(user.locate("[data-role='offline']")).to_be_visible()
+        user.offline = True
+        expect(user.locate("[data-role='offline']")).to_be_visible()
 
-                note_item = _create_text_note_from_home(
-                    user, home, note_body, expect_network=False
-                )
-                task_item = _create_task_from_home(
-                    home, task_name, expect_network=False
-                )
-                expect(note_item).to_have_attribute("data-offline", "true")
-                expect(task_item).to_have_attribute("data-offline", "true")
-                expect(note_item).to_have_attribute(
-                    "data-key", re.compile(r"^offline:")
-                )
-                expect(task_item).to_have_attribute(
-                    "data-key", re.compile(r"^offline:")
-                )
-                note_key = note_item.get_attribute("data-key")
-                task_key = task_item.get_attribute("data-key")
-                note_mutation_id = note_key.removeprefix("offline:")
-                task_mutation_id = task_key.removeprefix("offline:")
-                wait_for_offline_mutations(
-                    user, record_id=note_mutation_id, exact=1
-                )
-                wait_for_offline_mutations(
-                    user, record_id=task_mutation_id, exact=1
-                )
+        note_item = _create_text_note_from_home(
+            user, home, note_body, expect_network=False
+        )
+        task_item = _create_task_from_home(
+            home, task_name, expect_network=False
+        )
+        expect(note_item).to_have_attribute("data-offline", "true")
+        expect(task_item).to_have_attribute("data-offline", "true")
+        expect(note_item).to_have_attribute(
+            "data-key", re.compile(r"^offline:")
+        )
+        expect(task_item).to_have_attribute(
+            "data-key", re.compile(r"^offline:")
+        )
+        note_key = note_item.get_attribute("data-key")
+        task_key = task_item.get_attribute("data-key")
+        note_mutation_id = note_key.removeprefix("offline:")
+        task_mutation_id = task_key.removeprefix("offline:")
+        wait_for_offline_mutations(
+            user, record_id=note_mutation_id, exact=1
+        )
+        wait_for_offline_mutations(
+            user, record_id=task_mutation_id, exact=1
+        )
 
-                home = home.reload()
+        home = home.reload()
 
-                _loaded_activity_list(home)
-                _loaded_task_list(home)
-                expect(_activity_item(home, note_body)).not_to_be_attached()
-                expect(_task_item(home, task_name)).not_to_be_attached()
+        _loaded_activity_list(home)
+        _loaded_task_list(home)
+        expect(_activity_item(home, note_body)).not_to_be_attached()
+        expect(_task_item(home, task_name)).not_to_be_attached()
 
-                with user.page.expect_response(
-                    "**/l/activity/notes", timeout=15000
-                ):
-                    with user.page.expect_response("**/personal", timeout=15000):
-                        user.offline = False
+        with user.page.expect_response(
+            "**/l/activity/notes", timeout=15000
+        ), user.page.expect_response("**/personal", timeout=15000):
+            user.offline = False
 
-                wait_for_offline_mutations(
-                    user, record_id=note_mutation_id, exact=0
-                )
-                wait_for_offline_mutations(
-                    user, record_id=task_mutation_id, exact=0
-                )
+        wait_for_offline_mutations(
+            user, record_id=note_mutation_id, exact=0
+        )
+        wait_for_offline_mutations(
+            user, record_id=task_mutation_id, exact=0
+        )
     # The queue clears before replay refreshes Home's prefetched lists.
     wait_for_connectivity_replay(user)
-    home.activity_list
+    _ = home.activity_list
     expect(_activity_item(home, note_body)).to_be_visible()
     expect(_task_item(home, task_name)).to_be_attached()
-    home.task_list
+    _ = home.task_list
     expect(_task_item(home, task_name)).to_be_visible()
 
 
-# @matrix offline : optimistic-mutation reload replay server-first
 # @template home/notes.html::list
 # @template home/tasks.html::list
 def test_offline_home_reload_uses_server_state_until_replay(get_admin, get_user, browser_failures):
@@ -628,7 +613,7 @@ def test_offline_home_reload_uses_server_state_until_replay(get_admin, get_user,
 
     home = user.go(SitePages.HOME)
     home = home.reload()
-    home.task_list
+    _ = home.task_list
     task_item = _task_item(home, task_name)
     expect(task_item).to_be_visible()
 
@@ -638,53 +623,51 @@ def test_offline_home_reload_uses_server_state_until_replay(get_admin, get_user,
         user,
         status=503,
         path="/analytics/track",
+    ), browser_failures.expect_offline(
+        user,
+        ping_count=2,
+        max_ping_count=3,
     ):
-        with browser_failures.expect_offline(
-            user,
-            ping_count=2,
-            max_ping_count=3,
-        ):
-            user.offline = True
-            note_item = _create_text_note_from_home(
-                user, home, note_body, expect_network=False
-            )
-            expect(note_item).to_have_attribute("data-offline", "true")
-            expect(note_item).to_have_attribute(
-                "data-key", re.compile(r"^offline:")
-            )
-            note_key = note_item.get_attribute("data-key")
-            note_mutation_id = note_key.removeprefix("offline:")
-            wait_for_offline_mutations(
-                user, record_id=note_mutation_id, exact=1
-            )
-            note_item.locator("[data-action='delete-activity']").click()
-            wait_for_offline_mutations(
-                user, record_id=note_mutation_id, exact=0
-            )
-            task_item.locator("input[data-role='complete']").check()
-            expect(note_item).not_to_be_attached()
-            expect(task_item).not_to_be_attached()
-            wait_for_offline_mutations(
-                user, record_id=task_mutation_id, exact=1
-            )
+        user.offline = True
+        note_item = _create_text_note_from_home(
+            user, home, note_body, expect_network=False
+        )
+        expect(note_item).to_have_attribute("data-offline", "true")
+        expect(note_item).to_have_attribute(
+            "data-key", re.compile(r"^offline:")
+        )
+        note_key = note_item.get_attribute("data-key")
+        note_mutation_id = note_key.removeprefix("offline:")
+        wait_for_offline_mutations(
+            user, record_id=note_mutation_id, exact=1
+        )
+        note_item.locator("[data-action='delete-activity']").click()
+        wait_for_offline_mutations(
+            user, record_id=note_mutation_id, exact=0
+        )
+        task_item.locator("input[data-role='complete']").check()
+        expect(note_item).not_to_be_attached()
+        expect(task_item).not_to_be_attached()
+        wait_for_offline_mutations(
+            user, record_id=task_mutation_id, exact=1
+        )
 
-            home = home.reload()
+        home = home.reload()
 
-            _loaded_activity_list(home)
-            _loaded_task_list(home)
-            expect(_activity_item(home, note_body)).not_to_be_attached()
-            expect(_task_item(home, task_name)).to_be_attached()
+        _loaded_activity_list(home)
+        _loaded_task_list(home)
+        expect(_activity_item(home, note_body)).not_to_be_attached()
+        expect(_task_item(home, task_name)).to_be_attached()
 
-            with user.page.expect_response("**/complete", timeout=15000):
-                user.offline = False
+        with user.page.expect_response("**/complete", timeout=15000):
+            user.offline = False
 
-            wait_for_offline_mutations(
-                user, record_id=task_mutation_id, exact=0
-            )
+        wait_for_offline_mutations(
+            user, record_id=task_mutation_id, exact=0
+        )
     expect(_task_item(home, task_name)).not_to_be_attached()
 
 
-# @matrix offline : queue-clear replay
 # @template home/notes.html::note_item
 def test_offline_home_mutations_replay_when_online(get_admin, get_user, browser_failures):
     user = get_admin()
@@ -717,7 +700,6 @@ def test_offline_home_mutations_replay_when_online(get_admin, get_user, browser_
     assert Entities.fetch_one(replayed_key, request=Fetch.direct()).body == note_body
 
 
-# @matrix tasks : complete offline-queue
 # @template home/tasks.html::task
 def test_offline_task_complete_replays_after_reload(get_admin, get_user, browser_failures):
     user = get_admin()
@@ -730,7 +712,7 @@ def test_offline_task_complete_replays_after_reload(get_admin, get_user, browser
 
     home = user.go(SitePages.HOME)
     home = home.reload()
-    home.task_list
+    _ = home.task_list
     task_item = _task_item(home, task_name)
     expect(task_item).to_have_attribute("data-due-date", expected_due_date)
 
@@ -738,25 +720,24 @@ def test_offline_task_complete_replays_after_reload(get_admin, get_user, browser
         user,
         status=503,
         path="/analytics/track",
+    ), browser_failures.expect_offline(
+        user,
+        ping_count=2,
+        max_ping_count=3,
     ):
-        with browser_failures.expect_offline(
-            user,
-            ping_count=2,
-            max_ping_count=3,
-        ):
-            user.offline = True
-            task_item.locator("input[data-role='complete']").check()
-            expect(task_item).not_to_be_attached()
-            wait_for_offline_mutations(user, record_id=mutation_id, exact=1)
+        user.offline = True
+        task_item.locator("input[data-role='complete']").check()
+        expect(task_item).not_to_be_attached()
+        wait_for_offline_mutations(user, record_id=mutation_id, exact=1)
 
-            home = home.reload()
-            _loaded_task_list(home)
-            expect(_task_item(home, task_name)).to_have_attribute(
-                "data-due-date", expected_due_date
-            )
+        home = home.reload()
+        _loaded_task_list(home)
+        expect(_task_item(home, task_name)).to_have_attribute(
+            "data-due-date", expected_due_date
+        )
 
-            with user.page.expect_response("**/complete", timeout=15000):
-                user.offline = False
+        with user.page.expect_response("**/complete", timeout=15000):
+            user.offline = False
 
-            wait_for_offline_mutations(user, record_id=mutation_id, exact=0)
+        wait_for_offline_mutations(user, record_id=mutation_id, exact=0)
     expect(_task_item(home, task_name)).not_to_be_attached()

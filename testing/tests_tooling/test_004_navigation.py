@@ -72,7 +72,6 @@ def monitor(page):
     return failures
 
 
-# @matrix e2e : navigation static-assets failure-reporting
 def test_navigation_recovers_only_the_current_pages_exact_static_error(caplog):
     page = Page([503, 200])
     failures = monitor(page)
@@ -93,7 +92,6 @@ def test_navigation_recovers_only_the_current_pages_exact_static_error(caplog):
         failures.assert_clean()
 
 
-# @matrix e2e : bounded-retry failure-reporting
 @pytest.mark.parametrize("statuses", [[503, 503], [503, 404]])
 def test_navigation_persistent_asset_failure_still_fails(statuses):
     page = Page(statuses)
@@ -107,7 +105,6 @@ def test_navigation_persistent_asset_failure_still_fails(statuses):
     assert len(page.listeners["response"]) == 1
 
 
-# @matrix e2e : navigation bounded-retry
 @pytest.mark.parametrize("options", [
     {"statuses": [404]},
     {"statuses": [500]},
@@ -128,7 +125,6 @@ def test_navigation_does_not_retry_other_errors(options):
     assert all(event.ignored_reason is None for event in failures.events)
 
 
-# @matrix e2e : navigation
 def test_navigation_keeps_view_assertions_and_expected_http_status():
     page = Page([200])
     def broken_view():
@@ -143,7 +139,6 @@ def test_navigation_keeps_view_assertions_and_expected_http_status():
     assert response.status == 403 and page.navigations == ["goto"]
 
 
-# @matrix e2e : failure-reporting
 def test_navigation_recovery_does_not_hide_an_unrelated_page_error():
     page = Page([503, 200])
     failures = monitor(page)

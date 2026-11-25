@@ -1,9 +1,11 @@
-from datetime import datetime
 import math
 import re
+from contextlib import suppress
+from datetime import datetime
+from typing import cast
 
-from dateutil import parser as date_parser
 import phonenumbers
+from dateutil import parser as date_parser
 
 from ..definitions import FieldType, FilterOptions, Ordering
 from ..exceptions import ValidationError
@@ -13,14 +15,7 @@ from .base_schema import SchemaProperty
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_text_input
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_text_input_empty_column_value_is_blank
-# @tests tests_unit/test_004d_submitter.py::test_import_submission_space_joins_input_list_values
-# @tests tests_unit/test_004d_submitter.py::test_import_submission_preserves_table_row_lists_during_input_list_normalization
-# @tests tests_unit/test_004b_schema_core.py::test_schema_create_field_known_text_input
-# @matrix text-input : ai-value column empty-field empty-value field-factory filter-value import list-normalization save search-value
-class TextInput(SearchMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
+class TextInput(SearchMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty[str]):
     """Plain text input field.
 
     Strips "The " prefix for lexical sorting. On import, list values
@@ -38,7 +33,7 @@ class TextInput(SearchMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     _icon = "text"
 
     # Ingress Attributes
-    def validate_import(self, value):
+    def validate_import(self, value: object) -> None:
         try:
             value_string = (
                 " ".join(
@@ -47,7 +42,7 @@ class TextInput(SearchMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
                 if isinstance(value, list)
                 else value
             )
-            self.value = value_string if value_string else None
+            self.value = cast(str, value_string) if value_string else None
         except ValidationError as e:
             self.errors.append(e)
         except (ValueError, TypeError):
@@ -64,20 +59,17 @@ class TextInput(SearchMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     _editable = True
 
     @property
-    def sort_value(self):
+    def sort_value(self) -> str | None:
         return self.value.replace("The ", "").lower() if self.value else None
 
     @property
-    def search_value(self):
+    def search_value(self) -> object:
         if self.id == "name":
             return None
         return super().search_value
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_date_input
-# @matrix date-input : ai-value column filter-value form-submission import timezone
-class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
+class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty[datetime]):
     """Date input field. Stored as UTC datetime.
 
     Set:
@@ -96,11 +88,7 @@ class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     _editable = True
 
     # Form Attributes
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
-    # @tests tests_unit/test_004e_submission_behavior.py::test_typed_browser_submission_accepts_valid_and_blank
-    # @matrix date-input : empty-value form-submission validation
-    def validate_submission(self, value):
+    def validate_submission(self, value: object) -> None:
         """Parse form-submitted date string (YYYY-MM-DD format)."""
         try:
             if value in (None, "", []):
@@ -115,17 +103,17 @@ class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
             ) from error
 
     # AI Attributes
-    def validate_ai(self, value):
+    def validate_ai(self, value: object) -> None:
         """Parse an AI calendar date in the acting user's timezone; store UTC."""
         if value:
-            self.value = date_parser.parse(value)
+            self.value = date_parser.parse(cast(str, value))
         else:
             self._value = None
 
     # Ingress Attributes
-    def validate_import(self, value):
+    def validate_import(self, value: object) -> None:
         try:
-            self.value = value if not value else date_parser.parse(value)
+            self.value = value if not value else date_parser.parse(cast(str, value))
         except ValidationError as e:
             self.errors.append(e)
         except (ValueError, TypeError, date_parser.ParserError):
@@ -138,10 +126,7 @@ class DateInput(DateMixin, AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     _field_options = FilterOptions.DATE.value
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_time_input
-# @matrix time-input : ai-value column filter-value import
-class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
+class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[datetime]):
     """Time input field. Stored as a datetime with only the time component.
 
     Set:
@@ -162,15 +147,11 @@ class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     _editable = True
 
     # Form Attributes
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
-    # @tests tests_unit/test_004e_submission_behavior.py::test_typed_browser_submission_accepts_valid_and_blank
-    # @matrix time-input : empty-value form-submission validation
-    def validate_submission(self, value):
+    def validate_submission(self, value: object) -> None:
         """Parse form-submitted time string (HH:MM format)."""
         try:
             parsed = (
-                None if value in (None, "", []) else datetime.strptime(value, "%H:%M")
+                None if value in (None, "", []) else datetime.strptime(cast(str, value), "%H:%M")
             )
         except (ValueError, TypeError) as error:
             raise ValidationError(
@@ -179,9 +160,9 @@ class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
         self.value = parsed
 
     # Ingress Attributes
-    def validate_import(self, value):
+    def validate_import(self, value: object) -> None:
         try:
-            self.value = datetime.strptime(value, "%H:%M") if value else None
+            self.value = datetime.strptime(cast(str, value), "%H:%M") if value else None
         except ValidationError as e:
             self.errors.append(e)
         except (ValueError, TypeError):
@@ -194,7 +175,7 @@ class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     _field_options = FilterOptions.TIME.value
 
     @property
-    def filter_value(self):
+    def filter_value(self) -> float | None:
         """Convert time to timestamp for filtering."""
         if self.value:
             val = self.value
@@ -208,30 +189,27 @@ class TimeInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
         return None
 
     # AI Attributes
-    def validate_ai(self, value):
+    def validate_ai(self, value: object) -> None:
         """Parse AI-submitted time string (HH:MM format)."""
         if value:
-            self.value = datetime.strptime(value, "%H:%M")
+            self.value = datetime.strptime(cast(str, value), "%H:%M")
         else:
             self._value = None
 
     @property
-    def ai_value(self):
+    def ai_value(self) -> str | None:
         return self.value.strftime("%H:%M") if self.value else None
 
     @property
-    def db_value(self):
+    def db_value(self) -> str | None:
         return self.value.strftime("%H:%M") if self.value else None
 
     @db_value.setter
-    def db_value(self, value):
-        self.value = datetime.strptime(value, "%H:%M") if value else None
+    def db_value(self, value: object) -> None:
+        self.value = datetime.strptime(cast(str, value), "%H:%M") if value else None
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_number_input
-# @matrix number-input : ai-value filter-value import
-class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
+class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[float]):
     """Numeric input field. Stored as a float.
 
     Set:
@@ -240,7 +218,7 @@ class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     Get:
         value (float): Numeric value.
         sort_value (float): Same as filter_value.
-        filter_value (float): float(value), or None if invalid.
+        filter_value (float): float(cast(str | float, value)), or None if invalid.
     """
 
     # Property Attributes
@@ -251,22 +229,17 @@ class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     _editable = True
 
     @property
-    def sort_value(self):
+    def sort_value(self) -> float | None:
         return self.filter_value
 
     # Form Attributes
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_submission_number_form_accepts_zero
-    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
-    # @tests tests_unit/test_004e_submission_behavior.py::test_typed_browser_submission_accepts_valid_and_blank
-    # @matrix number-input : empty-value form-submission validation zero
-    def validate_submission(self, value):
+    def validate_submission(self, value: object) -> None:
         """Parse form-submitted number string to float."""
         try:
             if value in (None, []) or (isinstance(value, str) and not value.strip()):
                 parsed = None
             else:
-                parsed = float(value)
+                parsed = float(cast(str | float, value))
                 if not math.isfinite(parsed):
                     raise ValueError("Number must be finite")
         except (ValueError, TypeError, OverflowError) as error:
@@ -274,20 +247,20 @@ class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
         self.value = parsed
 
     # AI Attributes
-    def validate_ai(self, value):
+    def validate_ai(self, value: object) -> None:
         """Parse AI-submitted number (string or numeric) to float."""
         try:
-            self.value = float(value) if value is not None else None
+            self.value = float(cast(str | float, value)) if value is not None else None
         except (ValueError, TypeError):
             self.value = None
 
     # Ingress Attributes
-    def validate_import(self, value):
+    def validate_import(self, value: object) -> None:
         try:
             if value is None or (isinstance(value, str) and str(value).strip() == ""):
                 self.value = None
             else:
-                self.value = float(value)
+                self.value = float(cast(str | float, value))
         except ValidationError as e:
             self.errors.append(e)
         except (ValueError, TypeError):
@@ -300,7 +273,7 @@ class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     _field_options = FilterOptions.NUMBER.value
 
     @property
-    def filter_value(self):
+    def filter_value(self) -> float | None:
         if self.value is not None:
             try:
                 return float(self.value)
@@ -309,10 +282,7 @@ class NumberInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
         return None
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_email_input
-# @matrix email-input : ai-value filter-value import
-class EmailInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
+class EmailInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[str]):
     """Email input field. Validates format on browser submission, AI, and import.
 
     Set:
@@ -330,11 +300,7 @@ class EmailInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     _ordering = Ordering.EXISTS
     _editable = True
 
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
-    # @tests tests_unit/test_004e_submission_behavior.py::test_typed_browser_submission_accepts_valid_and_blank
-    # @matrix email-input : empty-value form-submission validation
-    def validate_submission(self, value):
+    def validate_submission(self, value: object) -> None:
         """Reject nonempty malformed addresses without replacing an existing value."""
         if value in (None, "", []):
             self.value = None
@@ -344,7 +310,7 @@ class EmailInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
             self.value = value
 
     # AI Attributes
-    def validate_ai(self, value):
+    def validate_ai(self, value: object) -> None:
         """Validate AI-submitted email format."""
         if value and isinstance(value, str) and EMAIL_REGEX.match(value):
             self.value = value
@@ -352,23 +318,20 @@ class EmailInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
             self.value = None
 
     # Ingress Attributes
-    def validate_import(self, value):
+    def validate_import(self, value: object) -> None:
         if isinstance(value, str) and not EMAIL_REGEX.match(value):
             self.errors.append(
                 f"Invalid email value '{value}' in column '({self.label})'"
             )
         else:
-            self.value = value if value else None
+            self.value = cast(str, value) if value else None
 
     # Filter Attributes
     _field_type = FieldType.STRING
     _field_options = FilterOptions.STRING.value
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_tel_input
-# @matrix tel-input : ai-value filter-value formatting import
-class TelInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
+class TelInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty[str]):
     """Telephone input field. Normalizes to E.164 format.
 
     Set:
@@ -391,51 +354,47 @@ class TelInput(AIMixin, FilterMixin, ColumnMixin, SchemaProperty):
     _field_type = FieldType.STRING
     _field_options = FilterOptions.STRING.value
 
-    def _format_phone(self, value):
+    def _format_phone(self, value: object) -> str | None:
         if not value:
             return None
 
         try:
-            parsed_number = phonenumbers.parse(value, "US")
+            parsed_number = phonenumbers.parse(cast(str, value), "US")
             return phonenumbers.format_number(
                 parsed_number, phonenumbers.PhoneNumberFormat.E164
             )
-        except phonenumbers.NumberParseException:
+        except phonenumbers.NumberParseException as error:
             raise ValidationError(
                 f"Invalid phone number value '{value}' in column '({self.label})'"
-            )
+            ) from error
         except (ValueError, TypeError):
             return None
 
     # AI Attributes
-    def validate_ai(self, value):
+    def validate_ai(self, value: object) -> None:
         """Parse and normalize AI-submitted phone number to E.164 format."""
         if value:
-            try:
+            with suppress(ValidationError):
                 self.value = self._format_phone(value)
-            except ValidationError:
-                pass
         else:
             self.value = None
 
     # Ingress Attributes
-    def validate_import(self, value):
+    def validate_import(self, value: object) -> None:
         try:
             self.value = self._format_phone(value)
         except ValidationError as e:
             self.errors.append(e)
 
-    def validate_submission(self, value):
+    def validate_submission(self, value: object) -> None:
         if value:
-            try:
+            with suppress(ValidationError):
                 self.value = self._format_phone(value)
-            except ValidationError:
-                pass
         else:
             self.value = None
 
     @property
-    def form_value(self):
+    def form_value(self) -> str | None:
         if not self.value:
             return None
 

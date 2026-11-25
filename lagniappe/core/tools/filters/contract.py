@@ -1,8 +1,20 @@
 """Versioned, authorized contracts for filter requests and saved filters."""
 
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, TypedDict, cast
+
+if TYPE_CHECKING:
+    from ...entities.category import Category
+    from ...entities.project import Project
+    from ...entities.form import Form
+    from ...entities.entity import Entity
+    from ...mixins.field_host import FieldUser
+    from ...mixins.filter import FilterMixin
+
 from dataclasses import dataclass
-from datetime import datetime, time, timezone
+from datetime import datetime, time, UTC
 import json
+from typing import Never
 from math import isfinite
 
 from lagniappe.core import exceptions
@@ -15,6 +27,21 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache, dates
+
+
+type FilterParent = Category | Project
+
+
+class FilterCondition(TypedDict):
+    source_id: str
+    field: str
+    comparator: str
+    values: list[object]
+
+
+class FilterContract(TypedDict):
+    version: int
+    conditions: list[FilterCondition]
 
 
 FILTER_CONTRACT_VERSION = 1
@@ -43,13 +70,10 @@ _CONTRACT_KEYS = frozenset({"version", "conditions"})
 _CONDITION_KEYS = frozenset({"source_id", "field", "comparator", "values"})
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::parse_filter_request
-# @reason error metadata is asserted through parser and compiler failures
 class FilterContractError(exceptions.ValidationError):
     """A safe filter-contract error with a stable location and HTTP status."""
 
-    def __init__(self, message, *, path="filter", code="invalid", status=422):
+    def __init__(self, message: str, *, path: str = "filter", code: str = "invalid", status: int = 422) -> None:
         super().__init__(message)
         self.path = path
         self.code = code
@@ -60,40 +84,30 @@ class FilterContractError(exceptions.ValidationError):
 class FilterField:
     """An authorized filter field and any exact entity values it accepts."""
 
-    source: object
-    field: object
-    allowed_values: dict | None = None
+    source: Entity
+    field: FilterMixin
+    allowed_values: dict[str, Entity] | None = None
 
 
 @dataclass(frozen=True)
 class CompiledFilter:
     """Validated query predicates plus their canonical persisted contract."""
 
-    definitions: tuple
-    contract: dict
-    related: tuple
+    definitions: tuple[FilterDefinition, ...]
+    contract: FilterContract
+    related: tuple[Entity, ...]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @covered-by lagniappe/core/tools/filters/contract.py::parse_filter_request
-# @reason shared error construction is exercised through public validation failures
-def _error(message, *, path="filter", code="invalid", status=422):
+def _error(message: str, *, path: str = "filter", code: str = "invalid", status: int = 422) -> Never:
     raise FilterContractError(message, path=path, code=code, status=status)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @reason byte accounting is exercised through contract limit validation
 def _json_bytes(value):
     return len(
         json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @reason scalar bounds are exercised through public compilation
 def _bounded_text(value, path, *, allow_empty=False):
     if not isinstance(value, str):
         _error(f"{path} must be a string.", path=path, code="shape")
@@ -109,10 +123,7 @@ def _bounded_text(value, path, *, allow_empty=False):
     return value
 
 
-# @testable true
-# @tests tests_unit/test_011c_filter_contract.py::test_parse_filter_request_distinguishes_malformed_and_semantic_errors
-# @matrix filters : legacy limits malformed request-contract versioning
-def parse_filter_request(contract_value, definition_values):
+def parse_filter_request(contract_value: object, definition_values: Iterable[object] | None) -> object:
     """Parse one v1 request envelope or adapt repeated legacy definitions."""
     definition_values = list(definition_values or ())
     if contract_value and definition_values:
@@ -158,10 +169,7 @@ def parse_filter_request(contract_value, definition_values):
     return legacy_definitions_to_contract(decoded)
 
 
-# @testable true
-# @tests tests_unit/test_011c_filter_contract.py::test_legacy_definitions_discard_client_type_flags
-# @matrix filters : compatibility legacy saved-filter
-def legacy_definitions_to_contract(definitions):
+def legacy_definitions_to_contract(definitions: object) -> dict[str, object]:
     """Convert compact v0 definition lists without trusting their type flags."""
     if not isinstance(definitions, list):
         _error("Saved filter definitions must be a list.", code="shape")
@@ -187,10 +195,7 @@ def legacy_definitions_to_contract(definitions):
     return {"version": FILTER_CONTRACT_VERSION, "conditions": conditions}
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_saved_filter
-# @reason saved-shape decoding is exercised through saved-filter compilation
-def load_filter_contract(value):
+def load_filter_contract(value: object) -> object:
     """Decode a saved v1 contract or adapt the legacy top-level list."""
     try:
         decoded = json.loads(value) if isinstance(value, str) else value
@@ -201,10 +206,7 @@ def load_filter_contract(value):
     return decoded
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/filters/main.py::_validated_display_condition
-# @reason browser DTO projection is exercised through condition/option routes
-def condition_contract(definition):
+def condition_contract(definition: FilterDefinition) -> FilterCondition:
     """Project a derived predicate into one explicit v1 condition object."""
     value = definition.value
     values = value if isinstance(value, list) else ([] if value is None else [value])
@@ -216,9 +218,6 @@ def condition_contract(definition):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @reason parent validation is exercised through public compilation
 def _validate_parent(parent, user):
     if not parent or getattr(parent, "kind", None) not in SUPPORTED_PARENT_KINDS:
         _error("Filter parent must be a project or category.", code="parent")
@@ -226,9 +225,6 @@ def _validate_parent(parent, user):
         _error("Access denied.", code="unavailable")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @reason identifier aliases are exercised through catalog resolution
 def _source_identifiers(source):
     return {
         str(identifier)
@@ -241,9 +237,6 @@ def _source_identifiers(source):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @reason source lookup is exercised through public compilation
 def _catalog_source(catalog, source_id):
     normalized = str(source_id or "").removeprefix("hash:")
     return next(
@@ -256,10 +249,7 @@ def _catalog_source(catalog, source_id):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::field_catalog
-# @reason catalog grouping is exercised through catalog consumers
-def _add_catalog_field(catalog, source, field, allowed_value=None):
+def _add_catalog_field(catalog: dict[tuple[str, str], FilterField], source: Entity, field: FilterMixin, allowed_value: Entity | None = None) -> None:
     key = (source.hash, field.filter_key)
     entry = catalog.get(key)
     if not entry:
@@ -270,23 +260,22 @@ def _add_catalog_field(catalog, source, field, allowed_value=None):
         )
         catalog[key] = entry
     if allowed_value:
+        assert entry.allowed_values is not None
         entry.allowed_values[allowed_value.hash] = allowed_value
 
 
-# @testable true
-# @matrix form-migration : pending-projection removed-field typed-filter
-# @tests tests_unit/test_004k_form_changes.py::test_pending_and_removed_fields_are_withheld_from_tables_and_filters
-def field_catalog(parent, user):
+def field_catalog(parent: FilterParent, user: FieldUser) -> dict[tuple[str, str], FilterField]:
     """Return the filter surface visible under ``parent`` to ``user``."""
     _validate_parent(parent, user)
     if hasattr(parent, "properties"):
-        parent = Entities.fetch_one(parent, request=Fetch.direct()) or parent
+        # Fetching an instantiated entity keeps its concrete kind.
+        parent = cast("FilterParent", Entities.fetch_one(parent, request=Fetch.direct()) or parent)
     catalog = {}
     for field in parent.filters.fields.values():
         _add_catalog_field(catalog, parent, field)
 
     for relation_field in parent.filters.entity_fields.values():
-        related = relation_field.value
+        related = cast("Entity | None", relation_field.value)
         if (
             not related
             or getattr(related, "reserved", False)
@@ -297,17 +286,12 @@ def field_catalog(parent, user):
         if getattr(related, "kind", None) == "form":
             if getattr(related, "db", {}).get("pending_form_change"):
                 continue
-            for field in related.filters.fields.values():
+            for field in cast("Form", related).filters.fields.values():
                 _add_catalog_field(catalog, related, field)
     return catalog
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_preview_rejects_malformed_and_forged_contracts
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_attached_form_select_condition
-# @matrix filters : attached-form unavailable-source
-# @pair permissions:unavailable-source
-def resolve_filter_field(parent, source_id, field_name, user):
+def resolve_filter_field(parent: FilterParent, source_id: object, field_name: str | None, user: FieldUser) -> FilterField:
     """Resolve a submitted source and field only through the authorized catalog."""
     catalog = field_catalog(parent, user)
     source = _catalog_source(catalog, source_id)
@@ -331,11 +315,7 @@ def resolve_filter_field(parent, source_id, field_name, user):
     return entry
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_attached_form_select_condition
-# @matrix filters : attached-form selector
-# @pair permissions:relationship
-def resolve_allowed_value(entry, value):
+def resolve_allowed_value(entry: FilterField, value: object) -> Entity:
     """Resolve a dynamic selector value from an entry's exact allowed set."""
     normalized = str(value or "").removeprefix("hash:")
     entity = next(
@@ -351,20 +331,13 @@ def resolve_allowed_value(entry, value):
     return entity
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @reason effective categorical types are asserted through compiled definitions
 def _effective_field_type(field):
     if getattr(field, "_is_categorical", False):
         return FieldType.LIST
     return field.field_type
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @covered-by lagniappe/core/tools/filters/contract.py::describe_filter_contract
-# @reason comparator matrices are asserted through compilation and schema output
-def field_comparators(field):
+def field_comparators(field: FilterMixin) -> list[Comparator]:
     """Return the canonical comparator set for one field."""
     options = field.field_options or ()
     available = {
@@ -385,9 +358,6 @@ def field_comparators(field):
     return sorted(supported, key=lambda comparator: comparator.value)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @reason comparator parsing is asserted through public compilation errors
 def _comparator(value, field, index):
     path = f"conditions[{index}].comparator"
     value = _bounded_text(value, path).lower()
@@ -411,9 +381,6 @@ def _comparator(value, field, index):
     return comparator
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @reason entity authorization and normalization are asserted through public compilation
 def _entity_filter_value(entry, value, user, index):
     path = f"conditions[{index}].values"
     identifier = _bounded_text(value, path)
@@ -421,8 +388,8 @@ def _entity_filter_value(entry, value, user, index):
     if not entity:
         normalized = identifier.removeprefix("hash:")
         details = cache.get_details_by_hash([normalized]).get(normalized)
-        if details and details.get("id"):
-            entity = Entities.fetch_one(details["id"], request=Fetch.direct())
+        if details and (entity_id := details.get("id")):
+            entity = Entities.fetch_one(entity_id, request=Fetch.direct())
     if not entity or not entity.allowed(Action.VIEW, user=user):
         _error(
             f"Filter condition {index + 1} references an unavailable entity.",
@@ -455,9 +422,6 @@ def _entity_filter_value(entry, value, user, index):
     return entity.hash, entity
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @reason scalar normalization is asserted through public compilation
 def _scalar_filter_value(field, value, user, index):
     path = f"conditions[{index}].values"
     if isinstance(value, (dict, list, tuple, set)) or value is None:
@@ -499,9 +463,6 @@ def _scalar_filter_value(field, value, user, index):
     return _bounded_text(str(value), path)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @reason timestamp normalization is asserted through public compilation
 def _timestamp_value(value, user, index):
     path = f"conditions[{index}].values"
     if isinstance(value, bool):
@@ -521,7 +482,7 @@ def _timestamp_value(value, user, index):
     user_timezone = dates.user_timezone(user)
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=user_timezone)
-    parsed = parsed.astimezone(timezone.utc)
+    parsed = parsed.astimezone(UTC)
     if not date_only:
         return {"instant": parsed.timestamp(), "date_only": False}
 
@@ -529,15 +490,12 @@ def _timestamp_value(value, user, index):
     start = datetime.combine(local_date, time.min, tzinfo=user_timezone)
     end = datetime.combine(local_date, time.max, tzinfo=user_timezone)
     return {
-        "start": start.astimezone(timezone.utc).timestamp(),
-        "end": end.astimezone(timezone.utc).timestamp(),
+        "start": start.astimezone(UTC).timestamp(),
+        "end": end.astimezone(UTC).timestamp(),
         "date_only": True,
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @reason date boundary selection is asserted through compiled predicates
 def _timestamp_condition(comparator, values):
     if comparator == Comparator.BETWEEN:
         start = values[0].get("start", values[0].get("instant"))
@@ -553,9 +511,6 @@ def _timestamp_condition(comparator, values):
     return comparator, value["start"]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @reason type-specific value shaping is asserted through public compilation
 def _condition_value(entry, comparator, values, user, index, related):
     path = f"conditions[{index}].values"
     if not isinstance(values, list):
@@ -592,10 +547,7 @@ def _condition_value(entry, comparator, values, user, index, related):
     return comparator, normalized[0]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::compile_filter_contract
-# @reason canonical storage projection is asserted through compiled contracts
-def _canonical_condition(entry, comparator, value):
+def _canonical_condition(entry: FilterField, comparator: Comparator, value: object) -> FilterCondition:
     values = value if isinstance(value, list) else ([] if value is None else [value])
     return {
         "source_id": entry.source.hash,
@@ -605,12 +557,7 @@ def _canonical_condition(entry, comparator, value):
     }
 
 
-# @testable true
-# @tests tests_unit/test_011c_filter_contract.py::test_compile_filter_contract_rederives_types_authorizes_entities_and_bounds_input
-# @tests tests_unit/test_015c_ai_filter_query.py::test_compile_filter_definitions_normalizes_dates_numbers_and_booleans
-# @matrix ai-filter : compilation validation
-# @matrix filters : authorization compilation limits normalization validation
-def compile_filter_contract(parent, contract, user, *, allow_default_source=False):
+def compile_filter_contract(parent: FilterParent, contract: object, user: FieldUser, *, allow_default_source: bool = False) -> CompiledFilter:
     """Validate a v1 DTO against the current authorized field catalog."""
     _validate_parent(parent, user)
     if not isinstance(contract, dict):
@@ -638,7 +585,7 @@ def compile_filter_contract(parent, contract, user, *, allow_default_source=Fals
     catalog = field_catalog(parent, user)
     definitions = []
     canonical = []
-    related = {parent.hash: parent}
+    related: dict[str, Entity] = {parent.hash: parent}
     form_scopes = set()
 
     for index, condition in enumerate(conditions):
@@ -736,7 +683,7 @@ def compile_filter_contract(parent, contract, user, *, allow_default_source=Fals
             code="limit",
         )
 
-    canonical_contract = {
+    canonical_contract: FilterContract = {
         "version": FILTER_CONTRACT_VERSION,
         "conditions": canonical,
     }
@@ -749,18 +696,12 @@ def compile_filter_contract(parent, contract, user, *, allow_default_source=Fals
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/filter.py::Filter.compile
-# @reason saved compilation is asserted through the Filter entity boundary
-def compile_saved_filter(parent, stored_value, user):
+def compile_saved_filter(parent: FilterParent, stored_value: object, user: FieldUser) -> CompiledFilter:
     """Compile either stored v1 data or a legacy v0 list."""
     contract = load_filter_contract(stored_value)
     return compile_filter_contract(parent, contract, user)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::describe_filter_contract
-# @reason compact reference projection is asserted through AI schema output
 def _entity_reference(entity):
     return {
         "kind": entity.kind,
@@ -769,9 +710,6 @@ def _entity_reference(entity):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/contract.py::describe_filter_contract
-# @reason choice projection is asserted through AI schema output
 def _field_choices(field):
     choices = getattr(field, "choices", None)
     if not isinstance(choices, dict):
@@ -779,10 +717,7 @@ def _field_choices(field):
     return [{"value": value, "label": label} for value, label in choices.items()]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/ai_query.py::describe_filter_fields
-# @reason the AI schema facade owns the public output contract
-def describe_filter_contract(parent, user):
+def describe_filter_contract(parent: FilterParent, user: FieldUser) -> dict[str, object]:
     """Describe the same authorized contract surface used for compilation."""
     catalog = field_catalog(parent, user)
     fields = []

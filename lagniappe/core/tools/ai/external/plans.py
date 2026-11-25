@@ -1,8 +1,17 @@
 """External API plans."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ....entities.entity import Entity
+    from ....entities import Identifier
+    from ..external_operations import PlanWriter
+    from ....entities.ai_report import AIReport
+    from ....entities.user import User
+
 import uuid
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch
@@ -26,16 +35,10 @@ from .definitions import (
 from .validation import submission_validation_errors, validate_external_proposal
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/plans.py::create_plan
-# @reason timestamp helper is exercised through draft creation and submission
 def _utcnow():
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/plans.py::create_plan
-# @reason title normalization is part of the public draft-creation contract
 def _plan_name(instructions, requested=None):
     requested = " ".join(str(requested or "").split())
     if requested:
@@ -44,17 +47,34 @@ def _plan_name(instructions, requested=None):
     return f"AI: {text[:80]}{'...' if len(text) > 80 else ''}" if text else "AI plan"
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
-# @matrix agent-api ai-report : draft report-session
-# @pair agent-api:entitlement-independent
-def create_plan(user, *, instructions="", name=None, remote_mcp=False, revises_plan_id=None):
+def create_plan(
+    user: User,
+    *,
+    instructions: object = "",
+    name: object = None,
+    remote_mcp: bool = False,
+    revises_plan_id: object = None,
+    require_review: bool = False,
+) -> AIReport:
     """Create a durable draft report without dispatching a provider job."""
     if revises_plan_id is not None and (not isinstance(revises_plan_id, str) or not revises_plan_id):
         raise exceptions.ValidationError("revises_plan_id must be a nonempty plan ID.")
     instructions = str(instructions or "").strip()
     if _text_bytes(instructions) > MAX_INSTRUCTIONS_BYTES:
         raise exceptions.ValidationError("Instructions are too large.")
+
+    manifest = {
+        "version": 1,
+        "source": "remote_mcp" if remote_mcp else "api",
+        "contract_version": CONTRACT_VERSION,
+        "created_at": _utcnow().isoformat(),
+        "original_brief": {
+            "name": _plan_name(instructions, name),
+            "instructions": instructions,
+        },
+    }
+    if require_review:
+        manifest["require_review"] = True
 
     report = Entities.REPORT.create(
         {
@@ -65,21 +85,14 @@ def create_plan(user, *, instructions="", name=None, remote_mcp=False, revises_p
             "origin": "api",
             "status": "draft",
             "pending": False,
-            "agent_manifest": {
-                "version": 1,
-                "source": "remote_mcp" if remote_mcp else "api",
-                "contract_version": CONTRACT_VERSION,
-                "created_at": _utcnow().isoformat(),
-                "original_brief": {
-                    "name": _plan_name(instructions, name),
-                    "instructions": instructions,
-                },
-            },
+            "agent_manifest": manifest,
         }
     )
     if revises_plan_id:
         from ..reporting.corrections import link_correction, save_correction
         source = Entities.fetch_one(revises_plan_id, request=Fetch.direct())
+        if not isinstance(source, Entities.REPORT):
+            raise exceptions.ValidationError("Choose an available plan that you created.")
         link_correction(report, source, user)
         save_correction(report, source)
     else:
@@ -87,30 +100,27 @@ def create_plan(user, *, instructions="", name=None, remote_mcp=False, revises_p
     return report
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_proposal_submission_is_idempotent_and_provider_free
-# @tests tests_unit/test_032_agent_api.py::test_external_ask_submission_completes_without_files_or_execution
-# @tests tests_unit/test_032_agent_api.py::test_external_create_submission_renders_markdown_without_files
-# @matrix agent-api ai-report : idempotency proposal-publication ready-state remote-update
-# @pairs agent-api:ask agent-api:create ai-report:answer-only agent-api:answer-only
-# @pairs agent-api:ask-revision agent-api:create-revision agent-api:organize-revision
 def submit_plan(
-    report,
-    user,
-    proposal,
+    report: AIReport,
+    user: User,
+    proposal: object,
     *,
-    contract_version,
-    file_usage,
-    save=None,
-    name=None,
-    instructions=None,
-):
+    contract_version: object,
+    file_usage: object,
+    save: PlanWriter | None = None,
+    name: object = None,
+    instructions: object = None,
+    require_review: object = None,
+) -> AIReport:
     if getattr(report, "result", None):
         raise exceptions.ValidationError(
             "A plan cannot be revised after execution has begun."
         )
     try:
-        submitted_contract_version = int(contract_version or 0)
+        value = contract_version or 0
+        if not isinstance(value, (str, int, float)):
+            raise TypeError("Contract version must be numeric.")
+        submitted_contract_version = int(value)
     except (TypeError, ValueError) as error:
         raise exceptions.ValidationError(
             "Unsupported plan contract version."
@@ -131,6 +141,7 @@ def submit_plan(
         for field, value in (("name", name), ("instructions", instructions))
         if value is not None
     }
+    normalized_brief: dict[str, str] = {}
     for field, value in brief.items():
         maximum = MAX_PLAN_NAME_CHARACTERS if field == "name" else MAX_INSTRUCTIONS_BYTES
         if (
@@ -139,14 +150,21 @@ def submit_plan(
             or (len(value) if field == "name" else _text_bytes(value)) > maximum
         ):
             raise exceptions.ValidationError(f"Invalid Plan {field}.")
+        normalized_brief[field] = value.strip()
     brief_changed = any(
-        getattr(report, field) != value.strip() for field, value in brief.items()
+        getattr(report, field) != value for field, value in normalized_brief.items()
+    )
+    review_changed = (
+        require_review is not None
+        and bool((report.agent_manifest or {}).get("require_review", False))
+        != bool(require_review)
     )
     if report.status in {"draft", "ready"} or (
         report.output_kind == "answer" and report.status == "complete"
     ):
         if (
             not brief_changed
+            and not review_changed
             and file_usage == (report.file_usage or [])
             and proposal_fingerprint(normalized)
             == proposal_fingerprint(report.proposal)
@@ -168,6 +186,8 @@ def submit_plan(
             "Provide instructions or finalized files before submission."
         )
 
+    # validate_external_proposal has validated every submitted usage row.
+    assert isinstance(file_usage, list)
     report.file_usage = deepcopy(file_usage)
     report.properties.process.set_proposal(normalized)
     manifest = dict(report.agent_manifest or {})
@@ -175,30 +195,27 @@ def submit_plan(
         manifest.setdefault(
             "original_brief", {"name": report.name, "instructions": report.instructions}
         )
-        for field, value in brief.items():
-            setattr(report, field, value.strip())
+        for field, value in normalized_brief.items():
+            setattr(report, field, value)
     manifest["submitted_at"] = _utcnow().isoformat()
     manifest["proposal_fingerprint"] = proposal_fingerprint(normalized)
     manifest["public_references"] = public_references
+    if require_review is not None:
+        if require_review:
+            manifest["require_review"] = True
+        else:
+            manifest.pop("require_review", None)
     report.agent_manifest = manifest
     (save or Entities.save)(report)
     return report
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_plan_resources_hide_other_users_plans
-# @matrix agent-api : creator-bound entitlement-independent generic-not-found plan-isolation stale-plan
-def load_plan(plan_id, user):
+def load_plan(plan_id: Identifier, user: User) -> AIReport:
     report = Entities.fetch_one(plan_id, request=Fetch.direct())
-    require_plan_access(report, user)
-    return report
+    return require_plan_access(report, user)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/plans.py::load_plan
-# @reason loaded and supplied reports have the same creator/origin/availability boundary
-def require_plan_access(report, user):
+def require_plan_access(report: Entity | None, user: User) -> AIReport:
     actor = user
     owner_key = getattr(report.properties.user, "key", None) if report else None
     if (
@@ -212,10 +229,7 @@ def require_plan_access(report, user):
     return report
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/api/main.py::execute_tool
-# @reason draft-state gating is exercised through plan-scoped operations
-def require_draft(report):
+def require_draft(report: AIReport) -> None:
     if report.status != "draft":
         raise ExternalPlanError(
             "plan_not_draft",
@@ -223,10 +237,7 @@ def require_draft(report):
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/plans.py::submit_plan_request
-# @reason both the transport precheck and claimed submission use this state gate
-def require_submission_available(report):
+def require_submission_available(report: AIReport) -> str:
     reusable_status = "complete" if report.output_kind == "answer" else "ready"
     if report.status not in {"draft", reusable_status}:
         raise ExternalPlanError(
@@ -235,20 +246,16 @@ def require_submission_available(report):
     return reusable_status
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_external_agent_api_requires_bearer_and_dispatches_as_bound_user
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_submission_is_serialized_with_upload_operations
-# @matrix agent-api : submission
-# @pairs agent-api:concurrency agent-api:plan-operation
-# @pairs mcp-upload:concurrency mcp-upload:plan-operation
-def submit_plan_request(report, user, data, *, request_id):
+def submit_plan_request(report: AIReport, user: User, data: dict[str, object], *, request_id: str | None) -> AIReport:
     require_plan_access(report, user)
     plan_id = report.urlsafe_key
     reusable_status = require_submission_available(report)
     operation_id = uuid.uuid4().hex
     claim_token = uuid.uuid4().hex
+    key = report.key
+    assert key is not None
     claim_outcome = agent_api_store.claim_plan_operation(
-        report.key,
+        key,
         phase="submit",
         operation_id=operation_id,
         claim_token=claim_token,
@@ -295,7 +302,7 @@ def submit_plan_request(report, user, data, *, request_id):
                 save=save,
                 **{
                     field: data[field]
-                    for field in ("name", "instructions")
+                    for field in ("name", "instructions", "require_review")
                     if field in data
                 },
             )

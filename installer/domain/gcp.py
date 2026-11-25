@@ -1,5 +1,10 @@
 """App Engine custom-domain mapping discovery and reconciliation."""
 
+from collections.abc import Callable, Iterable
+from typing import TypedDict
+from runner.presentation import Progress
+
+
 from runner.presentation import output as print
 from runner import presentation as ui
 
@@ -24,9 +29,10 @@ DOMAIN_MAPPING_POLL_DELAYS = (0, 1, 2, 4, 8)
 MANAGED_CERTIFICATE_POLL_DELAYS = (0, 30, 30) + (60,) * 9
 
 
-# @testable false
-# @covered-by installer/domain/gcp.py::create_gcp_domain_mapping
-# @reason subprocess adapter is owned by App Engine mapping reconciliation
+class _DomainMapping(TypedDict):
+    resourceRecords: list[dict[str, object]]
+
+
 def _run_gcloud_json(arguments, *, allow_not_found=False):
     if not GCLOUD_CLI:
         raise ProviderError("gcloud CLI not found.")
@@ -69,9 +75,6 @@ def _run_gcloud_json(arguments, *, allow_not_found=False):
         ) from error
 
 
-# @testable false
-# @covered-by installer/domain/gcp.py::create_gcp_domain_mapping
-# @reason discovery adapter is owned by App Engine mapping reconciliation
 def _get_domain_mapping(project_id, domain, account=None):
     target_flags = [f"--project={project_id}"]
     if account:
@@ -88,10 +91,6 @@ def _get_domain_mapping(project_id, domain, account=None):
     )
 
 
-# @testable false
-# @covered-by installer/domain/gcp.py::create_gcp_domain_mapping
-# @covered-by installer/domain/gcp.py::wait_for_managed_certificate
-# @reason list adapter is owned by domain reconciliation and readiness polling
 def _list_domain_mappings(project_id, account=None):
     target_flags = [f"--project={project_id}"]
     if account:
@@ -112,9 +111,6 @@ def _list_domain_mappings(project_id, account=None):
     return mappings
 
 
-# @testable false
-# @covered-by installer/domain/gcp.py::wait_for_managed_certificate
-# @reason discovery adapter is owned by managed-certificate readiness polling
 def _get_ssl_certificate(project_id, certificate_id, account=None):
     target_flags = [f"--project={project_id}"]
     if account:
@@ -131,9 +127,6 @@ def _get_ssl_certificate(project_id, certificate_id, account=None):
     )
 
 
-# @testable false
-# @covered-by installer/domain/gcp.py::wait_for_managed_certificate
-# @reason provider response normalization is owned by readiness polling
 def _managed_certificate_status(certificate):
     if not isinstance(certificate, dict):
         return "PENDING"
@@ -145,10 +138,6 @@ def _managed_certificate_status(certificate):
     return str(managed.get("status") or "PENDING").strip().upper()
 
 
-# @testable false
-# @covered-by installer/domain/gcp.py::create_gcp_domain_mapping
-# @covered-by installer/domain/gcp.py::wait_for_managed_certificate
-# @reason SSL response normalization is owned by domain reconciliation/readiness
 def _ssl_settings(mapping):
     if not isinstance(mapping, dict):
         return None
@@ -158,9 +147,6 @@ def _ssl_settings(mapping):
     return settings if isinstance(settings, dict) else None
 
 
-# @testable false
-# @covered-by installer/domain/gcp.py::create_gcp_domain_mapping
-# @reason automatic-management validation is owned by domain reconciliation
 def _uses_automatic_ssl(mapping):
     settings = _ssl_settings(mapping)
     if settings is None:
@@ -176,10 +162,6 @@ def _uses_automatic_ssl(mapping):
     }
 
 
-# @testable false
-# @covered-by installer/domain/gcp.py::create_gcp_domain_mapping
-# @covered-by installer/domain/gcp.py::wait_for_managed_certificate
-# @reason provider resource identity validation is owned by domain reconciliation
 def _mapping_matches_target(mapping, project_id, domain):
     if not isinstance(mapping, dict):
         return False
@@ -187,10 +169,6 @@ def _mapping_matches_target(mapping, project_id, domain):
     return mapping.get("id") == domain and mapping.get("name") == expected_name
 
 
-# @testable false
-# @covered-by installer/domain/gcp.py::create_gcp_domain_mapping
-# @covered-by installer/domain/gcp.py::wait_for_managed_certificate
-# @reason exact list selection is owned by domain reconciliation/readiness
 def _listed_domain_mapping(mappings, project_id, domain):
     expected_name = f"apps/{project_id}/domainMappings/{domain}"
     for mapping in mappings:
@@ -206,20 +184,13 @@ def _listed_domain_mapping(mappings, project_id, domain):
     return None
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_waits_for_provider_then_reports_active
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_default_polling_backs_off_without_extending_timeout
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_reports_permanent_provider_failure
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_timeout_keeps_deployment_incomplete
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_reports_missing_domain_mapping
-# @matrix setup : account-project deploy gcp-domain https incomplete-deployment managed-certificate missing-resource operator-guidance provider-failure provider-status retry success timeout
 def wait_for_managed_certificate(
-    domain,
+    domain: str,
     *,
-    announce_ready=False,
-    sleep=time.sleep,
-    poll_delays=MANAGED_CERTIFICATE_POLL_DELAYS,
-):
+    announce_ready: bool = False,
+    sleep: Callable[[float], None] = time.sleep,
+    poll_delays: Iterable[float] = MANAGED_CERTIFICATE_POLL_DELAYS,
+) -> bool:
     """Wait for Google to attach an active managed certificate."""
     from config import SETTINGS
 
@@ -319,7 +290,7 @@ def wait_for_managed_certificate(
             return True
         elif pending_id:
             certificate = retry_provider_call(
-                lambda: _get_ssl_certificate(project_id, pending_id, account),
+                lambda *, pending_id=pending_id: _get_ssl_certificate(project_id, pending_id, account),
                 description=f"Check App Engine managed certificate {pending_id}",
             )
             last_status = _managed_certificate_status(certificate)
@@ -359,9 +330,6 @@ def wait_for_managed_certificate(
     )
 
 
-# @testable false
-# @covered-by installer/domain/gcp.py::create_gcp_domain_mapping
-# @reason provider response validation is owned by mapping reconciliation
 def _validated_mapping(mapping, project_id, domain):
     if not _mapping_matches_target(mapping, project_id, domain):
         return None
@@ -378,13 +346,9 @@ def _validated_mapping(mapping, project_id, domain):
     return mapping
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_gcp_domain_mapping_and_ai_cache_commands
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_empty_mapping_list_creates_managed_mapping
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_existing_domain_mapping_enables_managed_tls
-# @tests tests_tooling/test_001d_setup_drift.py::test_app_engine_discovery_has_domain_mapping_create
-# @matrix setup : api-drift gcp-domain idempotence managed-certificate missing-resource provider-records reconciliation
-def create_gcp_domain_mapping(domain, sp, *, sleep=time.sleep):
+def create_gcp_domain_mapping(
+    domain: str, sp: Progress, *, sleep: Callable[[float], None] = time.sleep
+) -> _DomainMapping:
     """Discover or create a mapping and return Google's exact DNS records."""
     from config import SETTINGS
 

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tomllib
+from collections.abc import Callable, Sequence
+from pathlib import Path
 
 from runner.context import GIT_CLI, REPOSITORY_ROOT, UV_CLI
 from runner.uv_bootstrap import (
@@ -68,7 +69,7 @@ result_path = Path(sys.argv[2]).resolve()
 del sys.argv[1:3]
 
 sys.path.insert(0, str(repository_root))
-from testing.utility import traceability_results
+from testing.utility import evidence_results
 sys.path.pop(0)
 
 def capture_results(_repo_root, _command, outcomes, exitstatus):
@@ -84,32 +85,25 @@ def capture_results(_repo_root, _command, outcomes, exitstatus):
         stream.write("\\n")
     os.replace(temporary, result_path)
 
-traceability_results._write_manifest = capture_results
+evidence_results._write_manifest = capture_results
+evidence_results.should_write_test_evidence = (
+    lambda *, write_flag=False, skip_flag=False, environ=None: not skip_flag
+)
 
 import pytest
-raise SystemExit(pytest.main(sys.argv[1:], plugins=[traceability_results]))
+raise SystemExit(pytest.main(sys.argv[1:], plugins=[evidence_results]))
 """.strip()
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_rejects_unmanaged_uv_with_repair_command
-# @matrix mcp-package : bootstrap fail-closed managed-path repair-guidance
 class McpEnvironmentError(RuntimeError):
     """A fail-closed error from the repository-only package bridge."""
 
 
-# @testable false
-# @covered-by runner/mcp_environment.py::verify_managed_uv
-# @reason consistent actionable diagnostics are asserted through each public bridge boundary
-def _repair_error(message):
+def _repair_error(message: str) -> McpEnvironmentError:
     return McpEnvironmentError(f"{message} Run {MCP_REPAIR_COMMAND} to repair it.")
 
 
-# @testable false
-# @covered-by runner/mcp_environment.py::sync_environment
-# @covered-by runner/mcp_environment.py::run_python
-# @reason environment isolation is exercised through synchronized and child-process commands
-def _child_environment():
+def _child_environment() -> dict[str, str]:
     environment = os.environ.copy()
     for name in tuple(environment):
         if name.startswith("UV_") or name in {
@@ -132,11 +126,9 @@ def _child_environment():
     return environment
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_rejects_unmanaged_uv_with_repair_command
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_uses_managed_uv_lock_and_isolated_python
-# @matrix mcp-package : bootstrap fail-closed managed-path version-verification
-def verify_managed_uv(*, run=subprocess.run):
+def verify_managed_uv(
+    *, run: Callable[..., subprocess.CompletedProcess] = subprocess.run
+) -> Path:
     """Verify that the bridge and manifest select the same managed uv binary."""
     try:
         manifest = load_manifest(BOOTSTRAP_MANIFEST)
@@ -165,11 +157,7 @@ def verify_managed_uv(*, run=subprocess.run):
         raise _repair_error(f"Managed uv verification failed: {error}") from error
 
 
-# @testable false
-# @covered-by runner/mcp_environment.py::prepare_environment
-# @covered-by runner/mcp_environment.py::check_environment
-# @reason interpreter placement is exercised through the local and prebuilt public boundaries
-def _verify_environment_python(*, editable: bool, run=subprocess.run):
+def _verify_environment_python(*, editable: bool, run=subprocess.run) -> Path:
     try:
         result = run(
             [str(MCP_ENVIRONMENT_PYTHON), "-I", "-c", _ENVIRONMENT_PROBE],
@@ -234,11 +222,9 @@ def _verify_environment_python(*, editable: bool, run=subprocess.run):
     return MCP_ENVIRONMENT_PYTHON
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_uses_managed_uv_lock_and_isolated_python
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_sync_failure_is_actionable
-# @matrix mcp-package testing : environment-sync fail-closed locked-dependencies repair-guidance
-def sync_environment(*, run=subprocess.run):
+def sync_environment(
+    *, run: Callable[..., subprocess.CompletedProcess] = subprocess.run
+) -> Path:
     """Synchronize the shared adapter package environment from its exact uv lock."""
     verify_managed_uv(run=run)
     command = [str(UV_CLI), *UV_SYNC_ARGUMENTS]
@@ -261,19 +247,17 @@ def sync_environment(*, run=subprocess.run):
     return MCP_ENVIRONMENT_PYTHON
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_uses_managed_uv_lock_and_isolated_python
-# @matrix mcp-package testing : environment-sync interpreter isolation
-def prepare_environment(*, run=subprocess.run):
+def prepare_environment(
+    *, run: Callable[..., subprocess.CompletedProcess] = subprocess.run
+) -> Path:
     """Synchronize and verify the isolated package interpreter."""
     sync_environment(run=run)
     return _verify_environment_python(editable=True, run=run)
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_checks_prebuilt_environment_without_uv
-# @matrix hosted-e2e mcp-package testing : environment-check isolation
-def check_environment(*, run=subprocess.run):
+def check_environment(
+    *, run: Callable[..., subprocess.CompletedProcess] = subprocess.run
+) -> Path:
     """Verify an already-synchronized package environment without invoking uv."""
     if os.environ.get("LAGNIAPPE_HOSTED_E2E") != "true":
         raise _repair_error(
@@ -283,10 +267,12 @@ def check_environment(*, run=subprocess.run):
     return _verify_environment_python(editable=False, run=run)
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_builds_isolated_adapter_and_pytest_commands
-# @matrix mcp-package testing : command-bridge environment-sync isolation
-def run_python(arguments, *, prepared=False, run=subprocess.run):
+def run_python(
+    arguments: Sequence[str | Path],
+    *,
+    prepared: bool = False,
+    run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+) -> int:
     """Run arguments with isolated mode in the verified package interpreter."""
     python = MCP_ENVIRONMENT_PYTHON if prepared else prepare_environment(run=run)
     command = [str(python), "-I", *[str(argument) for argument in arguments]]
@@ -302,12 +288,13 @@ def run_python(arguments, *, prepared=False, run=subprocess.run):
     return result.returncode
 
 
-# @testable true
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_builds_isolated_adapter_and_pytest_commands
-# @tests tests_tooling/test_012_mcp_environment.py::test_mcp_environment_builds_result_transport_command
-# @matrix mcp-package testing : command-bridge isolation pytest-config
-# @matrix mcp-package testing traceability : result-aggregation test-evidence
-def run_pytest(arguments, *, prepared=False, result_path=None, run=subprocess.run):
+def run_pytest(
+    arguments: Sequence[str],
+    *,
+    prepared: bool = False,
+    result_path: Path | None = None,
+    run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+) -> int:
     """Run adapter tests in isolation and optionally transport their results."""
     command = []
     if result_path is not None:

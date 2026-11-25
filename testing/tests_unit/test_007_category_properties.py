@@ -9,7 +9,7 @@ Out of scope here: ``PageIndex.pages`` (database + ``url_for``),
 other suites where those paths are mocked or exercised end-to-end.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -22,7 +22,6 @@ from lagniappe.core.entities import category as category_module
 from testing.utility.test_entities import TestEntities, TestUser as UtilityTestUser
 
 
-# @matrix category filters page : conditions entity-fields filter-value
 @pytest.mark.unit
 def test_category_filters(get_test_entities, get_schema):
     """Test CategoryFilters conditions and page filter index values.
@@ -47,7 +46,7 @@ def test_category_filters(get_test_entities, get_schema):
 
     # set page properties and schemas on page forms
     for page in pages:
-        page.modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        page.modified = datetime(2026, 1, 1, tzinfo=UTC)
         page.name = page.test_spec.get("name")
         page.description = page.test_spec.get("description")
         if "public" in page.test_spec:
@@ -108,7 +107,6 @@ def test_category_filters(get_test_entities, get_schema):
             }
 
 
-# @matrix category form-schema : delegation schema
 @pytest.mark.unit
 def test_category_schema(get_test_entities, get_schema):
     """Category.schema mirrors attached form.schema when a form exists; else None."""
@@ -122,8 +120,6 @@ def test_category_schema(get_test_entities, get_schema):
             assert category.schema is None
 
 
-# @matrix category permissions : attached-form cache restricted-access
-# @source lagniappe/core/entities/category.py::Category
 @pytest.mark.unit
 def test_category_access_is_independent_of_attached_form_restrictions():
     viewer = UtilityTestUser(
@@ -161,7 +157,6 @@ def test_category_access_is_independent_of_attached_form_restrictions():
     )
 
 
-# @matrix category pages : default-category get-create
 @pytest.mark.unit
 def test_uncategorized_pages_get_create():
     existing = datastore.Entity(
@@ -200,7 +195,6 @@ def test_uncategorized_pages_get_create():
     created.save.assert_called_once_with()
 
 
-# @matrix category filters form : entity-fields related-forms
 @pytest.mark.unit
 def test_category_filters_related_forms(get_test_entities, get_schema):
     """entity_fields adds RelatedForm rows for primary form plus forms from ``forms``."""
@@ -226,7 +220,6 @@ def test_category_filters_related_forms(get_test_entities, get_schema):
             if "hash" in c] == [("form", "primform1"), ("form", "relform1")]
 
 
-# @matrix category filters permissions : conditions entity-fields view-access
 @pytest.mark.unit
 def test_category_filter_conditions_include_only_viewable_forms():
     category = Category(testing=True)
@@ -260,7 +253,6 @@ def test_category_filter_conditions_include_only_viewable_forms():
     assert hidden.hash not in entity_hashes
 
 
-# @matrix category form : add duplicate-primary related-forms relation-registration
 @pytest.mark.unit
 @pytest.mark.parametrize("primary_loaded", [True, False])
 def test_related_forms_add_skips_primary_form_and_registers_relation(primary_loaded):
@@ -300,7 +292,6 @@ def test_related_forms_add_skips_primary_form_and_registers_relation(primary_loa
     assert category.mutation_intents[0].entity is related
 
 
-# @matrix category form : add related-forms relation-registration
 @pytest.mark.unit
 def test_related_forms_add_existing_key_does_not_load_other_forms():
     category = TestEntities.get("CATEGORY", {"name": "Stored form registry"})
@@ -317,7 +308,6 @@ def test_related_forms_add_existing_key_does_not_load_other_forms():
     assert category.mutation_intents == []
 
 
-# @matrix category form : related-forms validation
 @pytest.mark.unit
 def test_related_forms_add_rejects_value_without_key():
     category = TestEntities.get(

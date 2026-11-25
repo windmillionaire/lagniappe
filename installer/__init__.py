@@ -1,3 +1,5 @@
+from typing import Self
+
 import sys
 
 from runner.console import (
@@ -20,30 +22,29 @@ from runner.context import (
 )
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
-# @matrix setup : portability prerequisites python-version virtualenv
-def verify_setup_runtime():
+def verify_python_version() -> None:
+    """Require the Python minor used by the installer and deployed application."""
+    if sys.version_info[:2] != (3, 14):
+        from installer.errors import SetupError
+
+        raise SetupError(
+            f"Python 3.14 is required (you are running {sys.version}).",
+            repair_action=virtualenv_instructions(),
+        )
+
+
+def verify_setup_runtime() -> None:
     """Require supported Python from this checkout's project virtualenv."""
     from installer.errors import SetupError
 
-    if sys.version_info < (3, 12):
-        print(
-            f"Python 3.12 or higher is required (you are running {sys.version})."
-        )
-        print(virtualenv_instructions())
-        raise SetupError("Python 3.12 or higher is required.")
-
+    verify_python_version()
     if not project_virtualenv_active():
         print("Setup must run from this checkout's project virtualenv.")
         print(virtualenv_instructions())
         raise SetupError("Setup must run from this checkout's project virtualenv.")
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_config_status_save_and_gcloud_login_helpers
-# @pair setup:config-files
-def config_file_status():
+def config_file_status() -> dict[str, bool]:
     from config import File
 
     """Return expected config files and whether each one exists."""
@@ -52,10 +53,6 @@ def config_file_status():
     return {file.name: file.exists() for file in required}
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_formatter_tracks_active_spinners
-# @tests tests_tooling/test_001k_setup_console.py::test_formatter_preserves_plain_and_colored_output
-# @matrix setup : package-install spinner
 class Formatter:
     """Bootstrap Rich once; formatting itself never changes dependencies."""
 
@@ -66,7 +63,7 @@ class Formatter:
     success = staticmethod(success)
     info = staticmethod(info)
 
-    def initialize(self):
+    def initialize(self) -> Self:
         if not self._initialized:
             from installer.package_install import install_if_missing
 

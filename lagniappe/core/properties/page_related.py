@@ -1,3 +1,14 @@
+from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+
+    from ..entities.category import Category
+    from ..entities.file import File
+    from ..entities.page import Page
+    from ..entities.user import User as User
+
 from ..definitions import Action, Fetch, FetchReason
 from ..entities import Entities
 from ..mixins import (
@@ -13,13 +24,8 @@ from .base_db import DBProperty
 from .base_property import Property
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_categories_model_restricted_and_cache_invalidation
-# @tests tests_unit/test_008_page_properties.py::test_page_categories_preserve_users_model_and_default_after_removing_only_model
-# @tests tests_unit/test_008_page_properties.py::test_page_categories_reject_invalid_related_values
-# @matrix page : cache-invalidation categories default-category model-category model-removal restrictions users-model validation
 class PageCategories(
-    RelatedEntityListMixin, FilterMixin, ColumnMixin, AIMixin, DBProperty
+    RelatedEntityListMixin["Category"], FilterMixin, ColumnMixin, AIMixin, DBProperty["list[Category]", "Page"]
 ):
     """Categories a page belongs to, including its model category when applicable.
 
@@ -38,20 +44,18 @@ class PageCategories(
 
     # Property Attributes
     _id = "categories"
+    _value: object
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._all_categories = None
+    def __init__(self, *args: object, entity: Page | None = None, **kwargs: object) -> None:
+        super().__init__(*args, entity=entity, **kwargs)
+        self._all_categories: list[Category] | None = None
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/page_related.py::PageCategories
-    # @reason page-category projection tests exercise the domain cache through the owning property
-    def _invalidate_projections(self):
+    def _invalidate_projections(self) -> None:
         self._all_categories = None
         super()._invalidate_projections()
 
     @property
-    def value(self):
+    def value(self) -> list[Category]:
         if isinstance(self._all_categories, list):
             self._all_categories = self._page_categories(self._all_categories)
             return self._all_categories
@@ -62,7 +66,7 @@ class PageCategories(
         return self._all_categories
 
     @staticmethod
-    def _page_categories(categories):
+    def _page_categories(categories: Iterable[Category | None]) -> list[Category]:
         return [
             c
             for c in categories
@@ -72,7 +76,7 @@ class PageCategories(
         ]
 
     @value.setter
-    def value(self, value):
+    def value(self, value: list[Category] | None) -> None:
         if value is not None and not isinstance(value, list):
             raise TypeError("Value must be a list")
         for category in value or []:
@@ -119,14 +123,14 @@ class PageCategories(
             self.entity.model = Entities.CATEGORY.get_uncategorized_pages()
 
     # Entity Attributes
-    def remove(self, value):
+    def remove(self, value: Category) -> None:
         key = getattr(value, "key", None)
         if not key:
             raise ValueError("Value must have a key")
 
         model = self.entity.model
         stored_categories = [
-            c for c in RelatedEntityListMixin.value.fget(self) if c.key != key
+            c for c in self._read_related_list() if c.key != key
         ]
 
         self._value = stored_categories
@@ -141,7 +145,7 @@ class PageCategories(
             if not stored_categories:
                 self.entity.model = Entities.CATEGORY.get_uncategorized_pages()
 
-    def add(self, value):
+    def add(self, value: Category) -> None:
         key = getattr(value, "key", None)
         if not key:
             raise ValueError("Value must have a key")
@@ -153,15 +157,11 @@ class PageCategories(
 
     # AI Attributes
     @property
-    def ai_key(self):
+    def ai_key(self) -> str:
         return "page_categories"
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_files_loads_database_files
-# @tests tests_unit/test_008_page_properties.py::test_page_files_reloads_query_results_and_skips_unlinked_files
-# @matrix page : db-load files stale-query
-class PageFiles(RelatedEntityListMixin, Property):
+class PageFiles(RelatedEntityListMixin["File"], Property["list[File]", "Page"]):
     """Files attached to a page. Loaded from the database on first access.
 
     Get:
@@ -170,15 +170,16 @@ class PageFiles(RelatedEntityListMixin, Property):
 
     # Property Attributes
     _id = "files"
+    _value: object
     _label = "Files"
 
     @property
-    def value(self):
+    def value(self) -> list[File]:  # pyright: ignore[reportIncompatibleMethodOverride] -- The live reverse relation is read-only.
         if self.is_set:
             return super().value
 
         file_keys = [
-            getattr(file, "key", file)
+            cast("Key", getattr(file, "key", file))
             for file in database_get.page_files(self.entity.key)
             if getattr(file, "key", file)
         ]
@@ -188,27 +189,20 @@ class PageFiles(RelatedEntityListMixin, Property):
             else []
         )
 
-        Property.value.fset(
-            self,
-            [
-                file
-                for file in loaded
-                if isinstance(file, Entities.FILE)
-                and self.entity.key == file.properties.page.key
-            ],
-        )
-        return self._value
+        files = [
+            file for file in loaded
+            if isinstance(file, Entities.FILE) and self.entity.key == file.properties.page.key
+        ]
+        self._value = files
+        return files
 
     # Column Attributes
     @property
-    def sort_value(self):
+    def sort_value(self) -> int | None:
         return len(self.value) if self.value else None
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_user_and_model_category_parent_keys
-# @pair page:user-key
-class PageUser(RelatedEntityMixin, DBProperty):
+class PageUser(RelatedEntityMixin["User"], DBProperty["User", "Page"]):
     """The user who owns this page (only set for user pages).
 
     Set:
@@ -223,15 +217,11 @@ class PageUser(RelatedEntityMixin, DBProperty):
     _label = "User"
 
     @property
-    def urlsafe_key(self):
-        return database_get.urlsafe_key(self.entity.db.get(self.id))
+    def urlsafe_key(self) -> str | None:
+        return database_get.urlsafe_key(cast("Key | None", self.entity.db.get(self.id)))
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_details
-# @tests tests_unit/test_008_page_properties.py::test_page_user_and_model_category_parent_keys
-# @matrix page : attach cache-parent details fallback-parent
-class PageModelCategory(RelatedEntityMixin, DetailsMixin, DBProperty):
+class PageModelCategory(RelatedEntityMixin["Category"], DetailsMixin, DBProperty["Category", "Page"]):
     """The primary/model category for a page.
 
     Setting this invalidates the PageCategories cache since the model
@@ -252,22 +242,27 @@ class PageModelCategory(RelatedEntityMixin, DetailsMixin, DBProperty):
 
     # Property Attributes
     _id = "model"
+    _value: object
     _label = "Model"
 
-    @RelatedEntityMixin.value.setter
-    def value(self, value):
-        RelatedEntityMixin.value.fset(self, value)
+    @property
+    def value(self) -> Category | None:
+        return self._read_related()
+
+    @value.setter
+    def value(self, value: Category | None) -> None:
+        self._write_related(value)
         # Invalidate PageCategories cache since model is included in categories
         if self.entity and hasattr(self.entity.properties, "categories"):
             self.entity.properties.categories._all_categories = None
 
     # Details Attributes
     @property
-    def details_key(self):
+    def details_key(self) -> str:
         return "parent"
 
     @property
-    def details_value(self):
+    def details_value(self) -> dict[str, object] | None:
         model = self.entity.model
         parent_entity = model
         if model is None and self.entity.categories:
@@ -282,7 +277,12 @@ class PageModelCategory(RelatedEntityMixin, DetailsMixin, DBProperty):
             parent.pop("parent", None)
         return parent
 
-    def attach(self, key_map):
-        key = super().key or self.entity.key.parent
-        self._value = key_map.get(key)
+    def attach(self, key_map: Mapping[Key, Category]) -> None:
+        key = super().key
+        if key is None:
+            page_key = self.entity.key
+            if page_key is None:
+                raise AttributeError("Page model attachment requires a page key")
+            key = page_key.parent
+        self._value = key_map.get(key) if key is not None else None
         self._cache_attached_entities()

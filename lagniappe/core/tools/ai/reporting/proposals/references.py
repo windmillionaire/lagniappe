@@ -1,9 +1,8 @@
 """Reference normalization helpers for AI report proposals."""
 
+from typing import TypeGuard
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/planner.py::generate_report
-# @reason file reference extraction is asserted through completion behavior tests
+
 def _proposal_file_refs(data):
     refs = []
     for key in ("file", "file_id", "file_ref"):
@@ -17,23 +16,15 @@ def _proposal_file_refs(data):
     return refs
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason recursive dependency extraction is exercised through the validator contract
 def _referenced_action_ids(action):
     yield from _explicit_dependency_ids(action)
     data = action.get("data") or {}
     yield from _data_action_references(data)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason explicit dependency normalization is exercised through proposal validation
 def _explicit_dependency_ids(action):
     dependencies = action.get("depends_on") or []
-    if isinstance(dependencies, str):
-        dependencies = [dependencies]
-    elif not isinstance(dependencies, list):
+    if isinstance(dependencies, str) or not isinstance(dependencies, list):
         dependencies = [dependencies]
 
     for dependency in dependencies:
@@ -41,9 +32,6 @@ def _explicit_dependency_ids(action):
             yield _strip_action_reference(dependency)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason reference-marker normalization is part of dependency validation
 def _strip_action_reference(value):
     if value.startswith("$"):
         return value[1:]
@@ -52,9 +40,6 @@ def _strip_action_reference(value):
     return value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::_validate_completed_task_target_action
-# @reason action-reference aliases are exercised through proposal validation
 def _data_action_reference(data, root):
     value = data.get(f"{root}_action")
     if isinstance(value, str) and value:
@@ -68,9 +53,6 @@ def _data_action_reference(data, root):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason action-shape errors are exercised through proposal validation tests
 def _first_data_reference(data, *keys):
     for key in keys:
         for candidate in (key, f"{key}_id", f"{key}_ref", f"{key}_action"):
@@ -80,9 +62,6 @@ def _first_data_reference(data, *keys):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason readable form labels are validated like executable form references
 def _has_form_reference_or_label(data):
     if _first_data_reference(data, "form"):
         return True
@@ -91,16 +70,10 @@ def _has_form_reference_or_label(data):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason action-shape errors are exercised through proposal validation tests
-def _proposal_string(value):
-    return isinstance(value, str) and value.strip()
+def _proposal_string(value: object) -> TypeGuard[str]:
+    return isinstance(value, str) and bool(value.strip())
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason recursive action-reference extraction is covered through proposal validation
 def _data_action_references(value, key=None):
     # Form field ids are user-defined and may legitimately be ``action`` or end
     # in ``_action``. Submission values are content, never proposal references,
@@ -117,8 +90,10 @@ def _data_action_references(value, key=None):
     elif isinstance(value, list):
         for child in value:
             yield from _data_action_references(child, key)
-    elif isinstance(value, str):
-        if value.startswith("$") or value.startswith("action:"):
-            yield _strip_action_reference(value)
-        elif key and key.endswith("_action"):
-            yield _strip_action_reference(value)
+    elif isinstance(value, str) and (
+        value.startswith("$")
+        or value.startswith("action:")
+        or key
+        and key.endswith("_action")
+    ):
+        yield _strip_action_reference(value)

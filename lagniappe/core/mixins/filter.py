@@ -1,10 +1,13 @@
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_entity.py::Name
-# @covered-by lagniappe/core/properties/common_entity.py::Description.filter_value
-# @covered-by lagniappe/core/properties/common_entity.py::Hash.filter_key
-# @covered-by lagniappe/core/properties/form_inputs.py::TextInput
-# @covered-by lagniappe/core/properties/task_dates.py::DueDate
-class FilterMixin:
+from enum import Enum
+from typing import TYPE_CHECKING
+
+from ..definitions.filters import FieldType
+from .field_host import FieldHost
+
+if TYPE_CHECKING:
+    from ..entities.condition import Condition
+
+class FilterMixin(FieldHost):
     """Adds filter indexing. Collected by Entity.to_filter_index().
 
     The filter cache stores {filter_key: filter_value} per entity.
@@ -29,87 +32,87 @@ class FilterMixin:
         _default (str): Default comparator name.
     """
 
-    _filter_kind = None
+    _filter_kind: str | None = None
+    _kind: str | None
+    _field_type: FieldType
 
     @property
-    def filter_key(self):
+    def filter_key(self) -> str:
         return getattr(self, "_filter_key", self.id)
 
     @filter_key.setter
-    def filter_key(self, value):
+    def filter_key(self, value: str) -> None:
         self._filter_key = value
 
     @property
-    def filter_value(self):
+    def filter_value(self) -> object:
         return self.value
 
     @property
-    def filter_label(self):
+    def filter_label(self) -> str | None:
         return self.label
 
     @property
-    def filter_kind(self):
+    def filter_kind(self) -> str | None:
         return self._kind
 
     @filter_kind.setter
-    def filter_kind(self, value):
+    def filter_kind(self, value: str) -> None:
         self._filter_kind = value
 
     @property
-    def default(self):
+    def default(self) -> str | None:
         return getattr(self, "_default", None)
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_column_and_filter_contract_errors_are_explicit
-    # @matrix property : filter validation
     @property
-    def field_type(self):
+    def field_type(self) -> FieldType:
         if not hasattr(self, "_field_type"):
             raise NotImplementedError(f"{self.__class__.__name__} requires _field_type")
         return self._field_type
 
     @field_type.setter
-    def field_type(self, value):
+    def field_type(self, value: FieldType) -> None:
         self._field_type = value
 
     @property
-    def field_text(self):
+    def field_text(self) -> str | None:
         return getattr(self, "_field_text", None)
 
     @property
-    def field_options(self):
+    def field_options(self) -> type[Enum] | None:
         return getattr(self, "_field_options", None)
 
     @property
-    def index(self):
+    def index(self) -> str | None:
         return getattr(self, "_index", None)
 
     @property
-    def placeholder(self):
+    def placeholder(self) -> str | None:
         return getattr(self, "_placeholder", None)
 
     @property
-    def choices(self):
+    def choices(self) -> dict[str, str] | None:
         return getattr(self, "_choices", None)
 
     @choices.setter
-    def choices(self, value):
+    def choices(self, value: dict[str, str] | None) -> None:
         self._choices = value
 
-    def filter_details(self, condition):
+    def filter_details(self, condition: Condition) -> dict[str, object]:
         """Build display details dict for a filter condition.
 
         Subclasses override to add type-specific keys (or, entity, etc.).
         Returns {field, type, text, status, value}.
         """
         comparator = condition.comparator.name
+        options = self.field_options
         value = condition.value
 
         details = {
             "field": self,
             "type": self.field_type.value,
-            "text": self.field_options[comparator].value
-            if hasattr(self.field_options, comparator)
+            "text": options[comparator].value
+            if options is not None and hasattr(options, comparator)
             else None,
             "status": comparator,
             "value": value,

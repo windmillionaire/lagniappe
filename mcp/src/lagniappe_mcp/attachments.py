@@ -1,6 +1,8 @@
 """Bounded ChatGPT attachment spooling before the existing upload workflow."""
 
 import asyncio
+from collections.abc import AsyncIterator, Mapping
+from typing import Protocol
 from contextlib import asynccontextmanager
 import ipaddress
 import mimetypes
@@ -18,13 +20,14 @@ from lagniappe_mcp.limits import MAX_UPLOAD_FILES
 from lagniappe_mcp.rest import _raw_chunks
 
 
+class _ClientFactory(Protocol):
+    def __call__(self, *, trust_env: bool, follow_redirects: bool) -> httpx.AsyncClient: ...
+
+
 _MAX_REDIRECTS = 3
 
 
-# @testable true
-# @tests tests_unit/test_033d_mcp_attachments.py::test_attachment_urls_reject_unsafe_addresses_and_pin_dns
-# @matrix mcp-upload : remote ssrf dns-pinning
-async def pinned_url(url):
+async def pinned_url(url: object) -> tuple[str, str]:
     """Validate every DNS answer, then connect to an IP with the original TLS name."""
     try:
         if not isinstance(url, str) or not 1 <= len(url) <= 8192:
@@ -77,10 +80,7 @@ async def pinned_url(url):
         ) from None
 
 
-# @testable true
-# @tests tests_unit/test_033d_mcp_attachments.py::test_attachment_names_and_mime_hints_do_not_select_paths
-# @matrix mcp-upload : remote filename mime
-def attachment_name(item, index, content_type):
+def attachment_name(item: Mapping[str, str], index: int, content_type: str) -> str:
     raw = item.get("file_name") or ""
     name = unicodedata.normalize("NFC", raw.replace("\\", "/").rsplit("/", 1)[-1])
     name = "".join(
@@ -103,15 +103,10 @@ def attachment_name(item, index, content_type):
     return stem + suffix
 
 
-# @testable true
-# @tests tests_unit/test_033d_mcp_attachments.py::test_attachment_download_counts_actual_bytes_and_cleans_partial_files
-# @tests tests_unit/test_033d_mcp_attachments.py::test_attachment_redirects_and_expiry_never_forward_credentials
-# @tests tests_unit/test_033d_mcp_attachments.py::test_redirect_destinations_are_revalidated_before_connecting
-# @tests tests_unit/test_033d_mcp_attachments.py::test_partial_downloads_clean_the_entire_spool_when_transfer_fails
-# @matrix mcp-upload : remote streaming bounds redirects privacy ssrf cancellation cleanup
 async def download_attachment(
-    item, directory, index, *, cap, client_factory=httpx.AsyncClient
-):
+    item: Mapping[str, str], directory: Path, index: int, *,
+    cap: int, client_factory: _ClientFactory = httpx.AsyncClient,
+) -> tuple[Path, int]:
     current, seen = item["download_url"], set()
     for redirect_count in range(_MAX_REDIRECTS + 1):
         if current in seen:
@@ -211,12 +206,10 @@ async def download_attachment(
     )
 
 
-# @testable true
-# @tests tests_unit/test_033d_mcp_attachments.py::test_spooling_has_one_total_limit_and_cleans_on_cancellation
-# @tests tests_unit/test_033d_mcp_attachments.py::test_partial_downloads_clean_the_entire_spool_when_transfer_fails
-# @matrix mcp-upload : remote cancellation cleanup bounds duplicate
 @asynccontextmanager
-async def spool_attachments(items, *, max_file_bytes, max_total_bytes):
+async def spool_attachments(
+    items: list[dict[str, str]], *, max_file_bytes: int, max_total_bytes: int,
+) -> AsyncIterator[list[dict[str, str]]]:
     if not isinstance(items, list) or not 1 <= len(items) <= MAX_UPLOAD_FILES:
         raise AdapterError(
             "invalid_attachments", "Choose between one and twenty attachments."

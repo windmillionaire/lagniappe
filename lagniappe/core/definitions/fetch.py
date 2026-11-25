@@ -2,10 +2,9 @@
 
 from dataclasses import dataclass
 from enum import Enum, IntEnum
+from typing import Self
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/definitions/fetch.py::Fetch
 class FetchDepth(IntEnum):
     """Total relationship depth available after a fetch completes."""
 
@@ -14,8 +13,6 @@ class FetchDepth(IntEnum):
     NESTED = 2
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/definitions/fetch.py::Fetch
 class FetchReason(Enum):
     """Registered invariants that justify nested relationship loading."""
 
@@ -32,9 +29,6 @@ class FetchReason(Enum):
     CACHE_REBUILD_MATERIALIZATION = "cache-rebuild-materialization"
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_fetch_requires_registered_reason_for_nested_depth
-# @pairs entities:explicit-fetch-depth permissions:registered-reason
 @dataclass(frozen=True)
 class Fetch:
     """A caller-owned declaration of the entity graph it needs.
@@ -47,7 +41,7 @@ class Fetch:
     depth: FetchDepth
     reason: FetchReason | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not isinstance(self.depth, FetchDepth):
             raise TypeError("Fetch depth must be a FetchDepth")
         if self.depth is FetchDepth.NESTED and not isinstance(
@@ -58,13 +52,13 @@ class Fetch:
             raise ValueError("Only nested fetches may declare a reason")
 
     @classmethod
-    def root(cls):
+    def root(cls) -> Self:
         return cls(FetchDepth.ROOT)
 
     @classmethod
-    def direct(cls):
+    def direct(cls) -> Self:
         return cls(FetchDepth.DIRECT)
 
     @classmethod
-    def nested(cls, *, because):
+    def nested(cls, *, because: FetchReason) -> Self:
         return cls(FetchDepth.NESTED, reason=because)

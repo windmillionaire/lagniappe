@@ -1,6 +1,6 @@
 """Focused contracts for AI-driven shared-cache workspace filters."""
 
-from datetime import datetime, time, timezone
+from datetime import datetime, time, UTC
 from types import SimpleNamespace
 
 import pytest
@@ -162,7 +162,6 @@ def _workspace_filter_fixture():
     return project, model, form, hidden_form
 
 
-# @matrix ai-filter : permissions schema
 @pytest.mark.unit
 def test_describe_filter_fields_exposes_parent_relations_and_form_fields():
     user = object()
@@ -202,7 +201,6 @@ def test_describe_filter_fields_exposes_parent_relations_and_form_fields():
     )
 
 
-# @matrix ai-filter : integration schema
 @pytest.mark.unit
 def test_describe_filter_fields_uses_real_project_and_form_filter_surfaces():
     user = object()
@@ -254,7 +252,6 @@ def test_describe_filter_fields_uses_real_project_and_form_filter_surfaces():
     assert fields[("hash:real-form", "input-amount")]["type"] == "number"
 
 
-# @matrix ai-filter : compilation validation
 @pytest.mark.unit
 def test_compile_filter_definitions_normalizes_dates_numbers_and_booleans(monkeypatch):
     user = object()
@@ -262,7 +259,7 @@ def test_compile_filter_definitions_normalizes_dates_numbers_and_booleans(monkey
     monkeypatch.setattr(
         contract.dates,
         "user_timezone",
-        lambda _user=None: timezone.utc,
+        lambda _user=None: UTC,
     )
 
     definitions = ai_query.compile_filter_definitions(
@@ -302,7 +299,7 @@ def test_compile_filter_definitions_normalizes_dates_numbers_and_booleans(monkey
     expected_end = datetime.combine(
         datetime(2026, 7, 31).date(),
         time.max,
-        tzinfo=timezone.utc,
+        tzinfo=UTC,
     ).timestamp()
     assert definitions[1].comparator == Comparator.LESS_EQUAL
     assert definitions[1].value == expected_end
@@ -313,7 +310,6 @@ def test_compile_filter_definitions_normalizes_dates_numbers_and_booleans(monkey
     assert definitions[4].value == ["paid"]
 
 
-# @matrix ai-filter : compilation permissions validation
 @pytest.mark.unit
 def test_compile_filter_definitions_rejects_unknown_fields_comparators_and_values(
     monkeypatch,
@@ -372,7 +368,6 @@ def test_compile_filter_definitions_rejects_unknown_fields_comparators_and_value
         )
 
 
-# @matrix ai-filter : cache-query output permissions
 @pytest.mark.unit
 def test_query_workspace_filter_uses_shared_cache_and_permission_filters_results(
     monkeypatch,
@@ -383,27 +378,27 @@ def test_query_workspace_filter_uses_shared_cache_and_permission_filters_results
         "task",
         "visible-task",
         "Visible",
-        modified=datetime(2026, 7, 10, tzinfo=timezone.utc),
+        modified=datetime(2026, 7, 10, tzinfo=UTC),
     )
     older = _Entity(
         "task",
         "older-task",
         "Older",
-        modified=datetime(2026, 7, 1, tzinfo=timezone.utc),
+        modified=datetime(2026, 7, 1, tzinfo=UTC),
     )
     hidden = _Entity(
         "task",
         "hidden-task",
         "Hidden",
         allowed=False,
-        modified=datetime(2026, 7, 12, tzinfo=timezone.utc),
+        modified=datetime(2026, 7, 12, tzinfo=UTC),
     )
     inactive = _Entity(
         "task",
         "inactive-task",
         "Inactive",
         active=False,
-        modified=datetime(2026, 7, 11, tzinfo=timezone.utc),
+        modified=datetime(2026, 7, 11, tzinfo=UTC),
     )
     calls = {}
 
@@ -475,7 +470,6 @@ def test_query_workspace_filter_uses_shared_cache_and_permission_filters_results
     assert hidden.to_ai_users == []
 
 
-# @matrix ai-filter : legacy-record bounded-error output
 @pytest.mark.unit
 def test_query_workspace_filter_reports_bounded_row_serialization_errors():
     user = object()
@@ -505,7 +499,6 @@ def test_query_workspace_filter_reports_bounded_row_serialization_errors():
     }
 
 
-# @matrix ai-filter : permissions tool-handler validation
 @pytest.mark.unit
 def test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors(
     monkeypatch,

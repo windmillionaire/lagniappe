@@ -16,7 +16,7 @@ Out of scope for this file: ``public_id``, ``ai_generated``, ``save`` /
 (covered elsewhere or in e2e).
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from unittest.mock import patch
 
 from google.cloud import datastore
@@ -32,7 +32,6 @@ from lagniappe.core.mutations import plan_mutation
 from testing.utility.test_entities import TestEntities, TestUser as UtilityTestUser
 
 
-# @pair model-task:reference-links
 def test_model_task_reference_retains_project_without_loading_relations():
     project = Project(testing=True)
     project._key = datastore.Key("models", "link-project", project="test")
@@ -52,7 +51,6 @@ def test_model_task_reference_retains_project_without_loading_relations():
     assert project.reference_details["id"] == project.urlsafe_key
 
 
-# @matrix project : ai-value cache column description filter-value html-stripping
 @pytest.mark.unit
 def test_project_description(get_test_entities):
     """Description strips markup while preserving text, case, and whitespace."""
@@ -73,7 +71,6 @@ def test_project_description(get_test_entities):
             assert project.to_ai()["description"] == expected
 
 
-# @matrix project : ai-value cache document filter-value
 @pytest.mark.unit
 def test_project_document(get_test_entities):
     """Test Document property with CacheMixin, FilterMixin, AIMixin.
@@ -100,12 +97,11 @@ def test_project_document(get_test_entities):
             assert project.to_filter_index()["has_document"] is False
 
 
-# @matrix project : document-state markup-fallback
 @pytest.mark.unit
 def test_project_document_state_uses_markup_when_no_ydoc():
     """Project document state falls back to saved HTML when no YDoc snapshot exists."""
     project = Project(testing=True)
-    project.modified = datetime(2026, 6, 30, tzinfo=timezone.utc)
+    project.modified = datetime(2026, 6, 30, tzinfo=UTC)
     project.allowed = lambda *_args, **_kwargs: True
     document = project.properties.document
     document._ydoc = None
@@ -117,7 +113,31 @@ def test_project_document_state_uses_markup_when_no_ydoc():
     assert state["markup"] == "<p>Readonly project document content marker</p>"
 
 
-# @matrix project : filter-value public
+@pytest.mark.unit
+def test_document_html_assignment_reads_back_text_and_clears():
+    project = Project(testing=True)
+    document = project.properties.document
+    markup = "<p>Revised</p>"
+    with patch.object(project, "save_asset", side_effect=[object(), None]) as save:
+        document.html = markup
+        assert document.html == markup
+        save.assert_called_with(markup, "document", "html")
+
+        document.html = None
+        assert document.html is None
+        save.assert_called_with(None, "document", "html")
+
+
+@pytest.mark.unit
+def test_document_computed_value_and_kind_reject_writes():
+    document = Project(testing=True).properties.document
+    for field in ("value", "kind"):
+        with pytest.raises(AttributeError):
+            setattr(document, field, "override")
+    assert document.value is document
+    assert document.kind == "project"
+
+
 @pytest.mark.unit
 def test_project_is_public(get_test_entities):
     """Test IsPublic property with FilterMixin.
@@ -143,7 +163,6 @@ def test_project_is_public(get_test_entities):
         assert project.to_filter_index()["is_public"] is is_public
 
 
-# @matrix filters project task : conditions entity-fields filter-value
 @pytest.mark.unit
 def test_project_filters(get_test_entities, get_schema):
     """Test ProjectFilters produces filter conditions and tasks have correct filter values.
@@ -246,7 +265,6 @@ def test_project_filters(get_test_entities, get_schema):
                     if key in projected_fields} == task.test_spec["expected_filter"]
 
 
-# @matrix filters permissions project : conditions entity-fields view-access
 @pytest.mark.unit
 def test_project_filter_conditions_include_only_viewable_entity_fields(monkeypatch):
     viewer = UtilityTestUser(
@@ -302,7 +320,6 @@ def test_project_filter_conditions_include_only_viewable_entity_fields(monkeypat
     assert hidden_form.hash not in entity_hashes
 
 
-# @matrix model-task permissions project : attached-form restricted-access
 @pytest.mark.unit
 def test_model_task_access_is_independent_of_attached_form_restrictions():
     viewer = UtilityTestUser(
@@ -336,7 +353,6 @@ def test_model_task_access_is_independent_of_attached_form_restrictions():
     )
 
 
-# @matrix project : db-load model-tasks ordering relation-attach
 @pytest.mark.unit
 def test_model_tasks_load_attach_and_order_from_database():
     """ModelTasks lazy-loads project children, attaches parent, and orders appends."""
@@ -380,7 +396,6 @@ def test_model_tasks_load_attach_and_order_from_database():
     assert model_two.order == 2
 
 
-# @matrix project : description identity update
 @pytest.mark.unit
 def test_project_update_sets_identity_and_description():
     """Project.update owns identity and description normalization."""
@@ -397,7 +412,6 @@ def test_project_update_sets_identity_and_description():
     assert project.description == "Safe  description"
 
 
-# @matrix model-task project : create ordering relation-save update
 @pytest.mark.unit
 def test_model_task_entity_create_update_order_and_save_relations():
     """ModelTask.create/update/order/save remain focused on model-task relations."""
@@ -408,19 +422,21 @@ def test_model_task_entity_create_update_order_and_save_relations():
     form = TestEntities.get("FORM", {"name": "Task Form", "hash": "frm005b"})
     created_db = {}
 
-    with patch(
-        "lagniappe.core.entities.entity.database_utility.create_key",
-        return_value=datastore.Key("models", "model005b", parent=project.key),
+    with (
+        patch(
+            "lagniappe.core.entities.entity.database_utility.create_key",
+            return_value=datastore.Key("models", "model005b", parent=project.key),
+        ),
+        patch("lagniappe.core.entities.entity.database_get.entity", return_value=None),
+        patch(
+            "lagniappe.core.entities.entity.database_utility.create_entity",
+            return_value=created_db,
+        ),
     ):
-        with patch("lagniappe.core.entities.entity.database_get.entity", return_value=None):
-            with patch(
-                "lagniappe.core.entities.entity.database_utility.create_entity",
-                return_value=created_db,
-            ):
-                model = ModelTask.create(
-                    project,
-                    {"name": "Inspection", "form": form},
-                )
+        model = ModelTask.create(
+            project,
+            {"name": "Inspection", "form": form},
+        )
 
     assert model.kind == "model"
     assert model.project is project
@@ -455,7 +471,6 @@ def test_model_task_entity_create_update_order_and_save_relations():
     assert writes[form.key].property_mask == ("modified",)
 
 
-# @matrix project : attach details model-task-parent
 @pytest.mark.unit
 def test_model_task_project_parent_details_and_attach():
     """ModelTaskProject resolves stored project keys for details/attach."""

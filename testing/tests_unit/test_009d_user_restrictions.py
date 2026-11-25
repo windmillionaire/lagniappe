@@ -28,8 +28,6 @@ def _app():
     return app
 
 
-# @matrix permissions : assign category-edit facets search
-# @matrix restrictions : assign category-edit facets page-list search
 @pytest.mark.unit
 def test_restrictions(get_permissions_test_data):
     """Test restrictions property for various user permission configurations.
@@ -135,7 +133,6 @@ def test_restrictions(get_permissions_test_data):
                 )
 
 
-# @matrix permissions restrictions : search
 @pytest.mark.unit
 def test_restrictions_only_project_permissions_that_imply_view():
     user = TestEntities.get(
@@ -164,7 +161,6 @@ def test_restrictions_only_project_permissions_that_imply_view():
         assert restrictions.form == expected
 
 
-# @pair restrictions:search
 @pytest.mark.unit
 @pytest.mark.parametrize("owner", [False, True])
 def test_administrator_search_membership_bypasses_restrictions(monkeypatch, owner):
@@ -199,7 +195,6 @@ def test_administrator_search_membership_bypasses_restrictions(monkeypatch, owne
         assert restrictions.search is Restriction.UNRESTRICTED
 
 
-# @matrix permissions restrictions : session-blob validation
 @pytest.mark.unit
 @pytest.mark.parametrize("field,value", [
     ("belongs_to", "UNRESTRICTED"),
@@ -231,8 +226,6 @@ def test_restriction_session_markers_validate_their_own_scope(field, value):
     }) is None
 
 
-# @matrix permissions restrictions : empty-access session-blob stale-session
-# @pair messaging:compose-eligibility
 @pytest.mark.unit
 def test_restrictions_session_blob_and_fingerprint(monkeypatch):
     user = TestEntities.get(
@@ -328,8 +321,6 @@ def test_restrictions_session_blob_and_fingerprint(monkeypatch):
         assert session["restrictions"]["fingerprint"] != previous_fingerprint
 
 
-# @matrix permissions : group-membership stored-requires
-# @pair restrictions:root-fetch
 @pytest.mark.unit
 def test_restrictions_builds_group_membership_from_stored_requires(monkeypatch):
     user = TestEntities.get(
@@ -350,16 +341,13 @@ def test_restrictions_builds_group_membership_from_stored_requires(monkeypatch):
         property(lambda _self: pytest.fail("group relation must not be read")),
     )
 
-    with _app().test_request_context("/"):
-        with MockRestrictions().patch_cache():
-            restrictions = user.properties.restrictions
-            assert restrictions.belongs_to == ["group-one", "group-two"]
-            assert session["restrictions"]["belongs_to"] == ["group-one", "group-two"]
-            assert restrictions.user_message_restrictions == ["group-one", "group-two"]
+    with _app().test_request_context("/"), MockRestrictions().patch_cache():
+        restrictions = user.properties.restrictions
+        assert restrictions.belongs_to == ["group-one", "group-two"]
+        assert session["restrictions"]["belongs_to"] == ["group-one", "group-two"]
+        assert restrictions.user_message_restrictions == ["group-one", "group-two"]
 
 
-# @matrix permissions restrictions : empty-access loaded-state
-# @pair messaging:compose-eligibility
 @pytest.mark.unit
 def test_restrictions_empty_list_is_loaded_state():
     user = TestEntities.get(
@@ -375,6 +363,8 @@ def test_restrictions_empty_list_is_loaded_state():
     with MockRestrictions().patch_cache() as details:
         restrictions = user.properties.restrictions
         assert restrictions.value == []
+        with pytest.raises(AttributeError):
+            restrictions.value = ["users"]
         assert restrictions.task == []
         assert restrictions.form == []
         assert restrictions.users == []
@@ -387,7 +377,6 @@ def test_restrictions_empty_list_is_loaded_state():
     assert details.call_count == 0
 
 
-# @matrix permissions restrictions : group-membership session-blob
 @pytest.mark.unit
 def test_session_membership_refreshes_without_permission_map_change(monkeypatch):
     user = TestEntities.get("USER", {"hash": "sessionmembership", "permissions": {"models": "VIEW"}})
@@ -404,7 +393,6 @@ def test_session_membership_refreshes_without_permission_map_change(monkeypatch)
         assert user.permissions_fingerprint == permissions
 
 
-# @matrix permissions restrictions : clear session-blob
 @pytest.mark.unit
 def test_restrictions_clear_removes_session_blob():
     user = TestEntities.get(

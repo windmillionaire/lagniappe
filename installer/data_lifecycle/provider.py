@@ -3,17 +3,41 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 import hashlib
 import json
 from pathlib import Path
 import re
 import tempfile
 import time
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Protocol, Self, TypedDict, Unpack
+from collections.abc import Callable
 from urllib.parse import urlsplit
 
 from installer.errors import ProviderTimeout, ProviderTransientError, SetupError
+
+
+if TYPE_CHECKING:
+    from config import SettingsDraft
+    from google.cloud import datastore, storage, tasks_v2
+
+
+class _Gcloud(Protocol):
+    def __call__(self, arguments: list[str], /, *, timeout: float) -> object: ...
+
+
+class _DatastoreFactory(Protocol):
+    def __call__(self, *, project: str, database: str) -> datastore.Client: ...
+
+
+class _ProviderOverrides(TypedDict, total=False):
+    gcloud: _Gcloud
+    storage_client: storage.Client
+    datastore_client_factory: _DatastoreFactory
+    cloud_tasks_client: tasks_v2.CloudTasksClient
+    sleep: Callable[[float], None]
+    monotonic: Callable[[], float]
+    now: Callable[[], datetime]
 
 
 BACKUP_FORMAT = "lagniappe-recovery-set"
@@ -41,9 +65,6 @@ class DataLifecycleError(SetupError):
     category = "data-lifecycle"
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_identifiers_and_storage_paths_are_strict
-# @matrix data-lifecycle : identifier-validation path-containment
 def validate_backup_id(value: str) -> str:
     """Return one canonical user-facing backup ID or raise."""
     value = str(value or "").strip()
@@ -58,19 +79,13 @@ def validate_backup_id(value: str) -> str:
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_identifiers_and_storage_paths_are_strict
-# @pair data-lifecycle:identifier-validation
-def validate_project_id(value: str) -> str:
+def validate_project_id(value: object) -> str:
     value = str(value or "").strip()
     if not PROJECT_ID_PATTERN.fullmatch(value):
         raise DataLifecycleError("Saved Google Cloud project ID is invalid.")
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_identifiers_and_storage_paths_are_strict
-# @pair data-lifecycle:identifier-validation
 def validate_database_id(value: str, *, allow_default: bool = True) -> str:
     """Validate the current Firestore multiple-database identifier contract."""
     value = str(value or "").strip()
@@ -88,9 +103,6 @@ def validate_database_id(value: str, *, allow_default: bool = True) -> str:
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_identifiers_and_storage_paths_are_strict
-# @pair data-lifecycle:identifier-validation
 def validate_bucket_name(value: str) -> str:
     value = str(value or "").strip()
     if not BUCKET_PATTERN.fullmatch(value) or ".." in value:
@@ -98,16 +110,10 @@ def validate_bucket_name(value: str) -> str:
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_identifiers_and_storage_paths_are_strict
-# @pair data-lifecycle:path-containment
 def backup_root_uri(bucket: str, backup_id: str) -> str:
     return f"gs://{validate_bucket_name(bucket)}/{BACKUP_ROOT_PREFIX}/{validate_backup_id(backup_id)}"
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_identifiers_and_storage_paths_are_strict
-# @pair data-lifecycle:path-containment
 def parse_gs_uri(value: str) -> tuple[str, str]:
     """Parse an exact object URI; bucket-only and URL-shaped values are rejected."""
     value = str(value or "").strip()
@@ -132,9 +138,6 @@ def parse_gs_uri(value: str) -> tuple[str, str]:
     return bucket, path
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_manifest_validation_rejects_foreign_or_uncontained_artifacts
-# @pair data-lifecycle:path-containment
 def require_uri_below(uri: str, root_uri: str) -> str:
     bucket, path = parse_gs_uri(uri)
     root_bucket, root_path = parse_gs_uri(f"{root_uri}/root")
@@ -144,7 +147,6 @@ def require_uri_below(uri: str, root_uri: str) -> str:
     return path
 
 
-# @testable infrastructure
 @dataclass(frozen=True)
 class BackupManifest:
     """Atomic v3 completion marker shared by every lifecycle consumer."""
@@ -174,9 +176,6 @@ class BackupManifest:
     asset_count: int
     tool_version: str
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_manifest_validation_rejects_foreign_or_uncontained_artifacts
-    # @matrix data-lifecycle : manifest path-containment
     @classmethod
     def from_dict(
         cls,
@@ -185,7 +184,7 @@ class BackupManifest:
         expected_project: str | None = None,
         expected_backup_id: str | None = None,
         expected_bucket: str | None = None,
-    ) -> "BackupManifest":
+    ) -> BackupManifest:
         if not isinstance(payload, dict):
             raise DataLifecycleError("Backup manifest must be a JSON object.")
         try:
@@ -285,7 +284,6 @@ class BackupManifest:
         return asdict(self)
 
 
-# @testable infrastructure
 @dataclass
 class ProviderContext:
     """Validated saved provider target and injectable provider adapters."""
@@ -294,19 +292,20 @@ class ProviderContext:
     database_id: str
     recovery_bucket: str
     application_version: str
-    gcloud: Callable[..., Any] | None = None
-    storage_client: Any = None
-    datastore_client_factory: Callable[..., Any] | None = None
-    cloud_tasks_client: Any = None
+    gcloud: _Gcloud | None = None
+    storage_client: storage.Client | None = None
+    datastore_client_factory: _DatastoreFactory | None = None
+    cloud_tasks_client: tasks_v2.CloudTasksClient | None = None
     sleep: Callable[[float], None] = time.sleep
     monotonic: Callable[[], float] = time.monotonic
-    now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)
+    now: Callable[[], datetime] = lambda: datetime.now(UTC)
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_provider_context_always_uses_default_database_and_recovery_bucket
-    # @pair data-lifecycle:provider-context
     @classmethod
-    def from_settings(cls, settings=None, **overrides):
+    def from_settings(
+        cls,
+        settings: SettingsDraft | None = None,
+        **overrides: Unpack[_ProviderOverrides],
+    ) -> Self:
         if settings is None:
             from config import SETTINGS
 
@@ -324,7 +323,7 @@ class ProviderContext:
             **overrides,
         )
 
-    def _run(self, arguments: list[str], *, timeout=600):
+    def _run(self, arguments: list[str], *, timeout: float = 600) -> object:
         if not isinstance(arguments, list) or not all(
             isinstance(item, str) and item for item in arguments
         ):
@@ -337,7 +336,7 @@ class ProviderContext:
         result = runner(arguments, timeout=timeout)
         return getattr(result, "stdout", result)
 
-    def json_command(self, arguments: list[str], *, timeout=600):
+    def json_command(self, arguments: list[str], *, timeout: float = 600) -> object:
         output = self._run([*arguments, "--project", self.project_id, "--format=json"], timeout=timeout)
         if isinstance(output, (dict, list)):
             return output
@@ -346,8 +345,14 @@ class ProviderContext:
         except json.JSONDecodeError as error:
             raise DataLifecycleError("Provider returned malformed JSON.") from error
 
+    @staticmethod
+    def require_resource(value: object) -> dict[str, object]:
+        if not isinstance(value, dict):
+            raise DataLifecycleError("Provider returned a malformed resource object.")
+        return value
+
     @property
-    def storage(self):
+    def storage(self) -> storage.Client:
         if self.storage_client is None:
             from google.cloud import storage
 
@@ -355,35 +360,39 @@ class ProviderContext:
         return self.storage_client
 
     @property
-    def bucket(self):
+    def bucket(self) -> storage.Bucket:
         return self.storage.bucket(self.recovery_bucket)
 
-    def database(self, database_id=None):
-        return self.json_command(
+    def database(self, database_id: str | None = None) -> dict[str, object]:
+        return self.require_resource(self.json_command(
             [
                 "firestore",
                 "databases",
                 "describe",
                 f"--database={validate_database_id(database_id or self.database_id)}",
             ]
-        )
+        ))
 
     def start_export(
-        self, output_uri: str, *, snapshot_time: datetime | None, database_id=None
-    ):
+        self,
+        output_uri: str,
+        *,
+        snapshot_time: datetime | None,
+        database_id: str | None = None,
+    ) -> tuple[str, dict[str, object]]:
         require_uri_below(output_uri + "/output", backup_root_uri(self.recovery_bucket, output_uri.split("/")[-2]))
         if snapshot_time is not None and (
             not isinstance(snapshot_time, datetime) or snapshot_time.tzinfo is None
         ):
             raise DataLifecycleError("Point-in-time export requires a timezone-aware timestamp.")
         if snapshot_time is not None:
-            snapshot_time = snapshot_time.astimezone(timezone.utc).replace(microsecond=0)
+            snapshot_time = snapshot_time.astimezone(UTC).replace(microsecond=0)
         snapshot_argument = (
             [f"--snapshot-time={snapshot_time.isoformat().replace('+00:00', 'Z')}"]
             if snapshot_time is not None
             else []
         )
-        payload = self.json_command(
+        payload = self.require_resource(self.json_command(
             [
                 "firestore",
                 "export",
@@ -393,13 +402,15 @@ class ProviderContext:
                 "--async",
             ],
             timeout=120,
-        )
+        ))
         name = str((payload or {}).get("name") or "").strip()
         if not OPERATION_PATTERN.fullmatch(name):
             raise DataLifecycleError("Provider did not return a valid export operation name.")
         return name, payload
 
-    def start_native_backup_restore(self, source_backup: str, destination_database: str):
+    def start_native_backup_restore(
+        self, source_backup: str, destination_database: str
+    ) -> tuple[str, dict[str, object]]:
         source_backup = str(source_backup or "").strip()
         expected_prefix = f"projects/{self.project_id}/locations/"
         if (
@@ -411,7 +422,7 @@ class ProviderContext:
         destination_database = validate_database_id(
             destination_database, allow_default=False
         )
-        payload = self.json_command(
+        payload = self.require_resource(self.json_command(
             [
                 "firestore",
                 "databases",
@@ -420,19 +431,18 @@ class ProviderContext:
                 f"--destination-database={destination_database}",
             ],
             timeout=120,
-        )
+        ))
         name = str((payload or {}).get("name") or "").strip()
         if not OPERATION_PATTERN.fullmatch(name):
             raise DataLifecycleError("Provider did not return a valid restore operation name.")
         return name, payload
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_database_import_uses_export_output_prefix
-    # @matrix data-lifecycle : database-import provider-contract
-    def start_import(self, output_prefix: str, database_id: str):
+    def start_import(
+        self, output_prefix: str, database_id: str
+    ) -> tuple[str, dict[str, object]]:
         parse_gs_uri(output_prefix)
         database_id = validate_database_id(database_id)
-        payload = self.json_command(
+        payload = self.require_resource(self.json_command(
             [
                 "firestore",
                 "import",
@@ -441,23 +451,25 @@ class ProviderContext:
                 "--async",
             ],
             timeout=120,
-        )
+        ))
         name = str((payload or {}).get("name") or "").strip()
         if not OPERATION_PATTERN.fullmatch(name):
             raise DataLifecycleError("Provider did not return a valid import operation name.")
         return name, payload
 
-    def start_clone(self, destination_database: str, *, snapshot_time: datetime):
+    def start_clone(
+        self, destination_database: str, *, snapshot_time: datetime
+    ) -> tuple[str, dict[str, object]]:
         """Clone the default database at one whole-minute safety point."""
         destination_database = validate_database_id(
             destination_database, allow_default=False
         )
         if not isinstance(snapshot_time, datetime) or snapshot_time.tzinfo is None:
             raise DataLifecycleError("Database clone time must include a timezone.")
-        snapshot_time = snapshot_time.astimezone(timezone.utc)
+        snapshot_time = snapshot_time.astimezone(UTC)
         if snapshot_time.second or snapshot_time.microsecond:
             raise DataLifecycleError("Database clone time must be a whole UTC minute.")
-        payload = self.json_command(
+        payload = self.require_resource(self.json_command(
             [
                 "firestore",
                 "databases",
@@ -467,16 +479,18 @@ class ProviderContext:
                 f"--destination-database={destination_database}",
             ],
             timeout=120,
-        )
+        ))
         name = str((payload or {}).get("name") or "").strip()
         if not OPERATION_PATTERN.fullmatch(name):
             raise DataLifecycleError("Provider did not return a valid clone operation name.")
         return name, payload
 
-    def operation(self, name: str, *, database_id=None):
+    def operation(
+        self, name: str, *, database_id: str | None = None
+    ) -> dict[str, object]:
         if not OPERATION_PATTERN.fullmatch(str(name or "")):
             raise DataLifecycleError("Provider operation name is invalid.")
-        return self.json_command(
+        return self.require_resource(self.json_command(
             [
                 "firestore",
                 "operations",
@@ -485,12 +499,11 @@ class ProviderContext:
                 f"--database={validate_database_id(database_id or self.database_id)}",
             ],
             timeout=30,
-        )
+        ))
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_operation_polling_resumes_and_reports_provider_failure
-    # @matrix data-lifecycle : failure-propagation operation-polling transient-retry
-    def wait_for_operation(self, name: str, *, database_id=None, timeout=None):
+    def wait_for_operation(
+        self, name: str, *, database_id: str | None = None, timeout: float | None = None
+    ) -> dict[str, object]:
         deadline = self.monotonic() + (timeout or OPERATION_TIMEOUT_SECONDS)
         attempt = 0
         while True:
@@ -507,12 +520,12 @@ class ProviderContext:
                 continue
             if payload.get("done"):
                 if payload.get("error"):
-                    detail = payload["error"].get("message") if isinstance(payload["error"], dict) else payload["error"]
+                    problem = payload["error"]
+                    detail = problem.get("message") if isinstance(problem, dict) else problem
                     raise DataLifecycleError(f"Provider operation failed: {detail}")
-                state = str(
-                    (((payload.get("metadata") or {}).get("common") or {}).get("state"))
-                    or ""
-                ).upper()
+                metadata = self.require_resource(payload.get("metadata") or {})
+                common = self.require_resource(metadata.get("common") or {})
+                state = str(common.get("state") or "").upper()
                 if state and state not in {"SUCCESSFUL", "DONE", "COMPLETED"}:
                     raise DataLifecycleError(f"Provider operation completed in state {state}.")
                 return payload
@@ -522,10 +535,9 @@ class ProviderContext:
             attempt += 1
             self.sleep(delay)
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_database_creation_uses_current_operation_gcloud_contract
-    # @matrix data-lifecycle : database-create operation-provider-contract
-    def create_database(self, database_id: str, location: str, *, delete_protection=True):
+    def create_database(
+        self, database_id: str, location: str, *, delete_protection: bool = True
+    ) -> dict[str, object]:
         database_id = validate_database_id(database_id, allow_default=False)
         arguments = [
             "firestore",
@@ -536,10 +548,10 @@ class ProviderContext:
             "--type=datastore-mode",
             "--delete-protection" if delete_protection else "--no-delete-protection",
         ]
-        payload = self.json_command(
+        payload = self.require_resource(self.json_command(
             arguments,
             timeout=120,
-        )
+        ))
         operation = str((payload or {}).get("name") or "").strip()
         if not OPERATION_PATTERN.fullmatch(operation):
             raise DataLifecycleError(
@@ -547,7 +559,7 @@ class ProviderContext:
             )
         return payload
 
-    def delete_database(self, database_id: str):
+    def delete_database(self, database_id: str) -> dict[str, object]:
         database_id = validate_database_id(database_id, allow_default=False)
         self._run(
             [
@@ -561,7 +573,7 @@ class ProviderContext:
         )
         return {}
 
-    def disable_database_delete_protection(self, database_id: str):
+    def disable_database_delete_protection(self, database_id: str) -> object:
         database_id = validate_database_id(database_id, allow_default=False)
         return self.json_command(
             [
@@ -574,7 +586,7 @@ class ProviderContext:
             timeout=600,
         )
 
-    def datastore_client(self, database_id: str):
+    def datastore_client(self, database_id: str) -> datastore.Client:
         database_id = validate_database_id(database_id)
         factory = self.datastore_client_factory
         if factory is None:
@@ -584,10 +596,9 @@ class ProviderContext:
         client_database_id = "" if database_id == "(default)" else database_id
         return factory(project=self.project_id, database=client_database_id)
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_lifecycle_requires_completed_asset_generation_migration
-    # @matrix data-lifecycle migrations : read-only asset-generation prerequisite
-    def require_asset_generation_migration(self, database_id="(default)"):
+    def require_asset_generation_migration(
+        self, database_id: str = "(default)"
+    ) -> datastore.Entity:
         """Require the application-owned asset-generation update without running it."""
         from config import SETTINGS
         from config.data_migrations import (
@@ -609,7 +620,7 @@ class ProviderContext:
             and record.get("migration_id") == ASSET_GENERATION_MIGRATION_ID
             and record.get("state") == "complete"
         )
-        if not valid:
+        if record is None or not valid:
             raise DataLifecycleError(
                 f"Asset generation update {ASSET_GENERATION_MIGRATION_ID} is not "
                 "complete. Sign in as the Owner, open Admin → Site Settings → "
@@ -617,9 +628,6 @@ class ProviderContext:
             )
         return record
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_queue_snapshot_preserves_full_task_definitions
-    # @matrix data-lifecycle : provider-pagination queue-purge-audit
     def list_queue_tasks(self, queue_name: str, location: str) -> list[dict[str, Any]]:
         """Return every task using FULL view so a pre-purge audit keeps payloads."""
         from google.cloud.tasks_v2.types import Task
@@ -653,7 +661,11 @@ class ProviderContext:
             else:
                 from google.protobuf.json_format import MessageToDict
 
+                from google.protobuf.message import Message
+
                 message = getattr(task, "_pb", task)
+                if not isinstance(message, Message):
+                    raise DataLifecycleError("Cloud Tasks returned a malformed task.")
                 payload = MessageToDict(message)
             if not isinstance(payload, dict):
                 raise DataLifecycleError("Cloud Tasks returned a malformed task.")
@@ -661,7 +673,7 @@ class ProviderContext:
         return tasks
 
     def queue_state(self, queue_name: str, location: str) -> str:
-        payload = self.json_command(
+        payload = self.require_resource(self.json_command(
             [
                 "tasks",
                 "queues",
@@ -669,7 +681,7 @@ class ProviderContext:
                 str(queue_name),
                 f"--location={str(location)}",
             ]
-        )
+        ))
         return str(payload.get("state") or "").upper()
 
     def _wait_for_state(self, observer, expected: str, label: str, *, timeout=180):
@@ -681,7 +693,7 @@ class ProviderContext:
             self.sleep(POLL_DELAYS[min(attempt, len(POLL_DELAYS) - 1)])
             attempt += 1
 
-    def pause_queue(self, queue_name: str, location: str):
+    def pause_queue(self, queue_name: str, location: str) -> None:
         if self.queue_state(queue_name, location) != "PAUSED":
             self._run(
                 [
@@ -701,7 +713,7 @@ class ProviderContext:
             "Cloud Tasks queue",
         )
 
-    def resume_queue(self, queue_name: str, location: str):
+    def resume_queue(self, queue_name: str, location: str) -> None:
         if self.queue_state(queue_name, location) != "RUNNING":
             self._run(
                 [
@@ -721,7 +733,7 @@ class ProviderContext:
             "Cloud Tasks queue",
         )
 
-    def purge_queue(self, queue_name: str, location: str):
+    def purge_queue(self, queue_name: str, location: str) -> None:
         self._run(
             [
                 "tasks",
@@ -735,7 +747,9 @@ class ProviderContext:
             ]
         )
 
-    def wait_for_empty_queue(self, queue_name: str, location: str, *, timeout=180):
+    def wait_for_empty_queue(
+        self, queue_name: str, location: str, *, timeout: float = 180
+    ) -> None:
         deadline = self.monotonic() + timeout
         attempt = 0
         while True:
@@ -758,7 +772,7 @@ class ProviderContext:
         schedule_at: datetime,
         app_url: str,
         service_account: str,
-    ):
+    ) -> tasks_v2.Task | None:
         """Idempotently restore one durable scheduled-task wake-up."""
         from google.api_core.exceptions import AlreadyExists
         from google.cloud import tasks_v2
@@ -768,7 +782,7 @@ class ProviderContext:
         self.cloud_tasks_client = client
         parent = client.queue_path(self.project_id, location, queue_name)
         identity = hashlib.sha256(
-            f"{entity_key}\0{token}".encode("utf-8")
+            f"{entity_key}\0{token}".encode()
         ).hexdigest()[:32]
         body = json.dumps(
             {"key": entity_key, "token": token},
@@ -776,7 +790,7 @@ class ProviderContext:
             separators=(",", ":"),
         ).encode("utf-8")
         timestamp = timestamp_pb2.Timestamp()
-        timestamp.FromDatetime(schedule_at.astimezone(timezone.utc))
+        timestamp.FromDatetime(schedule_at.astimezone(UTC))
         task = {
             "name": client.task_path(
                 self.project_id,
@@ -801,12 +815,9 @@ class ProviderContext:
         except AlreadyExists:
             return None
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_cutover_waits_for_dispatched_task_attempts_to_settle
-    # @pair data-lifecycle:inflight-task-settlement
     def wait_for_no_inflight_tasks(
-        self, queue_name: str, location: str, *, timeout=3700
-    ):
+        self, queue_name: str, location: str, *, timeout: float = 3700
+    ) -> None:
         """Wait until every dispatched attempt has received a response or disappeared."""
         deadline = self.monotonic() + timeout
         attempt = 0
@@ -840,7 +851,7 @@ class ProviderContext:
             attempt += 1
 
     def scheduler_state(self, job_name: str, location: str) -> str:
-        payload = self.json_command(
+        payload = self.require_resource(self.json_command(
             [
                 "scheduler",
                 "jobs",
@@ -848,10 +859,10 @@ class ProviderContext:
                 str(job_name),
                 f"--location={str(location)}",
             ]
-        )
+        ))
         return str(payload.get("state") or "").upper()
 
-    def pause_scheduler(self, job_name: str, location: str):
+    def pause_scheduler(self, job_name: str, location: str) -> None:
         if self.scheduler_state(job_name, location) != "PAUSED":
             self._run(
                 [
@@ -871,7 +882,7 @@ class ProviderContext:
             "Deferred-job Scheduler",
         )
 
-    def resume_scheduler(self, job_name: str, location: str):
+    def resume_scheduler(self, job_name: str, location: str) -> None:
         if self.scheduler_state(job_name, location) != "ENABLED":
             self._run(
                 [
@@ -891,7 +902,7 @@ class ProviderContext:
             "Deferred-job Scheduler",
         )
 
-    def indexes_ready(self, database_id: str, *, minimum_count=0) -> bool:
+    def indexes_ready(self, database_id: str, *, minimum_count: int = 0) -> bool:
         payload = self.json_command(
             [
                 "datastore",
@@ -909,7 +920,7 @@ class ProviderContext:
             for item in payload
         )
 
-    def deploy_indexes(self, database_id: str, index_path: str | Path):
+    def deploy_indexes(self, database_id: str, index_path: str | Path) -> None:
         import yaml
 
         index_path = Path(index_path).resolve()
@@ -941,9 +952,6 @@ class ProviderContext:
             self.sleep(POLL_DELAYS[min(attempt, len(POLL_DELAYS) - 1)])
             attempt += 1
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_maintenance_version_probe_uses_nonfailing_version_list
-    # @matrix data-lifecycle : app-engine-version provider-contract
     def version_exists(self, version_id: str) -> bool:
         payload = self.json_command(["app", "versions", "list", "--service=default"])
         if not isinstance(payload, list) or any(
@@ -964,9 +972,9 @@ class ProviderContext:
             return status == "SERVING"
         return False
 
-    def app_traffic(self):
-        payload = self.json_command(["app", "services", "describe", "default"])
-        split = payload.get("split") or payload.get("trafficSplit") or {}
+    def app_traffic(self) -> tuple[dict[str, float], str]:
+        payload = self.require_resource(self.json_command(["app", "services", "describe", "default"]))
+        split = self.require_resource(payload.get("split") or payload.get("trafficSplit") or {})
         allocations = split.get("allocations") or {}
         if not isinstance(allocations, dict) or not allocations:
             raise DataLifecycleError("App Engine traffic allocation is unavailable.")
@@ -983,7 +991,7 @@ class ProviderContext:
         ).casefold()
         return normalized, split_by
 
-    def deploy_maintenance_version(self, version_id: str, service_account: str):
+    def deploy_maintenance_version(self, version_id: str, service_account: str) -> None:
         service_account = str(service_account or "").strip().casefold()
         if not service_account.endswith(
             f"@{self.project_id}.iam.gserviceaccount.com"
@@ -1009,7 +1017,9 @@ class ProviderContext:
                 timeout=OPERATION_TIMEOUT_SECONDS,
             )
 
-    def set_traffic(self, allocations: dict[str, float], *, split_by="random"):
+    def set_traffic(
+        self, allocations: dict[str, float], *, split_by: str = "random"
+    ) -> None:
         try:
             normalized = {
                 str(version).strip(): float(weight)
@@ -1064,18 +1074,15 @@ class ProviderContext:
             self.sleep(POLL_DELAYS[min(attempt, len(POLL_DELAYS) - 1)])
             attempt += 1
 
-    # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_cache_invalidation_uses_setup_redis_connection
-    # @matrix data-lifecycle : cache-invalidation framework-neutral restore
-    def invalidate_cache(self):
+    def invalidate_cache(self) -> None:
         """Clear restored installation cache data without importing the web app."""
         import redis
 
         from config import SETTINGS
-        from config.redis import redis_client_kwargs
+        from config.redis import redis_connection_kwargs
 
         client = redis.Redis(
-            **redis_client_kwargs(
+            **redis_connection_kwargs(
                 SETTINGS.APP,
                 socket_connect_timeout=10,
                 socket_timeout=30,
@@ -1083,22 +1090,26 @@ class ProviderContext:
         )
         client.flushdb()
 
-    def list_objects(self, prefix: str):
+    def list_objects(self, prefix: str) -> list[storage.Blob]:
         if not prefix or prefix.startswith("/") or ".." in prefix.split("/"):
             raise DataLifecycleError("Cloud Storage prefix is unsafe.")
         return list(self.bucket.list_blobs(prefix=prefix))
 
-    def load_json_object(self, object_name: str):
+    def load_json_object(
+        self, object_name: str
+    ) -> tuple[dict[str, object], storage.Blob]:
         if not object_name or object_name.startswith("/") or ".." in object_name.split("/"):
             raise DataLifecycleError("Cloud Storage object name is unsafe.")
         blob = self.bucket.blob(object_name)
         try:
             payload = blob.download_as_text(encoding="utf-8")
-            return json.loads(payload), blob
+            return self.require_resource(json.loads(payload)), blob
         except Exception as error:
             raise DataLifecycleError(f"Could not read {object_name}: {error}") from error
 
-    def upload_json_create_only(self, object_name: str, payload: dict[str, Any]):
+    def upload_json_create_only(
+        self, object_name: str, payload: dict[str, object]
+    ) -> storage.Blob:
         blob = self.bucket.blob(object_name)
         content = json.dumps(payload, indent=2, sort_keys=True) + "\n"
         blob.upload_from_string(
@@ -1109,7 +1120,9 @@ class ProviderContext:
         blob.reload()
         return blob
 
-    def upload_json_replace(self, object_name: str, payload: dict[str, Any]):
+    def upload_json_replace(
+        self, object_name: str, payload: dict[str, object]
+    ) -> storage.Blob:
         """Replace one known JSON object using its observed generation."""
         if not object_name or object_name.startswith("/") or ".." in object_name.split("/"):
             raise DataLifecycleError("Cloud Storage object name is unsafe.")
@@ -1128,9 +1141,6 @@ class ProviderContext:
         return blob
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason provider response normalization is exercised through backup publication
 def operation_times(payload: dict[str, Any]) -> tuple[str, str]:
     metadata = payload.get("metadata") or {}
     common = metadata.get("common") or {}
@@ -1146,13 +1156,10 @@ def operation_times(payload: dict[str, Any]) -> tuple[str, str]:
         or metadata.get("endTime")
         or metadata.get("end_time")
     )
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     return str(start or now), str(end or now)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason provider response normalization is exercised through backup publication
 def export_output_uri(payload: dict[str, Any]) -> str:
     response = payload.get("response") or {}
     metadata = payload.get("metadata") or {}

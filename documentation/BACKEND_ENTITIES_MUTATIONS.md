@@ -72,7 +72,7 @@ job rather than publishing the schema immediately. The executor fences affected
 writes and deletes using the current pending marker and generation. Migration
 application uses explicit, lease-guarded answer masks and normal projection/cache
 effects; successful publication uses the same archive and exact-source guards
-above. See [BACKEND_JOBS.md](BACKEND_JOBS.md#deterministic-form-changes).
+above. See [BACKEND_JOBS.md](BACKEND_JOBS.md#form-changes).
 
 ## Property masks
 
@@ -213,7 +213,7 @@ Trace the whole effect, not just the root method:
 4. Separate durable changes from reconstructable/provider effects.
 5. Add focused unit coverage for commit failure, retry, and delete behavior.
 6. Run `mutation-contracts --check` and
-   `venv/bin/python run.py traceability --changed --check`.
+   `venv/bin/python -m basedpyright --warnings`.
 
 ## File ownership
 

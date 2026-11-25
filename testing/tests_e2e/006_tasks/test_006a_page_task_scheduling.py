@@ -41,8 +41,6 @@ def _add_weekly_schedule(task):
     _save_settings(task)
 
 
-# @matrix task-assignment : assignee-preservation home-list
-# @matrix task-scheduling : add due-date
 def test_page_task_add_due_date(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_page_task_add_due_date.get(user)
@@ -69,11 +67,10 @@ def test_page_task_add_due_date(get_admin, get_user):
 
     assigned_user = get_user(Users.create_user)
     assigned_home = assigned_user.go(SitePages.HOME)
-    assigned_home.task_list
+    _ = assigned_home.task_list
     expect(assigned_user.locate(f"[data-key='{task.key}']")).to_be_visible()
 
 
-# @matrix task-scheduling : due-date remove
 def test_page_task_remove_due_date(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_page_task_remove_due_date.get(user)
@@ -86,7 +83,6 @@ def test_page_task_remove_due_date(get_admin, get_user):
     expect(task.element.locator(DUE_DATE_BADGE)).not_to_be_attached()
 
 
-# @matrix task-scheduling : due-date today
 def test_page_task_due_today(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_page_task_due_today.get(user)
@@ -99,7 +95,6 @@ def test_page_task_due_today(get_admin, get_user):
     expect(task.element.locator(DUE_DATE_BADGE)).to_contain_text("Today")
 
 
-# @matrix task-scheduling : complete recurring
 def test_page_task_repeats_when_completed(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_page_task_repeats_when_completed.get(user)
@@ -115,7 +110,6 @@ def test_page_task_repeats_when_completed(get_admin, get_user):
 
 
 
-# @matrix task-scheduling : add scheduled
 def test_page_task_add_schedule(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_page_task_add_schedule.get(user)
@@ -126,7 +120,6 @@ def test_page_task_add_schedule(get_admin, get_user):
     expect(task.element.locator(SCHEDULE_BADGE)).to_contain_text("weekly")
 
 
-# @matrix task-scheduling : remove scheduled
 def test_page_task_remove_schedule(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_page_task_remove_schedule.get(user)
@@ -141,7 +134,6 @@ def test_page_task_remove_schedule(get_admin, get_user):
     expect(task.element.locator(SCHEDULE_BADGE)).not_to_be_attached()
 
 
-# @matrix task-scheduling : add recurring
 def test_page_task_add_recurring(get_admin, get_user):
     user = get_admin()
     task = Tasks.test_page_task_add_recurring.get(user)

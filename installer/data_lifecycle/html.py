@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
+from typing import NotRequired, TypedDict
+from .assets import ArchiveAsset
+
+
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 import html as html_stdlib
 import json
 from pathlib import Path, PurePosixPath
@@ -12,6 +17,24 @@ import re
 
 from .portable import portable_name, unportable_name
 from .provider import DataLifecycleError
+
+
+class _Identity(TypedDict):
+    type: str
+    id: str
+    namespace: str
+    reserved_role: NotRequired[str]
+
+
+class _Record(TypedDict):
+    identity: _Identity
+    properties: dict[str, object]
+
+
+
+class BuildResult(TypedDict):
+    pages: int
+    paths: list[str]
 
 
 INDEX_SECTIONS = (
@@ -46,10 +69,13 @@ STYLE = """
 """.strip()
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_html_sanitizer_removes_active_and_remote_content
-# @matrix portable-archive : html-sanitization no-network
-def sanitize_stored_html(value: str, *, page_path: str, identities: set[tuple[str, str, str]], assets=None) -> str:
+def sanitize_stored_html(
+    value: str,
+    *,
+    page_path: str,
+    identities: set[tuple[str, str, str]],
+    assets: Mapping[str, str] | None = None,
+) -> str:
     """Keep inert document markup and rewrite known portable links locally."""
     from installer.package_install import install_if_missing
 
@@ -89,9 +115,6 @@ def sanitize_stored_html(value: str, *, page_path: str, identities: set[tuple[st
     return str(soup)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/html.py::sanitize_stored_html
-# @reason URL classification and rewriting are sanitizer implementation details
 def _rewrite_reference_url(value, page_path, identities):
     if REMOTE_PATTERN.search(value) or value.casefold().startswith(("javascript:", "data:")):
         return None
@@ -112,20 +135,27 @@ def _rewrite_reference_url(value, page_path, identities):
     return posixpath.relpath(target, posixpath.dirname(page_path))
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_html_archive_renders_owner_sections_and_local_navigation
-# @matrix portable-archive : navigation offline-html owner-content
 class OfflineHTMLBuilder:
     """Render presentation pages using only already-portable records and assets."""
 
-    def __init__(self, root, *, backup_id, created_at, consistency, warnings=()):
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        backup_id: str,
+        created_at: str,
+        consistency: str,
+        warnings: Iterable[Mapping[str, object]] = (),
+    ) -> None:
         self.root = Path(root)
         self.backup_id = backup_id
         self.created_at = created_at
         self.consistency = consistency
         self.warnings = list(warnings)
 
-    def build(self, records, assets=()):
+    def build(
+        self, records: Iterable[_Record], assets: Iterable[ArchiveAsset] = ()
+    ) -> BuildResult:
         all_records = list(records)
         self._all_records = {
             self._identity(record): record for record in all_records
@@ -451,9 +481,9 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
             return self._render_datetime(value["$datetime"])
         if "$ref" in value:
             identity = self._reference_identity(value)
-            record = self._records_by_identity.get(identity)
+            record = self._records_by_identity.get(identity) if identity is not None else None
             if record is None:
-                hidden = self._all_records.get(identity)
+                hidden = self._all_records.get(identity) if identity is not None else None
                 if hidden is not None:
                     return html_stdlib.escape(self._title(hidden))
                 return "<span class='missing'>Unavailable reference</span>"
@@ -465,15 +495,17 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
             tag = value["$asset"]
             asset = self._assets.get(tag["logical_id"])
             if not asset or asset.get("status") != "available":
-                warning = (asset or {}).get("warning_id", "asset-unavailable")
+                warning = asset.get("warning_id", "asset-unavailable") if asset else "asset-unavailable"
                 return f"<span class='missing'>Unavailable asset ({html_stdlib.escape(warning)})</span>"
-            if asset.get("type") == "html" and asset.get("canonical_document"):
-                canonical = self.root / PurePosixPath(asset["canonical_document"])
+            canonical_document = asset.get("canonical_document")
+            if asset.get("type") == "html" and canonical_document:
+                canonical = self.root / PurePosixPath(canonical_document)
                 local_assets = {}
                 entity = asset.get("entity") or {}
                 for candidate in self._assets.values():
                     if (
                         candidate.get("status") == "available"
+                        and "path" in candidate
                         and (candidate.get("entity") or {}) == entity
                     ):
                         local_assets[candidate.get("name")] = candidate["path"]
@@ -481,7 +513,7 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
                         local_assets[
                             posixpath.relpath(
                                 candidate["path"],
-                                posixpath.dirname(asset["canonical_document"]),
+                                posixpath.dirname(canonical_document),
                             )
                         ] = candidate["path"]
                 sanitized = sanitize_stored_html(
@@ -491,6 +523,8 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
                     assets=local_assets,
                 )
                 return f"<section class='document' aria-label='Archived document'>{sanitized}</section>"
+            if "path" not in asset:
+                raise ValueError("Available archive asset lacks a path.")
             href = posixpath.relpath(asset["path"], posixpath.dirname(page_path))
             label = html_stdlib.escape(tag.get("name") or "asset")
             preview = ""
@@ -518,7 +552,7 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
         body = (
             f"<ul class='record-list'>{''.join(items)}</ul>"
             if items
-            else f"<p class='empty'>{html_stdlib.escape(empty)}</p>"
+            else f"<p class='empty'>{html_stdlib.escape(empty or "")}</p>"
         )
         return f"<section class='panel'><h2>{html_stdlib.escape(title)}</h2>{body}</section>"
 
@@ -554,7 +588,7 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
             values = properties.get("pages") or []
             candidate = values[0] if values else None
         identity = self._reference_identity(candidate)
-        return self._records_by_identity.get(identity)
+        return self._records_by_identity.get(identity) if identity is not None else None
 
     def _related(self, semantic_type, property_name, target):
         identity = self._identity(target)
@@ -570,7 +604,7 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
         records = []
         for item in values:
             identity = self._reference_identity(item)
-            record = self._records_by_identity.get(identity)
+            record = self._records_by_identity.get(identity) if identity is not None else None
             if record is not None and (
                 semantic_type is None or record["identity"]["type"] == semantic_type
             ):
@@ -597,7 +631,7 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
         )
 
     @staticmethod
-    def _identity(record):
+    def _identity(record) -> tuple[str, str, str]:
         identity = record["identity"]
         return identity.get("namespace") or "", identity["type"], identity["id"]
 
@@ -607,7 +641,8 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
         if identity.get("reserved_role") or properties.get("reserved") is True:
             return False
         if identity["type"] == "page":
-            parent = self._all_records.get(self._reference_identity(properties.get("model")))
+            parent_id = self._reference_identity(properties.get("model"))
+            parent = self._all_records.get(parent_id) if parent_id is not None else None
             if parent is not None and (
                 parent["identity"].get("reserved_role")
                 or parent["properties"].get("reserved") is True
@@ -666,7 +701,7 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
     @staticmethod
     def _datetime_text(value):
         try:
-            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00")).astimezone(timezone.utc)
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00")).astimezone(UTC)
         except (TypeError, ValueError):
             return str(value)
         clock = parsed.strftime("%I:%M %p").lstrip("0")
@@ -677,7 +712,7 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
         return value is None or value == "" or value == [] or value == {}
 
     @staticmethod
-    def _type_label(semantic_type):
+    def _type_label(semantic_type: str) -> str:
         return {
             "model": "Model task",
             "message_conversation": "Private conversation",

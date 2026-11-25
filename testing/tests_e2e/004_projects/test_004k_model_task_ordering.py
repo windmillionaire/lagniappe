@@ -31,7 +31,6 @@ def _ordered_project(owner):
     return project, models, form
 
 
-# @matrix model-tasks : ordering persistence
 # @template projects/model_tasks.html::model_task_list
 # @template projects/model_tasks.html::model_task
 def test_model_task_arrows_preserve_open_edits_and_saved_order(get_admin):
@@ -71,7 +70,6 @@ def test_model_task_arrows_preserve_open_edits_and_saved_order(get_admin):
     assert Entities.fetch_one(project.entity.key, request=Fetch.root()).description == "Preserve Project description"
 
 
-# @matrix model-tasks : permission-gates parent-membership ordering
 # @template projects/model_tasks.html::model_task
 def test_model_order_rejects_invalid_membership_and_readonly_users(get_admin, get_user):
     owner = get_admin()

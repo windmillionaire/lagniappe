@@ -1,6 +1,6 @@
 """Unit coverage for privacy-bounded AI generation observability."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 import json
 from types import SimpleNamespace
 import uuid
@@ -13,6 +13,7 @@ from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.database import analytics as analytics_database
+from lagniappe.core.tools.deferred_jobs.control import DeferredExecutionControl
 
 
 pytestmark = pytest.mark.unit
@@ -28,6 +29,15 @@ EXPECTED_SUMMARY_FIELDS = {
     "deferred_job_attempt",
     "deferred_job_type",
     "duration_ms",
+    "provider_duration_ms",
+    "tool_duration_ms",
+    "claim_check_duration_ms",
+    "progress_write_duration_ms",
+    "telemetry_write_duration_ms",
+    "claim_checks",
+    "progress_writes",
+    "telemetry_writes",
+    "round_timings",
     "empty_response_retries",
     "exact_call_cache_hits",
     "location",
@@ -42,6 +52,7 @@ EXPECTED_SUMMARY_FIELDS = {
     "provider_responses",
     "provider_result_chars",
     "resolved_model",
+    "requested_thinking_level",
     "service_tier",
     "stage",
     "state",
@@ -117,7 +128,6 @@ def _capture(monkeypatch):
     return persisted, pruned
 
 
-# @matrix observability : cache deferred-context privacy provider-calls tokens tools validation
 @pytest.mark.unit
 def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
     monkeypatch,
@@ -155,6 +165,7 @@ def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
     )
     prompt = Prompt(sentinel, user=SimpleNamespace(), type="ai report")
     prompt.enable_tools("get_file")
+    prompt.set_thinking_level("MEDIUM")
     prompt.set_model_tier("utility")
     prompt.set_service_tier("priority")
     prompt.set_output_format("JSON")
@@ -187,6 +198,7 @@ def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
     assert summary["workflow"] == "reports"
     assert summary["stage"] == "planning"
     assert summary["prompt_contract_id"] == "ai-report"
+    assert summary["requested_thinking_level"] == "MEDIUM"
     assert summary["resolved_model"] == "runtime-utility"
     assert summary["location"] == "us-central1"
     assert summary["model_tier"] == "utility"
@@ -216,7 +228,6 @@ def test_generation_summary_aggregates_visible_calls_and_redacts_payload(
     assert summary["success"] is True
 
 
-# @matrix observability : validation
 @pytest.mark.parametrize("marked_outcome", [None, "local_repair", "model_repair"])
 def test_ask_formatting_is_normalization_and_preserves_explicit_repairs(
     monkeypatch, marked_outcome
@@ -261,7 +272,6 @@ def test_ask_formatting_is_normalization_and_preserves_explicit_repairs(
     assert workflow["rows"][0]["outcomes"] == [{"name": expected_label, "count": 1}]
 
 
-# @matrix observability : empty-response error-normalization quota
 @pytest.mark.unit
 def test_generation_summary_records_empty_retry_and_bounded_quota_error(monkeypatch):
     persisted, _ = _capture(monkeypatch)
@@ -321,7 +331,6 @@ def test_generation_summary_records_empty_retry_and_bounded_quota_error(monkeypa
     )
 
 
-# @matrix observability : correlation in-flight privacy provider-stage
 def test_deferred_generation_overwrites_correlated_live_snapshots(monkeypatch):
     persisted, pruned = _capture(monkeypatch)
 
@@ -359,7 +368,71 @@ def test_deferred_generation_overwrites_correlated_live_snapshots(monkeypatch):
     assert "PRIVATE-GENERATED-RESULT" not in json.dumps(persisted, default=str)
 
 
-# @matrix observability : correlation model-repair nested-generation review-fallback
+def test_generation_attributes_nested_control_and_live_writes_to_their_own_clocks(monkeypatch):
+    persisted, _ = _capture(monkeypatch)
+    clock_ns = 0
+
+    def spend(ms):
+        nonlocal clock_ns
+        clock_ns += ms * 1_000_000
+        return True
+
+    monkeypatch.setattr(observability, "time", SimpleNamespace(
+        monotonic=lambda: clock_ns / 1_000_000_000,
+        monotonic_ns=lambda: clock_ns,
+    ))
+
+    def write(summary):
+        persisted.append(summary.payload())
+        spend(7)
+
+    monkeypatch.setattr(observability, "_write_summary", write)
+    control = DeferredExecutionControl(
+        deadline_at=datetime.now(UTC) + timedelta(minutes=5),
+        active_check=lambda: spend(3),
+        progress_callback=lambda progress: spend(5),
+    )
+    calls = [SimpleNamespace(name="get_entity", args={"id": key}) for key in ("first", "second")]
+    responses = iter((_response(calls=calls), _response(text="done")))
+
+    class Models:
+        def generate_content(self, **kwargs):
+            control.ensure_active()
+            spend(11)
+            return next(responses)
+
+    def handler(args, user):
+        spend(13)
+        return {"found": True}
+
+    monkeypatch.setitem(ai_functions.HANDLERS, "get_entity", handler)
+    generator = ai_core.GenAI()
+    generator._client = SimpleNamespace(models=Models())
+    prompt = Prompt("measure", user=SimpleNamespace(), type="ai report").set_output_format("TEXT")
+    prompt.enable_tools("get_entity")
+    with observability.ai_execution_context(telemetry_id="timed", execution_control=control):
+        assert generator.generate_content(prompt) == "done"
+
+    summary = persisted[-1]
+    assert summary["provider_duration_ms"] == 22
+    assert summary["tool_duration_ms"] == 26
+    assert (summary["claim_checks"], summary["claim_check_duration_ms"]) == (10, 30)
+    assert (summary["progress_writes"], summary["progress_write_duration_ms"]) == (3, 15)
+    assert (summary["telemetry_writes"], summary["telemetry_write_duration_ms"]) == (6, 42)
+    assert summary["duration_ms"] == 135
+    first, final = summary["round_timings"]
+    assert first == {
+        "provider_stage": "initial", "requested_tool_calls": 2,
+        "provider_duration_ms": 11, "tool_duration_ms": 26,
+        "claim_checks": 7, "claim_check_duration_ms": 21,
+        "progress_writes": 2, "progress_write_duration_ms": 10,
+        "telemetry_writes": 3, "telemetry_write_duration_ms": 21,
+    }
+    assert final["provider_stage"] == "tool"
+    assert final["requested_tool_calls"] == final["tool_duration_ms"] == 0
+    assert final["provider_duration_ms"] == 11
+
+
 @pytest.mark.unit
 def test_nested_model_repair_gets_its_own_summary(monkeypatch):
     persisted, _ = _capture(monkeypatch)
@@ -416,7 +489,6 @@ def test_nested_model_repair_gets_its_own_summary(monkeypatch):
     assert persisted[-1]["outcome"] == "review_fallback"
 
 
-# @matrix observability : disabled exception-transparency persistence-failure pruning-failure
 @pytest.mark.unit
 def test_observability_failures_never_change_generation_result_or_error(monkeypatch):
     warnings = []
@@ -516,7 +588,6 @@ class _Query:
         return self.records[:limit]
 
 
-# @matrix datastore : index-exclusions retention-bound uuid-key
 @pytest.mark.unit
 def test_summary_persistence_uses_uuid_key_and_bounded_pruning(monkeypatch):
     old_records = [SimpleNamespace(key=f"old-{index}") for index in range(700)]
@@ -552,7 +623,7 @@ def test_summary_persistence_uses_uuid_key_and_bounded_pruning(monkeypatch):
     identifier = str(uuid.uuid4())
     summary = observability.GenerationSummaryV1(
         correlation_id=identifier,
-        created=datetime.now(timezone.utc),
+        created=datetime.now(UTC),
         workflow="ask",
         stage="answer",
         prompt_contract_id="ask-report",
@@ -564,7 +635,7 @@ def test_summary_persistence_uses_uuid_key_and_bounded_pruning(monkeypatch):
     assert record["correlation_id"] == identifier
     assert record.exclude_from_indexes == observability.EXCLUDE_FROM_INDEXES
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     assert observability.prune_old_records(now=now, limit=900) == 500
     assert len(datastore.deleted) == 500
     assert query.keys_only_called is True
@@ -574,8 +645,6 @@ def test_summary_persistence_uses_uuid_key_and_bounded_pruning(monkeypatch):
     assert query.filters[0].value == now - timedelta(days=30)
 
 
-# @matrix analytics : groups outcomes query-limit
-# @pair observability:aggregation
 @pytest.mark.unit
 def test_ai_observability_dashboard_aggregation():
     records = [
@@ -658,9 +727,8 @@ def test_ai_observability_dashboard_aggregation():
     ]
 
 
-# @matrix ai-observability : job-correlation privacy
 def test_operation_diagnostic_payload_is_correlated_and_privacy_bounded():
-    created = datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc)
+    created = datetime(2026, 1, 2, 3, 4, tzinfo=UTC)
     operation = {
         "key": "job-key",
         "telemetry_id": "telemetry-match",
@@ -707,9 +775,8 @@ def test_operation_diagnostic_payload_is_correlated_and_privacy_bounded():
     assert "private_prompt" not in str(payload)
 
 
-# @matrix observability : in-flight deferred-context exception-transparency
 def test_report_telemetry_marks_lost_attempts_interrupted():
-    now = datetime(2026, 9, 17, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 17, tzinfo=UTC)
     base = {"state": "running", "deferred_job_type": "report-ai", "deferred_job_attempt": 1, "telemetry_id": "job", "created": now}
     assert observability.reconcile_generation_records([base], [{"telemetry_id": "job", "status": "running", "attempt": 1}], now=now) == [base]
     for job in [{"status": "cancelled"}, {"status": "failed"}, {"status": "complete"}, {"status": "running", "attempt": 2}]:

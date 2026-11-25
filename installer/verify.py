@@ -3,10 +3,7 @@
 from runner.presentation import output as print
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_installation_is_read_only_and_activation_is_explicit
-# @matrix setup : deploy-surface gcloud-config transactional-state
-def validate_installation():
+def validate_installation() -> bool:
     """Validate local setup state without creating or retargeting resources."""
     from config import verify_generation_manifest
     from runner.deploy import verify_runtime_deploy_surface
@@ -18,18 +15,12 @@ def validate_installation():
     return True
 
 
-# @testable false
-# @covered-by installer/verify.py::validate_installation
-# @reason compatibility alias intentionally delegates to read-only validation
-def verify_installation():
+def verify_installation() -> bool:
     """Compatibility name for read-only validation."""
     return validate_installation()
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_installation_is_read_only_and_activation_is_explicit
-# @matrix setup : activation gcloud-config
-def activate_installation(*, announce=True):
+def activate_installation(*, announce: bool = True) -> bool:
     """Explicitly activate the installation's saved local gcloud context."""
     from runner.gcloud import config_gcloud
 
@@ -37,28 +28,19 @@ def activate_installation(*, announce=True):
     return True
 
 
-# @testable false
-# @covered-by installer/verify.py::validate_installation
-# @reason focused commands use the target already verified at the CLI boundary
-def prepare_existing_installation():
+def prepare_existing_installation() -> bool:
     """Validate local setup after the CLI has activated and verified credentials."""
     return validate_installation()
 
 
-# @testable false
-# @covered-by installer/create_config.py::set_application_defaults
-# @reason explicit first-time authority wrapper around the tested initializer
-def initialize_installation():
+def initialize_installation() -> bool:
     """Run first-time configuration, which may create or select a project."""
     from installer.create_config import set_application_defaults
 
     return set_application_defaults()
 
 
-# @testable true
-# @tests tests_tooling/test_001g_setup_release_readiness.py::test_repair_runs_reconciliation_then_validation
-# @matrix setup : explicit-mutation repair validation
-def repair_installation():
+def repair_installation() -> int:
     """Explicitly reconcile setup state and validate the resulting installation."""
     from installer import wrap_text
 

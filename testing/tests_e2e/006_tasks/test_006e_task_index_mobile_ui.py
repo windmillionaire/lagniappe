@@ -4,9 +4,9 @@ Tests for the task index mobile table controls.
 Verified against:
 - lagniappe/web/templates/tasks/index.html
 - lagniappe/web/templates/table.html
-- src/script/widgets/tables/mobileControls.mjs
-- src/script/widgets/tables/visibility.mjs
-- src/script/widgets/tables/sorting.mjs
+- src/script/widgets/tables/mobileControls.ts
+- src/script/widgets/tables/visibility.ts
+- src/script/widgets/tables/sorting.ts
 """
 
 import pytest
@@ -19,7 +19,6 @@ from testing.resources.site import TaskIndex
 pytestmark = pytest.mark.e2e
 
 
-# @matrix table-controls : columns mobile-controls
 def test_task_index_mobile_controls_open_with_task_columns(get_admin, get_user):
     user = get_admin()
     Tasks.test_mobile_index_task.get(user)
@@ -37,7 +36,6 @@ def test_task_index_mobile_controls_open_with_task_columns(get_admin, get_user):
     expect(controls.row("modified")).to_be_visible()
 
 
-# @matrix table-controls : column-visibility mobile-controls
 def test_task_index_mobile_visibility_toggle_hides_column(get_admin, get_user):
     user = get_admin()
     Tasks.test_mobile_index_task.get(user)
@@ -54,7 +52,6 @@ def test_task_index_mobile_visibility_toggle_hides_column(get_admin, get_user):
     expect(user.locate("#table td[data-column='modified']:visible")).to_have_count(0)
 
 
-# @matrix table-controls : mobile-controls sorting
 def test_task_index_mobile_filter_button_opens_sorting_panel(get_admin, get_user):
     user = get_admin()
     Tasks.test_mobile_index_task.get(user)

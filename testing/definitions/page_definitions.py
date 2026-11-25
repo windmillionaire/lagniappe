@@ -5,11 +5,10 @@ Maps to:
 - Entity: lagniappe/core/entities/page.py
 - Routes: lagniappe/web/routes/pages/
 - Templates: lagniappe/web/templates/pages/
-- View: src/script/views/page.mjs
+- View: src/script/views/page.ts
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 from .categories import Categories
 from .forms import Forms
@@ -21,8 +20,8 @@ class PageDefinition:
     name: str
     category: Categories
     description: str = ""
-    form: Optional[Forms] = None
-    submission: Optional[Submissions] = None
+    form: Forms | None = None
+    submission: Submissions | None = None
 
 
 create_page = PageDefinition(

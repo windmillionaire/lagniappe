@@ -1,15 +1,14 @@
 # Shared Style Review
 
-Use this guide for the advisory cleanup candidates emitted by style
-traceability. The registry, compiled-candidate, CSS-ownership, build-parity, and
+Use this guide to review findings from `run.py style-contracts`. The registry, compiled-candidate, CSS-ownership, build-parity, and
 unknown-reference findings are contracts; repeated or long strings are prompts
 for semantic review, not automatic rewrites.
 
 ```bash
-venv/bin/python run.py traceability --styles
-venv/bin/python run.py traceability --style dropdown.panel
-venv/bin/python run.py traceability --style-source src/style/navigation.css
-venv/bin/python run.py traceability --style-consumer src/script/widgets/home/tasks.mjs
+venv/bin/python run.py style-contracts
+venv/bin/python run.py style-contracts --style dropdown.panel
+venv/bin/python run.py style-contracts --style-source src/style/navigation.css
+venv/bin/python run.py style-contracts --style-consumer src/script/widgets/home/tasks.ts
 ```
 
 The default run writes `reports/style-traceability.md` and the machine-readable
@@ -81,11 +80,10 @@ After a style change:
 
 ```bash
 npm run dev
-venv/bin/python run.py traceability --styles --check --fail-on warning
+venv/bin/python run.py style-contracts --check --fail-on warning
 venv/bin/python run.py test testing/tests_tooling/test_006_style_traceability.py
 venv/bin/python run.py test testing/tests_js/test_018_style_pipeline.mjs
 venv/bin/python run.py template-contracts --changed --check
-venv/bin/python run.py traceability --changed --check
 ```
 
 Report intentional advisory leftovers by semantic role and reason. Do not use a

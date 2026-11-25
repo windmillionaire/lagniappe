@@ -10,11 +10,29 @@ from testing.utility import (
     style_candidates,
     style_registry,
     style_traceability,
-    traceability,
-    traceability_common,
+    contract_common,
+    test_evidence,
+    template_contracts,
 )
 
 pytestmark = pytest.mark.tooling
+
+
+def test_source_contracts_include_native_typescript_modules(tmp_path):
+    scripts = tmp_path / "src/script"
+    scripts.mkdir(parents=True)
+    modules = {scripts / name for name in ("widget.mjs", "widget.ts", "widget.mts")}
+    for path in modules | {scripts / "widget.d.ts", scripts / "widget.d.mts"}:
+        path.write_text('document.querySelector("[data-role=\'action\']");\n', encoding="utf-8")
+
+    expected = {path.relative_to(tmp_path).as_posix() for path in modules}
+    aliases = template_contracts.collect_js_index(tmp_path).role_consumers
+    assert set(aliases["action"]) == expected
+    assert dict(style_candidates.iter_source_files(tmp_path, (scripts,))) == dict.fromkeys(
+        modules, "javascript"
+    )
+    assert {relative for _, relative in icon_traceability._source_files(tmp_path)} == expected
+    assert expected <= test_evidence.behavior_path_fingerprints(tmp_path).keys()
 
 
 def test_icon_registry_schema_enforces_material_symbol_records():
@@ -269,7 +287,7 @@ button:
         json.dumps(
             {
                 "schema_version": 4,
-                "frontend_entry": "src/script/main.mjs",
+                "frontend_entry": "src/script/main.ts",
                 "registry": {
                     "styles": "src/style/styles.yaml",
                     "schema": "src/style/registry.schema.json",
@@ -328,7 +346,7 @@ button:
     )
     write_file(tmp_path / "src/style/components.css", ".button { display: flex; }\n")
     write_file(
-        tmp_path / "src/script/main.mjs",
+        tmp_path / "src/script/main.ts",
         'import "../style/main.css";\nconst icon = createIcon("dueDate");\n',
     )
     write_file(
@@ -512,7 +530,7 @@ unused:
     report, _manifest = style_traceability.build_report(tmp_path)
     payload = style_traceability.report_payload(report)
 
-    assert payload["schema_version"] == traceability_common.TRACEABILITY_SCHEMA_VERSION
+    assert payload["schema_version"] == contract_common.CONTRACT_REPORT_SCHEMA_VERSION
     assert payload["kind"] == "style-traceability-report"
     assert payload["finding_ids"] == [
         finding["id"] for finding in payload["findings"]
@@ -558,13 +576,6 @@ def test_dropdown_panel():
     assert True
 """,
     )
-    write_file(
-        tmp_path / "testing/utility/traceability.yaml",
-        """
-source_roots: []
-test_roots: [tests_js]
-""",
-    )
     (tmp_path / "lagniappe/web/templates").mkdir(parents=True)
 
     manifest = style_traceability.build_manifest(tmp_path)
@@ -576,8 +587,27 @@ test_roots: [tests_js]
     assert manifest.styles["dropdown.panel"].evidence[0].current is False
     assert manifest.styles["dropdown.panel"].fingerprint
 
+    nodeid = "tests_js/test_dropdown.py::test_dropdown_panel"
+    paths = test_evidence.behavior_path_fingerprints(tmp_path)
+    test_evidence.write_json(
+        tmp_path / test_evidence.LATEST_TEST_RUN,
+        {
+            "schema_version": 2,
+            "tests": {nodeid: {"snapshot": "run", "outcome": "passed"}},
+            "snapshots": {"run": {"paths": paths}},
+        },
+    )
+    passing = style_traceability.build_manifest(tmp_path)
+    assert passing.styles["dropdown.panel"].evidence[0].current is True
 
-def test_traceability_styles_mode_emits_manifest_json(capsys, tmp_path):
+    styles_path = tmp_path / "src/style/styles.yaml"
+    styles_path.write_text(styles_path.read_text().replace("absolute hidden", "relative hidden"))
+    stale = style_traceability.build_manifest(tmp_path)
+    assert stale.styles["dropdown.panel"].evidence[0].outcome == "passed"
+    assert stale.styles["dropdown.panel"].evidence[0].current is False
+
+
+def test_style_contracts_emits_manifest_json(capsys, tmp_path):
     write_file(
         tmp_path / "src/style/styles.yaml",
         """
@@ -592,11 +622,10 @@ button:
     )
     (tmp_path / "src/script").mkdir(parents=True)
 
-    result = traceability.main(
+    result = style_traceability.main(
         [
             "--repo-root",
             str(tmp_path),
-            "--styles",
             "--json",
             "--no-manifest",
             "--no-report",

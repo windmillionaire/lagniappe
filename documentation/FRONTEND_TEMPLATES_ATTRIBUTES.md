@@ -3,7 +3,7 @@
 The `lp-*` attributes are the handshake between server-rendered Jinja
 templates and the frontend. Templates write ordinary HTML with stable
 `lp-*` markers, and the browser code reacts to those markers after
-`main.mjs` initializes the page.
+`main.ts` initializes the page.
 
 Think of an `lp-*` attribute as the opt-in signal and the neighboring
 `data-*` attributes as the configuration and mutable state. For example,
@@ -45,7 +45,7 @@ The usual page shape is:
 
 The flow is:
 
-1. `main.mjs` finds `[lp-view]`, reads `data-kind`, imports the matching view,
+1. `main.ts` finds `[lp-view]`, reads `data-kind`, imports the matching view,
    and calls `init()`.
 2. The view delegates clicks and submits from the root. It creates
    `ViewComponent` instances from `[lp-component]` elements as needed.
@@ -125,7 +125,7 @@ Most behavior in this system depends on `data-*` values on the active
 | `data-key`, `data-kind` | Entity identity and theme/routing context for widgets and controls. |
 | `data-role` | Local semantic role for widget/template internals. Examples include `title`, `controls`, `expand`, `expandable-cell`, `notifications`, and `notification-count`. Use this for local structure that is not a global `lp-*` behavior hook. Table bodies, page task lists, and site settings sections each own their local `data-role="expand"` behavior. |
 | `data-if-empty` | Switches list widgets to another widget when no items are present. |
-| `data-preload`, `data-schema`, `data-submission`, `data-conditions`, `data-columns`, `data-selected`, `data-options`, `data-attributes` | JSON configuration parsed by `widgets/loader.mjs` and form/table widgets. |
+| `data-preload`, `data-schema`, `data-submission`, `data-conditions`, `data-columns`, `data-selected`, `data-options`, `data-attributes` | JSON configuration parsed by `widgets/loader.ts` and form/table widgets. |
 
 ## Authoring Notes
 

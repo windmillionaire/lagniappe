@@ -1,19 +1,26 @@
 """Custom exceptions and error capture (Sentry in prod, console in dev)."""
 
+from __future__ import annotations
+
+import sys
+import traceback
+from collections.abc import Mapping
 from datetime import datetime
 from pprint import pformat
-import traceback
-import sys
+from typing import TYPE_CHECKING
 
 from config.deployment import DeploymentSettingsError as DeploymentSettingsError
 from lagniappe import CONFIG
 
+if TYPE_CHECKING:
+    from sentry_sdk._types import LogLevelStr
+
+from .frames import extract_entity_from_frames, extract_local_variables
 from .request import (
     extract_request_info,
     sanitize_error_context,
     sanitize_sentry_event,
 )
-from .frames import extract_local_variables, extract_entity_from_frames
 from .utility import format_debug_context_for_template
 
 
@@ -24,19 +31,17 @@ class AISettingsError(ValueError):
 class ValidationError(Exception):
     """Raised when entity data fails validation (import, form submission)."""
 
+    context: dict[str, object]
 
-# @testable infrastructure
+
 class MutationConflict(ValidationError):
     """A compare-and-set rejected a stale mutation before durable writes."""
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_exception_context_survives_autofill_wrapper_without_duplicate_capture
-# @pair ai:error-context
 class AIException(Exception):
     """Raised when AI generation fails or returns invalid output."""
 
-    def __init__(self, message, context=None):
+    def __init__(self, message: str, context: dict[str, object] | None = None) -> None:
         super().__init__(message)
         self.context = context or {}
 
@@ -57,7 +62,6 @@ class SiteImageError(Exception):
     """Raised when site image processing fails."""
 
 
-# @testable infrastructure
 class PropertyError(Exception):
     """Raised when a property fails to instantiate or is used incorrectly.
 
@@ -65,7 +69,7 @@ class PropertyError(Exception):
     for debugging. The original exception is chained (__cause__).
     """
 
-    def __init__(self, message, entity=None):
+    def __init__(self, message: str, entity: object | None = None) -> None:
         super().__init__(message)
         self.entity = entity
 
@@ -74,15 +78,12 @@ class UnloadedRelationError(Exception):
     """Raised or captured when code asks an entity relation to lazy-load."""
 
 
-# @testable false
-# @covered-by lagniappe/web/start/errors.py::_handle_error_with_context
-# @reason debug context is rendered and captured through the Flask error handler
-def get_debug_context(error):
+def get_debug_context(error: BaseException) -> dict[str, object]:
     """
     Extract comprehensive debug context from an exception.
     Returns a dict with all available debug information.
     """
-    context = {
+    context: dict[str, object] = {
         "timestamp": datetime.now().isoformat(),
         "error_type": type(error).__name__,
         "error_message": str(error),
@@ -108,12 +109,13 @@ def get_debug_context(error):
     return context
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_error_capture_can_wait_for_sentry_delivery
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_error_capture_sanitizes_context_without_duplicate_request
-# @matrix deferred-jobs : sentry terminal-delivery
-# @matrix error-handling : privacy redaction request-context sentry terminal-delivery
-def capture(error, context=None, level="error", *, wait_for_delivery=False):
+def capture(
+    error: object,
+    context: Mapping[str, object] | None = None,
+    level: LogLevelStr = "error",
+    *,
+    wait_for_delivery: bool = False,
+) -> None:
     """Capture an error, sending to Sentry in production or printing in dev."""
     if CONFIG.capture_errors:
         import sentry_sdk

@@ -1,5 +1,17 @@
 """Deterministic execution of stored AI report proposals."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypedDict, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ReportAction, ReportProposal
+    from lagniappe.core.tools.ai.reporting.execution.batch import ExecutionBatch
+    from lagniappe.core.tools.ai.reporting.execution.ledger import ActionRecord, ReportLedger
+
+
 from copy import deepcopy
 
 from lagniappe.core import exceptions
@@ -31,24 +43,18 @@ from .ledger import (
 )
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_invalid_completed_task_events_and_continues
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_rejects_saved_pending_submissions_before_execution
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_checks_deferred_execution_guard
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_propagates_deferred_control_stop
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_resumes_after_completed_create_without_duplicate
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_continues_independent_work_after_completed_entity_changes
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_reconciles_applying_create_when_output_already_exists
-# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_uses_category_form_from_stored_key_for_page_submission
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_targets_created_task
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_loads_attached_inputs_only_for_pending_file_work
-# @matrix ai-report : attachments cancellation completed-prefix continue create create-order deterministic-run execute idempotency partial-result permissions persistence post-commit-checkpoint recoverable recovery reuse skip-action stale-proposal validation
-# @matrix ai-report files : execution-inputs initial-load staged-inputs
-# @matrix ai-report : preservation unavailable
-def run_report(report, user, ensure_active=None):
+class ExecutionContext(TypedDict, total=False):
+    allocation_actions: list[ReportAction]
+    action_records: dict[str, ActionRecord]
+    batch: ExecutionBatch
+    action_record: ActionRecord
+
+
+def run_report(
+    report: models.AIReport,
+    user: models.User,
+    ensure_active: Callable[[], None] | None = None,
+) -> ReportLedger:
     """Prepare actions in order and commit bounded groups with their receipts."""
     from .batch import ExecutionBatch, WorkingEntities, publish_pending_documents
     from lagniappe.core.tools.deferred_jobs.errors import (
@@ -71,7 +77,8 @@ def run_report(report, user, ensure_active=None):
     fingerprint = proposal_fingerprint(proposal)
     existing = report.result if isinstance(report.result, dict) else {}
     if existing.get("ledger_version") == REPORT_LEDGER_VERSION:
-        result = existing
+        # The versioned ledger is checked against this proposal before recovery.
+        result = cast("ReportLedger", existing)
         if result.get("proposal_fingerprint") != fingerprint:
             raise exceptions.ValidationError("This report proposal changed after execution started.")
         _validate_report_ledger(proposal, result)
@@ -83,7 +90,7 @@ def run_report(report, user, ensure_active=None):
     actions = proposal.get("actions", [])
     if any(action["type"] in {"attach_file", "summarize_file"} and not action.get("skip")
            and record.get("status") not in {"complete", "skipped"}
-           for action, record in zip(actions, result["actions"])):
+           for action, record in zip(actions, result["actions"], strict=False)):
         attached_files = [file for file in report.input_files if file.has_references]
         if attached_files:
             Entities.fetch(*attached_files, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
@@ -94,16 +101,13 @@ def run_report(report, user, ensure_active=None):
     ensure_active()
     Entities.save(report)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-    # @reason a rejected preparation rebuilds only the uncommitted group
     def begin_batch():
         workspace = WorkingEntities()
         for alias, entity in _restore_completed_action_entities(result).items():
             workspace.remember(entity)
             workspace[alias] = workspace[entity.key]
         context = _build_report_run_context(proposal)
-        context["action_records"] = {record.get("id"): record for record in result["actions"] if record.get("id")}
+        context["action_records"] = {key: record for record in result["actions"] if (key := record.get("id"))}
         batch = ExecutionBatch(report, result, workspace, ensure_active)
         context["batch"] = batch
         return workspace, context, batch
@@ -116,7 +120,7 @@ def run_report(report, user, ensure_active=None):
         if record.get("status") in {"complete", "skipped"}:
             index += 1
             continue
-        if action.get("skip") or any(context["action_records"].get(dependency, {}).get("status") != "complete" for dependency in action.get("depends_on", [])):
+        if action.get("skip") or any(context.get("action_records", {}).get(dependency, {}).get("status") != "complete" for dependency in action.get("depends_on", [])):
             record.update(status="skipped", note=action.get("reason") or "Skipped by user or required prior action.")
             index += 1
             continue
@@ -152,7 +156,7 @@ def run_report(report, user, ensure_active=None):
             # The migration handler flushes staged work before starting its job.
             record["status"] = "waiting"
             result["status"] = "waiting"
-            report.result = result
+            report.result = cast("dict[str, object]", result)
             Entities.save(report)
             raise
         except (DeferredJobInfrastructureError, DeferredJobDeadlineError):
@@ -209,9 +213,6 @@ def run_report(report, user, ensure_active=None):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason rejected batches retain pending actions and a visible manual retry
 def _fail_batch(report, result, batch, error):
     indices = list(batch.indices)
     batch.discard()
@@ -226,8 +227,5 @@ def _fail_batch(report, result, batch, error):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason run-scoped report context setup is verified through report execution
-def _build_report_run_context(proposal):
-    return {"allocation_actions": proposal.get("actions", [])}
+def _build_report_run_context(proposal: ReportProposal) -> ExecutionContext:
+    return {"allocation_actions": proposal.get("actions", []), "action_records": {}}

@@ -1,5 +1,11 @@
 """Read-only complete migration preview with bounded, revision-bound pages."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 import base64
 import json
 
@@ -24,7 +30,7 @@ PREVIEW_FORM_SCHEMA_UPDATE = types.FunctionDeclaration(
         "Follow every next_cursor; include_values=true returns original affected AI values and scalar before/after values (clears=true omits after). "
         "Return baseline and scope_fingerprint unchanged in update_form_schema."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "required": ["id", "operations"],
         "properties": {
@@ -54,16 +60,14 @@ PREVIEW_FORM_SCHEMA_UPDATE = types.FunctionDeclaration(
             },
             "cursor": {"type": "string"},
         },
-    },
+    }),
 )
 
 
-# @testable true
-# @tests tests_unit/test_004l_form_schema_updates.py::test_preview_paginates_and_rejects_stale_cursor
-# @matrix form-migration ai : preview pagination read-only complete-scope
-def execute_preview_form_schema_update(args, user):
+def execute_preview_form_schema_update(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     try:
-        form = Entities.fetch_one(args.get("id"), request=Fetch.direct())
+        identifier = args.get("id")
+        form = Entities.fetch_one(identifier if isinstance(identifier, str) else None, request=Fetch.direct())
         if not isinstance(form, Entities.FORM) or form.db.get("pending_form_change"):
             raise ValidationError("Form is unavailable or already being updated.")
         schema = form_schema_updates.apply_operations(
@@ -78,9 +82,11 @@ def execute_preview_form_schema_update(args, user):
             [baseline, schema, scope["scope_fingerprint"]]
         )
         offset = 0
-        if args.get("cursor"):
+        if cursor_value := args.get("cursor"):
             try:
-                token = json.loads(base64.urlsafe_b64decode(args["cursor"].encode()))
+                if not isinstance(cursor_value, str):
+                    raise ValueError("Invalid cursor")
+                token = json.loads(base64.urlsafe_b64decode(cursor_value.encode()))
                 offset = token["offset"]
                 if token["identity"] != identity:
                     raise ValidationError(form_schema_updates.STALE_MESSAGE)

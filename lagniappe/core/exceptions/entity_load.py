@@ -1,23 +1,20 @@
-from pathlib import Path
+
 import traceback
+from collections.abc import Iterable
+from contextlib import suppress
+from pathlib import Path
+
 from flask import g, has_request_context, request
+
 from lagniappe import CONFIG
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/entity_load.py::record_entity_load_trace
-# @covered-by lagniappe/core/exceptions/entity_load.py::print_entity_load_trace
-# @reason request-local diagnostics helper for entity load tracing
 def _entity_load_tracing_enabled():
     return bool(getattr(CONFIG, "DEBUG_TRACING", False)) and has_request_context()
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/entity_load.py::record_entity_load_trace
-# @covered-by lagniappe/core/exceptions/entity_load.py::print_entity_load_trace
-# @reason display helper for entity load tracing
 def _trace_label(item):
     if not item:
         return "None"
@@ -36,9 +33,6 @@ def _trace_label(item):
     return str(item)
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/entity_load.py::print_entity_load_trace
-# @reason display helper for entity load tracing
 def _trace_summary(items, limit=6):
     if not items:
         return "-"
@@ -48,9 +42,6 @@ def _trace_summary(items, limit=6):
     return ", ".join(shown) + suffix
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/entity_load.py::record_entity_load_trace
-# @reason display helper for entity load tracing
 def _trace_labels(items):
     if isinstance(items, dict):
         items = items.values()
@@ -58,21 +49,13 @@ def _trace_labels(items):
     return [_trace_label(item) for item in items if item]
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/entity_load.py::record_entity_load_trace
-# @reason caller formatting is request-local diagnostic plumbing
 def _trace_frame_location(frame):
     path = Path(frame.filename).resolve()
-    try:
+    with suppress(ValueError):
         path = path.relative_to(PROJECT_ROOT)
-    except ValueError:
-        pass
     return f"{path}:{frame.lineno} {frame.name}"
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/entity_load.py::record_entity_load_trace
-# @reason caller detection is request-local diagnostic plumbing
 def _trace_caller():
     for frame in reversed(traceback.extract_stack()[:-1]):
         location = _trace_frame_location(frame)
@@ -82,23 +65,17 @@ def _trace_caller():
     return "-"
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_record_entity_load_trace_uses_request_context
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_record_entity_load_trace_skips_no_database_work
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_record_entity_load_trace_includes_fetch_scope
-# @matrix permissions : explicit-fetch-depth registered-reason
-# @pair entities:load-tracing
 def record_entity_load_trace(
     *,
-    primary,
-    secondary,
-    related,
-    first_batch_key_count,
-    related_key_count,
-    fetch_depth=None,
-    fetch_reason=None,
-    fetch_stage=None,
-):
+    primary: Iterable[object] | None,
+    secondary: Iterable[object] | None,
+    related: Iterable[object] | None,
+    first_batch_key_count: int,
+    related_key_count: int,
+    fetch_depth: str | None = None,
+    fetch_reason: str | None = None,
+    fetch_stage: str | None = None,
+) -> None:
     """Record one request-local entity-fetch diagnostic entry."""
     if not _entity_load_tracing_enabled():
         return
@@ -132,11 +109,7 @@ def record_entity_load_trace(
     g.entity_loads.append(trace)
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_print_entity_load_trace_outputs_request_summary
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_print_entity_load_trace_prints_once_per_request
-# @pair entities:load-tracing
-def print_entity_load_trace(response=None):
+def print_entity_load_trace(response: object | None = None) -> None:
     """Print request-local entity-fetch diagnostics."""
     if not _entity_load_tracing_enabled():
         return
@@ -174,9 +147,6 @@ def print_entity_load_trace(response=None):
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/entity_load.py::print_entity_load_trace
-# @reason db-read count normalization is part of entity load diagnostics
 def _trace_db_reads(load):
     return load.get(
         "db_reads",
@@ -184,9 +154,6 @@ def _trace_db_reads(load):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/entity_load.py::print_entity_load_trace
-# @reason request label formatting is part of entity load diagnostics
 def _request_trace_label(response=None):
     path = request.full_path.rstrip("?")
     status = getattr(response, "status_code", None) or "-"

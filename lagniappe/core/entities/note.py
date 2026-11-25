@@ -1,25 +1,56 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from . import property_types
+    from lagniappe.core.definitions.asset import AssetUpload
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.entities.entity import EntityProperties
+    from lagniappe.core.mixins.field_host import FieldUser
+    from typing import Self
+
+
 from .entity import Entity
 from ..definitions import Action
 from ..mixins import AssetMixin
 from ..properties import activity
 from ..tools.auth.context import current_context_user
+from werkzeug.local import LocalProxy
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/note.py::Note.create
-# @reason note entity shell metadata is exercised through the homepage activity create path
+class NoteCreation(TypedDict, total=False):
+    parent: Entity
+    user: models.User
+    body: str | None
+    photo: AssetUpload | None
+    scope: str
+    visibility: str
+
+
 class Note(AssetMixin, Entity):
+    if TYPE_CHECKING:
+        body: str | None
+
+        parent: Entity | None
+        user: models.User | None
+        scope: str
+        visibility: str
+
+        @property
+        def properties(self) -> property_types.NoteProperties: ...
+
     entity_kind = "note"
 
     @property
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         exclude = {
             "assets",
             "body",
         }
         return frozenset(exclude)
 
-    def _get_properties(self):
+    def _get_properties(self) -> EntityProperties:
         properties = super()._get_properties()
         properties.update(
             {
@@ -34,14 +65,14 @@ class Note(AssetMixin, Entity):
         return properties
 
     @property
-    def required(self):
-        return [self.parent.hash]
+    def required(self) -> list[str]:
+        parent = self.parent
+        if parent is None:
+            raise AttributeError(f"{type(self).__name__} requires an attached parent")
+        return [parent.hash]
 
-    # @testable true
-    # @tests tests_unit/test_002j_notes.py::test_note_permissions_follow_visibility_scope_and_authorship
-    # @matrix notes permissions : creator home owner page private shared
-    def allowed(self, action, user=None):
-        user = current_context_user(user)
+    def allowed(self, action: Action, user: FieldUser = None) -> bool:
+        user = current_context_user(user._get_current_object() if isinstance(user, LocalProxy) else user)
         if not user or not user.is_authenticated:
             return False
 
@@ -64,11 +95,8 @@ class Note(AssetMixin, Entity):
             and self.parent.allowed(Action.VIEW, user=user)
         )
 
-    # @testable true
-    # @tests tests_unit/test_002j_notes.py::test_note_create_persists_body_photo_visibility_and_scope
-    # @matrix notes : author body create defaults parent photo scope visibility
     @classmethod
-    def create(cls, data):
+    def create(cls, data: NoteCreation) -> Self:
         parent = data.get("parent") or data.get("user")
         user = data.get("user")
 

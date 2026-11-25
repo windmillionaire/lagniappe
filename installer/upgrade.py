@@ -23,20 +23,13 @@ from .upgrade_notice import (
 from .verify import activate_installation
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_update_reloads_config_and_setup_helpers
-# @matrix setup : config-files deferred-jobs post-deploy public-page-settings storage-buckets
-def update(*, announce=True):
+def update(*, announce: bool = True) -> int:
     """Apply app-saved configuration without replacing repository code."""
     activate_installation(announce=announce)
     return _apply_update(upgrade=False)
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_replaces_source_then_applies_update
-# @matrix setup : branch config-files git-upgrade post-deploy
-# @pairs migrations:major-version setup:major-version
-def upgrade(branch=None, *, announce=True):
+def upgrade(branch: str | None = None, *, announce: bool = True) -> int:
     """Replace tracked source from a remote branch, then apply and deploy it."""
     activate_installation(announce=announce)
 
@@ -111,11 +104,6 @@ def upgrade(branch=None, *, announce=True):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_update_reloads_config_and_setup_helpers
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_replaces_source_then_applies_update
-# @matrix setup : config-files deferred-jobs git-upgrade post-deploy provider-apis public-page-settings storage-buckets
-# @pairs migrations:major-version setup:major-version
 def _apply_update(
     *,
     upgrade,
@@ -236,9 +224,6 @@ def _apply_update(
     return 0
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_post_deploy_deferred_job_recovery_failure_is_nonfatal
-# @matrix deferred-jobs setup : failure-isolation post-deploy recovery
 def _configure_deferred_job_recovery(f, gcloud):
     """Provision recovery without invalidating an otherwise successful deploy."""
     try:
@@ -265,10 +250,6 @@ def _configure_deferred_job_recovery(f, gcloud):
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_images_installs_storage_before_restore_spinner
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_images_continues_when_no_remote_image_is_available
-# @matrix setup : image-restore site-image partial-failure
 def _update_custom_images(f):
     """Best-effort restore site images uploaded through the app."""
     from config import SETTINGS
@@ -353,10 +334,6 @@ def _update_custom_images(f):
             spinner.skip("Custom images unchanged")
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_deployment_settings_applies_saved_app_config
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_deployment_settings_continues_when_unavailable
-# @matrix setup : app-yaml deployment-settings
 def _update_deployment_settings(f):
     """Apply deployment settings saved from the app, if available."""
     from config.deployment import apply_deployment_settings
@@ -414,10 +391,6 @@ def _update_deployment_settings(f):
             spinner.fail()
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_ai_settings_applies_saved_app_config
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_ai_settings_continues_when_unavailable
-# @matrix setup : ai-settings app-yaml
 def _update_ai_settings(f):
     """Apply AI model settings saved from the app, if available."""
     from config.ai_settings import apply_ai_settings
@@ -461,10 +434,6 @@ def _update_ai_settings(f):
             spinner.fail()
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_public_page_settings_applies_saved_app_config
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_public_page_settings_continues_when_unavailable
-# @matrix setup : app-yaml public-page-indexing
 def _update_public_page_settings(f):
     """Apply public-page settings saved from the app, if available."""
     from config.public_pages import apply_public_page_settings
@@ -516,9 +485,6 @@ def _update_public_page_settings(f):
             spinner.fail()
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_refreshes_setup_dependencies_from_replaced_checkout
-# @matrix setup : dependency-bootstrap git-upgrade
 def _refresh_setup_dependencies():
     """Reload dependency bootstrap code from the replaced checkout and reconcile it."""
     from installer import package_install
@@ -528,9 +494,6 @@ def _refresh_setup_dependencies():
     refreshed.ensure_setup_dependencies()
 
 
-# @testable false
-# @covered-by installer/upgrade.py::_update_repository
-# @reason formatting helper for an argument-list Git reset target
 def _reset_target_for_branch(branch):
     """Return the remote ref used as the hard-reset target."""
     branch = str(branch or "").strip()
@@ -539,10 +502,6 @@ def _reset_target_for_branch(branch):
     return f"origin/{branch}"
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_target_fetches_and_reads_exact_remote_version
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_target_rejects_missing_ref_and_invalid_version
-# @matrix setup : branch failure-propagation git-upgrade version-validation
 def _fetch_upgrade_target(spinner, branch="main"):
     """Fetch and inspect one exact remote commit without replacing source."""
     from installer import FORMATTER
@@ -643,10 +602,6 @@ def _fetch_upgrade_target(spinner, branch="main"):
         return None
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_repository_preserves_report_before_branch_reset
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_repository_handles_clean_status_and_status_failure
-# @matrix setup : branch failure-propagation git-upgrade local-change-report
 def _update_repository(spinner, branch="main", *, target_commit=None):
     """Fetch remotes and replace tracked files with the requested remote ref."""
     from installer import FORMATTER
@@ -732,9 +687,6 @@ def _update_repository(spinner, branch="main", *, target_commit=None):
         return False
 
 
-# @testable false
-# @covered-by installer/upgrade.py::_update_repository
-# @reason local safety report is exercised through the dirty upgrade path
 def _write_local_changes_report(status_output, reset_target="origin/main"):
     """Save a best-effort report of tracked changes before a hard reset."""
     reports_dir = REPOSITORY_ROOT / "reports"
@@ -817,9 +769,6 @@ def _write_local_changes_report(status_output, reset_target="origin/main"):
         return None
 
 
-# @testable false
-# @covered-by installer/upgrade.py::_write_local_changes_report
-# @reason formatting helper for the local changes report
 def _git_report_output(result):
     output = result.stdout or result.stderr or ""
     if result.returncode != 0:

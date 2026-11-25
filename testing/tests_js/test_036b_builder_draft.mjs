@@ -3,7 +3,7 @@ import { webcrypto } from "node:crypto";
 import { test } from "node:test";
 import esmock from "esmock";
 
-import { BuilderDraft } from "../../src/script/views/builder/draft.mjs";
+import { BuilderDraft } from "../../src/script/views/builder/draft.ts";
 
 function replaceGlobal(t, name, value) {
 	const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
@@ -18,10 +18,6 @@ function replaceGlobal(t, name, value) {
 	});
 }
 
-/**
- * @source src/script/views/builder/draft.mjs::BuilderDraft
- * @matrix forms : draft-history
- */
 test("test_conversion_instructions_follow_draft_undo_redo_and_publication", () => {
 	const initial = {
 		name: "Conversion",
@@ -51,7 +47,6 @@ test("test_conversion_instructions_follow_draft_undo_redo_and_publication", () =
 	assert.equal(draft.dirty, false);
 });
 
-/** @matrix forms : draft-history stable-identity schema-generation */
 test("test_builder_draft_history_and_generation", () => {
 	const initial = {
 		name: "Draft",
@@ -199,10 +194,6 @@ test("test_builder_draft_history_and_generation", () => {
 	assert.equal(selectionDraft.state.selected_id, "table");
 });
 
-/**
- * @source src/script/views/builder/draft.mjs::BuilderDraft
- * @matrix forms : draft-history schema-generation
- */
 test("test_document_edits_and_html_generation_preserve_schema_redo", () => {
 	const initial = {
 		name: "Original",
@@ -289,10 +280,6 @@ test("test_document_edits_and_html_generation_preserve_schema_redo", () => {
 	assert.equal(draft.revision, lastRevision);
 });
 
-/**
- * @source src/script/views/builder/draft.mjs::BuilderDraft
- * @matrix forms : draft-history stable-identity
- */
 test("test_schema_undo_redo_restores_document_content_only_when_field_returns", () => {
 	const draft = new BuilderDraft(
 		{
@@ -350,10 +337,6 @@ test("test_schema_undo_redo_restores_document_content_only_when_field_returns", 
 	assert.equal(draft.state.html_fields.existing, "");
 });
 
-/**
- * @source src/script/views/builder/draft.mjs::BuilderDraft
- * @matrix forms : draft-history stale-acknowledgement
- */
 test("test_document_edit_during_save_stays_dirty_across_schema_undo_redo", () => {
 	const draft = new BuilderDraft(
 		{
@@ -410,32 +393,27 @@ test("test_document_edit_during_save_stays_dirty_across_schema_undo_redo", () =>
 	assert.equal(draft.state.html_fields.html, latestHtml);
 });
 
-/**
- * @source src/script/views/builder/conditions/options.mjs::Options
- * @source src/script/views/builder/conditions/columns.mjs::Columns
- * @matrix forms : stable-identity
- */
 test("test_builder_option_and_column_labels_keep_ids", async () => {
 	let nextId = 0;
 	class Condition {}
 	const boundaries = {
-		"../../src/script/elements/primitives.mjs": { primitives: {} },
-		"../../src/script/shared/utilities.mjs": {
+		"../../src/script/elements/primitives.ts": { primitives: {} },
+		"../../src/script/shared/utilities.ts": {
 			generateElementId: (prefix) => `${prefix}-${++nextId}`,
 		},
-		"../../src/script/views/builder/conditions/base.mjs": { Condition },
+		"../../src/script/views/builder/conditions/base.ts": { Condition },
 	};
 	const { default: Options } = await esmock.strict(
-		"../../src/script/views/builder/conditions/options.mjs",
+		"../../src/script/views/builder/conditions/options.ts",
 		boundaries,
 	);
 	const { default: Columns } = await esmock.strict(
-		"../../src/script/views/builder/conditions/columns.mjs",
+		"../../src/script/views/builder/conditions/columns.ts",
 		{
 			...boundaries,
-			"../../src/script/elements/combobox/index.mjs": { SelectBox: class {} },
-			"../../src/script/views/builder/config.mjs": { CONFIG: {} },
-			"../../src/script/views/builder/migrations.mjs": {
+			"../../src/script/elements/combobox/index.ts": { SelectBox: class {} },
+			"../../src/script/views/builder/config.ts": { CONFIG: {} },
+			"../../src/script/views/builder/migrations.ts": {
 				fieldKind: () => null,
 			},
 		},
@@ -478,10 +456,10 @@ test("test_builder_option_and_column_labels_keep_ids", async () => {
 
 async function loadFormSettings({ request, FormController = class {} }) {
 	return await esmock.strict(
-		"../../src/script/views/builder/panels/formSettings.mjs",
+		"../../src/script/views/builder/panels/formSettings.ts",
 		{
-			"../../src/script/forms/controller.mjs": { FormController },
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/forms/controller.ts": { FormController },
+			"../../src/script/shared/index.ts": {
 				captureError() {},
 				ENDPOINTS: { createSchema: "/generate" },
 				request,
@@ -490,10 +468,6 @@ async function loadFormSettings({ request, FormController = class {} }) {
 	);
 }
 
-/**
- * @source src/script/views/builder/panels/formSettings.mjs::FormSettings._generateSchema
- * @matrix forms : schema-generation draft-history
- */
 test("test_builder_generation_rejects_stale_cancelled_and_destroyed_responses", async (t) => {
 	const requests = [];
 	class FormDataBoundary extends Map {
@@ -515,9 +489,9 @@ test("test_builder_generation_rejects_stale_cancelled_and_destroyed_responses", 
 		},
 	});
 	const { ConditionPanel } = await esmock.strict(
-		"../../src/script/views/builder/panels/condition.mjs",
+		"../../src/script/views/builder/panels/condition.ts",
 		{
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 		},
@@ -649,13 +623,13 @@ function emptyClass() {
 async function loadBuilder({
 	connectivity = { hidden: false, online: true },
 } = {}) {
-	return await esmock.strict("../../src/script/views/builder/builder.mjs", {
-		"../../src/script/elements/combobox/search.mjs": {
+	return await esmock.strict("../../src/script/views/builder/builder.ts", {
+		"../../src/script/elements/combobox/search.ts": {
 			SearchBox: emptyClass(),
 		},
-		"../../src/script/elements/entityMenu.mjs": { EntityMenu: emptyClass() },
-		"../../src/script/shared/directUpload.mjs": { directUpload() {} },
-		"../../src/script/shared/index.mjs": {
+		"../../src/script/elements/entityMenu.ts": { EntityMenu: emptyClass() },
+		"../../src/script/shared/directUpload.ts": { directUpload() {} },
+		"../../src/script/shared/index.ts": {
 			captureError() {},
 			connectivity,
 			DeleteModal: emptyClass(),
@@ -664,58 +638,53 @@ async function loadBuilder({
 			OfflineModal: emptyClass(),
 			request: {},
 		},
-		"../../src/script/shared/transitions.mjs": {
+		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
-		"../../src/script/views/builder/changeStatus.mjs": {
+		"../../src/script/views/builder/changeStatus.ts": {
 			FormChangeStatus: emptyClass(),
 		},
-		"../../src/script/views/builder/conditions/loader.mjs": {
+		"../../src/script/views/builder/conditions/loader.ts": {
 			loadCondition: async () => null,
 		},
-		"../../src/script/views/builder/draft.mjs": { BuilderDraft },
-		"../../src/script/views/builder/migrations.mjs": {
+		"../../src/script/views/builder/draft.ts": { BuilderDraft },
+		"../../src/script/views/builder/migrations.ts": {
 			fieldKind: () => null,
 			needsMigration: () => false,
 			repairConditions: () => {},
 		},
-		"../../src/script/views/builder/panels/components.mjs": {
+		"../../src/script/views/builder/panels/components.ts": {
 			ComponentsPanel: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/condition.mjs": {
+		"../../src/script/views/builder/panels/condition.ts": {
 			ConditionPanel: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/elementSettings.mjs": {
+		"../../src/script/views/builder/panels/elementSettings.ts": {
 			ElementSettings: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/formSettings.mjs": {
+		"../../src/script/views/builder/panels/formSettings.ts": {
 			FormSettings: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/header.mjs": {
+		"../../src/script/views/builder/panels/header.ts": {
 			Header: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/model.mjs": {
+		"../../src/script/views/builder/panels/model.ts": {
 			ModelElement: {},
 			ModelPanel: emptyClass(),
 		},
 	});
 }
 
-/**
- * @source src/script/views/builder/builder.mjs::FormBuilder.deselectElement
- * @source src/script/views/builder/panels/model.mjs::ModelPanel.deselectItem
- * @matrix forms : builder-lifecycle draft-history
- */
 test("test_builder_deselection_clears_selection_without_editing_form", async (t) => {
 	replaceGlobal(t, "document", { getElementById: () => ({}) });
 	const { default: FormBuilder } = await loadBuilder();
 	const { ModelPanel } = await esmock.strict(
-		"../../src/script/views/builder/panels/model.mjs",
+		"../../src/script/views/builder/panels/model.ts",
 		{
 			sortablejs: { default: { create: () => ({}) } },
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
+			"../../src/script/elements/primitives.ts": { primitives: {} },
 			"../../src/script/generated/styles.mjs": { STYLES: {} },
-			"../../src/script/views/builder/config.mjs": { CONFIG: {} },
+			"../../src/script/views/builder/config.ts": { CONFIG: {} },
 		},
 	);
 	const state = {
@@ -759,7 +728,6 @@ test("test_builder_deselection_clears_selection_without_editing_form", async (t)
 	assert.equal(builder.draft.future.length, 0);
 });
 
-/** @matrix forms : draft-history stale-acknowledgement focus-recovery */
 test("test_builder_save_restores_unsubmitted_condition_buffer", async (t) => {
 	let focused = false;
 	const active = { name: "option-name", selectionStart: 4, selectionEnd: 8 };
@@ -775,11 +743,11 @@ test("test_builder_save_restores_unsubmitted_condition_buffer", async (t) => {
 	replaceGlobal(t, "document", { activeElement: active });
 	const { default: FormBuilder } = await loadBuilder();
 	const { Condition } = await esmock.strict(
-		"../../src/script/views/builder/conditions/base.mjs",
+		"../../src/script/views/builder/conditions/base.ts",
 		{
-			"../../src/script/elements/combobox/index.mjs": { SelectBox: class {} },
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
-			"../../src/script/forms/controller.mjs": {
+			"../../src/script/elements/combobox/index.ts": { SelectBox: class {} },
+			"../../src/script/elements/primitives.ts": { primitives: {} },
+			"../../src/script/forms/controller.ts": {
 				FormController: class {
 					constructor(owner) {
 						this.owner = owner;
@@ -788,8 +756,8 @@ test("test_builder_save_restores_unsubmitted_condition_buffer", async (t) => {
 				},
 			},
 			"../../src/script/generated/styles.mjs": { STYLES: {} },
-			"../../src/script/shared/icons.mjs": { setIcon() {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/icons.ts": { setIcon() {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 		},
@@ -875,12 +843,6 @@ test("test_builder_save_restores_unsubmitted_condition_buffer", async (t) => {
 	assert.equal(focused, true);
 });
 
-/**
- * @source src/script/views/builder/draftDocument.mjs::DraftDocument.flush
- * @source src/script/views/builder/builder.mjs::FormBuilder.setHtml
- * @source src/script/elements/html.mjs::HtmlElement.create
- * @matrix forms : draft-history
- */
 test("test_builder_html_flush_stays_local_and_empty_preview_does_not_fetch", async (t) => {
 	replaceGlobal(t, "document", {
 		createElement: () => ({ innerHTML: "", className: "" }),
@@ -892,9 +854,9 @@ test("test_builder_html_flush_stays_local_and_empty_preview_does_not_fetch", asy
 		}
 	}
 	const { HtmlElement } = await esmock.strict(
-		"../../src/script/elements/html.mjs",
+		"../../src/script/elements/html.ts",
 		{
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/shared/index.ts": {
 				captureError() {},
 				ENDPOINTS: {},
 				request: {
@@ -903,7 +865,7 @@ test("test_builder_html_flush_stays_local_and_empty_preview_does_not_fetch", asy
 					},
 				},
 			},
-			"../../src/script/elements/base/baseElement.mjs": { BaseElement },
+			"../../src/script/elements/base/baseElement.ts": { BaseElement },
 		},
 	);
 	const element = new HtmlElement(
@@ -912,21 +874,21 @@ test("test_builder_html_flush_stays_local_and_empty_preview_does_not_fetch", asy
 	);
 	assert.equal(element.create().innerHTML, "");
 	const { IndependentDocument } = await esmock.strict(
-		"../../src/script/elements/editor/independent.mjs",
+		"../../src/script/elements/editor/independent.ts",
 		{
 			"../../src/script/generated/styles.mjs": { STYLES: {} },
-			"../../src/script/shared/errors.mjs": { captureError() {} },
-			"../../src/script/shared/request.mjs": { request: {} },
-			"../../src/script/elements/editor/editor.mjs": {
+			"../../src/script/shared/errors.ts": { captureError() {} },
+			"../../src/script/shared/request.ts": { request: {} },
+			"../../src/script/elements/editor/editor.ts": {
 				independentEditor: () => null,
 			},
-			"../../src/script/elements/editor/toolbar.mjs": { Toolbar: class {} },
+			"../../src/script/elements/editor/toolbar.ts": { Toolbar: class {} },
 		},
 	);
 	const { DraftDocument } = await esmock.strict(
-		"../../src/script/views/builder/draftDocument.mjs",
+		"../../src/script/views/builder/draftDocument.ts",
 		{
-			"../../src/script/elements/editor/independent.mjs": {
+			"../../src/script/elements/editor/independent.ts": {
 				IndependentDocument,
 			},
 		},
@@ -999,12 +961,6 @@ test("test_builder_html_flush_stays_local_and_empty_preview_does_not_fetch", asy
 	assert.equal(empty.past.length, 0);
 });
 
-/**
- * @source src/script/views/builder/panels/formSettings.mjs::FormSettings._generateSchema
- * @source src/script/forms/controller.mjs::FormController.success
- * @pair forms:success
- * @matrix forms : schema-generation draft-history
- */
 test("test_stale_generation_retry_label_survives_base_form_error_transition", async (t) => {
 	const transitions = [];
 	const text = { textContent: "Generate" };
@@ -1052,24 +1008,24 @@ test("test_stale_generation_retry_label_survives_base_form_error_transition", as
 	replaceGlobal(t, "FormData", FormDataBoundary);
 	const transitionBoundary = (callback) => transitions.push(callback);
 	const { FormController } = await esmock.strict(
-		"../../src/script/forms/controller.mjs",
+		"../../src/script/forms/controller.ts",
 		{
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
-			"../../src/script/shared/icons.mjs": {
+			"../../src/script/elements/primitives.ts": { primitives: {} },
+			"../../src/script/shared/icons.ts": {
 				createIcon: (name) => ({ dataset: { icon: name } }),
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: transitionBoundary,
 			},
-			"../../src/script/shared/utilities.mjs": {
+			"../../src/script/shared/utilities.ts": {
 				showBriefly(wrapper, content) {
 					wrapper.replaceChildren(content);
 				},
 			},
-			"../../src/script/forms/controls/loader.mjs": {
+			"../../src/script/forms/controls/loader.ts": {
 				initFormControls: async () => {},
 			},
-			"../../src/script/forms/renderer.mjs": { FormRenderer: class {} },
+			"../../src/script/forms/renderer.ts": { FormRenderer: class {} },
 		},
 	);
 	const { FormSettings } = await loadFormSettings({
@@ -1238,7 +1194,6 @@ test("test_stale_generation_retry_label_survives_base_form_error_transition", as
 	assert.equal(target.dataset.visible, "false");
 });
 
-/** @matrix forms : builder-save stable-identity */
 test("test_saved_controls_refresh_without_replacing_draft_inputs", async (t) => {
 	replaceGlobal(t, "document", {
 		createElement: (tagName) => ({
@@ -1251,29 +1206,29 @@ test("test_saved_controls_refresh_without_replacing_draft_inputs", async (t) => 
 		}),
 	});
 	const { ElementSettings } = await esmock.strict(
-		"../../src/script/views/builder/panels/elementSettings.mjs",
+		"../../src/script/views/builder/panels/elementSettings.ts",
 		{
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
+			"../../src/script/elements/primitives.ts": { primitives: {} },
 			"../../src/script/generated/styles.mjs": { STYLES: {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
-			"../../src/script/views/builder/config.mjs": { CONFIG: {} },
+			"../../src/script/views/builder/config.ts": { CONFIG: {} },
 		},
 	);
 	const { default: Columns } = await esmock.strict(
-		"../../src/script/views/builder/conditions/columns.mjs",
+		"../../src/script/views/builder/conditions/columns.ts",
 		{
-			"../../src/script/elements/combobox/index.mjs": { SelectBox: class {} },
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
-			"../../src/script/shared/utilities.mjs": {
+			"../../src/script/elements/combobox/index.ts": { SelectBox: class {} },
+			"../../src/script/elements/primitives.ts": { primitives: {} },
+			"../../src/script/shared/utilities.ts": {
 				generateElementId: () => "column-1",
 			},
-			"../../src/script/views/builder/config.mjs": { CONFIG: {} },
-			"../../src/script/views/builder/migrations.mjs": {
+			"../../src/script/views/builder/config.ts": { CONFIG: {} },
+			"../../src/script/views/builder/migrations.ts": {
 				fieldKind: () => null,
 			},
-			"../../src/script/views/builder/conditions/base.mjs": {
+			"../../src/script/views/builder/conditions/base.ts": {
 				Condition: class {},
 			},
 		},

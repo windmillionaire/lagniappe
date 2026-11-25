@@ -1,24 +1,39 @@
 """Initialize services on the process-global Flask application."""
 
+from __future__ import annotations
 
-# @testable false
-# @reason Flask app startup is exercised through E2E app boot; unit coverage would require broad Flask/import scaffolding
-def initialize_app(app, csrf):
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask import Flask
+    from flask_wtf.csrf import CSRFProtect
+
+def initialize_app(
+    app: Flask,
+    csrf: CSRFProtect,
+    *,
+    initialize_services: bool = True,
+) -> None:
     """Initialize persistence, AI, entities, templates, errors, routes, and login."""
-    from lagniappe.core.tools import ai, cache
-    from lagniappe.core.tools.database import utility as database_utility
-    from lagniappe.core.tools.database import migrations
     from lagniappe.core import entities
     from . import blueprints, errors, jinja, login
 
-    cache.initialize()
-    fresh_install = database_utility.initialize()
-    migrations.initialize_fresh_install(fresh_install)
+    if initialize_services:
+        from lagniappe.core.tools import ai, cache
+        from lagniappe.core.tools.database import migrations
+        from lagniappe.core.tools.database import utility as database_utility
 
-    ai.initialize()
+        cache.initialize()
+        fresh_install = database_utility.initialize()
+        migrations.initialize_fresh_install(fresh_install)
+        ai.initialize()
+
     entities.initialize()
-    from lagniappe.core.tools.experiments import bootstrap
-    bootstrap()
+
+    if initialize_services:
+        from lagniappe.core.tools.experiments import bootstrap
+
+        bootstrap()
 
     jinja.initialize(app)
     errors.initialize(app)

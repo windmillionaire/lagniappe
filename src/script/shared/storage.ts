@@ -1,0 +1,86 @@
+/**
+ * Best-effort access to browser storage that never makes application behavior
+ * depend on storage availability.
+ *
+ */
+class StorageAdapter {
+	declare readonly name: "localStorage" | "sessionStorage";
+
+	constructor(name: "localStorage" | "sessionStorage") {
+		this.name = name;
+	}
+
+	_storage() {
+		try {
+			return globalThis[this.name] || null;
+		} catch {
+			return null;
+		}
+	}
+
+	get<T = null>(key: string, fallback: T | null = null) {
+		try {
+			const value = this._storage()?.getItem(key);
+			return value === null || value === undefined ? fallback : value;
+		} catch {
+			return fallback;
+		}
+	}
+
+	set(key: string, value: string) {
+		try {
+			const storage = this._storage();
+			if (!storage) return false;
+			storage.setItem(key, value);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	remove(key: string) {
+		try {
+			const storage = this._storage();
+			if (!storage) return false;
+			storage.removeItem(key);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	getJSON(key: string, fallback: unknown = null): unknown {
+		const value = this.get(key);
+		if (value === null) return fallback;
+
+		try {
+			return JSON.parse(value);
+		} catch {
+			this.remove(key);
+			return fallback;
+		}
+	}
+
+	setJSON(key: string, value: unknown) {
+		try {
+			const serialized = JSON.stringify(value);
+			if (serialized === undefined) return false;
+			return this.set(key, serialized);
+		} catch {
+			return false;
+		}
+	}
+}
+
+export const localStore = new StorageAdapter("localStorage");
+export const sessionStore = new StorageAdapter("sessionStorage");
+
+export const clearRecentSearchResults = () => {
+	const recentKeys = Array.from({ length: localStorage.length }, (_, index) =>
+		localStorage.key(index),
+	).filter((key): key is string => key?.startsWith("recent-") === true);
+
+	recentKeys.forEach((key) => {
+		localStorage.removeItem(key);
+	});
+};

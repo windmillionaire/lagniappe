@@ -10,6 +10,7 @@ import pytest
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import AI
+from lagniappe.core.definitions.asset import FileAsset
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.ai.reporting import uploads as report_uploads
 from lagniappe.core.tools.ai import external_api
@@ -79,10 +80,11 @@ class Actor:
 
 def _authenticated_client(monkeypatch, actor):
     client = app.test_client()
+    monkeypatch.setattr(Entities, "USER", Actor)
     monkeypatch.setattr(
         app.login_manager,
         "_user_callback",
-        lambda _identifier: actor,
+        lambda identifier: actor if identifier == actor.get_id() else None,
     )
     with client.session_transaction() as client_session:
         client_session["_user_id"] = actor.get_id()
@@ -147,8 +149,6 @@ def _allow_claimed_saves(monkeypatch, saved_reports=None):
     )
 
 
-# @pair agent-api:answer-context
-# @source lagniappe/web/routes/api/main.py::execute_tool
 def test_plan_free_reads_and_answer_context_do_not_create_reports(monkeypatch):
     actor = Actor()
     headers = {"Authorization": "Bearer valid-key"}
@@ -207,10 +207,6 @@ def test_plan_free_reads_and_answer_context_do_not_create_reports(monkeypatch):
     )
 
 
-# @matrix agent-api : rate-limit
-# @source lagniappe/web/routes/api/main.py::authenticate_request
-# @source lagniappe/web/routes/api/main.py::create_plan
-# @source lagniappe/web/routes/api/main.py::execute_tool
 def test_external_plan_start_limit_is_100_per_hour_without_raising_other_limits(
     monkeypatch,
 ):
@@ -298,7 +294,6 @@ def test_external_plan_start_limit_is_100_per_hour_without_raising_other_limits(
             rate_limiter.cache.redis.delete(*set(limiter_keys))
 
 
-# @matrix agent-api : discovery origin-validation proposal-contract
 def test_external_api_uses_only_a_configured_request_origin(monkeypatch):
     actor = Actor()
     report = _report(actor)
@@ -441,9 +436,6 @@ def test_external_api_uses_only_a_configured_request_origin(monkeypatch):
         assert read.json["result"]["summary"] == "See [source](/files/file-key)."
 
 
-# @matrix agent-api : bearer-only bootstrap contract create-revision organize-revision discovery error-envelope plan-session proposal-contract routing submission tool-catalog tool-dispatch uploads
-# @pairs agent-api:create-revision agent-api:organize-revision agent-api:plan-capability
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
 def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeypatch):
     allowed_origin = "https://workspace.example.test"
     monkeypatch.setattr(CONFIG, "GOOGLE_LOGIN_URI", allowed_origin)
@@ -501,6 +493,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     }
     assert authorized.json["capabilities"] == {
         "plans": True,
+        "execute_plan": False,
     }
 
     family = client.get(
@@ -572,10 +565,10 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     assert "/api/v1/plans/{plan_id}/submit" in openapi.json["paths"]
     assert set(openapi.json["paths"]["/api/v1/plans/{plan_id}/execute"]) == {"post"}
     assert (
-        "external API never applies those proposals"
+        "Proposals require authenticated browser approval"
         in openapi.json["info"]["description"]
     )
-    assert "website Execute control is the only" in openapi.json["info"]["description"]
+    assert "capabilities.execute_plan" in openapi.json["info"]["description"]
     assert "task=filing" in openapi.json["info"]["description"]
     assert "does not call a model" in openapi.json["info"]["description"]
     assert "one summary and two retrieval terms" in openapi.json["info"]["description"]
@@ -638,7 +631,9 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         "Updates and creation do not require files"
         in submit_operation["description"]
     )
-    assert "never executes actions" in submit_operation["description"]
+    assert "A mutation proposal becomes ready for review" in submit_operation["description"]
+    assert "When capabilities.execute_plan is true" in submit_operation["description"]
+    assert "Pass require_review=true to force browser review" in submit_operation["description"]
     assert "only after the user requests saving" in submit_operation["description"]
     assert "mutation proposal replaces" in submit_operation["description"]
     assert "submit it again" in submit_operation["description"]
@@ -1176,7 +1171,7 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
         key = "downloadable-file-key"
         entity_kind = "file"
         properties = SimpleNamespace(
-            file=SimpleNamespace(value=SimpleNamespace(path="private/person.vcf")),
+            file=SimpleNamespace(value=FileAsset({"path": "private/person.vcf"})),
             get=lambda _name: None,
         )
 
@@ -1369,7 +1364,6 @@ def test_external_agent_api_requires_bearer_and_dispatches_as_bound_user(monkeyp
     )
 
 
-# @matrix agent-api mcp-upload : last-writer upload-batch-identity uploads
 def test_upload_batch_identity_rejects_a_same_metadata_last_writer(monkeypatch):
     actor = Actor()
     report = _report(actor)
@@ -1546,7 +1540,6 @@ def test_upload_batch_identity_rejects_a_same_metadata_last_writer(monkeypatch):
     assert len([call for call in renew_calls if call[1]["phase"] == "finalize"]) == 1
 
 
-# @matrix agent-api mcp-upload : authoritative-reload concurrency checkpoint resume stale-snapshot
 def test_claimed_upload_routes_reload_before_storage_side_effects(monkeypatch):
     actor = Actor()
     headers = {"Authorization": "Bearer valid-key"}
@@ -1665,8 +1658,6 @@ def test_claimed_upload_routes_reload_before_storage_side_effects(monkeypatch):
     assert initial_finalize.upload_manifest[0].get("complete") is not True
 
 
-# @pairs agent-api:concurrency agent-api:plan-operation agent-api:submission
-# @pairs mcp-upload:concurrency mcp-upload:plan-operation
 def test_submission_is_serialized_with_upload_operations(monkeypatch):
     actor = Actor()
     report = _report(actor)
@@ -1702,7 +1693,6 @@ def test_submission_is_serialized_with_upload_operations(monkeypatch):
     assert claims[0][1]["phase"] == "submit"
 
 
-# @matrix agent-api : entitlement-independent public-user request-recheck stale-plan
 def test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibility(
     monkeypatch,
 ):
@@ -1733,6 +1723,7 @@ def test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibili
     assert actor_without_provider_access.status_code == 200
     assert actor_without_provider_access.json["capabilities"] == {
         "plans": True,
+        "execute_plan": False,
     }
 
     actor.is_public = True
@@ -1744,7 +1735,6 @@ def test_external_api_ignores_provider_entitlement_but_rechecks_public_eligibili
     }
 
 
-# @matrix agent-api : creator-bound generic-not-found plan-isolation
 def test_external_plan_resources_hide_other_users_plans(monkeypatch):
     owner = Actor()
     intruder = Actor()
@@ -1791,9 +1781,6 @@ def test_external_plan_resources_hide_other_users_plans(monkeypatch):
     assert owned.json["id"] == "report-key"
 
 
-# @source lagniappe/core/tools/ai/external/uploads.py::create_upload_sessions
-# @source lagniappe/core/tools/ai/external/plans.py::submit_plan_request
-# @pairs agent-api:ask-refinement agent-api:entitlement-independent agent-api:envelope-validation agent-api:tool-selection agent-api:plan-session agent-api:uploads agent-api:submission agent-api:plan-capability
 def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     class ProviderDisabledActor(Actor):
         ai_access = "NONE"
@@ -1818,9 +1805,18 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     )
     created_tools = []
 
-    def create(current, *, instructions, name=None, remote_mcp=False, revises_plan_id=None):
+    def create(
+        current,
+        *,
+        instructions,
+        name=None,
+        remote_mcp=False,
+        revises_plan_id=None,
+        require_review=False,
+    ):
         assert current is actor
         assert remote_mcp is False
+        assert require_review is False
         created_tools.append(instructions)
         report.instructions = instructions
         return report
@@ -1858,6 +1854,7 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     assert capabilities.status_code == 200
     assert capabilities.json["capabilities"] == {
         "plans": True,
+        "execute_plan": False,
     }
 
     create_draft = client.post(
@@ -1964,7 +1961,6 @@ def test_external_plan_types_are_available_without_provider_access(monkeypatch):
     assert missing_execution.json["error"]["code"] == "execution_forbidden"
 
 
-# @matrix agent-api ai-report : browser-review creator-bound short-link
 def test_api_plan_preview_redirect_is_session_and_creator_bound(monkeypatch):
     actor = Actor()
     actor.access = lambda required: False
@@ -2005,7 +2001,6 @@ def test_api_plan_preview_redirect_is_session_and_creator_bound(monkeypatch):
     assert "/tools/reports/report-key" not in logged_out.headers.get("Location", "")
 
 
-# @matrix agent-api user-settings : expiry revoke rotate shown-once
 def test_user_can_rotate_and_revoke_external_agent_api_key(monkeypatch):
     actor = Actor()
     actor.access = lambda required: False
@@ -2049,7 +2044,6 @@ def test_user_can_rotate_and_revoke_external_agent_api_key(monkeypatch):
     assert removed.json == {"credential": revoked}
 
 
-# @pair agent-api:provider-free-revision
 def test_api_report_revision_is_provider_blocked(monkeypatch):
     actor = Actor()
     report = _report(actor)
@@ -2078,7 +2072,6 @@ def test_api_report_revision_is_provider_blocked(monkeypatch):
     assert "Revise an unexecuted external plan through its originating assistant." in response.get_data(as_text=True)
 
 
-# @pair ai-access:provider-boundary
 @pytest.mark.parametrize("tier", [AI.NONE, AI.ASK, AI.CREATE])
 @pytest.mark.parametrize("origin,executed", [("api", True), ("web", True), ("web", False)])
 def test_browser_correction_requires_create_access(monkeypatch, tier, origin, executed):
@@ -2108,7 +2101,6 @@ def test_browser_correction_requires_create_access(monkeypatch, tier, origin, ex
         assert "Add feedback before revising" in response.get_data(as_text=True)
 
 
-# @matrix agent-api ai-report : browser-review cas delete skip-action
 @pytest.mark.parametrize(
     ("outcome", "message"),
     (
@@ -2191,7 +2183,6 @@ def test_api_report_browser_mutations_reject_fenced_state_without_side_effects(
     )
 
 
-# @matrix agent-api ai-report : browser-review delete report-execution
 def test_api_report_delete_rejects_active_execution_without_side_effects(monkeypatch):
     actor = Actor()
     report = _report(actor)
@@ -2226,7 +2217,6 @@ def test_api_report_delete_rejects_active_execution_without_side_effects(monkeyp
     assert "being updated" in response.get_data(as_text=True).lower()
 
 
-# @matrix agent-api ai-report : browser-review error-isolation report-execution
 def test_api_report_run_start_error_does_not_save_stale_report(monkeypatch):
     actor = Actor()
     actor.key = database_utility.create_named_key("user", actor.urlsafe_key)

@@ -7,8 +7,8 @@ view is mounted, read
 
 ## Startup boundaries
 
-`main.mjs` finds `[lp-view]`, imports the matching stable entry from
-`viewRegistry.mjs`, constructs it, and calls `init()`.
+`main.ts` finds `[lp-view]`, imports the matching stable entry from
+`viewRegistry.ts`, constructs it, and calls `init()`.
 
 ```text
 DOMContentLoaded
@@ -70,7 +70,7 @@ successful stage responses replace the controls from server state.
 ## Transition policy
 
 Cross-document navigation uses the CSS View Transition opt-in. In-page
-structural changes use `withTransition()` from `shared/transitions.mjs` with a
+structural changes use `withTransition()` from `shared/transitions.ts` with a
 synchronous callback. That module owns the single shared queue; consumers,
 including the `showBriefly()` utility, import it directly.
 

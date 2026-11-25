@@ -8,23 +8,13 @@ from lagniappe.core.definitions import DeferredJobType
 from .base import DeferredJobAdapter
 
 
-# @testable true
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_adapter_registry_rejects_duplicate_job_types
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_adapter_registry_rolls_back_failed_default_loading
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_adapter_registry_loads_defaults_once_across_threads
-# @matrix deferred-jobs : adapter-registry domain-strategy
 class DeferredJobAdapterRegistry:
-    def __init__(self):
-        self._adapters = {}
+    def __init__(self) -> None:
+        self._adapters: dict[DeferredJobType, DeferredJobAdapter] = {}
         self._defaults_loaded = False
         self._lock = RLock()
 
-    # @testable true
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_adapter_registry_rejects_duplicate_job_types
-    # @pair deferred-jobs:adapter-registration
-    def register(self, adapter):
+    def register[T: DeferredJobAdapter](self, adapter: T) -> T:
         if not isinstance(adapter, DeferredJobAdapter) or adapter.job_type is None:
             raise TypeError("Deferred job adapters require a job_type")
         with self._lock:
@@ -35,10 +25,7 @@ class DeferredJobAdapterRegistry:
             self._adapters[adapter.job_type] = adapter
         return adapter
 
-    # @testable true
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
-    # @pair deferred-jobs:adapter-lookup
-    def adapter(self, job_type):
+    def adapter(self, job_type: object) -> DeferredJobAdapter:
         self._load_default_adapters()
         if not isinstance(job_type, DeferredJobType):
             job_type = DeferredJobType(job_type)
@@ -49,10 +36,6 @@ class DeferredJobAdapterRegistry:
             )
         return adapter
 
-    # @testable true
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_adapter_registry_rolls_back_failed_default_loading
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_adapter_registry_loads_defaults_once_across_threads
-    # @matrix deferred-jobs : concurrency failure-isolation
     def _load_default_adapters(self):
         with self._lock:
             if self._defaults_loaded:

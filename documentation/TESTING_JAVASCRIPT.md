@@ -2,16 +2,18 @@
 
 JavaScript behavior tests live in `testing/tests_js/`. New tests are ordinary
 `test_*.mjs` modules using `node:test` and `node:assert/strict`. Pytest discovers
-each named case and runs it in a fresh Node process. Continue using the repo
-runner: selection, failures, reports, and traceability evidence stay in pytest.
+each named case, batches selected cases per file across a bounded Node worker
+pool (`LAGNIAPPE_JS_WORKERS`, default `min(8, cpu_count)`), and automatically
+falls back to an isolated per-case Node process whenever a file batch fails,
+misses a case, or hits a hook/runtime error (set `LAGNIAPPE_JS_BATCH=0` to force
+per-case execution directly). Continue using the repo runner for selection,
+failures, reports and recorded outcomes.
 
-Read [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) and
-[TESTING_TRACEABILITY_TOOL.md](TESTING_TRACEABILITY_TOOL.md) before adding or
-reshaping a test. An example is `testing/tests_js/test_045_offline_queue.mjs`.
-Harness contracts are exercised in `test_000_native_harness.mjs` and
-`test_000_native_runner.py`; the latter intentionally tests the Python bridge.
-`test_002_traceability_interop.py` likewise exercises the real Python-to-Node
-inventory boundary. Python-only traceability policies remain in tooling.
+Read [writing tests](TESTING_WRITING_TESTS.md) before adding or reshaping
+a test. `testing/tests_js/test_045_offline_queue.mjs` contains native cases.
+Harness tests in `test_000_native_harness.mjs` and `test_000_native_runner.py`
+exercise the Node runner and its Python bridge. Native discovery parses test
+declarations with `@babel/parser`.
 
 ## Commands and case declarations
 
@@ -64,7 +66,7 @@ This example can be placed directly in a `test_*.mjs` file:
 ```javascript
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { iconDefinition } from "../../src/script/shared/icons.mjs";
+import { iconDefinition } from "../../src/script/shared/icons.ts";
 
 test("test_page_icon_lookup", () => {
   assert.deepEqual(iconDefinition("page"), { glyph: "draft", fill: 1 });
@@ -72,8 +74,10 @@ test("test_page_icon_lookup", () => {
 });
 ```
 
-Production relative imports include their extension; directory imports name
-`index.mjs`. Styles and icons are normal generated modules. Never restore a
+Production relative imports include the file's extension—`.ts` for authored
+frontend modules and `.mjs` for generated style/icon registries. Name the index
+file explicitly for directory imports. Node strips erasable TypeScript when
+loading production modules. Styles and icons are normal generated modules. Never restore a
 virtual import or create a test-only copy of a production module. Full boot
 entries that import CSS remain build entry points; import the behavior owner
 in module tests and leave bundling checks in the build contract tests.
@@ -136,7 +140,7 @@ test("test_request_parses_server_html", async (t) => {
       });
     }
   });
-  const { request } = await import("../../src/script/shared/request.mjs");
+  const { request } = await import("../../src/script/shared/request.ts");
   const response = await request.get("/example");
   assert.equal(response.ok, true);
   assert.equal(response.html.querySelector("p").textContent, "Saved");
@@ -155,9 +159,9 @@ For consumer tests, import `esmock` and use:
 
 ```javascript
 const { OfflineQueue } = await esmock.strict(
-  "../../src/script/shared/offlineQueue.mjs",
+  "../../src/script/shared/offlineQueue.ts",
   {
-    "../../src/script/shared/request.mjs": {
+    "../../src/script/shared/request.ts": {
       request: { post: t.mock.fn(async () => ({ ok: true })) },
     },
   },
@@ -205,24 +209,21 @@ this helper. Keep fake time opt-in; do not make database tests depend on sleeps.
    export, exercise it through its exported owner. If that cannot preserve the
    assertion, document the obstacle and make a deliberate extraction into a
    production internal module; do not silently drop the assertion.
-6. Attach the original `@matrix`, `@pair`, `@source`, `@template`, `@style`, and
-   `@todo` comments immediately above each case. Update source `@tests` pointers
-   from `.py::name` to `.mjs::name`. Declare a source edge from one end only.
+6. Keep each case's `@template`, `@style` and relevant `@todo` comments
+   immediately above its declaration. Preserve its test name and macro identity.
+
 7. Compare the assertion checklist against the new cases. Check both positive
    and failure behavior. A mocked request's call count alone does not prove
    persistence, reconciliation, or user-visible state.
-8. Run the new file, an exact nodeid, and its traceability report. Run template
-   contracts for tests claiming template coverage. Fix stale links and tag
-   drift before removing the old file.
+8. Run the new file and an exact nodeid. Run template and style checks
+   for any markup or styles the cases exercise.
+
 9. Remove the Python wrapper and unused file-local harness. Preserve shared
    legacy helpers still used elsewhere. Run the relevant suite and final checks.
 
-Traceability inventories native cases statically. Their shared runner, helpers,
-package/lockfile, and registry inputs participate in evidence invalidation.
-Application ownership remains explicitly annotated. Literal selectors in JS
-cases participate in template-contract reporting; arbitrary helper-generated
-selectors are not inferred. Only tag a template when its real skeleton is part
-of the test contract, not merely because a hand-written HTML fixture resembles it.
+Native test declarations and literal selectors can be inspected statically.
+Tag a template when the test relies on its real DOM structure. Check dynamic
+selectors through behavioral tests.
 
 For a retained Python case that executes a separate Node program, declare that
 program immediately above the test:
@@ -233,14 +234,9 @@ def test_server_append_round_trips_through_yjs_and_editor_schema(node_binary):
     ...
 ```
 
-Use a repository-relative `.mjs` file path; repeat the tag for multiple programs.
-The program and its imported test helpers, shared Node test utilities, package
-manifests, Node pin, and registry inputs become execution dependencies of that
-Python case. A change makes its previous evidence stale and selects it for the
-changed-files check. Missing or invalid program paths are metadata errors.
-Keep application coverage in the existing `@source`/`@matrix` tags;
-`@node-program` declares execution inputs only. Merely storing a program path
-in a Python constant does not establish this dependency.
+Use a repository-relative `.mjs` file path and repeat the tag for multiple
+programs. The retained checkers use declared program files and shared harness
+inputs when evaluating the freshness of test evidence.
 
 ### Pilot assertion equivalence
 
@@ -285,10 +281,8 @@ worker tests into live-server tests solely to remove Python strings.
 
 ```bash
 venv/bin/python run.py test testing/tests_js/test_045_offline_queue.mjs
-venv/bin/python run.py traceability --test testing/tests_js/test_045_offline_queue.mjs
 venv/bin/python run.py test js
 npm run check
-venv/bin/python run.py traceability --changed --check
 ```
 
 For a template-tagged migration, also run `run.py template-contracts` with its

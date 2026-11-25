@@ -5,10 +5,7 @@ from runner.presentation import output as print
 from installer.errors import SetupError
 
 
-# @testable true
-# @tests tests_tooling/test_001l_setup_experiments.py::test_experiments_preset_preserves_existing_choices_and_rejects_conversion
-# @matrix experiments : configuration
-def configure(*, requested=False, first_install=False):
+def configure(*, requested: bool = False, first_install: bool = False) -> bool:
     from config import SETTINGS
     from config.experiments import normalize_experiments_config
 
@@ -50,10 +47,7 @@ def configure(*, requested=False, first_install=False):
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001l_setup_experiments.py::test_experiments_toolchain_builds_production_without_provisioning_test_resources
-# @matrix experiments : toolchain
-def prepare_toolchain():
+def prepare_toolchain() -> None:
     """Reuse local dependency setup without test buckets or a development build."""
     import sys
     from runner.context import NPM_CLI
@@ -92,10 +86,7 @@ def prepare_toolchain():
             raise SetupError(f"{label} failed; rerun setup to resume.")
 
 
-# @testable true
-# @tests tests_tooling/test_001l_setup_experiments.py::test_experiments_bootstrap_verification_requires_saved_accounts
-# @matrix experiments : bootstrap
-def verify_bootstrap(*, require_admin=False):
+def verify_bootstrap(*, require_admin: bool = False) -> None:
     """Start the normal app, then verify its persisted bootstrap outcome."""
     import requests
     from google.cloud import datastore
@@ -107,7 +98,7 @@ def verify_bootstrap(*, require_admin=False):
     origin = (
         f"https://{app['CUSTOM_DOMAIN']}"
         if app.get("CUSTOM_DOMAIN")
-        else app["APP_URL"]
+        else str(app["APP_URL"])
     )
     response = requests.get(
         f"{origin.rstrip('/')}/users/login", timeout=(10, 120), allow_redirects=False
@@ -128,7 +119,7 @@ def verify_bootstrap(*, require_admin=False):
     ):
         key = state.get(role)
         user = client.get(key) if key else None
-        if not user or str(user.get("email", "")).casefold() != email.casefold():
+        if not user or str(user.get("email", "")).casefold() != str(email).casefold():
             raise SetupError(f"Experiments {role} account could not be verified.")
         if role == "owner" and not user.get("owner"):
             raise SetupError("Experiments Owner role could not be verified.")

@@ -1,6 +1,7 @@
-# @testable false
-# @covered-by config/deployment.py::normalize_deployment_settings
-# @reason shared validation error exercised through deployment normalization
+
+from collections.abc import Mapping, MutableMapping
+
+
 class DeploymentSettingsError(ValueError):
     """Raised when deployment settings cannot be applied safely."""
 
@@ -9,9 +10,6 @@ MEMORY_SAFE_WORKER_CLASSES = frozenset({"F2", "B2"})
 MEMORY_SAFE_WORKER_LIMIT = 3
 
 
-# @testable false
-# @covered-by config/deployment.py::normalize_deployment_settings
-# @reason shared validation detail for deployment integer settings
 def _deployment_int(settings, defaults, key, label, min_value=1):
     value = settings.get(key, defaults[key])
     try:
@@ -19,7 +17,7 @@ def _deployment_int(settings, defaults, key, label, min_value=1):
     except (TypeError, ValueError):
         raise DeploymentSettingsError(
             f"{label} must be an integer greater than or equal to {min_value}."
-        )
+        ) from None
 
     if parsed < min_value:
         raise DeploymentSettingsError(
@@ -29,20 +27,21 @@ def _deployment_int(settings, defaults, key, label, min_value=1):
     return str(parsed)
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_deployment_settings_normalize_validation
-# @matrix config user-settings : app-yaml deployment-settings memory-pressure validation
-def normalize_deployment_settings(deployment_settings, *, enforce_worker_limit=True):
+def normalize_deployment_settings(
+    deployment_settings: Mapping[str, object] | None,
+    *,
+    enforce_worker_limit: bool = True,
+) -> dict[str, object]:
     from config import constants
 
     defaults = dict(constants.DEFAULT_DEPLOYMENT_SETTINGS)
     if not deployment_settings:
-        return defaults
+        return dict(defaults)
 
     scaling_type = deployment_settings.get(
         "DEPLOY_SCALING_TYPE", defaults["DEPLOY_SCALING_TYPE"]
     )
-    if scaling_type not in constants.SCALING_TYPES:
+    if not isinstance(scaling_type, str) or scaling_type not in constants.SCALING_TYPES:
         raise DeploymentSettingsError("Scaling type must be automatic or basic.")
 
     worker_count = _deployment_int(
@@ -53,7 +52,10 @@ def normalize_deployment_settings(deployment_settings, *, enforce_worker_limit=T
     )
     instance_class = deployment_settings.get(
         "DEPLOY_INSTANCE_CLASS", defaults["DEPLOY_INSTANCE_CLASS"]
-    ).upper()
+    )
+    if not isinstance(instance_class, str):
+        raise DeploymentSettingsError("Instance class must be a string.")
+    instance_class = instance_class.upper()
     min_idle_instances = _deployment_int(
         deployment_settings,
         defaults,
@@ -100,17 +102,13 @@ def normalize_deployment_settings(deployment_settings, *, enforce_worker_limit=T
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_deployment_settings_apply_automatic_scaling_preserves_unowned_app_config
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_deployment_settings_apply_basic_scaling_preserves_unowned_app_config
-# @matrix config : app-yaml deployment-settings
 def apply_deployment_settings(
-    app_config=None,
-    app_settings=None,
-    updated_settings=None,
+    app_config: MutableMapping[str, object] | None = None,
+    app_settings: MutableMapping[str, object] | None = None,
+    updated_settings: Mapping[str, object] | None = None,
     *,
-    enforce_worker_limit=True,
-):
+    enforce_worker_limit: bool = True,
+) -> MutableMapping[str, object]:
     from config import constants
 
     try:

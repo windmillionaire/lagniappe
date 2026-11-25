@@ -45,7 +45,7 @@ the preloaded records and takes the ordinary authenticated read path.
 
 ## Browser scheduler
 
-`src/script/shared/polling.mjs` owns scheduling for one mounted view. Each
+`src/script/shared/polling.ts` owns scheduling for one mounted view. Each
 subscription has a stable ID, type-specific fields, and an opaque revision.
 The coordinator:
 

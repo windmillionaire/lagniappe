@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, cast
+
 from flask_login import current_user
 
 from ..definitions import Action, FieldType, FilterOptions, MutationIntent, Ordering
@@ -16,20 +18,30 @@ from .base_property import Property
 from .form_special import Signature, Status
 
 
-# @testable true
-# @tests tests_unit/test_010_task_index.py::test_task_index_status_column_derives_messages_from_mixed_forms
-# @matrix status task-index : computed-column mixed-forms
-class TaskStatus(ColumnMixin, Property):
+if TYPE_CHECKING:
+    from ..entities import types as models
+    from ..entities.condition import Condition
+
+
+type _Task = models.Task
+type _TaskOrHistory = models.Task | models.TaskHistory
+type _Page = models.Page
+type _Category = models.Category
+type _File = models.File
+type _Model = models.ModelTask
+
+
+class TaskStatus(ColumnMixin, Property[list[str], _Task]):
     """Task-level status column derived from the task's attached form."""
 
     _id = "status"
     _label = "Status"
     _icon = "status"
-    _kind = "task"
+    _kind: str | None = "task"
     _ordering = Ordering.EXISTS
 
     @property
-    def status_field(self):
+    def status_field(self) -> Status | None:
         return next(
             (
                 field
@@ -40,27 +52,23 @@ class TaskStatus(ColumnMixin, Property):
         )
 
     @property
-    def value(self):
+    def value(self) -> list[str] | None:  # pyright: ignore[reportIncompatibleMethodOverride] -- This projection is computed and read-only.
         field = self.status_field
         return field.value if field else None
 
     @property
-    def column_value(self):
+    def column_value(self) -> list[str] | None:
         field = self.status_field
         return field.column_value if field else None
 
     @property
-    def sort_value(self):
+    def sort_value(self) -> bool | None:
         field = self.status_field
         return field.sort_value if field else None
 
 
-# @testable true
-# @tests tests_unit/test_005_project_properties.py::test_project_filters
-# @tests tests_unit/test_013_task_properties.py::test_task_categories_follow_parent_page_categories
-# @matrix task : categories conditions entity-fields filter-value parent-derived
 class TaskCategories(
-    RelatedEntityListMixin, FilterMixin, ColumnMixin, AIMixin, Property
+    RelatedEntityListMixin[_Category], FilterMixin, ColumnMixin, AIMixin, Property[list[_Category], _Task]
 ):
     """Categories for a task, derived from the task's parent page.
 
@@ -68,10 +76,11 @@ class TaskCategories(
     an empty list if the task has no page.
     """
 
+    _value: object
     _id = "categories"
     _label = "Categories"
     _icon = "category"
-    _kind = "category"
+    _kind: str | None = "category"
 
     # Filter Attributes
     _placeholder = "select a category..."
@@ -79,22 +88,23 @@ class TaskCategories(
     multiple = True
 
     @property
-    def value(self):
+    def value(self) -> list[models.Category]:  # pyright: ignore[reportIncompatibleMethodOverride] -- This projection is computed and read-only.
         if not self.entity.page:
             return []
 
-        self._value = self.entity.page.categories
-        return self._value
+        categories = self.entity.page.categories
+        self._value = categories
+        return categories
 
     @property
-    def filter_label(self):
+    def filter_label(self) -> str:
         return "In Categories"
 
     @property
-    def sort_value(self):
+    def sort_value(self) -> dict[str, str | None]:
         return {entity.hash: entity.name for entity in self.value}
 
-    def filter_details(self, condition):
+    def filter_details(self, condition: Condition) -> dict[str, object]:
         details = super().filter_details(condition)
         details["kind"] = "category"
         if "entity" in details:
@@ -103,11 +113,7 @@ class TaskCategories(
         return details
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_related_lists_replace_linked_pages_and_report_unloaded_files
-# @tests tests_unit/test_013_task_properties.py::test_task_update_saves_file_relations_from_upload_assets
-# @matrix task : file-assets file-details preload related-files unloaded-fallback
-class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
+class TaskFiles(RelatedEntityListMixin[_File], ColumnMixin, AIMixin, DBProperty[list[_File], _TaskOrHistory]):
     """Files related to a task.
 
     Get:
@@ -117,13 +123,13 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
     # Property Attributes
     _id = "files"
     _label = "Attachments"
-    _kind = "file"
+    _kind: str | None = "file"
     _icon = "file"
 
-    def _file_asset_preload_key(self, file):
+    def _file_asset_preload_key(self, file: models.File) -> str:
         return file.filename or file.name or file.hash
 
-    def _track_file_update(self, file):
+    def _track_file_update(self, file: models.File) -> None:
         file.normalize_owner()
         self.entity.add_mutation_intents(
             MutationIntent.patch(
@@ -137,21 +143,21 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
             )
         )
 
-    def _link_file(self, file):
+    def _link_file(self, file: models.File) -> None:
         if not file or not getattr(self.entity, "key", None):
             return
 
         if self.entity.entity_kind == "task_history":
             if not file.has_references:
-                file.task = self.entity.task
+                file.task = cast("models.TaskHistory", self.entity).task
                 self._track_file_update(file)
             return
         if file.has_references and file.properties.task.key != self.entity.key:
             raise ValidationError("Move the File to this Task before attaching it")
-        file.task = self.entity
+        file.task = cast("models.Task", self.entity)
         self._track_file_update(file)
 
-    def _unlink_file(self, file):
+    def _unlink_file(self, file: models.File) -> None:
         if not file or not getattr(self.entity, "key", None):
             return
 
@@ -160,12 +166,12 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
         return
 
     @property
-    def value(self):
-        return RelatedEntityListMixin.value.fget(self)
+    def value(self) -> list[models.File]:
+        return self._read_related_list()
 
     @value.setter
-    def value(self, value):
-        existing = {file.key: file for file in RelatedEntityListMixin.value.fget(self)}
+    def value(self, value: list[models.File] | None) -> None:
+        existing = {file.key: file for file in self._read_related_list()}
         updated = {file.key: file for file in value or []}
 
         for key, file in existing.items():
@@ -174,22 +180,22 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
         for file in updated.values():
             self._link_file(file)
 
-        RelatedEntityListMixin.value.fset(self, value)
+        self._write_related_list(value)
 
-    def add(self, value):
+    def add(self, value: models.File) -> bool | None:
         added = super().add(value)
         if added:
             self._link_file(value)
         return added
 
-    def remove(self, value):
-        removed = super().remove(value)
+    def remove(self, value: models.File) -> bool:
+        removed = self._remove_related(value)
         if removed:
             self._unlink_file(value)
         return removed
 
     @property
-    def preload(self):
+    def preload(self) -> dict[str, dict[str, object]]:
         preload = {}
 
         for file in self.value:
@@ -205,9 +211,10 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
         return preload
 
     @property
-    def column_value(self):
-        if getattr(self, "_column_value", None) is not None:
-            return self._column_value
+    def column_value(self) -> list[dict[str, object]]:
+        cached = getattr(self, "_column_value", None)
+        if cached is not None:
+            return cached
         elif not self.value:
             return []
 
@@ -220,7 +227,7 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
         return self._column_value
 
     @property
-    def ai_value(self):
+    def ai_value(self) -> list[dict[str, object]] | None:
         files = []
         for file in self.value:
             if (
@@ -234,13 +241,10 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
 
     # Column Attributes
     @property
-    def sort_value(self):
+    def sort_value(self) -> int | None:
         return len(self.value) if self.value else None
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_has_signature_filter_value
-# @matrix filters signature task : filter-value schema-field
-class HasSignature(FilterMixin, Property):
+class HasSignature(FilterMixin, Property[bool, _Task]):
     """Whether a task's schema includes a signature and the task has one saved.
 
     Returns ``None`` for tasks whose schema has no signature field, ``False`` for
@@ -251,7 +255,7 @@ class HasSignature(FilterMixin, Property):
     _id = "has_signature"
     _label = "Has Signature"
     _icon = "signature"
-    _kind = "task"
+    _kind: str | None = "task"
 
     # Filter Attributes
     _field_type = FieldType.BOOLEAN
@@ -260,7 +264,7 @@ class HasSignature(FilterMixin, Property):
     _default = "IS_TRUE"
 
     @property
-    def signature_field(self):
+    def signature_field(self) -> Signature | None:
         return next(
             (
                 field
@@ -271,23 +275,18 @@ class HasSignature(FilterMixin, Property):
         )
 
     @property
-    def value(self):
+    def value(self) -> bool | None:  # pyright: ignore[reportIncompatibleMethodOverride] -- This projection is computed and read-only.
         field = self.signature_field
         if not field:
             return None
-        return True if field.value else False
+        return bool(field.value)
 
     @property
-    def filter_value(self):
+    def filter_value(self) -> bool | None:
         return self.value
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_has_status_filter_value
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_has_status_renders_status_column
-# @matrix filters status : boolean-condition filter-value run-results schema-field
-# @matrix task : filter-value schema-field
-class HasStatus(FilterMixin, Property):
+class HasStatus(FilterMixin, Property[bool, _Task]):
     """Whether a task's schema includes status and any status is active.
 
     Returns ``None`` for tasks whose schema has no status field, ``False`` for
@@ -298,7 +297,7 @@ class HasStatus(FilterMixin, Property):
     _id = "has_status"
     _label = "Has Status"
     _icon = "status"
-    _kind = "task"
+    _kind: str | None = "task"
 
     # Filter Attributes
     _field_type = FieldType.BOOLEAN
@@ -307,7 +306,7 @@ class HasStatus(FilterMixin, Property):
     _default = "IS_TRUE"
 
     @property
-    def status_field(self):
+    def status_field(self) -> Status | None:
         return next(
             (
                 field
@@ -318,23 +317,18 @@ class HasStatus(FilterMixin, Property):
         )
 
     @property
-    def value(self):
+    def value(self) -> bool | None:  # pyright: ignore[reportIncompatibleMethodOverride] -- This projection is computed and read-only.
         field = self.status_field
         if not field:
             return None
-        return True if field.value else False
+        return bool(field.value)
 
     @property
-    def filter_value(self):
+    def filter_value(self) -> bool | None:
         return self.value
 
 
-# @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_without_schedule
-# @tests tests_unit/test_013_task_properties.py::test_task_assignment_records_assigned_by_user_page
-# @matrix task : assigned-by assignee assignment
-# @pair task-completion:assignee
-class AssignedTo(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProperty):
+class AssignedTo(RelatedEntityMixin[_Page], ColumnMixin, FilterMixin, AIMixin, DBProperty[_Page, _Task]):
     """User that a task is assigned to.
 
     Setting this also records who made the assignment (assigned_by)
@@ -349,27 +343,27 @@ class AssignedTo(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProper
 
     # Property Attributes
     _id = "assigned_to"
-    _kind = "user"
+    _kind: str | None = "user"
     _label = "Assigned To"
     _icon = "user"
     _text = "Assigned to:"
 
     @property
-    def value(self):
+    def value(self) -> models.Page | None:
         return super().value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: models.User | models.Page | None) -> None:
         if not value:
-            RelatedEntityMixin.value.fset(self.entity.properties.assigned_by, None)
-            RelatedEntityMixin.value.fset(self, None)
+            self.entity.properties.assigned_by._write_related(None)
+            self._write_related(None)
             return
 
-        assigned_to = value.page if isinstance(value, Entities.USER) else value
+        assigned_to = value.page if isinstance(value, Entities.USER) else cast("models.Page", value)
         if current_user and current_user.is_authenticated:
-            self.entity.assigned_by = current_user
+            self.entity.properties.assigned_by.value = cast("models.User", current_user)
 
-        RelatedEntityMixin.value.fset(self, assigned_to)
+        self._write_related(assigned_to)
 
     # Column Attributes
     _ordering = Ordering.CATEGORICAL
@@ -383,10 +377,7 @@ class AssignedTo(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProper
     multiple = True
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_assignment_records_assigned_by_user_page
-# @pair task:assigned-by
-class AssignedBy(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProperty):
+class AssignedBy(RelatedEntityMixin[_Page], ColumnMixin, FilterMixin, AIMixin, DBProperty[_Page, _Task]):
     """User who assigned the task. Only accepts authenticated users.
 
     Set:
@@ -398,21 +389,21 @@ class AssignedBy(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProper
 
     # Property Attributes
     _id = "assigned_by"
-    _kind = "user"
+    _kind: str | None = "user"
     _label = "Assigned By"
     _icon = "user"
     _text = "Assigned by:"
 
     @property
-    def value(self):
+    def value(self) -> models.Page | None:
         return super().value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: models.User | models.Page | None) -> None:
         if not isinstance(value, Entities.USER) or not value.is_authenticated:
             return
 
-        RelatedEntityMixin.value.fset(self, value.page)
+        self._write_related(value.page)
 
     # Column Attributes
     _ordering = Ordering.CATEGORICAL
@@ -426,10 +417,7 @@ class AssignedBy(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProper
     multiple = True
 
 
-# @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_without_schedule
-# @pair task-completion:completed-by
-class CompletedBy(RelatedEntityMixin, FilterMixin, AIMixin, ColumnMixin, DBProperty):
+class CompletedBy(RelatedEntityMixin[_Page], FilterMixin, AIMixin, ColumnMixin, DBProperty[_Page, _TaskOrHistory]):
     """User who completed the task. Only accepts authenticated users.
 
     Set:
@@ -441,20 +429,20 @@ class CompletedBy(RelatedEntityMixin, FilterMixin, AIMixin, ColumnMixin, DBPrope
 
     # Property Attributes
     _id = "completed_by"
-    _kind = "user"
+    _kind: str | None = "user"
     _label = "Completed By"
     _icon = "completedBy"
     _text = "Completed by:"
 
     @property
-    def value(self):
+    def value(self) -> models.Page | None:
         return super().value
 
     @value.setter
-    def value(self, value):
-        completed_by = value.page if isinstance(value, Entities.USER) else value
+    def value(self, value: models.User | models.Page | None) -> None:
+        completed_by = value.page if isinstance(value, Entities.USER) else cast("models.Page | None", value)
 
-        RelatedEntityMixin.value.fset(self, completed_by)
+        self._write_related(completed_by)
 
     # Column Attributes
     _ordering = Ordering.CATEGORICAL
@@ -468,10 +456,7 @@ class CompletedBy(RelatedEntityMixin, FilterMixin, AIMixin, ColumnMixin, DBPrope
     multiple = True
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_related_lists_replace_linked_pages_and_report_unloaded_files
-# @matrix task : linked-pages replacement
-class LinkedPages(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
+class LinkedPages(RelatedEntityListMixin[_Page], ColumnMixin, AIMixin, DBProperty[list[_Page], _TaskOrHistory]):
     """Pages linked to a task (beyond the parent page).
 
     The setter stores the current submission-derived page links and excludes
@@ -486,19 +471,19 @@ class LinkedPages(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
 
     # Property Attributes
     _id = "linked_pages"
-    _kind = "page"
+    _kind: str | None = "page"
     _label = "Linked Pages"
     _icon = "page"
 
     @property
-    def value(self):
+    def value(self) -> list[models.Page]:
         return super().value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: list[models.Page] | None) -> None:
         self._set_value(value)
 
-    def _set_value(self, value):
+    def _set_value(self, value: list[models.Page] | None) -> None:
         self._column_value = None
         existing = {p.key: p for p in super().value if p}
         page_key = self.entity.page.key if self.entity.page else None
@@ -510,7 +495,7 @@ class LinkedPages(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
             }.values()
         )
 
-        RelatedEntityListMixin.value.fset(self, linked)
+        self._write_related_list(linked)
         updated_keys = {p.key for p in linked}
         for key, page in existing.items():
             if key not in updated_keys:
@@ -519,10 +504,7 @@ class LinkedPages(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
                 )
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_model_and_page_details_attach_from_key_map
-# @pair task:model
-class TaskModel(RelatedEntityMixin, FilterMixin, AIMixin, DBProperty):
+class TaskModel(RelatedEntityMixin[_Model], FilterMixin, AIMixin, DBProperty[_Model, _Task]):
     """The model task (workflow stage) that a task belongs to within its project.
 
     Set:
@@ -536,16 +518,13 @@ class TaskModel(RelatedEntityMixin, FilterMixin, AIMixin, DBProperty):
     _id = "model"
     _label = "Model Task"
 
-    # @testable true
-    # @tests tests_unit/test_013_task_properties.py::test_task_model_tracking_inherits_model_form
-    # @matrix task : inheritance model-form
     @property
-    def value(self):
-        return RelatedEntityMixin.value.fget(self)
+    def value(self) -> models.ModelTask | None:
+        return self._read_related()
 
     @value.setter
-    def value(self, value):
-        RelatedEntityMixin.value.fset(self, value)
+    def value(self, value: models.ModelTask | None) -> None:
+        self._write_related(value)
         if not value or getattr(self.entity.properties.form, "key", None):
             return
 
@@ -553,10 +532,7 @@ class TaskModel(RelatedEntityMixin, FilterMixin, AIMixin, DBProperty):
         if form:
             self.entity.form = form
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/task_related.py::TaskModel.value
-    # @reason loaded model-form inheritance is asserted through the model setter
-    def _model_form(self, model):
+    def _model_form(self, model: models.ModelTask) -> models.Form | None:
         form_property = getattr(getattr(model, "properties", None), "form", None)
         if not form_property:
             return None
@@ -569,14 +545,11 @@ class TaskModel(RelatedEntityMixin, FilterMixin, AIMixin, DBProperty):
 
     # Filter attributes
     @property
-    def filter_key(self):
+    def filter_key(self) -> str:  # pyright: ignore[reportIncompatibleMethodOverride] -- Model ownership exposes a fixed filter key.
         return "model"
 
 
-# @testable true
-# @tests tests_unit/test_013_task_properties.py::test_task_model_and_page_details_attach_from_key_map
-# @matrix task : attach details page
-class TaskPage(RelatedEntityMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty):
+class TaskPage(RelatedEntityMixin[_Page], DetailsMixin, FilterMixin, AIMixin, DBProperty[_Page, _Task]):
     """Page for a task. Tasks inherit permissions from their page.
 
     Set:
@@ -594,16 +567,16 @@ class TaskPage(RelatedEntityMixin, DetailsMixin, FilterMixin, AIMixin, DBPropert
     _label = "Page"
 
     @property
-    def value(self):
+    def value(self) -> models.Page | None:
         return super().value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: models.Page | None) -> None:
         previous = self.value
         previous_key = previous.key if previous else None
         next_key = value.key if value else None
 
-        RelatedEntityMixin.value.fset(self, value)
+        self._write_related(value)
 
         if previous_key != next_key:
             self.entity.properties.restricted_to.unset()
@@ -615,11 +588,11 @@ class TaskPage(RelatedEntityMixin, DetailsMixin, FilterMixin, AIMixin, DBPropert
 
     # Details Attributes
     @property
-    def details_key(self):
+    def details_key(self) -> str:
         return "parent"
 
     @property
-    def details_value(self):
+    def details_value(self) -> dict[str, object] | None:
         if not self.entity.page:
             return None
 

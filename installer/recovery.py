@@ -1,5 +1,8 @@
 """Read-only provider discovery for canonical settings recovery."""
 
+from collections.abc import Mapping
+
+
 import json
 from urllib.parse import urlparse
 
@@ -13,17 +16,10 @@ AVAILABLE = "AVAILABLE"
 UNAVAILABLE = "UNAVAILABLE"
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason recovery-specific provider state error exercised through verification
 class RecoveryResourceError(RuntimeError):
     """Raised when recovered provider resources cannot be safely verified."""
 
 
-# @testable false
-# @covered-by installer/recovery.py::_probe_gcloud_json
-# @covered-by installer/recovery.py::_probe_ocr
-# @reason provider error classification exercised through public recovery verification
 def _provider_error_state(error):
     status_code = getattr(error, "status_code", None)
     code = getattr(error, "code", None)
@@ -49,9 +45,6 @@ def _provider_error_state(error):
     return UNAVAILABLE
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_provider_states_distinguish_absent_from_unavailable
-# @matrix setup : failure-isolation provider-discovery recovery
 def _probe_gcloud_json(command):
     """Return a three-state observation for an explicitly targeted gcloud lookup."""
     result = run_gcloud_command(command, check=False)
@@ -75,9 +68,6 @@ def _probe_gcloud_json(command):
     return {"state": AVAILABLE, "details": details, "error": None}
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_service_account(project_id, email):
     return _probe_gcloud_json(
         [
@@ -91,9 +81,6 @@ def _probe_service_account(project_id, email):
     )
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_enabled_api(project_id, service_name):
     result = run_gcloud_command(
         [
@@ -131,9 +118,6 @@ def _probe_enabled_api(project_id, service_name):
     }
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_service_account_policy(project_id, email):
     return _probe_gcloud_json(
         [
@@ -147,18 +131,12 @@ def _probe_service_account_policy(project_id, email):
     )
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_app_engine(project_id):
     return _probe_gcloud_json(
         ["app", "describe", f"--project={project_id}", "--format=json"]
     )
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_runtime_version(project_id):
     return _probe_gcloud_json(
         [
@@ -174,9 +152,6 @@ def _probe_runtime_version(project_id):
     )
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_task_queue(project_id, region, queue_name):
     return _probe_gcloud_json(
         [
@@ -191,9 +166,6 @@ def _probe_task_queue(project_id, region, queue_name):
     )
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason command construction is checked through the public provider recovery report
 def _probe_bucket(project_id, bucket_name):
     return _probe_gcloud_json(
         [
@@ -207,9 +179,6 @@ def _probe_bucket(project_id, bucket_name):
     )
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason provider client construction is checked through the public provider recovery report
 def _probe_ocr(project_id, location, processor_name):
     try:
         from google.api_core.client_options import ClientOptions
@@ -237,9 +206,6 @@ def _probe_ocr(project_id, location, processor_name):
         }
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_recovery_gets_live_config
-# @matrix setup : identity-platform recovery
 def _probe_identity_platform(project_id):
     try:
         import requests
@@ -277,9 +243,6 @@ def _probe_identity_platform(project_id):
         }
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason Redis setup adapter is checked through the public provider recovery report
 def _probe_redis(settings):
     from installer.redis import test_redis_connection
 
@@ -292,9 +255,6 @@ def _probe_redis(settings):
     }
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason state enforcement is exercised through the public provider recovery report
 def _require_observable(name, observation):
     if observation["state"] == UNAVAILABLE:
         raise RecoveryResourceError(
@@ -304,15 +264,15 @@ def _require_observable(name, observation):
     return observation
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_provider_discovery_targets_only_recovered_project
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_reports_missing_signing_setup_as_repairable_drift
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_provider_mismatch_or_unavailable_stops_before_mutation
-# @matrix setup : failure-isolation keyless-config project-identity project-number provider-discovery recovery repair
-def verify_recovery_resources(settings, project_id, *, project_details=None):
+def verify_recovery_resources(
+    settings: Mapping[str, object],
+    project_id: str,
+    *,
+    project_details: Mapping[str, object] | None = None,
+) -> dict[str, dict[str, object]]:
     """Discover saved resource markers without mutating or replacing the snapshot."""
-    runtime_email = settings["RUNTIME_SERVICE_ACCOUNT_EMAIL"]
-    internal_caller_email = settings["INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL"]
+    runtime_email = str(settings["RUNTIME_SERVICE_ACCOUNT_EMAIL"])
+    internal_caller_email = str(settings["INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL"])
     if runtime_email.casefold() != internal_caller_email.casefold():
         raise RecoveryResourceError(
             "Recovered internal caller does not match the runtime service account."
@@ -386,7 +346,7 @@ def verify_recovery_resources(settings, project_id, *, project_details=None):
         _probe_app_engine(project_id),
     )
     if report["app-engine"]["state"] == AVAILABLE:
-        expected_host = urlparse(settings["APP_URL"]).hostname
+        expected_host = urlparse(str(settings["APP_URL"])).hostname
         details = report["app-engine"]["details"] or {}
         provider_project = details.get("id") or details.get("projectId")
         if provider_project and provider_project != project_id:
@@ -398,7 +358,7 @@ def verify_recovery_resources(settings, project_id, *, project_details=None):
             or details.get("default_hostname")
             or ""
         )
-        if provider_host and provider_host.casefold() != expected_host.casefold():
+        if provider_host and provider_host.casefold() != (expected_host or "").casefold():
             raise RecoveryResourceError(
                 "Recovered App Engine hostname does not match the provider."
             )

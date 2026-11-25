@@ -1,32 +1,54 @@
+from typing import TYPE_CHECKING, Required, Self, TypedDict, Unpack
+
 from flask import url_for
 
 from ..definitions import Action
 from ..mixins import AssetMixin
 from ..properties import common_assets, common_entity, project
-from .entity import Entity
-from .index import TaskIndex
+from .entity import Entity, EntityProperties
+from .index import CollectionOptions, TaskIndex
 
 
-# @testable true
-# @tests tests_unit/test_005_project_properties.py::test_project_update_sets_identity_and_description
-# @pair project:update
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+
+    from . import property_types
+    from .model_task import ModelTask
+
+
+class ProjectData(TypedDict, total=False):
+    name: Required[str | None]
+    description: str | None
+
+
 class Project(Entity, AssetMixin):
+    if TYPE_CHECKING:
+        description: str | None
+
+        @property
+        def filters(self) -> project.ProjectFilters: ...
+
+        model_tasks: list[ModelTask]
+
+        @property
+        def properties(self) -> property_types.ProjectProperties: ...
+
     entity_kind = "project"
     retired_fields = frozenset({"attributes"})
 
     @property
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         return frozenset({"description"})
 
     @property
-    def required(self):
+    def required(self) -> list[str]:
         return ["models", self.hash]
 
     @property
-    def url(self):
+    def url(self) -> str:
         return url_for("projects.view", key=self.urlsafe_key)
 
-    def _get_properties(self):
+    def _get_properties(self) -> EntityProperties:
         properties = super()._get_properties()
         properties.update(
             {
@@ -42,7 +64,7 @@ class Project(Entity, AssetMixin):
         return properties
 
     @property
-    def sync_ids(self):
+    def sync_ids(self) -> dict[str, dict[str, str | None]]:
         return {
             "document": {
                 "id": self.properties.document.sync_id,
@@ -50,12 +72,15 @@ class Project(Entity, AssetMixin):
             },
         }
 
-    def state(self, sync_id):
+    def state(self, sync_id: str) -> dict[str, object]:
         if not self.allowed(Action.VIEW):
             return {}
 
-        state = {
-            "timestamp": self.modified.timestamp(),
+        modified = self.modified
+        if modified is None:
+            raise AttributeError("The project has no modification timestamp")
+        state: dict[str, object] = {
+            "timestamp": modified.timestamp(),
             "ydoc": self.properties.document.ydoc,
             "fingerprint": self.properties.document.fingerprint,
         }
@@ -64,14 +89,11 @@ class Project(Entity, AssetMixin):
 
         return state
 
-    def index(self, *args, **kwargs):
-        return TaskIndex(*args, entity=self, **kwargs)
+    def index(self, *args: object, undated: bool = False, **kwargs: Unpack[CollectionOptions]) -> TaskIndex:
+        return TaskIndex(*args, entity=self, undated=undated, **kwargs)
 
-    # @testable true
-    # @tests tests_unit/test_032h_report_batches.py::test_dependent_creations_share_one_commit
-    # @matrix ai-report : batching identity dependencies
     @classmethod
-    def create(cls, data, *, key=None):
+    def create(cls, data: ProjectData, *, key: Key | None = None) -> Self:
         new_project = cls(key)
         new_project.kind = cls.entity_kind
         new_project.properties.model_tasks._value = []
@@ -79,9 +101,6 @@ class Project(Entity, AssetMixin):
 
         return new_project
 
-    # @testable true
-    # @tests tests_unit/test_005_project_properties.py::test_project_update_sets_identity_and_description
-    # @matrix project : description identity update
-    def update(self, data):
+    def update(self, data: ProjectData) -> None:
         self.name = data["name"]
         self.description = data.get("description")

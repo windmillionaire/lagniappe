@@ -15,9 +15,6 @@ REFERENCE = {
 }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/functions.py::tool_catalog
-# @reason schema construction is published and asserted through the canonical catalog
 def _object(*required, properties=None):
     return {
         "type": "object",

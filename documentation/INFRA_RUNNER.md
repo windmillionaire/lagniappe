@@ -61,7 +61,7 @@ provider provisioning.
 | `run.py test ...` | `runner/pytest_routing.py`, `runner/testing.py`, and pytest configuration. |
 | `run.py test-server ...` | Managed Flask server and test-data lifecycle. |
 | `run.py browser-review ...` | Browser evidence and curated report tools. |
-| `run.py traceability ...` | Source/test/template/style evidence. |
+| `run.py style-contracts ...` | Style and icon checks, including test evidence. |
 | `run.py template-contracts ...` | Jinja/selector contracts. |
 | `run.py hosted-e2e ...` | Hosted App Engine/Cloud Run lifecycle. |
 | `run.py release-check ...` | Frozen release-tree validation. |
@@ -108,7 +108,7 @@ environment: the five `testing/tests_unit/test_033*.py` files cover the API
 adapter, file boundary, HTTP server, ChatGPT attachments and terminal uploads.
 They run exactly once there, while the root pytest process explicitly ignores
 them. Focused paths or nodeids take the same bridge. The runner validates and
-merges the isolated outcomes into ordinary traceability evidence and combines
+merges the isolated outcomes into the tracked test-result manifest and combines
 the two pytest exit statuses without treating an empty companion selection as
 a failure.
 

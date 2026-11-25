@@ -1,3 +1,19 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from . import property_types
+    from .file import File
+    from google.cloud.datastore import Key
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.entities.entity import EntityProperties
+    from lagniappe.core.mixins.field_host import FieldUser
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ReportProposal
+    from lagniappe.core.tools.ai.reporting.execution.ledger import ReportLedger
+    from typing import Literal, Self
+
+
 from .entity import Entity
 from ..definitions import Action
 from ..properties import activity
@@ -6,23 +22,71 @@ from ..properties import ai_report_process
 from ..properties import ai_report_proposal
 from ..properties import ai_report_result
 from ..tools.auth.context import current_context_user
+from werkzeug.local import LocalProxy
+
 
 REPORT_FORMAT_VERSION = 2
 UNAVAILABLE_PLAN_MESSAGE = "this plan is no longer available"
 
 
-# @testable true
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_create_and_file_cleanup
-# @tests tests_unit/test_032_agent_api.py::test_api_report_draft_preserves_agent_manifest
-# @matrix ai-report : create delete files status
-# @pair agent-api:report-session
+class ReportCreation(TypedDict, total=False):
+    parent: models.User | None
+    user: models.User | None
+    input_files: list[models.File]
+    format_version: int
+    file_usage: list[dict[str, object]] | None
+    upload_manifest: list[dict[str, object]] | None
+    proposal: ReportProposal | dict[str, object] | None
+    result: ReportLedger | dict[str, object] | None
+    agent_manifest: dict[str, object] | None
+    inbound_manifest: dict[str, object] | None
+    deferred_job: dict[str, object] | None
+    name: str | None
+    instructions: str | None
+    origin: str | None
+    status: str | None
+    summary: str | None
+    error: str | None
+    pending: bool
+
+
 class AIReport(Entity):
     """AI-generated report containing an ordered, deterministic action proposal."""
+    if TYPE_CHECKING:
+        parent: Entity | None
+        user: models.User | None
+        format_version: int | None
+        file_usage: list[dict[str, object]] | None
+        upload_manifest: list[dict[str, object]] | None
+        inbound_manifest: dict[str, object] | None
+        origin: str
+        instructions: str | None
+        summary: str | None
+        error: str | None
+        pending: bool
+        input_files: list[File]
+
+        agent_manifest: dict[str, object] | None
+        deferred_job: dict[str, object] | None
+        @property
+        def proposal(self) -> ReportProposal | None: ...
+        @proposal.setter
+        def proposal(self, value: ReportProposal | dict[str, object] | None) -> None: ...
+
+        @property
+        def result(self) -> ReportLedger | None: ...
+        @result.setter
+        def result(self, value: ReportLedger | dict[str, object] | None) -> None: ...
+
+        status: str | None
+
+        @property
+        def properties(self) -> property_types.AIReportProperties: ...
 
     entity_kind = "report"
 
     @property
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         return frozenset(
             {
                 "instructions",
@@ -36,10 +100,12 @@ class AIReport(Entity):
                 "error",
                 "deferred_job",
                 "correction",
+                "auto_execute",
+                "auto_execute_pause_reason",
             }
         )
 
-    def _get_properties(self):
+    def _get_properties(self) -> EntityProperties:
         properties = super()._get_properties()
         properties.update(
             {
@@ -66,11 +132,8 @@ class AIReport(Entity):
         )
         return properties
 
-    # @testable true
-    # @tests tests_unit/test_020b_ai_planner.py::test_report_availability_rejects_old_and_malformed_records
-    # @matrix ai-report : validation status unavailable
     @property
-    def available(self):
+    def available(self) -> bool:
         if self.format_version != REPORT_FORMAT_VERSION:
             return False
         try:
@@ -105,24 +168,21 @@ class AIReport(Entity):
         except (ValueError, TypeError, AttributeError, KeyError):
             return False
 
-    # @testable false
-    # @covered-by lagniappe/core/entities/ai_report.py::AIReport.available
-    # @reason output classification uses only supported report data
     @property
-    def output_kind(self):
+    def output_kind(self) -> Literal["proposal", "answer"] | None:
         if not self.available or not self.proposal:
             return None
         return "proposal" if self.proposal["actions"] else "answer"
 
     @property
-    def required(self):
-        return [self.parent.hash]
+    def required(self) -> list[str]:
+        parent = self.parent
+        if parent is None:
+            raise AttributeError(f"{type(self).__name__} requires an attached parent")
+        return [parent.hash]
 
-    # @testable true
-    # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_permissions_follow_creator_ownership
-    # @matrix ai-report permissions : creator delete owner unrelated-user view
-    def allowed(self, action, user=None):
-        user = current_context_user(user)
+    def allowed(self, action: Action, user: FieldUser = None) -> bool:
+        user = current_context_user(user._get_current_object() if isinstance(user, LocalProxy) else user)
         if not user or not user.is_authenticated:
             return False
 
@@ -136,7 +196,7 @@ class AIReport(Entity):
         return False
 
     @classmethod
-    def create(cls, data, *, key=None):
+    def create(cls, data: ReportCreation, *, key: Key | None = None) -> Self:
         parent = data.get("parent") or data.get("user")
         user = data.get("user") or parent
 

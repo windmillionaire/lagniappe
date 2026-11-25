@@ -15,9 +15,6 @@ from installer.errors import SetupCancelled
 from installer.state import record_step
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_is_announced_before_dependency_or_provider_mutation
-# @matrix setup : failure-isolation recovery
 def _recovery_file_present(app_dir=None):
     """Detect the canonical recovery-file shape without importing config."""
     app_dir = Path(app_dir) if app_dir else REPOSITORY_ROOT
@@ -27,12 +24,7 @@ def _recovery_file_present(app_dir=None):
     ).exists()
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_characterization_starts_empty_and_reaches_all_boundaries
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_only_prints_manual_deployment_steps_when_declined
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_activates_ai_email_after_deploy_and_jobs
-# @matrix setup : explicit-project main-install manual-deploy prerequisites virtualenv
-def install(*, experiments=False):
+def install(*, experiments: bool = False) -> int:
     print(ui.heading(wrap_text("Welcome to Lagniappe setup")))
     if _recovery_file_present():
         print(
@@ -160,7 +152,7 @@ def install(*, experiments=False):
 
         if not _configure_deferred_job_recovery(f, gcloud):
             return 1
-        if ai_email_config:
+        if isinstance(ai_email_config, dict) and ai_email_config:
             record_step("activate AI email submissions")
             ai_email.activate_ai_email(ai_email_config)
         deployed = True
@@ -170,7 +162,7 @@ def install(*, experiments=False):
             ui.info(wrap_text("You can deploy the application manually when ready."))
         )
         print(wrap_text(ui.heading("Manual deployment steps:")))
-        print(wrap_text((f"{ui.literal('1.')} Review the generated YAML files")))
+        print(wrap_text(f"{ui.literal('1.')} Review the generated YAML files"))
         print(
             ui.value(
                 (f"{ui.literal('2.')} Select the project"),
@@ -243,7 +235,7 @@ def install(*, experiments=False):
                     action=True,
                 )
             )
-        if ai_email_config:
+        if isinstance(ai_email_config, dict) and ai_email_config:
             print(
                 ui.value(
                     "Then activate the saved AI email configuration",

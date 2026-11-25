@@ -12,6 +12,7 @@ import {
 import { posix as path } from "node:path";
 import * as yaml from "js-yaml";
 import MagicString from "magic-string";
+import { renderServiceWorker } from "./serviceWorker.mjs";
 
 const STYLE_PIPELINE = JSON.parse(
 	readFileSync("./src/style/pipeline.json", "utf8"),
@@ -29,7 +30,6 @@ const rawStylesYaml = yaml.load(
 	readFileSync(`./${STYLE_PIPELINE.registry.styles}`, "utf8"),
 );
 const constantsPath = "./config/constants.py";
-const browserProtocolPath = "./config/browser_protocol.json";
 const BOOT_CONNECTIVITY_MODULE = "shared/connectivity.mjs";
 const INTERACTION_FOUNDATION_MODULES = new Set([
 	"shared/storage.mjs",
@@ -214,11 +214,6 @@ const FEATURE_CHUNK_MODULES = {
 	],
 };
 
-/**
- * @testable false
- * @covered-by build/utility.mjs::updateConstantsBuildId
- * @reason private durability helper exercised through generated build outputs
- */
 const atomicWriteFileSync = (pathValue, content) => {
 	if (existsSync(pathValue) && readFileSync(pathValue, "utf8") === content)
 		return;
@@ -237,10 +232,6 @@ const atomicWriteFileSync = (pathValue, content) => {
  * preload it without depending on Rollup's incidental shared-chunk split.
  * Connectivity stays separate because the main boot entry imports it too.
  *
- * @testable true
- * @tests tests_js/test_032_build_configuration.mjs::test_interaction_preloads_have_stable_manual_chunks
- * @tests tests_js/test_032_build_configuration.mjs::test_templates_preload_registered_view_and_interaction_foundations
- * @matrix frontend-build : chunking interaction-foundation modulepreload
  */
 const interactionFoundationChunk = (id) => {
 	const normalized = id.replaceAll("\\", "/");
@@ -262,7 +253,9 @@ const interactionFoundationChunk = (id) => {
 	const marker = "/src/script/";
 	const sourceIndex = normalized.lastIndexOf(marker);
 	if (sourceIndex === -1) return undefined;
-	const relative = normalized.slice(sourceIndex + marker.length);
+	const relative = normalized
+		.slice(sourceIndex + marker.length)
+		.replace(/\.m?ts$/, ".mjs");
 	for (const [chunk, modules] of Object.entries(FEATURE_CHUNK_MODULES)) {
 		if (modules.includes(relative)) return chunk;
 	}
@@ -283,11 +276,6 @@ const interactionFoundationChunk = (id) => {
 		: undefined;
 };
 
-/**
- * @testable false
- * @covered-by build/utility.mjs::javascriptStyleModuleSource
- * @reason private serializer exercised through emitted module sources
- */
 const stringify = (yaml) => {
 	return JSON.stringify(yaml, null, 2);
 };
@@ -307,11 +295,6 @@ const ICON_GLYPH = new RegExp(ICON_REGISTRY_SCHEMA.glyph_pattern);
 const ICON_RECORD_FIELDS = new Set(ICON_REGISTRY_SCHEMA.record_fields);
 const ICON_WEIGHTS = new Set(ICON_REGISTRY_SCHEMA.weights);
 
-/**
- * @testable true
- * @tests tests_js/test_018_style_pipeline.mjs::test_icon_registry_rejects_invalid_ids_and_material_symbol_records
- * @pair style-build:icon-schema-validation
- */
 const normalizeIconRegistry = (value, path = "icons") => {
 	if (
 		!value ||
@@ -364,19 +347,8 @@ const normalizeIconRegistry = (value, path = "icons") => {
 
 const iconsYaml = normalizeIconRegistry(rawIconsYaml);
 
-/**
- * @testable true
- * @tests tests_js/test_018_style_pipeline.mjs::test_virtual_and_python_style_payloads_share_one_runtime_value
- * @tests tests_js/test_018_style_pipeline.mjs::test_style_registry_rejects_untyped_and_unknown_leaves
- * @matrix style-build : runtime-parity schema-validation
- */
 const normalizeStyleRegistry = (value, path = "styles") => {
 	const records = new Map();
-	/**
-	 * @testable false
-	 * @covered-by build/utility.mjs::normalizeStyleRegistry
-	 * @reason private traversal step
-	 */
 	const collect = (node, nodePath) => {
 		if (!node || typeof node !== "object" || Array.isArray(node)) {
 			throw new TypeError(
@@ -490,11 +462,6 @@ const normalizeStyleRegistry = (value, path = "styles") => {
 	collect(value, path);
 
 	const resolved = new Map();
-	/**
-	 * @testable false
-	 * @covered-by build/utility.mjs::normalizeStyleRegistry
-	 * @reason private alias-resolution step
-	 */
 	const resolve = (name, stack = []) => {
 		if (resolved.has(name)) return resolved.get(name);
 		if (stack.includes(name)) {
@@ -532,11 +499,6 @@ const normalizeStyleRegistry = (value, path = "styles") => {
 			}
 		}
 	}
-	/**
-	 * @testable false
-	 * @covered-by build/utility.mjs::normalizeStyleRegistry
-	 * @reason private runtime-tree construction step
-	 */
 	const build = (node, nodePath) => {
 		if (records.has(nodePath)) return resolve(nodePath);
 		return Object.fromEntries(
@@ -551,29 +513,14 @@ const normalizeStyleRegistry = (value, path = "styles") => {
 
 const stylesYaml = normalizeStyleRegistry(rawStylesYaml);
 
-/**
- * @testable true
- * @tests tests_js/test_018_style_pipeline.mjs::test_virtual_and_python_style_payloads_share_one_runtime_value
- * @pair style-build:runtime-parity
- */
 const javascriptStyleModuleSource = (styles) => {
 	return `// This file is auto-generated. Do not edit manually.\nconst STYLES = ${stringify(styles)};\nexport { STYLES };`;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_018_style_pipeline.mjs::test_virtual_and_python_style_payloads_share_one_runtime_value
- * @pair style-build:runtime-parity
- */
 const javascriptIconModuleSource = (icons) => {
 	return `// This file is auto-generated. Do not edit manually.\nconst ICONS = ${stringify(icons)};\nexport { ICONS };`;
 };
 
-/**
- * @testable false
- * @covered-by build/utility.mjs::pythonStyleModuleSource
- * @reason private serializer exercised through generated Python payload parity
- */
 const pythonStringify = (value, depth = 0) => {
 	if (value === null) return "None";
 	if (value === true) return "True";
@@ -598,33 +545,16 @@ const pythonStringify = (value, depth = 0) => {
 		.join(",\n")}\n${closingIndent}}`;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_018_style_pipeline.mjs::test_virtual_and_python_style_payloads_share_one_runtime_value
- * @pair style-build:runtime-parity
- */
 const pythonStyleModuleSource = (name, registry) => {
 	const warning = "# This file is auto-generated. Do not edit manually.\n";
 	return `${warning}${name} = ${pythonStringify(registry)}\n`;
 };
 
-/**
- * @testable true
- * @tests tests_js/test_018_style_pipeline.mjs::test_style_pipeline_contract_names_authored_inputs_and_outputs
- * @tests tests_js/test_022_build_chunk_versioning.mjs::test_text_fonts_share_css_preload_and_asset_identity
- * @pair style-build:pipeline-contract
- * @pair frontend-build:font-delivery
- */
 const buildStyles = () => ({
 	name: "build-styles",
 	buildStart: generateStyleModules,
 });
 
-/**
- * @testable true
- * @tests tests_js/test_000_native_harness.mjs::test_registry_generation_is_idempotent_and_repairs_missing_outputs
- * @pair style-build:runtime-parity
- */
 const generateStyleModules = () => {
 	for (const [output, content] of [
 		[
@@ -651,11 +581,6 @@ const generateStyleModules = () => {
 		atomicWriteFileSync(output, content);
 };
 
-/**
- * @testable false
- * @covered-by build/utility.mjs::versionChunkImports
- * @reason private URL mutation is exercised through generated import and precache URLs
- */
 const withBuildVersion = (url, buildId) => {
 	const hashIndex = url.indexOf("#");
 	const base = hashIndex === -1 ? url : url.slice(0, hashIndex);
@@ -664,11 +589,6 @@ const withBuildVersion = (url, buildId) => {
 	return `${base}${separator}v=${encodeURIComponent(buildId)}${hash}`;
 };
 
-/**
- * @testable false
- * @covered-by build/utility.mjs::versionChunkImports
- * @reason private AST traversal only locates generated module specifier literals
- */
 const moduleSourceNodes = (node, sources = []) => {
 	if (!node || typeof node !== "object") return sources;
 	if (Array.isArray(node)) {
@@ -693,11 +613,6 @@ const moduleSourceNodes = (node, sources = []) => {
 	return sources;
 };
 
-/**
- * @testable false
- * @covered-by build/utility.mjs::versionChunkImports
- * @reason private path normalization is exercised through Rollup output at multiple directory depths
- */
 const resolvedChunkFileName = (importerFileName, specifier) => {
 	const bareSpecifier = specifier.split(/[?#]/, 1)[0];
 	if (bareSpecifier.startsWith("/")) return bareSpecifier.slice(1);
@@ -712,10 +627,6 @@ const resolvedChunkFileName = (importerFileName, specifier) => {
  * filenames stable on disk. Running before minification lets Rollup compose
  * the mutation into production source maps.
  *
- * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.mjs::test_rollup_versions_generated_chunk_imports_and_precache_urls
- * @tests tests_tooling/test_003_config.py::test_app_engine_chunk_handler_uses_immutable_cache_before_general_js
- * @matrix cache frontend-build : bundle-consistency chunk-versioning
  */
 const versionChunkImports = (buildId) => ({
 	name: "version-chunk-imports",
@@ -753,11 +664,6 @@ const versionChunkImports = (buildId) => ({
 	},
 });
 
-/**
- * @testable false
- * @covered-by build/utility.mjs::versionChunkImports
- * @reason precache URLs share the tested chunk-versioning contract
- */
 const precacheUrls = (bundle, buildId) => {
 	return Object.values(bundle)
 		.filter(
@@ -770,10 +676,8 @@ const precacheUrls = (bundle, buildId) => {
 		.sort();
 };
 
-/** @testable infrastructure */
 const generateBuildId = () => `b${randomBytes(4).toString("hex").slice(1)}`;
 
-/** @testable infrastructure */
 const updateConstantsBuildId = (buildId) => {
 	let content = readFileSync(constantsPath, "utf8");
 	const line = `BUILD_ID = "${buildId}"`;
@@ -789,36 +693,18 @@ const updateConstantsBuildId = (buildId) => {
 	atomicWriteFileSync(constantsPath, content);
 };
 
-/**
- * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.mjs::test_service_worker_records_the_build_identity
- * @matrix frontend-build : build-identity service-worker
- */
 const updateServiceWorker = (buildId) => {
 	return {
 		name: "update-service-worker",
 		writeBundle(_options, bundle) {
-			let swContent = readFileSync("./src/script/sw.template.mjs", "utf8");
-			const browserProtocol = JSON.parse(
-				readFileSync(browserProtocolPath, "utf8"),
+			atomicWriteFileSync(
+				"./lagniappe/web/static/sw.js",
+				renderServiceWorker(buildId, precacheUrls(bundle, buildId)),
 			);
-
-			swContent = swContent.replaceAll("__BUILD_ID__", buildId);
-			swContent = swContent.replace(
-				"/* __BROWSER_PROTOCOL__ */ null",
-				JSON.stringify(browserProtocol, null, "\t"),
-			);
-			swContent = swContent.replace(
-				"/* __PRECACHE_URLS__ */ []",
-				JSON.stringify(precacheUrls(bundle, buildId), null, "\t"),
-			);
-
-			atomicWriteFileSync("./lagniappe/web/static/sw.js", swContent);
 		},
 	};
 };
 
-/** @testable infrastructure */
 const emitPdfWorker = () => {
 	return {
 		name: "emit-pdf-worker",
@@ -847,9 +733,6 @@ const emitPdfWorker = () => {
  * downloaded minified code and copied assets have an accompanying license
  * document.
  *
- * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.mjs::test_third_party_notices_are_emitted_with_browser_assets
- * @matrix frontend-build licensing : browser-notice-delivery
  */
 const emitThirdPartyLicenses = () => {
 	return {
@@ -889,10 +772,6 @@ const fontUrls = Object.fromEntries(
  * Resolve every authored font URL through the same content-addressed inventory
  * used by font emission and server-side preload links.
  *
- * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.mjs::test_material_symbols_css_points_to_the_content_hashed_font
- * @tests tests_js/test_022_build_chunk_versioning.mjs::test_text_fonts_share_css_preload_and_asset_identity
- * @matrix frontend-build icons : css-url-resolution font-delivery
  */
 const resolveFonts = () => ({
 	postcssPlugin: "resolve-fonts",
@@ -912,10 +791,6 @@ const resolveFonts = () => ({
  * Emit all vendored text and icon webfonts with digest-derived filenames, then
  * remove obsolete fonts. Upstream maintenance inputs are never browser assets.
  *
- * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.mjs::test_material_symbols_subset_font_is_emitted_with_content_hash
- * @tests tests_js/test_022_build_chunk_versioning.mjs::test_text_fonts_share_css_preload_and_asset_identity
- * @matrix frontend-build icons : cache font-delivery stale-cleanup subset
  */
 const emitFonts = () => ({
 	name: "emit-fonts",

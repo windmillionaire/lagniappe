@@ -21,7 +21,6 @@ SYNC_TEXT_FIELD = "sync-text"
 OFFLINE_INDICATOR = "[data-role='offline']"
 
 
-# @matrix offline sync : cached-read empty-content reload save-guard
 # @template pages/document.html::document_tab
 # @template projects/document.html::document_tab
 @pytest.mark.parametrize("kind,content", [("page", "Read without editing"), ("project", "")])
@@ -89,10 +88,6 @@ def _unique(label):
     return f"test-sync-{label}-{uuid4().hex[:8]}"
 
 
-# @source src/script/elements/editor/collaborative.mjs::CollaborativeDocument.sync
-# @source lagniappe/core/tools/document_history.py::recovery_pin
-# @matrix editor sync : replacement recovery offline-replay
-# @matrix document-history : recovery
 # @template projects/document.html::document_tab
 @pytest.mark.parametrize("headless", [False, True])
 def test_offline_draft_is_pinned_before_document_replacement(get_admin, browser_failures, headless):
@@ -179,23 +174,22 @@ def _offline_document_edit(user, browser_failures, editor, *parts, sync_id):
         path="/l/poll",
         count=0,
         max_count=1,
-    ):
-        with browser_failures.expect_offline(user):
-            _go_offline(user)
-            editor.focus()
-            for index, part in enumerate(parts):
-                if index:
-                    editor.enter()
-                editor.type_text(part)
-            editor.wait_for_render()
-            for part in parts:
-                expect(editor.text_entry).to_contain_text(part)
-            editor.text_entry.blur()
-            wait_for_offline_sync_records(
-                user,
-                sync_id=sync_id,
-                saved_html_contains=parts,
-            )
+    ), browser_failures.expect_offline(user):
+        _go_offline(user)
+        editor.focus()
+        for index, part in enumerate(parts):
+            if index:
+                editor.enter()
+            editor.type_text(part)
+        editor.wait_for_render()
+        for part in parts:
+            expect(editor.text_entry).to_contain_text(part)
+        editor.text_entry.blur()
+        wait_for_offline_sync_records(
+            user,
+            sync_id=sync_id,
+            saved_html_contains=parts,
+        )
 
 
 def _offline_form_edit(user, form, value):
@@ -219,7 +213,6 @@ def _reconnect_with_sync(user, sync_id):
     wait_for_offline_sync_records(user, sync_id=sync_id, exact=0)
 
 
-# @matrix sync : offline-replay queue-clear replay-order
 def test_offline_document_edits_replay_in_order(get_admin, get_user, browser_failures):
     user = get_admin()
     project = Projects.test_offline_document_replay.get(user)
@@ -245,7 +238,6 @@ def test_offline_document_edits_replay_in_order(get_admin, get_user, browser_fai
     assert replayed.index(first) < replayed.index(second)
 
 
-# @matrix sync : offline-replay queue-preserved
 def test_failed_offline_replay_keeps_queue_and_retries(get_admin, get_user, browser_failures):
     user = get_admin()
     project = Projects.test_offline_document_retry.get(user)
@@ -275,21 +267,20 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_admin, get_user, brow
             status=503,
             path="/l/sync",
             max_count=2,
+        ), browser_failures.expect_http_error(
+            user,
+            status=503,
+            path="/l/poll",
+            count=0,
+            max_count=1,
         ):
-            with browser_failures.expect_http_error(
-                user,
-                status=503,
-                path="/l/poll",
-                count=0,
-                max_count=1,
+            with user.page.expect_request(
+                lambda request: request.method == "POST"
+                and request.url.endswith("/l/sync")
+                and document_sync_id in (request.post_data or "")
             ):
-                with user.page.expect_request(
-                    lambda request: request.method == "POST"
-                    and request.url.endswith("/l/sync")
-                    and document_sync_id in (request.post_data or "")
-                ):
-                    user.offline = False
-                wait_for_connectivity_replay(user)
+                user.offline = False
+            wait_for_connectivity_replay(user)
     finally:
         user.page.context.unroute("**/l/sync", fail_sync)
 
@@ -307,8 +298,6 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_admin, get_user, brow
     expect(project.editor.text_entry).to_contain_text(text)
 
 
-# @matrix polling : current-state cursor document
-# @matrix sync : concurrency document headless headless-widget merge offline-replay queue-clear
 def test_headless_offline_replay_merges_concurrent_remote_edits(
     get_admin, get_user, browser_failures
 ):

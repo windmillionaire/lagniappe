@@ -1,7 +1,7 @@
 """Restriction sources, minimal loading, migrations and queued cache updates."""
 from copy import deepcopy
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -57,7 +57,6 @@ class _HashPipeline:
         return results
 
 
-# @matrix permissions : source-clauses stable-order admin-only
 @pytest.mark.parametrize("policy,expected", [
     ({}, {}),
     ({"page": ["b", "a", "b"], "page_form": []}, {"page": ["a", "b"]}),
@@ -70,7 +69,6 @@ def test_restrictions_normalize_source_clauses(policy, expected):
     assert policy == original
 
 
-# @matrix permissions relations : required-parent unloaded-relation
 def test_required_permission_relation_does_not_hide_unloaded_page(monkeypatch):
     task = TestEntities.get("TASK", {"hash": "required-task"})
     task.db["page"] = "unloaded-page"
@@ -83,7 +81,6 @@ def test_required_permission_relation_does_not_hide_unloaded_page(monkeypatch):
         permission_relation(task, "page", required=True)
 
 
-# @matrix permissions : local-restrictions materialization owner-only
 def test_local_restrictions_materialize_without_persisting_inheritance():
     form = TestEntities.get("FORM", {"hash": "local-form", "restricted_to": ["form-group"]})
     page = TestEntities.get("PAGE", {"hash": "local-page"})
@@ -100,7 +97,6 @@ def test_local_restrictions_materialize_without_persisting_inheritance():
     assert page.restricted_to == {"page": ["admin"], "page_form": ["form-group"]}
 
 
-# @matrix files : ownership move reverse-links cardinality parent-key
 def test_file_move_preserves_single_ownership():
     page = TestEntities.get("PAGE", {"hash": "move-page"})
     task = TestEntities.get("TASK", {"hash": "move-task"}, page=page)
@@ -121,7 +117,6 @@ def test_file_move_preserves_single_ownership():
     assert file.owner is page and file.task is None and file.task_page is None
 
 
-# @matrix permissions cache : source-clauses preserved-fields
 @pytest.mark.parametrize("kind,form_type,source_policy,expected", [
     ("form", "page", {"page_form": ["new"]}, {"page": ["admin"], "page_form": ["new"], "task_form": ["task"]}),
     ("form", "task", {}, {"page": ["admin"], "page_form": ["old"]}),
@@ -137,7 +132,6 @@ def test_cached_restrictions_resolve_file_task_page_and_form(kind, form_type, so
     assert current["restricted_to"] == {"page": ["admin"], "page_form": ["old"], "task_form": ["task"]}
 
 
-# @matrix permissions cache : change-detection retry
 @pytest.mark.parametrize("cached", [True, False])
 @pytest.mark.parametrize("restricted", [True, False])
 def test_reconciliation_change_detection_and_forced_retry(monkeypatch, cached, restricted):
@@ -209,7 +203,6 @@ def test_reconciliation_change_detection_and_forced_retry(monkeypatch, cached, r
     assert form.urlsafe_key not in values[Keys.RESTRICTION_PENDING.value]
 
 
-# @matrix permissions cache : new-form content-only no-queue
 @pytest.mark.parametrize("restricted", [False, True])
 @pytest.mark.parametrize("change,cached", [
     ("create", False),
@@ -272,9 +265,8 @@ def test_form_creation_and_content_edits_do_not_queue_reconciliation(monkeypatch
     assert form.urlsafe_key not in values.get(Keys.RESTRICTION_PENDING.value, {})
 
 
-# @matrix permissions cache : fingerprint modified form-version stable-order
 def test_restricted_fingerprints_share_the_entity_and_cache_formula():
-    modified = datetime(2026, 9, 9, 12, tzinfo=timezone.utc)
+    modified = datetime(2026, 9, 9, 12, tzinfo=UTC)
     base = base_fingerprint(modified)
     assert base == base_fingerprint(modified)
     assert base != base_fingerprint(modified + timedelta(seconds=1))
@@ -301,11 +293,10 @@ def test_restricted_fingerprints_share_the_entity_and_cache_formula():
         assert entity.modified == modified
 
 
-# @matrix permissions cache : identity user-page form-version no-extra-read
 def test_user_page_cache_identity_preserves_permission_projection(monkeypatch):
     from lagniappe.core.tools.cache.details import identify_entity
 
-    modified = datetime(2026, 9, 9, 12, tzinfo=timezone.utc)
+    modified = datetime(2026, 9, 9, 12, tzinfo=UTC)
     page = TestEntities.get("PAGE", {
         "hash": "user-page", "modified": modified,
         "user": {"email": "cache-identity@example.com"},
@@ -337,7 +328,6 @@ def test_user_page_cache_identity_preserves_permission_projection(monkeypatch):
     assert cached[page.hash]["kind"] == "user"
 
 
-# @matrix permissions cache : fingerprint form-version no-descendant-writes
 @pytest.mark.parametrize("form_type", ["page", "task"])
 def test_restriction_projection_preserves_own_form_versions_and_base_modified(form_type):
     base = "b" * 32
@@ -360,7 +350,6 @@ def test_restriction_projection_preserves_own_form_versions_and_base_modified(fo
         assert current["modified"] == base
 
 
-# @matrix permissions cache : channel-invalidation reconciliation
 def test_reconciliation_completion_publishes_existing_collection_revisions(monkeypatch):
     from lagniappe.core.tools.database import utility
 
@@ -381,7 +370,6 @@ def test_reconciliation_completion_publishes_existing_collection_revisions(monke
     update.assert_called_once_with(owner)
 
 
-# @matrix permissions cache : owner-reuse no-extra-read
 @pytest.mark.parametrize("kind", ["PAGE", "TASK"])
 def test_reconciliation_collects_owner_keys_without_loading_relations(monkeypatch, kind):
     from google.cloud.datastore import Key
@@ -404,7 +392,6 @@ def test_reconciliation_collects_owner_keys_without_loading_relations(monkeypatc
     }
 
 
-# @matrix permissions : queue dispatch
 def test_reconciliation_enqueue_uses_current_source_key(monkeypatch):
     monkeypatch.setattr(reconcile, "CONFIG", SimpleNamespace(local=False))
     monkeypatch.setattr(reconcile, "url_for", lambda *args, **kwargs: "https://example.test/process/reconcile-restrictions")
@@ -417,8 +404,6 @@ def test_reconciliation_enqueue_uses_current_source_key(monkeypatch):
         reconcile.enqueue({"source_key": "form-key", "owner_keys": []})
 
 
-# @matrix files migrations : single-owner history conflict idempotence
-# @pair database-migrations:actionable-links
 def test_file_migration_normalizes_history_and_preserves_conflicts():
     from testing.tests_unit.test_018b_database_migrations import _Datastore, _entity, _key
     page = _entity(KINDS.instances.value, "page", {"type": "page", "hash": "page", "requires": ["page", "models"]})
@@ -443,7 +428,8 @@ def test_file_migration_normalizes_history_and_preserves_conflicts():
     assert len(outcome["errors"]) == 3
     for detail, affected, label in zip(
         outcome["errors"], (conflict, missing_owner, same_page_conflict),
-        ("Conflicting attachment", "scan.pdf", "Separate legacy attachments")
+        ("Conflicting attachment", "scan.pdf", "Separate legacy attachments"),
+        strict=True,
     ):
         assert detail["url"] == f"/files/{migrations.encode_urlsafe_key(affected.key)}"
         assert detail["link_label"] == label
@@ -457,7 +443,6 @@ def test_file_migration_normalizes_history_and_preserves_conflicts():
     assert migrate_file_ownership(context)["changed"] == 0
 
 
-# @matrix permissions migrations : local-restrictions owner-only idempotence
 def test_restrictions_migration_only_persists_local_sources():
     from testing.tests_unit.test_018b_database_migrations import _Datastore, _entity
     group = _entity(KINDS.users.value, "group", {"type": "group", "hash": "group"})
@@ -474,13 +459,11 @@ def test_restrictions_migration_only_persists_local_sources():
     assert migrate_local_restrictions(context)["changed"] == 0
 
 
-# @matrix permissions search : reconciliation local-restrictions removal batching source-clauses
-# @matrix permissions cache : owner-reuse
 @pytest.mark.parametrize("separate_batch", [False, True])
 def test_reconcile_preserves_local_page_groups_and_removes_form_restrictions(monkeypatch, separate_batch):
     from google.cloud.datastore import Entity as DatastoreEntity, Key
     from lagniappe.core.tools.database.filter import Results
-    modified = datetime(2026, 9, 9, 12, tzinfo=timezone.utc)
+    modified = datetime(2026, 9, 9, 12, tzinfo=UTC)
     form = TestEntities.get("FORM", {"hash": "source-form", "restricted_to": ["new-group"], "version": "v2", "modified": modified})
     form.version = "v2"
     page = TestEntities.get("PAGE", {"hash": "inherited-page", "modified": modified})
@@ -602,7 +585,6 @@ def test_reconcile_preserves_local_page_groups_and_removes_form_restrictions(mon
     assert explicit.db["restricted_to"] == ["explicit-group"]
 
 
-# @matrix permissions tasks : task-history live-task
 def test_history_permissions_follow_live_task(monkeypatch):
     page = TestEntities.get("PAGE", {"hash": "history-page"})
     task = TestEntities.get("TASK", {"hash": "history-task"}, page=page)
@@ -617,7 +599,6 @@ def test_history_permissions_follow_live_task(monkeypatch):
     assert history.allowed(Action.EDIT, user="editor")
 
 
-# @matrix files : ownership move reverse-links unloaded-relation
 def test_file_move_does_not_load_previous_task_attachments():
     page = TestEntities.get("PAGE", {"hash": "previous-parent"})
     task = TestEntities.get("TASK", {"hash": "previous-task"}, page=page)
@@ -631,7 +612,6 @@ def test_file_move_does_not_load_previous_task_attachments():
     assert file.owner is page
 
 
-# @matrix files : ownership move reverse-links unloaded-relation
 def test_file_move_does_not_load_destination_task_attachments():
     page = TestEntities.get("PAGE", {"hash": "destination-parent"})
     task = TestEntities.get("TASK", {"hash": "destination-task"}, page=page)
@@ -645,7 +625,6 @@ def test_file_move_does_not_load_destination_task_attachments():
     assert file.owner is task
 
 
-# @matrix permissions cache : preserved-fields restriction-removal batch-write
 def test_restriction_batch_updates_only_projection_fields(monkeypatch):
     details = {
         "page": {"id": "page-key", "kind": "page", "fingerprint": "old-page", "modified": "page-base",
@@ -682,7 +661,6 @@ def test_restriction_batch_updates_only_projection_fields(monkeypatch):
     assert details["file"]["restricted_to"] == {"page_form": ["old"]}
 
 
-# @matrix permissions cache : cache-miss no-extra-read
 def test_reconciliation_reads_available_cache_details_without_recovery(monkeypatch):
     source = TestEntities.get("PAGE", {"hash": "available-source", "restricted_to": ["a"]})
     source.form = None
@@ -719,7 +697,6 @@ def test_reconciliation_reads_available_cache_details_without_recovery(monkeypat
     assert set(write.call_args.args[1]) == {source.hash, file.hash}
 
 
-# @matrix permissions cache : batching concurrent-move continuation-restart
 def test_reconciliation_restarts_when_membership_changes_between_or_during_batches(monkeypatch):
     source = TestEntities.get("PAGE", {"hash": "membership-source"})
     source.form = None
@@ -745,12 +722,11 @@ def test_reconciliation_restarts_when_membership_changes_between_or_during_batch
     complete.assert_not_called()
 
 
-# @matrix permissions cache : concurrent-save deleted-row fingerprint reconciliation retry
 @pytest.mark.parametrize("change", ["repair", "cache-overwrite", "retry", "source-change", "deleted", "missing-target"])
 def test_reconciliation_verifies_repairs_and_retries(monkeypatch, change):
     from google.cloud.datastore import Entity as DatastoreEntity, Key
 
-    modified = datetime(2026, 9, 9, 12, tzinfo=timezone.utc)
+    modified = datetime(2026, 9, 9, 12, tzinfo=UTC)
     source_key = Key(KINDS.instances.value, "verification-page", project="permissions-unit")
     file_key = Key(KINDS.files.value, "verification-file", project="permissions-unit")
     owner_key = Key(KINDS.models.value, "verification-owner", project="permissions-unit")
@@ -860,7 +836,6 @@ def test_reconciliation_verifies_repairs_and_retries(monkeypatch, change):
         assert len(reads) == 2 and len(repairs) == 1
 
 
-# @matrix permissions cache : reserved-form form-version no-extra-read
 def test_reserved_form_is_not_a_cached_permission_source(monkeypatch):
     from lagniappe.core.properties import common_entity
     from lagniappe.core.tools.cache import add
@@ -900,7 +875,6 @@ def test_reserved_form_is_not_a_cached_permission_source(monkeypatch):
     assert "hash" not in default.db
 
 
-# @matrix permissions cache : cache-miss source-intent programmatic-save
 @pytest.mark.parametrize("kind", ["page", "task"])
 def test_cold_source_details_preserve_programmatic_restriction_changes(monkeypatch, kind):
     from lagniappe.core.definitions import MutationEffectType

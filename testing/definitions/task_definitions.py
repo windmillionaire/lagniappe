@@ -7,11 +7,11 @@ Maps to:
 - Entity: lagniappe/core/entities/task.py
 - Routes: lagniappe/web/routes/tasks/
 - Templates: lagniappe/web/templates/pages/tasks.html
-- View: src/script/views/page.mjs (task widget)
+- View: src/script/views/page.ts (task widget)
 """
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal
 
 from .due_date import DueDates
 from .files import Files
@@ -30,13 +30,13 @@ class TaskDefinition:
     name: str
     origin: Literal[SitePages.HOME] | Pages
     description: str = ""
-    due_date: Optional[DueDates] = None
-    form: Optional[Forms] = None
-    project: Optional[Projects] = None
-    model_task: Optional[ModelTasks] = None
-    assigned_to: Optional[Users] = None
-    file: Optional[Files] = None
-    submission: Optional[list[SubmissionFields]] = None
+    due_date: DueDates | None = None
+    form: Forms | None = None
+    project: Projects | None = None
+    model_task: ModelTasks | None = None
+    assigned_to: Users | None = None
+    file: Files | None = None
+    submission: list[SubmissionFields] | None = None
 
 
 _task_history_fields = {

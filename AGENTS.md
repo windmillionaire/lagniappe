@@ -39,11 +39,13 @@ These instructions apply to the whole repository unless a more specific
 - Prefer the repo runner for common test commands:
   - `venv/bin/python run.py test`
   - `venv/bin/python run.py test unit`
+  - `venv/bin/python run.py test http`
   - `venv/bin/python run.py test e2e`
   - `venv/bin/python run.py test js`
   - `venv/bin/python run.py test tooling`
   - `venv/bin/python run.py test setup`
-  - `venv/bin/python run.py traceability`
+  - `venv/bin/python run.py style-contracts --check`
+  - `venv/bin/python run.py mutation-contracts --check`
   - `venv/bin/python run.py template-contracts`
 - Run test commands directly, without shell redirection, pipes, or wrapper
   shells. Read ongoing output through the tool session; use runner-generated
@@ -77,20 +79,23 @@ These instructions apply to the whole repository unless a more specific
   others.
 - Before adding or materially reshaping tests, check
   `documentation/TESTING_WRITING_TESTS.md`.
-- When reviewing or annotating an existing test, check
-  `documentation/TESTING_TRACEABILITY_TOOL.md` as well as the test-writing
-  guidelines above.
+- For tests that assert rendered markup or styles, check
+  `documentation/TESTING_TEMPLATE_CONTRACTS.md` and
+  `documentation/INFRA_BUILD_STYLE_REVIEW.md`.
 - Keep the `testing/` root clean. Miscellaneous test utilities belong in
   `testing/utility/`; tooling and repository-health tests belong in
   `testing/tests_tooling/`.
 - Test placement:
   - backend unit tests belong in `testing/tests_unit/`;
+  - offline Flask `test_client()` route/auth/header/API contract tests belong in
+    `testing/tests_http/`;
   - browser/server workflow tests belong in `testing/tests_e2e/`;
   - Node-backed JavaScript behavior that does not require a live browser belongs
     in `testing/tests_js/`;
   - setup, config smoke, repository-health, and reporter tests belong in
     `testing/tests_tooling/`.
-- Only E2E tests may import `lagniappe.web`. Tooling tests also must not import
+- Only `testing/tests_http/` (offline `test_client()`) and `testing/tests_e2e/`
+  may import `lagniappe.web`. Tooling tests also must not import
   `lagniappe.core` or execute Node; use the unit and JavaScript suites instead.
 
 ## Project Map
@@ -98,7 +103,7 @@ These instructions apply to the whole repository unless a more specific
 - `lagniappe/core/` contains backend entities, properties, definitions, and
   service logic.
 - `lagniappe/web/` contains Flask routes, templates, and web integration code.
-- `src/script/` contains frontend modules.
+- `src/script/` contains strict TypeScript frontend modules.
 - `installer/` contains interactive install, recovery, repair, and update
   workflows.
 - `runner/` contains repository-local orchestration shared by `run.py` and the
@@ -129,17 +134,24 @@ These instructions apply to the whole repository unless a more specific
 
 ## Source And Docs
 
-- Before adding or reshaping durable classes/functions/methods, check
-  `documentation/TESTING_TRACEABILITY_TOOL.md` for the source annotation convention.
-- When reviewing whether annotated tests actually cover their referenced source
-  symbols, use `documentation/TESTING_SOURCE_REVIEW.md`.
-- When reviewing UI/E2E tests with `@template` tags, use
-  `venv/bin/python run.py template-contracts`.
-- Run `venv/bin/python run.py traceability --changed --check` after adding,
-  moving, or renaming source symbols in inventoried paths.
+- Require Python 3.14 for setup, development and deployment. Type public APIs,
+  shared interfaces and external data at their boundaries. Use local inference
+  for implementation details. Explain rule-specific suppressions at the site.
+- Run `venv/bin/python -m basedpyright --warnings` for the application.
+  After preparing the locked MCP environment, run the same command with
+  `--project mcp/pyrightconfig.json` for the adapter.
+- Author frontend modules under `src/script/` as strict, erasable `.ts`
+  (explicit relative file extensions on runtime imports, `import type` for
+  type-only imports; only `src/script/generated/*.mjs` remain generated JS).
+- Run `venv/bin/python -m ruff check .`, `npm run typecheck`, and
+  `npm run check`.
+- Check the contracts affected by your changes:
+  - `venv/bin/python run.py template-contracts --changed --check` for Jinja and DOM selectors.
+  - `venv/bin/python run.py style-contracts --check` for styles, icons and test evidence.
+  - `venv/bin/python run.py mutation-contracts --check` for entity mutations.
+
 - Update `documentation/` when changing commands, setup behavior, test layout,
-  source annotation conventions, or other workflows another developer/agent
-  would need to know.
+  or other workflows another developer/agent would need to know.
 - Prefer updating an existing focused doc over creating a new one unless the
   topic clearly needs its own page.
 

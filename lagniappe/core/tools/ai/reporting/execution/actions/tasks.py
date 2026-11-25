@@ -30,14 +30,6 @@ from .references import (
 from .checkpoints import _prepared_output_key
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_warns_but_continues_when_task_form_submission_missing
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_task_that_references_page_form_and_continues
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_targets_created_task
-# @matrix ai-report : completed-task continue deterministic-run mismatched-form missing-submission persistence submission-completion task-form
-# @matrix forms : continue deterministic-run mismatched-form recoverable
-# @matrix task-completion : completed-task continue missing-submission task-form
-# @matrix tasks : completed-task continue deterministic-run mismatched-form missing-submission recoverable task-form
 def _create_task(action, _report, user, created, context=None):
     data = _data(action)
     page = _resolve_action_page(data, created, user)
@@ -85,8 +77,8 @@ def _create_task(action, _report, user, created, context=None):
             "completed": _is_completed_task_event(data),
             "submission_key_present": "submission" in data,
             "submission_field_count": (
-                len(data.get("submission"))
-                if isinstance(data.get("submission"), dict)
+                len(submission)
+                if isinstance(submission := data.get("submission"), dict)
                 else None
             ),
         },

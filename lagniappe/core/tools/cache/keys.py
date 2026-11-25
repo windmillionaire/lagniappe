@@ -1,5 +1,11 @@
 """Redis key templates and search index enums for the cache layer."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ...entities.entity import Entity
+    from ...restrictions import QueryHashes
+
 import hashlib
 import json
 from enum import Enum
@@ -34,14 +40,12 @@ class Keys(Enum):
     PUBLIC_DISCOVERY_EPOCH = f"{CONFIG.PREFIX}PUBLIC:DISCOVERY:EPOCH"
     SITEMAP = f"{CONFIG.PREFIX}PUBLIC:SITEMAP"
 
-    # @testable infrastructure
-    def key(self, entity):
+    def key(self, entity: Entity) -> str:
         return self.value.format(entity.hash)
 
-    # @testable infrastructure
-    def access_key(self, entity, access):
-        access = "models" if Restriction.is_unrestricted(access) else access
-        access_hash = hashlib.md5(json.dumps(sorted(access)).encode()).hexdigest()
+    def access_key(self, entity: Entity, access: QueryHashes) -> str:
+        values = "models" if Restriction.is_unrestricted(access) else access
+        access_hash = hashlib.md5(json.dumps(sorted(values)).encode()).hexdigest()
         return self.value.format(entity.hash, access_hash)
 
 
@@ -52,8 +56,7 @@ class Sync(Enum):
     PRESENCE = f"{CONFIG.PREFIX}SYNC:PRESENCE:{{}}"
     CLIENTS = f"{CONFIG.PREFIX}SYNC:CLIENTS"
 
-    # @testable infrastructure
-    def key(self, key):
+    def key(self, key: str) -> str:
         return self.value.format(key)
 
 
@@ -72,8 +75,7 @@ class Search(Enum, metaclass=DefaultEnum):
 
     DEFAULT = None
 
-    # @testable infrastructure
-    def key(self, entity):
+    def key(self, entity: Entity) -> str | None:
         if not self.value:
             return None
 

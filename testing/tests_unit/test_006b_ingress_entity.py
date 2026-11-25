@@ -14,7 +14,7 @@ not replace the behavior under test.
 import json
 import pytest
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from types import SimpleNamespace
 
 import lagniappe.core.entities.ingress as ingress_module
@@ -40,7 +40,6 @@ from testing.utility.test_entities import TestEntities
 CSV_DIR = Path(__file__).parent.parent / "files"
 
 
-# @pair ingress:size-limit
 @pytest.mark.unit
 def test_ingress_rejects_oversized_csv_before_read():
     upload = SimpleNamespace(
@@ -134,7 +133,6 @@ def set_ingress_csv_payload(ingress, csv_data):
     ingress.properties.rows._asset = csv_data["rows"]
 
 
-# @matrix ingress : property stage
 def test_stage_returns_property(ingress_entity):
     """ingress.stage returns the Stage orchestrator; name matches Enum member name."""
     stage = ingress_entity.stage
@@ -144,7 +142,6 @@ def test_stage_returns_property(ingress_entity):
     assert ingress_entity.get_process("workflow")["current"] == "PROCESS_CSV"
 
 
-# @matrix ingress : enum stage
 def test_stage_set_enum(ingress_entity):
     """Setting stage via IngressStage enum updates db and Stage.name."""
     ingress_entity.properties.stage.value = IngressStage.CHOOSE_TYPE
@@ -153,7 +150,6 @@ def test_stage_set_enum(ingress_entity):
     assert ingress_entity.get_process("workflow")["current"] == "CHOOSE_TYPE"
 
 
-# @matrix ingress : stage string
 def test_stage_set_string(ingress_entity):
     """Setting stage with uppercase string key."""
     ingress_entity.properties.stage.value = "CHOOSE_FORM"
@@ -162,14 +158,12 @@ def test_stage_set_string(ingress_entity):
     assert ingress_entity.get_process("workflow")["current"] == "CHOOSE_FORM"
 
 
-# @matrix ingress : stage validation
 def test_stage_set_invalid_raises(ingress_entity):
     """Invalid stage value raises."""
     with pytest.raises(ValueError, match="Invalid stage"):
         ingress_entity.properties.stage.value = 12345
 
 
-# @matrix ingress : default stage
 def test_stage_default():
     """Unversioned ingress rows are rejected instead of guessed."""
     test_spec = {"hash": "ingress002", "name": "New Import", "kind": "ingress"}
@@ -181,7 +175,6 @@ def test_stage_default():
         _ = ingress.stage.name
 
 
-# @matrix ingress : back navigation stage
 def test_back_moves_to_prior_stage(ingress_entity):
     """Stage.back() moves to previous stage (returns None; check db)."""
     ingress_entity.properties.stage.value = IngressStage.CHOOSE_TYPE
@@ -193,7 +186,6 @@ def test_back_moves_to_prior_stage(ingress_entity):
     assert ingress_entity.stage.name == "PROCESS_CSV"
 
 
-# @matrix ingress : first-stage navigation stage
 def test_back_at_first_stage_noop(ingress_entity):
     """Stage.back() at first stage returns None and leaves stage unchanged."""
     ingress_entity.properties.stage.value = IngressStage.PROCESS_CSV
@@ -204,7 +196,6 @@ def test_back_at_first_stage_noop(ingress_entity):
     assert ingress_entity.get_process("workflow")["current"] == "PROCESS_CSV"
 
 
-# @matrix ingress : finalize navigation stage
 def test_next_advances_after_finalize(ingress_entity):
     """Stage.next() finalizes current stage and advances (returns None; check db)."""
     ingress_entity.properties.stage.value = IngressStage.CHOOSE_TYPE
@@ -217,7 +208,6 @@ def test_next_advances_after_finalize(ingress_entity):
     assert ingress_entity.stage.name == "CHOOSE_PARENT"
 
 
-# @matrix ingress : stage status
 def test_stage_status(ingress_entity):
     """properties.stage.status(stage) returns the ProcessProperty for that stage."""
     status = ingress_entity.properties.stage.status(IngressStage.PROCESS_CSV)
@@ -226,7 +216,6 @@ def test_stage_status(ingress_entity):
     assert status.section_id == "process_csv"
 
 
-# @matrix ingress : choose-type update
 def test_choose_type_update_via_current_stage_property(ingress_entity):
     """Update current stage data through choose_type.update (Stage has no update)."""
     ingress_entity.properties.stage.value = IngressStage.CHOOSE_TYPE
@@ -237,7 +226,6 @@ def test_choose_type_update_via_current_stage_property(ingress_entity):
     assert ingress_entity.properties.choose_type.entity_type == "page"
 
 
-# @matrix ingress : choose-type clear-downstream
 @pytest.mark.unit
 def test_import_wizard_story_restarts_downstream_choices_when_entity_type_changes(
     ingress_entity,
@@ -273,7 +261,6 @@ def test_import_wizard_story_restarts_downstream_choices_when_entity_type_change
     assert ingress_entity.properties.completed.section == {}
 
 
-# @matrix form ingress : schema-generation
 @pytest.mark.unit
 @pytest.mark.parametrize("form_type", ["page", "task"])
 @pytest.mark.parametrize("inferred_type", ["string", "number", "categorical"])
@@ -296,7 +283,6 @@ def test_generated_import_schema_preserves_reserved_page_fields(form_type, infer
         assert schema[0]["id"] not in {"name", "description"}
 
 
-# @matrix form ingress : choose-form default-form schema-generation
 @pytest.mark.unit
 def test_import_wizard_story_builds_or_selects_the_submission_form(
     sample_csv_data, monkeypatch
@@ -367,7 +353,6 @@ def test_import_wizard_story_builds_or_selects_the_submission_form(
     assert cleared == [True]
 
 
-# @matrix ingress project : parent related-entities
 def test_related_entities_project():
     """Setting project establishes parent for project-only import target."""
     project = TestEntities.get("PROJECT", {"hash": "proj001", "name": "Test Project"})
@@ -381,7 +366,6 @@ def test_related_entities_project():
     assert ingress.form is None
 
 
-# @matrix category form ingress : parent related-entities
 def test_related_entities_category_and_form():
     """Selecting a category inherits its form and persists both relation keys."""
     form = TestEntities.get("FORM", {"hash": "form002", "name": "Test Form"})
@@ -398,7 +382,6 @@ def test_related_entities_category_and_form():
     assert ingress.db["form"] == form.key
 
 
-# @matrix form ingress project task : model related-entities
 def test_related_entities_model_project_form():
     """Selecting a model inherits its project/form; clearing removes all wiring."""
     form = TestEntities.get("FORM", {"hash": "form003", "name": "Test Form"})
@@ -426,7 +409,6 @@ def test_related_entities_model_project_form():
     assert all(ingress.db.get(key) is None for key in ("model", "project", "category", "form"))
 
 
-# @matrix relations : key-validation validation
 @pytest.mark.unit
 def test_related_entity_setter_rejects_values_without_key():
     ingress = make_raw_ingress("Invalid Relation", "page")
@@ -435,7 +417,6 @@ def test_related_entity_setter_rejects_values_without_key():
         ingress.category = SimpleNamespace()
 
 
-# @matrix ingress : finalize process-complete stage
 def test_finalize_sets_choose_type_complete(ingress_entity):
     """Stage.finalize() runs finalize path on current stage ProcessProperty."""
     ingress_entity.properties.stage.value = IngressStage.CHOOSE_TYPE
@@ -446,7 +427,6 @@ def test_finalize_sets_choose_type_complete(ingress_entity):
     assert ingress_entity.properties.choose_type.complete is True
 
 
-# @matrix ingress : clear process-state
 def test_stage_clear():
     """clear() on a ProcessProperty resets section-backed fields."""
     test_spec = {"hash": "ingress_clear", "name": "Import", "kind": "ingress"}
@@ -465,7 +445,6 @@ def test_stage_clear():
     assert ingress.properties.choose_type.complete is None
 
 
-# @matrix ingress : error-handling stage
 @pytest.mark.unit
 def test_import_wizard_story_reports_stage_errors_without_advancing(
     ingress_entity, monkeypatch
@@ -489,7 +468,6 @@ def test_import_wizard_story_reports_stage_errors_without_advancing(
     assert captured == []
 
 
-# @matrix ingress : asset-storage process-csv rows upload-counts
 @pytest.mark.unit
 def test_import_wizard_story_parses_the_uploaded_csv_into_rows_and_columns(
     sample_csv_data,
@@ -527,7 +505,6 @@ def test_import_wizard_story_parses_the_uploaded_csv_into_rows_and_columns(
     }
 
 
-# @matrix ingress : choose-parent form-reset model parent
 @pytest.mark.unit
 def test_import_wizard_story_reuses_or_creates_the_parent_before_form_mapping(
     monkeypatch,
@@ -625,7 +602,6 @@ def test_import_wizard_story_reuses_or_creates_the_parent_before_form_mapping(
     ]
 
 
-# @matrix ingress relations : existing-parent model-load required-validation
 @pytest.mark.unit
 def test_import_wizard_existing_model_parent_loads_project_for_required(monkeypatch):
     project = TestEntities.get(
@@ -669,7 +645,6 @@ def test_import_wizard_existing_model_parent_loads_project_for_required(monkeypa
     assert model.required == ["models", model.hash, project.hash]
 
 
-# @matrix requires : unloaded-relation validation
 @pytest.mark.unit
 def test_model_task_required_reports_unloaded_project_relation(monkeypatch):
     monkeypatch.setattr(
@@ -694,7 +669,6 @@ def test_model_task_required_reports_unloaded_project_relation(monkeypatch):
         model.properties.requires.update()
 
 
-# @matrix ingress : assign-columns guessed-fields ignored-columns multiple-columns table-fields task-name
 @pytest.mark.unit
 def test_import_wizard_story_maps_csv_columns_to_page_task_and_table_fields(
     get_schema,
@@ -749,6 +723,10 @@ def test_import_wizard_story_maps_csv_columns_to_page_task_and_table_fields(
     assert "html-instructqr" not in assign.fields
     assert assign.ignore("col-ignore") == "on"
     assert assign.guess_field("col-website")["id"] == "link-externalij"
+    # A stored field can have a missing label. Other columns must still match.
+    mapping = assign.mapping
+    mapping.fields["name"]["label"] = None
+    assert mapping.guess_field("col-website")["id"] == "link-externalij"
     assert assign.column_map == {
         "col-name": {
             **assign.fields["name"],
@@ -784,7 +762,6 @@ def test_import_wizard_story_maps_csv_columns_to_page_task_and_table_fields(
     assert assign.field("row-emailef34")["description"] == "{ Email }"
 
 
-# @matrix ingress : assign-columns stale-field
 @pytest.mark.unit
 def test_import_wizard_stale_form_field_mapping_is_ignored(get_schema):
     ingress = TestEntities.get(
@@ -819,7 +796,6 @@ def test_import_wizard_stale_form_field_mapping_is_ignored(get_schema):
     assert assign.field_map == {"name": ["col-name"]}
 
 
-# @matrix ingress link : assign-columns fuzzy-match internal table-fields
 @pytest.mark.unit
 def test_import_wizard_internal_link_fields_offer_fuzzy_import(get_schema):
     ingress = TestEntities.get(
@@ -858,7 +834,6 @@ def test_import_wizard_internal_link_fields_offer_fuzzy_import(get_schema):
     assert verify.fuzzy_match("row_rel") is True
 
 
-# @matrix ingress : fuzzy-match page-lookup verify-import
 @pytest.mark.unit
 def test_task_import_story_chooses_page_lookup_fields_before_rows_are_imported(
     get_schema, monkeypatch
@@ -944,7 +919,6 @@ def test_task_import_story_chooses_page_lookup_fields_before_rows_are_imported(
     assert verify.fuzzy_match("input-textab12") is True
 
 
-# @matrix ingress : asset-storage import-pages row-results validation-errors
 @pytest.mark.unit
 def test_importer_story_processes_page_rows_into_entities_and_results(monkeypatch):
     field = SimpleNamespace(
@@ -1013,9 +987,6 @@ def test_importer_story_processes_page_rows_into_entities_and_results(monkeypatc
     assert "entity" not in imported[1]
 
 
-# @matrix ingress : row-results row-task task-import validation-errors
-# @matrix form-todo : import validation
-# @matrix submission : error-message import save validation
 @pytest.mark.unit
 def test_importer_rejects_entire_malformed_todo_row(monkeypatch):
     page = TestEntities.get("PAGE", {"hash": "todo_import_page", "name": "Target"})
@@ -1101,7 +1072,6 @@ def test_importer_rejects_entire_malformed_todo_row(monkeypatch):
     }
 
 
-# @matrix ingress : entity-name import-pages list-normalization
 @pytest.mark.unit
 def test_importer_story_space_joins_entity_name_fallback(get_schema, monkeypatch):
     form = TestEntities.get("FORM", {"hash": "name_fallback_form", "name": "Form"})
@@ -1149,14 +1119,13 @@ def test_importer_story_space_joins_entity_name_fallback(get_schema, monkeypatch
     assert page.db["description"] == "General Contractor"
 
 
-# @matrix ingress : completion-history due-date multiple-columns page-match task-import task-name
 @pytest.mark.unit
 def test_importer_story_creates_tasks_for_matched_pages_and_records_history(
     monkeypatch,
 ):
     parsed_dates = {
-        "2026-01-06": datetime(2026, 1, 6, tzinfo=timezone.utc),
-        "2026-01-10": datetime(2026, 1, 10, tzinfo=timezone.utc),
+        "2026-01-06": datetime(2026, 1, 6, tzinfo=UTC),
+        "2026-01-10": datetime(2026, 1, 10, tzinfo=UTC),
     }
     page = SimpleNamespace(key="page-key", name="Target Page")
     project = SimpleNamespace(key="project-key")
@@ -1324,14 +1293,13 @@ def test_importer_story_creates_tasks_for_matched_pages_and_records_history(
     assert result == {}
 
 
-# @matrix ingress : completion-history existing-model-task live-completion multiple-columns row-task task-import
 @pytest.mark.unit
 def test_task_import_creates_distinct_tasks_per_row_with_same_row_completion_history(
     monkeypatch,
 ):
     parsed_dates = {
-        "2026-01-06": datetime(2026, 1, 6, tzinfo=timezone.utc),
-        "2026-01-10": datetime(2026, 1, 10, tzinfo=timezone.utc),
+        "2026-01-06": datetime(2026, 1, 6, tzinfo=UTC),
+        "2026-01-10": datetime(2026, 1, 10, tzinfo=UTC),
     }
     model = SimpleNamespace(key="model-key")
     project = SimpleNamespace(key="project-key")
@@ -1514,7 +1482,6 @@ def test_task_import_creates_distinct_tasks_per_row_with_same_row_completion_his
     assert result == {}
 
 
-# @matrix ingress : completion-history description name task-import
 @pytest.mark.unit
 def test_importer_records_older_completion_snapshot_text():
     form = SimpleNamespace(key="history-form")
@@ -1529,7 +1496,7 @@ def test_importer_records_older_completion_snapshot_text():
     )
     entity = SimpleNamespace(form=form, get_process=lambda _process_id: {})
     importing = ingress_service.IngressMutationPlanner(entity)
-    completed_on = datetime(2025, 4, 3, tzinfo=timezone.utc)
+    completed_on = datetime(2025, 4, 3, tzinfo=UTC)
     values = {
         "name": "Historical inspection",
         "description": "Imported historical details",
@@ -1549,7 +1516,6 @@ def test_importer_records_older_completion_snapshot_text():
     assert imported == [(values, importing)]
 
 
-# @matrix ingress : fuzzy-match page-match task-import
 @pytest.mark.unit
 def test_importer_task_page_lookup_uses_shared_find_page(monkeypatch):
     calls = []
@@ -1589,7 +1555,6 @@ def test_importer_task_page_lookup_uses_shared_find_page(monkeypatch):
     assert result == {"warnings": ["Weak match for Name: 'Target Page'"]}
 
 
-# @matrix ingress : completed row-results
 @pytest.mark.unit
 def test_completed_ingress_shows_results():
     ingress = TestEntities.get(
@@ -1615,7 +1580,6 @@ def test_completed_ingress_shows_results():
     assert saved_assets == [(results, "results", "json", "private")]
 
 
-# @matrix ingress : asset-storage regression row-results
 @pytest.mark.unit
 def test_results_asset_loads_stored_json_without_recursing():
     ingress = make_raw_ingress("Stored Results", "page")
@@ -1634,7 +1598,6 @@ def test_results_asset_loads_stored_json_without_recursing():
     assert calls == ["results"]
 
 
-# @matrix ingress : delete row-results
 @pytest.mark.unit
 def test_ingress_results_remove_deleted_imported_entities():
     ingress = make_raw_ingress("Remove Results", "page")
@@ -1661,7 +1624,6 @@ def test_ingress_results_remove_deleted_imported_entities():
     assert saved_assets == [(list(results), "results", "json", "private")]
 
 
-# @matrix ingress : delete reload row-results
 @pytest.mark.unit
 def test_ingress_results_prune_missing_entities(monkeypatch):
     ingress = make_raw_ingress("Prune Results", "page")
@@ -1695,7 +1657,6 @@ def test_ingress_results_prune_missing_entities(monkeypatch):
     assert saved_assets == [(list(results), "results", "json", "private")]
 
 
-# @matrix ingress : bulk-delete delete row-results
 @pytest.mark.unit
 def test_ingress_delete_imported_entities_deletes_pages_and_tasks(monkeypatch):
     ingress = make_raw_ingress("Bulk Delete Results", "page")
@@ -1732,3 +1693,19 @@ def test_ingress_delete_imported_entities_deletes_pages_and_tasks(monkeypatch):
         {"entity": {"id": "form-1", "name": "Unrelated Form", "kind": "form"}},
         {"row": "{\"Name\": \"Bad\"}", "errors": ["Bad row"]},
     ]
+
+
+@pytest.mark.unit
+def test_csv_import_uses_saved_separator_for_multiple_choices(get_schema):
+    from lagniappe.core.tools.ingress import IngressMutationPlanner
+
+    ingress = TestEntities.get("INGRESS", {"name": "Colors", "hash": "importcolors"})
+    ingress.properties.choose_form.separator = "|"
+    form = TestEntities.get("FORM", {"name": "Colors", "hash": "colorform"})
+    form.schema = get_schema("select_only")
+    page = TestEntities.get("PAGE", {"name": "Colors", "hash": "colorpage"})
+    page.form = form
+
+    page.import_submission({"select-ab12": ["Red|Blue"]}, IngressMutationPlanner(ingress))
+
+    assert page.submission["select-ab12"] == ["red", "blue"]

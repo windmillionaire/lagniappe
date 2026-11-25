@@ -1,6 +1,6 @@
 """Focused deferred-job behavior tests."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 
 import pytest
@@ -22,9 +22,8 @@ from testing.utility.deferred_job_fakes import (
 pytestmark = pytest.mark.unit
 
 
-# @matrix deferred-jobs : compare-and-set deterministic-task-id reconciliation redispatch
 def test_reconciler_redispatches_one_cas_claimed_stale_job(monkeypatch):
-    now = datetime(2026, 7, 19, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 19, tzinfo=UTC)
     job = RunnerJob(attempt=2)
     job.status = DeferredJobStatus.RETRY_WAIT.value
     job.status_revision = 4
@@ -82,9 +81,8 @@ def test_reconciler_redispatches_one_cas_claimed_stale_job(monkeypatch):
     ]
 
 
-# @matrix deferred-jobs : compare-and-set maximum-age reconciliation terminal-delivery
 def test_reconciler_terminalizes_one_cas_claimed_expired_job(monkeypatch):
-    now = datetime(2026, 7, 19, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 19, tzinfo=UTC)
     job = RunnerJob(attempt=3)
     job.status = DeferredJobStatus.RUNNING.value
     job.status_revision = 4
@@ -136,10 +134,8 @@ def test_reconciler_terminalizes_one_cas_claimed_expired_job(monkeypatch):
     assert "automatic recovery" in str(delivered[0][1])
 
 
-# @matrix deferred-jobs : grace reconciliation terminal-delivery
-# @pair notifications:terminal-delivery
 def test_reconciler_resumes_stale_terminal_delivery_after_grace(monkeypatch):
-    now = datetime(2026, 7, 19, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 19, tzinfo=UTC)
     job = RunnerJob()
     job.status = DeferredJobStatus.SUCCEEDED.value
     job.dispatch_state = "delivery_pending"
@@ -165,11 +161,10 @@ def test_reconciler_resumes_stale_terminal_delivery_after_grace(monkeypatch):
     assert delivered == []
 
 
-# @pair deferred-jobs:orphaned-input
 def test_reconciler_completes_terminal_delivery_when_input_was_deleted(
     monkeypatch,
 ):
-    now = datetime(2026, 7, 20, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 20, tzinfo=UTC)
     job = RunnerJob()
     job.job_type = DeferredJobType.REPORT_AI.value
     job.status = DeferredJobStatus.FAILED.value

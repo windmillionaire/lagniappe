@@ -13,11 +13,7 @@ from runner import cloud_settings as settings
 from runner.context import GCLOUD_CLI
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_cloud_connection_requires_target_identity
-# @tests tests_tooling/test_016_cloud_operator.py::test_cloud_connection_accepts_only_the_configured_relay
-# @matrix auth setup : adc project-identity
-def connection_file(account):
+def connection_file(account: str) -> str:
     path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
     manifest = os.environ.get("OIC_MANIFEST_PATH")
     if manifest:
@@ -66,10 +62,9 @@ def connection_file(account):
     return str(Path(path).resolve())
 
 
-# @testable infrastructure
-def _gcloud(*arguments, env):
+def _gcloud(*arguments: str, env: dict[str, str]) -> None:
     result = subprocess.run(
-        [GCLOUD_CLI, *arguments, "--quiet"], env=env, capture_output=True
+        [GCLOUD_CLI or "gcloud", *arguments, "--quiet"], env=env, capture_output=True
     )
     if result.returncode:
         raise RuntimeError(
@@ -77,10 +72,7 @@ def _gcloud(*arguments, env):
         )
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_startup_checks_identity_and_optional_redis
-# @matrix auth setup : adc project-identity
-def probe(project, *, check_redis=False):
+def probe(project: str, *, check_redis: bool = False) -> None:
     from config import SETTINGS
     from config.experiments import normalize_experiments_config
     from runner.gcloud import activate_repository_gcloud
@@ -97,11 +89,11 @@ def probe(project, *, check_redis=False):
     if not check_redis:
         return
 
-    from config.redis import redis_client_kwargs
+    from config.redis import redis_connection_kwargs
     from redis import Redis
 
     client = Redis(
-        **redis_client_kwargs(SETTINGS.APP, socket_timeout=5, socket_connect_timeout=5)
+        **redis_connection_kwargs(SETTINGS.APP, socket_timeout=5, socket_connect_timeout=5)
     )
     try:
         if not client.ping():
@@ -111,12 +103,7 @@ def probe(project, *, check_redis=False):
     print(f"Verified direct Redis connectivity for {project}.")
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_task_reuses_pinned_version
-# @tests tests_tooling/test_016_cloud_operator.py::test_check_connection_uses_task_identity_before_restore
-# @tests tests_tooling/test_016_cloud_operator.py::test_default_startup_reads_hosted_status
-# @matrix setup : cli-routing project-identity
-def main(arguments=None):
+def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--project",

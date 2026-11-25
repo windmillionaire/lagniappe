@@ -5,14 +5,13 @@ import { createBrowser } from "../utility/js/environment.mjs";
 async function setup(t) {
 	createBrowser(t);
 	const [{ LocationElement }, { STYLES }] = await Promise.all([
-		import("../../src/script/elements/location.mjs"),
+		import("../../src/script/elements/location.ts"),
 		import("../../src/script/generated/styles.mjs"),
 	]);
 	const render = (submission) => new LocationElement({}, {}, submission).read;
 	return { render, STYLES };
 }
 
-/** @matrix location : encoding maps-url place-id */
 test("test_location_maps_url_uses_search_contract_and_place_id", async (t) => {
 	const { render } = await setup(t);
 	const resolved = new URL(
@@ -51,10 +50,6 @@ test("test_location_maps_url_uses_search_contract_and_place_id", async (t) => {
 	);
 });
 
-/**
- * @source src/script/elements/location.mjs::LocationElement.read
- * @pair location:read-layout
- */
 test("test_location_read_layout_only_grows_for_visible_details", async (t) => {
 	const { render, STYLES } = await setup(t);
 	const textContainer = (read) => read.children[0].children[1];

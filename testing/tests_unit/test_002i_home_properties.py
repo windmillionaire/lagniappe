@@ -9,7 +9,6 @@ from testing.utility.mock_restrictions import MockRestrictions
 from testing.utility.test_entities import TestEntities
 
 
-# @matrix home : explicit-user validation
 @pytest.mark.unit
 @pytest.mark.parametrize("constructor", [Home, home_properties.HomeProperty])
 def test_home_requires_explicit_user(constructor):
@@ -19,9 +18,6 @@ def test_home_requires_explicit_user(constructor):
         constructor(user=None)
 
 
-# @source lagniappe/core/properties/home.py::TaskList
-# @source lagniappe/core/properties/home.py::PageList
-# @matrix home : explicit-user pagination count permissions
 @pytest.mark.unit
 def test_home_sections_keep_their_viewer_across_lazy_and_paginated_reads(monkeypatch):
     tasks = [
@@ -89,7 +85,6 @@ def test_home_sections_keep_their_viewer_across_lazy_and_paginated_reads(monkeyp
         first.section("tasks", user=viewers[1])
 
 
-# @matrix home : pagination projects restrictions
 @pytest.mark.unit
 def test_home_project_list_restrictions_and_cursor(monkeypatch):
     user = SimpleNamespace(
@@ -135,7 +130,6 @@ def test_home_project_list_restrictions_and_cursor(monkeypatch):
     assert section.list is projects
 
 
-# @matrix home : categories pagination restrictions
 @pytest.mark.unit
 def test_home_category_list_restrictions_and_cursor(monkeypatch):
     user = SimpleNamespace(
@@ -184,7 +178,6 @@ def test_home_category_list_restrictions_and_cursor(monkeypatch):
     assert section.list is loaded_categories
 
 
-# @matrix home pages : pagination restrictions
 @pytest.mark.unit
 def test_home_page_list_restrictions_and_cursor(monkeypatch):
     class FakePage:
@@ -244,7 +237,6 @@ def test_home_page_list_restrictions_and_cursor(monkeypatch):
     assert section.list is visible_pages
 
 
-# @matrix home : count permissions tasks view-only
 @pytest.mark.unit
 def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
     class FakeTask:
@@ -328,7 +320,6 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
     assert count_requests == ["user-page"]
 
 
-# @matrix starred : missing-placeholder pagination view-authorization
 @pytest.mark.unit
 def test_home_starred_list_paginates_and_marks_missing_keys(monkeypatch):
     class FakeStarred:
@@ -417,7 +408,6 @@ def test_home_starred_list_paginates_and_marks_missing_keys(monkeypatch):
     assert next_section.count == 12
 
 
-# @matrix starred : inaccessible-placeholder retained-inaccessible view-authorization
 @pytest.mark.unit
 def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
     class FakeEntity:
@@ -487,8 +477,6 @@ def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
     ]
 
 
-# @matrix home : ingress list notes query tools
-# @matrix ai-report : list query tools
 @pytest.mark.unit
 def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
     user = SimpleNamespace(email="owner@example.com")
@@ -505,9 +493,9 @@ def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
         ingress_requests.append(True)
         return ["ingress-1"]
 
-    def get_ai_reports(requested_user):
-        ai_report_requests.append(requested_user)
-        return ["report-1"]
+    def get_ai_reports(requested_user, **kwargs):
+        ai_report_requests.append((requested_user, kwargs))
+        return SimpleNamespace(results=["report-1"], next_cursor="reports-next")
 
     def load_entities(*keys, request):
         load_requests.append((keys, request))
@@ -522,14 +510,14 @@ def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
 
     note_section = home_properties.NoteList(user=user)
     ingress_section = home_properties.IngressList(user=user)
-    tools_section = home_properties.ToolsList(user=user)
+    tools_section = home_properties.ToolsList(user=user, cursor="reports-page-1")
     notes = note_section.list
     ingress_files = ingress_section.list
     reports = tools_section.list
 
     assert notes_requests == [user]
     assert ingress_requests == [True]
-    assert ai_report_requests == [user]
+    assert ai_report_requests == [(user, {"start_cursor": "reports-page-1"})]
     assert load_requests == [
         (("note-1", "note-2"), home_properties.Fetch.direct()),
         (("ingress-1",), home_properties.Fetch.direct()),
@@ -541,4 +529,6 @@ def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
     assert note_section.list is notes
     assert ingress_section.list is ingress_files
     assert tools_section.list is reports
+    assert tools_section.cursor == "reports-next"
+    assert tools_section.back is True
     assert tools_section.label == "Plans & Reports"

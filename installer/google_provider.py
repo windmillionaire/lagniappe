@@ -20,9 +20,6 @@ PROVIDER_OPERATION_POLL_DELAYS = (1, 2, 4, 5)
 PROVIDER_REQUEST_ATTEMPTS = 4
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_google_provider_access_token_refresh_retries_connection_resets
-# @matrix setup : authentication google-provider retry
 def _get_access_token():
     """Get an OAuth2 access token for Google provider management APIs."""
     f = FORMATTER.initialize()
@@ -49,9 +46,6 @@ def _get_access_token():
     return credentials.token
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_google_provider_helpers_use_timeouts_and_report_errors
-# @pairs google-provider-api:quota-project setup:google-provider-api
 def _google_request_headers(access_token, project_id, *, json_content=False):
     """Build quota-project-bound Google provider REST headers."""
     headers = {
@@ -63,10 +57,6 @@ def _google_request_headers(access_token, project_id, *, json_content=False):
     return headers
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_google_provider_helpers_use_timeouts_and_report_errors
-# @tests tests_tooling/test_001b_setup_providers.py::test_google_provider_api_request_reports_reason_and_retries_service_activation
-# @matrix setup : diagnostics google-provider-api retry
 def _api_request(
     session,
     method,
@@ -84,9 +74,6 @@ def _api_request(
     attempts = attempts or PROVIDER_REQUEST_ATTEMPTS
     delays = delays or PROVIDER_OPERATION_POLL_DELAYS
 
-    # @testable false
-    # @covered-by installer/google_provider.py::_api_request
-    # @reason retry-delay selection is exercised through the bounded provider request
     def wait_for_retry(attempt):
         delay = delays[min(attempt, len(delays) - 1)]
         if retry_label:

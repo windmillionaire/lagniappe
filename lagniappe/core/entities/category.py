@@ -1,33 +1,56 @@
+from typing import TYPE_CHECKING, Self, TypedDict, Unpack, cast
+
 from flask import url_for
 from ..properties import category, common_entity, common_related
 from lagniappe.core.tools.database import get as database_get
-from .entity import Entity
-from .index import PageIndex
+from .entity import Entity, EntityProperties
+from .index import CollectionOptions, PageIndex
+
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Entity as Row, Key
+
+    from . import property_types
+    from .form import Form
 
 UNCATEGORIZED_PAGES_NAME = "Uncategorized Pages"
 
 
-# @testable true
-# @tests tests_unit/test_007_category_properties.py::test_category_schema
-# @matrix category form-schema : delegation schema
-# @matrix category permissions : attached-form cache restricted-access
+class CategoryData(TypedDict, total=False):
+    name: str | None
+    description: str | None
+    form: Form | None
+
+
 class Category(Entity):
+    if TYPE_CHECKING:
+        description: str | None
+
+        @property
+        def filters(self) -> category.CategoryFilters: ...
+
+        form: Form | None
+        forms: list[Form]
+
+        @property
+        def properties(self) -> property_types.CategoryProperties: ...
+
     entity_kind = "category"
     retired_fields = frozenset({"attributes"})
 
     @property
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         return frozenset({"description"})
 
     @property
-    def required(self):
+    def required(self) -> list[str]:
         return ["models", self.hash]
 
     @property
-    def url(self):
+    def url(self) -> str:
         return url_for("categories.index", key=self.urlsafe_key)
 
-    def _get_properties(self):
+    def _get_properties(self) -> EntityProperties:
         properties = super()._get_properties()
         properties.update(
             {
@@ -40,40 +63,28 @@ class Category(Entity):
         )
         return properties
 
-    def index(self, *args, **kwargs):
+    def index(self, *args: object, **kwargs: Unpack[CollectionOptions]) -> PageIndex:
         return PageIndex(*args, entity=self, **kwargs)
 
     @property
-    def schema(self):
+    def schema(self) -> list[dict[str, object]] | None:
         return self.form.schema if self.form else None
 
-    # @testable true
-    # @tests tests_unit/test_032h_report_batches.py::test_dependent_creations_share_one_commit
-    # @matrix ai-report : identity
     @classmethod
-    def create(cls, data, *, key=None):
+    def create(cls, data: CategoryData, *, key: Key | None = None) -> Self:
         new_category = cls(key)
         new_category.kind = cls.entity_kind
 
         new_category.update(data)
         return new_category
 
-    # @testable true
-    # @tests tests_unit/test_012_category_conditions.py::test_category_string_filters
-    # @tests tests_unit/test_012_category_conditions.py::test_category_boolean_filters
-    # @tests tests_unit/test_012_category_conditions.py::test_category_timestamp_filters
-    # @tests tests_unit/test_012_category_conditions.py::test_category_entity_filters
-    # @matrix category : boolean condition-definition entity-valued string timestamp
-    def update(self, data):
+    def update(self, data: CategoryData) -> None:
         self.form = data.get("form")
         self.name = data.get("name")
         self.description = data.get("description")
 
-    # @testable true
-    # @tests tests_unit/test_007_category_properties.py::test_uncategorized_pages_get_create
-    # @matrix category pages : default-category get-create
     @classmethod
-    def get_uncategorized_pages(cls):
+    def get_uncategorized_pages(cls) -> Self:
         exists = database_get.category_by_name(UNCATEGORIZED_PAGES_NAME)
         if exists:
             return cls(exists)
@@ -83,16 +94,13 @@ class Category(Entity):
         return category
 
 
-# @testable true
-# @tests tests_unit/test_009b_user_permissions.py::test_users_category_uses_users_scope_not_models_scope
-# @matrix category permissions users : models-scope users-category
 class UserCategory(Category):
     entity_kind = "users"
 
     @property
-    def required(self):
+    def required(self) -> list[str]:
         return ["users"]
 
     @classmethod
-    def get(cls):
-        return cls(database_get.reserved("users"))
+    def get(cls) -> Self:
+        return cls(cast("Row", database_get.reserved("users")))

@@ -1,5 +1,11 @@
 """Resumable delegated-installation handoff to the permanent business Owner."""
 
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, Protocol, TypedDict
+
+
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 
@@ -11,13 +17,24 @@ from runner.console import format_prompt, wrap_text
 from runner.context import setup_command
 
 
+if TYPE_CHECKING:
+    from google.cloud.iam_admin_v1 import IAMClient
+    from google.cloud.resourcemanager_v3 import ProjectsClient
+    from google.cloud.storage import Bucket
+
+class HandoffContext(TypedDict):
+    projects: ProjectsClient
+    service_accounts: IAMClient
+    buckets: Mapping[str, Bucket]
+
+class _Deploy(Protocol):
+    def __call__(self, *, print_final_summary: bool) -> None: ...
+
+
 OWNER_ROLE = "roles/owner"
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_handoff_operator_preparation_accepts_installer_or_owner
-# @matrix handoff : active-account adc gcloud installer operator owner preconditions
-def prepare_handoff_operator():
+def prepare_handoff_operator() -> str:
     """Activate the saved project as either permitted handoff operator."""
     from config import SETTINGS
     from runner import gcloud as runner_gcloud
@@ -60,10 +77,7 @@ def prepare_handoff_operator():
     return active_email
 
 
-# @testable false
-# @covered-by installer/handoff.py::handoff
-# @reason provider client composition is exercised through the injected transaction contract
-def _cloud_context(project_id, bucket_names):
+def _cloud_context(project_id: str, bucket_names: Sequence[str]) -> HandoffContext:
     install_if_missing(
         "google.cloud.resourcemanager_v3",
         "Google Resource Manager API",
@@ -91,9 +105,6 @@ def _cloud_context(project_id, bucket_names):
     }
 
 
-# @testable false
-# @covered-by installer/handoff.py::handoff
-# @reason provider policy fetch shape is owned by the handoff transaction
 def _project_policy(client, project_id):
     return client.get_iam_policy(
         request={
@@ -103,9 +114,6 @@ def _project_policy(client, project_id):
     )
 
 
-# @testable false
-# @covered-by installer/handoff.py::handoff
-# @reason provider policy fetch shape is owned by the handoff transaction
 def _service_account_policy(client, project_id, runtime_email):
     resource = f"projects/{project_id}/serviceAccounts/{runtime_email}"
     policy = client.get_iam_policy(
@@ -117,9 +125,6 @@ def _service_account_policy(client, project_id, runtime_email):
     return resource, policy
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent
-# @matrix handoff : bucket idempotence owner-add service-account verification
 def _grant_owner_resource_access(context, project_id, runtime_email, owner_email):
     from google.iam.v1 import policy_pb2
 
@@ -173,9 +178,6 @@ def _grant_owner_resource_access(context, project_id, runtime_email, owner_email
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent
-# @matrix handoff : bucket installer-removal service-account unrelated-members verification
 def _remove_installer_resource_access(
     context, project_id, runtime_email, installer_email
 ):
@@ -204,9 +206,6 @@ def _remove_installer_resource_access(
         raise RuntimeError("Installer still has direct IAM on the runtime service account.")
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent
-# @matrix handoff : all-bindings final-mutation owner-lockout project-role verification
 def _remove_installer_project_access(
     context, project_id, installer_email, owner_email
 ):
@@ -230,11 +229,13 @@ def _remove_installer_project_access(
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_rejects_owner_lockout_and_default_no_confirmation
-# @matrix handoff : cleanup confirmation default-no deploy idempotence no-mutation ordering owner-lockout preconditions preview resumable settings
-def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
+def handoff(
+    *,
+    context: HandoffContext | None = None,
+    deploy: _Deploy | None = None,
+    confirm: Callable[[str], str] | None = None,
+    permission_check: Callable[[str], object] | None = None,
+) -> int:
     """Transfer Lagniappe-managed operator access from installer to Owner."""
     from config import File, SETTINGS
     from installer.deploy import deploy_to_app_engine
@@ -327,7 +328,9 @@ def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
     print(ui.success("\nHandoff complete"))
     print("Installation roles removed from installer.")
     print(ui.heading("\nRemaining business cleanup"))
-    auth_email = settings.get("AUTH_EMAIL_CONFIG") or {}
+    auth_email = settings.get("AUTH_EMAIL_CONFIG")
+    if not isinstance(auth_email, dict):
+        auth_email = {}
     if installer_email in {
         str(auth_email.get(field) or "").strip().casefold()
         for field in ("senderEmail", "username")

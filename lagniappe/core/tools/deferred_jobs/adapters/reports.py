@@ -1,6 +1,15 @@
 """Deferred-job adapters for the reports domain."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.definitions import DeferredJobSpec
+    from lagniappe.core.tools.deferred_jobs.context import DeferredJobContext
+    from collections.abc import Mapping
+
+from ..context import required_input
 from copy import deepcopy
+import hashlib
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
@@ -8,6 +17,7 @@ from lagniappe.core.definitions import (
     Action,
     DeferredJobInspection,
     DeferredJobPhase,
+    DeferredJobStatus,
     DeferredJobType,
     Fetch,
     MutationIntent,
@@ -28,20 +38,14 @@ from ..errors import (
 )
 
 
-# @testable true
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_phases_reuse_current_report_without_loading_input_files
-# @matrix ai-report : input-files no-extra-read fresh-read
 class ReportAdapter(DeferredJobAdapter):
     """Shared report generation and revision behavior."""
 
     queued_message = "Creating report..."
     retry_message = "The model is busy right now. We'll try again later."
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_replacement_supersedes_old_job_and_ignores_old_failure
-    # @pairs ai-report:active-operation deferred-jobs:superseded
-    def started(self, context):
-        report = context.input("report")
+    def started(self, context: DeferredJobContext) -> None:
+        report = required_input(context, "report")
         current = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
         if isinstance(current, Entities.REPORT):
             report = current
@@ -58,10 +62,7 @@ class ReportAdapter(DeferredJobAdapter):
         }
         Entities.save(report, context.actor)
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_corrective_report_generation_requires_create_access
-    # @pair ai-access:provider-boundary
-    def authorize(self, context):
+    def authorize(self, context: DeferredJobContext) -> None:
         super().authorize(context)
         report = context.input("report")
         if not isinstance(context.actor, Entities.USER):
@@ -79,19 +80,18 @@ class ReportAdapter(DeferredJobAdapter):
                 "You do not have permission to update this report."
             )
 
-    def validate_apply(self, context):
+    def validate_apply(self, context: DeferredJobContext) -> None:
         """Only the operation recorded on the report may publish its proposal."""
-        report = context.input("report")
+        report = required_input(context, "report")
         active_job = report.deferred_job or {}
         if active_job.get("key") != context.job.urlsafe_key:
             raise exceptions.ValidationError(
                 "This report operation was replaced by a newer request."
             )
 
-    # @testable infrastructure
-    def inspect(self, context):
+    def inspect(self, context: DeferredJobContext) -> DeferredJobInspection:
         report = Entities.fetch_one(
-            context.input("report").urlsafe_key,
+            required_input(context, "report").urlsafe_key,
             request=Fetch.direct(),
         )
         if report is None:
@@ -106,16 +106,10 @@ class ReportAdapter(DeferredJobAdapter):
             return DeferredJobInspection.NOT_APPLIED
         return DeferredJobInspection.DRIFTED
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_ai_report_resumes_prepared_proposal
-    # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
-    # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-    # @matrix ai-report : proposal-publication status
-    # @matrix ai-report : async persistence
-    def apply(self, context):
+    def apply(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         context.ensure_active()
         self.validate_apply(context)
-        report = context.input("report")
+        report = required_input(context, "report")
         proposal = deepcopy(context.checkpoint["proposal"])
         if proposal.get("actions") and not context.actor.access(AI.CREATE):
             raise exceptions.ValidationError(
@@ -129,9 +123,12 @@ class ReportAdapter(DeferredJobAdapter):
         snapshot = external_operations.report_snapshot(report)
         report.properties.process.set_proposal(proposal)
         report.file_usage = deepcopy(context.checkpoint.get("file_usage") or [])
+        job_key, lease_token = context.job.key, context.job.lease_token
+        if job_key is None or not isinstance(lease_token, str):
+            raise DeferredJobDriftError("Report generation was cancelled or replaced.")
         outcome = external_operations.save_plan_if_idle(
             report, snapshot,
-            active_job=(context.job.key, context.job.lease_token),
+            active_job=(job_key, lease_token),
         )
         if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
             raise DeferredJobDriftError("Report generation was cancelled or replaced.")
@@ -141,9 +138,7 @@ class ReportAdapter(DeferredJobAdapter):
             "action_count": len(proposal.get("actions") or []),
         }
 
-    # @testable true
-    # @matrix ai-report : cancellation revision reload
-    def cleanup(self, context, *, terminal):
+    def cleanup(self, context: DeferredJobContext, *, terminal: bool) -> None:
         if not terminal:
             return
         report = context.input("report")
@@ -172,11 +167,49 @@ class ReportAdapter(DeferredJobAdapter):
         outcome = external_operations.save_plan_if_idle(report, snapshot)
         if outcome != agent_api_store.PLAN_OPERATION_COMMITTED:
             raise DeferredJobDriftError("Report changed during generation cleanup.")
+        if (
+            context.job.status == DeferredJobStatus.SUCCEEDED.value
+            and context.parameters.get("auto_execute")
+            and report.status == "ready"
+            and (report.proposal or {}).get("actions")
+            and getattr(report, "origin", "web") == "web"
+        ):
+            context.parameters.pop("auto_execute", None)
+            self._chain_auto_execution(context, report)
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_replacement_supersedes_old_job_and_ignores_old_failure
-    # @pair ai-report:failure-isolation
-    def failure(self, context, error):
+    def _chain_auto_execution(self, context, report):
+        from lagniappe.core.tools.ai.auto_execute import (
+            can_auto_execute_onsite_plan,
+            plan_requires_review,
+        )
+        from lagniappe.core.tools.ai.reporting.execution.request import (
+            request_execution,
+        )
+
+        actor = Entities.fetch_one(context.actor.key, request=Fetch.direct())
+        if not can_auto_execute_onsite_plan(actor):
+            return
+        pause_reason = plan_requires_review(report)
+        if pause_reason:
+            report.db["auto_execute_pause_reason"] = pause_reason
+            Entities.save_root(report, property_mask=("auto_execute_pause_reason",))
+            return
+        identity = hashlib.sha256(
+            str(context.job.idempotency_key or context.job.urlsafe_key).encode("utf-8")
+        ).hexdigest()[:48]
+        try:
+            request_execution(
+                report,
+                actor,
+                operation_id=f"auto-execute-{identity}",
+                expected_fingerprint=proposal_fingerprint(report.proposal),
+                auto_execute=True,
+            )
+        except exceptions.ValidationError as error:
+            report.db["auto_execute_pause_reason"] = str(error)
+            Entities.save_root(report, property_mask=("auto_execute_pause_reason",))
+
+    def failure(self, context: DeferredJobContext, error: BaseException | str) -> None:
         report = context.input("report")
         if not isinstance(report, Entities.REPORT):
             return
@@ -191,15 +224,14 @@ class ReportAdapter(DeferredJobAdapter):
             report.properties.process.revision_failed(str(error))
         else:
             result = (
-                {"error_context": error.context}
-                if getattr(error, "context", None)
+                {"error_context": error_context}
+                if (error_context := getattr(error, "context", None))
                 else None
             )
             report.properties.process.fail(str(error), result=result)
         external_operations.save_plan_if_idle(report, snapshot)
 
-    # @testable infrastructure
-    def terminal_message(self, context, *, succeeded, error=None):
+    def terminal_message(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> str:
         label = "AI"
         if context.job.status in {"cancelled", "superseded"}:
             return "AI report generation cancelled."
@@ -209,24 +241,20 @@ class ReportAdapter(DeferredJobAdapter):
         return f"{label} report failed. {str(error or '').strip()}".strip()
 
 
-# @testable true
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_ai_report_resumes_prepared_proposal
-# @matrix ai-report : plan-resume proposal-publication status
-# @matrix deferred-jobs : quota retry service-tier cancellation
 class AIReportAdapter(ReportAdapter):
     job_type = DeferredJobType.REPORT_AI
     required_ai_access = AI.ASK
     max_lifetime_seconds = 10 * 60
     resume_preparation = False
 
-    def checkpoint_ready(self, context):
+    def checkpoint_ready(self, context: DeferredJobContext) -> bool:
         checkpoint = context.checkpoint or {}
         return checkpoint.get("stage") == "ready_to_apply" and isinstance(
             checkpoint.get("proposal"), dict
         )
 
-    def prepare(self, context):
-        report, actor = context.input("report"), context.actor
+    def prepare(self, context: DeferredJobContext) -> Mapping[str, object] | None:
+        report, actor = required_input(context, "report"), context.actor
         stage = (context.checkpoint or {}).get("stage")
         stage_index = {
             None: 0,
@@ -282,22 +310,6 @@ class AIReportAdapter(ReportAdapter):
         return None
 
 
-# @testable true
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_adapter_runs_the_reviewed_proposal
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_schedules_report_dependency_checks_with_backoff
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_failure_preserves_a_retryable_ledger
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_execution_start_rejects_stale_browser_snapshot
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_external_report_duplicate_cleanup_cannot_overwrite_new_api_proposal
-# @tests tests_unit/test_034_experiments.py::test_execution_rejects_stale_proposals_and_reuses_exact_operations
-# @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_phases_reuse_current_report_without_loading_input_files
-# @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
-# @matrix ai-report : deterministic-run entitlement-independent recovery
-# @matrix deferred-jobs : cancellation provider-boundary report-execution tier-declaration
-# @matrix agent-api ai-report deferred-jobs : browser-review cas report-execution terminal-delivery
-# @matrix ai-report : input-files no-extra-read fresh-read
-# @matrix deferred-jobs : dependency-wait backoff
-# @matrix experiments : execution-policy
 class ReportExecutionAdapter(DeferredJobAdapter):
     """Durably execute a reviewed report through its per-action ledger."""
 
@@ -309,13 +321,14 @@ class ReportExecutionAdapter(DeferredJobAdapter):
     active_message = "Still saving report changes..."
     notification_policy = "none"
 
-    def checkpoint_ready(self, _context):
+    def checkpoint_ready(self, context: DeferredJobContext) -> bool:
         """The report's action ledger is the execution checkpoint."""
         return True
 
-    def authorization(self, spec):
+    def authorization(self, spec: DeferredJobSpec) -> dict[str, object]:
         authorization = super().authorization(spec)
         report = spec.inputs.get("report")
+        assert report is not None
         # The MCP request gate checks this submitted identity before new work.
         # Replays must also match the receipt after legacy execution normalized
         # its saved proposal; the shared service still compares the entire job.
@@ -326,8 +339,8 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         )
         return authorization
 
-    def started(self, context):
-        report = context.input("report")
+    def started(self, context: DeferredJobContext) -> None:
+        report = required_input(context, "report")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         external_snapshot = (
@@ -375,12 +388,23 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             report._form_additional_guards = [(report.key, ExactEntityState(initial_state))]
             Entities.save(report, context.actor)
 
-    def authorize(self, context):
+    def authorize(self, context: DeferredJobContext) -> None:
         report = context.input("report")
         if context.parameters.get("experiments_execution"):
             from lagniappe.core.tools.experiments import can_execute
             if not can_execute(context.actor, remote_mcp=True):
                 raise exceptions.ValidationError("Experiments execution is no longer allowed for this actor.")
+        elif context.parameters.get("external_execution"):
+            from lagniappe.core.tools.ai.auto_execute import can_execute_external_plan
+            if not can_execute_external_plan(
+                context.actor,
+                remote_mcp=bool(context.parameters.get("remote_mcp")),
+            ):
+                raise exceptions.ValidationError("Automatic plan execution is no longer allowed for this actor.")
+        elif context.parameters.get("auto_execute"):
+            from lagniappe.core.tools.ai.auto_execute import can_auto_execute_onsite_plan
+            if not can_auto_execute_onsite_plan(context.actor):
+                raise exceptions.ValidationError("Automatic plan execution is no longer allowed for this actor.")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         super().authorize(context)
@@ -395,8 +419,8 @@ class ReportExecutionAdapter(DeferredJobAdapter):
                 "You do not have permission to execute this report."
             )
 
-    def validate_apply(self, context):
-        report = context.input("report")
+    def validate_apply(self, context: DeferredJobContext) -> None:
+        report = required_input(context, "report")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         active_job = report.deferred_job or {}
@@ -410,9 +434,9 @@ class ReportExecutionAdapter(DeferredJobAdapter):
                 "The report proposal changed while execution was queued."
             )
 
-    def inspect(self, context):
+    def inspect(self, context: DeferredJobContext) -> DeferredJobInspection:
         report = Entities.fetch_one(
-            context.input("report").urlsafe_key,
+            required_input(context, "report").urlsafe_key,
             request=Fetch.direct(),
         )
         if report is None:
@@ -428,10 +452,10 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             return DeferredJobInspection.NOT_APPLIED
         return DeferredJobInspection.DRIFTED
 
-    def apply(self, context):
+    def apply(self, context: DeferredJobContext) -> Mapping[str, object] | None:
         context.ensure_active()
         self.validate_apply(context)
-        report = context.input("report")
+        report = required_input(context, "report")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
         result = report_runner.run_report(
@@ -449,9 +473,6 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             "action_count": len(result.get("actions") or []),
         }
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/deferred_jobs/adapters/reports.py::ReportExecutionAdapter
-    # @reason ledger mutation boundaries recheck the shared execution policy
     def _ensure_execution_active(self, context):
         context.ensure_active()
         if context.parameters.get("experiments_execution"):
@@ -459,8 +480,21 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             actor = Entities.fetch_one(context.actor.key, request=Fetch.direct())
             if not can_execute(actor, remote_mcp=True):
                 raise exceptions.ValidationError("Experiments execution is no longer allowed for this actor.")
+        elif context.parameters.get("external_execution"):
+            from lagniappe.core.tools.ai.auto_execute import can_execute_external_plan
+            actor = Entities.fetch_one(context.actor.key, request=Fetch.direct())
+            if not can_execute_external_plan(
+                actor,
+                remote_mcp=bool(context.parameters.get("remote_mcp")),
+            ):
+                raise exceptions.ValidationError("Automatic plan execution is no longer allowed for this actor.")
+        elif context.parameters.get("auto_execute"):
+            from lagniappe.core.tools.ai.auto_execute import can_auto_execute_onsite_plan
+            actor = Entities.fetch_one(context.actor.key, request=Fetch.direct())
+            if not can_auto_execute_onsite_plan(actor):
+                raise exceptions.ValidationError("Automatic plan execution is no longer allowed for this actor.")
 
-    def failure(self, context, error):
+    def failure(self, context: DeferredJobContext, error: BaseException | str) -> None:
         report = context.input("report")
         if getattr(report, "db", {}).get("superseded_by"):
             raise exceptions.ValidationError("This execution was superseded by an approved correction.")
@@ -483,15 +517,19 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         if result and result.get("ledger_version") == report_ledger.REPORT_LEDGER_VERSION:
             result["status"] = "failed"
             if not result.get("failed_at"):
-                for index, action in enumerate(result.get("actions") or [], 1):
+                records = result.get("actions") or []
+                if not isinstance(records, list):
+                    raise exceptions.ValidationError("Invalid execution action ledger.")
+                for index, action in enumerate(records, 1):
                     if action.get("status") not in {"complete", "skipped"}:
                         result["failed_at"] = index
                         break
             report.properties.process.fail(str(error), result=result)
         else:
+            previous_status = active_job.get("previous_status")
             report.properties.process.restore_after_execution_failure(
                 str(error),
-                previous_status=active_job.get("previous_status"),
+                previous_status=previous_status if isinstance(previous_status, str) else None,
             )
         if external_snapshot is not None:
             if hasattr(report, "add_mutation_intents"):
@@ -505,7 +543,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         else:
             Entities.save(report, context.actor)
 
-    def cleanup(self, context, *, terminal):
+    def cleanup(self, context: DeferredJobContext, *, terminal: bool) -> None:
         if not terminal:
             return
         report = context.input("report")
@@ -536,14 +574,11 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             else:
                 Entities.save(report, context.actor)
 
-    def terminal_message(self, context, *, succeeded, error=None):
+    def terminal_message(self, context: DeferredJobContext, *, succeeded: bool, error: BaseException | str | None = None) -> str:
         if succeeded:
             return "Report changes are saved."
         return f"Report execution failed. {str(error or '').strip()}".strip()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/deferred_jobs/adapters/reports.py::ReportExecutionAdapter
-# @reason execution authorization and drift checks own this canonical proposal hash
 def _report_proposal_fingerprint(report):
     return proposal_fingerprint(getattr(report, "proposal", None))

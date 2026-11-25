@@ -17,9 +17,6 @@ from lagniappe.core.tools.ai.reporting.contracts.schema import (
 pytestmark = pytest.mark.unit
 
 
-# @source lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
-# @source lagniappe/core/tools/ai/reporting/contracts/schema.py::report_proposal_response_schema
-# @matrix agent-api ai-report : external-schema proposal-contract structured-output
 @pytest.mark.parametrize(
     "kind", ["update_task", "update_page", "update_project", "update_model_task", "update_file"]
 )
@@ -57,8 +54,6 @@ def test_cohesive_update_contract_requires_target_and_nonempty_known_patch(kind)
     )
 
 
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
-# @matrix ai-report submission : validation preservation
 @pytest.mark.parametrize("kind", ["update_task", "update_page"])
 def test_selected_patch_guidance_uses_cohesive_contract(kind):
     result = execute_external_get_guidelines(
@@ -70,8 +65,6 @@ def test_selected_patch_guidance_uses_cohesive_contract(kind):
     assert "update_form_values" not in result["guidelines"]
 
 
-# @source lagniappe/core/tools/ai/reporting/display/actions/forms.py::schema_details
-# @matrix ai-report form-schema : details proposal
 def test_schema_review_displays_exact_form_and_change_count():
     from lagniappe.core.tools.ai.reporting.display.actions.forms import schema_details
 

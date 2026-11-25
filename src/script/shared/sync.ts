@@ -1,0 +1,639 @@
+import { loadHeadlessWidget } from "../elements/editor/headless.ts";
+import type { RequestResult } from "../types/api.d.ts";
+import type {
+	DocumentCursor,
+	PersistedSyncRecord,
+	SyncComponent,
+	SyncResponse,
+	SyncSendOptions,
+	SyncUpdate,
+	SyncView,
+	SyncWidget,
+} from "../types/sync.d.ts";
+import { ENDPOINTS } from "./endpoints.ts";
+import {
+	deleteSyncRecord,
+	deleteSyncRecords,
+	getAllOfflineRecords,
+	getSyncRecord,
+	updateSyncRecord,
+} from "./offline.ts";
+import type { PollDescriptor, PollResult } from "./polling.ts";
+import { request } from "./request.ts";
+import { waitForAttribute } from "./utilities.ts";
+
+type SyncSendResult = RequestResult<SyncResponse> | null | undefined;
+
+// The legacy editor factory accepts replay options with no remote state yet.
+const loadReplayWidget = loadHeadlessWidget as (options: {
+	sync_id: string;
+	offline: PersistedSyncRecord;
+}) => Promise<SyncWidget | null>;
+
+/**
+ * Coordinate Yjs document updates through the shared polling protocol.
+ *
+ */
+export class SyncManager {
+	declare view: SyncView;
+	declare _initialized: boolean;
+	declare _subscriptions: Map<string, () => void>;
+	declare _cursors: Map<string, DocumentCursor>;
+	declare _checkpointRetries: Set<string>;
+	declare _checkpointPollFirst: Set<string>;
+	declare _pendingParentTouches: Set<string>;
+	declare _activating: Set<string>;
+	declare _offlineReplayAttempts: Map<string, number>;
+	declare _registerPromise: Promise<void> | null;
+	declare _sendPromise: Promise<SyncSendResult> | null;
+	declare _queuedSend: (Required<SyncSendOptions> & { save: boolean }) | null;
+	declare ready: Promise<this> | Promise<void>;
+	declare _syncSave: () => Promise<SyncSendResult>;
+
+	constructor(view: SyncView) {
+		this.view = view;
+		this._initialized = false;
+		this._subscriptions = new Map();
+		this._cursors = new Map();
+		this._checkpointRetries = new Set();
+		this._checkpointPollFirst = new Set();
+		this._pendingParentTouches = new Set();
+		this._activating = new Set();
+		this._offlineReplayAttempts = new Map();
+		this._registerPromise = null;
+		this._sendPromise = null;
+		this._queuedSend = null;
+		this.ready = Promise.resolve(this);
+		this._syncSave = () => this.sendUpdates(true);
+	}
+
+	init() {
+		if (this._initialized) return this;
+		this._initialized = true;
+		window.addEventListener("sync-save", this._syncSave);
+		this.ready = this.register();
+		return this;
+	}
+
+	get widgets() {
+		const entries: [string, SyncWidget][] = [];
+		for (const component of Object.values(this.view.components ?? {})) {
+			for (const widget of Object.values(component.widgets ?? {})) {
+				if (widget.syncId) {
+					entries.push([widget.syncId, widget]);
+				}
+			}
+		}
+		return Object.fromEntries(entries);
+	}
+
+	_componentVisible(component: SyncComponent | null | undefined) {
+		if (component?.visible !== true) return false;
+		let ancestor =
+			component.elt?.parentElement?.closest?.<HTMLElement>("[lp-component]");
+		while (ancestor) {
+			if (ancestor.dataset.visible === "false") return false;
+			ancestor =
+				ancestor.parentElement?.closest?.<HTMLElement>("[lp-component]");
+		}
+		return true;
+	}
+
+	_widgetVisible(widget: SyncWidget) {
+		return Boolean(
+			widget?.component?.active === widget &&
+				this._componentVisible(widget.component) &&
+				widget.visible === true,
+		);
+	}
+
+	_descriptor(widget: SyncWidget) {
+		const active = this.view.PollingCoordinator?.get(
+			`document:${widget.syncId}`,
+		);
+		const protocol =
+			(active as PollDescriptor<"document"> | null | undefined) ??
+			this._cursors.get(widget.syncId);
+		return {
+			key: widget.component?.key ?? widget.key,
+			sync_id: widget.syncId,
+			generation: protocol?.generation ?? null,
+			revision: protocol?.revision ?? 0,
+			presence_digest: protocol?.presence_digest ?? null,
+		};
+	}
+
+	_rememberCursor(
+		syncId: string,
+		patch: Partial<DocumentCursor> | null = null,
+	) {
+		const active = this.view.PollingCoordinator?.get(`document:${syncId}`) as
+			| PollDescriptor<"document">
+			| null
+			| undefined;
+		const current = this._cursors.get(syncId) ?? {};
+		const source = { ...current, ...active, ...patch };
+		this._cursors.set(syncId, {
+			generation: source.generation ?? null,
+			revision: source.revision ?? 0,
+			presence_digest: source.presence_digest ?? null,
+		});
+	}
+
+	_replayBlocked(syncId: string) {
+		return (
+			this._offlineReplayAttempts.get(syncId) ===
+			(this.view.connectivityGeneration ?? 0)
+		);
+	}
+
+	_subscribe(widget: SyncWidget, { force = false } = {}) {
+		if (!widget?.syncId || this._subscriptions.has(widget.syncId)) return;
+		if (!force && !this._widgetVisible(widget)) return;
+		const id = `document:${widget.syncId}`;
+		const descriptor: PollDescriptor<"document"> = {
+			id,
+			type: "document",
+			...this._descriptor(widget),
+		};
+		const unsubscribe = this.view.PollingCoordinator?.subscribe(descriptor, {
+			mode: "periodic",
+			initial: "immediate",
+			beforePoll: () => {
+				const current = this.widgets[widget.syncId] ?? widget;
+				if (
+					!this._widgetVisible(current) &&
+					!this._activating.has(widget.syncId)
+				)
+					return;
+				return this.sendUpdates(
+					this._checkpointRetries.has(widget.syncId) &&
+						!this._checkpointPollFirst.has(widget.syncId),
+				);
+			},
+			onResult: async (result) => {
+				const current = this.widgets[widget.syncId] ?? widget;
+				if (
+					!this._widgetVisible(current) &&
+					!this._activating.has(widget.syncId)
+				)
+					return false;
+				if (result.status === "unavailable") {
+					await current.readCache?.clear();
+				}
+				if (result.status !== "changed" || !result.payload) return;
+				// state() consumes its forced result directly, so its cursor is
+				// safe to accept while the editor's async create event is still
+				// completing. Any later result must wait for the mounted widget.
+				if (!current.initialized) return this._activating.has(widget.syncId);
+				current.remote = result.payload;
+				if ((await current.sync()) === false) return false;
+				this._rememberCursor(widget.syncId);
+				await current.readCache?.accept(result.payload);
+				if (
+					!current.readonly &&
+					(result.payload.checkpoint_required ||
+						this._checkpointRetries.has(widget.syncId))
+				) {
+					this._checkpointPollFirst.delete(widget.syncId);
+					await this.sendUpdates(true);
+				}
+			},
+		});
+		if (unsubscribe) {
+			this._subscriptions.set(widget.syncId, unsubscribe);
+			this._rememberCursor(widget.syncId, descriptor);
+		}
+	}
+
+	async state(widget: SyncWidget) {
+		await this.ready;
+		const offline = await getSyncRecord(widget.syncId);
+		if (offline) widget.offlineRecord = offline;
+		// Pending edits already include a complete Yjs state. Re-seeding legacy
+		// cached HTML before merging it would create duplicate document nodes.
+		if (!this.view.online)
+			return offline?.ydoc ? null : ((await widget.readCache?.read()) ?? null);
+		this._activating.add(widget.syncId);
+		try {
+			this._subscribe(widget, { force: true });
+			const results = await this.view.PollingCoordinator?.trigger(
+				`document:${widget.syncId}`,
+			);
+			const result = results?.find(
+				(result): result is PollResult<"document"> =>
+					result.id === `document:${widget.syncId}`,
+			);
+			if (result?.payload) {
+				await widget.readCache?.accept(result.payload);
+				return result.payload;
+			}
+			if (!result || result.status === "error") {
+				return offline?.ydoc
+					? null
+					: ((await widget.readCache?.read()) ?? null);
+			}
+			if (result.status === "unavailable") {
+				await widget.readCache?.clear();
+				widget.offlineRecord = null;
+			}
+			return null;
+		} finally {
+			this._activating.delete(widget.syncId);
+		}
+	}
+
+	/**
+	 * Coalesced lifecycle events may request registration more than once during
+	 * one reconnect. A failed durable replay is attempted once per connectivity
+	 * generation and remains queued for the next genuine recovery.
+	 *
+	 */
+	register() {
+		if (this._registerPromise) return this._registerPromise;
+		const generation = this.view.connectivityGeneration ?? 0;
+		const pending = this._register(generation);
+		this._registerPromise = pending;
+		const complete = () => {
+			if (this._registerPromise === pending) this._registerPromise = null;
+		};
+		void pending.then(complete, complete);
+		return pending;
+	}
+
+	async _register(generation: number) {
+		const { sync: allOffline } = await getAllOfflineRecords();
+		const offline = allOffline.filter(
+			({ sync_id }) =>
+				sync_id?.endsWith(":document") &&
+				this._offlineReplayAttempts.get(sync_id) !== generation,
+		);
+		const obsolete = allOffline.filter(
+			({ sync_id }) => !sync_id?.endsWith(":document"),
+		);
+		if (obsolete.length) {
+			await deleteSyncRecords(obsolete.map(({ sync_id }) => sync_id));
+		}
+		for (const widget of Object.values(this.widgets)) this._subscribe(widget);
+		if (offline.length) {
+			for (const { sync_id } of offline) {
+				this._offlineReplayAttempts.set(sync_id, generation);
+			}
+			const completed = await this._reconcile(offline);
+			if (completed) {
+				for (const { sync_id } of offline) {
+					if (this._offlineReplayAttempts.get(sync_id) === generation) {
+						this._offlineReplayAttempts.delete(sync_id);
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Keep document presence and its fast polling cadence scoped to the active,
+	 * visible document widget.
+	 *
+	 */
+	async reconcileSubscriptions() {
+		if (!this.view.online || this.view.hidden) return;
+		const widgets = this.widgets;
+		const active = new Map(
+			Object.entries(widgets).filter(([, widget]) =>
+				this._widgetVisible(widget),
+			),
+		);
+		const closing = [...this._subscriptions.keys()].filter(
+			(syncId) => !active.has(syncId) && !this._activating.has(syncId),
+		);
+		if (closing.length) {
+			await this.sendUpdates(true, null, { touchSyncIds: closing });
+			for (const syncId of closing) {
+				this._rememberCursor(syncId);
+				this._subscriptions.get(syncId)?.();
+				this._subscriptions.delete(syncId);
+			}
+			await this.view.PollingCoordinator?.closeDocuments(closing);
+		}
+		for (const widget of active.values()) this._subscribe(widget);
+	}
+
+	async deregister() {
+		// Persist any edits made after a failed replay while transitioning offline;
+		// the next online generation owns the retry.
+		this._offlineReplayAttempts.clear();
+		const syncIds = [...this._subscriptions.keys()];
+		await this.sendUpdates(true, null, {
+			keepalive: true,
+			touchSyncIds: syncIds,
+		});
+		for (const syncId of syncIds) this._rememberCursor(syncId);
+		for (const unsubscribe of this._subscriptions.values()) unsubscribe();
+		this._subscriptions.clear();
+		await this.view.PollingCoordinator?.closeDocuments(syncIds);
+	}
+
+	async _waitForWidgetInitialized(widget: SyncWidget) {
+		if (widget.initialized) return;
+		const target = widget.container ?? widget.target;
+		if (target) await waitForAttribute(target, "initialized");
+	}
+
+	/**
+	 * Fetch the authoritative state newer than an offline record's base cursor.
+	 *
+	 */
+	async _pollOfflineState(offline: PersistedSyncRecord) {
+		const id = `replay:${offline.sync_id}`;
+		const polling = this.view.PollingCoordinator;
+		if (!polling) return null;
+		const unsubscribe = polling.subscribe(
+			{
+				id,
+				type: "document",
+				key: offline.key,
+				sync_id: offline.sync_id,
+				generation: offline.generation ?? null,
+				revision: offline.revision ?? 0,
+				presence_digest: null,
+			},
+			{ mode: "periodic", initial: "immediate" },
+		);
+		if (!unsubscribe) return null;
+
+		try {
+			const results = await polling.trigger(id);
+			const result = results?.find(
+				(candidate): candidate is PollResult<"document"> => candidate.id === id,
+			);
+			if (
+				!result ||
+				!["changed", "unchanged"].includes(result.status) ||
+				(result.status === "changed" && !result.payload)
+			) {
+				return null;
+			}
+			const descriptor = polling.get(id) as PollDescriptor<"document"> | null;
+			if (!descriptor?.generation) return null;
+			const cursor = {
+				generation: descriptor.generation,
+				revision: descriptor.revision,
+			};
+			return { cursor, payload: result.payload ?? null };
+		} finally {
+			unsubscribe();
+		}
+	}
+
+	async _reconcile(offlineRecords: PersistedSyncRecord[]) {
+		const replays: SyncUpdate[] = [];
+		const headless: SyncWidget[] = [];
+		let unresolved = false;
+		try {
+			for (const offline of offlineRecords) {
+				if (
+					offline.touch_parent &&
+					!offline.update &&
+					!offline.ydoc &&
+					!Object.hasOwn(offline, "html")
+				) {
+					replays.push({
+						key: offline.key,
+						sync_id: offline.sync_id,
+						fingerprint: offline.fingerprint,
+						generation: offline.generation ?? null,
+						revision: Number(offline.revision) || 0,
+						save: true,
+						touch_parent: true,
+					});
+					continue;
+				}
+				let widget: SyncWidget | null = this.widgets[offline.sync_id];
+				if (!widget) {
+					widget = await loadReplayWidget({
+						sync_id: offline.sync_id,
+						offline,
+					});
+					if (!widget) {
+						unresolved = true;
+						continue;
+					}
+					headless.push(widget);
+					await widget.init();
+					await this._waitForWidgetInitialized(widget);
+				}
+
+				const current = await this._pollOfflineState(offline);
+				if (!current) {
+					unresolved = true;
+					continue;
+				}
+				widget.remote = current.payload;
+				widget.offlineRecord = offline;
+				if ((await widget.sync()) === false) {
+					unresolved = true;
+					continue;
+				}
+				this._rememberCursor(offline.sync_id, current.cursor);
+				await widget.waitForRender();
+
+				const saveData = widget.saveData;
+				if (!saveData) {
+					if (offline.touch_parent) {
+						replays.push({
+							key: widget.component?.key ?? widget.key ?? offline.key,
+							sync_id: offline.sync_id,
+							fingerprint: widget.fingerprint ?? offline.fingerprint,
+							...current.cursor,
+							save: true,
+							touch_parent: true,
+						});
+					} else {
+						await deleteSyncRecord(offline.sync_id);
+					}
+					continue;
+				}
+				replays.push({
+					key: widget.component?.key ?? widget.key ?? offline.key,
+					sync_id: offline.sync_id,
+					fingerprint: widget.fingerprint ?? offline.fingerprint,
+					...current.cursor,
+					...saveData,
+					save: true,
+					touch_parent: true,
+				});
+			}
+			if (!replays.length) return !unresolved;
+			const response = await this.sendUpdates(false, replays);
+			return !unresolved && response?.ok === true;
+		} finally {
+			for (const widget of headless) {
+				widget.destroy();
+			}
+			await this.view.PollingCoordinator?.closeDocuments(
+				headless.map((widget) => widget.syncId),
+			);
+		}
+	}
+
+	_collect(save: boolean, { touchSyncIds = [] }: SyncSendOptions = {}) {
+		const batch: SyncUpdate[] = [];
+		const touches = new Set(touchSyncIds);
+		const included = new Set<string>();
+		for (const widget of Object.values(this.widgets)) {
+			if (this._replayBlocked(widget.syncId)) continue;
+			const payload = save ? widget.saveData : widget.syncData;
+			if (!payload) continue;
+			const update: SyncUpdate = {
+				...this._descriptor(widget),
+				...payload,
+				save,
+			};
+			if (save && touches.has(widget.syncId)) update.touch_parent = true;
+			batch.push(update);
+			included.add(widget.syncId);
+		}
+		if (save) {
+			for (const syncId of touches) {
+				if (included.has(syncId) || !this._pendingParentTouches.has(syncId))
+					continue;
+				const widget = this.widgets[syncId];
+				if (!widget) continue;
+				batch.push({
+					...this._descriptor(widget),
+					save: true,
+					touch_parent: true,
+				});
+			}
+		}
+		return batch;
+	}
+
+	async _sendUpdatesNow(
+		save = false,
+		updates: SyncUpdate[] | null = null,
+		{ keepalive = false, touchSyncIds = [] }: SyncSendOptions = {},
+	) {
+		const batch = updates ?? this._collect(save, { touchSyncIds });
+		if (!batch.length) return null;
+		if (!this.view.online) {
+			for (const update of batch) await updateSyncRecord(update);
+			return null;
+		}
+		const response = await request.post<SyncResponse>(
+			ENDPOINTS.sync,
+			{
+				client_id: this.view.PollingCoordinator?.clientId,
+				updates: batch,
+			},
+			{ keepalive },
+		);
+		if (response?.ok === false) {
+			for (const update of batch) {
+				await updateSyncRecord(update);
+				this._checkpointRetries.add(update.sync_id);
+				this._checkpointPollFirst.delete(update.sync_id);
+			}
+			return response;
+		}
+		const submitted = new Map(batch.map((update) => [update.sync_id, update]));
+		for (const acknowledgement of response?.updates ?? []) {
+			const update = submitted.get(acknowledgement.sync_id);
+			if (acknowledgement.checkpoint_accepted) {
+				const cursor = {
+					generation: acknowledgement.generation,
+					revision: acknowledgement.revision,
+				};
+				this.view.PollingCoordinator?.update(
+					`document:${acknowledgement.sync_id}`,
+					cursor,
+				);
+				this._rememberCursor(acknowledgement.sync_id, cursor);
+				this._checkpointRetries.delete(acknowledgement.sync_id);
+				this._checkpointPollFirst.delete(acknowledgement.sync_id);
+			}
+			if (acknowledgement.checkpoint_persisted) {
+				if (update?.save && update.ydoc) {
+					const widget = this.widgets[acknowledgement.sync_id];
+					await widget?.readCache?.accept({
+						mode: "snapshot",
+						ydoc: update.ydoc,
+						fingerprint: widget.fingerprint,
+					});
+					if (widget?.commitSavedBaseline) {
+						widget.commitSavedBaseline(update.ydoc, update.mentions || []);
+					} else if (widget) {
+						widget.snapshot = update.ydoc;
+					}
+				}
+				if (acknowledgement.entity_touched) {
+					this._pendingParentTouches.delete(acknowledgement.sync_id);
+				} else {
+					this._pendingParentTouches.add(acknowledgement.sync_id);
+				}
+				await deleteSyncRecord(acknowledgement.sync_id);
+			} else if (acknowledgement.entity_touched) {
+				this._pendingParentTouches.delete(acknowledgement.sync_id);
+				await deleteSyncRecord(acknowledgement.sync_id);
+			} else if (update?.save) {
+				this._checkpointRetries.add(acknowledgement.sync_id);
+				this._checkpointPollFirst.add(acknowledgement.sync_id);
+				await updateSyncRecord(update);
+			}
+		}
+		return response;
+	}
+
+	async sendUpdates(
+		save = false,
+		updates: SyncUpdate[] | null = null,
+		options: SyncSendOptions = {},
+	): Promise<SyncSendResult> {
+		if (this._sendPromise) {
+			if (updates) {
+				await this._sendPromise;
+				return this.sendUpdates(save, updates, options);
+			}
+			this._queuedSend = {
+				save: Boolean(this._queuedSend?.save || save),
+				keepalive: Boolean(this._queuedSend?.keepalive || options.keepalive),
+				touchSyncIds: new Set([
+					...(this._queuedSend?.touchSyncIds ?? []),
+					...(options.touchSyncIds ?? []),
+				]),
+			};
+			return this._sendPromise;
+		}
+		this._sendPromise = (async () => {
+			let response = await this._sendUpdatesNow(save, updates, options);
+			while (this._queuedSend) {
+				const queued = this._queuedSend;
+				this._queuedSend = null;
+				response = await this._sendUpdatesNow(queued.save, null, {
+					keepalive: queued.keepalive,
+					touchSyncIds: queued.touchSyncIds,
+				});
+			}
+			return response;
+		})();
+		try {
+			return await this._sendPromise;
+		} finally {
+			this._sendPromise = null;
+		}
+	}
+
+	destroy() {
+		for (const unsubscribe of this._subscriptions.values()) unsubscribe();
+		this._subscriptions.clear();
+		this._cursors.clear();
+		this._checkpointRetries.clear();
+		this._checkpointPollFirst.clear();
+		this._pendingParentTouches.clear();
+		this._activating.clear();
+		this._offlineReplayAttempts.clear();
+		this._registerPromise = null;
+		window.removeEventListener("sync-save", this._syncSave);
+		this._initialized = false;
+	}
+}

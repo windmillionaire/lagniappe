@@ -15,51 +15,60 @@ import yaml
 import run
 from runner import pytest_routing
 from testing.utility import (
-    traceability_common,
-    traceability_results,
+    test_evidence,
+    evidence_results,
 )
 
 pytestmark = pytest.mark.tooling
 
 
-def test_traceability_discovers_unit_tests_within_testing_root(tmp_path):
-    from testing.utility import traceability
-
-    path = tmp_path / "testing/tests_unit/test_internal.py"
-    path.parent.mkdir(parents=True)
-    path.write_text("def test_internal():\n    pass\n", encoding="utf-8")
-    roots = ["tests_unit"]
-    nodeid = "tests_unit/test_internal.py::test_internal"
-    discovered = traceability.discover_tests(tmp_path, roots)
-    assert set(discovered) == {nodeid}
-    assert traceability.pytest_collect_root_args(roots) == ["testing/tests_unit"]
-    assert traceability.test_path_from_nodeid(nodeid, tmp_path) == path
-    assert [test.nodeid for test in traceability.changed_tests_for_paths(
-        discovered, ["testing/tests_unit/test_internal.py"]
-    )] == [nodeid]
-    for unsafe in ("repo:clients/example/tests", "../outside", "/outside"):
-        with pytest.raises(ValueError, match="must stay within"):
-            traceability.test_files_in_roots(tmp_path, [unsafe])
-
-
-def test_traceability_result_plugin_can_skip_manifest_output(monkeypatch, tmp_path):
+def test_traceability_result_plugin_defaults_to_clean_local_runs_and_supports_opt_in(
+    monkeypatch, tmp_path
+):
     writes = []
+    monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E", raising=False)
+    monkeypatch.delenv("LAGNIAPPE_WRITE_TEST_EVIDENCE", raising=False)
     monkeypatch.setattr(
-        traceability_results,
+        evidence_results,
         "_write_manifest",
         lambda *arguments: writes.append(arguments),
     )
-    config = types.SimpleNamespace(
-        rootpath=tmp_path,
-        getoption=lambda name, default=False: name == "no_test_evidence",
-    )
 
-    traceability_results.pytest_sessionfinish(
-        types.SimpleNamespace(config=config),
-        0,
-    )
+    def invoke(*, write_flag=False, skip_flag=False):
+        config = types.SimpleNamespace(
+            rootpath=tmp_path,
+            getoption=lambda name, default=False: {
+                "write_test_evidence": write_flag,
+                "no_test_evidence": skip_flag,
+            }.get(name, default),
+        )
+        evidence_results.pytest_sessionfinish(
+            types.SimpleNamespace(config=config),
+            0,
+        )
 
+    # Ordinary local run leaves tracked testing/evidence/latest.json untouched.
+    invoke()
     assert writes == []
+
+    # Explicit --write-test-evidence opts in.
+    invoke(write_flag=True)
+    assert len(writes) == 1
+
+    # Explicit --no-test-evidence always wins over opt-in flags and hosted env.
+    monkeypatch.setenv("LAGNIAPPE_HOSTED_E2E", "true")
+    invoke(write_flag=True, skip_flag=True)
+    assert len(writes) == 1
+
+    # Hosted E2E writes evidence automatically.
+    invoke()
+    assert len(writes) == 2
+
+    # LAGNIAPPE_WRITE_TEST_EVIDENCE=1 opts in locally.
+    monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E")
+    monkeypatch.setenv("LAGNIAPPE_WRITE_TEST_EVIDENCE", "1")
+    invoke()
+    assert len(writes) == 3
 
 
 @pytest.mark.parametrize("phase", ["setup", "call", "teardown"])
@@ -68,9 +77,9 @@ def test_traceability_result_plugin_records_failure_tracebacks(
 ):
     outcomes = {}
     with monkeypatch.context() as patch:
-        patch.setattr(traceability_results, "_OUTCOMES", outcomes)
+        patch.setattr(evidence_results, "_OUTCOMES", outcomes)
         patch.setattr(
-            traceability_results,
+            evidence_results,
             "behavior_snapshot",
             lambda repo_root: (
                 "snapshot",
@@ -78,7 +87,7 @@ def test_traceability_result_plugin_records_failure_tracebacks(
             ),
         )
 
-        traceability_results.pytest_runtest_logreport(
+        evidence_results.pytest_runtest_logreport(
             types.SimpleNamespace(
                 nodeid="tests_unit/test_failure.py::test_failure",
                 duration=0.25,
@@ -88,7 +97,7 @@ def test_traceability_result_plugin_records_failure_tracebacks(
                 longreprtext=f"{phase} failure traceback",
             )
         )
-        traceability_results._write_manifest(
+        evidence_results._write_manifest(
             tmp_path,
             ["run.py", "test", "tests_unit/test_failure.py::test_failure"],
             outcomes,
@@ -105,11 +114,11 @@ def test_traceability_result_plugin_records_failure_tracebacks(
 
 def test_traceability_result_plugin_bounds_failure_tracebacks(monkeypatch):
     outcomes = {}
-    oversized = "begin\n" + ("x" * traceability_results.MAX_TRACEBACK_CHARS) + "\nend"
+    oversized = "begin\n" + ("x" * evidence_results.MAX_TRACEBACK_CHARS) + "\nend"
 
     with monkeypatch.context() as patch:
-        patch.setattr(traceability_results, "_OUTCOMES", outcomes)
-        traceability_results.pytest_runtest_logreport(
+        patch.setattr(evidence_results, "_OUTCOMES", outcomes)
+        evidence_results.pytest_runtest_logreport(
             types.SimpleNamespace(
                 nodeid="tests_unit/test_failure.py::test_failure",
                 duration=0.25,
@@ -121,10 +130,10 @@ def test_traceability_result_plugin_bounds_failure_tracebacks(monkeypatch):
         )
 
     result = outcomes["tests_unit/test_failure.py::test_failure"]
-    assert len(result["traceback"]) == traceability_results.MAX_TRACEBACK_CHARS
+    assert len(result["traceback"]) == evidence_results.MAX_TRACEBACK_CHARS
     assert result["traceback"].startswith("begin\n")
     assert result["traceback"].endswith("\nend")
-    assert traceability_results.TRACEBACK_TRUNCATION_MARKER in result["traceback"]
+    assert evidence_results.TRACEBACK_TRUNCATION_MARKER in result["traceback"]
     assert result["traceback_truncated"] is True
 
 
@@ -140,17 +149,17 @@ def test_traceability_snapshot_interning_round_trips_path_maps():
         },
     }
 
-    fingerprint_pairs, encoded = traceability_common.encode_test_run_snapshots(
+    fingerprint_pairs, encoded = test_evidence.encode_test_run_snapshots(
         snapshots
     )
     manifest = {
-        "schema_version": traceability_common.TEST_RUN_SCHEMA_VERSION,
+        "schema_version": test_evidence.TEST_RUN_SCHEMA_VERSION,
         "fingerprint_pairs": fingerprint_pairs,
         "snapshots": encoded,
     }
 
     assert fingerprint_pairs.count(["pkg/shared.py", "shared"]) == 1
-    assert traceability_common.decode_test_run_snapshots(manifest) == snapshots
+    assert test_evidence.decode_test_run_snapshots(manifest) == snapshots
 
 
 def test_behavior_snapshot_excludes_tracked_test_evidence(monkeypatch, tmp_path):
@@ -160,7 +169,7 @@ def test_behavior_snapshot_excludes_tracked_test_evidence(monkeypatch, tmp_path)
     workflow = tmp_path / ".github/workflows/release.yml"
     workflow.parent.mkdir(parents=True)
     workflow.write_text("name: CI\n")
-    evidence = tmp_path / traceability_common.LATEST_TEST_RUN
+    evidence = tmp_path / test_evidence.LATEST_TEST_RUN
     evidence.parent.mkdir(parents=True)
     evidence.write_text('{"tests": {}}\n')
 
@@ -175,9 +184,9 @@ def test_behavior_snapshot_excludes_tracked_test_evidence(monkeypatch, tmp_path)
         )
         return subprocess.CompletedProcess(args, 0, stdout=stdout, stderr=b"")
 
-    monkeypatch.setattr(traceability_common, "_git", fake_git)
+    monkeypatch.setattr(test_evidence, "git_query", fake_git)
 
-    fingerprints = traceability_common.behavior_path_fingerprints(tmp_path)
+    fingerprints = test_evidence.behavior_path_fingerprints(tmp_path)
 
     assert "src/example.py" in fingerprints
     assert ".github/workflows/release.yml" not in fingerprints
@@ -190,13 +199,13 @@ def test_source_archive_snapshot_excludes_installed_mcp_environment(monkeypatch,
     installed.parent.mkdir(parents=True)
     source.write_text("VALUE = 1\n")
     installed.write_text("VALUE = 2\n")
-    monkeypatch.setattr(traceability_common, "_git", lambda *_a, **_kw:
+    monkeypatch.setattr(test_evidence, "git_query", lambda *_a, **_kw:
                         subprocess.CompletedProcess([], 1, stdout=b"", stderr=b"no git"))
-    fingerprints = traceability_common.behavior_path_fingerprints(tmp_path)
+    fingerprints = test_evidence.behavior_path_fingerprints(tmp_path)
     assert "mcp/server.py" in fingerprints
     assert not any(path.startswith("mcp/.venv/") for path in fingerprints)
     installed.write_text("VALUE = 3\n")
-    assert traceability_common.behavior_path_fingerprints(tmp_path) == fingerprints
+    assert test_evidence.behavior_path_fingerprints(tmp_path) == fingerprints
 
 
 def test_traceability_result_plugin_merges_focused_results_without_session_history(
@@ -208,13 +217,13 @@ def test_traceability_result_plugin_merges_focused_results_without_session_histo
     (tests_root / "test_b.py").write_text("def test_b():\n    pass\n")
     generated_at = "2026-01-01T00:00:00+00:00"
     monkeypatch.setattr(
-        traceability_results,
+        evidence_results,
         "utc_now",
         lambda: generated_at,
     )
     for nodeid in ("tests_unit/test_a.py::test_a", "tests_unit/test_b.py::test_b"):
         command = ["run.py", "test", nodeid]
-        traceability_results._write_manifest(
+        evidence_results._write_manifest(
             tmp_path,
             command,
             {nodeid: {"outcome": "passed", "duration": 0.1}},
@@ -262,10 +271,10 @@ def test_traceability_result_plugin_replaces_a_tests_previous_result(
         ]
     )
     monkeypatch.setattr(
-        traceability_results, "behavior_snapshot", lambda repo_root: next(snapshots)
+        evidence_results, "behavior_snapshot", lambda repo_root: next(snapshots)
     )
     nodeid = "tests_unit/test_a.py::test_a"
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", nodeid],
         {
@@ -277,7 +286,7 @@ def test_traceability_result_plugin_replaces_a_tests_previous_result(
         },
         1,
     )
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", nodeid],
         {nodeid: {"outcome": "passed", "duration": 0.1}},
@@ -296,7 +305,7 @@ def test_traceability_result_plugin_replaces_a_tests_previous_result(
     assert payload["fingerprint_pairs"] == [
         ["testing/tests_unit/test_a.py", "b"]
     ]
-    assert traceability_common.decode_test_run_snapshots(payload) == {
+    assert test_evidence.decode_test_run_snapshots(payload) == {
         "snapshot-two": {"testing/tests_unit/test_a.py": "b"}
     }
     assert len(payload["sessions"]) == 1
@@ -313,10 +322,10 @@ def test_traceability_result_plugin_replaces_a_completed_parameter_set(
         ]
     )
     monkeypatch.setattr(
-        traceability_results, "behavior_snapshot", lambda repo_root: next(snapshots)
+        evidence_results, "behavior_snapshot", lambda repo_root: next(snapshots)
     )
     base_nodeid = "tests_unit/test_a.py::test_a"
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", base_nodeid],
         {
@@ -326,7 +335,7 @@ def test_traceability_result_plugin_replaces_a_completed_parameter_set(
         0,
     )
 
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", base_nodeid],
         {
@@ -360,16 +369,16 @@ def test_traceability_result_plugin_keeps_other_tests_across_tree_changes(
         ]
     )
     monkeypatch.setattr(
-        traceability_results,
+        evidence_results,
         "utc_now",
         lambda: next(generated_times),
     )
     monkeypatch.setattr(
-        traceability_results, "behavior_snapshot", lambda repo_root: next(snapshots)
+        evidence_results, "behavior_snapshot", lambda repo_root: next(snapshots)
     )
 
     for nodeid in ("tests_unit/test_a.py::test_a", "tests_unit/test_b.py::test_b"):
-        traceability_results._write_manifest(
+        evidence_results._write_manifest(
             tmp_path,
             ["run.py", "test", nodeid],
             {nodeid: {"outcome": "passed", "duration": 0.1}},
@@ -382,7 +391,7 @@ def test_traceability_result_plugin_keeps_other_tests_across_tree_changes(
         "tests_unit/test_b.py::test_b",
     ]
     assert set(payload["snapshots"]) == {"snapshot-one", "snapshot-two"}
-    assert traceability_common.decode_test_run_snapshots(payload) == {
+    assert test_evidence.decode_test_run_snapshots(payload) == {
         "snapshot-one": {"testing/tests_unit/test_a.py": "a"},
         "snapshot-two": {"testing/tests_unit/test_b.py": "b"},
     }
@@ -411,11 +420,11 @@ def test_traceability_result_plugin_prunes_deleted_test_modules(monkeypatch, tmp
         ]
     )
     monkeypatch.setattr(
-        traceability_results, "behavior_snapshot", lambda repo_root: next(snapshots)
+        evidence_results, "behavior_snapshot", lambda repo_root: next(snapshots)
     )
     deleted_nodeid = "tests_unit/test_deleted.py::test_deleted"
     retained_nodeid = "tests_unit/test_retained.py::test_retained"
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", "testing/tests_unit"],
         {
@@ -426,7 +435,7 @@ def test_traceability_result_plugin_prunes_deleted_test_modules(monkeypatch, tmp
     )
 
     deleted_path.unlink()
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", retained_nodeid],
         {retained_nodeid: {"outcome": "passed", "duration": 0.1}},
@@ -436,7 +445,7 @@ def test_traceability_result_plugin_prunes_deleted_test_modules(monkeypatch, tmp
     payload = json.loads((tmp_path / "testing/evidence/latest.json").read_text())
     assert set(payload["tests"]) == {retained_nodeid}
     assert set(payload["snapshots"]) == {"snapshot-two"}
-    assert traceability_common.decode_test_run_snapshots(payload) == {
+    assert test_evidence.decode_test_run_snapshots(payload) == {
         "snapshot-two": {"testing/tests_unit/test_retained.py": "retained-current"}
     }
 
@@ -458,11 +467,11 @@ def test_traceability_result_plugin_prunes_deleted_test_functions(
         ]
     )
     monkeypatch.setattr(
-        traceability_results, "behavior_snapshot", lambda repo_root: next(snapshots)
+        evidence_results, "behavior_snapshot", lambda repo_root: next(snapshots)
     )
     removed = "tests_unit/test_example.py::test_removed"
     retained = "tests_unit/test_example.py::test_retained"
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", "testing/tests_unit"],
         {
@@ -473,7 +482,7 @@ def test_traceability_result_plugin_prunes_deleted_test_functions(
     )
 
     module.write_text("def test_retained():\n    pass\n")
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", retained],
         {retained: {"outcome": "passed", "duration": 0.1}},
@@ -519,7 +528,7 @@ def test_traceability_result_plugin_migrates_legacy_snapshot_maps(
         )
     )
     monkeypatch.setattr(
-        traceability_results,
+        evidence_results,
         "behavior_snapshot",
         lambda repo_root: (
             "snapshot-two",
@@ -530,7 +539,7 @@ def test_traceability_result_plugin_migrates_legacy_snapshot_maps(
         ),
     )
 
-    traceability_results._write_manifest(
+    evidence_results._write_manifest(
         tmp_path,
         ["run.py", "test", "tests_unit/test_b.py::test_b"],
         {
@@ -543,13 +552,13 @@ def test_traceability_result_plugin_migrates_legacy_snapshot_maps(
     )
 
     payload = json.loads(destination.read_text())
-    assert payload["schema_version"] == traceability_common.TEST_RUN_SCHEMA_VERSION
+    assert payload["schema_version"] == test_evidence.TEST_RUN_SCHEMA_VERSION
     assert sorted(payload["tests"]) == [
         "tests_unit/test_a.py::test_a",
         "tests_unit/test_b.py::test_b",
     ]
     assert payload["fingerprint_pairs"].count(["pkg/shared.py", "shared"]) == 1
-    assert traceability_common.decode_test_run_snapshots(payload) == {
+    assert test_evidence.decode_test_run_snapshots(payload) == {
         "snapshot-one": {
             "testing/tests_unit/test_a.py": "test-a",
             "pkg/shared.py": "shared",
@@ -566,7 +575,7 @@ def test_behavior_fingerprint_ignores_python_and_javascript_comments(tmp_path):
     python_path.write_text(
         '"""first module note"""\n# @matrix old : behavior\ndef value():\n    """old note"""\n    return 1\n'
     )
-    python_before = traceability_common.behavior_file_fingerprint(python_path)
+    python_before = test_evidence.behavior_file_fingerprint(python_path)
     python_path.write_text(
         '"""new module note"""\n# @matrix new : behavior\ndef value():\n    """new note"""\n    return 1\n'
     )
@@ -575,14 +584,14 @@ def test_behavior_fingerprint_ignores_python_and_javascript_comments(tmp_path):
     javascript_path.write_text(
         "/** @matrix old : behavior */\nexport function value() { return 'https://a.test'; }\n"
     )
-    javascript_before = traceability_common.behavior_file_fingerprint(javascript_path)
+    javascript_before = test_evidence.behavior_file_fingerprint(javascript_path)
     javascript_path.write_text(
         "// @matrix new : behavior\nexport function value() { return 'https://a.test'; }\n"
     )
 
-    assert traceability_common.behavior_file_fingerprint(python_path) == python_before
+    assert test_evidence.behavior_file_fingerprint(python_path) == python_before
     assert (
-        traceability_common.behavior_file_fingerprint(javascript_path)
+        test_evidence.behavior_file_fingerprint(javascript_path)
         == javascript_before
     )
 
@@ -591,13 +600,13 @@ def test_behavior_fingerprint_ignores_generated_build_id(tmp_path):
     constants_path = tmp_path / "config/constants.py"
     constants_path.parent.mkdir(parents=True)
     constants_path.write_text('BUILD_ID = "b0000000"\nVALUE = 1\n')
-    before = traceability_common.behavior_file_fingerprint(constants_path)
+    before = test_evidence.behavior_file_fingerprint(constants_path)
 
     constants_path.write_text('BUILD_ID = "b1234567"\nVALUE = 1\n')
-    assert traceability_common.behavior_file_fingerprint(constants_path) == before
+    assert test_evidence.behavior_file_fingerprint(constants_path) == before
 
     constants_path.write_text('BUILD_ID = "b1234567"\nVALUE = 2\n')
-    assert traceability_common.behavior_file_fingerprint(constants_path) != before
+    assert test_evidence.behavior_file_fingerprint(constants_path) != before
 
 
 def test_behavior_snapshot_fingerprints_style_records_independently(tmp_path):
@@ -612,7 +621,7 @@ def test_behavior_snapshot_fingerprints_style_records_independently(tmp_path):
         "    classes: font-semibold\n"
     )
 
-    before = traceability_common.behavior_path_fingerprints(tmp_path)
+    before = test_evidence.behavior_path_fingerprints(tmp_path)
     styles.write_text(
         "button:\n"
         "  submit:\n"
@@ -621,13 +630,12 @@ def test_behavior_snapshot_fingerprints_style_records_independently(tmp_path):
         "  default:\n"
         "    classes: font-semibold\n"
     )
-    after = traceability_common.behavior_path_fingerprints(tmp_path)
+    after = test_evidence.behavior_path_fingerprints(tmp_path)
 
     assert before["@style/button.submit"] != after["@style/button.submit"]
     assert before["@style/label.default"] == after["@style/label.default"]
 
 
-# @matrix testing : cli-routing pytest-options target-selection
 @pytest.mark.parametrize(
     ("arguments", "expected_args", "expected_targets", "includes_e2e"),
     (
@@ -757,7 +765,6 @@ def test_pytest_cli_options_are_not_registered_in_suite_conftests():
     assert violations == []
 
 
-# @matrix setup testing : cli-routing opt-in pytest-markers
 @pytest.mark.parametrize(
     ("marker_expression", "expected_markers"),
     (
@@ -820,7 +827,6 @@ def test_normalize_pytest_invocation_handles_strict_and_pytest_separator():
     assert literal_target.collection_targets == ("--strict",)
 
 
-# @matrix testing : cli-routing pytest-options target-selection
 @pytest.mark.parametrize(
     "arguments",
     (
@@ -852,7 +858,7 @@ def _configured_value_option_cases(tmp_path):
     repository_root = Path(run.__file__).parent
     config = _prepareconfig(
         ["-c", pytest_routing.PYTEST_CONFIG, "--noconftest"],
-        plugins=[pytest_routing, traceability_results],
+        plugins=[pytest_routing, evidence_results],
         prog="run.py test",
     )
     special_values = {
@@ -960,7 +966,6 @@ def test_normalize_pytest_invocation_isolates_parser_imports_and_cwd(
     )
 
 
-# @matrix testing : cli-routing target-selection
 def test_normalized_targets_control_actual_pytest_collection(
     monkeypatch, tmp_path
 ):
@@ -1034,7 +1039,6 @@ def test_normalized_targets_control_actual_pytest_collection(
         assert invocation.includes_e2e is includes_e2e
 
 
-# @matrix setup testing : pytest-markers
 def test_pytest_routing_plugin_normalizes_provider_marker_tokens():
     config = types.SimpleNamespace(
         option=types.SimpleNamespace(markexpr="provider and not ai_provider")
@@ -1047,7 +1051,6 @@ def test_pytest_routing_plugin_normalizes_provider_marker_tokens():
     )
 
 
-# @matrix mcp-package testing : cli-routing environment-isolation no-duplicate-collection
 def test_partition_mcp_adapter_test_selection():
     repository_root = Path(run.__file__).parent
     adapter = pytest_routing.MCP_ADAPTER_TEST
@@ -1108,7 +1111,6 @@ def test_partition_mcp_adapter_test_selection():
     )
 
 
-# @matrix mcp-package testing : cli-routing local-preflight
 def test_targets_include_repository_file():
     repository_root = Path(run.__file__).parent
     target = "testing/tests_e2e/013_agent_api/test_013b_agent_api_mcp.py"
@@ -1138,7 +1140,6 @@ def _transported_adapter_results(path, status=0):
     )
 
 
-# @matrix mcp-package testing : cli-routing environment-isolation
 @pytest.mark.parametrize(
     "selector",
     [
@@ -1192,11 +1193,17 @@ def test_run_py_focused_adapter_uses_only_locked_package_bridge(
     assert calls == [
         "prepare",
         ("adapter", [selector], True),
+    ]
+
+    calls.clear()
+    assert run.run_tests(["--write-test-evidence", selector]) == 0
+    assert calls == [
+        "prepare",
+        ("adapter", ["--write-test-evidence", selector], True),
         ("merge", 0, 0, True),
     ]
 
 
-# @matrix mcp-package testing : cli-routing exit-status no-duplicate-collection result-aggregation
 def test_run_py_unit_partitions_adapter_once_and_merges_results(monkeypatch):
     from runner import mcp_environment
 
@@ -1218,7 +1225,7 @@ def test_run_py_unit_partitions_adapter_once_and_merges_results(monkeypatch):
     monkeypatch.setattr(
         run,
         "activate_repository_gcloud",
-        lambda **kwargs: calls.append("gcloud"),
+        lambda **kwargs: pytest.fail("offline unit tests must skip gcloud"),
     )
     monkeypatch.setattr(
         run,
@@ -1246,11 +1253,10 @@ def test_run_py_unit_partitions_adapter_once_and_merges_results(monkeypatch):
             True,
         )
     ) == 1
-    assert ("merge", 0, 0) in calls
-    assert calls[:2] == ["prepare", "gcloud"]
+    assert ("merge", 0, 0) not in calls
+    assert calls[0] == "prepare"
 
 
-# @matrix testing mcp-package : junit result-aggregation environment-isolation
 @pytest.mark.parametrize("root_status,mcp_status", [(1, 0), (0, 1), (0, 0)])
 @pytest.mark.parametrize("option", ["--junitxml", "--junit-xml"])
 def test_run_py_merges_partition_junit(monkeypatch, tmp_path, root_status, mcp_status, option):
@@ -1286,7 +1292,6 @@ def test_run_py_merges_partition_junit(monkeypatch, tmp_path, root_status, mcp_s
     assert destination not in written
 
 
-# @matrix testing mcp-package : junit result-aggregation environment-isolation
 def test_partition_junit_reports_preserves_single_run_and_rejects_missing_results(tmp_path):
     from runner.pytest_reports import partition_junit_reports
 
@@ -1302,13 +1307,14 @@ def test_partition_junit_reports_preserves_single_run_and_rejects_missing_result
     partitions = pytest_routing.PytestPartitions(
         (f"--junitxml={target}",), (f"--junitxml={target}",)
     )
-    with pytest.raises(RuntimeError, match="Missing or invalid partition JUnit"):
-        with partition_junit_reports(partitions):
-            pass
+    with (
+        pytest.raises(RuntimeError, match="Missing or invalid partition JUnit"),
+        partition_junit_reports(partitions),
+    ):
+        pass
     assert not target.exists()
 
 
-# @matrix mcp-package testing : fail-closed local-preflight repair-guidance
 def test_run_py_adapter_preflight_stops_before_root_test_work(monkeypatch, capsys):
     from runner import mcp_environment
 
@@ -1338,7 +1344,6 @@ def test_run_py_adapter_preflight_stops_before_root_test_work(monkeypatch, capsy
     assert "./setup.sh development" in capsys.readouterr().out
 
 
-# @matrix hosted-e2e mcp-package testing : environment-check isolation
 def test_run_py_hosted_adapter_selection_checks_prebuilt_environment(monkeypatch):
     from runner import mcp_environment
 
@@ -1374,7 +1379,6 @@ def test_run_py_hosted_adapter_selection_checks_prebuilt_environment(monkeypatch
     assert calls == ["check", "adapter"]
 
 
-# @matrix mcp-package testing traceability : result-aggregation test-evidence
 def test_merge_mcp_test_evidence_validates_and_forwards_outcomes(
     monkeypatch, tmp_path
 ):
@@ -1387,7 +1391,7 @@ def test_merge_mcp_test_evidence_validates_and_forwards_outcomes(
     ] = {"outcome": "passed", "duration": 0.02}
     result_path.write_text(json.dumps(payload), encoding="utf-8")
     monkeypatch.setattr(
-        traceability_results,
+        evidence_results,
         "_write_manifest",
         lambda *arguments: writes.append(arguments),
     )
@@ -1460,7 +1464,6 @@ def test_run_py_test_argument_errors_stop_before_preflight(monkeypatch, capsys):
     assert "suite aliases cannot be combined" in capsys.readouterr().err
 
 
-# @pair testing:environment
 def test_configure_test_environment_only_sets_import_environment(monkeypatch):
     calls = []
     config_module = types.ModuleType("config")
@@ -1474,15 +1477,16 @@ def test_configure_test_environment_only_sets_import_environment(monkeypatch):
 
     run.configure_test_environment(includes_e2e=False)
     assert os.environ["FLASK_ENV"] == "testing"
+    assert os.environ["LAGNIAPPE_OFFLINE_WEB_TEST"] == "1"
     assert calls == []
 
     monkeypatch.setenv("FLASK_ENV", "production")
     run.configure_test_environment(includes_e2e=True)
     assert os.environ["FLASK_ENV"] == "testing"
+    assert "LAGNIAPPE_OFFLINE_WEB_TEST" not in os.environ
     assert calls == []
 
 
-# @matrix hosted-e2e testing : cli-routing frontend-build provider-auth
 def test_hosted_e2e_runner_skips_local_build_and_gcloud_activation(monkeypatch):
     calls = []
     from runner import testing as testing_module
@@ -1508,7 +1512,6 @@ def test_hosted_e2e_runner_skips_local_build_and_gcloud_activation(monkeypatch):
     assert [name for name, *_rest in calls] == ["pytest"]
 
 
-# @matrix hosted-e2e testing : cleanup fail-closed prefix
 def test_cleanup_scope_requires_the_reserved_test_prefix():
     from runner import testing as testing_module
 
@@ -1524,7 +1527,6 @@ def test_cleanup_scope_requires_the_reserved_test_prefix():
             testing_module._require_test_cleanup_scope(config)
 
 
-# @matrix hosted-e2e testing : cache database initialization migrations
 def test_initialize_test_services_replays_server_persistence_startup():
     from runner import testing as testing_module
 
@@ -1557,16 +1559,7 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
             return 3
 
     def fake_popen(command, **kwargs):
-        assert events == [
-            (
-                "activate-gcloud",
-                {
-                    "ensure_adc": False,
-                    "allow_runtime_adc": False,
-                    "allow_adc_login": False,
-                },
-            )
-        ]
+        assert events == []
         calls.append((command, kwargs))
         return FakeProcess()
 
@@ -1589,7 +1582,7 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
         "-c",
         "testing/pytest.ini",
         "-p",
-        "testing.utility.traceability_results",
+        "testing.utility.evidence_results",
         "-p",
         "runner.pytest_routing",
         "testing/tests_tooling/test_007_run_py_test_command.py",
@@ -1602,7 +1595,67 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
     assert os.environ["LAGNIAPPE_TEST_COMMAND"] == '["outer", "test"]'
 
 
-# @pair testing:adc
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["http"],
+        ["tooling"],
+        ["js"],
+        ["setup"],
+        ["setup", "-m", "setup_drift"],
+        ["testing/tests_unit/test_001_config_validation.py"],
+        ["testing/tests_http/test_001_web_security_wiring.py"],
+    ],
+)
+def test_run_py_offline_suites_skip_gcloud_activation(monkeypatch, arguments):
+    monkeypatch.setattr(
+        run,
+        "activate_repository_gcloud",
+        lambda **kwargs: pytest.fail(
+            f"offline test selection {arguments!r} must skip gcloud preflight"
+        ),
+    )
+    monkeypatch.setattr(run, "_run_pytest_subprocess", lambda command: 0)
+
+    assert run.run_tests(arguments) == 0
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["setup", "-m", "setup_provider"],
+        ["setup", "-m", "provider"],
+    ],
+)
+def test_run_py_provider_contract_markers_require_gcloud_activation(
+    monkeypatch, arguments
+):
+    from runner import mcp_environment
+
+    calls = []
+    monkeypatch.setattr(mcp_environment, "prepare_environment", lambda: None)
+    monkeypatch.setattr(
+        run,
+        "activate_repository_gcloud",
+        lambda **kwargs: calls.append(kwargs)
+        or (_ for _ in ()).throw(RuntimeError("gcloud mismatch")),
+    )
+    monkeypatch.setattr(
+        run,
+        "_run_pytest_subprocess",
+        lambda command: pytest.fail("pytest must not start when gcloud fails"),
+    )
+
+    assert run.run_tests(arguments) == 1
+    assert calls == [
+        {
+            "ensure_adc": True,
+            "allow_runtime_adc": True,
+            "allow_adc_login": False,
+        }
+    ]
+
+
 def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
     from runner import mcp_environment
 
@@ -1708,7 +1761,6 @@ def test_run_py_e2e_adc_mismatch_stops_before_pytest(monkeypatch, capsys):
     assert "run.py auth" in output
 
 
-# @matrix development : adc gcloud-config launch-order
 def test_run_dev_server_aligns_adc_before_flask_launch(monkeypatch):
     from runner import development
 
@@ -1774,7 +1826,6 @@ def test_run_dev_server_aligns_adc_before_flask_launch(monkeypatch):
     ]
 
 
-# @matrix development : adc gcloud-config launch-order noninteractive
 def test_run_dev_server_adc_mismatch_stops_before_flask(monkeypatch, capsys):
     from runner import development
 
@@ -1797,7 +1848,6 @@ def test_run_dev_server_adc_mismatch_stops_before_flask(monkeypatch, capsys):
     assert "run.py auth" in output
 
 
-# @matrix development : lifecycle process-ownership signals
 def test_run_dev_server_forwards_signals_and_restores_handlers(monkeypatch):
     from runner import development
 
@@ -1842,7 +1892,6 @@ def test_run_dev_server_forwards_signals_and_restores_handlers(monkeypatch):
     assert restored == [development.signal.SIGINT, development.signal.SIGTERM]
 
 
-# @matrix development : escalation exceptional-cleanup process-ownership
 def test_run_dev_server_cleans_up_process_group_after_runner_failure(monkeypatch):
     from runner import development
 
@@ -1883,7 +1932,6 @@ def test_run_dev_server_cleans_up_process_group_after_runner_failure(monkeypatch
     ]
 
 
-# @matrix auth : adc explicit-command interactive runtime-identity
 def test_run_py_auth_runs_interactive_human_adc_alignment(
     monkeypatch,
     capsys,
@@ -1910,7 +1958,6 @@ def test_run_py_auth_runs_interactive_human_adc_alignment(
     )
 
 
-# @matrix auth : adc explicit-command interactive runtime-identity
 def test_run_py_auth_reports_alignment_failure(monkeypatch, capsys):
     monkeypatch.setattr(run, "GCLOUD_CLI", "/usr/bin/gcloud")
     monkeypatch.setattr(
@@ -2021,7 +2068,6 @@ def test_run_py_test_forwards_signals_to_pytest_process_group(monkeypatch):
     assert restored_handlers == [run.signal.SIGINT, run.signal.SIGTERM]
 
 
-# @pair setup:gcloud-token
 def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch, capsys):
     from runner import adc as runner_adc
     from runner import gcloud as runner_gcloud
@@ -2110,7 +2156,6 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch, capsys
     assert "Verified:" not in output
 
 
-# @matrix auth : gcloud-token interactive refresh
 def test_runner_gcloud_source_login_refreshes_stale_token(monkeypatch):
     from runner import adc as runner_adc
 
@@ -2171,7 +2216,6 @@ def test_runner_gcloud_source_login_refreshes_stale_token(monkeypatch):
     ]
 
 
-# @matrix setup : gcloud-token safe-failure
 def test_runner_gcloud_source_login_stops_before_authentication_by_default(
     monkeypatch,
 ):
@@ -2206,7 +2250,6 @@ def test_runner_gcloud_source_login_stops_before_authentication_by_default(
     ]
 
 
-# @matrix development setup testing : adc identity project-identity
 def test_runner_adc_identity_is_secret_free_and_project_bound():
     from runner import adc as runner_adc
 
@@ -2243,7 +2286,6 @@ def test_runner_adc_identity_is_secret_free_and_project_bound():
     assert "secret-access-token" not in repr(identity)
 
 
-# @matrix setup testing : adc automatic-activation identity project-identity quota-project
 def test_runner_adc_alignment_reauthenticates_and_sets_quota_project(monkeypatch):
     from runner import adc as runner_adc
 
@@ -2315,7 +2357,6 @@ def test_runner_adc_alignment_reauthenticates_and_sets_quota_project(monkeypatch
     ]
 
 
-# @matrix auth : adc automatic-activation identity project-identity quota-project
 def test_runner_adc_auth_selects_account_then_project_before_login(monkeypatch):
     from runner import adc as runner_adc
 
@@ -2450,7 +2491,6 @@ def test_runner_adc_auth_selects_account_then_project_before_login(monkeypatch):
     ]
 
 
-# @matrix development testing : adc automatic-activation identity project-identity quota-project
 @pytest.mark.parametrize(
     "identity",
     [
@@ -2499,7 +2539,6 @@ def test_runner_local_adc_mismatch_directs_to_auth_command(
         )
 
 
-# @matrix setup testing : adc automatic-activation quota-project
 def test_runner_adc_alignment_updates_only_stale_quota_project(monkeypatch):
     from runner import adc as runner_adc
 
@@ -2551,7 +2590,6 @@ def test_runner_adc_alignment_updates_only_stale_quota_project(monkeypatch):
     ]
 
 
-# @matrix auth development setup testing : activation gcloud-config unconfigured
 def test_runner_gcloud_activation_skips_unconfigured_repository(monkeypatch):
     from runner import gcloud as runner_gcloud
 
@@ -2562,7 +2600,6 @@ def test_runner_gcloud_activation_skips_unconfigured_repository(monkeypatch):
     assert runner_gcloud.activate_repository_gcloud() is False
 
 
-# @matrix auth development setup testing : activation gcloud-config validation
 def test_runner_gcloud_activation_rejects_partial_saved_target(monkeypatch):
     from runner import gcloud as runner_gcloud
 
@@ -2579,7 +2616,6 @@ def test_runner_gcloud_activation_rejects_partial_saved_target(monkeypatch):
         runner_gcloud.activate_repository_gcloud()
 
 
-# @matrix dependencies : cli-routing upgrade
 @pytest.mark.parametrize("only", [None, "node", "npm", "python"])
 def test_run_py_upgrade_dependencies_runs_dependency_upgrade(monkeypatch, only):
     config_module = types.ModuleType("config")
@@ -2595,7 +2631,6 @@ def test_run_py_upgrade_dependencies_runs_dependency_upgrade(monkeypatch, only):
     assert received == [{"only": only}]
 
 
-# @matrix dependencies : cli-routing upgrade
 def test_run_py_upgrade_dependencies_rejects_software_upgrade_branch(capsys):
     with pytest.raises(SystemExit, match="2"):
         run.run_dependency_upgrade_command(["--branch", "release/candidate"])
@@ -2853,7 +2888,6 @@ def test_main_release_workflow_contract():
     assert "pr-clean" not in workflow_text
 
 
-# @pair release:delivery-tree
 def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
     repo = _release_check_repository(tmp_path)
     _write_release_candidate(repo)
@@ -2882,7 +2916,6 @@ def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
     assert "Release check passed against main" in result.stdout
 
 
-# @matrix release : build-mode delivery-tree
 @pytest.mark.parametrize("change", ["runner", "documentation", "backend"])
 def test_run_py_release_check_reuses_valid_production_build(tmp_path, change):
     repo = _release_check_repository(tmp_path)
@@ -2897,7 +2930,6 @@ def test_run_py_release_check_reuses_valid_production_build(tmp_path, change):
     assert run.run_release_check_command(["--base", base], repo_root=repo) == 0
 
 
-# @matrix release : build-mode delivery-tree
 @pytest.mark.parametrize("change", ["source", "artifact", "missing-artifact", "build-id"])
 def test_run_py_release_check_rejects_stale_or_modified_build(tmp_path, capsys, change):
     repo = _release_check_repository(tmp_path)
@@ -2916,7 +2948,6 @@ def test_run_py_release_check_rejects_stale_or_modified_build(tmp_path, capsys, 
     assert "Frontend build:" in capsys.readouterr().out
 
 
-# @pair release:delivery-tree
 @pytest.mark.parametrize(
     "declaration",
     [".nvmrc", "package.json", "package-lock.json", "docker-version", "docker-digest"],
@@ -2972,7 +3003,6 @@ def _write_candidate_migration(repo: Path, *, introduced_in: str) -> None:
     _git(repo, "add", str(path.relative_to(repo)))
 
 
-# @matrix migrations release : major-version release-note version-metadata
 def test_run_py_release_check_requires_major_version_for_new_migration(
     tmp_path,
     capsys,
@@ -2995,7 +3025,6 @@ def test_run_py_release_check_requires_major_version_for_new_migration(
     assert "NEXT-001" in output
 
 
-# @matrix migrations release : major-version release-note version-metadata
 def test_run_py_release_check_requires_matching_migration_release_metadata(
     tmp_path,
     capsys,
@@ -3029,7 +3058,6 @@ def test_run_py_release_check_requires_matching_migration_release_metadata(
     assert "Release check passed against main" in capsys.readouterr().out
 
 
-# @matrix release : build-mode delivery-tree
 def test_run_py_release_check_rejects_development_build(tmp_path, capsys):
     repo = _release_check_repository(tmp_path)
     _write_release_candidate(repo, mode="development")
@@ -3039,7 +3067,6 @@ def test_run_py_release_check_rejects_development_build(tmp_path, capsys):
     assert "must identify a production build" in output
 
 
-# @pair release:delivery-tree
 def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
     repo = _release_check_repository(tmp_path)
     (repo / "package.json").write_text(
@@ -3065,7 +3092,6 @@ def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
     assert "must identify a production build" in output
 
 
-# @pair version:cli-routing
 @pytest.mark.parametrize(
     ("settings_exist", "settings_version", "expected_version"),
     [
@@ -3100,7 +3126,6 @@ def test_run_py_version_show_uses_package_only_before_generated_settings_exist(
     ]
 
 
-# @pair version:cli-routing
 def test_run_py_version_note_appends_concise_release_entry(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(run, "RELEASES_DIR", tmp_path / "documentation" / "releases")
 
@@ -3116,8 +3141,6 @@ def test_run_py_version_note_appends_concise_release_entry(monkeypatch, tmp_path
     assert "Added version note" in capsys.readouterr().out
 
 
-# @pair version:cli-routing
-# @source run.py::run_version_command
 @pytest.mark.parametrize("version", ["", "1.25", "1.2.3-rc1", "../outside", "01.2.3"])
 @pytest.mark.parametrize("action", ["set", "explicit-note", "current-note"])
 def test_run_py_version_rejects_invalid_values_before_mutation(
@@ -3160,12 +3183,11 @@ def test_run_py_version_rejects_invalid_values_before_mutation(
 
     assert error.value.code == 2
     assert "X.Y.Z" in capsys.readouterr().err
-    assert settings.NODE == original_node
-    assert settings.APP == original_app
+    assert original_node == settings.NODE
+    assert original_app == settings.APP
     assert not list(tmp_path.iterdir())
 
 
-# @pair version:cli-routing
 def test_run_py_version_set_updates_package_settings_and_release_file(
     monkeypatch, tmp_path, capsys
 ):

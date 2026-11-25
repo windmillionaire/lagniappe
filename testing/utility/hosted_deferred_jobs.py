@@ -1,6 +1,6 @@
 """Hosted E2E delivery helpers for real App Engine deferred jobs."""
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 import math
 
 from lagniappe import CONFIG
@@ -21,7 +21,6 @@ HOSTED_JOB_TRANSITION_TIMEOUT_MS = (
 ) * 1_000
 
 
-# @testable infrastructure
 def _ai_diagnostics(job):
     """Return privacy-bounded provider telemetry for one hosted job."""
     telemetry_id = getattr(job, "telemetry_id", None)
@@ -38,9 +37,6 @@ def _ai_diagnostics(job):
     ]
 
 
-# @testable true
-# @tests tests_unit/test_023f_hosted_deferred_job_test_helper.py::test_hosted_transition_poll_starts_after_existing_revision
-# @matrix deferred-jobs hosted-e2e : polling revision timing
 def wait_for_hosted_job_transition(
     page,
     job_key,
@@ -125,9 +121,6 @@ def wait_for_hosted_job_transition(
         )
 
 
-# @testable true
-# @tests tests_unit/test_023f_hosted_deferred_job_test_helper.py::test_hosted_retry_waits_for_new_revision_and_scheduled_delay
-# @matrix deferred-jobs hosted-e2e : retry revision scheduling timing
 def dispatch_hosted_deferred_job(
     page,
     job,
@@ -152,7 +145,7 @@ def dispatch_hosted_deferred_job(
                     math.ceil(
                         (
                             current_job.next_attempt_at
-                            - datetime.now(timezone.utc)
+                            - datetime.now(UTC)
                         ).total_seconds()
                     ),
                     0,

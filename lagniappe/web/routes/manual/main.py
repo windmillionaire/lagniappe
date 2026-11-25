@@ -1,3 +1,10 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import abort
 
 from lagniappe.core.definitions.manual import (
@@ -10,17 +17,10 @@ from lagniappe.web import responses
 from . import manual
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_navigate_to_manual_from_home_button
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_security_section_loads
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_public_manual_loads_without_login_or_auth_bootstrap
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_manual_keeps_account_addresses_authenticated
-# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
-# @matrix manual : address-redaction ai-email anonymous-access direct-section no-auth-bootstrap page-load section-navigation
 @manual.route("/", methods=["GET"])
 @manual.route("/<section>", methods=["GET"])
 @manual_permission()
-def index(section=None):
+def index(section: str | None = None) -> ResponseReturnValue:
     if section and section not in VALID_MANUAL_SECTIONS:
         abort(404)
 
@@ -28,16 +28,9 @@ def index(section=None):
     return responses.manual_index(key, MANUAL_SECTIONS)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_navigate_to_manual_from_home_button
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_security_section_loads
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_manual_keeps_account_addresses_authenticated
-# @tests tests_e2e/002_home/test_002m_home_manual_discovery.py::test_public_manual_search_metadata_and_navigation
-# @matrix manual : address-redaction ai-email ajax-section anonymous-access section-navigation
-# @pair manual:page-load
 @manual.route("/section/<section>", methods=["GET"])
 @manual_permission()
-def content(section):
+def content(section: str) -> ResponseReturnValue:
     if section not in VALID_MANUAL_SECTIONS:
         abort(404)
 

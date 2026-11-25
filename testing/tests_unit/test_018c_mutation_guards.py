@@ -59,7 +59,6 @@ def guard_store(monkeypatch):
                            lookup=lookup, transaction_ids=transaction_ids)
 
 
-# @matrix mutations : concurrency batched-reads
 def test_guarded_write_batches_distinct_keys_and_matches_unordered_results(guard_store):
     page = guard_store.row("page", assets="saved", unrelated="kept")
     form = guard_store.row("form", generation=2)
@@ -87,7 +86,6 @@ def test_guarded_write_batches_distinct_keys_and_matches_unordered_results(guard
     assert list(mutation.property_mask.paths) == ["assets"]
 
 
-# @matrix mutations : concurrency batched-reads
 @pytest.mark.parametrize("saved,expectations,conflict", [
     (None, [None, None], False),
     ({}, [None, {}], True),
@@ -122,7 +120,6 @@ def test_guarded_write_enforces_every_expectation(guard_store, saved, expectatio
     assert guard_store.api.lookup.call_args.kwargs["request"]["keys"] == [key.to_protobuf()]
 
 
-# @matrix mutations : concurrency batched-reads
 @pytest.mark.parametrize("count,sizes", [(0, []), (1000, [1000]), (1001, [1000, 1]), (2001, [1000, 1000, 1])])
 def test_guard_reads_respect_lookup_limit_and_skip_empty_input(guard_store, count, sizes):
     keys = [guard_store.client.key("records", str(index)) for index in range(count)]
@@ -135,7 +132,6 @@ def test_guard_reads_respect_lookup_limit_and_skip_empty_input(guard_store, coun
     assert all(request["read_options"].transaction == guard_store.transaction_ids[0] for request in requests)
 
 
-# @matrix mutations : concurrency batched-reads
 @pytest.mark.parametrize("unresolved", [False, True])
 def test_guard_reads_resolve_deferred_keys_before_accepting_absence(guard_store, monkeypatch, unresolved):
     from google.cloud.datastore import client as datastore_client
@@ -164,7 +160,6 @@ def test_guard_reads_resolve_deferred_keys_before_accepting_absence(guard_store,
     assert all(request["read_options"].transaction == guard_store.transaction_ids[0] for request in attempts)
 
 
-# @matrix mutations : concurrency batched-reads
 @pytest.mark.parametrize("changed", [False, True])
 def test_guarded_write_rechecks_batched_guards_after_aborted_commit(guard_store, changed):
     saved = guard_store.row("guarded", version=1)
@@ -191,7 +186,6 @@ def test_guarded_write_rechecks_batched_guards_after_aborted_commit(guard_store,
             for call in guard_store.api.lookup.call_args_list] == guard_store.transaction_ids
 
 
-# @matrix mutations : concurrency batched-reads
 @pytest.mark.parametrize("conflict", [False, True])
 def test_atomic_job_start_enforces_duplicate_guards_before_writing(guard_store, conflict):
     source = guard_store.row("report", revision=2, status="ready")
@@ -211,3 +205,85 @@ def test_atomic_job_start_enforces_duplicate_guards_before_writing(guard_store, 
     requests = [call.kwargs["request"] for call in guard_store.api.lookup.call_args_list]
     assert sum(key == source.key.to_protobuf() for request in requests for key in request["keys"]) == 1
     assert all(request["read_options"].transaction == guard_store.transaction_ids[0] for request in requests)
+
+
+@pytest.mark.parametrize(
+    "racing_write", ["hint", "cleared_hint", "added", "removed", "changed", "deleted", "strict_guard"]
+)
+def test_page_form_save_preserves_note_hint_and_rejects_other_changes(guard_store, monkeypatch, racing_write):
+    from copy import deepcopy
+    from datetime import UTC, datetime, timedelta
+
+    from lagniappe.core.entities import Entities
+    from lagniappe.core.tools.forms.review import stage_submission_guard
+
+    revision = datetime(2025, 5, 1, tzinfo=UTC)
+    current = guard_store.row(
+        "page", type="page", modified=revision,
+        **{"legacy.field": "remove locally", "access": "original"},
+    )
+    current["name"] = "Old"
+    if racing_write == "cleared_hint":
+        current.update(has_notes=False, notes_checked_revision=revision)
+    form_page = Entities.PAGE(deepcopy(current))
+    notes_page = Entities.PAGE(deepcopy(current))
+    assert stage_submission_guard(form_page, {"form-revision": form_page.autofill_revision})
+
+    def save_note_hint(page, *, property_mask):
+        current.update({name: page.db[name] for name in property_mask})
+
+    monkeypatch.setattr(Entities, "save_root", save_note_hint)
+    if racing_write == "cleared_hint":
+        current.pop("has_notes")
+        current.pop("notes_checked_revision")
+    else:
+        notes_page.remember_empty_notes()
+        assert current["notes_checked_revision"] == revision
+    form_page.db.pop("legacy.field")
+    form_page.db.update(name="Edited", modified=revision + timedelta(seconds=1))
+    if racing_write == "added":
+        current["restricted_to"] = "new permission"
+    elif racing_write == "removed":
+        current.pop("access")
+    elif racing_write == "changed":
+        current["name"] = "Another edit"
+    elif racing_write == "deleted":
+        del guard_store.rows[current.key]
+
+    writes = [(form_page, None)]
+    guards = form_page._form_additional_guards
+    if racing_write == "strict_guard":
+        guards = [*guards, (current.key, utility.ExactEntityState(guards[0][1]))]
+    if racing_write not in {"hint", "cleared_hint"}:
+        with pytest.raises(MutationConflict):
+            utility._save_guarded_mutations(writes, [], guards)
+        guard_store.api.commit.assert_not_called()
+        return
+
+    utility._save_guarded_mutations(writes, [], guards)
+    [mutation] = guard_store.api.commit.call_args.kwargs["request"]["mutations"]
+    saved = helpers.entity_from_protobuf(mutation.upsert)
+    assert saved.key == current.key
+    assert saved["name"] == "Edited" and "legacy.field" not in saved
+    if racing_write == "hint":
+        assert saved["has_notes"] is False and saved["notes_checked_revision"] == revision
+        assert "has_notes" not in form_page.db
+    else:
+        assert "has_notes" not in saved and "notes_checked_revision" not in saved
+        assert form_page.db["has_notes"] is False
+    assert Entities.PAGE(saved).has_notes  # Old observations never hide notes at a later revision.
+
+
+def test_task_form_save_still_guards_the_whole_row(guard_store):
+    from copy import deepcopy
+
+    from lagniappe.core.entities import Entities
+    from lagniappe.core.tools.forms.review import stage_submission_guard
+
+    current = guard_store.row("task", type="task")
+    task = Entities.TASK(deepcopy(current))
+    assert stage_submission_guard(task, {"form-revision": task.autofill_revision})
+    current["has_notes"] = False
+    with pytest.raises(MutationConflict):
+        utility._save_guarded_mutations([(task, None)], [], task._form_additional_guards)
+    guard_store.api.commit.assert_not_called()

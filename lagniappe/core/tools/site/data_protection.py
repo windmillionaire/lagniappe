@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from google.cloud.firestore_admin_v1 import FirestoreAdminClient
+
+
+from collections.abc import Iterable
+from datetime import datetime, UTC
 import json
 import re
 
@@ -15,9 +22,6 @@ from lagniappe.core.tools.database.core import DATA
 RUNTIME_CATALOG_OBJECT = "data-lifecycle/recovery-catalog.json"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/data_protection.py::data_protection_status
-# @reason provider timestamp normalization is exercised by the public status projection
 def _timestamp(value):
     """Return a readable provider timestamp while preserving unknown values."""
     if value in (None, ""):
@@ -33,24 +37,18 @@ def _timestamp(value):
 
     suffix = ""
     if moment.tzinfo is not None:
-        moment = moment.astimezone(timezone.utc)
+        moment = moment.astimezone(UTC)
         suffix = " UTC"
     time = moment.strftime("%I:%M %p").lstrip("0")
     return f"{time}, {moment.strftime('%d %b %Y')}{suffix}"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/data_protection.py::data_protection_status
-# @reason provider message normalization is exercised by the public status projection
 def _message(value):
     if isinstance(value, dict):
         return dict(value)
     return MessageToDict(getattr(value, "_pb", value), preserving_proto_field_name=True)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/data_protection.py::data_protection_status
-# @reason schedule formatting is exercised by the public status projection
 def _schedule(payload):
     recurrence = "Daily" if "daily_recurrence" in payload else "Weekly"
     weekly = payload.get("weekly_recurrence") or {}
@@ -69,9 +67,6 @@ def _schedule(payload):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/data_protection.py::data_protection_status
-# @reason backup formatting is exercised by the public status projection
 def _backup(payload, project_id):
     resource_name = str(payload.get("name") or "").strip()
     expected = re.compile(
@@ -91,10 +86,7 @@ def _backup(payload, project_id):
     }
 
 
-# @testable true
-# @tests tests_unit/test_024_data_protection_status.py::test_data_protection_status_is_sanitized_and_read_only
-# @matrix admin disaster-recovery : human-readable-timestamps native-backups recovery-catalog sanitization schedules
-def data_protection_status(admin_client=None):
+def data_protection_status(admin_client: FirestoreAdminClient | None = None) -> dict[str, object]:
     """Return provider metadata and a sanitized manual-backup catalog."""
     project_id = CONFIG.GOOGLE_CLOUD_PROJECT
     if admin_client is None:
@@ -114,6 +106,8 @@ def data_protection_status(admin_client=None):
     schedule_values = getattr(schedules, "backup_schedules", schedules)
     backups = admin_client.list_backups(parent=f"projects/{project_id}/locations/-")
     backup_values = getattr(backups, "backups", backups)
+    if not isinstance(schedule_values, Iterable) or not isinstance(backup_values, Iterable):
+        raise TypeError("Backup inventory did not return iterable records")
     backup_payloads = [_message(item) for item in backup_values]
     backup_payloads = [
         item

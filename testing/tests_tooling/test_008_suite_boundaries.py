@@ -733,6 +733,20 @@ def test_lower_level_suites_do_not_import_web_package():
     assert violations == {}
 
 
+def test_http_suite_does_not_import_browser_harness():
+    violations = {}
+    for path in _python_files(TESTING_ROOT / "tests_http"):
+        forbidden = [
+            *_package_imports(path, "playwright.sync_api"),
+            *_package_imports(path, "testing.resources"),
+            *_package_imports(path, "testing.elements"),
+        ]
+        if forbidden:
+            violations[str(path.relative_to(TESTING_ROOT))] = forbidden
+
+    assert violations == {}
+
+
 def test_tooling_suite_does_not_import_core_package():
     violations = {}
     for path in _python_files(TESTING_ROOT / "tests_tooling"):

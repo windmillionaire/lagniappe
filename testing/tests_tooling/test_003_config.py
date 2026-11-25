@@ -70,7 +70,6 @@ def saved_projection_settings(settings_config):
     return config
 
 
-# @matrix config : configuration transactional-state
 def test_runtime_settings_own_nested_values_and_return_independent_copies(
     settings_config,
 ):
@@ -100,7 +99,6 @@ def test_runtime_settings_own_nested_values_and_return_independent_copies(
     }
 
 
-# @matrix config : configuration transactional-state
 def test_settings_drafts_own_documents_and_preserve_internal_aliases(
     saved_projection_settings,
 ):
@@ -111,7 +109,7 @@ def test_settings_drafts_own_documents_and_preserve_internal_aliases(
     first.APP["NESTED"]["items"][0]["label"] = "changed"
     first.DEV_CONFIG["SERVER_PORT"] = "9000"
     first.GCLOUD_CONFIG["PROJECT"] = "changed-project"
-    assert second.APP == original
+    assert original == second.APP
     assert second.DEV_CONFIG["SERVER_PORT"] == "5050"
     assert second.GCLOUD_CONFIG["PROJECT"] == "project-1"
     for name in (
@@ -129,7 +127,6 @@ def test_settings_drafts_own_documents_and_preserve_internal_aliases(
     assert first.GCLOUD_CONFIG is first.DEV["gcloud_config"]
 
 
-# @matrix config : config-files configuration parsing
 def test_runtime_loading_is_independent_of_drafts_and_generated_documents(
     saved_projection_settings, monkeypatch
 ):
@@ -158,7 +155,6 @@ def test_runtime_loading_is_independent_of_drafts_and_generated_documents(
     }
 
 
-# @matrix config : config-files configuration parsing
 @pytest.mark.parametrize(
     "environment,port,analytics",
     [
@@ -229,7 +225,6 @@ def test_runtime_and_draft_projections_preserve_environment_precedence(
         assert projected["EXPERIMENTS_DIAGNOSTICS"] == "summary"
 
 
-# @matrix config : configuration transactional-state
 def test_draft_projections_observe_edits_without_saving_or_aliasing(
     saved_projection_settings, monkeypatch
 ):
@@ -260,7 +255,6 @@ def test_draft_projections_observe_edits_without_saving_or_aliasing(
     assert draft.APP["NESTED"]["items"] == [{"label": "draft"}]
 
 
-# @matrix config : config-files transactional-state
 def test_draft_save_preserves_identity_and_publishes_only_selected_files(
     saved_projection_settings, monkeypatch
 ):
@@ -298,7 +292,6 @@ def test_draft_save_preserves_identity_and_publishes_only_selected_files(
     assert draft.APP["APP_NAME"] == "Unpublished app"
 
 
-# @matrix config : config-files parsing
 def test_saved_settings_reader_preserves_raw_values_without_loading_a_draft(
     settings_config, monkeypatch
 ):
@@ -324,14 +317,13 @@ def test_saved_settings_reader_preserves_raw_values_without_loading_a_draft(
     assert config._settings_draft is None
 
 
-# @matrix config setup : config-files git-upgrade
 def test_settings_singleton_is_lazy_and_reloads_saved_documents(
     saved_projection_settings,
 ):
     config = saved_projection_settings
     assert config._settings_draft is None
     with pytest.raises(AttributeError):
-        getattr(config, "unknown_setting_attribute")
+        _ = config.unknown_setting_attribute
     first = config.SETTINGS
     assert first is config.SETTINGS
     assert first.APP["APP_NAME"] == "Saved app"
@@ -344,9 +336,6 @@ def test_settings_singleton_is_lazy_and_reloads_saved_documents(
     assert first.APP["APP_NAME"] == "Saved app"
 
 
-# @matrix hosted-e2e testing : configuration deployment-binding fail-closed identity prefix
-# @pair config:configuration
-# @source config/hosted_e2e.py::hosted_e2e_settings_overrides
 def test_hosted_runtime_projection_preserves_validated_overrides(
     saved_projection_settings, monkeypatch
 ):
@@ -408,7 +397,6 @@ def _load_recovery_module(monkeypatch):
     return importlib.import_module("config.recovery")
 
 
-# @matrix config setup : permissions transactional-state utf8
 def test_atomic_config_write_preserves_valid_file_and_restricts_secrets(
     monkeypatch,
     tmp_path,
@@ -450,7 +438,6 @@ def test_atomic_config_write_preserves_valid_file_and_restricts_secrets(
         assert target.stat().st_mode & 0o777 == 0o600
 
 
-# @matrix config deploy setup : completeness generation source-marker
 def test_generation_manifest_tracks_constants_and_required_outputs(
     monkeypatch,
     tmp_path,
@@ -550,7 +537,6 @@ def test_gcloudignore_uploads_only_canonical_runtime_config():
         assert f"!/config/files/{local_only}" not in ignore
 
 
-# @matrix config setup : app-engine-location compatibility resource-region
 def test_google_location_aliases_keep_app_engine_and_regional_resources_distinct():
     from config.locations import (
         normalize_app_engine_location,
@@ -578,7 +564,6 @@ def test_dependency_upgrade_tracks_all_requirement_files():
     ]
 
 
-# @pair dependencies:upgrade-requirements
 def test_dependency_upgrade_resolves_and_rewrites_all_requirement_files(
     monkeypatch,
     tmp_path,
@@ -652,7 +637,6 @@ def test_dependency_upgrade_resolves_and_rewrites_all_requirement_files(
     assert font_requirements.read_text(encoding="utf-8") == "fonttools==4.60.2\n"
 
 
-# @pair dependencies:upgrade-report
 def test_dependency_upgrade_report_includes_setup_pins(capsys):
     from runner import upgrade
 
@@ -679,7 +663,6 @@ def test_dependency_upgrade_report_includes_setup_pins(capsys):
     assert str(report_path) in output
 
 
-# @matrix dependencies : node-version pinning upgrade
 def test_dependency_upgrade_updates_node_version_pin(monkeypatch, tmp_path):
     from runner import upgrade
 
@@ -721,7 +704,6 @@ def test_dependency_upgrade_updates_node_version_pin(monkeypatch, tmp_path):
     )
 
 
-# @matrix config : config-files parsing
 def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_path):
     app_dir = tmp_path / "demo-app"
     config_files_dir = app_dir / "config" / "files"
@@ -730,7 +712,7 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
     (app_dir / "main.py").write_text("")
     (app_dir / "package.json").write_text("{}")
     (app_dir / "index.yaml").write_text("indexes: []\n")
-    (app_dir / "lagniappe.yaml").write_text("runtime: python312\n")
+    (app_dir / "lagniappe.yaml").write_text("runtime: python314\n")
     (config_files_dir / "lagniappe_settings.yaml").write_text(
         yaml.safe_dump(
             {
@@ -801,7 +783,7 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
         from config import APP_DIR, Directory, Environment, File, SETTINGS, constants
 
         assert sys.modules["runner.testing"] is stale_testing
-        assert APP_DIR == app_dir
+        assert app_dir == APP_DIR
         assert Directory.CONFIG.value == config_files_dir
         assert Environment.TESTING.value == "testing"
         assert SETTINGS.APP["AI_ENABLED"] is True
@@ -865,7 +847,6 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
         restore_config_modules()
 
 
-# @pairs cache:bundle-consistency frontend-build:chunk-versioning
 def test_app_engine_chunk_handler_uses_immutable_cache_before_general_js():
     constants_path = Path(__file__).resolve().parents[2] / "config" / "constants.py"
     spec = importlib.util.spec_from_file_location(
@@ -899,7 +880,6 @@ def test_app_engine_chunk_handler_uses_immutable_cache_before_general_js():
     assert "expiration" not in chunk_handler
 
 
-# @matrix deploy : app-yaml pdf-preview static-assets
 def test_app_engine_pdfjs_wasm_handlers_precede_general_js():
     constants_path = Path(__file__).resolve().parents[2] / "config" / "constants.py"
     spec = importlib.util.spec_from_file_location(
@@ -1064,7 +1044,6 @@ def test_app_engine_dynamic_handler_allowlist_covers_registered_routes():
     assert "That page was not found on this server." in static_404_page.read_text()
 
 
-# @matrix deploy : deploy-surface gcloudignore imports requirements
 def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirements(
     monkeypatch, tmp_path
 ):
@@ -1167,15 +1146,43 @@ def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirem
         else:
             runner.__dict__.pop("deploy", None)
 
-# @matrix deploy : deploy-surface gcloudignore imports package-boundary
 def test_runtime_upload_boundary_has_no_local_orchestration_imports(settings_config):
     from runner.deploy import runtime_deploy_surface_issues
 
     assert runtime_deploy_surface_issues(runner_context.REPOSITORY_ROOT) == []
 
+def test_offline_mutation_contracts_check_the_real_registry(monkeypatch):
+    root = runner_context.REPOSITORY_ROOT
+    monkeypatch.setenv("LAGNIAPPE_CONFIG_ROOT", str(root / "testing/fixtures/offline-runtime"))
+    monkeypatch.setenv("FLASK_ENV", "testing")
+    monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
+    cli = ["run.py", "mutation-contracts", "--check", "--json"]
+    result = subprocess.run([sys.executable, *cli], cwd=root, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert json.loads(result.stdout)["errors"] == []
 
-# @matrix config : current-schema messaging-removal recovery-export
-# @pair public-pages:recovery-export
+    # Remove a real persisted relation while leaving the entity class intact.
+    # Run the same CLI in the process containing the altered contract registry.
+    drift = """
+from dataclasses import replace
+import runpy
+import sys
+
+from lagniappe.core.definitions.mutation_contracts import ENTITY_MUTATION_CONTRACTS
+
+user = ENTITY_MUTATION_CONTRACTS["user"]
+ENTITY_MUTATION_CONTRACTS["user"] = replace(
+    user, relations=tuple(relation for relation in user.relations if relation.name != "groups")
+)
+sys.argv = sys.argv[1:]
+runpy.run_path(sys.argv[0], run_name="__main__")
+"""
+    result = subprocess.run([sys.executable, "-c", drift, *cli], cwd=root, capture_output=True, text=True)
+    assert result.returncode == 1, result.stderr or result.stdout
+    assert "user is missing persisted relations: groups" in json.loads(result.stdout)["errors"]
+
+
+
 def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch):
     recovery = _load_recovery_module(monkeypatch)
 
@@ -1236,7 +1243,6 @@ def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch
     assert persisted["DEPLOY_MAX_INSTANCES"] == "1"
 
 
-# @matrix config : public-page-indexing validation
 def test_public_page_settings_normalize_boolean_values():
     from config.public_pages import (
         ConfigPublicPageSettingsError,
@@ -1253,7 +1259,6 @@ def test_public_page_settings_normalize_boolean_values():
         normalize_public_page_settings({"PUBLIC_PAGE_INDEXING": "sometimes"})
 
 
-# @matrix config : recovery-display secrets
 def test_recovery_display_redacts_nested_and_flat_secrets_without_mutation():
     from config import recovery
 
@@ -1337,7 +1342,6 @@ def _valid_recovery_document():
     }
 
 
-# @matrix config : project-identity project-number recovery-validation
 def test_recovery_document_cross_checks_all_persisted_project_identities():
     from config import recovery
 
@@ -1388,7 +1392,6 @@ def test_recovery_document_cross_checks_all_persisted_project_identities():
     assert recovery.validate_recovery_document(numeric_ocr_parent)
 
 
-# @matrix config : messaging-removal recovery-validation schema-upgrade
 def test_recovery_upgrades_schema_2_and_discards_legacy_messaging_config(monkeypatch):
     recovery = _load_recovery_module(monkeypatch)
 
@@ -1401,7 +1404,6 @@ def test_recovery_upgrades_schema_2_and_discards_legacy_messaging_config(monkeyp
     assert "FIREBASE_CONFIG" not in recovered
 
 
-# @matrix config : current-schema recovery-validation required-settings
 @pytest.mark.parametrize(
     ("setting", "message"),
     [
@@ -1427,7 +1429,6 @@ def test_recovery_requires_complete_current_configuration(setting, message):
         recovery.validate_recovery_document(document)
 
 
-# @matrix config : authentication-email recovery-validation secrets
 def test_recovery_validates_and_normalizes_auth_email_smtp():
     from config import recovery
 
@@ -1453,7 +1454,6 @@ def test_recovery_validates_and_normalizes_auth_email_smtp():
         recovery.validate_recovery_document(snapshot)
 
 
-# @pair config:ai-email
 def test_recovery_accepts_and_redacts_optional_ai_email_config():
     from config import recovery
 
@@ -1482,7 +1482,6 @@ def test_recovery_accepts_and_redacts_optional_ai_email_config():
     assert displayed["AI_EMAIL_CONFIG"]["resend"]["sendingApiKey"] == "[REDACTED]"
 
 
-# @matrix config : project-identity recovery-validation
 def test_recovery_rejects_current_configuration_identity_mismatch():
     from config import recovery
 
@@ -1541,7 +1540,6 @@ def test_recovery_rejects_current_configuration_identity_mismatch():
             recovery.validate_recovery_document(document)
 
 
-# @matrix config : certificate-validation recovery-export recovery-restore redis-tls
 def test_recovery_redis_ca_round_trips_through_one_file(monkeypatch, tmp_path):
     from config import recovery
 
@@ -1589,7 +1587,6 @@ def test_recovery_redis_ca_round_trips_through_one_file(monkeypatch, tmp_path):
     assert validated[1].parent == target.parent
 
 
-# @matrix config : certificate-validation redis-connection redis-tls settings
 def test_redis_client_kwargs_support_verified_tls(monkeypatch, tmp_path):
     from config import redis as redis_config
 
@@ -1644,7 +1641,23 @@ def test_redis_client_kwargs_support_verified_tls(monkeypatch, tmp_path):
     assert validated == [{"cafile": str(ca_bundle)}]
 
 
-# @matrix config : certificate-validation failure redis-tls
+def test_redis_connection_options_require_complete_endpoint():
+    from config.redis import redis_client_kwargs, redis_connection_kwargs
+
+    assert redis_client_kwargs({}) == {"host": None, "port": None, "password": None}
+    with pytest.raises(ValueError, match="REDIS_HOST"):
+        redis_connection_kwargs({})
+    with pytest.raises(ValueError, match="REDIS_PORT"):
+        redis_connection_kwargs({"REDIS_HOST": "cache.example"})
+    assert redis_connection_kwargs(
+        {"REDIS_HOST": "cache.example", "REDIS_PORT": "6379"},
+        socket_connect_timeout=5,
+    ) == {
+        "host": "cache.example", "port": 6379, "password": None,
+        "socket_connect_timeout": 5,
+    }
+
+
 def test_redis_tls_requires_a_valid_ca_bundle(monkeypatch, tmp_path):
     from config import redis as redis_config
 
@@ -1674,7 +1687,6 @@ def test_redis_tls_requires_a_valid_ca_bundle(monkeypatch, tmp_path):
         redis_config.redis_client_kwargs(settings, app_dir=tmp_path)
 
 
-# @matrix deploy : package-lock transactional-state utf8 version
 def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path):
     app_dir = tmp_path / "demo-app"
     config_files_dir = app_dir / "config" / "files"
@@ -1682,7 +1694,7 @@ def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path)
     (app_dir / "main.py").write_text("")
     (app_dir / "package.json").write_text(json.dumps({"version": "1.23"}))
     (app_dir / "index.yaml").write_text("indexes: []\n")
-    (app_dir / "lagniappe.yaml").write_text("runtime: python312\n")
+    (app_dir / "lagniappe.yaml").write_text("runtime: python314\n")
     (config_files_dir / "lagniappe_settings.yaml").write_text("{}\n")
     (config_files_dir / "lagniappe_dev.yaml").write_text("{}\n")
 
@@ -1753,8 +1765,6 @@ def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path)
     assert "\\u2764" not in lock_text
 
 
-# @matrix deploy : app-yaml build capture-output explicit-project failure-output index-yaml progress version
-# @matrix frontend-build : freshness no-op rebuild
 def test_deploy_modes_separate_dev_build_from_setup_publish(
     monkeypatch,
     tmp_path,
@@ -1807,6 +1817,8 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         from runner.deploy import deploy as deploy_app
 
         deploy_module = importlib.import_module("runner.deploy")
+        monkeypatch.setattr(deploy_module, "GCLOUD_CLI", None)
+        monkeypatch.setattr(deploy_module, "NPM_CLI", None)
         SETTINGS.DEPLOY["handlers"] = json.loads(
             json.dumps(deployed_constants.APP_HANDLERS)
         )
@@ -1863,7 +1875,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
 
         def fake_run_command(command, **kwargs):
             commands.append((command, kwargs))
-            if command == [deploy_module.NPM_CLI, "run", "build"]:
+            if command == ["npm", "run", "build"]:
                 package_json = json.loads(
                     (app_dir / "package.json").read_text(encoding="utf-8")
                 )
@@ -1896,7 +1908,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         assert commands == [
             (
                 [
-                    deploy_module.GCLOUD_CLI,
+                    "gcloud",
                     "app",
                     "deploy",
                     str(app_dir / "index.yaml"),
@@ -1908,7 +1920,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
             ),
             (
                 [
-                    deploy_module.GCLOUD_CLI,
+                    "gcloud",
                     "app",
                     "deploy",
                     str(app_dir / "lagniappe.yaml"),
@@ -1955,12 +1967,12 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         ]
         assert commands == [
             (
-                [deploy_module.NPM_CLI, "run", "build"],
+                ["npm", "run", "build"],
                 {"check": True, "capture_output": False},
             ),
             (
                 [
-                    deploy_module.GCLOUD_CLI,
+                    "gcloud",
                     "app",
                     "deploy",
                     str(app_dir / "lagniappe.yaml"),
@@ -2000,7 +2012,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
         assert commands == [
             (
                 [
-                    deploy_module.GCLOUD_CLI,
+                    "gcloud",
                     "app",
                     "deploy",
                     str(app_dir / "lagniappe.yaml"),
@@ -2057,8 +2069,6 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(
             runner.__dict__.pop("deploy", None)
 
 
-# @matrix config : recovery-validation site-policy
-# @source config/recovery.py::validate_recovery_document
 def test_recovery_preserves_ai_policy_without_implicitly_selecting_mcp():
     from config import recovery
     from installer.mcp import requested

@@ -1,3 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 from flask import request, session, url_for
 from flask_login import current_user
 
@@ -19,16 +29,9 @@ from lagniappe.web import direct_uploads
 from . import files
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_file_input
-# @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_drag_drop
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_opens_with_processed_csv_status
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_error_state_persists_after_reopen
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_rejects_non_csv_upload
-# @matrix ingress : drag-drop file-input non-csv process-csv reopen stage-wizard upload-counts validation
 @files.route("/ingress", methods=["GET", "POST"])
 @permission(Resource.SITE)
-def ingress(**kwargs):
+def ingress(**kwargs: object) -> ResponseReturnValue:
     if request.method == "POST":
         upload = request.files.get("ingress-file") or direct_uploads.direct_upload_file(
             "ingress-file"
@@ -50,34 +53,31 @@ def ingress(**kwargs):
         key = request.args.get("key")
         loaded = Entities.fetch(key, request=Fetch.direct())
         file = loaded[0] if loaded else None
+        if not isinstance(file, Entities.INGRESS):
+            return responses.not_found("Import not found")
         service = IngressService(file)
         try:
             service.require_supported()
         except IngressError as error:
             return responses.json_response({"error": str(error)}, 409)
         if service.stage.name == "COMPLETED":
-            removed = service.entity.prune_missing_results()
+            removed = file.prune_missing_results()
             if removed:
-                service.entity.save()
-        return responses.ingress_progress(service.entity)
+                file.save()
+        return responses.ingress_progress(file)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/files/ingress.py::ingress
-# @reason route permission mirrors the final ingress upload endpoint
 @files.route("/ingress/direct-upload", methods=["POST"])
 @permission(Resource.SITE)
-def ingress_direct(**kwargs):
+def ingress_direct(**kwargs: object) -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
-# @testable true
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_stage_navigation_reconciles_downstream_status
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_error_state_persists_after_reopen
-# @matrix ingress : error-handling persistence set-stage stage-wizard
 @files.route("/ingress/<key>/stage", methods=["PUT", "GET"])
 @permission(Resource.SITE)
-def ingress_stage(key, **kwargs):
+def ingress_stage(
+    key: str, **kwargs: Unpack[EntityContext[models.Ingress]]
+) -> ResponseReturnValue:
     file = kwargs["entity"]
     target = (
         (request.get_json(silent=True) or {}).get("stage")
@@ -85,6 +85,8 @@ def ingress_stage(key, **kwargs):
         else request.args.get("stage")
     )
     try:
+        if not isinstance(target, str):
+            raise ValueError(f"Invalid stage: {target}")
         IngressService(file).navigate(target)
     except IngressError as error:
         return responses.json_response({"error": str(error)}, 409)
@@ -93,13 +95,11 @@ def ingress_stage(key, **kwargs):
     return responses.ingress_progress(file)
 
 
-# @testable true
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-# @pair ingress:stage-wizard
 @files.route("/ingress/<key>/update", methods=["PATCH"])
 @permission(Resource.SITE)
-def ingress_update(key, **kwargs):
+def ingress_update(
+    key: str, **kwargs: Unpack[EntityContext[models.Ingress]]
+) -> ResponseReturnValue:
     file = kwargs["entity"]
     try:
         section = IngressService(file).update_current(request.form)
@@ -108,14 +108,11 @@ def ingress_update(key, **kwargs):
     return responses.json_response(section)
 
 
-# @testable true
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-# @tests tests_unit/test_006b_ingress_entity.py::test_next_advances_after_finalize
-# @matrix ingress : finalize stage-wizard
 @files.route("/ingress/<key>/next", methods=["PUT"])
 @permission(Resource.SITE)
-def ingress_next(key, **kwargs):
+def ingress_next(
+    key: str, **kwargs: Unpack[EntityContext[models.Ingress]]
+) -> ResponseReturnValue:
     file = kwargs["entity"]
     try:
         IngressService(file).advance(request.form)
@@ -124,16 +121,11 @@ def ingress_next(key, **kwargs):
     return responses.ingress_progress(file)
 
 
-# @testable true
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_importing_stage_streams_results_and_completes
-# @tests tests_unit/test_006b_ingress_entity.py::test_importer_story_processes_page_rows_into_entities_and_results
-# @matrix ingress : completed import-results stage-wizard verify-import
-# @pair ingress:row-results
 @files.route("/ingress/<key>/import", methods=["POST"])
 @permission(Resource.SITE)
-def ingress_import(key, **kwargs):
+def ingress_import(
+    key: str, **kwargs: Unpack[EntityContext[models.Ingress]]
+) -> ResponseReturnValue:
     file = kwargs["entity"]
     service = IngressService(file)
     already_active = False
@@ -155,15 +147,15 @@ def ingress_import(key, **kwargs):
         IngressRunStatus.QUEUED.value,
         IngressRunStatus.RUNNING.value,
     }:
-        return responses.ingress_progress(service.entity)
+        return responses.ingress_progress(file)
 
     if already_active:
-        return responses.ingress_progress(service.entity)
+        return responses.ingress_progress(file)
 
     if CONFIG.local:
         while service.run_status == IngressRunStatus.QUEUED.value:
             service.run_batch(limit=2)
-        return responses.ingress_progress(service.entity)
+        return responses.ingress_progress(file)
 
     task_endpoint = url_for("process.ingress", _external=True)
     payload = {
@@ -189,34 +181,32 @@ def ingress_import(key, **kwargs):
                 "file": service.entity.db,
             },
         )
-        return responses.ingress_progress(service.entity)
+        return responses.ingress_progress(file)
 
-    return responses.ingress_progress(service.entity)
+    return responses.ingress_progress(file)
 
 
-# @testable false
-# @manual true
-# @reason production remote import stop/restart depends on asynchronous importing state
-# @matrix ingress : restart stop
 @files.route("/ingress/<key>/stop", methods=["POST"])
 @permission(Resource.SITE)
-def ingress_stop(key, **kwargs):
+def ingress_stop(
+    key: str, **kwargs: Unpack[EntityContext[models.Ingress]]
+) -> ResponseReturnValue:
     file = kwargs["entity"]
     try:
+        if not isinstance(file, Entities.INGRESS):
+            return responses.not_found("Import not found")
         service = IngressService(file)
         service.stop()
     except IngressError as error:
         return responses.json_response({"error": str(error)}, 409)
-    return responses.ingress_progress(service.entity)
+    return responses.ingress_progress(file)
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/ingress.py::Ingress.delete_imported_entities
-# @reason route delegates bulk deletion to the core ingress entity and returns the standard progress payload
-# @matrix ingress : bulk-delete row-results
 @files.route("/ingress/<key>/delete-imported", methods=["GET", "DELETE"])
 @permission(Resource.SITE)
-def ingress_delete_imported(key, **kwargs):
+def ingress_delete_imported(
+    key: str, **kwargs: Unpack[EntityContext[models.Ingress]]
+) -> ResponseReturnValue:
     file = kwargs["entity"]
 
     if request.method == "GET":
@@ -229,14 +219,11 @@ def ingress_delete_imported(key, **kwargs):
     return responses.ingress_progress(file)
 
 
-# @testable true
-# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_task_page_form_lookup_updates_index_fields
-# @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_builds_or_selects_the_submission_form
-# @matrix ingress : page-form-lookup task-import
-# @pair ingress:default-form
 @files.route("/ingress/<key>/get-page-form", methods=["GET"])
 @permission(Resource.SITE)
-def ingress_get_page_form(key, **kwargs):
+def ingress_get_page_form(
+    key: str, **kwargs: Unpack[EntityContext[models.Ingress]]
+) -> ResponseReturnValue:
     file = kwargs["entity"]
     update_form_index = request.values.get("update-form-index")
     try:

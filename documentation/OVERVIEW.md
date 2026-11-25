@@ -19,7 +19,7 @@ is an optional mode described in [INFRA_EXPERIMENTS.md](INFRA_EXPERIMENTS.md).
 | Frontend application | [FRONTEND_OVERVIEW.md](FRONTEND_OVERVIEW.md) |
 | Views and widgets | [FRONTEND_VIEWS.md](FRONTEND_VIEWS.md) |
 | Synchronization | [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md) |
-| Configuration and setup | [INFRA_CONFIG.md](INFRA_CONFIG.md), [INFRA_SETUP.md](INFRA_SETUP.md), [INFRA_SETUP_CLI.md](INFRA_SETUP_CLI.md) |
+| Configuration and setup | [INFRA_CONFIG.md](INFRA_CONFIG.md), [INFRA_SETUP.md](INFRA_SETUP.md), [INSTALL_WITH_AI.md](INSTALL_WITH_AI.md), [INFRA_SETUP_CLI.md](INFRA_SETUP_CLI.md) |
 | Tests | [TESTING.md](TESTING.md), [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) |
 
 ## AI
@@ -107,8 +107,6 @@ is an optional mode described in [INFRA_EXPERIMENTS.md](INFRA_EXPERIMENTS.md).
 | [TESTING_AI_PROCESS.md](TESTING_AI_PROCESS.md) | Recorded live-model cases, paired before/after evaluation, scoring, and entry-point parity. |
 | [TESTING_SERVER.md](TESTING_SERVER.md) | Managed local server, seed packs, agent login, browser review, and teardown. |
 | [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md) | Cloud Run test job, exact-source candidate, artifacts, evidence, and teardown. |
-| [TESTING_SOURCE_REVIEW.md](TESTING_SOURCE_REVIEW.md) | Reviewing source annotations and meaningful coverage. |
-| [TESTING_TRACEABILITY_TOOL.md](TESTING_TRACEABILITY_TOOL.md) | Annotation schema, reporter modes, evidence, checks, and manifests. |
 | [TESTING_TEMPLATE_CONTRACTS.md](TESTING_TEMPLATE_CONTRACTS.md) | Macro, DOM, selector, and route evidence tracking. |
 | [TESTING_BROWSER_REVIEW.md](TESTING_BROWSER_REVIEW.md) | Curated browser-review reports, screenshots, specs, and agent workflow. |
 

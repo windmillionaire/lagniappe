@@ -1,29 +1,34 @@
 """Redis cache clients for hash-based (search) and JSON-based (filter) entity storage."""
 
+from collections.abc import Collection, Iterable, Mapping
+from contextlib import suppress
 from datetime import timedelta
+from typing import TYPE_CHECKING, cast
 
 import redis
-from redis import ResponseError
+from redis import Redis, ResponseError
+from redis.client import Pipeline
 from redis.commands.search.field import NumericField, TagField, TextField
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from redis.commands.search.result import Result
 
-from config.redis import redis_client_kwargs
-from lagniappe import CONFIG
+from config.redis import redis_connection_kwargs
+from lagniappe import CONFIG, Config
 from lagniappe.core.exceptions import capture
 from ..auth.restrictions import RESTRICTION_SOURCES
 
 from .keys import HELP_PREFIX, SEARCH_SCORE_FIELD, Keys, Search
 
 
-# @testable true
-# @tests tests_unit/test_017_cache_query.py::test_runtime_redis_client_uses_shared_tls_options
-# @matrix cache : redis-connection redis-tls
-def _create_redis_client(settings=CONFIG):
+if TYPE_CHECKING:
+    from redis.commands.json._util import JsonType
+
+
+def _create_redis_client(settings: Config = CONFIG) -> Redis:
     """Create the shared runtime Redis client from application settings."""
     client = redis.Redis(
-        **redis_client_kwargs(
+        **redis_connection_kwargs(
             settings,
             decode_responses=False,
         )
@@ -34,8 +39,6 @@ def _create_redis_client(settings=CONFIG):
     return client
 
 
-# @testable false
-# @reason used for error reporting
 def _query_context(query):
     """Extract readable context from a RediSearch Query object."""
     if isinstance(query, Query):
@@ -49,42 +52,30 @@ def _query_context(query):
     return {"query": str(query)}
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-# @pair cache:redis-connection
 class Cache:
     """Redis hash cache client with full-text search indexing."""
 
-    def __init__(self):
-        self._redis = None
+    def __init__(self) -> None:
+        self._redis: Redis | None = None
         self.INDEX = Keys.SEARCH_INDEX.value
 
-    # @testable true
-    # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-    # @pair cache:redis-connection
     @property
-    def redis(self):
+    def redis(self) -> Redis:
         """Return the Redis connection, initializing if needed."""
         if not self._redis:
             self.initialize()
 
+        assert self._redis is not None
         return self._redis
 
-    # @testable true
-    # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-    # @pair cache:redis-connection
-    def initialize(self):
+    def initialize(self) -> None:
         """Establish the Redis connection pool."""
         if self._redis:
             return
 
         self._redis = _create_redis_client()
 
-    # @testable true
-    # @tests tests_unit/test_017_cache_query.py::test_search_index_indexes_empty_requires_tags
-    # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-    # @matrix cache : empty-requires index-recreation index-schema redis-cloud search-ranking tag-syntax
-    def create_index(self):
+    def create_index(self) -> None:
         """Create the RediSearch full-text index if it doesn't exist."""
         try:
             self.redis.ft(self.INDEX).info()
@@ -110,43 +101,32 @@ class Cache:
                 score_field=SEARCH_SCORE_FIELD,
             )
             try:
-                self.redis.ft(self.INDEX).create_index(schema, definition=definition)
+                self.redis.ft(self.INDEX).create_index(list(schema), definition=definition)
             except ResponseError as error:
                 if "index already exists" not in str(error).lower():
                     raise
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/cache/utility.py::delete_cache
-    # @reason maintenance api-wrapper owned by full cache reset workflow
-    def flush(self):
+    def flush(self) -> None:
         """Flush the entire Redis database."""
         self.redis.flushdb()
 
-    # @testable false
-    # @reason api-wrapper; callers own pipeline command semantics
-    def pipeline(self):
+    def pipeline(self) -> Pipeline:
         """Return a new Redis pipeline."""
         return self.redis.pipeline()
 
-    # @testable false
-    # @reason api-wrapper; callers own key selection and deletion workflow
-    def delete(self, *keys):
+    def delete(self, *keys: str | bytes) -> None:
         """Delete one or more keys in a pipeline."""
         with self.redis.pipeline() as pipe:
             pipe.delete(*keys)
             pipe.execute()
 
-    # @testable false
-    # @reason decoded Redis get wrapper used by provider-specific cache consumers
-    def get(self, key):
+    def get(self, key: str | bytes) -> str | None:
         """Return the decoded string value for a key, or None."""
-        value = self.redis.get(key)
+        # This client is constructed with decode_responses=False.
+        value = cast(bytes | None, self.redis.get(key))
         return value.decode("utf-8") if value else None
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/cache/utility.py::check_hash
-    # @reason decoded Redis hash-field wrapper
-    def hget(self, key, field, expires=None):
+    def hget(self, key: str, field: str, expires: int | timedelta | None = None) -> str | None:
         """Return a decoded hash field value, optionally refreshing expiry."""
         with self.pipeline() as pipe:
             pipe.hget(key, field)
@@ -157,9 +137,7 @@ class Cache:
         value = result[0]
         return value.decode("utf-8") if value else None
 
-    # @testable false
-    # @reason decoded Redis hash-map wrapper retained for direct cache clients
-    def hgetall(self, key, expires=None):
+    def hgetall(self, key: str, expires: int | timedelta | None = None) -> dict[str, str]:
         """Return all hash fields as a decoded dict, optionally refreshing expiry."""
         with self.pipeline() as pipe:
             pipe.hgetall(key)
@@ -168,28 +146,19 @@ class Cache:
             result = pipe.execute()
         return {k.decode("utf-8"): v.decode("utf-8") for k, v in result[0].items()}
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/cache/utility.py::cleanup_test_data
-    # @reason api-wrapper used by test-data cleanup
-    def keys(self, pattern):
+    def keys(self, pattern: str) -> list[bytes]:
         """Return all keys matching the given pattern."""
-        return self.redis.keys(pattern)
+        return cast(list[bytes], self.redis.keys(pattern))  # Response decoding is disabled.
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/cache/utility.py::cleanup_test_data
-    # @covered-by lagniappe/core/tools/cache/utility.py::delete_cache
-    # @reason maintenance api-wrapper owned by cleanup/reset workflows
-    def drop_index(self, index):
+    def drop_index(self, index: str) -> None:
         """Drop a RediSearch index."""
         self.redis.ft(index).dropindex()
 
-    # @testable true
-    # @tests tests_unit/test_017_cache_query.py::test_cache_search_delegates_to_redisearch_client
-    # @matrix search : parser redis-cloud redis-py
-    def search(self, query):
+    def search(self, query: Query | str) -> Result:
         """Execute a RediSearch query against the primary index."""
         try:
-            return self.redis.ft(self.INDEX).search(query)
+            # A synchronous search on a client returns Result. The SDK also types pipelines and profiles here.
+            return cast(Result, self.redis.ft(self.INDEX).search(query))
         except ResponseError as e:
             capture(
                 e,
@@ -202,14 +171,10 @@ class Cache:
             )
             raise e
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/cache/details.py::get_details_by_hash
-    # @covered-by lagniappe/core/tools/cache/documents.py::poll_document
-    # @reason Redis hash api-wrapper used by detail and document-presence workflows
-    def hmget(self, key, fields):
+    def hmget(self, key: str, fields: Iterable[str]) -> list[bytes | None]:
         """Return values for multiple hash fields."""
         try:
-            return self.redis.hmget(key, fields)
+            return cast(list[bytes | None], self.redis.hmget(key, fields))  # Response decoding is disabled.
         except ResponseError as e:
             capture(
                 e,
@@ -226,38 +191,27 @@ class Cache:
 cache = Cache()
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-# @pair cache:redis-connection
 class CacheJSON:
     """Redis JSON cache client for filter and relationship data."""
 
-    def __init__(self):
-        self._redis = None
+    def __init__(self) -> None:
+        self._redis: Redis | None = None
         self.INDEX = Keys.JSON_INDEX.value
 
-    # @testable true
-    # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-    # @pair cache:redis-connection
     @property
-    def redis(self):
+    def redis(self) -> Redis:
         """Return the Redis connection, initializing if needed."""
         if not self._redis:
             self.initialize()
 
+        assert self._redis is not None
         return self._redis
 
-    # @testable true
-    # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-    # @pair cache:redis-connection
-    def initialize(self):
+    def initialize(self) -> None:
         """Bind to the shared Redis connection from the hash cache."""
         self._redis = cache.redis
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/cache/core.py::initialize
-    # @reason index setup is owned by module-level cache startup
-    def create_index(self):
+    def create_index(self) -> None:
         """Create the JSON search index if it doesn't exist."""
         try:
             self.redis.ft(self.INDEX).info()
@@ -271,36 +225,26 @@ class CacheJSON:
                 index_type=IndexType.JSON,
                 prefix=[f"{CONFIG.PREFIX}JSON:"],
             )
-            try:
-                self.redis.ft(self.INDEX).create_index(schema, definition=definition)
-            except ResponseError:
-                pass
+            with suppress(ResponseError):
+                self.redis.ft(self.INDEX).create_index(list(schema), definition=definition)
 
-    # @testable false
-    # @reason api-wrapper; currently reserved for direct JSON key deletion
-    def delete(self, key):
+    def delete(self, key: str) -> None:
         """Delete a JSON key."""
         self.redis.json().delete(key)
 
-    # @testable false
-    # @reason api-wrapper; currently used only for debugging/inspection
-    def get(self, key):
+    def get(self, key: str) -> JsonType:
         """Return the JSON value for a key."""
         return self.redis.json().get(key)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
-    # @reason JSON cache existence check owned by filter-cache workflow
-    def exists(self, key):
+    def exists(self, key: str) -> int:
         """Check whether a key exists."""
         return self.redis.exists(key)
 
-    # @testable false
-    # @reason api-wrapper; no current direct caller owns this search helper
-    def search(self, query):
+    def search(self, query: Query | str) -> Result:
         """Execute a RediSearch query against the JSON index."""
         try:
-            return self.redis.ft(self.INDEX).search(query)
+            # A synchronous search on a client returns Result. The SDK also types pipelines and profiles here.
+            return cast(Result, self.redis.ft(self.INDEX).search(query))
         except ResponseError as e:
             capture(
                 e,
@@ -313,10 +257,7 @@ class CacheJSON:
             )
             raise e
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
-    # @reason JSON document creation is owned by filter-cache population
-    def create(self, key, mapping):
+    def create(self, key: str, mapping: dict[str, JsonType]) -> None:
         """Store a JSON document with an access hash and one-day expiry."""
         parent_hash = key.split(":")[1]
         mapping["access"] = {"hash": parent_hash}
@@ -327,10 +268,7 @@ class CacheJSON:
             raise e
         self.redis.expire(key, timedelta(days=1))
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.query
-    # @reason JSONPath api-wrapper owned by filter query workflow
-    def query(self, key, json_path):
+    def query(self, key: str, json_path: str) -> JsonType:
         """Return a JSON value at a specific path within a key."""
         try:
             return self.redis.json().get(key, f"{json_path}")
@@ -338,12 +276,9 @@ class CacheJSON:
             capture(e, context={"method": "query", "key": key, "json_path": json_path})
             raise e
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
-    # @reason JSON field update is owned by filter-cache refresh workflow
-    def set(self, key, mapping):
+    def set(self, key: str, mapping: Mapping[str, JsonType]) -> None:
         """Update multiple JSON fields on a key and refresh expiry."""
-        triplets = [(key, f"$.{k}", v) for k, v in mapping.items()]
+        triplets: list[tuple[str, str, JsonType]] = [(key, f"$.{k}", v) for k, v in mapping.items()]
         if triplets:
             try:
                 self.redis.json().mset(triplets)
@@ -352,21 +287,14 @@ class CacheJSON:
                 raise e
             self.redis.expire(key, timedelta(days=1))
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
-    # @reason refresh marker query is owned by filter-cache refresh workflow
-    def refresh_needed(self, cache_key):
+    def refresh_needed(self, cache_key: str) -> list[str]:
         """Get member IDs within a specific JSON object that have refresh stubs"""
         # Use JSON path to get all members where refresh=1, then extract their ids
         refresh_members = self.redis.json().get(cache_key, "$..[?(@refresh == 1)].id")
-        return refresh_members if refresh_members else []
+        # This JSONPath selects only identifiers from persisted refresh markers.
+        return cast(list[str], refresh_members) if refresh_members else []
 
-    # @testable true
-    # @tests tests_unit/test_017_cache_query.py::test_existing_filter_parents_execute_before_pipeline_closes
-    # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_note_delete_completes_with_root_only_owners
-    # @matrix notes cache : masked-touch preserved-fields no-extra-read filter-invalidation
-    # @matrix cache : parent-index redis-protocol pipeline
-    def get_existing_parents(self, hashes):
+    def get_existing_parents(self, hashes: Collection[str]) -> dict[str, list[str]]:
         """Return a mapping of hashes to their parent JSON key IDs."""
         with self.redis.pipeline() as pipe:
             for h in hashes:
@@ -376,16 +304,13 @@ class CacheJSON:
             results = pipe.execute()
 
         parents = {}
-        for entity_hash, raw in zip(hashes, results):
+        for entity_hash, raw in zip(hashes, results, strict=True):
             result = Result.from_resp3(raw) if isinstance(raw, dict) else Result(raw, hascontent=False)
             if result.docs:
                 parents[entity_hash] = [doc.id for doc in result.docs]
         return parents
 
-    # @testable true
-    # @tests tests_unit/test_017_cache_query.py::test_json_parent_lookup_skips_empty_parent_query
-    # @matrix cache : empty-parent-lookup parent-index redis-cloud tag-syntax
-    def get_new_parents(self, parent_hashes):
+    def get_new_parents(self, parent_hashes: Iterable[str]) -> list[str]:
         """Return JSON key IDs for parents matching the given hashes."""
         parent_hashes = list(parent_hashes)
         if not parent_hashes:
@@ -400,12 +325,7 @@ class CacheJSON:
 filter_cache = CacheJSON()
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001a_environment.py::test_server_running
-# @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-# @matrix cache : cleanup index-recreation
-# @pair server:initialization
-def initialize():
+def initialize() -> None:
     """Initialize both cache clients and create their search indexes."""
     cache.initialize()
     filter_cache.initialize()

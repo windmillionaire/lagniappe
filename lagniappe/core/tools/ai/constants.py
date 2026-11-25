@@ -1,5 +1,8 @@
 """Constants for form components, input types, and supported MIME types."""
 
+THINKING_LEVELS = frozenset({"MINIMAL", "LOW", "MEDIUM", "HIGH"})
+
+
 AVAILABLE_COMPONENTS = """
 - `input`
 - `link`
@@ -83,12 +86,7 @@ GEMINI_MIMETYPE_ALIASES = {
 }
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_file_to_ai_exports_metadata_and_uri_to_ai
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_prompt_normalizes_textual_file_mimetypes_for_gemini
-# @tests tests_unit/test_020d_ai_report_prompts.py::test_summarize_report_input_files_saves_missing_summaries
-# @matrix ai files : mimetype normalization
-def gemini_mimetype(mimetype):
+def gemini_mimetype(mimetype: object) -> str | None:
     """Return the provider-supported media type for a Lagniappe MIME type."""
     mimetype = str(mimetype or "").partition(";")[0].strip().lower()
     mimetype = GEMINI_MIMETYPE_ALIASES.get(mimetype, mimetype)

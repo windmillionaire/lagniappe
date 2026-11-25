@@ -15,7 +15,6 @@ function replaceGlobal(t, name, value) {
 	});
 }
 
-/** @pairs manual:responsive-navigation startup:mobile-only-dropdown */
 test("test_manual_dropdown_loads_only_in_mobile_mode", async (t) => {
 	let mobileMode = false;
 	const window = {
@@ -35,14 +34,14 @@ test("test_manual_dropdown_loads_only_in_mobile_mode", async (t) => {
 		}
 	}
 	const { default: Manual } = await esmock.strict(
-		"../../src/script/views/manual.mjs",
+		"../../src/script/views/manual.ts",
 		{
-			"../../src/script/shared/endpoints.mjs": { ENDPOINTS: { manual: {} } },
-			"../../src/script/shared/request.mjs": { request: {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/endpoints.ts": { ENDPOINTS: { manual: {} } },
+			"../../src/script/shared/request.ts": { request: {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
-			"../../src/script/views/base/shell.mjs": { default: ShellView },
+			"../../src/script/views/base/shell.ts": { default: ShellView },
 		},
 	);
 	const createRoot = () => {
@@ -81,7 +80,6 @@ test("test_manual_dropdown_loads_only_in_mobile_mode", async (t) => {
 	assert.equal(mobileLoads, 1);
 });
 
-/** @matrix manual admin : clipboard-fallback command-copy */
 test("test_command_copy_falls_back_when_clipboard_is_unavailable", async (t) => {
 	let copied = null;
 	let textarea = null;
@@ -117,9 +115,9 @@ test("test_command_copy_falls_back_when_clipboard_is_unavailable", async (t) => 
 	replaceGlobal(t, "document", document);
 	replaceGlobal(t, "navigator", navigator);
 	const { default: ShellView } = await esmock.strict(
-		"../../src/script/views/base/shell.mjs",
+		"../../src/script/views/base/shell.ts",
 		{
-			"../../src/script/shared/connectivity.mjs": {
+			"../../src/script/shared/connectivity.ts": {
 				connectivity: { online: true, hidden: false },
 			},
 		},
@@ -151,7 +149,6 @@ test("test_command_copy_falls_back_when_clipboard_is_unavailable", async (t) => 
 	assert.equal(attributes.get("aria-label"), "Command copied");
 });
 
-/** @matrix table-controls : eager-column-state lazy-checkbox-panel persistence */
 test("test_column_visibility_state_applies_before_lazy_panel", async (t) => {
 	const storage = new Map([["columns-tasks", "[2]"]]);
 	let toggleListener = null;
@@ -173,7 +170,7 @@ test("test_column_visibility_state_applies_before_lazy_panel", async (t) => {
 	}))
 		replaceGlobal(t, name, value);
 	const { TableVisibilityState } = await import(
-		"../../src/script/widgets/tables/visibilityState.mjs"
+		"../../src/script/widgets/tables/visibilityState.ts"
 	);
 	const headers = ["name", "status", "owner"].map((column) => ({
 		dataset: { column },
@@ -213,7 +210,6 @@ test("test_column_visibility_state_applies_before_lazy_panel", async (t) => {
 	assert.equal(toggleListener, null);
 });
 
-/** @matrix pages : photo-lazy-activation photo-visible-startup */
 test("test_page_photo_initializes_only_when_selected_or_visible", async (t) => {
 	const storage = new Map();
 	const localStorage = {
@@ -238,13 +234,13 @@ test("test_page_photo_initializes_only_when_selected_or_visible", async (t) => {
 		}
 	}
 	const { default: Page } = await esmock.strict(
-		"../../src/script/views/page.mjs",
+		"../../src/script/views/page.ts",
 		{
-			"../../src/script/shared/icons.mjs": { setIcon() {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/icons.ts": { setIcon() {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
-			"../../src/script/views/base/entity.mjs": { default: Entity },
+			"../../src/script/views/base/entity.ts": { default: Entity },
 		},
 	);
 	const photo = {};
@@ -276,7 +272,6 @@ test("test_page_photo_initializes_only_when_selected_or_visible", async (t) => {
 	assert.equal(selected.activations(), 0);
 });
 
-/** @matrix ai-report : concurrent-form-init lazy-form-runtime */
 test("test_report_loads_base_form_only_for_present_forms_and_in_parallel", async (t) => {
 	const events = [];
 	const pending = new Map();
@@ -300,18 +295,18 @@ test("test_report_loads_base_form_only_for_present_forms_and_in_parallel", async
 	const window = { addEventListener() {} };
 	replaceGlobal(t, "window", window);
 	const { default: Report } = await esmock.strict.p(
-		"../../src/script/views/report.mjs",
+		"../../src/script/views/report.ts",
 		{
-			"../../src/script/shared/icons.mjs": {
+			"../../src/script/shared/icons.ts": {
 				createIcon() {},
 				setIcon() {},
 			},
-			"../../src/script/shared/request.mjs": { request: {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/request.ts": { request: {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
-			"../../src/script/views/base/core.mjs": { default: Core },
-			"../../src/script/forms/controller.mjs": {
+			"../../src/script/views/base/core.ts": { default: Core },
+			"../../src/script/forms/controller.ts": {
 				FormController: FakeBaseForm,
 			},
 		},

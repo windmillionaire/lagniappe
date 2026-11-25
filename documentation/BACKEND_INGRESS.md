@@ -126,7 +126,7 @@ failure is persisted as `failed`. Redis is not part of the execution authority.
 
 The progress response contains `stage`, `run_status`, `processed`, `total`,
 `error`, `stopped`, allowed `actions`, `poll_after_ms`, and rendered progress
-and status HTML. `widgets/ingress.mjs` uses the allowed actions and run status
+and status HTML. `widgets/ingress.ts` uses the allowed actions and run status
 for start/stop/restart/polling; stage-specific browser branches only initialize
 DOM controls.
 

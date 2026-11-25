@@ -1,5 +1,11 @@
 """Function declaration and handler for loading a page's tasks."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch
@@ -21,7 +27,7 @@ GET_PAGE_TASKS = types.FunctionDeclaration(
         "Reuse sufficient search/list evidence; a duplicate check does not require both. "
         "Omit compact for the existing full task details."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "view": {"type": "string", "enum": ["default", "edit"]},
@@ -40,18 +46,13 @@ GET_PAGE_TASKS = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_page_tasks_returns_active_and_completed_tasks
-# @matrix ai tasks : active completed page-task-context
-# @matrix ai tasks : compact pagination permissions
-# @tests tests_unit/test_015f_ai_task_lists.py::test_compact_tasks_*
-def execute_get_page_tasks(args, user):
+def execute_get_page_tasks(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
-    if not identifier:
+    if not isinstance(identifier, str) or not identifier:
         return {"error": "id is required"}
 
     page = Entities.fetch_one(identifier, request=Fetch.direct())

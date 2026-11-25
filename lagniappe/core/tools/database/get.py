@@ -1,27 +1,49 @@
 """Datastore read queries for all entity types."""
 
-from datetime import datetime, timedelta, timezone
+from collections.abc import Iterable, Iterator
+from datetime import datetime, timedelta, UTC
+from typing import Literal, Protocol, TypedDict, Unpack, cast, overload
 
 from google.cloud.datastore import Entity, Key
 
-from ...restrictions import Restriction
+from ...restrictions import QueryHashes, Restriction
 from .core import DATA, KINDS
 from .filter import Filter, Query, Results
 from config.datastore import decode_urlsafe_key, encode_urlsafe_key
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_empty_results_has_no_items_or_cursor
-# @matrix database : empty-page restricted-results
-def _empty_results():
+class _Keyed(Protocol):
+    @property
+    def key(self) -> Key | None: ...
+
+
+type Identifier = Key | _Keyed | str | None
+
+
+class TaskFilters(TypedDict, total=False):
+    project: Identifier
+    model: Identifier
+    hashes: QueryHashes | None
+    completed: bool
+    assigned_to: Identifier
+
+
+def _empty_results() -> Results[Entity]:
     return Results([], None)
 
 
 # --- Keys ---
 
 
-# @testable infrastructure
-def urlsafe_key(identifier):
+@overload
+def urlsafe_key(identifier: Key) -> str: ...
+
+
+@overload
+def urlsafe_key(identifier: object) -> str | None: ...
+
+
+def urlsafe_key(identifier: object) -> str | None:
     """Convert an identifier to its URL-safe base64 key string."""
     key = datastore_key(identifier)
     if key:
@@ -30,17 +52,15 @@ def urlsafe_key(identifier):
     return None
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_datastore_key_decodes_without_runtime_rebinding
-# @pair database:named-key-encoding
-def datastore_key(identifier):
+def datastore_key(identifier: object) -> Key | None:
     """Resolve a live key, keyed entity, or urlsafe string without rebinding."""
     if identifier is None:
         return None
     elif isinstance(identifier, Key):
         return identifier
     elif hasattr(identifier, "key"):
-        return identifier.key
+        # Framework entities and SDK records both expose their own key.
+        return cast(_Keyed, identifier).key
     elif isinstance(identifier, str):
         try:
             return decode_urlsafe_key(identifier)
@@ -49,8 +69,7 @@ def datastore_key(identifier):
     return None
 
 
-# @testable infrastructure
-def is_urlsafe_key(identifier):
+def is_urlsafe_key(identifier: str | bytes) -> bool:
     """Return True if the identifier is a valid URL-safe Datastore key."""
     try:
         decode_urlsafe_key(identifier)
@@ -62,8 +81,7 @@ def is_urlsafe_key(identifier):
 # --- Entities ---
 
 
-# @testable infrastructure
-def entity(identifier):
+def entity(identifier: Identifier) -> Entity | None:
     """Fetch a single Datastore entity by key, entity, or URL-safe string."""
     if isinstance(identifier, Entity):
         return identifier
@@ -73,17 +91,14 @@ def entity(identifier):
     return DATA.datastore.get(key) if key else None
 
 
-# @testable false
-# @reason reserved model lookup is persistence-owned and covered by setup/E2E flows
-def reserved(kind=None):
+def reserved(kind: str | None = None) -> Entity | dict[str, Entity]:
     """Return reserved models, optionally filtered to a single kind by type."""
     results = Query(KINDS.models).filter(Filter().eq("reserved", True)).fetch_all()
     reserved = {m["type"]: m for m in results}
     return reserved[kind] if kind else reserved
 
 
-# @testable infrastructure
-def entities(*keys):
+def entities(*keys: Identifier | list[Key] | set[Key]) -> list[Entity]:
     """Fetch multiple entities by keys, accepting keys, lists, or sets."""
     if not keys:
         return []
@@ -97,26 +112,22 @@ def entities(*keys):
         elif key:
             all_keys.add(datastore_key(key))
 
-    all_keys = [k for k in all_keys if k]
-    if not all_keys:
+    valid_keys = [k for k in all_keys if k]
+    if not valid_keys:
         return []
 
-    return DATA.datastore.get_multi(all_keys)
+    return DATA.datastore.get_multi(valid_keys)
 
 
 # --- Users ---
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def user(email):
+def user(email: str) -> Entity | None:
     """Fetch a single user entity by email address."""
     return Query(KINDS.users).filter(Filter().eq("email", email)).fetch_one()
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def users(start_cursor=None, hashes=Restriction.UNRESTRICTED, group=None, limit=25):
+def users(start_cursor: str | None = None, hashes: QueryHashes | None = Restriction.UNRESTRICTED, group: Key | None = None, limit: int | None = 25) -> Results[Entity]:
     """Fetch a paginated list of users, optionally filtered by hashes or group."""
     if Restriction.is_denied(hashes):
         return _empty_results()
@@ -137,10 +148,7 @@ def users(start_cursor=None, hashes=Restriction.UNRESTRICTED, group=None, limit=
     return q.fetch()
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_groups_with_denied_hashes_does_not_query_datastore
-# @matrix database permissions : deny-all group-query
-def groups(hashes=Restriction.UNRESTRICTED):
+def groups(hashes: QueryHashes = Restriction.UNRESTRICTED) -> list[Entity]:
     """Fetch all group models, optionally restricted to the given hashes."""
     return (
         Query(KINDS.models)
@@ -149,9 +157,7 @@ def groups(hashes=Restriction.UNRESTRICTED):
     )
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def public_group():
+def public_group() -> Entity | None:
     """Fetch the built-in public group model."""
     public = (
         Query(KINDS.models)
@@ -168,9 +174,7 @@ def public_group():
     )
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def group_view_access(hashes):
+def group_view_access(hashes: list[str] | str) -> list[Entity]:
     """Fetch all groups that have view access to the given hashes."""
     if Restriction.is_denied(hashes):
         return []
@@ -188,9 +192,24 @@ def group_view_access(hashes):
 # --- Home ---
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def models(model_type, start_cursor=None, limit=10, hashes=Restriction.UNRESTRICTED):
+@overload
+def models(
+    model_type: str, start_cursor: str | None = None, limit: Literal[10] = 10,
+    hashes: QueryHashes = Restriction.UNRESTRICTED,
+) -> Results[Entity]: ...
+
+
+@overload
+def models(
+    model_type: str, start_cursor: str | None = None, limit: int | None = 10,
+    hashes: QueryHashes = Restriction.UNRESTRICTED,
+) -> Results[Entity] | list[Entity]: ...
+
+
+def models(
+    model_type: str, start_cursor: str | None = None, limit: int | None = 10,
+    hashes: QueryHashes = Restriction.UNRESTRICTED,
+) -> Results[Entity] | list[Entity]:
     """Fetch active models of a given type with optional pagination."""
     if Restriction.is_denied(hashes):
         return _empty_results() if limit else []
@@ -214,9 +233,8 @@ def models(model_type, start_cursor=None, limit=10, hashes=Restriction.UNRESTRIC
     )
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def recent_pages(start_cursor=None, limit=10, hashes=Restriction.UNRESTRICTED):
+def recent_pages(start_cursor: str | None = None, limit: int = 10,
+                 hashes: QueryHashes = Restriction.UNRESTRICTED) -> Results[Entity]:
     """Fetch recent active pages with optional permission restrictions."""
     if Restriction.is_denied(hashes):
         return _empty_results()
@@ -231,9 +249,7 @@ def recent_pages(start_cursor=None, limit=10, hashes=Restriction.UNRESTRICTED):
     )
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def category_by_name(name):
+def category_by_name(name: str) -> Entity | None:
     """Fetch an active category model by exact name."""
     return (
         Query(KINDS.models)
@@ -242,16 +258,12 @@ def category_by_name(name):
     )
 
 
-# @testable false
-# @reason maintenance iterator is persistence-owned and covered by maintenance/E2E workflows
-def all_models():
+def all_models() -> Iterator[Entity]:
     """Iterate over all active models."""
     return Query(KINDS.models).filter(Filter().eq("active", True)).fetch_iter()
 
 
-# @testable false
-# @reason maintenance iterator is persistence-owned and covered by maintenance/E2E workflows
-def all_categories():
+def all_categories() -> Iterator[Entity]:
     """Iterate over all active category models."""
     return (
         Query(KINDS.models)
@@ -260,9 +272,7 @@ def all_categories():
     )
 
 
-# @testable false
-# @reason maintenance iterator is persistence-owned and covered by maintenance/E2E workflows
-def all_projects():
+def all_projects() -> Iterator[Entity]:
     """Iterate over all active project models."""
     return (
         Query(KINDS.models)
@@ -271,16 +281,12 @@ def all_projects():
     )
 
 
-# @testable false
-# @reason maintenance iterator is persistence-owned and covered by maintenance/E2E workflows
-def all_instances():
+def all_instances() -> Iterator[Entity]:
     """Iterate over all active instances."""
     return Query(KINDS.instances).fetch_iter()
 
 
-# @testable false
-# @reason maintenance iterator is persistence-owned and covered by maintenance/E2E workflows
-def all_pages():
+def all_pages() -> Iterator[Entity]:
     """Iterate over all active page instances."""
     return (
         Query(KINDS.instances)
@@ -289,16 +295,12 @@ def all_pages():
     )
 
 
-# @testable false
-# @reason maintenance iterator is persistence-owned and covered by maintenance/E2E workflows
-def all_files():
+def all_files() -> Iterator[Entity]:
     """Iterate over all file entities."""
     return Query(KINDS.files).fetch_iter()
 
 
-# @testable false
-# @reason maintenance iterator is persistence-owned and covered by maintenance/E2E workflows
-def all_users():
+def all_users() -> Iterator[Entity]:
     """Iterate over all user entities."""
     return Query(KINDS.users).fetch_iter()
 
@@ -306,9 +308,7 @@ def all_users():
 # --- Pages ---
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def public_pages(public_id):
+def public_pages(public_id: str) -> list[Entity]:
     """Fetch all page instances sharing a public_id."""
     return (
         Query(KINDS.instances)
@@ -317,9 +317,7 @@ def public_pages(public_id):
     )
 
 
-# @testable false
-# @reason sitemap query recipe is persistence-owned and covered by public-route tests
-def discoverable_page_rows():
+def discoverable_page_rows() -> list[Entity]:
     """Fetch candidate public rows; callers enforce active/type/page settings."""
     return (
         Query(KINDS.instances)
@@ -328,15 +326,25 @@ def discoverable_page_rows():
     )
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
+@overload
+def pages(category_key: Key, form: _Keyed | None = None, start_cursor: str | None = None,
+          limit: int | None = 25, hashes: QueryHashes = Restriction.UNRESTRICTED) -> Results[Entity]: ...
+
+@overload
+def pages(category_key: object, form: _Keyed | None = None, start_cursor: str | None = None,
+          limit: Literal[25] = 25, hashes: QueryHashes = Restriction.UNRESTRICTED) -> Results[Entity]: ...
+
+@overload
+def pages(category_key: object, form: _Keyed | None = None, start_cursor: str | None = None,
+          limit: int | None = 25, hashes: QueryHashes = Restriction.UNRESTRICTED) -> Results[Entity] | list[Entity]: ...
+
 def pages(
-    category_key,
-    form=None,
-    start_cursor=None,
-    limit=25,
-    hashes=Restriction.UNRESTRICTED,
-):
+    category_key: object,
+    form: _Keyed | None = None,
+    start_cursor: str | None = None,
+    limit: int | None = 25,
+    hashes: QueryHashes = Restriction.UNRESTRICTED,
+) -> Results[Entity] | list[Entity]:
     """Fetch paginated pages belonging to a category."""
     if Restriction.is_denied(hashes):
         return _empty_results()
@@ -380,9 +388,7 @@ def pages(
 # --- Files ---
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def page_files(page_key):
+def page_files(page_key: Identifier) -> list[Entity]:
     """Fetch Files owned directly by the Page."""
     return (
         Query(KINDS.files)
@@ -391,9 +397,7 @@ def page_files(page_key):
     )
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def ingress_files():
+def ingress_files() -> list[Entity]:
     """Fetch all file entities with type 'ingress'."""
     return Query(KINDS.files).filter(Filter().eq("type", "ingress")).fetch_all()
 
@@ -401,9 +405,7 @@ def ingress_files():
 # --- Projects ---
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def model_tasks(project):
+def model_tasks(project: _Keyed) -> list[Entity]:
     """Fetch all task model entities that are children of a project."""
     return (
         Query(KINDS.models)
@@ -416,20 +418,16 @@ def model_tasks(project):
 # --- Tasks ---
 
 # Lower bound so ``>=`` matches only instances that have ``due_date`` indexed.
-_TASK_DUE_MIN = datetime(1, 1, 1, tzinfo=timezone.utc)
+_TASK_DUE_MIN = datetime(1, 1, 1, tzinfo=UTC)
 
 
-# @testable true
-# @tests tests_unit/test_010_task_index.py::test_task_query_filter_uses_completed_status_not_active_status
-# @tests tests_unit/test_010_task_index.py::test_task_query_filter_includes_assignee_visibility_branch
-# @matrix task-index : active assignee-visibility completed query-filter
 def _tasks_filter(
-    project=None,
-    model=None,
-    hashes=None,
-    completed=False,
-    assigned_to=None,
-):
+    project: Identifier = None,
+    model: Identifier = None,
+    hashes: QueryHashes | None = None,
+    completed: bool = False,
+    assigned_to: Identifier = None,
+) -> Filter:
     f = Filter().eq("type", "task").eq("active", True).eq("completed", completed)
     if model:
         f.eq("model", datastore_key(model))
@@ -454,9 +452,9 @@ def _tasks_filter(
     return f
 
 
-# @testable false
-# @reason task index query recipe is persistence-owned and covered by route/E2E workflows
-def tasks(start_cursor=None, limit=25, **kwargs):
+def tasks(
+    start_cursor: str | None = None, limit: int | None = 25, **kwargs: Unpack[TaskFilters]
+) -> Results[Entity]:
     """Fetch paginated task instances with optional model, project, and completion filters."""
     if (
         Restriction.is_denied(kwargs.get("hashes"))
@@ -481,10 +479,9 @@ def tasks(start_cursor=None, limit=25, **kwargs):
     return q.fetch()
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/index.py::TaskIndex.dated_tasks
-# @reason task index query recipe is persistence-owned and covered by route/E2E workflows
-def tasks_with_due_dates(start_cursor=None, limit=25, **kwargs):
+def tasks_with_due_dates(
+    start_cursor: str | None = None, limit: int | None = 25, **kwargs: Unpack[TaskFilters]
+) -> Results[Entity]:
     """Paginate incomplete active tasks that have a due date, ordered soonest first."""
     if (
         Restriction.is_denied(kwargs.get("hashes"))
@@ -510,10 +507,9 @@ def tasks_with_due_dates(start_cursor=None, limit=25, **kwargs):
     return q.fetch()
 
 
-# @testable false
-# @covered-by lagniappe/core/entities/index.py::TaskIndex.undated_tasks
-# @reason task index query recipe is persistence-owned and covered by route/E2E workflows
-def tasks_without_due_dates(start_cursor=None, limit=25, **kwargs):
+def tasks_without_due_dates(
+    start_cursor: str | None = None, limit: int | None = 25, **kwargs: Unpack[TaskFilters]
+) -> Results[Entity]:
     """Paginate tasks with no due date, most recently modified first."""
     if (
         Restriction.is_denied(kwargs.get("hashes"))
@@ -539,9 +535,7 @@ def tasks_without_due_dates(start_cursor=None, limit=25, **kwargs):
     return q.fetch()
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def page_tasks(page):
+def page_tasks(page: _Keyed) -> list[Entity]:
     """Fetch all tasks linked to, owned by, or assigned to a page."""
     f = Filter().any_of(
         Filter().eq("type", "task").eq("linked_pages", page.key),
@@ -552,9 +546,7 @@ def page_tasks(page):
     return Query(KINDS.instances).filter(f).fetch_all()
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def page_tasks_with_history(page):
+def page_tasks_with_history(page: _Keyed) -> list[Entity]:
     """Fetch Task and TaskHistory rows whose owning ``page`` is this Page."""
     f = Filter().eq("type", "task").eq("page", page.key)
     tasks = Query(KINDS.instances).filter(f).fetch_all()
@@ -565,10 +557,7 @@ def page_tasks_with_history(page):
     return tasks + history
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002o_home_task_count.py::test_user_task_count_aggregates_owned_and_assigned_tasks_once
-# @matrix home : task-count ownership assignment deduplication
-def user_task_count(page):
+def user_task_count(page: _Keyed) -> int:
     """Count tasks owned by or assigned to a page."""
     f = Filter().any_of(
         Filter()
@@ -586,15 +575,12 @@ def user_task_count(page):
     return Query(KINDS.instances).filter(f).count()
 
 
-# @testable true
-# @tests tests_unit/test_010_task_index.py::test_due_tasks_does_not_add_requires_filter_for_unrestricted
-# @matrix home task-index : due-tasks restrictions unrestricted
-def due_tasks(hashes=Restriction.UNRESTRICTED, assigned_to=None):
+def due_tasks(hashes: QueryHashes = Restriction.UNRESTRICTED, assigned_to: Identifier = None) -> list[Entity]:
     """Fetch incomplete active tasks due within the next seven days."""
     if Restriction.is_denied(hashes) and assigned_to is None:
         return []
 
-    today = datetime.now(timezone.utc)
+    today = datetime.now(UTC)
     next_week = today + timedelta(days=7)
 
     f = _tasks_filter(
@@ -607,24 +593,17 @@ def due_tasks(hashes=Restriction.UNRESTRICTED, assigned_to=None):
     return Query(KINDS.instances).filter(f).order("due_date").fetch_all()
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def task_history(task):
+def task_history(task: _Keyed) -> list[Entity]:
     """Fetch all history entries for a task."""
     return Query(KINDS.history).ancestor(task.key).fetch_all()
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tasks/main.py::latest_history_submission
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def latest_task_history(task):
+def latest_task_history(task: _Keyed) -> Entity | None:
     """Fetch the most recent history entry for a task."""
     return Query(KINDS.history).ancestor(task.key).order("-created").fetch_one()
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def document_history(entity):
+def document_history(entity: _Keyed) -> list[Entity]:
     """Fetch direct document-history children for an entity."""
     rows = (
         Query(KINDS.history)
@@ -632,15 +611,14 @@ def document_history(entity):
         .filter(Filter().eq("type", "document_history"))
         .fetch_all()
     )
-    return [row for row in rows if row.key.parent == entity.key]
+    # Datastore assigns a key to every persisted query result.
+    return [row for row in rows if cast(Key, row.key).parent == entity.key]
 
 
 # --- Filters ---
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def filters(entity, user_key=None):
+def filters(entity: Identifier, user_key: Identifier = None) -> list[Entity]:
     """Fetch saved filters for an entity, optionally scoped to a user."""
     entity_key = datastore_key(entity)
     user_key = datastore_key(user_key) or user_key
@@ -658,9 +636,7 @@ def filters(entity, user_key=None):
 # --- Forms ---
 
 
-# @testable false
-# @reason form index query recipe is persistence-owned and covered by route/E2E workflows
-def forms(start_cursor=None, limit=25):
+def forms(start_cursor: str | None = None, limit: int | None = 25) -> Results[Entity]:
     """Fetch a paginated list of active form models."""
     f = Filter().eq("type", "form").eq("active", True)
     return (
@@ -673,13 +649,7 @@ def forms(start_cursor=None, limit=25):
     )
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_form_users_filters_references_and_preserves_owner_set
-# @tests tests_unit/test_018_database_utility.py::test_form_users_bounds_batches_and_deduplicates_owners
-# @tests tests_unit/test_018_database_utility.py::test_form_users_empty_input_does_not_read
-# @tests tests_e2e/003_forms/test_003h_form_references.py::test_form_reference_lookup_matches_primary_secondary_and_batched_owners
-# @matrix forms database : reference-query primary-secondary batching owner-deduplication empty-input
-def form_users(*forms):
+def form_users(*forms: _Keyed) -> list[Entity]:
     """Find categories and models that reference any of the given forms."""
     form_keys = list(dict.fromkeys(f.key for f in forms))
     if not form_keys:
@@ -700,14 +670,12 @@ def form_users(*forms):
                 continue
             parents[model.key] = model
             if model.get("type") == "model":
-                project_keys.add(model.key.parent)
+                project_keys.add(cast(Key, model.key).parent)
 
     return list(parents.values()) + entities(list(project_keys))
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
-def form_instance_users(form_key):
+def form_instance_users(form_key: Key) -> list[Entity]:
     """Fetch all instances that reference a given form."""
     return Query(KINDS.instances).filter(Filter().eq("form", form_key)).fetch_all()
 
@@ -715,10 +683,7 @@ def form_instance_users(form_key):
 # --- Activity ---
 
 
-# @testable true
-# @tests tests_unit/test_002j_notes.py::test_activity_query_filters_requested_types
-# @matrix activity : ancestor query multi-type type-order
-def activity(parent, types=("note", "notification")):
+def activity(parent: Identifier, types: str | Iterable[str] | None = ("note", "notification")) -> list[Entity]:
     """Fetch activity items belonging to ``parent``."""
     parent_key = datastore_key(parent)
     if not parent_key:
@@ -740,11 +705,7 @@ def activity(parent, types=("note", "notification")):
     )
 
 
-# @testable true
-# @tests tests_unit/test_002j_notes.py::test_home_notes_return_only_visible_notes
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_note_visibility_across_users
-# @matrix activity notes permissions : home ordering owner private shared
-def home_notes(user):
+def home_notes(user: Identifier) -> list[Entity]:
     """Fetch Home-scope notes visible to ``user``."""
     note_filter = Filter().eq("type", "note").eq("scope", "home")
     notes = Query(KINDS.activity).filter(note_filter).order("-created").fetch_all()
@@ -760,25 +721,16 @@ def home_notes(user):
     return notes
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/get.py::home_notes
-# @reason compatibility alias keeps the Home property contract focused on notes
-def notes(user):
+def notes(user: Identifier) -> list[Entity]:
     return home_notes(user)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/notes.py::get_notes
-# @reason page note query reuses the indexed ancestor activity recipe
-def page_notes(page):
+def page_notes(page: Identifier) -> list[Entity]:
     """Fetch notes attached to a Page."""
     return activity(page, types="note")
 
 
-# @testable false
-# @covered-by lagniappe/core/mutations/delete.py::DeleteCollector.user_notes
-# @reason user-deletion lookup is exercised through the delete mutation plan
-def notes_by_user(user):
+def notes_by_user(user: Identifier) -> list[Entity]:
     """Fetch notes authored by ``user`` across Home and Page surfaces."""
     user_key = datastore_key(user)
     if not user_key:
@@ -792,18 +744,24 @@ def notes_by_user(user):
     ]
 
 
-# @testable true
-# @tests tests_unit/test_002i_home_properties.py::test_home_note_ingress_and_tool_lists_load_database_entities
-# @matrix ai-report home : list query
-def ai_reports(user_key):
-    """Fetch AI report activity records belonging to a user."""
-    return activity(user_key, types=("report",))
+def ai_reports(user_key: Identifier, *, start_cursor: str | None = None, limit: int | None = 10) -> Results[Entity]:
+    """Fetch paginated AI report activity records belonging to a user."""
+    parent_key = datastore_key(user_key)
+    if not parent_key:
+        return _empty_results()
+
+    return (
+        Query(KINDS.activity)
+        .ancestor(parent_key)
+        .filter(Filter().eq("type", "report"))
+        .order("-created")
+        .limit(limit)
+        .cursor(start_cursor)
+        .fetch()
+    )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/tools/preview.py::api_plan_preview
-# @reason creator-scoped hash lookup is exercised through the browser redirect route
-def ai_report_by_hash(user_key, report_hash):
+def ai_report_by_hash(user_key: Identifier, report_hash: str) -> Entity | None:
     """Fetch one activity record by public hash beneath the given user."""
     parent_key = datastore_key(user_key)
     report_hash = str(report_hash or "").strip()
@@ -817,14 +775,10 @@ def ai_report_by_hash(user_key, report_hash):
     )
 
 
-# @testable false
-# @reason persistence-owned query used by ownership mutation workflows
-def task_files(task_key):
+def task_files(task_key: Identifier) -> list[Entity]:
     return Query(KINDS.files).filter(Filter().eq("task", datastore_key(task_key))).fetch_all()
 
 
-# @testable false
-# @reason persistence-owned query used by File deletion and history cleanup
-def file_references(file_key):
+def file_references(file_key: Identifier) -> list[Entity]:
     return [row for kind in (KINDS.instances, KINDS.history)
             for row in Query(kind).filter(Filter().eq("files", datastore_key(file_key))).fetch_all()]

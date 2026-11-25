@@ -1,3 +1,6 @@
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, cast
+
 from ..definitions import Fetch, MutationIntent, Ordering
 from ..entities import Entities
 from ..mixins import (
@@ -8,13 +11,17 @@ from ..mixins import (
 )
 from .base_db import DBProperty
 
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
 
-# @testable true
-# @tests tests_unit/test_009a_user.py::test_user_groups_membership_changes_recalculate_permissions
-# @tests tests_unit/test_009a_user.py::test_user_groups_reject_invalid_relation_inputs
-# @tests tests_unit/test_009a_user.py::test_public_user_groups_force_public_group_only
-# @matrix user-groups : membership-change permission-recalc public-group-only public-user relation-storage sync validation
-class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
+    from ..entities.category import UserCategory
+    from ..entities.entity import Entity
+    from ..entities.group import UserGroup
+    from ..entities.page import Page, PageData
+    from ..entities.user import User as User
+
+
+class Groups(RelatedEntityListMixin["UserGroup"], FilterMixin, ColumnMixin, DBProperty[list["UserGroup"], "User"]):
     """Groups a user belongs to.
 
     Changing group membership triggers a permission recalculation.
@@ -34,15 +41,15 @@ class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
     _icon = "group"
 
     @property
-    def value(self):
-        value = RelatedEntityListMixin.value.fget(self)
+    def value(self) -> list[UserGroup]:
+        value = self._read_related_list()
         if self.entity.is_public and not self._is_public_only(value):
             value = [self._public_group(value)]
-            RelatedEntityListMixin.value.fset(self, value)
+            self._write_related_list(value)
         return value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: list[UserGroup] | None) -> None:
         if value is not None and not isinstance(value, list):
             raise TypeError("Value must be a list")
 
@@ -54,20 +61,20 @@ class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
             if not getattr(group, "key", None):
                 raise ValueError("Value must have a key")
 
-        existing = [g.key for g in RelatedEntityListMixin.value.fget(self)]
+        existing = [g.key for g in self._read_related_list()]
         new = [g.key for g in value]
 
-        if not set(existing) == set(new):
-            RelatedEntityListMixin.value.fset(self, value)
+        if set(existing) != set(new):
+            self._write_related_list(value)
             self.entity.properties.permissions.create()
 
     # DB Attributes
-    def add(self, value):
+    def add(self, value: UserGroup) -> bool | None:
         if not getattr(value, "key", None):
             raise ValueError("Value must have a key")
 
         if self.entity.is_public:
-            existing_value = RelatedEntityListMixin.value.fget(self)
+            existing_value = self._read_related_list()
             public_group = self._public_group(existing_value)
             existing = [g.key for g in existing_value]
             self.value = [public_group]
@@ -76,17 +83,17 @@ class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
         if super().add(value):
             self.entity.properties.permissions.create()
 
-    def _public_group(self, value=None):
+    def _public_group(self, value: list[UserGroup] | None = None) -> UserGroup:
         for group in value or []:
             if self._is_public_group(group):
                 return group
         return Entities.PUBLIC_GROUP.get()
 
-    def _is_public_only(self, value):
+    def _is_public_only(self, value: list[UserGroup]) -> bool:
         return len(value) == 1 and self._is_public_group(value[0])
 
     @staticmethod
-    def _is_public_group(group):
+    def _is_public_group(group: UserGroup) -> bool:
         return (
             getattr(group, "kind", None) == "public_group"
             or getattr(group, "entity_kind", None) == "public_group"
@@ -94,14 +101,7 @@ class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
         )
 
 
-# @testable true
-# @tests tests_unit/test_009a_user.py::test_user_page_auto_create_lazy_load_and_owner_link
-# @tests tests_unit/test_009a_user.py::test_user_page_missing_key_raises_runtime_error
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_reassign_and_remove_user_from_page
-# @matrix user : auto-create lazy-load owner-link personal-page public-user validation
-# @matrix public-users : auto-create lazy-load owner-link public-user
-# @pair user-settings:page-remove
-class UserPage(RelatedEntityMixin, DBProperty):
+class UserPage(RelatedEntityMixin["Page"], DBProperty["Page", "User"]):
     """The page entity associated with a user.
 
     Auto-created if not provided. The user entity handles auth and
@@ -117,61 +117,57 @@ class UserPage(RelatedEntityMixin, DBProperty):
 
     # Property Attributes
     _id = "page"
+    _value: object
 
     @property
-    def value(self):
+    def value(self) -> Page:
         if self.is_set:
-            return self._value
+            return cast("Page", self._value)
 
         key = self.entity.db.get(self.id)
         if not key:
             raise RuntimeError("User page key not found")
-        self._value = Entities.fetch_one(key, request=Fetch.direct())
-        self._value.user = self.entity
+        page = cast("Page", Entities.fetch_one(cast("Key | str", key), request=Fetch.direct()))
+        self._value = page
+        page.user = self.entity
         self._cache_attached_entities()
-        return self._value
+        return cast("Page", self._value)
 
     @value.setter
-    def value(self, page):
+    def value(self, value: Page | None) -> None:
+        page = value
         user_model = self._user_model(page)
         if not page:
             page = self._create_user_page(user_model)
 
         self._set_user_model(page, user_model)
-        RelatedEntityMixin.value.fset(self, page)
+        self._write_related(page)
         page.user = self.entity
         self.entity.add_mutation_intents(
             MutationIntent.standard(page, reason="user-page-mirror")
         )
 
-    def _create_user_page(self, user_model):
-        data = {
+    def _create_user_page(self, user_model: UserCategory) -> Page:
+        data: PageData = {
             "model": user_model,
             "user": self.entity,
             "name": self.entity.name,
         }
         return Entities.PAGE.create(data)
 
-    def _user_model(self, page=None):
+    def _user_model(self, page: Page | None = None) -> UserCategory:
         model = page.model if page else None
         if isinstance(model, Entities.USERS):
             return model
         return Entities.USERS.get()
 
-    def _set_user_model(self, page, user_model):
+    def _set_user_model(self, page: Page, user_model: UserCategory) -> None:
         categories = page.categories
         page.model = user_model
         page.categories = categories
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_category
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_file
-# @tests tests_unit/test_009a_user.py::test_user_starred_key_removal_preserves_order
-# @matrix starred : category file key-removal page project
-class Starred(RelatedEntityListMixin, DBProperty):
+class Starred(RelatedEntityListMixin["Entity"], DBProperty[list["Entity"], "User"]):
     """Entities the user has starred (bookmarked).
 
     Supports toggling and bulk deletion of stale keys.
@@ -184,7 +180,7 @@ class Starred(RelatedEntityListMixin, DBProperty):
     _id = "starred"
     _label = "Starred"
 
-    def toggle_star(self, entity):
+    def toggle_star(self, entity: Entity) -> bool:
         if entity.key in [s.key for s in self.value]:
             self.remove(entity)
             return False
@@ -192,6 +188,6 @@ class Starred(RelatedEntityListMixin, DBProperty):
             self.add(entity)
             return True
 
-    def delete_starred_keys(self, keys):
+    def delete_starred_keys(self, keys: Iterable[Key]) -> None:
         for key in keys:
-            self.entity.db[self.id].remove(key)
+            cast("list[Key]", self.entity.db[self.id]).remove(key)

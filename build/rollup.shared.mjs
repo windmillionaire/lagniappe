@@ -1,6 +1,7 @@
 import json from "@rollup/plugin-json";
 import resolve from "@rollup/plugin-node-resolve";
-import { VIEW_ENTRIES } from "../src/script/viewRegistry.mjs";
+import esbuild from "rollup-plugin-esbuild";
+import { VIEW_ENTRIES } from "../src/script/viewRegistry.ts";
 import { recordBuildArtifacts } from "./publication.mjs";
 import {
 	buildStyles,
@@ -11,32 +12,29 @@ import {
 const thirdPartyLicenseBanner =
 	"/*! Third-party licenses: /third-party-licenses.txt */";
 
-/**
- * @testable false
- * @covered-by build/rollup.shared.mjs::createRollupConfig
- */
+export const stripFrontendTypes = () =>
+	esbuild({
+		include: /\.m?ts$/,
+		loaders: { ".mts": "ts" },
+		target: "esnext",
+		tsconfig: false,
+	});
+
 const browserPlugins = () => [
 	json(),
 	resolve({
 		browser: true,
-		extensions: ["js", ".mjs", ".json"],
+		extensions: [".js", ".mjs", ".json", ".ts", ".mts"],
 		preferBuiltins: false,
 	}),
+	stripFrontendTypes(),
 ];
 
-/**
- * @testable false
- * @covered-by build/rollup.shared.mjs::createRollupConfig
- */
 const onwarn = (warning, warn) => {
 	if (warning.code === "EVAL" && warning.id.includes("node_modules")) return;
 	warn(warning);
 };
 
-/**
- * @testable false
- * @covered-by build/rollup.shared.mjs::createRollupConfig
- */
 const onMainWarning = (warning, warn) => {
 	if (
 		warning.code === "CIRCULAR_DEPENDENCY" &&
@@ -50,9 +48,6 @@ const onMainWarning = (warning, warn) => {
  * Build the shared entry/output contract with fresh plugins for each bundle.
  * Mode-specific transforms stay ordered in the calling configuration.
  *
- * @testable true
- * @tests tests_js/test_032_build_configuration.mjs::test_rollup_modes_preserve_bundle_and_publication_contracts
- * @matrix frontend-build : artifact-inventory chunking view-registry warnings build-modes
  */
 export const createRollupConfig = ({
 	buildId,
@@ -64,7 +59,7 @@ export const createRollupConfig = ({
 }) => [
 	// Standalone login and optional browser error-monitoring bundles.
 	...["login", "sentry"].map((name) => ({
-		input: `./src/script/${name}.mjs`,
+		input: `./src/script/${name}.ts`,
 		output: {
 			file: `./lagniappe/web/static/${name}.js`,
 			inlineDynamicImports: true,
@@ -83,8 +78,8 @@ export const createRollupConfig = ({
 	})),
 	{
 		input: {
-			main: "./src/script/main.mjs",
-			public: "./src/script/public.mjs",
+			main: "./src/script/main.ts",
+			public: "./src/script/public.ts",
 			...Object.fromEntries(
 				Object.entries(VIEW_ENTRIES).map(([entry, source]) => [
 					entry,

@@ -8,7 +8,7 @@ Related Files:
     Application:
         - lagniappe/web/templates/projects/document.html: Document tab template
         - src/script/widgets/document.mjs: Document widget
-        - src/script/elements/editor/collaborative.mjs: Collaborative editor
+        - src/script/elements/editor/collaborative.ts: Collaborative editor
 
     Test Framework:
         - testing/elements/editor.py: Editor class and option enums
@@ -52,7 +52,6 @@ MARKDOWN_TABLE_PASTE_FIXTURE = "\n".join(
 )
 
 
-# @matrix sync : empty-content initialization parent-modified save-guard
 def test_untouched_document_does_not_save_or_touch_project(get_admin, get_user):
     user = get_admin()
     # The shared toolbar project is intentionally edited by the earlier offline
@@ -87,7 +86,7 @@ def test_untouched_document_does_not_save_or_touch_project(get_admin, get_user):
             f'"closed_documents":["{document_sync_id}"]'
         ),
     ):
-        Tabs(user).info
+        _ = Tabs(user).info
 
     after = Entities.fetch_one(project.key, request=Fetch.direct()).modified
     assert after == before
@@ -97,7 +96,6 @@ def test_untouched_document_does_not_save_or_touch_project(get_admin, get_user):
     )
 
 
-# @matrix editor : reload text-save
 def test_editor_loads_and_saves_text(get_admin, get_user):
     user = get_admin()
     project = Projects.test_toolbar_loads.get(user)
@@ -117,10 +115,6 @@ def test_editor_loads_and_saves_text(get_admin, get_user):
     assert editor.get_text() == test_text
 
 
-# @source src/script/elements/editor/collaborative.mjs::CollaborativeDocument
-# @source src/script/elements/editor/collaborative.mjs::CollaborativeDocument._startLoading
-# @source src/script/elements/editor/collaborative.mjs::CollaborativeDocument._finishLoading
-# @matrix editor : loading-feedback reload text-save
 def test_document_loading_status_waits_for_saved_content(get_admin, get_user):
     user = get_admin()
     project = Project(
@@ -173,7 +167,6 @@ def test_document_loading_status_waits_for_saved_content(get_admin, get_user):
         assert after == pytest.approx(before, abs=1)
 
 
-# @matrix editor : formatting reload
 @pytest.mark.filterwarnings("ignore:.*[tiptap warn].*")
 def test_formatting_persists(get_admin, get_user):
     user = get_admin()
@@ -213,8 +206,6 @@ def test_formatting_persists(get_admin, get_user):
     expect(editor.get_element("ul")).to_contain_text("Second item")
 
 
-# @source src/script/elements/editor/extensions/image.mjs::getImageStyles
-# @pair editor:image-layout
 def test_image_layout_survives_document_autosave_and_reload(get_admin, get_user):
     user = get_admin()
     project = Project(
@@ -280,7 +271,6 @@ def test_image_layout_survives_document_autosave_and_reload(get_admin, get_user)
     expect(editor.text_entry).to_contain_text("Keep this document instruction.")
 
 
-# @matrix editor : formatting inline-code reload selection toggle
 def test_inline_code_style_formats_selected_text_and_persists(get_admin, get_user):
     user = get_admin()
     project = Projects.test_inline_code_style.get(user)
@@ -315,7 +305,6 @@ def test_inline_code_style_formats_selected_text_and_persists(get_admin, get_use
     expect(editor.get_element("p")).to_have_text(full_text)
 
 
-# @matrix editor markdown : conversion paste
 def test_pasting_markdown_table_preserves_table_after_reload(get_admin, get_user):
     user = get_admin()
     project = Projects.test_editor_markdown_table_paste.get(user)
@@ -349,8 +338,6 @@ def test_pasting_markdown_table_preserves_table_after_reload(get_admin, get_user
     expect(editor.get_element("td").filter(has_text="response_mime_type")).to_be_visible()
 
 
-# @matrix editor markdown : conversion paste
-# @matrix files security : html-sanitization
 def test_pasting_plain_html_inserts_safe_formatted_content(get_admin, get_user):
     user = get_admin()
     project = Projects.test_editor_plain_html_paste.get(user)
@@ -399,7 +386,6 @@ def test_pasting_plain_html_inserts_safe_formatted_content(get_admin, get_user):
     assert "alert" not in markup
 
 
-# @matrix editor markdown : conversion paste
 # @style editor.markdownSource
 # @style editor.toolbar.markdownPrompt
 # @style editor.toolbar.markdownPromptMessage
@@ -512,7 +498,6 @@ raw <script> stays text
     ).to_have_count(3)
 
 
-# @matrix editor markdown : paste source-block
 # @style editor.markdownSource
 def test_keeping_pasted_markdown_preserves_source_block(get_admin, get_user):
     user = get_admin()
@@ -540,7 +525,6 @@ def test_keeping_pasted_markdown_preserves_source_block(get_admin, get_user):
     expect(source).to_have_class("markdown-source")
 
 
-# @matrix editor : reload task-list
 def test_task_list_persists(get_admin, get_user):
     user = get_admin()
     project = Projects.test_editor_task_list.get(user)

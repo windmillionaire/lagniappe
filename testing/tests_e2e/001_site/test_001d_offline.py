@@ -7,9 +7,9 @@ and transition resilience.
 
 Related Files:
     Application:
-        - src/script/views/base/core.mjs: Core.offline() state transitions
-        - src/script/shared/sync.mjs: SyncManager.sendUpdates offline path
-        - src/script/main.mjs: pingServer, syncView
+        - src/script/views/base/core.ts: Core.offline() state transitions
+        - src/script/shared/sync.ts: SyncManager.sendUpdates offline path
+        - src/script/main.ts: pingServer, syncView
 
     Test Framework:
         - testing/resources/project.py: Project resource with editor property
@@ -28,7 +28,6 @@ from playwright.sync_api import expect
 pytestmark = pytest.mark.e2e
 
 OFFLINE_INDICATOR = "[data-role='offline']"
-# @matrix offline : browser-state indicator
 def test_offline_indicator_toggles(get_admin, browser_failures):
     """
     Test that the offline indicator responds to offline state changes.
@@ -49,15 +48,20 @@ def test_offline_indicator_toggles(get_admin, browser_failures):
     indicator = user.locate(OFFLINE_INDICATOR)
     expect(indicator).to_be_hidden()
 
-    with browser_failures.expect_offline(user):
-        user.offline = True
-        expect(indicator).to_be_visible()
+    # A dashboard poll already in flight can receive the service worker's
+    # synthetic offline response while Chromium switches network state.
+    with browser_failures.expect_http_error(
+        user, status=503, path="/l/poll", method="POST",
+        body='{"ok":false,"error":"You are offline"}', count=0, max_count=1,
+    ):
+        with browser_failures.expect_offline(user):
+            user.offline = True
+            expect(indicator).to_be_visible()
 
-    user.offline = False
-    expect(indicator).to_be_hidden()
+        user.offline = False
+        expect(indicator).to_be_hidden()
 
 
-# @matrix offline : indicator server-health
 def test_failed_ping_marks_view_offline_until_next_sync_event(
     get_admin,
     browser_failures,
@@ -98,32 +102,30 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
         method="HEAD",
         path="/l/ping",
         failure="net::ERR_CONNECTION_FAILED",
+    ), browser_failures.expect(
+        user,
+        kind="console",
+        count=1,
+        max_count=3,
+        console_type="error",
+        text="Failed to load resource: net::ERR_CONNECTION_FAILED",
+        source_path="/l/ping",
     ):
-        with browser_failures.expect(
-            user,
-            kind="console",
-            count=1,
-            max_count=3,
-            console_type="error",
-            text="Failed to load resource: net::ERR_CONNECTION_FAILED",
-            source_path="/l/ping",
+        with scoped_browser_route(user.page.context, "**/l/ping", fail_ping):
+            user.reload()
+            expect(indicator).to_be_visible()
+
+        assert 1 <= len(failed_pings) <= 3
+
+        with expect_successful_response(
+            user.page,
+            method="HEAD",
+            path="/l/ping",
         ):
-            with scoped_browser_route(user.page.context, "**/l/ping", fail_ping):
-                user.reload()
-                expect(indicator).to_be_visible()
-
-            assert 1 <= len(failed_pings) <= 3
-
-            with expect_successful_response(
-                user.page,
-                method="HEAD",
-                path="/l/ping",
-            ):
-                user.reload()
+            user.reload()
     expect(indicator).to_be_hidden()
 
 
-# @matrix offline : browser-state indicator reconnect server-health
 def test_offline_poll_recovers_without_online_event(get_admin, browser_failures):
     """
     Test that retry polling recovers after the native online event fails.
@@ -143,7 +145,7 @@ def test_offline_poll_recovers_without_online_event(get_admin, browser_failures)
     user.go(SitePages.HOME)
 
     indicator = user.locate(OFFLINE_INDICATOR)
-    with browser_failures.expect_offline(user):
+    with browser_failures.expect_offline(user, max_ping_count=3):
         user.offline = True
         expect(indicator).to_be_visible()
 
@@ -154,41 +156,42 @@ def test_offline_poll_recovers_without_online_event(get_admin, browser_failures)
         failed_pings.append(route.request)
         route.abort("connectionfailed")
 
-    with expect_successful_response(
-        user.page,
-        method="HEAD",
-        path="/l/ping",
-        timeout=8000,
+    with (
+        expect_successful_response(
+            user.page,
+            method="HEAD",
+            path="/l/ping",
+            timeout=8000,
+        ),
+        scoped_browser_route(user.page.context, "**/l/ping", fail_ping),
+        browser_failures.expect(
+            user,
+            kind="requestfailed",
+            method="HEAD",
+            path="/l/ping",
+            failure="net::ERR_CONNECTION_FAILED",
+        ),
+        browser_failures.expect(
+            user,
+            kind="console",
+            console_type="error",
+            text="Failed to load resource: net::ERR_CONNECTION_FAILED",
+            source_path="/l/ping",
+        ),
     ):
-        with scoped_browser_route(user.page.context, "**/l/ping", fail_ping):
-            with browser_failures.expect(
-                user,
-                kind="requestfailed",
-                method="HEAD",
-                path="/l/ping",
-                failure="net::ERR_CONNECTION_FAILED",
-            ):
-                with browser_failures.expect(
-                    user,
-                    kind="console",
-                    console_type="error",
-                    text="Failed to load resource: net::ERR_CONNECTION_FAILED",
-                    source_path="/l/ping",
-                ):
-                    with user.page.expect_event(
-                        "requestfailed",
-                        predicate=lambda request: request.method == "HEAD"
-                        and request.url.endswith("/l/ping"),
-                    ):
-                        user.offline = False
-                    expect(indicator).to_be_visible()
-                    assert user.page.evaluate("navigator.onLine") is True
+        with user.page.expect_event(
+            "requestfailed",
+            predicate=lambda request: request.method == "HEAD"
+            and request.url.endswith("/l/ping"),
+        ):
+            user.offline = False
+        expect(indicator).to_be_visible()
+        assert user.page.evaluate("navigator.onLine") is True
 
     assert len(failed_pings) == 1
     expect(indicator).to_be_hidden()
 
 
-# @matrix sync : offline-replay queue-clear
 def test_offline_prevents_sync_requests(get_admin, browser_failures):
     """
     Test that going offline prevents sync network requests and that
@@ -233,7 +236,6 @@ def test_offline_prevents_sync_requests(get_admin, browser_failures):
     )
 
 
-# @matrix offline : indicator view-reset
 def test_testing_mode_navigation_resets_offline_state(get_admin, browser_failures):
     """
     Test that a new testing-mode view rechecks server state after navigation.
@@ -251,7 +253,7 @@ def test_testing_mode_navigation_resets_offline_state(get_admin, browser_failure
     user = get_admin()
     user.go(SitePages.HOME)
 
-    with browser_failures.expect_offline(user):
+    with browser_failures.expect_offline(user, max_ping_count=3):
         user.offline = True
         indicator = user.locate(OFFLINE_INDICATOR)
         expect(indicator).to_be_visible()
@@ -261,9 +263,6 @@ def test_testing_mode_navigation_resets_offline_state(get_admin, browser_failure
     expect(indicator).to_be_hidden()
 
 
-# @source src/script/shared/upstreamUnavailable.mjs::showUpstreamUnavailable
-# @matrix e2e : server-failure upstream-unavailable
-# @matrix request-errors : banner dom-preservation server-failure upstream-unavailable
 def test_upstream_unavailable_preserves_current_form_state(
     get_admin,
     browser_failures,

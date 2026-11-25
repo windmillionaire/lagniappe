@@ -10,7 +10,6 @@ schema fields). Stored filter hydration is ``test_011_filters``; filter UI shape
 import pytest
 
 
-# @matrix filters : condition-definition string
 @pytest.mark.unit
 def test_project_string_filters(get_test_entities, test_condition_definition):
     """Test STRING fields (name) with SUBSTRING and EQUALS comparators."""
@@ -19,7 +18,6 @@ def test_project_string_filters(get_test_entities, test_condition_definition):
     test_condition_definition(project)
 
 
-# @matrix filters : boolean condition-definition
 @pytest.mark.unit
 def test_project_boolean_filters(get_test_entities, test_condition_definition):
     """Both completed and in-progress conditions use the real Project fields."""
@@ -27,7 +25,6 @@ def test_project_boolean_filters(get_test_entities, test_condition_definition):
     test_condition_definition(project)
 
 
-# @matrix filters : condition-definition timestamp
 @pytest.mark.unit
 def test_project_timestamp_filters(get_test_entities, test_condition_definition):
     """Test TIMESTAMP field (due_date) with various date comparators."""
@@ -37,7 +34,6 @@ def test_project_timestamp_filters(get_test_entities, test_condition_definition)
     test_condition_definition(project)
 
 
-# @matrix filters : condition-definition entity-valued
 @pytest.mark.unit
 def test_project_entity_filters(get_test_entities, test_condition_definition):
     """Test entity-valued fields (categories, assigned_to) with single and multiple values."""
@@ -50,7 +46,6 @@ def test_project_entity_filters(get_test_entities, test_condition_definition):
     test_condition_definition(project, entity_map=entity_map)
 
 
-# @matrix filters : condition-definition model-task
 @pytest.mark.unit
 def test_project_model_filters(get_test_entities, test_condition_definition):
     """Test AttachedModelTask entity-valued field (one-to-one relation)."""

@@ -5,10 +5,6 @@ from runner.console import format_prompt
 from installer import FORMATTER, wrap_text
 
 
-# @testable false
-# @covered-by installer/optional.py::setup_error_monitoring
-# @covered-by installer/optional.py::configure_development_error_monitoring
-# @reason shared DSN prompt validation is exercised through the two monitoring setup flows
 def _operator_sentry_dsn(prompt):
     from urllib.parse import urlparse
 
@@ -29,12 +25,7 @@ def _operator_sentry_dsn(prompt):
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_error_monitoring_supports_maintainer_or_operator_sentry
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_disabled_error_monitoring_offers_to_enable
-# @matrix setup : default-disabled optional privacy-consent rerun sentry-destination settings-save
-def setup_error_monitoring():
+def setup_error_monitoring() -> bool:
     """
     Ask user for consent to enable error monitoring and crash reporting.
     Returns True if user consents, False otherwise.
@@ -174,10 +165,10 @@ def setup_error_monitoring():
 
     print(
         wrap_text(
-            (
+
                 f"\nYou can disable this at any time by changing {ui.literal('CAPTURE_ERRORS')} "
                 f"to {ui.literal('False')} in your settings file."
-            )
+
         )
     )
 
@@ -227,10 +218,7 @@ def setup_error_monitoring():
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_development_monitoring_rejects_maintainer_sentry
-# @matrix setup : development privacy sentry-destination
-def configure_development_error_monitoring():
+def configure_development_error_monitoring() -> bool:
     """Ensure development errors never use the maintainer Sentry project."""
     from config import SETTINGS
 
@@ -275,10 +263,7 @@ def configure_development_error_monitoring():
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_ai_observability_is_an_explicit_preserved_setup_choice
-# @matrix ai-observability setup : privacy-consent rerun settings-save
-def configure_ai_observability():
+def configure_ai_observability() -> bool:
     """Set the optional owner-only AI generation summary flag."""
     from config import SETTINGS
 
@@ -324,10 +309,7 @@ def configure_ai_observability():
     return enabled
 
 
-# @testable true
-# @tests tests_tooling/test_001j_setup_ai_mcp.py::test_mcp_connection_name_prompt
-# @matrix setup : interactive-input settings-save validation
-def configure_mcp_name():
+def configure_mcp_name() -> str:
     """Choose the saved connection name used by the installation's manual."""
     from config import SETTINGS
     from config.remote_mcp import mcp_connection_name
@@ -351,10 +333,7 @@ def configure_mcp_name():
         return name
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
-# @matrix setup : ai-model ai-observability optional settings-save site-policy
-def configure_ai_features():
+def configure_ai_features() -> bool:
     """Choose the installation's built-in and external AI access policy."""
     from config import SETTINGS
 
@@ -370,7 +349,7 @@ def configure_ai_features():
         .strip()
         .casefold()
     )
-    enabled = answer in {"y", "yes"} if answer else previous
+    enabled = answer in {"y", "yes"} if answer else bool(previous)
     SETTINGS.APP["AI_ENABLED"] = enabled
     if not enabled:
         SETTINGS.APP["EXTERNAL_AI_ENABLED"] = False
@@ -386,10 +365,10 @@ def configure_ai_features():
             print(ui.value(label, SETTINGS.APP.get(key, default), column=11))
         print(
             wrap_text(
-                (
+
                     "You can change these in "
                     f"{ui.literal('Admin → Site Settings → AI Models')}."
-                )
+
             )
         )
         print(wrap_text(

@@ -21,21 +21,19 @@ async function loadUserSettings({
 	captureError = () => {},
 	request = {},
 }) {
-	return await esmock.strict("../../src/script/widgets/userSettings.mjs", {
-		"../../src/script/elements/input.mjs": { InputElement: class {} },
-		"../../src/script/elements/radio.mjs": { RadioElement: class {} },
-		"../../src/script/elements/sectionToggle.mjs": { SectionToggle: {} },
-		"../../src/script/shared/index.mjs": {
+	return await esmock.strict("../../src/script/widgets/userSettings.ts", {
+		"../../src/script/elements/input.ts": { InputElement: class {} },
+		"../../src/script/elements/radio.ts": { RadioElement: class {} },
+		"../../src/script/elements/sectionToggle.ts": { SectionToggle: {} },
+		"../../src/script/shared/index.ts": {
 			captureError,
 			Modal,
 			request,
 		},
-		"../../src/script/widgets/base/formWidget.mjs": { FormWidget },
+		"../../src/script/widgets/base/formWidget.ts": { FormWidget },
 	});
 }
 
-// @matrix agent-api : expiry poll-reconcile revoke rotate shown-once status
-// @matrix user-settings : poll-reconcile status
 test("test_agent_api_key_controls_keep_secret_ephemeral", async (t) => {
 	let stored = false;
 	replaceGlobal(t, "localStorage", {
@@ -165,7 +163,6 @@ test("test_agent_api_key_controls_keep_secret_ephemeral", async (t) => {
 	assert.equal(widget.target.dataset.visible, "true");
 });
 
-// @matrix agent-api user-settings : confirmation-modal
 test("test_agent_api_key_confirmation_uses_app_modal", async () => {
 	const modalInstances = [];
 	class Modal {

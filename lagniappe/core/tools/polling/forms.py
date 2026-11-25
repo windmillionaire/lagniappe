@@ -1,11 +1,15 @@
 """Runtime-safe contracts shared by form mutation and sync routes."""
 
+from typing import TYPE_CHECKING
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_sync_payload_validation_is_document_only_and_bounded
-# @matrix sync : client-identity document-only validation
-# @pair forms:no-live-sync
-def validate_sync_payload(payload):
+if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity
+    from collections.abc import Mapping
+    from lagniappe.core.entities.page import Page
+    from lagniappe.core.entities.task import Task
+
+
+def validate_sync_payload(payload: object) -> str | None:
     """Return a public validation error, or ``None`` for a valid sync payload."""
     if not isinstance(payload, dict):
         return "Invalid sync payload."
@@ -57,10 +61,7 @@ def validate_sync_payload(payload):
     return None
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_offline_replay_conflict_requires_stale_origin_fingerprint
-# @pairs forms:conflict-review offline:replay-precondition
-def offline_replay_conflicts(entity, form):
+def offline_replay_conflicts(entity: Entity, form: Mapping[str, object]) -> bool:
     """Return whether an offline form targets an outdated entity revision."""
     expected = form.get("offline-fingerprint")
     return bool(
@@ -70,16 +71,14 @@ def offline_replay_conflicts(entity, form):
     )
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_form_field_membership_uses_the_attached_schema
-# @matrix deferred-jobs : form-lock quick-edit
-def is_form_field(entity, field_id):
+def is_form_field(entity: Page | Task, field_id: str | None) -> bool:
     """Return whether a quick-edit field belongs to an entity's form surface."""
+    form = getattr(entity, "form", None)
     return bool(
         field_id
-        and getattr(entity, "form", None)
+        and form
         and any(
             isinstance(field, dict) and field.get("id") == field_id
-            for field in (entity.form.schema or ())
+            for field in (form.schema or ())
         )
     )

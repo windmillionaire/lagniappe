@@ -1,6 +1,12 @@
 """Atomic mention-marker, notification, and aggregate persistence."""
 
-from datetime import datetime, timezone
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
+
+from google.cloud.datastore import Entity as Row
+from google.cloud.datastore import Key
 
 from ...properties import mention
 from . import notifications
@@ -8,19 +14,19 @@ from .core import DATA
 from .transactions import retry_aborted
 from .utility import create_named_key
 
+if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity as DomainEntity
+    from lagniappe.core.entities.user import User
 
-# @testable true
-# @tests tests_unit/test_027c_mentions.py::test_mention_delivery_ledger_survives_notification_replay
-# @matrix mentions : delivery-ledger idempotency
-# @pair notifications:aggregate-count
+
 @retry_aborted
 def create_mention_delivery(
-    actor,
-    recipient,
-    document,
-    occurrence_id,
-    display_name,
-):
+    actor: User,
+    recipient: User,
+    document: DomainEntity,
+    occurrence_id: str,
+    display_name: str,
+) -> tuple[bool, Row | None, Key]:
     from ...entities.mention import MentionMarker
 
     identity = mention.occurrence_identity(document, occurrence_id)
@@ -28,7 +34,7 @@ def create_mention_delivery(
     notification_key = notifications.ordinary_notification_key(
         recipient, f"document-mention-{identity}"
     )
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with DATA.datastore.transaction() as transaction:
         marker = DATA.datastore.get(marker_key, transaction=transaction)
         if marker is not None:

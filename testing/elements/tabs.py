@@ -102,7 +102,7 @@ class MobileNav:
     Related Files:
         - lagniappe/web/templates/projects/project.html: mobile_nav macro
         - lagniappe/web/templates/pages/page.html: mobile_nav macro
-        - src/script/views/base/entity.mjs: _initMobileNav method
+        - src/script/views/base/entity.ts: _initMobileNav method
         - src/style/special.css: slide-left, slide-right, data-flipped styles
 
     Attributes:

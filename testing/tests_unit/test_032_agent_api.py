@@ -1,6 +1,6 @@
 """Provider-free external-agent API domain and credential coverage."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 import json
 import threading
@@ -28,7 +28,6 @@ from testing.utility.ai_report_fakes import _fetch_one_from, _patch_fake_keys, _
 from testing.utility.test_entities import TestEntities
 
 
-# @pair agent-api:origin-validation
 @pytest.mark.unit
 def test_external_entity_links_use_the_site_origin_without_rewriting_evidence():
     raw = {
@@ -72,14 +71,6 @@ def test_external_entity_links_use_the_site_origin_without_rewriting_evidence():
     assert json.dumps(raw, sort_keys=True) == snapshot
 
 
-# @source lagniappe/core/tools/ai/external/contracts.py::plan_contract
-# @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @source lagniappe/core/tools/ai/external/plans.py::submit_plan
-# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @source lagniappe/core/tools/ai/reporting/execution/actions/files.py::_move_file
-# @matrix agent-api ai-report : proposal-contract proposal-validation remote-update
-# @pair ai-report:deterministic-run
-# @pair files:move-file
 @pytest.mark.unit
 @pytest.mark.parametrize("origin", ["web", "api", "email"])
 def test_fileless_organize_creates_task_and_moves_existing_file(monkeypatch, origin):
@@ -155,7 +146,6 @@ def _contract_actor():
     return SimpleNamespace(page=page, is_authenticated=True, db={"timezone": "UTC"})
 
 
-# @matrix agent-api : bootstrap discovery secret-handling tool-envelope
 @pytest.mark.unit
 def test_client_skill_markdown_is_minimal_and_discovery_first():
     skill = external_api.client_skill_markdown("https://lagniappe.test/api/v1/")
@@ -179,9 +169,6 @@ def test_client_skill_markdown_is_minimal_and_discovery_first():
     assert "Bearer <" not in skill
 
 
-# @matrix agent-api ai-report : draft report-session status
-# @pair agent-api:entitlement-independent
-# @pair agent-api:origin
 @pytest.mark.unit
 @pytest.mark.parametrize("remote_mcp", [False, True])
 def test_api_report_draft_preserves_agent_manifest(monkeypatch, remote_mcp):
@@ -215,8 +202,6 @@ def test_api_report_draft_preserves_agent_manifest(monkeypatch, remote_mcp):
     assert report.note == "Waiting for external plan"
 
 
-# @source lagniappe/core/tools/ai/external/plans.py::create_plan
-# @pair agent-api:entitlement-independent
 @pytest.mark.unit
 @pytest.mark.parametrize("source_origin", ["web", "api"])
 def test_external_correction_does_not_require_provider_access(monkeypatch, source_origin):
@@ -251,7 +236,6 @@ def test_external_correction_does_not_require_provider_access(monkeypatch, sourc
     assert saved == [source, correction]
 
 
-# @matrix agent-api ai-report : upload-batch-identity upload-manifest
 @pytest.mark.unit
 def test_external_upload_batch_identity_is_preserved_in_every_record():
     records = [
@@ -287,8 +271,6 @@ def test_external_upload_batch_identity_is_preserved_in_every_record():
     assert records[0]["upload_batch_id"] == "caller-controlled-value"
 
 
-# @matrix agent-api mcp-upload : deterministic-file-identity retry upload-manifest
-# @matrix ai-report : deterministic-file-identity upload-manifest
 @pytest.mark.unit
 def test_upload_file_identity_is_deterministic_per_batch_record(monkeypatch):
     report_key = object()
@@ -333,7 +315,6 @@ def test_upload_file_identity_is_deterministic_per_batch_record(monkeypatch):
     assert bound[0]["file_key"] == f"encoded:{first[1]}"
 
 
-# @matrix agent-api mcp-upload : claim cleanup concurrency fencing lease ownership renewal transaction
 @pytest.mark.unit
 def test_plan_operation_claim_serializes_competing_workers(monkeypatch):
     report_key = Key("activity", "report", project="test-project")
@@ -384,7 +365,7 @@ def test_plan_operation_claim_serializes_competing_workers(monkeypatch):
         lambda _key: claim_key,
     )
     monkeypatch.setattr(credential_store.DATA, "_datastore_client", Datastore())
-    now = datetime(2026, 9, 4, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 4, 12, tzinfo=UTC)
 
     def compete(calls):
         start = threading.Barrier(len(calls) + 1)
@@ -606,7 +587,6 @@ def test_plan_operation_claim_serializes_competing_workers(monkeypatch):
     )
 
 
-# @matrix agent-api mcp-upload : atomic-checkpoint cas claim fencing transaction
 @pytest.mark.unit
 def test_plan_operation_commit_rejects_a_replacement_owner(monkeypatch):
     report_key = Key("activity", "report", project="test-project")
@@ -631,7 +611,7 @@ def test_plan_operation_commit_rejects_a_replacement_owner(monkeypatch):
             "phase": "create",
             "operation_id": "batch-aaaaaaaaaaaaaaaa",
             "claim_token": "a" * 32,
-            "expires_at": datetime(2026, 9, 4, 12, 5, tzinfo=timezone.utc),
+            "expires_at": datetime(2026, 9, 4, 12, 5, tzinfo=UTC),
         }
     )
     rows = {report_key: report_row, claim_key: claim_row}
@@ -682,7 +662,7 @@ def test_plan_operation_commit_rejects_a_replacement_owner(monkeypatch):
         "claim_token": "a" * 32,
         "expected_report": expected,
         "writes": [(entity, None)],
-        "now": datetime(2026, 9, 4, 12, 1, tzinfo=timezone.utc),
+        "now": datetime(2026, 9, 4, 12, 1, tzinfo=UTC),
     }
 
     # A lease takeover immediately before the guarded save replaces the exact
@@ -727,7 +707,6 @@ def test_plan_operation_commit_rejects_a_replacement_owner(monkeypatch):
     assert rows[claim_key]["expires_at"] > options["now"]
 
 
-# @matrix agent-api ai-report : browser-review cas claim fencing transaction
 @pytest.mark.unit
 def test_idle_plan_mutation_fences_api_claims_and_stale_browser_snapshots(
     monkeypatch,
@@ -740,7 +719,7 @@ def test_idle_plan_mutation_fences_api_claims_and_stale_browser_snapshots(
         "operation",
         parent=report_key,
     )
-    now = datetime(2026, 9, 4, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
     report_row = DatastoreEntity(key=report_key)
     report_row.update(
         {
@@ -905,7 +884,6 @@ def test_idle_plan_mutation_fences_api_claims_and_stale_browser_snapshots(
     )
 
 
-# @matrix agent-api ai-report : browser-review cas delete file-cleanup save
 @pytest.mark.unit
 def test_external_browser_plan_save_and_delete_use_idle_transaction(monkeypatch):
     monkeypatch.setattr(database_get, "file_references", lambda *_: [])
@@ -976,7 +954,6 @@ def test_external_browser_plan_save_and_delete_use_idle_transaction(monkeypatch)
     }
 
 
-# @matrix agent-api ai-report : external-schema proposal-contract structured-output
 @pytest.mark.unit
 def test_external_proposal_schema_has_named_discriminated_actions():
     schema = external_api.external_report_proposal_response_schema(
@@ -1019,7 +996,6 @@ def test_external_proposal_schema_has_named_discriminated_actions():
     assert summary_data["properties"]["retrieval_terms"]["items"]["maxLength"] == 80
 
 
-# @matrix agent-api ai-report : file-placement file-summary permissions proposal-contract
 @pytest.mark.unit
 def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     actor = _contract_actor()
@@ -1048,7 +1024,7 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     monkeypatch.setattr(
         external_contracts.dates,
         "user_today",
-        lambda _user=None: datetime(2026, 8, 31, tzinfo=timezone.utc),
+        lambda _user=None: datetime(2026, 8, 31, tzinfo=UTC),
     )
 
     contract = external_api.plan_contract(
@@ -1087,7 +1063,6 @@ def test_external_plan_contract_is_permission_and_file_scoped(monkeypatch):
     assert full["payload_sizes"]["proposal_schema_bytes"] > 0
 
 
-# @pair agent-api:answer-context
 @pytest.mark.unit
 def test_answer_context_is_plan_free(monkeypatch):
     monkeypatch.setattr(
@@ -1104,9 +1079,6 @@ def test_answer_context_is_plan_free(monkeypatch):
     )
 
 
-# @pair agent-api:proposal-contract
-# @source lagniappe/core/tools/ai/external/contracts.py::plan_contract
-# @source lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
 @pytest.mark.unit
 def test_contract_selection_preserves_permissions_and_full_validation(monkeypatch):
     actor = _contract_actor()
@@ -1171,7 +1143,6 @@ def test_contract_selection_preserves_permissions_and_full_validation(monkeypatc
         external_api.plan_contract(report, actor, actions=["suggest_page_deletion"], view="schema", **kwargs)
 
 
-# @pair agent-api:execution-receipt
 @pytest.mark.unit
 def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
     visible = SimpleNamespace(
@@ -1258,8 +1229,6 @@ def test_public_execution_receipt_rechecks_entity_visibility(monkeypatch):
     assert external_api.public_execution_receipt(report, object()) is None
 
 
-# @source lagniappe/core/tools/ai/functions.py::tool_catalog
-# @matrix agent-api ai : provider-neutral-schema tool-catalog
 @pytest.mark.unit
 def test_external_tool_catalog_uses_id_for_subject_entity_references():
     expected_required = {
@@ -1313,7 +1282,6 @@ def test_external_tool_catalog_uses_id_for_subject_entity_references():
     assert "parent_id" in catalog["search_entities"]["input_schema"]["properties"]
 
 
-# @matrix agent-api ai : permission-context provider-neutral-dispatch provider-neutral-schema tool-catalog tool-registry
 @pytest.mark.unit
 def test_external_tool_catalog_and_dispatch_share_registered_tools(monkeypatch):
     names = [tool["name"] for tool in ai_functions.tool_catalog()]
@@ -1376,7 +1344,6 @@ def test_external_tool_catalog_and_dispatch_share_registered_tools(monkeypatch):
     assert parts == [{"uri": "gs://private/one"}]
 
 
-# @matrix agent-api ai-report : file-placement file-summary permissions proposal-validation references
 @pytest.mark.unit
 def test_external_proposal_validation_enforces_permissions_files_and_shape(
     monkeypatch,
@@ -1464,7 +1431,6 @@ def test_external_proposal_validation_enforces_permissions_files_and_shape(
         external_api.validate_external_proposal(inaccessible, report, actor, file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
 
 
-# @matrix agent-api : envelope schema field-path bounded-validation
 @pytest.mark.unit
 def test_external_submission_validation_collects_independent_field_errors():
     report = SimpleNamespace(available=True, file_usage=[], instructions="Answer", input_files=[])
@@ -1529,8 +1495,6 @@ def test_external_submission_validation_collects_independent_field_errors():
     assert bounded[-1]["code"] == "validation_errors_truncated"
 
 
-# @matrix agent-api ai-report : idempotency proposal-publication ready-state
-# @pair agent-api:organize-revision
 @pytest.mark.unit
 def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatch):
     proposal = {
@@ -1630,7 +1594,6 @@ def test_external_proposal_submission_is_idempotent_and_provider_free(monkeypatc
     assert report.name == "Expanded title"
 
 
-# @pairs agent-api:ask agent-api:ask-revision ai-report:answer-only
 @pytest.mark.unit
 def test_external_ask_submission_completes_without_files_or_execution(monkeypatch):
     proposal = {
@@ -1695,7 +1658,6 @@ def test_external_ask_submission_completes_without_files_or_execution(monkeypatc
     assert saved == [report, report]
 
 
-# @pairs agent-api:ask ai-report:answer-only
 @pytest.mark.unit
 def test_external_ask_submission_allows_hash_token_in_named_link_destination(
     monkeypatch,
@@ -1737,8 +1699,6 @@ def test_external_ask_submission_allows_hash_token_in_named_link_destination(
         external_api.validate_external_proposal(proposal, report, _test_user("actor"), file_usage=[{"file": ref, "usage": "organize"} for ref in external_api.report_file_references(report)],)
 
 
-# @pairs agent-api:create ai-report:proposal-publication
-# @pair agent-api:create-revision
 @pytest.mark.unit
 def test_external_create_submission_renders_markdown_without_files(monkeypatch):
     actor = object()
@@ -1831,7 +1791,6 @@ def test_external_create_submission_renders_markdown_without_files(monkeypatch):
     assert saved == [report, report]
 
 
-# @matrix agent-api ai-report : markdown public-reference round-trip stored-execution
 @pytest.mark.unit
 def test_public_plan_proposal_round_trips_hash_references_and_markdown(monkeypatch):
     entity = SimpleNamespace(
@@ -1890,7 +1849,6 @@ def test_public_plan_proposal_round_trips_hash_references_and_markdown(monkeypat
     assert report.proposal["actions"][0]["data"]["category"] == entity.urlsafe_key
 
 
-# @matrix agent-api ai-report : public-reference round-trip stored-execution
 @pytest.mark.unit
 def test_public_plan_omits_preview_references_before_loading_entities(monkeypatch):
     from google.cloud.datastore import Key
@@ -1920,7 +1878,6 @@ def test_public_plan_omits_preview_references_before_loading_entities(monkeypatc
     assert report.proposal["actions"][0]["_entity_update"]["display_after"]["form"]["id"] == preview
 
 
-# @matrix agent-api files : complete-inventory deterministic-fingerprint seven-file-regression
 @pytest.mark.unit
 def test_external_plan_contract_inventories_all_seven_finalized_files(monkeypatch):
     actor = _contract_actor()
@@ -1947,7 +1904,7 @@ def test_external_plan_contract_inventories_all_seven_finalized_files(monkeypatc
     monkeypatch.setattr(
         external_contracts.dates,
         "user_today",
-        lambda _user=None: datetime(2026, 9, 2, tzinfo=timezone.utc),
+        lambda _user=None: datetime(2026, 9, 2, tzinfo=UTC),
     )
     report = SimpleNamespace(available=True, file_usage=[], instructions="File the uploads", input_files=files, upload_manifest=None)
     contract = external_api.plan_contract(
@@ -1967,10 +1924,9 @@ def test_external_plan_contract_inventories_all_seven_finalized_files(monkeypatc
     )
 
 
-# @matrix agent-api : authentication expiry issue revoke shown-once
 @pytest.mark.unit
 def test_issue_authenticate_expire_and_revoke_credential(monkeypatch):
-    now = datetime(2026, 8, 31, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 31, 12, tzinfo=UTC)
     user = _test_user("credential-owner")
     rows = {}
 
@@ -2057,10 +2013,9 @@ def test_issue_authenticate_expire_and_revoke_credential(monkeypatch):
     assert metadata == replacement
 
 
-# @matrix agent-api : authentication tamper user-binding
 @pytest.mark.unit
 def test_authenticate_rejects_tampered_and_mismatched_credentials(monkeypatch):
-    now = datetime(2026, 8, 31, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 31, 12, tzinfo=UTC)
     user = _test_user("credential-mismatch-owner")
     token = (
         f"lgn_{agent_auth.credential_id(user)}."
@@ -2087,7 +2042,6 @@ def test_authenticate_rejects_tampered_and_mismatched_credentials(monkeypatch):
         agent_auth.authenticate_credential(token, now=now)
 
 
-# @matrix agent-api : credential persistence revoke rotate
 @pytest.mark.unit
 def test_credential_rotation_and_revocation_are_transactional(monkeypatch):
     key = Key("agent-api", "credential", project="test-project")
@@ -2115,7 +2069,7 @@ def test_credential_rotation_and_revocation_are_transactional(monkeypatch):
 
     monkeypatch.setattr(credential_store, "credential_key", lambda identifier: key)
     monkeypatch.setattr(credential_store.DATA, "_datastore_client", Datastore())
-    now = datetime(2026, 8, 31, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 31, tzinfo=UTC)
 
     first = credential_store.rotate_credential(
         "credential",
@@ -2159,7 +2113,6 @@ def test_credential_rotation_and_revocation_are_transactional(monkeypatch):
     assert len(transactions) == 4
 
 
-# @matrix agent-api ai-report mcp-upload : deterministic-file-identity lease-renewal upload-finalization temporary-view-ownership
 @pytest.mark.unit
 def test_external_upload_finalization_binds_report_user(monkeypatch):
     actor = object()
@@ -2263,9 +2216,6 @@ def test_external_upload_finalization_binds_report_user(monkeypatch):
     ]
 
 
-# @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @source lagniappe/core/tools/ai/external/plans.py::submit_plan
-# @matrix ai-report agent-api : answer-only proposal-validation file-placement
 @pytest.mark.unit
 def test_uploaded_evidence_answer_can_be_revised_into_a_proposal(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -2294,8 +2244,6 @@ def test_uploaded_evidence_answer_can_be_revised_into_a_proposal(monkeypatch):
         external_api.submit_plan(report, actor, answer, contract_version=external_api.CONTRACT_VERSION, file_usage=usage)
 
 
-# @source lagniappe/core/tools/database/agent_api.py::commit_plan_mutation_if_idle
-# @matrix agent-api ai-report : browser-review cas claim fencing transaction
 @pytest.mark.parametrize("state,lease,expired,expected", [
     ("running", "active", False, "committed"),
     ("cancelled", None, False, "lost"),
@@ -2305,7 +2253,7 @@ def test_uploaded_evidence_answer_can_be_revised_into_a_proposal(monkeypatch):
 def test_generation_publication_checks_job_in_report_transaction(monkeypatch, state, lease, expired, expected):
     report_key = Key("activity", "report", project="test-project")
     job_key = Key("jobs", "generation", project="test-project")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     original = {"type": "report", "process": "pending"}
     report = DatastoreEntity(key=report_key)
     report.update({**original, "process": "ready"})

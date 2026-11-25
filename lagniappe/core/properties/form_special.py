@@ -1,19 +1,23 @@
+from typing import TYPE_CHECKING, cast
+
 from ..definitions import FieldType, FilterOptions, Ordering
+from ..definitions.asset import HTMLAsset, ImageAsset
 from ..definitions.identifiers import short_uuid
 from ..mixins import AIMixin, ColumnMixin, FilterMixin
 from .base_asset import AssetProperty
-from .base_schema import SchemaProperty
 from .base_property import UNSET
+from .base_schema import SchemaProperty
+
+if TYPE_CHECKING:
+    from ..definitions.asset import AssetUpload
+    # Specialized generic bases below defer the circular owner import.
+    from ..entities.entity import Entity as Entity
+    from ..mixins.assets import AssetMixin
+    from .base_schema import FieldDefinition
+    from .form_submission import FormSubmission
 
 
-# @testable true
-# @tests tests_unit/test_003c_submission_complex.py::test_signature_field_asset_lifecycle_saves_and_clears_image
-# @tests tests_unit/test_003c_submission_complex.py::test_signature_field_projections_reflect_asset_presence
-# @tests tests_unit/test_013_task_properties.py::test_task_signature_form_submission_saves_asset_id
-# @tests tests_unit/test_013_task_properties.py::test_task_signature_form_submission_saves_multiple_assets_by_field_id
-# @matrix signature submission task : ai-value asset-lifecycle column db-value filter-value multiple-fields schema-id sort
-# @pair signature:form-value
-class Signature(AssetProperty, FilterMixin, AIMixin, ColumnMixin, SchemaProperty):
+class Signature(AssetProperty["Entity", ImageAsset, object], FilterMixin, AIMixin, ColumnMixin, SchemaProperty[ImageAsset, object]):
     """Signature image field. Stored as an image asset.
 
     Set:
@@ -31,7 +35,7 @@ class Signature(AssetProperty, FilterMixin, AIMixin, ColumnMixin, SchemaProperty
     # Property Attributes
     _asset_type = "image"
 
-    def validate_submission(self, value):
+    def validate_submission(self, value: object) -> None:
         if not value:
             self.value = None
         elif isinstance(value, str):
@@ -41,36 +45,36 @@ class Signature(AssetProperty, FilterMixin, AIMixin, ColumnMixin, SchemaProperty
             self.value = value
 
     @property
-    def db_value(self):
+    def db_value(self) -> str | None:
         return self.id if self.value else None
 
     @db_value.setter
-    def db_value(self, value):
+    def db_value(self, value: object) -> None:
         self._asset = UNSET
         self.unset()
 
     @property
-    def form_value(self):
+    def form_value(self) -> str | bytes | None:
         asset = self.value
         if not asset:
             return None
 
-        return getattr(asset, "url", None) or self.asset
+        return getattr(asset, "url", None) or cast(bytes | None, self.asset)
 
     # Column Attributes
     _ordering = Ordering.EXISTS
 
     @property
-    def column_value(self):
+    def column_value(self) -> str | bytes | None:
         return self.form_value
 
     @property
-    def sort_value(self):
-        return True if self.value else False
+    def sort_value(self) -> bool:
+        return bool(self.value)
 
     # AI Attributes
     @property
-    def ai_value(self):
+    def ai_value(self) -> bool:
         return self.filter_value
 
     # Filter Attributes
@@ -78,16 +82,11 @@ class Signature(AssetProperty, FilterMixin, AIMixin, ColumnMixin, SchemaProperty
     _field_options = FilterOptions.SIGNATURE.value
 
     @property
-    def filter_value(self):
-        return True if self.value else False
+    def filter_value(self) -> bool:
+        return bool(self.value)
 
 
-# @testable true
-# @tests tests_unit/test_004_form_properties.py::test_form_html_fields
-# @tests tests_unit/test_004e_submission_behavior.py::test_html_field_is_ignored_by_form_submission
-# @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
-# @matrix html-field : asset-isolation asset-lifecycle html-fields render-fetch submit-boundary
-class HTML(AssetProperty, SchemaProperty):
+class HTML(AssetProperty["Entity", HTMLAsset, str | None], SchemaProperty[HTMLAsset, str | None]):
     """Rich HTML content field. Stored as an HTML text asset.
 
     The setter returns whether the content actually changed (by
@@ -105,56 +104,52 @@ class HTML(AssetProperty, SchemaProperty):
     _asset_type = "html"
 
     @property
-    def value(self):
+    def value(self) -> HTMLAsset | None:
         return super().value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: str | None) -> bool | None:  # pyright: ignore[reportIncompatibleMethodOverride] -- direct descriptor callers receive the asset change flag.
         if not value:
             return None
 
-        AssetProperty.value.fset(self, value)
-        return super().value.updated
+        self._store_asset_value(value)
+        return cast(HTMLAsset, super().value).updated
 
-    def validate_submission(self, value):
+    def validate_submission(self, value: object) -> None:
         self.unset()
 
-    def validate_import(self, value):
+    def validate_import(self, value: object) -> None:
         self.unset()
 
-    def validate_ai(self, value):
+    def validate_ai(self, value: object) -> None:
         self.unset()
 
     @property
-    def db_value(self):
+    def db_value(self) -> None:
         return None
 
     @db_value.setter
-    def db_value(self, value):
+    def db_value(self, value: object) -> None:
         self.unset()
 
     @property
-    def form_value(self):
+    def form_value(self) -> None:
         return None
 
     # Column Attributes
     _ordering = None
 
     @property
-    def sort_value(self):
-        return True if self.entity.assets.get(self.id) else False
+    def sort_value(self) -> bool:
+        return bool(cast("AssetMixin", self.entity).assets.get(self.id))
 
     # Asset Attributes
-    def add_image(self, image, visibility="private"):
+    def add_image(self, image: AssetUpload, visibility: str = "private") -> str | None:
         name = f"image_{self.id}_{short_uuid()}"
-        asset = self.entity.save_asset(image, name, "image", visibility=visibility)
+        asset = cast("AssetMixin", self.entity).save_asset(image, name, "image", visibility=visibility)
         return asset.url if asset else None
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/form_special.py::Status.status_conditions
-# @covered-by lagniappe/core/properties/form_special.py::Status.ai_value
-# @covered-by lagniappe/core/properties/form_special.py::Status.column_value
 class Status(AIMixin, ColumnMixin, SchemaProperty):
     """Computed status field derived from other form field values.
 
@@ -171,17 +166,14 @@ class Status(AIMixin, ColumnMixin, SchemaProperty):
     _icon = "status"
 
     # Property Attributes
-    # @testable true
-    # @tests tests_unit/test_003c_submission_complex.py::test_submission_status
-    # @pair status:computed
     @property
-    def status_conditions(self):
+    def status_conditions(self) -> list[FieldDefinition]:
         """Return the status conditions from the schema."""
-        return self.get("status", [])
+        return cast("list[FieldDefinition]", self.get("status", []))
 
     @property
-    def active_statuses(self):
-        submission = self.entity.properties.get("submission")
+    def active_statuses(self) -> list[FieldDefinition]:
+        submission = cast("FormSubmission | None", self.entity.properties.get("submission"))
         if not submission:
             return []
 
@@ -192,47 +184,40 @@ class Status(AIMixin, ColumnMixin, SchemaProperty):
         ]
 
     @property
-    def value(self):
+    def value(self) -> list[str]:
         return self.ai_value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: object) -> None:
         self._value = None
 
-    def validate_submission(self, value):
+    def validate_submission(self, value: object) -> None:
         self.value = None
 
     @property
-    def db_value(self):
+    def db_value(self) -> None:
         return None
 
     @db_value.setter
-    def db_value(self, value):
+    def db_value(self, value: object) -> None:
         self.value = None
 
     @property
-    def form_value(self):
+    def form_value(self) -> None:
         return None
 
     # Column Attributes
     _ordering = Ordering.EXISTS
 
-    # @testable true
-    # @tests tests_unit/test_003c_submission_complex.py::test_submission_status
-    # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_has_status_renders_status_column
-    # @matrix status : column computed-column
     @property
-    def column_value(self):
+    def column_value(self) -> list[str]:
         return self.value
 
     @property
-    def sort_value(self):
+    def sort_value(self) -> bool:
         return bool(self.value)
 
     # AI Attributes
-    # @testable true
-    # @tests tests_unit/test_003c_submission_complex.py::test_submission_status
-    # @matrix status : ai-value computed
     @property
-    def ai_value(self):
-        return [status_element["text"] for status_element in self.active_statuses]
+    def ai_value(self) -> list[str]:
+        return [cast(str, status_element["text"]) for status_element in self.active_statuses]

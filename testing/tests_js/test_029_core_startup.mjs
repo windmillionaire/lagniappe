@@ -78,9 +78,9 @@ function installShellEnvironment(t, mode) {
 
 async function loadShellView(connectivity = { online: true, hidden: false }) {
 	const { default: ShellView } = await esmock.strict(
-		"../../src/script/views/base/shell.mjs",
+		"../../src/script/views/base/shell.ts",
 		{
-			"../../src/script/shared/connectivity.mjs": { connectivity },
+			"../../src/script/shared/connectivity.ts": { connectivity },
 		},
 	);
 	return ShellView;
@@ -121,8 +121,6 @@ function createSubmit(form, submitter) {
 	};
 }
 
-/** @matrix startup : deferred-services destroy-safety interaction-ready performance-marks single-flight */
-/** @pair forms:submit-interception */
 test("test_shell_intercepts_interactions_before_deferred_services", async (t) => {
 	const { marks } = installShellEnvironment(t, "public");
 	const ShellView = await loadShellView();
@@ -262,10 +260,8 @@ test("test_shell_intercepts_interactions_before_deferred_services", async (t) =>
 	assert.equal(retrySubmits, 1);
 });
 
-/** @matrix startup : first-interaction single-flight */
-/** @pair search:navbar-results */
 test("test_lazy_search_replays_the_latest_live_input_after_loading", async (t) => {
-	const coreSource = readFileSync("src/script/views/base/core.mjs", "utf8");
+	const coreSource = readFileSync("src/script/views/base/core.ts", "utf8");
 	assert.equal(
 		coreSource.includes("(box) => this._activateSearchBox(box)"),
 		true,
@@ -325,22 +321,22 @@ async function loadCore(connectivity = { online: true }) {
 	class ShellView {}
 	const emptyService = () => null;
 	const { default: Core } = await esmock.strict(
-		"../../src/script/views/base/core.mjs",
+		"../../src/script/views/base/core.ts",
 		{
-			"../../src/script/shared/connectivity.mjs": { connectivity },
-			"../../src/script/shared/endpoints.mjs": { ENDPOINTS: {} },
-			"../../src/script/shared/errors.mjs": { captureError() {} },
-			"../../src/script/shared/request.mjs": { request: {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/connectivity.ts": { connectivity },
+			"../../src/script/shared/endpoints.ts": { ENDPOINTS: {} },
+			"../../src/script/shared/errors.ts": { captureError() {} },
+			"../../src/script/shared/request.ts": { request: {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
-			"../../src/script/views/base/component.mjs": { default: class {} },
-			"../../src/script/views/base/reconciliation.mjs": {
+			"../../src/script/views/base/component.ts": { default: class {} },
+			"../../src/script/views/base/reconciliation.ts": {
 				collectRefreshTargets: () => [],
 				reconcileChange() {},
 				refreshCollectionComponents() {},
 			},
-			"../../src/script/views/base/services.mjs": {
+			"../../src/script/views/base/services.ts": {
 				ensureDeferredOperations: emptyService,
 				ensureEditWatcher: emptyService,
 				ensureEntityMenu: emptyService,
@@ -354,14 +350,13 @@ async function loadCore(connectivity = { online: true }) {
 				ensureSyncManager: emptyService,
 				initializeCoreServices() {},
 			},
-			"../../src/script/views/base/shell.mjs": { default: ShellView },
-			"../../src/script/views/base/task.mjs": { Task: class {} },
+			"../../src/script/views/base/shell.ts": { default: ShellView },
+			"../../src/script/views/base/task.ts": { Task: class {} },
 		},
 	);
 	return Core;
 }
 
-/** @matrix navigation tasks : delegated-toggle task-open-event */
 test("test_component_open_event_follows_delegated_toggle", async (t) => {
 	const { createBrowser } = await import("../utility/js/environment.mjs");
 	createBrowser(t);
@@ -405,8 +400,6 @@ test("test_component_open_event_follows_delegated_toggle", async (t) => {
 	assert.deepEqual(opened, [trigger], "Closing must not emit an open event");
 });
 
-/** @matrix polling : active-widget channel entity nonblocking refresh subscription-lifecycle visibility */
-/** @matrix startup : nonblocking single-flight */
 test("test_core_polling_subscription_lifecycle", async () => {
 	const Core = await loadCore();
 	const subscriptions = [];
@@ -579,8 +572,6 @@ test("test_core_polling_subscription_lifecycle", async () => {
 	assert.equal(maximumActivePasses, 1);
 });
 
-/** @matrix polling : blur visibility */
-/** @pair sync:deregistration */
 test("test_core_sync_distinguishes_visible_blur_from_hard_suspension", async () => {
 	const Core = await loadCore({ online: true });
 	const events = [];
@@ -636,14 +627,14 @@ test("test_core_sync_distinguishes_visible_blur_from_hard_suspension", async () 
 
 async function loadViewComponent() {
 	const { default: ViewComponent } = await esmock.strict(
-		"../../src/script/views/base/component.mjs",
+		"../../src/script/views/base/component.ts",
 		{
-			"../../src/script/elements/nav.mjs": { NavElement: class {} },
-			"../../src/script/shared/errors.mjs": { captureError() {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/elements/nav.ts": { NavElement: class {} },
+			"../../src/script/shared/errors.ts": { captureError() {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
-			"../../src/script/widgets/loader.mjs": {
+			"../../src/script/widgets/loader.ts": {
 				loadWidget: async () => null,
 			},
 		},
@@ -651,8 +642,7 @@ async function loadViewComponent() {
 	return ViewComponent;
 }
 
-/** @covers src/script/views/base/component.mjs::ViewComponent.activate */
-/** @matrix navigation tabs : static-component visibility */
+/** @covers src/script/views/base/component.ts::ViewComponent.activate */
 test("test_static_component_without_default_widget_activates", async () => {
 	const ViewComponent = await loadViewComponent();
 	const component = Object.create(ViewComponent.prototype);
@@ -671,7 +661,6 @@ test("test_static_component_without_default_widget_activates", async () => {
 	assert.equal(component.active, null);
 });
 
-/** @matrix deferred-jobs : rendered-visibility */
 test("test_task_form_operation_subscription_follows_component_visibility", async () => {
 	const ViewComponent = await loadViewComponent();
 	const events = [];
@@ -714,8 +703,6 @@ test("test_task_form_operation_subscription_follows_component_visibility", async
 	assert.deepEqual(events.slice(-2), ["suspend", "disable"]);
 });
 
-/** @matrix polling : component-render nonblocking subscription-lifecycle */
-/** @matrix startup : component-render deferred-services nonblocking */
 test("test_component_render_does_not_wait_for_polling_reconciliation", async (t) => {
 	replaceGlobal(t, "document", { getElementById: () => null });
 	const ViewComponent = await loadViewComponent();
@@ -749,19 +736,18 @@ test("test_component_render_does_not_wait_for_polling_reconciliation", async (t)
 	assert.equal(scheduled, 1);
 });
 
-/** @pair forms:queue-independent-initial-render */
 test("test_offline_queue_does_not_block_initial_form_render", async () => {
 	const { FormWidget } = await esmock.strict(
-		"../../src/script/widgets/base/formWidget.mjs",
+		"../../src/script/widgets/base/formWidget.ts",
 		{
-			"../../src/script/forms/controller.mjs": { FormController: class {} },
-			"../../src/script/forms/migrationNotice.mjs": {
+			"../../src/script/forms/controller.ts": { FormController: class {} },
+			"../../src/script/forms/migrationNotice.ts": {
 				installMigrationNotice: () => null,
 			},
-			"../../src/script/forms/representation.mjs": {
+			"../../src/script/forms/representation.ts": {
 				compatibleField: () => true,
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 		},
@@ -819,25 +805,25 @@ async function loadCollaborativeDocument({
 		mergeUpdates: () => null,
 	};
 	const { CollaborativeDocument } = await esmock.strict(
-		"../../src/script/elements/editor/collaborative.mjs",
+		"../../src/script/elements/editor/collaborative.ts",
 		{
 			yjs: Y,
 			"../../src/script/generated/styles.mjs": {
 				STYLES: { editor: { container: "editor-container" } },
 			},
-			"../../src/script/shared/utilities.mjs": {
+			"../../src/script/shared/utilities.ts": {
 				base64ToUint8Array: () => null,
 				uint8ArrayToBase64: () => "",
 				waitForAttribute,
 			},
-			"../../src/script/elements/editor/editor.mjs": {
+			"../../src/script/elements/editor/editor.ts": {
 				collaborativeEditor: () => editor,
 			},
-			"../../src/script/elements/editor/extensions/index.mjs": {
+			"../../src/script/elements/editor/extensions/index.ts": {
 				MentionSuggestions: class {},
 			},
-			"../../src/script/elements/editor/toolbar.mjs": { Toolbar: class {} },
-			"../../src/script/elements/editor/versions.mjs": {
+			"../../src/script/elements/editor/toolbar.ts": { Toolbar: class {} },
+			"../../src/script/elements/editor/versions.ts": {
 				DocumentVersions: class {
 					beforeSync() {
 						return true;
@@ -850,7 +836,6 @@ async function loadCollaborativeDocument({
 	return CollaborativeDocument;
 }
 
-/** @matrix sync : editor-readiness state-only */
 test("test_collaborative_document_renders_before_initial_state", async (t) => {
 	let resolveSync;
 	const dom = createBrowser(t, { html: "<section></section>" });
@@ -902,8 +887,6 @@ test("test_collaborative_document_renders_before_initial_state", async (t) => {
 	assert.equal(documentWidget.container.hasAttribute("loaded"), true);
 });
 
-/** @matrix editor : loading-feedback empty-content failure lifecycle */
-/** @matrix sync : lifecycle */
 test("test_document_loading_status_tracks_content_and_teardown", async (t) => {
 	const dom = createBrowser(t);
 	t.mock.timers.enable({ apis: ["setTimeout"] });
@@ -1023,8 +1006,6 @@ test("test_document_loading_status_tracks_content_and_teardown", async (t) => {
 	}
 });
 
-/** @matrix editor : empty-content initialization save-guard */
-/** @matrix sync : checkpoint concurrent-edit dirty-state empty-content initialization intentional-clear response-contract save-guard */
 test("test_collaborative_document_does_not_save_untouched_empty_state", async () => {
 	let editorHandler;
 	let ydocUpdateHandler;

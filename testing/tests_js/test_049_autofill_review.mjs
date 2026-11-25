@@ -19,14 +19,10 @@ function widgetFixture() {
 	return widget;
 }
 
-/**
- * @source src/script/forms/reviewBar.mjs::renderReviewBar
- * @pair forms:submission-choice
- */
 test("test_review_bar_keeps_answers_editable_and_prioritizes_new_operation", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { renderReviewBar } = await import(
-		"../../src/script/forms/reviewBar.mjs"
+		"../../src/script/forms/reviewBar.ts"
 	);
 	const widget = widgetFixture();
 	widget.reviewState.reviews = [{ operation: "prior" }];
@@ -82,14 +78,10 @@ test("test_review_bar_keeps_answers_editable_and_prioritizes_new_operation", asy
 	);
 });
 
-/**
- * @source src/script/forms/reviewBar.mjs::renderReviewBar
- * @pair forms:autofill-completion-review
- */
 test("test_new_autofill_hides_prior_completion_until_its_own_review_arrives", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { renderReviewBar } = await import(
-		"../../src/script/forms/reviewBar.mjs"
+		"../../src/script/forms/reviewBar.ts"
 	);
 	const widget = widgetFixture();
 	const marker = widget.target.querySelector("[lp-edited-marker]");
@@ -125,14 +117,10 @@ test("test_new_autofill_hides_prior_completion_until_its_own_review_arrives", as
 	assert.equal(progress.hidden, true);
 });
 
-/**
- * @source src/script/forms/reviewBar.mjs::renderReviewBar
- * @pair forms:autofill-completion-review
- */
 test("test_failed_new_autofill_restores_older_review", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { renderReviewBar } = await import(
-		"../../src/script/forms/reviewBar.mjs"
+		"../../src/script/forms/reviewBar.ts"
 	);
 	const widget = widgetFixture();
 	widget.reviewState.reviews = [
@@ -174,20 +162,15 @@ test("test_failed_new_autofill_restores_older_review", async (t) => {
 	);
 });
 
-/**
- * @source src/script/forms/migrationNotice.mjs::installMigrationNotice
- * @source src/script/forms/reviewBar.mjs::renderReviewBar
- * @matrix form-migration : informational-notice readonly-modal
- */
 test("test_schema_notice_is_readonly_and_independent_of_value_review", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { renderReviewBar } = await import(
-		"../../src/script/forms/reviewBar.mjs"
+		"../../src/script/forms/reviewBar.ts"
 	);
 	const { installMigrationNotice } = await esmock.strict(
-		"../../src/script/forms/migrationNotice.mjs",
+		"../../src/script/forms/migrationNotice.ts",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(root) {
 						this.root = root;
@@ -250,14 +233,10 @@ test("test_schema_notice_is_readonly_and_independent_of_value_review", async (t)
 	assert.match(marker.textContent, /Run Autofill again/);
 });
 
-/**
- * @source src/script/forms/reviewBar.mjs::renderReviewBar
- * @pair forms:autofill-completion-review
- */
 test("test_review_bar_keeps_success_visible_until_review_arrives", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { renderReviewBar } = await import(
-		"../../src/script/forms/reviewBar.mjs"
+		"../../src/script/forms/reviewBar.ts"
 	);
 	const widget = widgetFixture();
 	renderReviewBar(widget, {
@@ -309,14 +288,10 @@ test("test_review_bar_keeps_success_visible_until_review_arrives", async (t) => 
 	);
 });
 
-/**
- * @source src/script/forms/reviewBar.mjs::renderReviewBar
- * @pair forms:autofill-completion-review
- */
 test("test_running_autofill_defers_remote_review_without_discarding_it", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { renderReviewBar } = await import(
-		"../../src/script/forms/reviewBar.mjs"
+		"../../src/script/forms/reviewBar.ts"
 	);
 	const widget = widgetFixture();
 	const marker = widget.target.querySelector("[lp-edited-marker]");
@@ -361,9 +336,6 @@ test("test_running_autofill_defers_remote_review_without_discarding_it", async (
 	assert.equal(review.hidden, false);
 });
 
-/**
- * @pair ai:autofill
- */
 test("test_review_bar_cancel_uses_operation_identity", async (t) => {
 	createBrowser(t, { html: formHTML });
 	let sent;
@@ -382,7 +354,7 @@ test("test_review_bar_cancel_uses_operation_identity", async (t) => {
 		}),
 	);
 	const { installReviewBar } = await import(
-		"../../src/script/forms/reviewBar.mjs"
+		"../../src/script/forms/reviewBar.ts"
 	);
 	const widget = widgetFixture();
 	widget.target.dataset.formState = JSON.stringify({
@@ -416,14 +388,10 @@ test("test_review_bar_cancel_uses_operation_identity", async (t) => {
 	widget._reviewBar.destroy();
 });
 
-/**
- * @source src/script/forms/reviewBar.mjs::installReviewBar
- * @pair ai:autofill
- */
 test("test_retry_button_shows_pending_feedback_until_submission_settles", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { installReviewBar } = await import(
-		"../../src/script/forms/reviewBar.mjs"
+		"../../src/script/forms/reviewBar.ts"
 	);
 	const widget = widgetFixture();
 	widget.target.dataset.formState = JSON.stringify({
@@ -458,10 +426,6 @@ test("test_retry_button_shows_pending_feedback_until_submission_settles", async 
 	widget._reviewBar.destroy();
 });
 
-/**
- * @source src/script/forms/revisions/reconciler.mjs::EditReconciler
- * @pair forms:autofill-completion-review
- */
 test("test_review_button_shows_feedback_while_refreshing_latest_values", async (t) => {
 	createBrowser(t, { html: formHTML });
 	let finishGet;
@@ -471,9 +435,9 @@ test("test_review_button_shows_feedback_while_refreshing_latest_values", async (
 		finishGet = resolve;
 	});
 	const { EditReconciler } = await esmock.strict(
-		"../../src/script/forms/revisions/reconciler.mjs",
+		"../../src/script/forms/revisions/reconciler.ts",
 		{
-			"../../src/script/shared/request.mjs": {
+			"../../src/script/shared/request.ts": {
 				request: {
 					get: () => {
 						gets += 1;
@@ -481,7 +445,7 @@ test("test_review_button_shows_feedback_while_refreshing_latest_values", async (
 					},
 				},
 			},
-			"../../src/script/forms/revisions/modals.mjs": {
+			"../../src/script/forms/revisions/modals.ts": {
 				FormRevisionModal: class {
 					async init() {
 						opened += 1;
@@ -508,7 +472,7 @@ test("test_review_button_shows_feedback_while_refreshing_latest_values", async (
 	reconciler._setAction(marker, "review");
 	widget.reviewState.reviews = [{ operation: "job" }];
 	const { renderReviewBar } = await import(
-		"../../src/script/forms/reviewBar.mjs"
+		"../../src/script/forms/reviewBar.ts"
 	);
 	renderReviewBar(widget);
 	assert.equal(
@@ -526,18 +490,14 @@ test("test_review_button_shows_feedback_while_refreshing_latest_values", async (
 	assert.equal(button.hasAttribute("aria-busy"), false);
 });
 
-/**
- * @source src/script/forms/revisions/reconciler.mjs::EditReconciler
- * @matrix edited-entity-notice : structured-conflict
- */
 test("test_stale_update_review_fetches_latest_values_before_opening", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const fetched = [];
 	const opened = [];
 	const { EditReconciler } = await esmock.strict(
-		"../../src/script/forms/revisions/reconciler.mjs",
+		"../../src/script/forms/revisions/reconciler.ts",
 		{
-			"../../src/script/shared/request.mjs": {
+			"../../src/script/shared/request.ts": {
 				request: {
 					get: async (route) => {
 						fetched.push(route);
@@ -545,7 +505,7 @@ test("test_stale_update_review_fetches_latest_values_before_opening", async (t) 
 					},
 				},
 			},
-			"../../src/script/forms/revisions/modals.mjs": {
+			"../../src/script/forms/revisions/modals.ts": {
 				FormRevisionModal: class {
 					constructor(_reconciler, _marker, _widget, state, options) {
 						opened.push({
@@ -593,16 +553,12 @@ test("test_stale_update_review_fetches_latest_values_before_opening", async (t) 
 	assert.equal(marker.dataset.visible, "false");
 });
 
-/**
- * @source src/script/forms/revisions/reconciler.mjs::EditReconciler
- * @pair forms:submission-choice
- */
 test("test_active_autofill_completion_stages_review_even_when_values_match", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { EditReconciler } = await esmock.strict(
-		"../../src/script/forms/revisions/reconciler.mjs",
+		"../../src/script/forms/revisions/reconciler.ts",
 		{
-			"../../src/script/forms/revisions/preview.mjs": {
+			"../../src/script/forms/revisions/preview.ts": {
 				loadRevisionPreview: async () => ({
 					revisionSnapshot: () => "unchanged",
 					destroy() {},
@@ -652,16 +608,12 @@ test("test_active_autofill_completion_stages_review_even_when_values_match", asy
 	assert.match(marker.textContent, /Autofill is complete/);
 });
 
-/**
- * @source src/script/forms/revisions/reconciler.mjs::EditReconciler
- * @pair forms:autofill-completion-review
- */
 test("test_remote_form_status_registers_operation_without_regressing_completion", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { EditReconciler } = await esmock.strict(
-		"../../src/script/forms/revisions/reconciler.mjs",
+		"../../src/script/forms/revisions/reconciler.ts",
 		{
-			"../../src/script/forms/revisions/preview.mjs": {
+			"../../src/script/forms/revisions/preview.ts": {
 				loadRevisionPreview: async () => ({
 					revisionSnapshot: () => "saved form",
 					destroy() {},
@@ -670,7 +622,7 @@ test("test_remote_form_status_registers_operation_without_regressing_completion"
 		},
 	);
 	const { FormWidget } = await import(
-		"../../src/script/widgets/base/formWidget.mjs"
+		"../../src/script/widgets/base/formWidget.ts"
 	);
 	const widget = widgetFixture();
 	widget.schema = [];
@@ -727,16 +679,12 @@ test("test_remote_form_status_registers_operation_without_regressing_completion"
 	assert.equal(tracked[1].options.revision, 2);
 });
 
-/**
- * @source src/script/forms/revisions/modals.mjs::FormRevisionModal
- * @matrix forms : submission-choice
- */
 test("test_review_chooser_calls_blank_values_empty_without_changing_zero", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { FormRevisionModal } = await esmock.strict(
-		"../../src/script/forms/revisions/modals.mjs",
+		"../../src/script/forms/revisions/modals.ts",
 		{
-			"../../src/script/shared/modal.mjs": { Modal: class {} },
+			"../../src/script/shared/modal.ts": { Modal: class {} },
 		},
 	);
 	const widget = widgetFixture();
@@ -761,23 +709,19 @@ test("test_review_chooser_calls_blank_values_empty_without_changing_zero", async
 	);
 });
 
-/**
- * @source src/script/forms/revisions/modals.mjs::FormRevisionModal
- * @pair forms:autofill-review
- */
 test("test_prestart_conflict_chooser_says_autofill_did_not_start", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { FormRevisionModal } = await esmock.strict(
-		"../../src/script/forms/revisions/modals.mjs",
+		"../../src/script/forms/revisions/modals.ts",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(node) {
 						document.body.append(node);
 					}
 				},
 			},
-			"../../src/script/forms/revisions/preview.mjs": {
+			"../../src/script/forms/revisions/preview.ts": {
 				loadRevisionPreview: async (_widget, response) => ({
 					form: {
 						renderer: {
@@ -832,16 +776,12 @@ test("test_prestart_conflict_chooser_says_autofill_did_not_start", async (t) => 
 	);
 });
 
-/**
- * @source src/script/forms/revisions/modals.mjs::FormRevisionModal
- * @pair forms:submission-choice
- */
 test("test_review_modal_keeps_incompatible_old_values_and_selects_ai_collection", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const { FormRevisionModal } = await esmock.strict(
-		"../../src/script/forms/revisions/modals.mjs",
+		"../../src/script/forms/revisions/modals.ts",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(node) {
 						document.body.append(node);
@@ -849,7 +789,7 @@ test("test_review_modal_keeps_incompatible_old_values_and_selects_ai_collection"
 					async remove() {}
 				},
 			},
-			"../../src/script/forms/revisions/preview.mjs": {
+			"../../src/script/forms/revisions/preview.ts": {
 				loadRevisionPreview: async (_widget, response) => ({
 					form: {
 						renderer: {
@@ -993,10 +933,6 @@ test("test_review_modal_keeps_incompatible_old_values_and_selects_ai_collection"
 	);
 });
 
-/**
- * @source src/script/forms/revisions/modals.mjs::FormRevisionModal
- * @pair forms:autofill-review
- */
 test("test_review_modal_shows_applied_autofill_changes_without_duplicate_saved_values", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const schema = [
@@ -1006,16 +942,16 @@ test("test_review_modal_shows_applied_autofill_changes_without_duplicate_saved_v
 		{ id: "quantity", title: "Quantity", type: "input", input: "number" },
 	];
 	const { FormRevisionModal } = await esmock.strict(
-		"../../src/script/forms/revisions/modals.mjs",
+		"../../src/script/forms/revisions/modals.ts",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(node) {
 						document.body.append(node);
 					}
 				},
 			},
-			"../../src/script/forms/revisions/preview.mjs": {
+			"../../src/script/forms/revisions/preview.ts": {
 				loadRevisionPreview: async (_widget, response) => ({
 					form: {
 						renderer: {
@@ -1141,10 +1077,6 @@ test("test_review_modal_shows_applied_autofill_changes_without_duplicate_saved_v
 	);
 });
 
-/**
- * @source src/script/forms/revisions/modals.mjs::FormRevisionModal
- * @pair forms:autofill-review
- */
 test("test_review_modal_prefers_ai_unless_saved_value_changed_after_launch", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const schema = [
@@ -1152,16 +1084,16 @@ test("test_review_modal_prefers_ai_unless_saved_value_changed_after_launch", asy
 		{ id: "subject", title: "Subject", type: "input", input: "text" },
 	];
 	const { FormRevisionModal } = await esmock.strict(
-		"../../src/script/forms/revisions/modals.mjs",
+		"../../src/script/forms/revisions/modals.ts",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(node) {
 						document.body.append(node);
 					}
 				},
 			},
-			"../../src/script/forms/revisions/preview.mjs": {
+			"../../src/script/forms/revisions/preview.ts": {
 				loadRevisionPreview: async (_widget, response) => ({
 					form: {
 						renderer: {
@@ -1297,10 +1229,6 @@ test("test_review_modal_prefers_ai_unless_saved_value_changed_after_launch", asy
 	});
 });
 
-/**
- * @source src/script/forms/revisions/modals.mjs::FormRevisionModal
- * @pair forms:autofill-review
- */
 test("test_review_modal_deduplicates_unchanged_ai_context_after_concurrent_save", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const schema = [
@@ -1308,16 +1236,16 @@ test("test_review_modal_deduplicates_unchanged_ai_context_after_concurrent_save"
 		{ id: "quantity", title: "Quantity", type: "input", input: "number" },
 	];
 	const { FormRevisionModal } = await esmock.strict(
-		"../../src/script/forms/revisions/modals.mjs",
+		"../../src/script/forms/revisions/modals.ts",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(node) {
 						document.body.append(node);
 					}
 				},
 			},
-			"../../src/script/forms/revisions/preview.mjs": {
+			"../../src/script/forms/revisions/preview.ts": {
 				loadRevisionPreview: async (_widget, response) => ({
 					form: {
 						renderer: {
@@ -1426,24 +1354,20 @@ test("test_review_modal_deduplicates_unchanged_ai_context_after_concurrent_save"
 	);
 });
 
-/**
- * @source src/script/forms/revisions/modals.mjs::FormRevisionModal
- * @pair forms:autofill-review
- */
 test("test_review_modal_explains_when_autofill_suggested_no_new_values", async (t) => {
 	createBrowser(t, { html: formHTML });
 	const schema = [{ id: "summary", title: "Summary", type: "textarea" }];
 	const { FormRevisionModal } = await esmock.strict(
-		"../../src/script/forms/revisions/modals.mjs",
+		"../../src/script/forms/revisions/modals.ts",
 		{
-			"../../src/script/shared/modal.mjs": {
+			"../../src/script/shared/modal.ts": {
 				Modal: class {
 					async attach(node) {
 						document.body.append(node);
 					}
 				},
 			},
-			"../../src/script/forms/revisions/preview.mjs": {
+			"../../src/script/forms/revisions/preview.ts": {
 				loadRevisionPreview: async (_widget, response) => ({
 					form: {
 						renderer: {

@@ -493,7 +493,6 @@ def _needs_review_report(user):
     return report
 
 
-# @matrix ai-report : ask create instructions multi-file tool-switcher upload-form
 # @template home/tools.html::create_report
 def test_tools_create_form_has_expected_controls(get_admin, get_user):
     user = get_admin()
@@ -512,10 +511,6 @@ def test_tools_create_form_has_expected_controls(get_admin, get_user):
     instructions.fill("Create a task and move its file.")
 
 
-# @matrix ai-access : authentication route-gate
-# @matrix ai-report : empty-count toggle
-# @pair ai-report:provider-independent-history
-# @pair cache:invalidation-acknowledgement
 # @template home/home.html::main
 # @template home/tools.html::create_report
 # @template home/tools.html::report_list
@@ -601,9 +596,6 @@ def test_ai_access_tiers_gate_tool_routes(get_admin, get_user, browser_failures)
             assert response["text"] == "Add files or instructions before creating a report."
 
 
-# @matrix ai-report : delete deterministic-run entitlement-independent skip-action toggle
-# @pair ai-report:provider-independent-history
-# @pair ai-access:provider-boundary
 # @template home/home.html::main
 # @template home/tools.html::report_list
 # @template tools/report.html::proposal_action_item
@@ -669,7 +661,6 @@ def test_saved_report_controls_do_not_require_provider_access(get_admin, get_use
     assert Entities.fetch_one(report.urlsafe_key, request=Fetch.root()) is None
 
 
-# @pair ai-access:provider-boundary
 # @template home/tools.html::generation_controls
 @pytest.mark.parametrize("tier", [AI.NONE, AI.ASK, AI.CREATE])
 def test_corrective_plan_controls_require_create_access(get_admin, get_user, browser_failures, tier):
@@ -740,7 +731,6 @@ def test_corrective_plan_controls_require_create_access(get_admin, get_user, bro
         expect(user.page.get_by_role("button", name="Revise Response", exact=True)).to_be_visible()
 
 
-# @matrix ai-report : async create persistence title-truncation filter-create
 # @template home/tools.html::create_report
 @pytest.mark.parametrize("cold_list", [False, True])
 def test_create_tool_starts_pending_report(get_admin, get_user, cold_list):
@@ -767,9 +757,13 @@ def test_create_tool_starts_pending_report(get_admin, get_user, cold_list):
     form = user.locate(home.CREATE_TOOL_REPORT_FORM)
     form.locator("textarea[name='instructions']").fill(instructions)
 
-    with user.page.expect_response("**/tools/ai"):
+    with expect_successful_response(user.page, method="POST", path="/tools/ai") as created:
         form.get_by_role("button", name="Start").click()
 
+    payload = created.value.json()
+    operation = payload["operation"]
+    assert isinstance(operation, str) and operation
+    assert f'data-operation="{operation}"' in payload["html"]
     report_list = List(user.locate(home.TOOL_REPORT_LIST))
     report_name = f"{instructions[:80]}..."
     item = report_list.new_item(report_name, flash=False)
@@ -777,7 +771,7 @@ def test_create_tool_starts_pending_report(get_admin, get_user, cold_list):
         "aria-pressed", "true"
     )
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal pending")
-    expect(item).to_have_attribute("data-operation", re.compile(".+"))
+    expect(item).to_have_attribute("data-operation", operation)
     expect(item.locator("[data-role='deferred-phase']")).to_have_text(
         "Waiting to start"
     )
@@ -793,7 +787,6 @@ def test_create_tool_starts_pending_report(get_admin, get_user, cold_list):
     assert report.pending is True
 
 
-# @matrix ai-report : lazy-load list status-reconciliation
 # @template home/tools.html::report_item
 def test_lazy_report_list_reconciles_active_job_status(get_admin, get_user):
     user = get_admin()
@@ -847,7 +840,6 @@ def test_lazy_report_list_reconciles_active_job_status(get_admin, get_user):
     )
 
 
-# @matrix ai-report : remote-update async create text-only
 # @template home/tools.html::create_report
 def test_text_only_organize_plans_updates(get_admin, get_user):
     user = get_admin()
@@ -870,7 +862,6 @@ def test_text_only_organize_plans_updates(get_admin, get_user):
     assert report.input_files == []
 
 
-# @matrix ai-report : http-boundary upload validation
 def test_organize_rejects_zero_byte_folder_placeholder(get_admin, get_user, browser_failures):
     user = get_admin()
     user.go(SitePages.HOME)
@@ -921,7 +912,6 @@ def _create_uploaded_report_item(user):
     return item, report
 
 
-# @pair ai-report:list-snippets
 # @template home/tools.html::report_item
 def test_report_list_snippets_are_plain_text_and_at_most_five_lines(get_admin, get_user, tmp_path):
     user = get_admin()
@@ -982,7 +972,6 @@ def test_report_list_snippets_are_plain_text_and_at_most_five_lines(get_admin, g
     assert saved.proposal["summary"] == markdown
 
 
-# @matrix ai-report : delete-modal file-cleanup list
 # @template home/tools.html::report_item
 def test_report_list_item_delete_removes_report_only_file(get_admin, get_user):
     user = get_admin()
@@ -1003,7 +992,6 @@ def test_report_list_item_delete_removes_report_only_file(get_admin, get_user):
     assert Entities.fetch_one(uploaded_file.urlsafe_key, request=Fetch.root()) is None
 
 
-# @matrix ai-report : delete-modal detail deterministic-run idempotent repeat-run result-json action-counts
 def test_report_detail_runs_ready_report(get_admin, get_user):
     user = get_admin()
     report, category_name, page_name = _ready_report(user)
@@ -1067,8 +1055,6 @@ def test_report_detail_runs_ready_report(get_admin, get_user):
     modal.element.get_by_role("button", name="Cancel").click()
 
 
-# @source lagniappe/core/tools/ai/reporting/display/details.py::ProposalDetailCollector
-# @matrix ai-report : details proposal
 # @template tools/report.html::proposal_details
 def test_report_document_previews_are_plain_text_and_at_most_ten_lines(get_admin, get_user, tmp_path):
     user = get_admin()
@@ -1135,8 +1121,6 @@ def test_report_document_previews_are_plain_text_and_at_most_ten_lines(get_admin
     assert saved.proposal == proposal
 
 
-# @matrix ai-report : details proposal submission-review
-# @pair form-schema:submission-review
 # @template tools/report.html::proposal_details
 def test_report_detail_shows_proposed_submission_values(get_admin, get_user):
     user = get_admin()
@@ -1197,7 +1181,6 @@ def test_email_report_detail_collapses_message_behind_subject_and_sender(get_adm
     )
 
 
-# @matrix ai-report : detail failed-prefix failure recovery reload retry
 def test_failed_report_detail_offers_retry_and_preserves_completed_work(get_admin, get_user):
     user = get_admin()
     report, project = _recoverable_failed_report(user)
@@ -1217,7 +1200,6 @@ def test_failed_report_detail_offers_retry_and_preserves_completed_work(get_admi
     assert Entities.fetch_one(project.urlsafe_key, request=Fetch.root()) is not None
 
 
-# @matrix ai-report : answer-html ask detail links no-actions
 def test_ask_report_detail_shows_answer_without_duplicate_proposal(get_admin, get_user):
     user = get_admin()
     report = _ask_answer_report(user)
@@ -1240,7 +1222,6 @@ def test_ask_report_detail_shows_answer_without_duplicate_proposal(get_admin, ge
     expect(report_page.execute_button).not_to_be_visible()
 
 
-# @matrix ai-report : completed-state ready-state revision route-guard
 def test_report_revision_requires_saved_response_and_allows_corrections(
     get_admin, get_user, browser_failures
 ):
@@ -1315,7 +1296,6 @@ def test_report_revision_requires_saved_response_and_allows_corrections(
 
 
 
-# @matrix ai-report : detail needs-review no-execute revision
 # @template tools/report.html::proposal_action_item
 def test_report_detail_shows_review_only_proposal_without_execute(get_admin, get_user):
     user = get_admin()
@@ -1337,7 +1317,6 @@ def test_report_detail_shows_review_only_proposal_without_execute(get_admin, get
     expect(user.page.get_by_role("button", name="Revise Plan")).to_be_visible()
 
 
-# @matrix ai-report : create detail execute revision skip-action
 def test_create_report_detail_shows_revision_and_manual_execution(get_admin, get_user):
     user = get_admin()
     report = _create_ready_report(user)
@@ -1355,7 +1334,6 @@ def test_create_report_detail_shows_revision_and_manual_execution(get_admin, get
     expect(proposal_json).to_contain_text('"type": "create_page"')
 
 
-# @matrix ai-report : async detail feedback live-submit organize pending revision
 def test_organize_report_detail_submits_revision(
     get_admin, get_user,
 ):
@@ -1390,7 +1368,6 @@ def test_organize_report_detail_submits_revision(
     assert job.parameters["mode"] == "revise"
 
 
-# @matrix ai-report : dependencies detail result-json skip-action
 def test_report_detail_skips_action_dependencies(get_admin, get_user):
     user = get_admin()
     report = _dependency_report(user)
@@ -1445,7 +1422,6 @@ def test_report_detail_skips_action_dependencies(get_admin, get_user):
     ]
 
 
-# @matrix ai-report submission : persistence schema-update
 def test_report_adds_schema_fields_persists_all_task_values_and_completes(get_admin, get_user):
     user = get_admin()
     report, _page_form, page = _schema_section_report(user)
@@ -1543,7 +1519,6 @@ def test_report_adds_schema_fields_persists_all_task_values_and_completes(get_ad
     expect(report_page.result).to_contain_text("Completed Task:")
 
 
-# @matrix ai-report : browser-review stale-proposal
 # @template tools/report.html::proposal_action_item
 @pytest.mark.parametrize("origin", ["api", "web"])
 def test_stale_schema_plan_keeps_review_and_explains_recovery(get_admin, get_user, browser_failures, origin):
@@ -1629,8 +1604,6 @@ def test_stale_schema_plan_keeps_review_and_explains_recovery(get_admin, get_use
     assert Entities.fetch_one(page.urlsafe_key, request=Fetch.direct()).submission == edited_submission
 
 
-# @source lagniappe/core/tools/ai/reporting/schema_updates.py::report_impact
-# @matrix ai-report : review
 def test_report_detail_reviews_schema_action_without_id(get_admin, get_user):
     user = get_admin()
     report, form, page = _schema_section_report(user)
@@ -1655,12 +1628,7 @@ def test_report_detail_reviews_schema_action_without_id(get_admin, get_user):
     assert Entities.fetch_one(page.urlsafe_key, request=Fetch.direct()).submission["input-note"] == "unpaid"
 
 
-# @matrix ai-report : detail schema-update skip-action
 # @template tools/report.html::proposal_action_item
-# @source lagniappe/core/tools/ai/reporting/display/projector.py::ProposalDisplayProjector._group_proposal_display_actions
-# @source lagniappe/core/tools/ai/reporting/proposals/selection.py::toggle_proposal_action_indexes
-# @pair form-schema:schema-section
-# @matrix ai-report : exact-indexes schema-section
 def test_report_detail_skips_schema_section_and_dependent_submission_updates(get_admin, get_user):
     user = get_admin()
     report, form, page = _schema_section_report(user)
@@ -1745,9 +1713,6 @@ def test_report_detail_skips_schema_section_and_dependent_submission_updates(get
     assert {"value": "paid", "label": "Paid"} not in status_field["options"]
 
 
-# @source lagniappe/core/entities/ai_report.py::AIReport.available
-# @source lagniappe/core/tools/ai/report_history.py::delete_report_record
-# @matrix ai-report : unavailable delete file-cleanup
 # @template home/tools.html::report_item
 @pytest.mark.parametrize("malformed", [False, True])
 def test_incompatible_reports_render_and_delete_without_touching_workspace(get_admin, get_user, malformed):
@@ -1779,11 +1744,6 @@ def test_incompatible_reports_render_and_delete_without_touching_workspace(get_a
     assert Entities.fetch_one(file.urlsafe_key, request=Fetch.root()) is not None
 
 
-# @source lagniappe/web/routes/tools/main.py::cancel_generation
-# @source lagniappe/web/routes/tools/main.py::retry_generation
-# @source lagniappe/core/tools/deferred_jobs/adapters/reports.py::ReportAdapter.cleanup
-# @source src/script/views/report.mjs::Report
-# @matrix ai-report : cancellation deferred-refresh revision reload
 # @template home/tools.html::generation_controls
 @pytest.mark.parametrize("revision", [False, True])
 def test_cancel_report_generation_restores_terminal_view(get_admin, get_user, revision):

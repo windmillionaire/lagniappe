@@ -1,9 +1,14 @@
 """Shared setup presentation; importing this module never installs packages."""
 
+from __future__ import annotations
+
 import builtins
-from contextlib import contextmanager
 import os
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
+from types import TracebackType
+from typing import TYPE_CHECKING, Literal, Self, TextIO, TypedDict, Unpack
 
 from runner.console import (
     ProgressLabel,
@@ -13,15 +18,22 @@ from runner.console import (
 )
 from runner.terminal import _console, styled, unstyle
 
+if TYPE_CHECKING:
+    from rich.console import Console
+
+
+class ValueLayout(TypedDict, total=False):
+    width: int | None
+    column: int | None
+    verbatim: bool
+    standalone: bool
+
 
 ACTIVE_PROGRESS = []
 _PAUSE_DEPTH = 0
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason shared encoding policy exercised by status and progress contracts
-def supports_unicode(stream, text):
+def supports_unicode(stream: TextIO | None, text: str) -> bool:
     try:
         text.encode(getattr(stream, "encoding", None) or "ascii")
     except (LookupError, UnicodeEncodeError):
@@ -29,31 +41,26 @@ def supports_unicode(stream, text):
     return True
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason format-only section heading follows the shared semantic style contract
-def heading(message):
+def heading(message: object) -> str:
     return styled(str(message).rstrip().rstrip(":.!"), "bold")
 
 
-# @testable false
-# @covered-by runner/terminal.py::styled
-# @reason literal inline emphasis shares the renderer's terminal and plain fallbacks
-def emphasis(message, *, stream=None):
+def emphasis(message: object, *, stream: TextIO | None = None) -> str:
     return styled(message, "bold", stream=stream)
 
 
-# @testable false
-# @covered-by runner/terminal.py::styled
-# @reason exact action targets share the renderer's literal span contract
-def literal(message, *, stream=None):
+def literal(message: object, *, stream: TextIO | None = None) -> str:
     return styled(message, "cyan", stream=stream)
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_instruction_values_preserve_styles_and_copyable_content
-# @matrix setup : operator-summary terminal-wrapping
-def value(label, content, *, action=False, stream=None, **layout):
+def value(
+    label: object,
+    content: object,
+    *,
+    action: bool = False,
+    stream: TextIO | None = None,
+    **layout: Unpack[ValueLayout],
+) -> str:
     """Render a bold label and an optional cyan copy/type/open target."""
     label = str(label).rstrip(":")
     content = literal(content, stream=stream) if action else str(content)
@@ -63,25 +70,18 @@ def value(label, content, *, action=False, stream=None, **layout):
     return format_value(label, content, **layout)
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason format-only annotation follows the shared semantic style contract
-def secondary(message):
+def secondary(message: object) -> str:
     return styled(message, "bright_black")
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason menu choice styling uses the same literal span renderer
-def choice(key, label, detail=None):
+def choice(key: object, label: object, detail: object = None) -> str:
     result = f"  {styled(str(key) + '.', 'cyan')} {label}"
     return wrap_text(result + (f" {secondary('(' + str(detail) + ')')}" if detail else ""))
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_semantic_output
-# @matrix setup : encoding operator-summary portability terminal-wrapping
-def status(message, kind="neutral", *, stream=None):
+def status(
+    message: object, kind: str = "neutral", *, stream: TextIO | None = None
+) -> str:
     """Style only the status marker, leaving explanatory prose neutral."""
     stream = sys.stdout if stream is None else stream
     glyph, style = {
@@ -100,47 +100,33 @@ def status(message, kind="neutral", *, stream=None):
     return styled(glyph, style, stream=stream) + rendered[len(glyph):]
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason semantic status shortcut
-def success(message, *, stream=None):
+def success(message: object, *, stream: TextIO | None = None) -> str:
     return status(message, "success", stream=stream)
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason semantic status shortcut
-def warning(message, diagnostic=None, *, stream=None):
+def warning(
+    message: object, diagnostic: object = None, *, stream: TextIO | None = None
+) -> str:
     result = status(message, "warning", stream=stream)
     return result + "\n" + str(diagnostic) if diagnostic else result
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason diagnostic payload is intentionally left verbatim
-def error(message, diagnostic=None, *, stream=None):
+def error(
+    message: object, diagnostic: object = None, *, stream: TextIO | None = None
+) -> str:
     result = status(message, "error", stream=stream)
     return result + "\n" + str(diagnostic) if diagnostic else result
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason informational prose has no status color
-def info(message):
+def info(message: object) -> str:
     return wrap_text(message)
 
 
-# @testable false
-# @covered-by runner/presentation.py::status
-# @reason static activity labels share the semantic style contract
-def activity(message):
+def activity(message: object) -> str:
     return secondary(wrap_text(str(message).rstrip().rstrip(".") + "..."))
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_progress_modes
-# @matrix setup : portability spinner
-def plain_progress(console, stream=None):
+def plain_progress(console: Console | None, stream: TextIO | None = None) -> bool:
     stream = sys.stdout if stream is None else stream
     return (
         console is None
@@ -152,12 +138,8 @@ def plain_progress(console, stream=None):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_install_if_missing_pauses_active_spinner_for_prompt
-# @tests tests_tooling/test_001k_setup_console.py::test_progress_output_and_input
-# @matrix setup : package-install spinner
 @contextmanager
-def pause_progress():
+def pause_progress() -> Iterator[None]:
     global _PAUSE_DEPTH
     if _PAUSE_DEPTH == 0:
         for progress in reversed(ACTIVE_PROGRESS):
@@ -171,20 +153,20 @@ def pause_progress():
             ACTIVE_PROGRESS[-1].start()
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_progress_output_and_input
-# @matrix setup : package-install spinner
-def read_input(prompt=""):
+def read_input(prompt: str = "") -> str:
     """Preserve builtin input semantics while keeping the prompt stationary."""
     with pause_progress():
         return builtins.input(prompt) if prompt else builtins.input()
 
 
-# @testable true
-# @tests tests_tooling/test_001k_setup_console.py::test_progress_output_and_input
-# @tests tests_tooling/test_001k_setup_console.py::test_semantic_output
-# @matrix setup : operator-summary terminal-wrapping package-install spinner
-def output(*messages, sep=" ", end="\n", file=None, flush=False, raw=False):
+def output(
+    *messages: object,
+    sep: str = " ",
+    end: str = "\n",
+    file: TextIO | None = None,
+    flush: bool = False,
+    raw: bool = False,
+) -> None:
     """Print already-laid-out text literally, coordinating with active progress."""
     stream = sys.stdout if file is None else file
     active = next(
@@ -207,15 +189,10 @@ def output(*messages, sep=" ", end="\n", file=None, flush=False, raw=False):
         stream.flush()
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_formatter_tracks_active_spinners
-# @tests tests_tooling/test_001k_setup_console.py::test_progress_output_and_input
-# @tests tests_tooling/test_001k_setup_console.py::test_formatter_preserves_plain_and_colored_output
-# @matrix setup : package-install spinner
 class Progress:
     """One transient Rich indicator, with a static transcript fallback."""
 
-    def __init__(self, text="", *, success_text=None):
+    def __init__(self, text: str = "", *, success_text: str | None = None) -> None:
         self.text = unstyle(text).strip().rstrip(".")
         self.success_text = success_text
         self.stream = sys.stdout
@@ -225,7 +202,7 @@ class Progress:
         self.announced = False
         self.live = None
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         for progress in reversed(ACTIVE_PROGRESS):
             progress.stop()
         ACTIVE_PROGRESS.append(self)
@@ -236,7 +213,12 @@ class Progress:
             raise
         return self
 
-    def __exit__(self, exc_type, exc, tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> Literal[False]:
         try:
             self.stop()
         finally:
@@ -256,7 +238,7 @@ class Progress:
         self.spinner.update(text=Text(str(self.label), style="bright_black"))
         return self.spinner
 
-    def start(self):
+    def start(self) -> Self:
         if self.finished or self.running or _PAUSE_DEPTH:
             return self
         if plain_progress(self.console, self.stream):
@@ -276,13 +258,13 @@ class Progress:
         self.running = True
         return self
 
-    def stop(self):
+    def stop(self) -> Self:
         if self.live is not None and self.running:
             self.live.stop()
         self.running = False
         return self
 
-    def write(self, message, *, raw=False):
+    def write(self, message: object, *, raw: bool = False) -> None:
         output(message, file=self.stream, raw=raw)
 
     def _finish(self, kind, message):
@@ -292,11 +274,11 @@ class Progress:
         self.finished = True
         output(status(message, kind, stream=self.stream), file=self.stream)
 
-    def ok(self, message=None):
+    def ok(self, message: object = None) -> None:
         self._finish("success", message or self.success_text or f"Completed: {self.text}")
 
-    def fail(self, message=None):
+    def fail(self, message: object = None) -> None:
         self._finish("error", message or f"Failed: {self.text}")
 
-    def skip(self, message):
+    def skip(self, message: object) -> None:
         self._finish("neutral", message)

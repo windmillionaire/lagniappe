@@ -85,7 +85,6 @@ def _desktop_photo_toggle(user):
     return user.locate("#tabs nav[data-nav='tabs'] button[lp-show='photo:active']")
 
 
-# @matrix pages : image-add photo-prompt
 def test_add_image_to_page(get_admin, get_user):
     user = get_admin()
     page = user.go(Pages.test_add_image_page)
@@ -97,7 +96,6 @@ def test_add_image_to_page(get_admin, get_user):
     expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-7xl.*"))
 
 
-# @matrix pages : desktop-tabs photo-prompt
 def test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop(get_admin, get_user):
     user = get_admin()
     page = user.go(Pages.test_desktop_photo_prompt_page)
@@ -113,8 +111,6 @@ def test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop(get_admin,
     expect(desktop_photo_toggle).to_be_hidden()
 
 
-# @matrix entity-layout : dynamic-secondary page-mobile
-# @matrix pages : mobile-photo-tab photo-prompt
 # @template pages/page.html::main
 def test_mobile_photo_prompt_rejoins_section_switching(get_admin, get_user):
     user = get_admin()
@@ -135,7 +131,6 @@ def test_mobile_photo_prompt_rejoins_section_switching(get_admin, get_user):
     expect(photo_form).to_be_hidden()
 
 
-# @pair pages:image-replace
 def test_replace_image_on_page(get_admin, get_user):
     user = get_admin()
     page = user.go(Pages.test_image_page)
@@ -149,7 +144,6 @@ def test_replace_image_on_page(get_admin, get_user):
     _expect_cache_busted_image(form)
 
 
-# @matrix pages : image-generate photo-prompt
 def test_generate_image_on_page(get_admin, get_user):
     user = get_admin()
     page = user.go(Pages.test_generated_image_page)
@@ -190,7 +184,6 @@ def test_generate_image_on_page(get_admin, get_user):
         expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-7xl.*"))
 
 
-# @pair pages:image-paste
 def test_paste_image_on_page(get_admin, get_user):
     user = get_admin()
     page = user.go(Pages.test_image_page)
@@ -223,7 +216,6 @@ def test_paste_image_on_page(get_admin, get_user):
     _expect_cache_busted_image(form)
 
 
-# @pair pages:image-remove
 def test_remove_image_from_page(get_admin, get_user):
     user = get_admin()
     page = user.go(Pages.test_image_page)
@@ -238,7 +230,6 @@ def test_remove_image_from_page(get_admin, get_user):
     expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-5xl.*"))
 
 
-# @matrix pages : photo-visibility photo-prompt desktop-tabs mobile-photo-tab
 # @template pages/photo.html::image_controls
 # @template pages/page.html::main
 # @template pages/info.html::info_form
@@ -292,7 +283,6 @@ def test_photo_controls_toggle_and_remember_desktop_visibility(get_admin, get_us
     expect(user.locate(page.PHOTO_MENU_BUTTON)).to_be_visible()
 
 
-# @matrix pages : photo-visibility readonly
 # @template pages/photo.html::image_controls
 # @template pages/photo.html::card
 def test_readonly_viewer_can_toggle_image_without_editing(get_admin, get_user):
@@ -314,10 +304,8 @@ def test_readonly_viewer_can_toggle_image_without_editing(get_admin, get_user):
     expect(viewer.locate(page.PHOTO_MENU_BUTTON)).not_to_be_attached()
 
 
-# @matrix pages : photo-prompt ai-disabled
 # @template pages/photo.html::image_controls
 # @template pages/photo.html::image
-# @source src/script/widgets/pagePhoto.mjs::PagePhoto
 @pytest.mark.e2e_group("owner")
 def test_site_ai_disabled_upload_has_no_generation_controls(get_user, monkeypatch):
     from lagniappe import CONFIG
@@ -353,8 +341,6 @@ def test_site_ai_disabled_upload_has_no_generation_controls(get_user, monkeypatc
         expect(form).to_be_hidden()
 
 
-# @matrix pages : image-generate photo-visibility
-# @source src/script/widgets/pagePhoto.mjs::PagePhoto
 def test_cancel_generation_restores_previous_image_visibility(get_admin, get_user):
     user = get_admin()
     page = Pages.test_image_page.get(user)
@@ -390,11 +376,6 @@ def test_cancel_generation_restores_previous_image_visibility(get_admin, get_use
         expect(generate).to_be_focused()
 
 
-# @matrix pages : image-add image-replace image-remove unsaved-preservation
-# @pair edited-entity-notice:unchanged-form
-# @source src/script/forms/revisions/reconciler.mjs::EditReconciler
-# @source src/script/widgets/pagePhoto.mjs::PagePhoto.uploadImage
-# @source src/script/widgets/pagePhoto.mjs::PagePhoto._removeImage
 @pytest.mark.parametrize("dirty", [False, True])
 def test_image_changes_preserve_page_info_dom_and_draft(get_admin, get_user, dirty):
     user = get_admin()
@@ -456,8 +437,6 @@ def test_image_changes_preserve_page_info_dom_and_draft(get_admin, get_user, dir
             Entities.delete(saved)
 
 
-# @matrix pages : image-replace upload-error
-# @source src/script/widgets/pagePhoto.mjs::PagePhoto.uploadImage
 def test_failed_image_replacement_preserves_existing_image(get_admin, get_user, browser_failures):
     user = get_admin()
     page = user.go(Pages.test_image_page)
@@ -472,14 +451,16 @@ def test_failed_image_replacement_preserves_existing_image(get_admin, get_user, 
             body='{"error":"Image upload rejected"}',
         )
 
-    with scoped_browser_route(user.page.context, f"**{path}", reject_replacement):
-        with browser_failures.expect_http_error(user, status=422, path=path):
-            with user.page.expect_response(f"**{path}"):
-                with user.page.expect_file_chooser() as chooser:
-                    UploadDropdown.REPLACE.select(form)
-                chooser.value.set_files(Uploads.editor_test_image.definition.file.path)
-            expect(form.locator("[data-role='image-error']")).to_have_text("Image upload rejected")
-            image = form.locator("[data-role='existing-image'] img")
-            expect(image).to_be_visible()
-            expect(image).to_have_attribute("src", original_src)
-            expect(user.locate(page.PHOTO_PROMPT_UPLOAD)).to_be_enabled()
+    with (
+        scoped_browser_route(user.page.context, f"**{path}", reject_replacement),
+        browser_failures.expect_http_error(user, status=422, path=path),
+    ):
+        with user.page.expect_response(f"**{path}"):
+            with user.page.expect_file_chooser() as chooser:
+                UploadDropdown.REPLACE.select(form)
+            chooser.value.set_files(Uploads.editor_test_image.definition.file.path)
+        expect(form.locator("[data-role='image-error']")).to_have_text("Image upload rejected")
+        image = form.locator("[data-role='existing-image'] img")
+        expect(image).to_be_visible()
+        expect(image).to_have_attribute("src", original_src)
+        expect(user.locate(page.PHOTO_PROMPT_UPLOAD)).to_be_enabled()

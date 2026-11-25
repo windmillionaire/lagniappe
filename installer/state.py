@@ -1,5 +1,12 @@
 """Process locking and secret-free setup operation journaling."""
 
+from __future__ import annotations
+
+from collections.abc import Iterator, Mapping, Sequence
+from types import TracebackType
+from typing import Self
+
+
 from runner import presentation as ui
 from runner.presentation import output as print
 
@@ -10,6 +17,7 @@ from pathlib import Path
 import signal
 import subprocess
 import tempfile
+import time
 
 from runner.context import REPOSITORY_ROOT, setup_command
 from installer.errors import SetupError, SetupInterrupted
@@ -19,10 +27,6 @@ STATE_SCHEMA_VERSION = 1
 _ACTIVE_JOURNAL = None
 
 
-# @testable false
-# @covered-by installer/state.py::SetupProcessLock
-# @covered-by installer/state.py::OperationJournal
-# @reason platform permission adapter is owned by setup state persistence
 def _restrict_state_file(path):
     if os.name != "nt":
         os.chmod(path, 0o600)
@@ -59,9 +63,6 @@ def _restrict_state_file(path):
     return True
 
 
-# @testable false
-# @covered-by installer/state.py::setup_operation
-# @reason state-path selection is exercised through setup operation journaling
 def _state_dir():
     override = os.environ.get("LAGNIAPPE_SETUP_STATE_DIR")
     path = (
@@ -73,9 +74,6 @@ def _state_dir():
     return path
 
 
-# @testable false
-# @covered-by installer/state.py::OperationJournal
-# @reason atomic journal serialization is exercised through the journal contract
 def _write_json(path, payload):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -107,9 +105,6 @@ def _write_json(path, payload):
         temporary.unlink(missing_ok=True)
 
 
-# @testable false
-# @covered-by installer/state.py::SetupProcessLock
-# @reason process probe is owned by the setup lock contract
 def _pid_running(pid):
     if not pid:
         return False
@@ -120,19 +115,26 @@ def _pid_running(pid):
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @pair setup:process-lock
 class SetupProcessLock:
     """Cross-platform single-process lock based on atomic file creation."""
 
-    def __init__(self, path=None):
+    def __init__(
+        self,
+        path: str | Path | None = None,
+        *,
+        wait_seconds: float = 0.0,
+        poll_interval: float = 0.1,
+    ) -> None:
         self.path = Path(path or (_state_dir() / ".lagniappe_setup.lock"))
+        self.wait_seconds = max(0.0, float(wait_seconds))
+        self.poll_interval = max(0.01, float(poll_interval))
         self.acquired = False
 
-    def acquire(self):
+    def acquire(self) -> Self:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        for _attempt in range(2):
+        deadline = time.monotonic() + self.wait_seconds
+        stale_retries = 0
+        while True:
             try:
                 descriptor = os.open(
                     self.path,
@@ -146,11 +148,21 @@ class SetupProcessLock:
                     )
                 except (OSError, ValueError, json.JSONDecodeError):
                     payload = {}
-                if _pid_running(payload.get("pid")):
+                holder_pid = payload.get("pid")
+                if _pid_running(holder_pid):
+                    remaining = deadline - time.monotonic()
+                    if remaining > 0:
+                        time.sleep(min(self.poll_interval, remaining))
+                        continue
                     raise SetupError(
                         "Another Lagniappe setup process is already running "
-                        f"(pid {payload['pid']})."
-                    )
+                        f"(pid {holder_pid})."
+                    ) from None
+                if stale_retries >= 3:
+                    raise SetupError(
+                        "Could not acquire the Lagniappe setup process lock."
+                    ) from None
+                stale_retries += 1
                 self.path.unlink(missing_ok=True)
                 continue
             with os.fdopen(
@@ -173,27 +185,30 @@ class SetupProcessLock:
             _restrict_state_file(self.path)
             self.acquired = True
             return self
-        raise SetupError("Could not acquire the Lagniappe setup process lock.")
 
-    def release(self):
+    def release(self) -> None:
         if self.acquired:
             self.path.unlink(missing_ok=True)
             self.acquired = False
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self.acquire()
 
-    def __exit__(self, exc_type, exc, tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
         self.release()
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @matrix setup : operation-journal recovery
 class OperationJournal:
     """Persist the last safe setup boundary without settings or credentials."""
 
-    def __init__(self, mode, argv, path=None):
+    def __init__(
+        self, mode: str, argv: Sequence[str], path: str | Path | None = None
+    ) -> None:
         self.path = Path(
             path or (_state_dir() / "lagniappe_setup_operation.json")
         )
@@ -206,16 +221,24 @@ class OperationJournal:
             "mutations": [],
         }
 
-    def save(self):
+    def save(self) -> None:
         _write_json(self.path, self.payload)
 
-    def step(self, name):
+    def step(self, name: str) -> None:
         self.payload["last_step"] = str(name)
         self.save()
 
-    def mutation(self, step, *, action, resource, identifier, details=None):
+    def mutation(
+        self,
+        step: str,
+        *,
+        action: str,
+        resource: str,
+        identifier: str,
+        details: Mapping[str, object] | None = None,
+    ) -> None:
         self.payload["last_step"] = str(step)
-        mutation = {
+        mutation: dict[str, object] = {
             "step": str(step),
             "action": str(action),
             "resource": str(resource),
@@ -226,25 +249,26 @@ class OperationJournal:
         self.payload["mutations"].append(mutation)
         self.save()
 
-    def finish(self, status, error=None):
+    def finish(self, status: str, error: BaseException | None = None) -> None:
         self.payload["status"] = status
         if error is not None:
             self.payload["error_category"] = getattr(error, "category", "setup")
         self.save()
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @pair setup:operation-journal
-def record_step(name):
+def record_step(name: str) -> None:
     if _ACTIVE_JOURNAL is not None:
         _ACTIVE_JOURNAL.step(name)
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @matrix setup : operation-journal recovery
-def record_mutation(step, *, action, resource, identifier, details=None):
+def record_mutation(
+    step: str,
+    *,
+    action: str,
+    resource: str,
+    identifier: str,
+    details: Mapping[str, object] | None = None,
+) -> None:
     if _ACTIVE_JOURNAL is not None:
         _ACTIVE_JOURNAL.mutation(
             step,
@@ -255,16 +279,10 @@ def record_mutation(step, *, action, resource, identifier, details=None):
         )
 
 
-# @testable false
-# @covered-by installer/state.py::setup_operation
-# @reason platform signal adapter exercised through the setup operation boundary
 @contextmanager
 def _interrupt_handlers():
     previous = {}
 
-    # @testable false
-    # @covered-by installer/state.py::setup_operation
-    # @reason signal callback raises the typed interruption owned by its context
     def interrupt(signum, _frame):
         raise SetupInterrupted(f"Setup interrupted by signal {signum}.")
 
@@ -282,9 +300,6 @@ def _interrupt_handlers():
             signal.signal(signum, handler)
 
 
-# @testable false
-# @covered-by installer/state.py::setup_operation
-# @reason console rendering is exercised through interrupted operation recovery
 def _print_recovery(journal, prefix):
     print(f"{prefix} after: {journal.payload['last_step'] or 'start'}")
     mutations = journal.payload["mutations"]
@@ -309,11 +324,14 @@ def _print_recovery(journal, prefix):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_process_lock_and_operation_journal
-# @matrix setup : operation-journal process-lock recovery
 @contextmanager
-def setup_operation(mode, argv, *, lock_path=None, journal_path=None):
+def setup_operation(
+    mode: str,
+    argv: Sequence[str],
+    *,
+    lock_path: str | Path | None = None,
+    journal_path: str | Path | None = None,
+) -> Iterator[OperationJournal]:
     """Lock setup and report a secret-free exact resume command on failure."""
     global _ACTIVE_JOURNAL
 

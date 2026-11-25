@@ -21,9 +21,8 @@ import {
 	VIEW_ENTRIES,
 	VIEW_REGISTRY,
 	viewEntryUrl,
-} from "../../src/script/viewRegistry.mjs";
+} from "../../src/script/viewRegistry.ts";
 
-// @matrix build : optional-credentials release-version sentry source-maps
 test("test_sentry_build_uses_package_release_and_requires_upload_token", () => {
 	for (const settings of [
 		{},
@@ -56,7 +55,6 @@ test("test_sentry_build_uses_package_release_and_requires_upload_token", () => {
 	assert.doesNotMatch(rollupConfig, /name: settings\.VERSION/);
 });
 
-// @pair frontend-build:view-registry
 test("test_frontend_entries_and_startup_budget_contract", () => {
 	assert.equal(
 		viewEntryUrl("manual"),
@@ -129,11 +127,17 @@ test("test_frontend_entries_and_startup_budget_contract", () => {
 	oversized["script.js"].code = "x".repeat(STARTUP_BUDGETS.main + 1);
 	assert.throws(() => validateStartupBudgets(oversized), /main boot closure/);
 
-	const forbidden = structuredClone(bundle);
-	forbidden["chunks/views/page.js"].modules = {
-		[`/src/script${CORE_FORBIDDEN_MODULES[0]}`]: {},
-	};
-	assert.throws(() => validateStartupBudgets(forbidden), /statically includes/);
+	for (const extension of [".mjs", ".ts", ".mts"]) {
+		const forbidden = structuredClone(bundle);
+		const module = CORE_FORBIDDEN_MODULES[0].replace(/\.mjs$/, extension);
+		forbidden["chunks/views/page.js"].modules = {
+			[`/src/script${module}`]: {},
+		};
+		assert.throws(
+			() => validateStartupBudgets(forbidden),
+			/statically includes/,
+		);
+	}
 
 	for (const module of ["watcher", "reconciler", "modals", "preview"]) {
 		const revisions = structuredClone(bundle);
@@ -168,7 +172,6 @@ test("test_frontend_entries_and_startup_budget_contract", () => {
 	}
 });
 
-// @matrix frontend-build : modulepreload view-registry
 test("test_templates_preload_registered_view_and_interaction_foundations", () => {
 	const base = readFileSync(
 		"lagniappe/web/templates/layouts/base.html",
@@ -238,22 +241,21 @@ test("test_templates_preload_registered_view_and_interaction_foundations", () =>
 	}
 });
 
-// @matrix frontend-build : chunking interaction-foundation modulepreload
 test("test_interaction_preloads_have_stable_manual_chunks", () => {
 	const root = "/checkout/src/script/";
 	for (const module of [
-		"shared/endpoints.mjs",
-		"shared/errors.mjs",
-		"shared/notificationState.mjs",
-		"shared/request.mjs",
-		"shared/transitions.mjs",
-		"shared/utilities.mjs",
-		"views/base/shell.mjs",
+		"shared/endpoints.ts",
+		"shared/errors.ts",
+		"shared/notificationState.ts",
+		"shared/request.ts",
+		"shared/transitions.ts",
+		"shared/utilities.ts",
+		"views/base/shell.ts",
 	]) {
 		assert.equal(interactionFoundationChunk(`${root}${module}`), "foundation");
 	}
 	assert.equal(
-		interactionFoundationChunk(`${root}shared/connectivity.mjs`),
+		interactionFoundationChunk(`${root}shared/connectivity.ts`),
 		"connectivity",
 	);
 	assert.equal(
@@ -261,13 +263,13 @@ test("test_interaction_preloads_have_stable_manual_chunks", () => {
 		"connectivity",
 	);
 	for (const module of [
-		"elements/nav.mjs",
-		"views/base/component.mjs",
-		"views/base/core.mjs",
-		"views/base/reconciliation.mjs",
-		"views/base/services.mjs",
-		"views/base/task.mjs",
-		"widgets/loader.mjs",
+		"elements/nav.ts",
+		"views/base/component.ts",
+		"views/base/core.ts",
+		"views/base/reconciliation.ts",
+		"views/base/services.ts",
+		"views/base/task.ts",
+		"widgets/loader.ts",
 	]) {
 		assert.equal(
 			interactionFoundationChunk(`${root}${module}`),
@@ -275,24 +277,24 @@ test("test_interaction_preloads_have_stable_manual_chunks", () => {
 		);
 	}
 	assert.equal(
-		interactionFoundationChunk(`${root}views/base/entity.mjs`),
+		interactionFoundationChunk(`${root}views/base/entity.ts`),
 		"entity-foundation",
 	);
 	for (const module of [
-		"views/base/index.mjs",
-		"widgets/tables/visibilityState.mjs",
+		"views/base/index.ts",
+		"widgets/tables/visibilityState.ts",
 	]) {
 		assert.equal(
 			interactionFoundationChunk(`${root}${module}`),
 			"index-foundation",
 		);
 	}
-	assert.equal(interactionFoundationChunk(`${root}views/home.mjs`), undefined);
+	assert.equal(interactionFoundationChunk(`${root}views/home.ts`), undefined);
 	for (const module of [
-		"elements/editor/collaborative.mjs",
-		"elements/editor/readCache.mjs",
-		"elements/editor/toolbar.mjs",
-		"elements/editor/editor.mjs",
+		"elements/editor/collaborative.ts",
+		"elements/editor/readCache.ts",
+		"elements/editor/toolbar.ts",
+		"elements/editor/editor.ts",
 	]) {
 		assert.equal(interactionFoundationChunk(`${root}${module}`), "document");
 	}
@@ -307,68 +309,68 @@ test("test_interaction_preloads_have_stable_manual_chunks", () => {
 		);
 	}
 	assert.equal(
-		interactionFoundationChunk(`${root}widgets/user.mjs`),
+		interactionFoundationChunk(`${root}widgets/user.ts`),
 		"user-tools",
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}widgets/userPermissions.mjs`),
+		interactionFoundationChunk(`${root}widgets/userPermissions.ts`),
 		"user-tools",
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}forms/controller.mjs`),
+		interactionFoundationChunk(`${root}forms/controller.ts`),
 		"forms",
 	);
 	// Optional editor dialogs and specialized form fields keep their lazy boundary.
 	assert.equal(
-		interactionFoundationChunk(`${root}elements/editor/options/addLink.mjs`),
+		interactionFoundationChunk(`${root}elements/editor/options/addLink.ts`),
 		"editor-dialogs",
 	);
 	assert.equal(
 		interactionFoundationChunk(
-			`${root}elements/editor/options/toolbarButtons.mjs`,
+			`${root}elements/editor/options/toolbarButtons.ts`,
 		),
 		"document",
 	);
 	assert.equal(
 		interactionFoundationChunk(
-			`${root}elements/editor/options/documentHistory.mjs`,
+			`${root}elements/editor/options/documentHistory.ts`,
 		),
 		undefined,
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}widgets/uploadFile.mjs`),
+		interactionFoundationChunk(`${root}widgets/uploadFile.ts`),
 		"uploads",
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}shared/directUpload.mjs`),
+		interactionFoundationChunk(`${root}shared/directUpload.ts`),
 		undefined,
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}elements/table.mjs`),
+		interactionFoundationChunk(`${root}elements/table.ts`),
 		"form-complex",
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}elements/todo.mjs`),
+		interactionFoundationChunk(`${root}elements/todo.ts`),
 		"form-complex",
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}elements/select.mjs`),
+		interactionFoundationChunk(`${root}elements/select.ts`),
 		"forms",
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}elements/facetedSearch.mjs`),
+		interactionFoundationChunk(`${root}elements/facetedSearch.ts`),
 		"forms",
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}elements/primitives.mjs`),
+		interactionFoundationChunk(`${root}elements/primitives.ts`),
 		"ui-controls",
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}forms/controls/accessRestrictions.mjs`),
+		interactionFoundationChunk(`${root}forms/controls/accessRestrictions.ts`),
 		"permissions",
 	);
 	assert.equal(
-		interactionFoundationChunk(`${root}forms/controls/loader.mjs`),
+		interactionFoundationChunk(`${root}forms/controls/loader.ts`),
 		"forms",
 	);
 	assert.equal(interactionFoundationChunk("\0virtual:styles"), undefined);
@@ -380,13 +382,13 @@ test("test_interaction_preloads_have_stable_manual_chunks", () => {
 		"search",
 	]) {
 		assert.equal(
-			interactionFoundationChunk(`${root}elements/combobox/${module}.mjs`),
+			interactionFoundationChunk(`${root}elements/combobox/${module}.ts`),
 			"combobox",
 		);
 	}
 	for (const module of ["facets", "select", "submitter"]) {
 		assert.equal(
-			interactionFoundationChunk(`${root}elements/combobox/${module}.mjs`),
+			interactionFoundationChunk(`${root}elements/combobox/${module}.ts`),
 			"forms",
 		);
 	}
@@ -406,8 +408,6 @@ test("test_interaction_preloads_have_stable_manual_chunks", () => {
 	}
 });
 
-// @source build/publication.mjs::recordBuildArtifacts
-// @matrix frontend-build : artifact-inventory chunking view-registry warnings build-modes
 test("test_rollup_modes_preserve_bundle_and_publication_contracts", async () => {
 	const repositoryRoot = process.cwd();
 	const fixture = mkdtempSync(join(tmpdir(), "lagniappe-build-version-"));
@@ -436,14 +436,14 @@ test("test_rollup_modes_preserve_bundle_and_publication_contracts", async () => 
 			);
 			assert.equal(bundles.length, 3);
 			const [login, sentry, main] = bundles;
-			assert.equal(login.input, "./src/script/login.mjs");
-			assert.equal(sentry.input, "./src/script/sentry.mjs");
+			assert.equal(login.input, "./src/script/login.ts");
+			assert.equal(sentry.input, "./src/script/sentry.ts");
 			assert.equal(login.output.file, "./lagniappe/web/static/login.js");
 			assert.equal(login.output.inlineDynamicImports, true);
 			assert.equal(sentry.output.inlineDynamicImports, true);
 			assert.equal(sentry.output.file, "./lagniappe/web/static/sentry.js");
-			assert.equal(main.input.main, "./src/script/main.mjs");
-			assert.equal(main.input.public, "./src/script/public.mjs");
+			assert.equal(main.input.main, "./src/script/main.ts");
+			assert.equal(main.input.public, "./src/script/public.ts");
 			assert.deepEqual(
 				Object.keys(main.input).sort(),
 				["main", "public", ...Object.keys(VIEW_ENTRIES)].sort(),

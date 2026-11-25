@@ -55,8 +55,6 @@ def _fixture():
     return page, task, form
 
 
-# @source lagniappe/web/routes/pages/main.py::tasks
-# @matrix tasks cache : conditional-response durable-revision viewer-scope
 @pytest.mark.e2e_group("owner")
 def test_unchanged_task_list_skips_loading_and_invalidates_on_save(get_user, monkeypatch, quiet_control):
     owner = get_user(Users.OWNER)
@@ -99,12 +97,6 @@ def test_unchanged_task_list_skips_loading_and_invalidates_on_save(get_user, mon
     assert b"Task after" not in denied.data
 
 
-# @source lagniappe/web/auth.py::_load_session_user_context
-# @source lagniappe/web/auth.py::_load_request_context
-# @source lagniappe/web/auth.py::permission
-# @source lagniappe/web/routes/pages/main.py::tasks
-# @matrix auth : batch-load session-preload fallback
-# @matrix tasks cache : conditional-response
 @pytest.mark.e2e_group("owner")
 def test_task_list_batches_validation_with_session_context(get_user, monkeypatch, quiet_control):
     owner = get_user(Users.OWNER)
@@ -151,9 +143,6 @@ def test_task_list_batches_validation_with_session_context(get_user, monkeypatch
     assert len(calls) == 2
 
 
-# @source lagniappe/web/routes/pages/main.py::tasks
-# @matrix experiments : task-list-comparison
-# @matrix tasks cache : conditional-response
 @pytest.mark.e2e_group("owner")
 def test_experiments_compare_task_list_paths_without_changing_content_or_access(
     get_user, monkeypatch, quiet_control,
@@ -198,11 +187,6 @@ def test_experiments_compare_task_list_paths_without_changing_content_or_access(
         assert denied.status_code == 403 and b"Task before" not in denied.data
 
 
-# @source lagniappe/web/auth.py::_load_session_user_context
-# @source lagniappe/web/deferred_autofill.py::finish_task_list_validation
-# @source lagniappe/web/routes/pages/main.py::tasks
-# @matrix auth : batch-load
-# @matrix tasks cache : conditional-response concurrent-render
 @pytest.mark.e2e_group("owner")
 def test_task_list_detects_change_after_batched_root_read(get_user, monkeypatch, quiet_control):
     owner = get_user(Users.OWNER)
@@ -231,8 +215,6 @@ def test_task_list_detects_change_after_batched_root_read(get_user, monkeypatch,
     assert settled.status_code == 200 and settled.headers.get("ETag")
 
 
-# @source lagniappe/web/routes/pages/main.py::tasks
-# @matrix tasks cache : conditional-response job-lifecycle concurrent-render
 @pytest.mark.e2e_group("owner")
 def test_task_list_job_boundaries_and_render_race(get_user, monkeypatch, quiet_control):
     owner = get_user(Users.OWNER)
@@ -281,8 +263,6 @@ def test_task_list_job_boundaries_and_render_race(get_user, monkeypatch, quiet_c
     assert client.get(path, headers={"If-None-Match": settled.headers["ETag"]}).status_code == 304
 
 
-# @source lagniappe/web/routes/pages/main.py::tasks
-# @matrix tasks cache permissions : conditional-response immediate-revocation inherited-restrictions
 @pytest.mark.e2e_group("owner")
 @pytest.mark.parametrize("restriction", ["page", "page-form", "task-form"])
 def test_task_list_rechecks_restrictions_for_cached_viewer(get_user, quiet_control, restriction):

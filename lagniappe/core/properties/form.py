@@ -1,7 +1,8 @@
 """Form-related properties for form type filtering and display."""
-
 import hashlib
 import json
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Literal, cast
 
 from ..definitions import Ordering
 from ..exceptions import ValidationError
@@ -12,17 +13,16 @@ from ..mixins import (
     DetailsMixin,
     FilterMixin,
 )
-
-# from ..tools import cache
 from .base_db import DBProperty
 from .base_filters import Filters
 from .form_table import Table
 
+if TYPE_CHECKING:
+    from ..entities.form import Form
+    from .base_schema import FieldDefinition
 
-# @testable true
-# @tests tests_unit/test_004_form_properties.py::test_form_type
-# @matrix form-type : cache column details property
-class FormType(AIMixin, ColumnMixin, DetailsMixin, CacheMixin, DBProperty):
+
+class FormType(AIMixin, ColumnMixin, DetailsMixin, CacheMixin, DBProperty[str, "Form"]):
     """Form type classification (e.g. "page", "task").
 
     Set:
@@ -42,43 +42,37 @@ class FormType(AIMixin, ColumnMixin, DetailsMixin, CacheMixin, DBProperty):
     _ordering = Ordering.CATEGORICAL
 
     @property
-    def sort_value(self):
+    def sort_value(self) -> dict[str, str] | None:
         return {self.value.capitalize(): self.value} if self.value else None
 
     @property
-    def ai_key(self):
+    def ai_key(self) -> str:
         return self.id
 
     # Cache Attributes
     @property
-    def cache_value(self):
+    def cache_value(self) -> str | None:
         return self.value
 
     @property
-    def cache_key(self):
+    def cache_key(self) -> str:
         return "type"
 
 
-# @testable true
-# @tests tests_unit/test_012b_form_conditions.py::test_form_status_filters
-# @matrix filters status : form-filters status-excluded
 class FormFilters(Filters):
     _filter_fields = []
 
-    # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_filters
-    # @matrix filters form : schema-fields
     @property
-    def fields(self):
+    def fields(self) -> dict[str, FilterMixin]:
         if self.entity.db.get("pending_form_change"):
             return {}
         return {
             k: v
-            for k, v in self.entity.fields.items()
+            for k, v in cast("Form", self.entity).fields.items()
             if isinstance(v, FilterMixin) and not isinstance(v, Table)
         }
 
-    def _condition(self, field):
+    def _condition(self, field: FilterMixin) -> dict[str, object]:
         return {
             "field": field.filter_key,
             "label": field.label,
@@ -86,24 +80,19 @@ class FormFilters(Filters):
             "icon": field.icon,
         }
 
-    # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_filters
-    # @matrix filters form : conditions exclude-table-fields schema-fields
     @property
-    def conditions(self):
-        if getattr(self, "_conditions", None):
-            return self._conditions
+    def conditions(self) -> list[dict[str, object]]:
+        if cached := getattr(self, "_conditions", None):
+            return cached
 
         self._conditions = [self._condition(field) for field in self.fields.values()]
         return self._conditions
 
 
-# @testable true
-# @tests tests_unit/test_004_form_properties.py::test_submission_conversion_requires_changes_to_existing_values
-# @tests tests_unit/test_004_form_properties.py::test_submission_conversion_preserves_presentation_and_additions
-# @tests tests_unit/test_004_form_properties.py::test_submission_conversion_ignores_fields_without_answers_and_unused_link_setting
-# @matrix form : generation value-conversion
-def requires_submission_conversion(previous_schema, proposed_schema):
+def requires_submission_conversion(
+    previous_schema: Iterable[FieldDefinition] | None,
+    proposed_schema: Iterable[FieldDefinition] | None,
+) -> bool:
     """Compare normalized definitions for changes that affect existing values.
 
     Labels, presentation, ordering and additions leave saved values readable.
@@ -130,24 +119,21 @@ def requires_submission_conversion(previous_schema, proposed_schema):
         ):
             return True
         if kind in {"select", "radio"}:
-            option_values = {option["value"] for option in proposed.get("options", [])}
+            option_values = {option["value"] for option in cast("list[dict[str, str]]", proposed.get("options", []))}
             if any(
                 option["value"] not in option_values
-                for option in previous.get("options", [])
+                for option in cast("list[dict[str, str]]", previous.get("options", []))
             ):
                 return True
         if kind == "table" and requires_submission_conversion(
-            previous.get("columns", []), proposed.get("columns", []),
+            cast("list[FieldDefinition]", previous.get("columns", [])),
+            cast("list[FieldDefinition]", proposed.get("columns", [])),
         ):
             return True
     return False
 
 
-# @testable true
-# @tests tests_unit/test_004_form_properties.py::test_form_generation_defaults_to_zero_without_reinterpreting_legacy_versions
-# @tests tests_unit/test_004_form_properties.py::test_form_generation_stores_nonnegative_integers
-# @matrix form : generation defaults validation
-class FormGeneration(DBProperty):
+class FormGeneration(DBProperty[int, "Form"]):
     """Submission representation generation, advanced explicitly at publication.
 
     Missing generations start at zero, independently of older version fields.
@@ -156,33 +142,27 @@ class FormGeneration(DBProperty):
     _id = "generation"
 
     @property
-    def value(self):
+    def value(self) -> int:
         value = super().value
         return 0 if value is None else value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: object) -> None:
         if type(value) is not int or value < 0:
             raise ValidationError("Form generation must be a nonnegative integer.")
-        DBProperty.value.fset(self, value)
+        self._write_db_value(value)
 
 
-# @testable true
-# @tests tests_unit/test_004_form_properties.py::test_schema_version_update_changes_when_schema_changes
-# @tests tests_unit/test_004_form_properties.py::test_schema_version_tracks_metadata_and_static_content
-# @tests tests_unit/test_004_form_properties.py::test_schema_version_ignores_name_storage_paths_and_unrelated_assets
-# @tests tests_unit/test_004_form_properties.py::test_schema_version_requires_static_content_fingerprints
-# @matrix form : schema-version update content-fingerprint
-class SchemaVersion(DBProperty):
+class SchemaVersion(DBProperty[str, "Form"]):
     """Content fingerprint used to invalidate cached Form presentations."""
 
     _id = "version"
 
-    def update(self):
+    def update(self) -> str | Literal[False] | None:
         """Refresh the schema and published HTML/image fingerprint."""
         previous_version = super().value
         html_ids = {
-            field["id"] for field in self.entity.schema if field.get("type") == "html"
+            cast(str, field["id"]) for field in self.entity.schema if field.get("type") == "html"
         }
         assets = {
             name: {key: asset.get(key) for key in ("type", "fingerprint")}

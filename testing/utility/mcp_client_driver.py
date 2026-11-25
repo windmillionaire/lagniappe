@@ -68,9 +68,6 @@ def _write_json(path: Path, value: Any) -> None:
         raise
 
 
-# @testable true
-# @tests tests_unit/test_033_mcp_adapter.py::test_hosted_driver_transport_scopes_only_run_cookie
-# @matrix hosted-e2e mcp-adapter : authentication transport origin-isolation
 class HostedRunTransport(httpx.AsyncBaseTransport):
     """Test-only deployment credential; never an application login session."""
 
@@ -317,7 +314,9 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
                 },
             },
         )
-        ask_get = await _call(client, "get_plan", {"plan_id": ask["id"]})
+        ask_get = await _call(
+            client, "get_plan", {"plan_id": ask["id"], "include_proposal": True}
+        )
         result["ask"] = {
             "start": ask_start,
             "search": search,
@@ -396,7 +395,9 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
                 "instructions": "Prepare the revised field guide Page for browser review.",
             },
         )
-        replacement_get = await _call(client, "get_plan", {"plan_id": create["id"]})
+        replacement_get = await _call(
+            client, "get_plan", {"plan_id": create["id"], "include_proposal": True}
+        )
         result["create"] = {
             "start": create_start,
             "selected_contract": create_contract_call,
@@ -451,7 +452,9 @@ async def _workflow(specification: dict[str, Any]) -> tuple[dict[str, Any], str]
             "start": update_start,
             "contract": update_contract,
             "receipt": update_receipt,
-            "get": await _call(client, "get_plan", {"plan_id": update["id"]}),
+            "get": await _call(
+                client, "get_plan", {"plan_id": update["id"], "include_proposal": True}
+            ),
         }
 
         organize_start = await _call(
@@ -597,9 +600,6 @@ async def _foreign_plan(specification: dict[str, Any]) -> tuple[dict[str, Any], 
     return result, diagnostics_text
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013b_agent_api_mcp.py::test_rest_and_mcp_share_submission_validation
-# @pair mcp-adapter:product-contract
 async def _submission_parity(specification: dict[str, Any]) -> tuple[dict[str, Any], str]:
     """Submit identical candidates through both public paths, with real validators."""
     async with _connection() as client:
@@ -634,9 +634,6 @@ async def _submission_parity(specification: dict[str, Any]) -> tuple[dict[str, A
         return result, ""
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_e2e/013_agent_api/test_013b_agent_api_mcp.py::test_mcp_original_pdf_download_uses_existing_api_and_storage
 async def _original_file(specification: dict[str, Any]) -> tuple[dict[str, Any], str]:
     """Consume download credentials in memory; persist only source evidence."""
     async with _connection() as client:

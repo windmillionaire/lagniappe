@@ -23,7 +23,6 @@ def _set_forms_permission(user, action):
     user.entity = entity
 
 
-# @matrix forms : builder-save focus-recovery persistent-error retryable-action
 # @template forms/builder.html::header
 def test_builder_save_failure_releases_control_for_retry(
     get_admin, get_user, browser_failures

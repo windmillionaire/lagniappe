@@ -1,4 +1,13 @@
-from datetime import datetime, timezone
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Literal, TypedDict
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+
+from datetime import datetime, UTC
+import re
 import secrets
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
@@ -26,6 +35,7 @@ from lagniappe.core.tools.services import identity_platform
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
 from lagniappe.web.auth import (
     clear_login_session,
+    is_demo_guest_session,
     login_cache_invalidation_required,
     request_client_cache_invalidation,
     seed_login_session,
@@ -37,13 +47,104 @@ from . import users
 
 REMEMBER_PREFERENCE_COOKIE = "lagniappe_remember"
 AGENT_ACCESS_SCOPE = "agent-login"
+DEMO_LOGIN_SCOPE = "demo-login"
+_LOGIN_NOTICE_MAX_LENGTH = 500
+_LOGIN_NOTICE_LINK_PATTERN = re.compile(
+    r"\[([^\[\]\n]{1,120})\]\(([^()\s]{1,300})\)"
+)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/users/login.py::login
-# @covered-by lagniappe/web/routes/users/login.py::login_agent
-# @covered-by lagniappe/web/routes/users/login.py::login_identity
-# @reason tiny wrapper keeps Flask-Login and Lagniappe session seeding together
+class LoginNoticeSegment(TypedDict):
+    kind: Literal["text", "link", "break"]
+    text: str
+    href: str
+    external: bool
+
+
+def _safe_notice_link(url: str) -> tuple[str, bool] | None:
+    """Allow only internal root-relative paths or explicit HTTPS URLs."""
+    candidate = url.strip()
+    if not candidate or any(ord(ch) < 32 for ch in candidate):
+        return None
+    if candidate.startswith("/"):
+        if candidate.startswith(("//", "/\\")):
+            return None
+        return candidate, False
+    parts = urlsplit(candidate)
+    if parts.scheme == "https" and parts.netloc:
+        return candidate, True
+    return None
+
+
+def parse_login_notice(raw: object) -> list[LoginNoticeSegment]:
+    """Parse an optional plain-text login notice with safe inline links."""
+    text = str(raw or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not text:
+        return []
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    if len(text) > _LOGIN_NOTICE_MAX_LENGTH:
+        text = text[:_LOGIN_NOTICE_MAX_LENGTH].rstrip()
+
+    segments: list[LoginNoticeSegment] = []
+
+    def append_plain(chunk: str) -> None:
+        if not chunk:
+            return
+        lines = chunk.split("\n")
+        for index, line in enumerate(lines):
+            if line:
+                segments.append(
+                    {"kind": "text", "text": line, "href": "", "external": False}
+                )
+            if index < len(lines) - 1:
+                segments.append(
+                    {"kind": "break", "text": "", "href": "", "external": False}
+                )
+
+    cursor = 0
+    for match in _LOGIN_NOTICE_LINK_PATTERN.finditer(text):
+        append_plain(text[cursor : match.start()])
+        label = match.group(1).strip()
+        safe = _safe_notice_link(match.group(2)) if label else None
+        if safe is not None:
+            href, external = safe
+            segments.append(
+                {
+                    "kind": "link",
+                    "text": label,
+                    "href": href,
+                    "external": external,
+                }
+            )
+        else:
+            append_plain(match.group(0))
+        cursor = match.end()
+
+    append_plain(text[cursor:])
+    return segments
+
+
+def _demo_guest_email() -> str:
+    return str(getattr(CONFIG, "DEMO_GUEST_EMAIL", "") or "").strip().casefold()
+
+
+def _demo_guest_privileged_email(email: str) -> bool:
+    owner_email = str(getattr(CONFIG, "ADMIN_EMAIL", "") or "").strip().casefold()
+    bootstrap_email = (
+        str(getattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", "") or "").strip().casefold()
+    )
+    return bool(email and email in {owner_email, bootstrap_email})
+
+
+def _demo_guest_enabled(owner_setup: bool) -> bool:
+    demo_email = _demo_guest_email()
+    return bool(
+        demo_email
+        and not owner_setup
+        and not _demo_guest_privileged_email(demo_email)
+    )
+
+
 def _login_and_seed(user, remember=False):
     invalidate_cache = login_cache_invalidation_required(user)
     login_user(user, remember=remember)
@@ -53,9 +154,6 @@ def _login_and_seed(user, remember=False):
     )
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
-# @pair login:remember-cookie
 def _remember_preference(default=True):
     """Read the user's remember-me preference from a lightweight cookie."""
     preference = request.cookies.get(REMEMBER_PREFERENCE_COOKIE)
@@ -65,9 +163,6 @@ def _remember_preference(default=True):
     return preference not in {"0", "false", "False"}
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
-# @pair login:owner-bootstrap
 def _owner_requires_first_login():
     """Return whether the configured owner still needs an initial login."""
     owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().lower()
@@ -81,10 +176,6 @@ def _owner_requires_first_login():
     return Entities.USER(exists).last_login is None
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_delegated_bootstrap_admin_requires_exact_google_email_and_closes_after_owner_login
-# @matrix admin : exact-email google-only
-# @matrix login : bootstrap owner-first-login
 def _bootstrap_admin_allowed(email):
     """Allow exactly the configured installer while the Owner is uninitialized."""
     bootstrap_email = (
@@ -98,9 +189,6 @@ def _bootstrap_admin_allowed(email):
     )
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_login_returns_to_requested_url_after_redirect
-# @pair login:redirect-target
 def _safe_redirect_target(target):
     """Return an internal redirect target, or None if the target is unsafe."""
     if not target:
@@ -125,10 +213,6 @@ def _safe_redirect_target(target):
     return urlunsplit(("", "", parts.path, parts.query, parts.fragment))
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_login_returns_to_requested_url_after_redirect
-# @tests tests_e2e/001_site/test_001b_login.py::test_login_accepts_google_state_redirect_target
-# @pair login:redirect-target
 def _login_redirect_url():
     """Choose the post-login destination, falling back to home."""
     targets = (
@@ -144,10 +228,6 @@ def _login_redirect_url():
     return url_for("home.home_page")
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_login_returns_to_requested_url_after_redirect
-# @tests tests_e2e/001_site/test_001b_login.py::test_login_google_buttons_carry_safe_next_state
-# @pair login:redirect-target
 def _store_safe_next_from_query():
     """Persist a safe next query parameter for redirect-based auth handoffs."""
     target = request.args.get("next")
@@ -162,9 +242,6 @@ def _store_safe_next_from_query():
     return _safe_redirect_target(session.get("next"))
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/users/login.py::login_agent
-# @reason tiny content negotiation helper owned by agent login route
 def _wants_json_response():
     return (
         request.headers.get("X-Lagniappe-Request") == "true"
@@ -174,9 +251,6 @@ def _wants_json_response():
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/users/login.py::login_agent
-# @reason template context helper owned by agent login route
 def _agent_login_template(error=None, status=200):
     _store_safe_next_from_query()
     return (
@@ -194,9 +268,6 @@ def _agent_login_template(error=None, status=200):
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/users/login.py::_enforce_auth_rate_limit
-# @reason response-shaping helper exercised through the auth rate-limit wrapper
 def _rate_limit_response(message, retry_after, json_mode=True):
     """Return either JSON or plain-text 429 responses for auth endpoints."""
     if json_mode:
@@ -209,9 +280,6 @@ def _rate_limit_response(message, retry_after, json_mode=True):
     return response
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_login_identity_returns_rate_limit_response
-# @pair login:rate-limit
 def _enforce_auth_rate_limit(scope, limit, window_seconds, json_mode=True):
     """Apply a small fixed-window auth rate limit keyed by client IP."""
     ip = client_ip(request)
@@ -238,9 +306,6 @@ def _enforce_auth_rate_limit(scope, limit, window_seconds, json_mode=True):
     )
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_auth_action_url_preserves_safe_login_destination
-# @matrix login : authentication-email redirect-target
 def _auth_action_url(mode, oob_code, next_target=None):
     """Build a Lagniappe action URL on the configured login origin."""
     login_uri = str(getattr(CONFIG, "GOOGLE_LOGIN_URI", "") or "").strip()
@@ -255,9 +320,6 @@ def _auth_action_url(mode, oob_code, next_target=None):
     return urlunsplit((origin.scheme, origin.netloc, "/users/login", query, ""))
 
 
-# @testable false
-# @manual true
-# @reason orchestration requires live Identity Platform code generation and Gmail
 def _send_auth_action_email(email, action, *, user_ip=None, next_target=None):
     """Generate an Identity Platform action code and email its Lagniappe URL."""
     request_type = {
@@ -278,12 +340,13 @@ def _send_auth_action_email(email, action, *, user_ip=None, next_target=None):
     auth_email.send_auth_email(email, subject, text_body, html_body)
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_delegated_bootstrap_admin_requires_exact_google_email_and_closes_after_owner_login
-# @matrix admin : exact-email google-only
-# @matrix login : bootstrap provisioning
-# @pair owner:provisioning
-def verify_user(email, name, picture, *, allow_bootstrap_admin=False):
+def verify_user(
+    email: str,
+    name: str | None,
+    picture: str | None,
+    *,
+    allow_bootstrap_admin: bool = False,
+) -> models.User | None:
     """Verify and create/update user based on authentication."""
     email = str(email or "").strip().lower()
     exists = database_get.user(email)
@@ -321,25 +384,14 @@ def verify_user(email, name, picture, *, allow_bootstrap_admin=False):
     else:
         user = Entities.USER(exists)
 
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = datetime.now(UTC)
     user.save()
 
     return user
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_login_page_loads
-# @tests tests_e2e/001_site/test_001b_login.py::test_user_login_success
-# @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
-# @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
-# @tests tests_e2e/001_site/test_001b_login.py::test_unregistered_google_error_returns_to_method_chooser
-# @tests tests_e2e/001_site/test_001b_login.py::test_disabled_google_error_returns_to_method_chooser
-# @tests tests_e2e/001_site/test_001b_login.py::test_login_hides_google_when_provider_is_disabled
-# @tests tests_e2e/001_site/test_001b_login.py::test_google_signin_setting_disables_ui_and_callback
-# @tests tests_e2e/001_site/test_001b_login.py::test_google_signin_uses_response_specific_style_nonces
-# @matrix login : auth-method authorization-error cookie-hardening disabled-account disabled-provider form-state google-oauth operator-intent owner-bootstrap page-load safe-error session test-user
 @users.route("/login", methods=["GET"])
-def login():
+def login() -> ResponseReturnValue:
     test_user = request.values.get("test_user", "").strip()
     if current_user.is_authenticated and not test_user:
         return render_template("users/logged_in.html")
@@ -367,11 +419,10 @@ def login():
         if not exists and test_user == CONFIG.ADMIN_EMAIL:
             user = Entities.USER.create({"email": test_user, "name": CONFIG.ADMIN_NAME})
             user.save()
-            exists = user.db
         elif not exists:
             abort(403, "User not registered")
-
-        user = Entities.USER(exists)
+        else:
+            user = Entities.USER(exists)
         if not user.is_test_user:
             user.is_test_user = True
             user.save()
@@ -409,7 +460,7 @@ def login():
             "This account is disabled and cannot sign in. "
             "Contact the site owner if you think this is a mistake."
         ),
-    }.get(request.args.get("authError"))
+    }.get(request.args.get("authError", ""))
     return render_template(
         "users/login.html",
         mode=request.args.get("mode"),
@@ -423,14 +474,58 @@ def login():
         owner_setup=owner_setup,
         owner_email=CONFIG.ADMIN_EMAIL if owner_setup else "",
         auth_error=auth_error,
+        demo_guest_enabled=_demo_guest_enabled(owner_setup),
+        login_notice_segments=parse_login_notice(getattr(CONFIG, "LOGIN_NOTICE", "")),
     )
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_agent_access_login_form_creates_session
-# @matrix login : agent-access session user-page
+@users.route("/demo-login", methods=["POST"])
+def demo_login() -> ResponseReturnValue:
+    """Sign into the optional read-only demo guest account."""
+    demo_email = _demo_guest_email()
+    if not demo_email or _owner_requires_first_login():
+        abort(404)
+
+    wants_json = _wants_json_response()
+    limited = _enforce_auth_rate_limit(
+        DEMO_LOGIN_SCOPE, 20, 300, json_mode=wants_json
+    )
+    if limited:
+        return limited
+
+    if _demo_guest_privileged_email(demo_email):
+        exceptions.capture(
+            "Refusing demo guest login for privileged account",
+            context={"auth": {"operation": "demo_login"}},
+            level="warning",
+        )
+        abort(403, "Demo guest account is unavailable.")
+
+    exists = database_get.user(demo_email)
+    if not exists:
+        abort(403, "Demo guest account is unavailable.")
+
+    user = Entities.USER(exists)
+    if getattr(user, "is_owner", False) or getattr(user, "is_admin", False):
+        exceptions.capture(
+            "Refusing demo guest login for administrator account",
+            context={"auth": {"operation": "demo_login"}},
+            level="warning",
+        )
+        abort(403, "Demo guest account is unavailable.")
+
+    _login_and_seed(user, remember=False)
+    session[CONFIG.LOGIN_DEMO_GUEST_KEY] = True
+    record_login(user, "demo-guest")
+
+    target = _login_redirect_url()
+    if wants_json:
+        return jsonify({"success": True, "redirect": target})
+    return redirect(target, code=302)
+
+
 @users.route("/agent-login", methods=["GET", "POST"])
-def login_agent():
+def login_agent() -> ResponseReturnValue:
     if not agent_access.enabled():
         abort(404)
 
@@ -449,6 +544,8 @@ def login_agent():
         return _agent_login_template("Invalid access code", status=401)
 
     user = agent_access.get_or_create_user()
+    if not isinstance(user, Entities.USER):
+        abort(403)
     _login_and_seed(user, remember=_remember_preference(default=True))
     record_login(user, "agent")
 
@@ -457,13 +554,8 @@ def login_agent():
     return redirect(_login_redirect_url(), code=302)
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_csrf_exempt_surfaces_reach_replacement_authentication_gates
-# @tests tests_e2e/001_site/test_001b_login.py::test_google_signin_enforces_double_submit_csrf_before_provider_auth
-# @matrix csrf : double-submit exemption-policy
-# @pair login:google-signin
 @users.route("/google-signin", methods=["POST"])
-def login_google():
+def login_google() -> ResponseReturnValue:
     """Exchange a Google credential through Identity Platform and sign in."""
     limited = _enforce_auth_rate_limit("google-signin", 20, 300, json_mode=False)
     if limited:
@@ -478,7 +570,7 @@ def login_google():
         safe_state = _safe_redirect_target(request.values.get("state"))
         if safe_state:
             query["next"] = safe_state
-        return redirect(url_for("users.login", **query))
+        return redirect(url_for("users.login", authError=query.get("authError"), next=query.get("next")))
 
     token = request.values.get("credential")
     if not token:
@@ -496,13 +588,13 @@ def login_google():
             not registered
             and google_email != owner_email
             and not _bootstrap_admin_allowed(google_email)
+            and not Entities.PUBLIC_GROUP.enabled()
         ):
-            if not Entities.PUBLIC_GROUP.enabled():
-                query = {"authError": "google-not-registered"}
-                safe_state = _safe_redirect_target(request.values.get("state"))
-                if safe_state:
-                    query["next"] = safe_state
-                return redirect(url_for("users.login", **query))
+            query = {"authError": "google-not-registered"}
+            safe_state = _safe_redirect_target(request.values.get("state"))
+            if safe_state:
+                query["next"] = safe_state
+            return redirect(url_for("users.login", authError=query.get("authError"), next=query.get("next")))
 
         google_login = urlsplit(CONFIG.GOOGLE_LOGIN_URI)
         identity_request_uri = urlunsplit(
@@ -513,8 +605,11 @@ def login_google():
             CONFIG.IDENTITY_PLATFORM_CONFIG,
             identity_request_uri,
         )
+        id_token = exchange.get("idToken")
+        if not isinstance(id_token, str):
+            raise identity_platform.IdentityPlatformError("Missing identity token")
         idinfo = identity_platform.verify_identity_token(
-            exchange["idToken"],
+            id_token,
             CONFIG.IDENTITY_PLATFORM_CONFIG["projectId"],
         )
 
@@ -528,8 +623,8 @@ def login_google():
 
         user = verify_user(
             email,
-            name,
-            picture,
+            name if isinstance(name, str) else None,
+            picture if isinstance(picture, str) else None,
             allow_bootstrap_admin=True,
         )
         if not user:
@@ -553,7 +648,7 @@ def login_google():
             safe_state = _safe_redirect_target(request.values.get("state"))
             if safe_state:
                 query["next"] = safe_state
-            return redirect(url_for("users.login", **query))
+            return redirect(url_for("users.login", authError=query.get("authError"), next=query.get("next")))
         abort(401, "Invalid token")
     except ValueError as e:
         context = {
@@ -568,12 +663,8 @@ def login_google():
     return redirect(_login_redirect_url())
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_login_identity_returns_rate_limit_response
-# @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
-# @matrix login : email-password hosted-e2e identity-platform rate-limit token-verification
 @users.route("/login-identity", methods=["POST"])
-def login_identity():
+def login_identity() -> ResponseReturnValue:
     """Handle Identity Platform email/password authentication."""
     try:
         limited = _enforce_auth_rate_limit("login-identity", 20, 300)
@@ -604,7 +695,8 @@ def login_identity():
             exceptions.capture(e, context)
             return jsonify({"success": False, "error": "Invalid token"}), 401
 
-        email = decoded_token.get("email", "").strip().lower()
+        email_claim = decoded_token.get("email")
+        email = email_claim.strip().lower() if isinstance(email_claim, str) else ""
         if not email:
             return jsonify({"success": False, "error": "No email in token"}), 401
 
@@ -623,7 +715,11 @@ def login_identity():
         name = data.get("name") or decoded_token.get("name") or email.split("@")[0]
         remember = data.get("remember", False)
 
-        user = verify_user(email, name, decoded_token.get("picture"))
+        picture = decoded_token.get("picture")
+        user = verify_user(
+            email, name if isinstance(name, str) else None,
+            picture if isinstance(picture, str) else None,
+        )
         if not user:
             return (
                 jsonify(
@@ -654,11 +750,8 @@ def login_identity():
         return jsonify({"success": False, "error": "Authentication failed"}), 500
 
 
-# @testable false
-# @manual true
-# @reason password-reset email delivery requires live Identity Platform and Gmail
 @users.route("/send-password-reset-email", methods=["POST"])
-def send_password_reset_email():
+def send_password_reset_email() -> ResponseReturnValue:
     """Generate and deliver a password-reset link without enumerating accounts."""
     limited = _enforce_auth_rate_limit("password-reset-email", 5, 900)
     if limited:
@@ -712,11 +805,8 @@ def send_password_reset_email():
     return jsonify({"success": True})
 
 
-# @testable false
-# @manual true
-# @reason verification email delivery requires live Identity Platform and Gmail
 @users.route("/send-verification-email", methods=["POST"])
-def send_verification_email():
+def send_verification_email() -> ResponseReturnValue:
     """Deliver a verification link for the authenticated Identity user."""
     limited = _enforce_auth_rate_limit("verification-email", 5, 900)
     if limited:
@@ -769,12 +859,8 @@ def send_verification_email():
     return jsonify({"success": True})
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_check_user_status_endpoint_does_not_enumerate_accounts
-# @tests tests_e2e/001_site/test_001b_login.py::test_check_user_status_endpoint_returns_first_time_setup
-# @matrix login : account-enumeration endpoint first-time-setup
 @users.route("/check-user-status", methods=["GET"])
-def check_user_status():
+def check_user_status() -> ResponseReturnValue:
     """Return the next login step without exposing detailed account metadata."""
     try:
         limited = _enforce_auth_rate_limit("check-user-status", 30, 300)
@@ -813,9 +899,6 @@ def check_user_status():
         return jsonify({"success": False, "error": "System error"}), 500
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/users/login.py::logout
-# @reason logout route owns the authenticated user/session transition
 def _mark_logout_cache_invalidation():
     """Flag the current user's client cache before ending the session."""
     if not getattr(current_user, "is_authenticated", False):
@@ -825,19 +908,18 @@ def _mark_logout_cache_invalidation():
         current_user._get_current_object(),
         request=Fetch.nested(because=FetchReason.USER_SAVE_REQUIREMENTS),
     )
+    if not isinstance(user, Entities.USER):
+        return None
     user.invalidate_cache = True
     user.save()
     return user
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001b_login.py::test_logout_clears_session_and_returns_login
-# @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
-# @matrix login : ajax invalidation logout redirect session
 @users.route("/logout", methods=["POST"])
-def logout():
+def logout() -> ResponseReturnValue:
     """Log the user out and return the normal login-page redirect target."""
-    _mark_logout_cache_invalidation()
+    if not is_demo_guest_session():
+        _mark_logout_cache_invalidation()
     logout_user()
     clear_login_session()
     request_client_cache_invalidation()

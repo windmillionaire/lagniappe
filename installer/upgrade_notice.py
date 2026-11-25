@@ -1,5 +1,10 @@
 """Version-driven owner-maintenance notices for installer deployments."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 
@@ -9,15 +14,17 @@ from runner.console import format_prompt, wrap_text
 from .errors import SetupCancelled
 
 
+if TYPE_CHECKING:
+    from config import SettingsDraft
+    from installer import Formatter
+
+
 RELEASE_VERSION_PATTERN = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$"
 )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_maintenance_notice_version_policy
-# @matrix setup migrations : major-version version-validation
-def parse_release_version(value):
+def parse_release_version(value: object) -> tuple[int, ...] | None:
     """Return a stable release-version tuple, or ``None`` for invalid input."""
     match = RELEASE_VERSION_PATTERN.fullmatch(str(value or "").strip())
     if not match:
@@ -25,10 +32,9 @@ def parse_release_version(value):
     return tuple(int(part) for part in match.groups())
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_maintenance_notice_version_policy
-# @matrix setup migrations : major-version unknown-source
-def post_upgrade_maintenance_required(installed_version, target_version):
+def post_upgrade_maintenance_required(
+    installed_version: object, target_version: object
+) -> bool:
     """Return whether the target crosses an owner-maintenance boundary."""
     target = parse_release_version(target_version)
     if target is None:
@@ -41,10 +47,7 @@ def post_upgrade_maintenance_required(installed_version, target_version):
     return target[0] > installed[0]
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_legacy_upgrade_deploy_notice_uses_active_operation
-# @matrix setup migrations : legacy-upgrade major-version
-def legacy_upgrade_deploy_notice_required(settings):
+def legacy_upgrade_deploy_notice_required(settings: SettingsDraft) -> bool:
     """Detect a major release reached through a pre-1.0 upgrade orchestrator."""
     from installer import state
 
@@ -55,11 +58,9 @@ def legacy_upgrade_deploy_notice_required(settings):
     return payload.get("mode") == "upgrade" and parsed is not None and parsed[1:] == (0, 0)
 
 
-# @testable false
-# @covered-by installer/upgrade.py::_apply_update
-# @covered-by installer/deploy.py::deploy_to_app_engine
-# @reason shared terminal presentation is asserted through both deployment workflows
-def print_post_upgrade_maintenance_notice(formatter, installed_version, target_version):
+def print_post_upgrade_maintenance_notice(
+    formatter: Formatter, installed_version: object, target_version: object
+) -> None:
     """Explain required owner work before a major-version deployment."""
     transition = f"to version {target_version}"
     if parse_release_version(installed_version):
@@ -73,49 +74,44 @@ def print_post_upgrade_maintenance_notice(formatter, installed_version, target_v
     )
     print(
         wrap_text(
-            (
+
                 "After deployment, open "
                 f"{ui.literal('Admin → Site Settings → Maintenance')}, select "
                 f"{ui.literal('Apply Updates')}, resolve any reported failures, and then "
                 f"select {ui.literal('Refresh Cache')}."
-            )
+
         )
     )
 
 
-# @testable false
-# @covered-by installer/upgrade.py::_apply_update
-# @covered-by installer/deploy.py::deploy_to_app_engine
-# @reason shared terminal presentation is asserted through both deployment workflows
-def print_post_upgrade_maintenance_steps(formatter):
+def print_post_upgrade_maintenance_steps(formatter: Formatter) -> None:
     """Repeat the required in-app work after a major deployment succeeds."""
     print(wrap_text(f"\n{ui.heading('Required next steps')}"))
     print(
-        wrap_text((f"  {ui.literal('1.')} Sign in as the Owner or an Administrator."))
+        wrap_text(f"  {ui.literal('1.')} Sign in as the Owner or an Administrator.")
     )
     print(
         wrap_text(
-            (
+
                 f"  {ui.literal('2.')} Open "
                 f"{ui.literal('Admin → Site Settings → Maintenance')}."
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 f"  {ui.literal('3.')} Select {ui.literal('Apply Updates')} and resolve "
                 "any reported failures."
-            )
+
         )
     )
-    print(wrap_text((f"  {ui.literal('4.')} Select {ui.literal('Refresh Cache')}.")))
+    print(wrap_text(f"  {ui.literal('4.')} Select {ui.literal('Refresh Cache')}."))
 
 
-# @testable false
-# @covered-by installer/deploy.py::deploy_to_app_engine
-# @reason compatibility confirmation is exercised through the deployment helper
-def confirm_legacy_upgrade_deployment(formatter, target_version):
+def confirm_legacy_upgrade_deployment(
+    formatter: Formatter, target_version: object
+) -> None:
     """Give old upgrade orchestration one final stop before deploying 1.0+."""
     print_post_upgrade_maintenance_notice(formatter, None, target_version)
     consent = input(

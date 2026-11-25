@@ -1,16 +1,30 @@
 """Form-oriented proposal display adapters."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ActionData, ReportAction
+    from lagniappe.core.tools.ai.reporting.display.details import ProposalDetailCollector
+
+
 from ..contracts import ProposalActionDisplay, ProposalActionGrouping
 
 
-# @testable infrastructure
-def create_form_details(details, data, action=None):
+def create_form_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.add("Form Type", data.get("form_type") or data.get("form-type"))
 
 
-# @testable true
-# @matrix ai-report form-schema : details proposal
-def schema_details(details, data, action=None):
+def schema_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("Form", data, "form")
     operations = data.get("operations")
     if isinstance(operations, list):

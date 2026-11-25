@@ -1,0 +1,14 @@
+# Synthetic installation settings for credential-free source checks.
+CONFIG_KIND: lagniappe-settings
+CONFIG_SCHEMA_VERSION: 3
+GOOGLE_CLOUD_PROJECT: project-1
+VERSION: "1.0"
+GIBBERISH: bucket-seed
+RUNTIME_SERVICE_ACCOUNT_EMAIL: runtime@project-1.iam.gserviceaccount.com
+INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL: runtime@project-1.iam.gserviceaccount.com
+APP_ENGINE_LOCATION: us-central
+RESOURCE_REGION: us-central1
+AI_MODEL: offline-model
+SERVER_NAME: localhost
+SERVER_PORT: 8080
+AI_IMAGE_MODEL: offline-image-model

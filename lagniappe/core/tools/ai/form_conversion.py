@@ -1,5 +1,11 @@
 """Focused, tool-free utility-model conversion of saved collection values."""
 
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from ...entities.user import User
+
 from copy import deepcopy
 import json
 
@@ -10,11 +16,15 @@ from .core import ai_model
 from .prompt import Prompt
 
 
-# @testable true
-# @tests tests_unit/test_004l_form_schema_updates.py::test_utility_conversion_is_bounded_strict_and_tool_free
-# @tests tests_unit/test_004l_form_schema_updates.py::test_utility_table_conversion_omits_blanks_and_repairs_invalid_numbers
-# @matrix form-migration ai : utility-provider strict-output permission
-def generate_conversions(requests, actor, *, generate=None):
+class ConversionRequest(TypedDict):
+    id: str
+    target: dict[str, object]
+    source: dict[str, object]
+    value: object
+    instructions: str
+
+
+def generate_conversions(requests: Sequence[ConversionRequest], actor: User, *, generate: Callable[[Prompt], object] | None = None) -> dict[str, dict[str, object]]:
     if not actor.access(AI.CREATE):
         raise ValidationError("This user does not have the required AI access.")
     if (
@@ -107,10 +117,9 @@ def generate_conversions(requests, actor, *, generate=None):
                 f"Correct the response structure: {error}. Return every original request again."
             )
 
+    raise AssertionError("Conversion retry loop ended without a result.")
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/form_conversion.py::generate_conversions
-# @reason Builder blank-cell normalization is tested through utility conversion; reviewed candidates stay strict
+
 def _omit_blank_table_cells(result, target):
     """Treat blank model cells as absent, without coercing populated values."""
     value = result.get("value")

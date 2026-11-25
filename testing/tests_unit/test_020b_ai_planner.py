@@ -33,7 +33,6 @@ def _report(user, **values):
     )
 
 
-# @matrix ai-report : prompt permissions tools
 def test_report_prompt_uses_shared_tools_and_selected_schemas(monkeypatch):
     user = _test_user("planner-owner")
     monkeypatch.setattr(type(user), "access", lambda self, access: True)
@@ -67,8 +66,6 @@ def test_report_prompt_uses_shared_tools_and_selected_schemas(monkeypatch):
     assert '"allowed_actions": []' in answer_prompt.build()
 
 
-# @source lagniappe/core/tools/ai/planner.py::report_prompt
-# @matrix ai-report : prompt permissions file-placement
 @pytest.mark.parametrize(
     "instructions,uploaded,can_create,feedback,require_filing",
     [
@@ -121,7 +118,6 @@ def test_report_prompt_scopes_file_guidance_to_uploads_and_permissions(
         assert feedback in text
 
 
-# @matrix ai-report : permissions
 @pytest.mark.parametrize("feedback", [None, "Put this on my personal Page instead."])
 def test_native_and_external_plans_share_personal_page_guidance(monkeypatch, feedback):
     from lagniappe.core.tools.ai import external_api
@@ -148,7 +144,6 @@ def test_native_and_external_plans_share_personal_page_guidance(monkeypatch, fee
         assert feedback in prompt
 
 
-# @matrix ai-report : validation file-placement
 def test_file_usage_requires_exact_coverage_and_files_only_filing():
     usage = [{"file": "hash:receipt12345", "usage": "evidence"}]
     validated = planner.validate_file_usage(usage, ["hash:receipt12345"])
@@ -173,10 +168,6 @@ def test_file_usage_requires_exact_coverage_and_files_only_filing():
         planner.validate_file_usage(usage, ["hash:receipt12345"], read_only=True)
 
 
-# @source lagniappe/core/tools/ai/references.py::render_ai_markdown
-# @pair markdown:html-sanitization
-# @pair ai-report:answer-only
-# @matrix ai-report : generate validation file-placement
 def test_generate_report_validates_answers_actions_and_file_usage(monkeypatch):
     prompt = SimpleNamespace(
         allowed_actions=(),
@@ -214,7 +205,6 @@ def test_generate_report_validates_answers_actions_and_file_usage(monkeypatch):
         planner.generate_report(prompt)
 
 
-# @matrix ai-report : validation status
 def test_report_availability_rejects_old_and_malformed_records():
     user = _test_user("availability-owner")
     report = _report(user)
@@ -239,10 +229,6 @@ def test_report_availability_rejects_old_and_malformed_records():
     assert report.output_kind is None
 
 
-# @source lagniappe/core/properties/user_restrictions.py::Restrictions.ai_action_capabilities
-# @source lagniappe/core/tools/ai/reporting/contracts/permissions.py::allowed_report_actions
-# @matrix ai-report : action-capabilities permissions
-# @pair permissions:own-page
 def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
     from testing.utility.ai_report_fakes import _permissioned_user
     from testing.utility.mock_restrictions import MockRestrictions
@@ -264,8 +250,6 @@ def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
     )
 
 
-# @source lagniappe/core/tools/ai/reporting/contracts/permissions.py::allowed_report_actions
-# @matrix ai-report : action-capabilities permissions
 @pytest.mark.parametrize(
     "permissions,expected_capabilities,additional_actions",
     [
@@ -293,8 +277,9 @@ def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
         ),
         (
             {"page-one": "DELETE"},
-            {"can_update_pages", "can_update_tasks", "can_delete_pages"},
-            {"append_page_document", "replace_page_document", "attach_file", "move_file", "move_task", "suggest_page_deletion"},
+            {"can_update_pages", "can_update_tasks", "can_delete_pages", "can_delete_tasks", "can_delete_files"},
+            {"append_page_document", "replace_page_document", "attach_file", "move_file", "move_task",
+             "suggest_page_deletion", "delete_page", "delete_task", "delete_file"},
         ),
         (
             {"models": "EDIT"},
@@ -304,9 +289,13 @@ def test_shared_actions_respect_permissions_and_allow_personal_page_tasks():
         (
             {"models": "CREATE"},
             {"can_create_categories", "can_create_projects", "can_create_pages",
-             "can_create_model_tasks", "can_update_pages", "can_update_tasks", "can_delete_pages"},
+             "can_create_model_tasks", "can_update_pages", "can_update_tasks",
+             "can_delete_pages", "can_delete_categories", "can_delete_projects",
+             "can_delete_tasks", "can_delete_files"},
             {"create_category", "create_project", "create_page", "create_model_task",
-             "append_page_document", "replace_page_document", "attach_file", "move_file", "move_task", "suggest_page_deletion"},
+             "append_page_document", "replace_page_document", "attach_file", "move_file", "move_task",
+             "suggest_page_deletion", "delete_page", "delete_category", "delete_project",
+             "delete_model_task", "delete_task", "delete_file"},
         ),
     ],
     ids=["viewer", "page-editor", "category-editor", "project-editor", "form-editor",
@@ -330,16 +319,17 @@ def test_action_catalog_uses_create_update_delete_permissions(
         "can_create_forms", "can_create_categories", "can_create_projects",
         "can_create_pages", "can_create_model_tasks", "can_update_pages",
         "can_update_tasks", "can_update_forms", "can_delete_pages",
+        "can_delete_categories", "can_delete_projects", "can_delete_tasks",
+        "can_delete_files",
     }
     assert {key for key, value in capabilities.items() if value} == expected_capabilities
     assert actions == {
         "create_task", "complete_task", "skip", "needs_review", "update_task",
-        "update_page", "update_project", "update_model_task", "update_file",
+        "update_page", "update_project", "update_category", "update_model_task",
+        "update_file",
     } | additional_actions
 
 
-# @source lagniappe/core/tools/ai/reporting/contracts/schema.py::report_proposal_response_schema
-# @matrix ai-report : allowed-actions provider-validation schema structured-output
 def test_selected_response_schema_keeps_complete_action_values():
     from google.genai import types as genai_types
     from lagniappe.core.tools.ai.reporting.contracts.schema import (
@@ -364,3 +354,29 @@ def test_selected_response_schema_keeps_complete_action_values():
     )
     with pytest.raises(ValueError, match="Missing report response schema"):
         report_proposal_response_schema(("invented_action",))
+
+
+@pytest.mark.parametrize(
+    "can_create,uploaded,feedback,correction,expected_level",
+    [
+        (True, False, None, None, "LOW"),
+        (False, False, None, None, "LOW"),
+        (True, True, None, None, None),
+        (False, True, None, None, None),
+        (True, False, "Add another link", None, None),
+        (True, False, None, {"failed_actions": 1}, None),
+    ],
+)
+def test_report_prompt_sets_low_thinking_only_for_fresh_text_only_reports(
+    monkeypatch, can_create, uploaded, feedback, correction, expected_level
+):
+    user = _test_user("thinking-level-scope")
+    monkeypatch.setattr(
+        type(user), "access", lambda self, access: can_create or access == AI.ASK
+    )
+    files = [_test_file("receipt.pdf")] if uploaded else []
+    report = _report(user, instructions="How many ideas have we tried?", input_files=files)
+    if correction is not None:
+        report.db["correction"] = correction
+    prompt = planner.report_prompt(report, user, feedback=feedback)
+    assert prompt.thinking_level == expected_level

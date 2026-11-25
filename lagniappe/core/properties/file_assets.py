@@ -1,3 +1,15 @@
+from typing import TYPE_CHECKING, Any, Protocol, TypedDict, cast
+
+if TYPE_CHECKING:
+    from werkzeug.datastructures import FileStorage
+    from ..definitions.asset import FileAsset as StoredFile, TextAsset as StoredText
+    from .file_options import Extract
+    from ..entities.file import File
+    from ..entities.ingress import Ingress
+    from ..tools.database.assets import DirectUploadFile
+    from ..tools.ingress import CsvRow
+    from ..tools.files.html import SafeHTML
+
 from ..mixins import CacheMixin
 from ..definitions import (
     FileConsumer,
@@ -11,12 +23,19 @@ from .base_asset import AssetProperty
 from .base_property import UNSET
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_direct_upload_file_asset_sniffs_generic_video_from_sample_without_full_read
-# @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_records_metadata_before_asset_save
-# @tests tests_unit/test_006_file_properties.py::test_file_asset_detects_mislabeled_png_upload
-# @matrix file storage : asset-extension asset-lifecycle direct-upload encoding large-video metadata mimetype upload
-class FileAsset(AssetProperty):
+type _FileOwner = File | Ingress
+
+
+class FilePart(TypedDict):
+    uri: str
+    mime_type: str
+
+
+class _PreparedUpload(Protocol):
+    lagniappe_content_type: str | None
+
+
+class FileAsset(AssetProperty[_FileOwner, "StoredFile", "FileStorage | DirectUploadFile"]):
     """The uploaded file for a File entity.
 
     The setter determines the mimetype and encoding from the upload.
@@ -38,11 +57,12 @@ class FileAsset(AssetProperty):
     _icon = "file"
 
     @property
-    def value(self):
-        return super().value
+    def value(self) -> StoredFile | None:
+        return cast("StoredFile | None", super().value)
 
     @value.setter
-    def value(self, upload):
+    def value(self, value: FileStorage | DirectUploadFile) -> None:
+        upload = value
         mimetype = upload.content_type or self.entity.mimetype
         self.entity.mimetype = file_utility.determine_mimetype(
             upload, self.entity.filename, mimetype, self.entity.encoding
@@ -51,39 +71,33 @@ class FileAsset(AssetProperty):
         if self.entity.mimetype in file_constants.TEXT_MIMETYPES.values():
             self.entity.encoding = file_utility.determine_encoding(upload)
 
-        upload.lagniappe_content_type = self.entity.mimetype
-        AssetProperty.value.fset(self, upload)
+        cast(_PreparedUpload, upload).lagniappe_content_type = self.entity.mimetype
+        self._store_asset_value(upload)
 
     @property
-    def url(self):
+    def url(self) -> str | None:
         return self.value.url if self.value else None
 
-    # @testable true
-    # @tests tests_unit/test_014_security.py::test_svg_removed_from_preview_mimetypes
-    # @matrix files security : mimetype preview svg
     @property
-    def preview(self):
+    def preview(self) -> str | None:
         mimetype = self.entity.mimetype
         if mimetype and mimetype in file_constants.PREVIEW_MIMETYPES:
             return self.url
         return None
 
     @property
-    def image(self):
+    def image(self) -> str | None:
         mimetype = self.entity.mimetype
         if mimetype and mimetype in file_constants.IMAGE_MIMETYPES:
             return self.url
         return None
 
     @property
-    def uri(self):
+    def uri(self) -> str | None:
         return self.value.uri if self.value else None
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_file_to_ai_exports_metadata_and_uri_to_ai
-    # @matrix ai file : mimetype uri
     @property
-    def uri_to_ai(self):
+    def uri_to_ai(self) -> FilePart | None:
         from ..tools.ai.constants import gemini_mimetype
 
         mime_type = gemini_mimetype(self.entity.mimetype)
@@ -96,14 +110,7 @@ class FileAsset(AssetProperty):
         return {"uri": uri, "mime_type": mime_type}
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/file_assets.py::TextAsset.is_text_file
-# @covered-by lagniappe/core/properties/file_assets.py::TextAsset.extractable
-# @covered-by lagniappe/core/properties/file_assets.py::TextAsset.value
-# @covered-by lagniappe/core/properties/file_assets.py::TextAsset.asset
-# @covered-by lagniappe/core/properties/file_assets.py::TextAsset.markup
-# @reason text asset behavior is owned by availability, fallback, and markup accessors
-class TextAsset(CacheMixin, AssetProperty):
+class TextAsset(CacheMixin, AssetProperty[_FileOwner, bool, "str | None"]):
     """Extracted text content for a File entity.
 
     If no text asset is stored, falls back to reading the file directly
@@ -126,21 +133,15 @@ class TextAsset(CacheMixin, AssetProperty):
     _label = "Text"
     _icon = "text"
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_text_asset_extractable_only_for_non_text_document_ai_mimetypes
-    # @matrix file : mimetype text-asset
     @property
-    def is_text_file(self):
+    def is_text_file(self) -> bool:
         mimetype = self.entity.mimetype
         return bool(
             mimetype and mimetype in file_constants.TEXT_MIMETYPES.values()
         )
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_text_asset_extractable_only_for_non_text_document_ai_mimetypes
-    # @matrix file : extractable mimetype
     @property
-    def extractable(self):
+    def extractable(self) -> bool:
         mimetype = self.entity.mimetype
         return bool(
             mimetype
@@ -148,21 +149,13 @@ class TextAsset(CacheMixin, AssetProperty):
             and mimetype in file_constants.DOCUMENT_AI_MIMETYPES
         )
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_as_html
-    # @tests tests_unit/test_006_file_properties.py::test_text_asset_falls_back_to_original_text_file
-    # @tests tests_unit/test_006_file_properties.py::test_text_asset_skips_oversized_original_before_download
-    # @tests tests_unit/test_006_file_properties.py::test_extract_update_completes_immediately_for_text_files
-    # @matrix file : extract fallback process-complete text-asset
     @property
-    def value(self):
+    def value(self) -> bool | None:
         if self.is_set:
-            return self._value
+            return cast("bool | None", self._value)
 
-        stored_asset = self.entity.get_asset(self.id)
-        if stored_asset:
-            self._value = True
-        elif self.is_text_file and self.entity.get_asset("file") and self.entity.encoding:
+        stored_asset = cast("StoredText | None", self.entity.get_asset(self.id))
+        if stored_asset or self.is_text_file and self.entity.get_asset("file") and self.entity.encoding:
             self._value = True
         else:
             self._value = None
@@ -170,25 +163,22 @@ class TextAsset(CacheMixin, AssetProperty):
         return self._value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: str | None) -> None:
         self._markup = UNSET
-        AssetProperty.value.fset(self, value)
+        self._store_asset_value(value)
         self._value = True if value else None
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_text_asset_falls_back_to_original_text_file
-    # @matrix file : fallback text-asset
     @property
-    def asset(self):
+    def asset(self) -> str | None:
         if getattr(self, "_asset", UNSET) is not UNSET:
-            return self._asset
+            return cast("str | None", self._asset)
 
-        stored_asset = self.entity.get_asset(self.id)
+        stored_asset = cast("StoredText | None", self.entity.get_asset(self.id))
         if stored_asset:
             self._asset = stored_asset.get()
             return self._asset
 
-        file_asset = self.entity.get_asset("file")
+        file_asset = cast("StoredFile | None", self.entity.get_asset("file"))
         encoding = self.entity.encoding
 
         if file_asset and encoding and self.is_text_file:
@@ -208,36 +198,29 @@ class TextAsset(CacheMixin, AssetProperty):
 
         return self._asset
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_as_html
-    # @tests tests_unit/test_006_file_properties.py::test_text_asset_falls_back_to_original_text_file
-    # @matrix file : fallback html-preview text-asset
     @property
-    def markup(self):
+    def markup(self) -> SafeHTML | None:
         if getattr(self, "_markup", UNSET) is not UNSET:
-            return self._markup
+            return cast("SafeHTML | None", self._markup)
 
         text = self.asset
         self._markup = (
             file_html.htmlize(text, self.entity.mimetype) if text else None
         )
-        return self._markup
+        return cast("SafeHTML | None", self._markup)
 
     @property
-    def cache_value(self):
-        extract = self.entity.properties.get("extract")
+    def cache_value(self) -> str | None:
+        extract = cast("Extract | None", self.entity.properties.get("extract"))
         if extract and extract.search:
             return self.asset
 
     @property
-    def cache_key(self):
+    def cache_key(self) -> str:
         return "doc"
 
 
-# @testable true
-# @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_parses_the_uploaded_csv_into_rows_and_columns
-# @matrix ingress : asset-storage rows
-class Rows(AssetProperty):
+class Rows(AssetProperty["Ingress"]):
     """Parsed CSV rows for an ingress file. Stored as a JSON asset.
 
     Set:
@@ -247,16 +230,15 @@ class Rows(AssetProperty):
         asset (list[dict]): Row dicts keyed by column ID.
     """
 
+    if TYPE_CHECKING:
+        @property
+        def asset(self) -> list[CsvRow] | None: ...
+
     _id = "rows"
     _asset_type = "json"
 
 
-# @testable true
-# @tests tests_unit/test_006b_ingress_entity.py::test_importer_story_processes_page_rows_into_entities_and_results
-# @tests tests_unit/test_006b_ingress_entity.py::test_completed_ingress_shows_results
-# @tests tests_unit/test_006b_ingress_entity.py::test_results_asset_loads_stored_json_without_recursing
-# @matrix ingress : asset-storage completed regression row-results
-class Results(AssetProperty):
+class Results(AssetProperty["Ingress", "list[dict[str, Any] | None]", "list[dict[str, Any] | None] | None"]):
     """Import results for an ingress file. Stored as a JSON asset.
 
     Each result dict contains the row data, created entity details,
@@ -270,38 +252,38 @@ class Results(AssetProperty):
     _asset_type = "json"
 
     @property
-    def value(self):
+    def value(self) -> list[dict[str, Any] | None]:
         slots = self.slots
         if self.entity.db.get("ingress_format") != 1:
             return slots
         execution = self.entity.get_process("execution")
-        cursor = max(0, int(execution.get("cursor") or 0))
+        cursor = max(0, int(cast(int, execution.get("cursor") or 0)))
         if cursor >= len(slots):
             return slots
         return [result for result in slots[:cursor] if result is not None]
 
     @value.setter
-    def value(self, value):
+    def value(self, value: list[dict[str, Any] | None] | None) -> None:
         self.save_slots(value or [])
 
     @property
-    def slots(self):
+    def slots(self) -> list[dict[str, Any] | None]:
         """Return all written result slots, including uncommitted tail slots."""
         if getattr(self, "_asset", UNSET) is not UNSET:
             return self._asset
 
-        stored_asset = AssetProperty.value.fget(self)
+        stored_asset = self._stored_asset()
         if stored_asset:
-            self._asset = stored_asset.get() or []
+            self._asset = cast("list[dict[str, Any] | None]", stored_asset.get() or [])
         else:
             self._asset = []
 
         return self._asset
 
-    def save_slots(self, value):
+    def save_slots(self, value: list[dict[str, Any] | None]) -> None:
         """Write indexed result slots before the cursor transaction publishes them."""
-        AssetProperty.value.fset(self, value)
+        self._store_asset_value(value)
         self._asset = value or []
 
-    def save(self):
+    def save(self) -> None:
         self.save_slots(getattr(self, "_asset", None) or [])

@@ -1,5 +1,16 @@
 """Behavior-preserving validation for stored AI report proposals."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ReportProposal
+    from lagniappe.core.tools.cache.details import CachedDetail
+
+
 import re
 
 from lagniappe.core import exceptions
@@ -25,10 +36,7 @@ ENTITY_PAIR_ACTION_REFERENCES = {
 }
 
 
-# @testable true
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_renders_page_document_markdown
-# @pairs ai-report:proposal ai-report:validation editor:document markdown:html-sanitization
-def normalize_report_markdown(proposal, *, preserve_markdown=False):
+def normalize_report_markdown[T](proposal: T, *, preserve_markdown: bool = False) -> T:
     """Render new model-facing Markdown fields into legacy executable HTML."""
     if not isinstance(proposal, dict):
         return proposal
@@ -52,32 +60,19 @@ def normalize_report_markdown(proposal, *, preserve_markdown=False):
     return proposal
 
 
-# @testable true
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_unsafe_schema_update_operations
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_completed_root_task_targets
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_every_report_file_attachment
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_external_file_summaries
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_treats_action_like_submission_fields_as_content
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_future_completed_dates
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_invalid_static_form_content
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_accepts_virtual_user_kind_as_personal_page
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_create_task_page_reference
-# @tests tests_unit/test_004l_form_schema_updates.py::test_organize_repairs_prepared_conversions_before_returning_plan
-# @matrix ai-report : action-reference-namespace completed-task explicit-task-identity file-placement file-summary future-date proposal schema-update submission task-page validation
-# @pairs ai-report:reference-kind permissions:personal-page
 def validate_proposal(
-    proposal,
-    allowed_actions=None,
-    allow_pending_submissions=False,
-    required_file_refs=None,
-    require_file_summaries=False,
-    validate_reference_kinds=False,
-    user=None,
-    preserve_document_markdown=False,
-    resolved_reference_details=None,
-    prepare_schema_changes=False,
-    require_response=False,
-):
+    proposal: object,
+    allowed_actions: Iterable[str] | None = None,
+    allow_pending_submissions: bool = False,
+    required_file_refs: Iterable[str] | None = None,
+    require_file_summaries: bool = False,
+    validate_reference_kinds: bool = False,
+    user: models.User | None = None,
+    preserve_document_markdown: bool = False,
+    resolved_reference_details: dict[str, CachedDetail] | None = None,
+    prepare_schema_changes: bool = False,
+    require_response: bool = False,
+) -> ReportProposal:
     """Validate the JSON proposal returned by native or external report planning."""
     allowed = ALLOWED_ACTIONS if allowed_actions is None else frozenset(allowed_actions)
     raw_proposal = proposal
@@ -92,7 +87,8 @@ def validate_proposal(
         resolved_details=resolved_reference_details,
     )
     proposal = normalized["proposal"]
-    required_file_refs = normalized["required_file_refs"]
+    normal_refs = normalized["required_file_refs"]
+    assert isinstance(normal_refs, list)
     if not isinstance(proposal, dict):
         raise exceptions.AIException("Report proposal must be a JSON object.")
     if require_response:
@@ -190,7 +186,7 @@ def validate_proposal(
             seen_ids.add(action_id)
             seen_actions[action_id] = action
 
-    if required_file_refs:
+    if normal_refs:
         attached_file_refs = {
             action.get("data", {}).get("file")
             for action in actions
@@ -204,7 +200,7 @@ def validate_proposal(
         missing_file_refs = [
             submitted_file_ref
             for file_ref, submitted_file_ref in zip(
-                required_file_refs,
+                normal_refs,
                 submitted_required_file_refs,
                 strict=True,
             )
@@ -230,7 +226,7 @@ def validate_proposal(
                 file_ref = action["data"].get("file")
                 summary_counts[file_ref] = summary_counts.get(file_ref, 0) + 1
 
-            required_file_ref_set = set(required_file_refs)
+            required_file_ref_set = set(normal_refs)
             if any(file_ref not in required_file_ref_set for file_ref in summary_counts):
                 raise exceptions.AIException(
                     "summarize_file actions must target uploads classified as organize."
@@ -239,7 +235,7 @@ def validate_proposal(
             missing_summary_refs = []
             duplicate_summary_refs = []
             for file_ref, submitted_file_ref in zip(
-                required_file_refs,
+                normal_refs,
                 submitted_required_file_refs,
                 strict=True,
             ):
@@ -261,22 +257,21 @@ def validate_proposal(
                     f"{', '.join(str(file_ref) for file_ref in duplicate_summary_refs)}"
                 )
 
+    # The action, data, and dependency contracts have been validated above.
+    checked = cast("ReportProposal", proposal)
     if prepare_schema_changes:
         from ..schema_updates import prepare_schema_updates
 
         try:
-            prepare_schema_updates(proposal, user)
+            prepare_schema_updates(checked, user)
             from ..entity_updates import prepare_entity_updates
-            prepare_entity_updates(proposal, user)
+            prepare_entity_updates(checked, user)
         except exceptions.ValidationError as error:
             raise exceptions.AIException(f"update_form_schema: {error}") from error
 
-    return proposal
+    return checked
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason reference-kind validation is exercised through proposal repair tests
 def _validate_existing_reference_kinds(action, action_label, resolved_details):
     """Reject hash references whose resolved entity kind violates the action."""
     rules = {
@@ -300,12 +295,19 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
         "replace_page_document": (("page", {"page"}),),
         "summarize_file": (("file", {"file"}),),
         "suggest_page_deletion": (("page", {"page"}),),
+        "update_category": (("entity", {"category"}),),
+        "delete_page": (("entity", {"page"}),),
+        "delete_task": (("entity", {"task"}),),
+        "delete_category": (("entity", {"category"}),),
+        "delete_project": (("entity", {"project"}),),
+        "delete_model_task": (("entity", {"model"}),),
+        "delete_file": (("entity", {"file"}),),
     }
     data = action.get("data") if isinstance(action, dict) else None
     if not isinstance(data, dict):
         return
 
-    for field, expected_kinds in rules.get(action.get("type"), ()):
+    for field, expected_kinds in rules.get(action.get("type") or "", ()):
         reference = _direct_entity_data_reference(data, field)
         match = re.fullmatch(r"hash:([0-9a-z]{12})", reference or "")
         if not match:
@@ -327,9 +329,6 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason direct-reference extraction is exercised through reference-kind validation
 def _direct_entity_data_reference(data, field):
     for key in (field, f"{field}_id", f"{field}_ref"):
         value = data.get(key)
@@ -344,9 +343,6 @@ def _direct_entity_data_reference(data, field):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason dependency cleanup is exercised through proposal validation
 def _clean_action_dependencies(proposal, action, seen_ids, action_label):
     if "depends_on" not in action:
         return
@@ -354,9 +350,7 @@ def _clean_action_dependencies(proposal, action, seen_ids, action_label):
     valid = []
     invalid = []
     dependencies = action.get("depends_on") or []
-    if isinstance(dependencies, str):
-        dependencies = [dependencies]
-    elif not isinstance(dependencies, list):
+    if isinstance(dependencies, str) or not isinstance(dependencies, list):
         dependencies = [dependencies]
 
     for dependency in dependencies:
@@ -382,9 +376,6 @@ def _clean_action_dependencies(proposal, action, seen_ids, action_label):
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason action-shape errors are exercised through proposal validation tests
 def _validate_action_data_shape(
     action,
     action_label,
@@ -399,12 +390,19 @@ def _validate_action_data_shape(
 
     if action_type == "create_form":
         _validate_create_form_action_data(data, action_label)
-    if action_type in {"append_page_document", "replace_page_document"}:
-        if not _first_data_reference(data, "page") or not _proposal_string(data.get("document")):
-            raise exceptions.AIException(f"Action {action_label} requires a Page reference and non-empty document_markdown.")
-    if action_type == "attach_file":
-        if set(data) - {"entity", "entity_action", "entity_name", "file", "display_name"}:
-            raise exceptions.AIException(f"Action {action_label} uses entity/entity_action for its attachment target.")
+    if action_type in {"append_page_document", "replace_page_document"} and (
+        not _first_data_reference(data, "page")
+        or not _proposal_string(data.get("document"))
+    ):
+        raise exceptions.AIException(f"Action {action_label} requires a Page reference and non-empty document_markdown.")
+    if action_type == "attach_file" and set(data) - {
+        "entity",
+        "entity_action",
+        "entity_name",
+        "file",
+        "display_name",
+    }:
+        raise exceptions.AIException(f"Action {action_label} uses entity/entity_action for its attachment target.")
     if action_type == "update_form_schema":
         _validate_update_form_schema_action_data(data, action_label)
     if action_type == "create_page" and not _proposal_string(data.get("name")):
@@ -445,9 +443,6 @@ def _validate_action_data_shape(
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason summary shape errors are exercised through proposal validation tests
 def _validate_file_summary_action_data(
     data,
     action_label,
@@ -473,9 +468,6 @@ def _validate_file_summary_action_data(
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason action-shape errors are exercised through proposal validation tests
 def _validate_create_form_action_data(data, action_label):
     if not _proposal_string(data.get("name")):
         raise exceptions.AIException(f"Action {action_label} requires data.name.")
@@ -514,9 +506,6 @@ def _validate_create_form_action_data(data, action_label):
                 )
 
 
-# @testable true
-# @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_unsafe_schema_update_operations
-# @matrix form-schema : proposal schema-update validation
 def _validate_update_form_schema_action_data(data, action_label):
     if not _first_data_reference(data, "form"):
         raise exceptions.AIException(f"Action {action_label} requires data.form.")
@@ -581,9 +570,6 @@ def _validate_update_form_schema_action_data(data, action_label):
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason schema field shape is exercised through create/update proposal tests
 def _validate_schema_field_definition(field, action_label, field_label, used_ids):
     if not isinstance(field, dict):
         raise exceptions.AIException(
@@ -614,9 +600,6 @@ def _validate_schema_field_definition(field, action_label, field_label, used_ids
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason action-shape errors are exercised through proposal validation tests
 def _validate_create_task_action_data(data, action_label, user=None):
     if not _first_data_reference(data, "page"):
         raise exceptions.AIException(
@@ -658,9 +641,6 @@ def _validate_create_task_action_data(data, action_label, user=None):
         data["schedule"] = validate_task_schedule(data["schedule"])
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason explicit completed-task target validation is exercised through proposal tests
 def _validate_completed_task_target_action(action, action_label, seen_actions):
     if action.get("type") != "create_task":
         return
@@ -683,19 +663,12 @@ def _validate_completed_task_target_action(action, action_label, seen_actions):
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::_validate_create_task_action_data
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::_validate_completed_task_target_action
-# @reason completion marker normalization is exercised through proposal validation
 def _is_completed_task_action_data(data):
     return bool(
         data.get("completed_on") or data.get("completed-on") or data.get("completed")
     )
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_rejects_saved_pending_submissions_before_execution
-# @matrix form-schema submission : deterministic-run stale-proposal validation
 def _validate_form_submission_action_data(data, action_label, allow_pending=True):
     if not _has_form_reference_or_label(data):
         return
@@ -713,9 +686,6 @@ def _validate_form_submission_action_data(data, action_label, allow_pending=True
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason action-shape errors are exercised through proposal validation tests
 def _validate_move_file_action_data(data, action_label):
     file_reference = _first_data_reference(data, "file")
     if not file_reference:
@@ -758,9 +728,6 @@ def _validate_move_file_action_data(data, action_label):
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/proposals/validation.py::validate_proposal
-# @reason action-shape errors are exercised through proposal validation tests
 def _validate_entity_pair_action_data(
     data,
     action_label,

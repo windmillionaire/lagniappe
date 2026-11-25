@@ -17,10 +17,6 @@ from testing.utility.messaging_fakes import HashRedis, managed_user
 pytestmark = pytest.mark.unit
 
 
-# @matrix mentions : document-view permission
-# @matrix messaging : managed-user owner-opt-in permission public-exclusion recipient-resolution self-exclusion
-# @matrix task-assignment : owner-opt-in permission self-assignment
-# @pair task-assignment:permission
 def test_collaboration_permissions_use_current_recipient_and_document_access(
     monkeypatch,
 ):
@@ -87,7 +83,6 @@ def test_collaboration_permissions_use_current_recipient_and_document_access(
     assert collaboration.resolve_user("page") is stored_user
 
 
-# @matrix owner-projection : fail-closed normalization repair request-memo revision selector-shape
 def test_owner_projection_normalizes_and_round_trips(monkeypatch):
     redis = HashRedis()
     monkeypatch.setattr(owner.cache, "_redis", redis)
@@ -131,9 +126,6 @@ def test_owner_projection_normalizes_and_round_trips(monkeypatch):
     assert repaired["revision"] == 1
 
 
-# @matrix messaging : owner-search recipient-key self-exclusion
-# @matrix owner-projection : deduplication normalization
-# @pair mentions:recipient-search
 def test_collaboration_search_excludes_self_owner_and_stale_rows(monkeypatch):
     class SearchPage:
         def __init__(self, identifier, user):

@@ -5,9 +5,6 @@ from enum import Enum, auto
 from .default import DefaultEnum
 
 
-# @testable true
-# @tests tests_unit/test_009f_user_ai_access.py::test_ai_access_tiers_are_hierarchical_and_fail_closed
-# @matrix ai-access : fail-closed hierarchy validation
 class AI(Enum, metaclass=DefaultEnum):
     """Hierarchical provider entitlements, independent from permissions."""
 
@@ -17,7 +14,7 @@ class AI(Enum, metaclass=DefaultEnum):
 
     DEFAULT = NONE
 
-    def implies(self, required):
+    def implies(self, required: object) -> bool:
         """Return whether this tier includes a concrete required AI capability."""
         return bool(
             isinstance(required, AI)
@@ -27,7 +24,7 @@ class AI(Enum, metaclass=DefaultEnum):
         )
 
     @classmethod
-    def name_for(cls, value):
+    def name_for(cls, value: object) -> str:
         """Normalize an enum or exact stored/form name, rejecting unknown values."""
         if isinstance(value, cls):
             return value.name

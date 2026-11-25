@@ -507,6 +507,11 @@ jobs:
           python -m venv venv
           venv/bin/python -m pip install --disable-pip-version-check -r requirements-dev.txt
 
+      - name: Exercise setup imports on Python 3.14
+        run: |
+          venv/bin/python -m installer --help
+          venv/bin/python -m testing.utility.installer_bootstrap_smoke
+
       - name: Validate exact hosted release evidence
         env:
           BASE_SHA: ${{ steps.context.outputs.base_sha }}
@@ -530,8 +535,30 @@ jobs:
       - name: Check authored frontend source
         run: npm run check
 
+      - name: Check frontend types
+        run: npm run typecheck
+
       - name: Check Python source
         run: venv/bin/python -m ruff check .
+
+      - name: Check every tracked application and operator Python file
+        run: |
+          git ls-files -z -- 'config/*.py' 'installer/*.py' 'lagniappe/*.py' 'runner/*.py' main.py run.py |
+            xargs -0 venv/bin/python -m basedpyright --warnings --project pyrightconfig.json
+
+      - name: Check Python types in the locked MCP environment
+        run: |
+          venv/bin/python -m runner.uv_bootstrap install --non-interactive
+          venv/bin/python -c 'from runner.mcp_environment import prepare_environment; prepare_environment()'
+          git ls-files -z -- 'mcp/src/*.py' |
+            xargs -0 venv/bin/python -m basedpyright --warnings --project mcp/pyrightconfig.json
+
+      - name: Check template, style, icon, and mutation contracts
+        run: |
+          venv/bin/python run.py template-contracts --check --no-report
+          venv/bin/python run.py style-contracts --check --no-report --no-manifest
+          LAGNIAPPE_CONFIG_ROOT="$PWD/testing/fixtures/offline-runtime" FLASK_ENV=testing \
+            venv/bin/python run.py mutation-contracts --check
 
       - name: Check complete release tree
         env:

@@ -3,7 +3,8 @@
   {% call card() %}
     <p class="text-base-medium mb-3">
       Lagniappe is a Flask/Jinja application with server-rendered HTML and
-      vanilla JavaScript modules on the frontend. It uses Google Cloud for
+      strict TypeScript modules on the frontend (bundled without a
+      single-page-app framework). It uses Google Cloud for
       hosting, storage, auth, tasks, OCR, and optional AI, plus Redis for search,
       filters, cache, and sync state.
     </p>
@@ -18,7 +19,7 @@
   {% call card() %}
     <ul class="text-base-medium space-y-2">
       <li><strong>Backend:</strong> Python, Flask, Jinja, Datastore, Cloud Storage, Cloud Tasks.</li>
-      <li><strong>Frontend:</strong> server-rendered templates, vanilla ES modules, Rollup, Tailwind CSS.</li>
+      <li><strong>Frontend:</strong> server-rendered templates, strict TypeScript modules, Rollup, Tailwind CSS.</li>
       <li><strong>Editor:</strong> TipTap/ProseMirror with Yjs for collaborative document state.</li>
       <li><strong>Search/cache:</strong> Redis with search and JSON features.</li>
       <li><strong>Auth/updates:</strong> Google Identity Platform and adaptive polling.</li>
@@ -48,10 +49,9 @@
       large single-page-app framework.
     </p>
     <p class="text-base-medium mb-3">
-      Every so often, things outside the app shift -- cloud APIs, OAuth rules,
-      cloud APIs, Python runtimes, AI models, security
-      patches, or billing policies. The architecture is meant to make those
-      shifts small chores rather than rewrites.
+      Every so often, things outside the app shift — cloud APIs, OAuth rules,
+      Python runtimes, AI models, security patches, or billing policies. The
+      architecture is meant to make those shifts small chores rather than rewrites.
     </p>
     {% call callout("tip", False) %}
       The most reliable long-term safety net is the simple stuff: exports,

@@ -1,10 +1,23 @@
+
 import traceback
+from collections.abc import Iterable, Mapping
+from contextlib import suppress
 from pathlib import Path
+from typing import Protocol
 
 from flask import has_request_context, request
 
 from lagniappe import CONFIG
+
 from . import UnloadedRelationError, capture
+
+
+class _RelationProperty(Protocol):
+    _reported_unloaded_keys: tuple[str, tuple[str, ...]] | None
+
+
+
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
@@ -16,9 +29,6 @@ def _unloaded_relations_tracing_enabled():
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/unloaded_relations.py::capture_unloaded_relation
-# @reason relation diagnostics need defensive attribute access
 def _safe_attr(item, attr, default=None):
     try:
         return getattr(item, attr, default)
@@ -26,9 +36,6 @@ def _safe_attr(item, attr, default=None):
         return f"<{type(error).__name__}: {error}>"
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/unloaded_relations.py::capture_unloaded_relation
-# @reason relation diagnostics should not depend on loaded entity instances
 def _debug_key(key):
     kind = _safe_attr(key, "kind")
     key_name = _safe_attr(key, "name")
@@ -38,9 +45,6 @@ def _debug_key(key):
     return str(key)
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/unloaded_relations.py::capture_unloaded_relation
-# @reason request context formatting is diagnostic plumbing
 def _request_context():
     if not has_request_context():
         return None
@@ -53,9 +57,6 @@ def _request_context():
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/unloaded_relations.py::capture_unloaded_relation
-# @reason caller formatting is diagnostic plumbing
 def _caller_location():
     skip_prefixes = (
         "lagniappe/core/mixins/related.py:",
@@ -65,10 +66,8 @@ def _caller_location():
     )
     for frame in reversed(traceback.extract_stack()[:-1]):
         path = Path(frame.filename).resolve()
-        try:
+        with suppress(ValueError):
             path = path.relative_to(PROJECT_ROOT)
-        except ValueError:
-            pass
         location = f"{path}:{frame.lineno} {frame.name}"
         if location.startswith(skip_prefixes):
             continue
@@ -76,14 +75,13 @@ def _caller_location():
     return "-"
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/unloaded_relations.py::capture_unloaded_relation
-# @reason context formatting is diagnostic plumbing
 def _entity_context(entity):
     if not entity:
         return None
 
-    db = _safe_attr(entity, "db", {}) or {}
+    db = _safe_attr(entity, "db", {})
+    if not isinstance(db, Mapping):
+        db = {}
     kind = _safe_attr(entity, "kind") or _safe_attr(entity, "entity_kind")
     return {
         "class": f"{type(entity).__module__}.{type(entity).__name__}",
@@ -92,13 +90,10 @@ def _entity_context(entity):
         "id": _safe_attr(entity, "id"),
         "hash": _safe_attr(entity, "hash"),
         "urlsafe_key": _safe_attr(entity, "urlsafe_key"),
-        "db_keys": sorted(str(key) for key in db.keys()),
+        "db_keys": sorted(str(key) for key in db),
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/exceptions/unloaded_relations.py::capture_unloaded_relation
-# @reason context formatting is diagnostic plumbing
 def _property_context(prop):
     return {
         "class": f"{type(prop).__module__}.{type(prop).__name__}",
@@ -109,12 +104,9 @@ def _property_context(prop):
     }
 
 
-# @testable true
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_related_list_value_reports_unloaded_relation_without_loading
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_related_single_value_reports_unloaded_relation_without_loading
-# @tests tests_unit/test_001_test_general_and_utilities.py::test_related_value_strict_mode_raises_after_reporting
-# @matrix relations : diagnostics strict-mode unloaded-fallback
-def capture_unloaded_relation(prop, *, relation_type, keys):
+def capture_unloaded_relation(
+    prop: _RelationProperty, *, relation_type: str, keys: Iterable[object]
+) -> None:
     """Capture a diagnostic when relation access would have lazy-loaded."""
     if not _unloaded_relations_tracing_enabled():
         return

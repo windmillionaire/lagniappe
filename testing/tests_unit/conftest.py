@@ -21,6 +21,7 @@ import pytest
 
 from lagniappe import CONFIG
 from testing.utility.test_entities import TestEntities, TestUser
+from datetime import UTC
 
 TEST_ENTITIES_DIR = Path(__file__).parent.parent / "files" / "test_entities"
 TEST_SCHEMAS_DIR = Path(__file__).parent.parent / "files" / "test_schemas"
@@ -331,13 +332,13 @@ def test_submission_values():
 
     def _check_value(entity, field, field_id, expected):
         """Check exact stored values; DateMixin also retains its UTC contract."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         if isinstance(field, mixins.DateMixin):
             assert field.value is not None, (
                 f"{entity.name}: {field_id}.value should not be None"
             )
-            assert field.value.tzinfo == timezone.utc, (
+            assert field.value.tzinfo == UTC, (
                 f"{entity.name}: {field_id}.value should be UTC, "
                 f"got {field.value.tzinfo}"
             )
@@ -468,7 +469,7 @@ def test_submission_values():
                 )
         else:
             field_filter_key = getattr(field, "filter_key", field.id)
-            assert field_filter_key not in to_filter_index.keys(), (
+            assert field_filter_key not in to_filter_index, (
                 f"{entity.name}: non-FilterMixin field '{field_filter_key}' "
                 f"in to_filter_index"
             )

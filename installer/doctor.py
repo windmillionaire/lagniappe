@@ -1,5 +1,10 @@
 """Read-only local and provider diagnostics for an existing installation."""
 
+from collections.abc import Callable, Mapping
+from subprocess import CalledProcessError, CompletedProcess
+from typing import Protocol
+
+
 from runner import presentation as ui
 from runner.presentation import output as print
 
@@ -14,6 +19,12 @@ import yaml
 from config import decode_app_settings
 from runner.context import REPOSITORY_ROOT, setup_command
 from installer.summary import expected_resource_lines
+
+
+class _GcloudRunner(Protocol):
+    def __call__(
+        self, command: list[str], *, check: bool
+    ) -> CompletedProcess[str] | CalledProcessError: ...
 
 
 GENERATED_FILES = (
@@ -33,9 +44,6 @@ SECRET_FILES = (
 )
 
 
-# @testable false
-# @covered-by installer/doctor.py::run_doctor
-# @reason private UTF-8 parser is exercised through the public read-only diagnostic
 def _load_document(path):
     with path.open("r", encoding="utf-8", newline="") as document:
         if path.suffix == ".json":
@@ -46,9 +54,6 @@ def _load_document(path):
         return data
 
 
-# @testable false
-# @covered-by installer/doctor.py::run_doctor
-# @reason local checksum and permission collection is owned by the public diagnostic
 def _local_state(root):
     issues = []
     documents = {}
@@ -84,8 +89,10 @@ def _local_state(root):
         )
         source_checksum = hashlib.sha256(source_content).hexdigest()
 
-    if source_checksum and manifest:
-        if (
+    if (
+        source_checksum
+        and manifest
+        and (
             manifest.get("schema") != 2
             or manifest.get("source")
             != {
@@ -93,10 +100,11 @@ def _local_state(root):
                 "sha256": source_checksum,
             }
             or manifest.get("generation") != source_checksum
-        ):
-            issues.append(
-                "generated files do not match the current constants generation"
-            )
+        )
+    ):
+        issues.append(
+            "generated files do not match the current constants generation"
+        )
 
     if os.name != "nt":
         for relative in SECRET_FILES:
@@ -104,12 +112,33 @@ def _local_state(root):
             if path.is_file() and path.stat().st_mode & 0o077:
                 issues.append(f"{relative}: permissions are broader than owner-only")
 
+    app_settings = documents.get("config/files/lagniappe_settings.yaml")
+    if isinstance(app_settings, Mapping):
+        from config.secrets import (
+            SecretsBackendError,
+            find_leaked_secret_keys,
+            normalize_secrets_config,
+            uses_secret_manager,
+        )
+
+        try:
+            normalize_secrets_config(app_settings)
+        except SecretsBackendError as error:
+            issues.append(f"config/files/lagniappe_settings.yaml: {error}")
+        else:
+            if uses_secret_manager(app_settings):
+                leaked = find_leaked_secret_keys(app_settings)
+                if leaked:
+                    issues.append(
+                        "config/files/lagniappe_settings.yaml: secret keys present "
+                        "on disk while SECRETS_BACKEND=secret_manager ("
+                        + ", ".join(leaked)
+                        + ")"
+                    )
+
     return documents, issues
 
 
-# @testable false
-# @covered-by installer/doctor.py::run_doctor
-# @reason read-only command normalization is exercised through the public diagnostic
 def _gcloud_value(runner, command):
     try:
         result = runner(command, check=False)
@@ -120,9 +149,6 @@ def _gcloud_value(runner, command):
     return str(result.stdout or "").strip() or None
 
 
-# @testable false
-# @covered-by installer/doctor.py::run_doctor
-# @reason active identity collection is owned by the public diagnostic
 def _active_cli_identity(runner):
     return {
         "configuration": _gcloud_value(
@@ -146,9 +172,6 @@ def _active_cli_identity(runner):
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_reads_adc_identity_without_changing_it
-# @matrix setup : adc doctor provider-identity read-only
 def _read_adc_identity(
     *,
     auth_default=None,
@@ -204,11 +227,13 @@ def _read_adc_identity(
         }
 
 
-# @testable true
-# @tests tests_tooling/test_001g_setup_release_readiness.py::test_default_doctor_provider_checker_targets_saved_project
-# @matrix setup : doctor operator-permissions project-identity provider-apis provider-discovery
 def _default_provider_checker(settings, project):
     from config import constants
+    from config.secrets import (
+        load_runtime_secrets,
+        merge_secret_settings,
+        uses_secret_manager,
+    )
     from installer.iam import inspect_operator_permissions
     from installer.recovery import verify_recovery_resources
     from installer.commands import run_gcloud_command
@@ -223,8 +248,14 @@ def _default_provider_checker(settings, project):
         project_details = json.loads(result.stdout or "{}")
     except json.JSONDecodeError as error:
         raise RuntimeError("target project returned invalid data") from error
+
+    effective_settings = (
+        merge_secret_settings(settings, load_runtime_secrets(settings))
+        if uses_secret_manager(settings)
+        else settings
+    )
     report = verify_recovery_resources(
-        settings,
+        effective_settings,
         project,
         project_details=project_details,
     )
@@ -251,12 +282,19 @@ def _default_provider_checker(settings, project):
         for value in str(services.stdout or "").splitlines()
         if value.strip()
     }
-    missing_apis = sorted(set(constants.REQUIRED_GOOGLE_CLOUD_APIS) - enabled_apis)
+    from installer.secrets import SECRET_MANAGER_API, probe_runtime_secrets_resource
+
+    required_apis = set(constants.REQUIRED_GOOGLE_CLOUD_APIS)
+    if uses_secret_manager(settings):
+        required_apis.add(SECRET_MANAGER_API)
+    missing_apis = sorted(required_apis - enabled_apis)
     report["required-apis"] = {
         "state": "ABSENT" if missing_apis else "AVAILABLE",
         "details": {"missing": missing_apis},
         "error": None,
     }
+    if uses_secret_manager(settings):
+        report["runtime-secrets"] = probe_runtime_secrets_resource(settings, project)
     from installer.monitoring import inspect_memory_alert
 
     report["app-engine-memory-alert"] = inspect_memory_alert(settings, project)
@@ -268,9 +306,6 @@ def _default_provider_checker(settings, project):
     return report
 
 
-# @testable false
-# @covered-by installer/doctor.py::run_doctor
-# @reason identity drift comparison is exercised through the public diagnostic
 def _identity_issues(saved, active):
     expected = {
         "configuration": saved.get("NAME"),
@@ -287,9 +322,6 @@ def _identity_issues(saved, active):
     return issues
 
 
-# @testable true
-# @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_reports_keyless_identity_drift
-# @matrix setup : adc doctor keyless-config project-identity
 def _keyless_identity_issues(settings, deploy):
     """Return local keyless identity and deployment attachment drift."""
     runtime_email = (
@@ -328,17 +360,16 @@ def _keyless_identity_issues(settings, deploy):
     return issues
 
 
-# @testable true
-# @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_reports_drift_without_writing
-# @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_decodes_saved_settings_and_guides_adc_alignment
-# @matrix setup : adc doctor drift independent-provider-check parsing provider-identity read-only
 def run_doctor(
     *,
-    root=REPOSITORY_ROOT,
-    gcloud_runner=None,
-    adc_checker=None,
-    provider_checker=None,
-):
+    root: str | Path = REPOSITORY_ROOT,
+    gcloud_runner: _GcloudRunner | None = None,
+    adc_checker: Callable[[], Mapping[str, str | None]] | None = None,
+    provider_checker: Callable[
+        [Mapping[str, object], str], Mapping[str, Mapping[str, object]]
+    ]
+    | None = None,
+) -> int:
     """Inspect setup state and expected providers without repairing anything."""
     root = Path(root)
     documents, local_issues = _local_state(root)
@@ -374,7 +405,7 @@ def run_doctor(
                 identity_issues.append("ADC principal is unavailable")
             elif (
                 saved_gcloud.get("ACCOUNT")
-                and adc["principal"].casefold() != saved_gcloud["ACCOUNT"].casefold()
+                and str(adc["principal"]).casefold() != saved_gcloud["ACCOUNT"].casefold()
             ):
                 identity_issues.append("ADC principal differs from the saved deployer")
             if saved_gcloud.get("PROJECT") and (

@@ -30,7 +30,6 @@ def _allowed(entity, allowed):
     return entity
 
 
-# @matrix submitted-references : action batch generic-error kind predicate
 def test_submitted_reference_resolver_rejects_unavailable_targets():
     actor = UtilityTestUser()
     denied = _allowed(
@@ -80,7 +79,6 @@ def test_submitted_reference_resolver_rejects_unavailable_targets():
         )
 
 
-# @matrix submitted-references : dedup existing order predicate
 def test_submitted_reference_resolver_preserves_authorized_order_and_existing_targets():
     actor = UtilityTestUser()
     first = _allowed(
@@ -107,7 +105,6 @@ def test_submitted_reference_resolver_preserves_authorized_order_and_existing_ta
     ) == [first, existing]
 
 
-# @matrix task-attachments : actor expiry file scope signed-claim tamper validation
 def test_task_attachment_claim_is_actor_file_scope_bound_and_expiring(monkeypatch):
     monkeypatch.setattr(CONFIG, "SECRET_KEY", "attachment-secret-" * 4)
     actor = TestEntities.get(
@@ -157,7 +154,6 @@ def test_task_attachment_claim_is_actor_file_scope_bound_and_expiring(monkeypatc
     )
 
 
-# @matrix submitted-references : browser internal-link preflight preservation
 def test_browser_submission_references_require_view_and_preserve_hidden_existing_values(
     get_schema,
 ):
@@ -213,7 +209,6 @@ def test_browser_submission_references_require_view_and_preserve_hidden_existing
         assert page.properties.submission.fields["top_link"].db_value == existing.details
 
 
-# @matrix submitted-references : browser internal-link no-partial-mutation preflight table
 def test_browser_submission_references_validate_table_links_before_mutation(get_schema):
     actor = UtilityTestUser()
     page = TestEntities.get(
@@ -245,18 +240,16 @@ def test_browser_submission_references_validate_table_links_before_mutation(get_
         patch(
             "lagniappe.core.tools.auth.references.database_get.datastore_key",
             return_value=denied.key,
-        ),
+        ),pytest.raises(ValidationError, match=UNAVAILABLE_REFERENCE_ERROR)
     ):
-        with pytest.raises(ValidationError, match=UNAVAILABLE_REFERENCE_ERROR):
-            page.form_submission(
-                WebFormSubmission({"with_rows": rows}),
-                actor=actor,
-            )
+        page.form_submission(
+            WebFormSubmission({"with_rows": rows}),
+            actor=actor,
+        )
 
     assert "with_rows" not in page.properties.submission.db_value
 
 
-# @pair task:assignee-preservation
 def test_task_update_preserves_unchanged_assignee_eligibility():
     task = TestEntities.get(
         "TASK",

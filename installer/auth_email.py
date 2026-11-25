@@ -1,5 +1,12 @@
 """Configure SMTP delivery for authentication action links."""
 
+from __future__ import annotations
+from collections.abc import Callable, Mapping
+from typing import TypedDict
+
+
+from contextlib import suppress
+from typing import SupportsIndex, SupportsInt
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 
@@ -23,6 +30,18 @@ from installer.errors import (
 )
 from runner.context import setup_command
 
+class SMTPConfig(TypedDict):
+    provider: str
+    service: str
+    host: str
+    port: int
+    security: str
+    username: str
+    password: str
+    senderEmail: str
+    senderName: str
+
+
 GMAIL_APP_PASSWORDS_URL = (
     "https://accounts.google.com/AccountChooser"
     "?continue=https%3A%2F%2Fmyaccount.google.com%2Fapppasswords"
@@ -39,22 +58,15 @@ SMTP_SECURITY_MODES = {"starttls", "ssl"}
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_auth_email_config_requires_canonical_smtp
-# @matrix setup : app-password authentication-email validation
-def normalize_app_password(value):
+def normalize_app_password(value: object) -> str | None:
     """Normalize and validate Google's displayed 16-character app password."""
     password = "".join(str(value or "").split())
     return password if re.fullmatch(r"[A-Za-z0-9]{16}", password) else None
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_auth_email_config_requires_canonical_smtp
-# @matrix setup : authentication-email smtp validation
-def normalize_auth_email_config(config):
+def normalize_auth_email_config(config: object) -> SMTPConfig | None:
     """Return one validated generic SMTP configuration or ``None``."""
-    config = config or {}
-    if config.get("provider") != "smtp":
+    if not isinstance(config, Mapping) or config.get("provider") != "smtp":
         return None
     service = str(config.get("service") or "SMTP").strip()
     host = str(config.get("host") or "").strip()
@@ -64,7 +76,10 @@ def normalize_auth_email_config(config):
     sender_email = str(config.get("senderEmail") or "").strip()
     sender_name = str(config.get("senderName") or "").strip()
     try:
-        port = int(config.get("port"))
+        raw_port = config.get("port")
+        if not isinstance(raw_port, (str, bytes, bytearray, SupportsIndex, SupportsInt)):
+            return None
+        port = int(raw_port)
     except (TypeError, ValueError):
         return None
     if not (
@@ -91,17 +106,11 @@ def normalize_auth_email_config(config):
     }
 
 
-# @testable false
-# @covered-by installer/auth_email.py::normalize_auth_email_config
-# @reason validation predicate delegates to the canonical normalizer
-def auth_email_config_matches(config):
+def auth_email_config_matches(config: object) -> bool:
     """Return whether saved authentication-email settings are complete."""
     return normalize_auth_email_config(config) is not None
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_smtp_test_message_supports_tls_and_reports_transport_failures
-# @matrix setup : authentication-email certificate-validation smtp tls
 def _create_smtp_tls_context():
     """Build an SMTP context with system and installer-managed CA certificates."""
     context = ssl.create_default_context()
@@ -109,19 +118,16 @@ def _create_smtp_tls_context():
     return context
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_smtp_test_message_supports_tls_and_reports_transport_failures
-# @matrix setup : authentication-email error-reporting smtp tls transient-retry
 def test_smtp_delivery(
-    config,
-    recipient=None,
+    config: object,
+    recipient: str | None = None,
     *,
-    smtp_factory=smtplib.SMTP,
-    smtp_ssl_factory=smtplib.SMTP_SSL,
-    tls_context=None,
-    smtp_attempts=2,
-    retry_sleep=None,
-):
+    smtp_factory: type[smtplib.SMTP] = smtplib.SMTP,
+    smtp_ssl_factory: type[smtplib.SMTP_SSL] = smtplib.SMTP_SSL,
+    tls_context: ssl.SSLContext | None = None,
+    smtp_attempts: int = 2,
+    retry_sleep: Callable[[float], None] | None = None,
+) -> bool:
     """Send a test message through the candidate SMTP configuration."""
     normalized = normalize_auth_email_config(config)
     if not normalized:
@@ -142,18 +148,12 @@ def test_smtp_delivery(
     )
     context = tls_context or _create_smtp_tls_context()
 
-    # @testable false
-    # @covered-by installer/auth_email.py::test_smtp_delivery
-    # @reason nested response sanitizer is exercised through SMTP failure handling
-    def response_detail(response):
+    def response_detail(response: object) -> str:
         if isinstance(response, bytes):
             response = response.decode("utf-8", errors="replace")
         return " ".join(str(response or "").split())[:500]
 
-    # @testable false
-    # @covered-by installer/auth_email.py::test_smtp_delivery
-    # @reason one-attempt transport helper is exercised through bounded delivery retry
-    def send_test_message():
+    def send_test_message() -> bool:
         stage = "connect to the email service"
         try:
             if normalized["security"] == "ssl":
@@ -249,68 +249,63 @@ def test_smtp_delivery(
             ) from error
         return True
 
-    retry_options = {
-        "description": f"Test {normalized['service']} email delivery",
-        "attempts": smtp_attempts,
-        "delays": (1,),
-    }
-    if retry_sleep is not None:
-        retry_options["sleep"] = retry_sleep
-    return retry_provider_call(send_test_message, **retry_options)
+    return retry_provider_call(
+        send_test_message,
+        description=f"Test {normalized['service']} email delivery",
+        attempts=smtp_attempts, delays=(1,),
+        **({"sleep": retry_sleep} if retry_sleep is not None else {}),
+    )
 
 
-# @testable false
-# @covered-by installer/auth_email.py::setup_auth_email
-# @reason interactive browser guidance is owned by the public setup step
 def _print_gmail_instructions():
     print(wrap_text(ui.heading("\nConfigure authentication email:")))
     print(
         wrap_text(
-            (
+
                 "Lagniappe can send verification and password-reset links through any Gmail "
                 f"or Google Workspace mailbox with {ui.literal('2-Step Verification')} and "
                 f"{ui.literal('App Passwords')} enabled. After adding a custom domain, "
                 f"{ui.literal(setup_command('email'))} can replace Gmail with any SMTP email "
                 "service."
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 "Google warns about app passwords because they let an app sign in without the usual interactive Google prompt. "
                 "Lagniappe uses this one only to send email from the chosen mailbox on its owner's behalf, so people the owner invites can verify their email addresses and request password resets."
-            )
+
         )
     )
     print(
         wrap_text(
-            (f"\n{ui.literal('1.')} Choose the mailbox Lagniappe should send from.")
+            f"\n{ui.literal('1.')} Choose the mailbox Lagniappe should send from."
         )
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('2.')} Enable {ui.literal('2-Step Verification')} if it is "
                 "not already enabled."
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('3.')} In the {ui.literal('App name')} box, enter '"
                 f"{ui.literal('Lagniappe')}', then click {ui.literal('Create')}."
-            )
+
         )
     )
     print(
         wrap_text(
-            (
+
                 f"{ui.literal('4.')} Copy the 16-character password Google displays. "
                 "Setup will test it and store it in the private application settings "
                 "file."
-            )
+
         )
     )
     ready = input(
@@ -320,22 +315,16 @@ def _print_gmail_instructions():
         raise SetupCancelled("Installation cancelled before Google App Passwords.")
     print(
         wrap_text(
-            (
+
                 f"Opening a Google account picker for {ui.literal('App Passwords')}:\n  "
                 f"{ui.literal(GMAIL_APP_PASSWORDS_URL)}"
-            )
+
         )
     )
-    try:
+    with suppress(webbrowser.Error):
         webbrowser.open_new_tab(GMAIL_APP_PASSWORDS_URL)
-    except webbrowser.Error:
-        pass
 
 
-# @testable false
-# @covered-by installer/auth_email.py::setup_auth_email
-# @covered-by installer/auth_email.py::_setup_provider_auth_email
-# @reason interactive retry and cancellation behavior is owned by setup
 def _prompt(label, default=None):
     value = input(format_prompt(
         label, default=default if default not in (None, "") else None,
@@ -346,12 +335,7 @@ def _prompt(label, default=None):
     return value or str(default or "").strip()
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_setup_auth_email_saves_generic_gmail_smtp_after_test
-# @tests tests_tooling/test_001b_setup_providers.py::test_setup_auth_email_replaces_existing_gmail_sender
-# @tests tests_tooling/test_001b_setup_providers.py::test_setup_auth_email_uses_custom_domain_provider_path
-# @matrix setup : authentication-email custom-domain failure-isolation interactive-input replacement settings-save smtp
-def setup_auth_email(*, replace=False):
+def setup_auth_email(*, replace: bool = False) -> bool:
     """Select a custom-domain SMTP service or the zero-domain Gmail bootstrap."""
     from config import SETTINGS
 
@@ -474,9 +458,6 @@ def setup_auth_email(*, replace=False):
         return True
 
 
-# @testable false
-# @covered-by installer/auth_email.py::_setup_provider_auth_email
-# @reason transport choice prompt is owned by the provider configuration workflow
 def _prompt_security(default="starttls"):
     while True:
         value = _prompt(
@@ -491,9 +472,6 @@ def _prompt_security(default="starttls"):
         print(ui.error(wrap_text("Choose STARTTLS or SSL/TLS.")))
 
 
-# @testable false
-# @covered-by installer/auth_email.py::_setup_provider_auth_email
-# @reason numeric port prompt is owned by the provider configuration workflow
 def _prompt_port(default=587):
     while True:
         value = _prompt("SMTP port", default)
@@ -506,9 +484,6 @@ def _prompt_port(default=587):
         print(ui.error(wrap_text("Enter an SMTP port between 1 and 65535.")))
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_auth_email_dmarc_setup_supports_cloudflare_and_manual_dns
-# @matrix setup : authentication-email cloudflare-dns dmarc manual-dns
 def _configure_dmarc_for_sender(sender_email):
     """Publish or confirm a DMARC policy for the visible sender domain."""
     from config import SETTINGS
@@ -524,13 +499,13 @@ def _configure_dmarc_for_sender(sender_email):
     print(
         "\n"
         + wrap_text(
-            (
+
                 "DMARC ties the visible From domain to SPF or DKIM and tells receiving "
                 "mail systems how to handle messages that fail. Setup starts with the "
                 f"non-disruptive {ui.literal('p=none')} policy; it enables DMARC "
                 "authentication without asking receivers to quarantine or reject mail. "
                 "This step is recommended but optional."
-            )
+
         )
     )
 
@@ -593,10 +568,6 @@ def _configure_dmarc_for_sender(sender_email):
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_provider_auth_email_uses_resend_cloudflare_shortcut
-# @tests tests_tooling/test_001b_setup_providers.py::test_resend_auth_email_rerun_reuses_saved_sending_key_without_prompt
-# @matrix setup : authentication-email cloudflare-dns interactive-input resend settings-save smtp
 def _setup_resend_auth_email(current, custom_domain):
     """Guide Resend/Cloudflare setup and save Resend's fixed SMTP settings."""
     from config import SETTINGS
@@ -610,13 +581,13 @@ def _setup_resend_auth_email(current, custom_domain):
     if cloudflare_configured:
         print(
             wrap_text(
-                (
+
                     "This installation already uses Cloudflare DNS. Resend can publish "
                     "its SPF, DKIM, and return-path records through the '"
                     f"{ui.literal('Sign in to Cloudflare')}' button. After the SMTP "
                     "test, setup will separately publish or verify the sender domain's "
                     "DMARC record."
-                )
+
             )
         )
     else:
@@ -627,10 +598,8 @@ def _setup_resend_auth_email(current, custom_domain):
             )
         )
     print(wrap_text(f"Opening Resend domains:\n  {ui.literal(RESEND_DOMAINS_URL)}"))
-    try:
+    with suppress(webbrowser.Error):
         webbrowser.open_new_tab(RESEND_DOMAINS_URL)
-    except webbrowser.Error:
-        pass
     domain_ready = input(
         format_prompt("Wait until Resend shows the sending domain as verified", hint="Enter to continue; x to exit")
     ).strip()
@@ -690,12 +659,12 @@ def _setup_resend_auth_email(current, custom_domain):
         else:
             print(
                 wrap_text(
-                    (
+
                         f"\nCreate an API key named '{ui.literal('Lagniappe')}' with "
                         f"{ui.literal('Sending access')}. Restrict it to the verified "
                         "sending domain when Resend offers that choice. The key is shown "
                         "only once."
-                    )
+
                 )
             )
             print(
@@ -703,10 +672,8 @@ def _setup_resend_auth_email(current, custom_domain):
                     f"Opening Resend API keys:\n  {ui.literal(RESEND_API_KEYS_URL)}"
                 )
             )
-            try:
+            with suppress(webbrowser.Error):
                 webbrowser.open_new_tab(RESEND_API_KEYS_URL)
-            except webbrowser.Error:
-                pass
             api_key = _prompt("Resend API key (input is visible)")
         default_sender = (
             current_sender
@@ -777,11 +744,11 @@ def _setup_resend_auth_email(current, custom_domain):
             print(
                 f.warning(
                     wrap_text(
-                        (
+
                             "The previous authentication-email settings remain active. "
                             "Confirm that Resend verified the domain and that the API "
                             f"key has {ui.literal('Sending access')} before retrying."
-                        )
+
                     )
                 )
             )
@@ -809,9 +776,6 @@ def _setup_resend_auth_email(current, custom_domain):
         return True
 
 
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_provider_auth_email_saves_only_after_successful_smtp_test
-# @matrix setup : authentication-email custom-domain interactive-input settings-save smtp
 def _setup_provider_auth_email():
     """Collect, test, and save provider-neutral SMTP settings."""
     from config import SETTINGS
@@ -932,11 +896,7 @@ def _setup_provider_auth_email():
         return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_email_cli_replaces_gmail_without_custom_domain
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_email_cli_configures_and_optionally_deploys
-# @matrix setup : authentication-email cli custom-domain deploy gmail replacement smtp
-def configure_auth_email():
+def configure_auth_email() -> int:
     """Replace authentication-email delivery on an existing installation."""
     from .verify import prepare_existing_installation
 

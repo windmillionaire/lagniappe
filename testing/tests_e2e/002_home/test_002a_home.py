@@ -9,7 +9,7 @@ Related Files:
         - lagniappe/web/routes/home/main.py: Home route (/)
         - lagniappe/web/templates/home/home.html: Main home template
         - lagniappe/web/templates/home/*.html: Component templates
-        - src/script/views/home.mjs: Client-side initialization
+        - src/script/views/home.ts: Client-side initialization
         - src/script/widgets/home/: List, activity, and task widget classes
 
     Core Entity:
@@ -49,7 +49,6 @@ from testing.utility.test_file import TestFile as _TestFile
 pytestmark = pytest.mark.e2e
 
 
-# @matrix home icons : material-symbol-markup
 # @template home/home.html::main
 def test_home_material_symbols_use_semantic_span_markup(get_admin, get_user):
     user = get_admin()
@@ -135,7 +134,6 @@ def test_home_material_symbols_use_semantic_span_markup(get_admin, get_user):
     )
 
 
-# @pair home:directory-list
 def test_directory_list(get_admin, get_user):
     """
     Verify a home toggle opens and closes its widget through client-side state.
@@ -158,7 +156,6 @@ def test_directory_list(get_admin, get_user):
     expect(directory_list).to_be_hidden()
 
 
-# @matrix home : prefetch task-count task-list
 def test_tasks_prefetch(get_admin, get_user):
     """
     Verify tasks are prefetched on page load.
@@ -168,7 +165,7 @@ def test_tasks_prefetch(get_admin, get_user):
     task count replaces the initial loading marker on page load.
 
     Verifies:
-        - src/script/views/home.mjs: Prefetch initialization
+        - src/script/views/home.ts: Prefetch initialization
         - lagniappe/web/templates/home/tasks.html: lp-prefetch attribute
         - Task list shell is replaced after prefetch GET /l/get/tasks
         - Task count element is rendered
@@ -189,7 +186,6 @@ def test_tasks_prefetch(get_admin, get_user):
     expect(user.locate(home.TASK_LIST_TOGGLE)).not_to_be_disabled()
 
 
-# @matrix home : category-list lazy-load loading-indicator project-list
 # @scaffolding testing/elements/containers.py::List.find_item
 def test_model_lists_load_on_toggle(get_admin, get_user):
     """Verify project and category home lists load through their /l/get branches on demand."""
@@ -223,7 +219,6 @@ def test_model_lists_load_on_toggle(get_admin, get_user):
     )
 
 
-# @matrix home : layout load mobile
 def test_home_mobile_dashboard_smoke(get_admin, get_user):
     """Smoke-check the homepage dashboard and a representative form at mobile width."""
     user = get_admin()
@@ -244,7 +239,6 @@ def test_home_mobile_dashboard_smoke(get_admin, get_user):
     )
 
 
-# @matrix notes : body-create combined-input photo-picker preview remove
 # @template notes.html::composer
 def test_create_note_composer_keeps_text_and_photo_from_home(get_admin, get_user):
     user = get_admin()

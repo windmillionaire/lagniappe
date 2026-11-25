@@ -1,6 +1,6 @@
 """Document poll projection against Redis with counted durable asset reads."""
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from importlib import import_module
 import json
 from types import SimpleNamespace
@@ -20,7 +20,6 @@ poll = import_module("lagniappe.web.routes.home.poll")
 pytestmark = pytest.mark.e2e
 
 
-# @matrix polling : document read-path
 @pytest.mark.parametrize("entity_type", [Page, Project], ids=["page", "project"])
 @pytest.mark.parametrize("legacy_html", [False, True], ids=["ydoc", "legacy-html"])
 def test_document_poll_loads_storage_only_on_cache_miss(
@@ -30,7 +29,7 @@ def test_document_poll_loads_storage_only_on_cache_miss(
     sync_id = f"{identity}:document"
     client_id = f"{identity}:client"
     viewer = SimpleNamespace(details={"hash": identity, "name": "Poll viewer"})
-    monkeypatch.setattr(poll, "current_user", viewer)
+    monkeypatch.setattr(poll, "authenticated_user", lambda: viewer)
     stored_assets = {
         "document": {"type": "html", "path": "saved.html", "fingerprint": "saved"},
     }
@@ -44,7 +43,7 @@ def test_document_poll_loads_storage_only_on_cache_miss(
         # per-instance property memoization cannot hide an eager Storage read.
         entity = entity_type(testing=True)
         entity.db.update(hash=identity, assets=json.dumps(stored_assets))
-        entity.modified = datetime(2026, 9, 19, tzinfo=timezone.utc)
+        entity.modified = datetime(2026, 9, 19, tzinfo=UTC)
         entity.allowed = Mock(return_value=True)
         return entity
 
@@ -90,11 +89,10 @@ def test_document_poll_loads_storage_only_on_cache_miss(
         documents.cache.redis.delete(document_key, presence_key)
 
 
-# @matrix polling : authorization document unavailable
 @pytest.mark.parametrize("unavailable", ["missing", "forbidden", "wrong-document", "no-document"])
 def test_document_poll_rejects_unavailable_documents_before_loading_state(monkeypatch, unavailable):
     viewer = SimpleNamespace(details={"hash": "viewer"})
-    monkeypatch.setattr(poll, "current_user", viewer)
+    monkeypatch.setattr(poll, "authenticated_user", lambda: viewer)
     read_cache = Mock(side_effect=AssertionError("Unavailable documents must not read Redis."))
     monkeypatch.setattr(poll.cache, "poll_document", read_cache)
     load_seed = Mock(side_effect=AssertionError("Unavailable documents must not load Storage."))

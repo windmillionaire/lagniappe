@@ -1,6 +1,6 @@
 """Focused deferred-job behavior tests."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 import hashlib
 import json
 from types import SimpleNamespace
@@ -46,7 +46,6 @@ from testing.utility.deferred_job_fakes import (
 pytestmark = pytest.mark.unit
 
 
-# @matrix deferred-jobs : index-exclusion json-encoding persisted-schema property-ownership
 def test_deferred_job_property_split_preserves_persisted_schema():
     job = Entities.DEFERRED_JOB(testing=True)
     registry = job.properties._registry
@@ -128,7 +127,6 @@ def test_deferred_job_property_split_preserves_persisted_schema():
     )
 
 
-# @matrix deferred-jobs : input-serialization payload-limit request-identity
 def test_deferred_job_request_properties_own_identity_and_payload_validation(
     monkeypatch,
 ):
@@ -171,7 +169,6 @@ def test_deferred_job_request_properties_own_identity_and_payload_validation(
         )
 
 
-# @matrix deferred-jobs : feedback-identity task-identity
 def test_deferred_job_task_identity_is_deterministic_and_bounded():
     job = SimpleNamespace(idempotency_key="stable-operation")
     digest = hashlib.sha256(b"stable-operation").hexdigest()[:32]
@@ -188,7 +185,6 @@ def test_deferred_job_task_identity_is_deterministic_and_bounded():
     assert TaskIdentity.feedback(job) == f"job-{digest}-feedback"
 
 
-# @matrix deferred-jobs : browser-projection lock-identity
 def test_deferred_job_lock_properties_own_identity_and_projection():
     target = SimpleNamespace(urlsafe_key="target-key")
     expected = hashlib.sha256(b"form-autofill:target-key").hexdigest()
@@ -206,16 +202,15 @@ def test_deferred_job_lock_properties_own_identity_and_projection():
     }
 
 
-# @matrix deferred-jobs : elapsed-time timestamp-normalization
 def test_deferred_job_lifecycle_normalizes_timestamps_and_elapsed_time():
-    now = datetime(2026, 8, 22, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 22, 12, tzinfo=UTC)
     naive = datetime(2026, 8, 22, 11, 58)
 
     assert deferred_job_lifecycle.datetime_value(naive) == naive.replace(
-        tzinfo=timezone.utc
+        tzinfo=UTC
     )
     assert deferred_job_lifecycle.datetime_value("2026-08-22T11:58:00Z") == (
-        naive.replace(tzinfo=timezone.utc)
+        naive.replace(tzinfo=UTC)
     )
     assert deferred_job_lifecycle.datetime_value("not-a-date") is None
     assert deferred_job_lifecycle.elapsed_seconds(naive, now) == 120
@@ -223,13 +218,12 @@ def test_deferred_job_lifecycle_normalizes_timestamps_and_elapsed_time():
     assert deferred_job_lifecycle.elapsed_seconds(None, now) == 0
 
 
-# @matrix deferred-jobs : revision transaction user-write-isolation
 def test_deferred_job_status_transactions_do_not_write_actor(monkeypatch):
     class JobKey:
         def __init__(self, parent):
             self.parent = parent
 
-    now = datetime(2026, 7, 30, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 30, tzinfo=UTC)
     actor_key = object()
     job_key = JobKey(actor_key)
     actor = KeyedEntity(
@@ -287,9 +281,8 @@ def test_deferred_job_status_transactions_do_not_write_actor(monkeypatch):
     assert all(entity is not actor for entity in datastore.saved)
 
 
-# @matrix deferred-jobs : checkpoint claim compare-and-set duplicate-delivery lease
 def test_deferred_job_claim_and_checkpoint_are_compare_and_set(monkeypatch):
-    now = datetime(2026, 7, 16, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 16, tzinfo=UTC)
     entity = {"status": "queued", "attempt": 0}
     datastore = FakeDatastore(entity)
     monkeypatch.setattr(
@@ -339,9 +332,8 @@ def test_deferred_job_claim_and_checkpoint_are_compare_and_set(monkeypatch):
     assert "next_attempt_at" not in entity
 
 
-# @matrix deferred-jobs : retry transaction-contention
 def test_deferred_job_transactions_retry_aborted_contention(monkeypatch):
-    now = datetime(2026, 7, 20, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 20, tzinfo=UTC)
     sleeps = []
     monkeypatch.setattr(database_transactions.time, "sleep", sleeps.append)
     monkeypatch.setattr(deferred_database, "_deferred_job_key", lambda _value: "job")
@@ -414,8 +406,6 @@ def test_deferred_job_transactions_retry_aborted_contention(monkeypatch):
     assert sleeps[-3:] == [0.05, 0.1, 0.2]
 
 
-# @matrix deferred-jobs : get-or-create idempotency notification start transactional-start
-# @pair notifications:aggregate-count
 def test_deferred_job_create_is_transactionally_idempotent(monkeypatch):
     datastore = FakeDatastore(None)
     monkeypatch.setattr(
@@ -492,7 +482,6 @@ def test_deferred_job_create_is_transactionally_idempotent(monkeypatch):
     assert len(datastore.transaction_instance.saved) == 3
 
 
-# @pairs ai:autofill deferred-jobs:form-lock
 def test_autofill_start_acquires_one_target_lock(monkeypatch):
     datastore = KeyedDatastore()
     monkeypatch.setattr(
@@ -573,7 +562,6 @@ def test_autofill_start_acquires_one_target_lock(monkeypatch):
     assert datastore.entities["target-form-lock"]["operation"] == "job-one"
 
 
-# @matrix deferred-jobs : compare-and-set form-lock
 def test_autofill_lock_cleanup_is_compare_and_delete(monkeypatch):
     lock = KeyedEntity("target-form-lock", operation="job-two")
     datastore = KeyedDatastore(lock)
@@ -603,7 +591,6 @@ def test_autofill_lock_cleanup_is_compare_and_delete(monkeypatch):
     assert datastore.deleted == ["target-form-lock"]
 
 
-# @matrix deferred-jobs : deterministic-key form-lock stale-cleanup
 def test_deferred_job_lock_resolution_is_target_scoped(monkeypatch):
     named_keys = []
     monkeypatch.setattr(
@@ -672,7 +659,27 @@ def test_deferred_job_lock_resolution_is_target_scoped(monkeypatch):
     assert released == [("lock:terminal", "job-terminal")]
 
 
-# @matrix deferred-jobs : browser-projection form-lock
+@pytest.mark.parametrize("job_id", ["job-key", None])
+def test_form_change_lock_survives_a_missing_job_row(monkeypatch, job_id):
+    target = SimpleNamespace(urlsafe_key="target-key", entity_kind="page", db={"form": "form-key"})
+    pending = {"id": "change-id", "job": job_id} if job_id else {"id": "change-id"}
+    form = SimpleNamespace(key="form-key", db={"pending_form_change": json.dumps(pending)})
+    monkeypatch.setattr(deferred_locks, "deferred_job_lock_key", lambda *args: "lock-key")
+    monkeypatch.setattr(
+        deferred_locks.Entities, "fetch",
+        lambda *keys, request: [form] if keys == (form.key,) else [],
+    )
+
+    if job_id is None:
+        with pytest.raises(exceptions.ValidationError, match="needs repair"):
+            deferred_job_lock_descriptor(target)
+    else:
+        descriptor = deferred_job_lock_descriptor(target)
+        assert descriptor["scope"] == "form-change"
+        assert descriptor["operation"] == job_id
+        assert descriptor["blocks_edit"] is True
+
+
 def test_deferred_job_lock_descriptor_is_browser_safe(monkeypatch):
     lock = SimpleNamespace(scope="form-autofill")
     job = SimpleNamespace(urlsafe_key="job-key", status_revision=7)
@@ -691,9 +698,8 @@ def test_deferred_job_lock_descriptor_is_browser_safe(monkeypatch):
     }
 
 
-# @matrix deferred-jobs : compare-and-set dispatch grace lease maximum-age reconciliation worker-race
 def test_deferred_job_recovery_claim_is_compare_and_set(monkeypatch):
-    now = datetime(2026, 7, 19, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 19, tzinfo=UTC)
     entity = {
         "status": "queued",
         "status_revision": 4,
@@ -768,10 +774,8 @@ def test_deferred_job_recovery_claim_is_compare_and_set(monkeypatch):
     assert recent["dispatch_state"] == "pending"
 
 
-# @source lagniappe/core/tools/database/deferred_jobs.py::claim_deferred_job_recovery
-# @matrix deferred-jobs : maximum-age reconciliation
 def test_recovery_redispatches_committed_autofill_without_failing_it(monkeypatch):
-    now = datetime(2026, 7, 19, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 19, tzinfo=UTC)
     entity = {
         "status": "running", "status_revision": 4, "dispatch_state": "claimed",
         "created": now - timedelta(hours=4), "modified": now - timedelta(minutes=6),
@@ -793,14 +797,12 @@ def test_recovery_redispatches_committed_autofill_without_failing_it(monkeypatch
     assert entity["autofill_receipt"] == '{"applied_fields":["title"]}'
 
 
-# @source lagniappe/core/tools/database/deferred_jobs.py::claim_deferred_job_recovery
-# @matrix deferred-jobs : compare-and-set lease maximum-age reconciliation
 @pytest.mark.parametrize("status", ["queued", "running", "retry_wait"])
 @pytest.mark.parametrize("age_seconds", [10799, 10800, 10801])
 def test_recovery_maximum_age_expires_live_work_at_the_boundary(
     monkeypatch, status, age_seconds
 ):
-    now = datetime(2026, 7, 19, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 19, tzinfo=UTC)
     entity = {
         "status": status,
         "status_revision": 4,
@@ -856,9 +858,8 @@ def test_recovery_maximum_age_expires_live_work_at_the_boundary(
         assert entity["status_revision"] == 5
 
 
-# @matrix deferred-jobs : cancellation compare-and-set lease terminal-race tombstone
 def test_deferred_job_terminal_transition_revokes_the_active_lease(monkeypatch):
-    now = datetime(2026, 7, 19, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 19, tzinfo=UTC)
     entity = {
         "status": "running",
         "lease_token": "worker-one",
@@ -910,7 +911,6 @@ def test_deferred_job_terminal_transition_revokes_the_active_lease(monkeypatch):
     assert entity["status"] == "cancelled"
 
 
-# @matrix deferred-jobs : client-contract operation-fingerprint routing-identity
 def test_request_fingerprint_tracks_the_complete_client_contract():
     values = {
         "job_type": "autofill",
@@ -936,9 +936,8 @@ def test_request_fingerprint_tracks_the_complete_client_contract():
     assert first != rerouted
 
 
-# @matrix deferred-jobs : privacy progress stale-state status timing
 def test_status_projection_is_bounded_and_marks_stale_work():
-    now = datetime(2026, 7, 19, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 19, 12, tzinfo=UTC)
     job = SimpleNamespace(
         urlsafe_key="opaque-operation",
         job_type="ask_report",
@@ -971,7 +970,6 @@ def test_status_projection_is_bounded_and_marks_stale_work():
     assert "private authored content" not in json.dumps(status)
 
 
-# @matrix deferred-jobs : timing
 @pytest.mark.parametrize(
     "status, phase",
     [
@@ -982,7 +980,7 @@ def test_status_projection_is_bounded_and_marks_stale_work():
     ],
 )
 def test_terminal_job_elapsed_time_stays_fixed_after_completion(status, phase):
-    created = datetime(2026, 9, 1, 12, tzinfo=timezone.utc)
+    created = datetime(2026, 9, 1, 12, tzinfo=UTC)
     finished = created + timedelta(seconds=148)
     job = SimpleNamespace(
         urlsafe_key="finished-operation",
@@ -1005,10 +1003,9 @@ def test_terminal_job_elapsed_time_stays_fixed_after_completion(status, phase):
             assert result["phase_elapsed_seconds"] == 0
 
 
-# @matrix deferred-jobs : timing
 @pytest.mark.parametrize("status", ["queued", "running", "retry_wait"])
 def test_active_job_elapsed_time_advances_with_the_clock(status):
-    created = datetime(2026, 9, 1, 12, tzinfo=timezone.utc)
+    created = datetime(2026, 9, 1, 12, tzinfo=UTC)
     job = SimpleNamespace(
         urlsafe_key="active-operation",
         status=status,
@@ -1029,7 +1026,6 @@ def test_active_job_elapsed_time_advances_with_the_clock(status):
         assert result["phase_elapsed_seconds"] == elapsed - 120
 
 
-# @matrix deferred-jobs : timing
 @pytest.mark.parametrize(
     "updated_at, modified, expected",
     [
@@ -1040,7 +1036,7 @@ def test_active_job_elapsed_time_advances_with_the_clock(status):
     ],
 )
 def test_terminal_job_elapsed_time_uses_stored_fallbacks(updated_at, modified, expected):
-    created = datetime(2026, 9, 1, 12, tzinfo=timezone.utc)
+    created = datetime(2026, 9, 1, 12, tzinfo=UTC)
     job = SimpleNamespace(
         urlsafe_key="legacy-operation",
         status="succeeded",
@@ -1057,10 +1053,9 @@ def test_terminal_job_elapsed_time_uses_stored_fallbacks(updated_at, modified, e
         assert result["phase_elapsed_seconds"] == 0
 
 
-# @matrix deferred-jobs : progress recovery dependency-wait
 @pytest.mark.parametrize("phase", ["waiting_dependency", "summarizing"])
 def test_dependency_status_distinguishes_form_waits_from_recovery(phase):
-    now = datetime(2026, 9, 12, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 12, 12, tzinfo=UTC)
     job = SimpleNamespace(
         urlsafe_key="operation", job_type=DeferredJobType.REPORT_EXECUTION.value,
         status="retry_wait", progress={"phase": phase, "updated_at": now.isoformat()},
@@ -1088,9 +1083,8 @@ def test_dependency_status_distinguishes_form_waits_from_recovery(phase):
     assert status["recovering"] is False
 
 
-# @matrix deferred-jobs : diagnostics privacy
 def test_admin_projection_exposes_diagnostics_without_payload_content():
-    now = datetime(2026, 7, 19, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 19, 12, tzinfo=UTC)
     job = SimpleNamespace(
         urlsafe_key="opaque-operation",
         job_type="report-organize",

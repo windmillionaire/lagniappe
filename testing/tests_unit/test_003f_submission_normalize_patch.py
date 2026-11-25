@@ -16,28 +16,24 @@ def _assert_normalize_case(entity, get_schema):
     assert got == case["expected"]
 
 
-# @matrix submission : normalize unknown-keys
 @pytest.mark.unit
 def test_normalize_skips_keys_not_in_schema(get_test_entities, get_schema):
     for entity in get_test_entities():
         _assert_normalize_case(entity, get_schema)
 
 
-# @matrix submission : multipart normalize
 @pytest.mark.unit
 def test_normalize_multipart_keys_merge_under_field_id(get_test_entities, get_schema):
     for entity in get_test_entities():
         _assert_normalize_case(entity, get_schema)
 
 
-# @matrix submission : list-filtering normalize
 @pytest.mark.unit
 def test_normalize_drops_falsy_entries_in_lists(get_test_entities, get_schema):
     for entity in get_test_entities():
         _assert_normalize_case(entity, get_schema)
 
 
-# @matrix submission : patch single-field
 @pytest.mark.unit
 def test_patch_submission_merges_single_field(get_test_entities, get_schema):
     for entity in get_test_entities():
@@ -48,7 +44,6 @@ def test_patch_submission_merges_single_field(get_test_entities, get_schema):
         assert json.loads(entity.db["submission"]) == spec["expected_submission"]
 
 
-# @matrix submission : json-payload patch
 @pytest.mark.unit
 def test_patch_submission_accepts_json_string(get_test_entities, get_schema):
     for entity in get_test_entities():

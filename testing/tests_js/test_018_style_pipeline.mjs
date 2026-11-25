@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { rollup } from "rollup";
+import { stripFrontendTypes } from "../../build/rollup.shared.mjs";
 import {
 	buildStyles,
 	javascriptIconModuleSource,
@@ -17,7 +18,7 @@ import { validateStyleCandidates } from "../utility/style_compile.mjs";
 async function bundle(input) {
 	const build = await rollup({
 		input,
-		plugins: [buildStyles()],
+		plugins: [buildStyles(), stripFrontendTypes()],
 	});
 	try {
 		const { output } = await build.generate({ format: "esm" });
@@ -29,7 +30,6 @@ async function bundle(input) {
 	}
 }
 
-// @pair style-build:runtime-parity
 test("test_virtual_and_python_style_payloads_share_one_runtime_value", async () => {
 	const typedRegistry = {
 		button: {
@@ -66,7 +66,6 @@ test("test_virtual_and_python_style_payloads_share_one_runtime_value", async () 
 	assert.deepEqual(virtualStyles.STYLES, pythonPayload);
 });
 
-// @pair style-build:schema-validation
 test("test_style_registry_rejects_untyped_and_unknown_leaves", () => {
 	assert.throws(
 		() => normalizeStyleRegistry({ button: { submit: "flex" } }),
@@ -123,7 +122,6 @@ test("test_style_registry_rejects_untyped_and_unknown_leaves", () => {
 	);
 });
 
-// @pair style-build:icon-schema-validation
 test("test_icon_registry_rejects_invalid_ids_and_material_symbol_records", () => {
 	assert.deepEqual(
 		normalizeIconRegistry({
@@ -179,7 +177,6 @@ test("test_icon_registry_rejects_invalid_ids_and_material_symbol_records", () =>
 	);
 });
 
-// @pair style-build:pipeline-contract
 // @style button.submit
 // @style dropdown.option.action
 // @style dropdown.option.flow
@@ -256,11 +253,10 @@ test("test_style_pipeline_contract_names_authored_inputs_and_outputs", async () 
 	);
 });
 
-// @matrix ui-action : fixed-layout loading-state
 // @style button.submit
 test("test_active_action_buttons_preserve_full_width_icon_slots", async (t) => {
 	createBrowser(t);
-	const module = await bundle("./src/script/elements/buttons.mjs");
+	const module = await bundle("./src/script/elements/buttons.ts");
 	const button = document.createElement("button");
 	button.textContent = "Refresh Cache";
 	const action = module.buttons.active({
@@ -294,10 +290,9 @@ test("test_active_action_buttons_preserve_full_width_icon_slots", async (t) => {
 	assert.equal(textSlot.textContent, "Cache Refreshed");
 });
 
-// @matrix frontend-icons : accessibility animation element-creation fill lookup nested-ids registry semantic-markup weight
 test("test_frontend_icon_helpers_render_structured_material_symbols", async (t) => {
 	createBrowser(t);
-	const module = await bundle("./src/script/shared/icons.mjs");
+	const module = await bundle("./src/script/shared/icons.ts");
 
 	const project = module.createIcon("project", "text-project-default");
 	assert.equal(project.textContent, "flowsheet");

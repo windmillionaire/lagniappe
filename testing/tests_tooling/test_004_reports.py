@@ -21,9 +21,9 @@ pytestmark = pytest.mark.tooling
 
 
 def test_test_artifacts_write_under_reports():
-    assert TEST_FAILURES_DIR == Path("reports/test_failures")
-    assert TEST_REPORTS_DIR == Path("reports/test_reports")
-    assert BROWSER_REVIEWS_DIR == Path("reports/browser_reviews")
+    assert Path("reports/test_failures") == TEST_FAILURES_DIR
+    assert Path("reports/test_reports") == TEST_REPORTS_DIR
+    assert Path("reports/browser_reviews") == BROWSER_REVIEWS_DIR
     assert error_tracking.FAILURES_DIR == TEST_FAILURES_DIR
     assert test_reporting.REPORTS_DIR == TEST_REPORTS_DIR
 
@@ -128,7 +128,6 @@ def test_browser_review_html_includes_diagnostics_only_when_present(tmp_path):
     assert "failed to load module" in html
 
 
-# @matrix browser-review : attachment failure-cleanup
 @pytest.mark.parametrize(
     ("keep_failed", "exists_after_failure"),
     [(False, False), (True, True)],

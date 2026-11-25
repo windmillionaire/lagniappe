@@ -14,7 +14,6 @@ from testing.utility import e2e_resources, e2e_worker
 pytestmark = pytest.mark.unit
 
 
-# @matrix testing : parallel-e2e
 def test_enum_identity_is_reused_after_forgetting_and_across_process_state(tmp_path, monkeypatch):
     monkeypatch.setenv("LAGNIAPPE_E2E_WORKER_CONTEXT", "test-context")
     monkeypatch.setattr(e2e_worker, "context", lambda: {"resource_registry": str(tmp_path)})
@@ -49,7 +48,6 @@ def test_enum_identity_is_reused_after_forgetting_and_across_process_state(tmp_p
     assert fetch.call_count == 2
 
 
-# @matrix testing : parallel-e2e
 def test_publishing_keys_preserves_the_first_shared_identity(tmp_path, monkeypatch):
     monkeypatch.setenv("LAGNIAPPE_E2E_WORKER_CONTEXT", "test-context")
     monkeypatch.setattr(e2e_worker, "context", lambda: {"resource_registry": str(tmp_path)})

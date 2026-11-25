@@ -21,7 +21,6 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.test_entities import TestEntities
 
 
-# @matrix ai-report files : attachment validation task-attachment
 @pytest.mark.unit
 @pytest.mark.parametrize("source_kind", ["page", "task"])
 @pytest.mark.parametrize("target_kind", ["page", "task", "task_history"])
@@ -55,7 +54,6 @@ def test_attach_file_preserves_single_owner(monkeypatch, source_kind, target_kin
     assert [(item.db, item.mutation_intents) for item in records] == before
 
 
-# @matrix ai-report files : attachment deterministic-run task-attachment
 @pytest.mark.unit
 @pytest.mark.parametrize("target_kind", ["page", "task", "task_history"])
 def test_attach_file_repeated_destination_is_noop(monkeypatch, target_kind):
@@ -96,7 +94,6 @@ def test_attach_file_repeated_destination_is_noop(monkeypatch, target_kind):
         file_actions._attach_file(action, report, user, references)
 
 
-# @matrix ai-report files : attachment validation deterministic-run partial-result
 @pytest.mark.unit
 def test_run_report_rejects_second_file_owner(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -125,7 +122,6 @@ def test_run_report_rejects_second_file_owner(monkeypatch):
     assert file.owner.key == pages[0].key
 
 
-# @matrix ai-report files : execution-inputs initial-load staged-inputs
 @pytest.mark.unit
 @pytest.mark.parametrize("attached,skip", [(False, False), (True, False), (True, True)])
 def test_run_report_loads_attached_inputs_only_for_pending_file_work(monkeypatch, attached, skip):
@@ -174,8 +170,6 @@ def test_run_report_loads_attached_inputs_only_for_pending_file_work(monkeypatch
         assert file.restricted_to == ({"page": ["page-group"], "task_form": ["task-group"]} if attached else {})
 
 
-# @matrix ai-report : deterministic-run exact-id file-summary report-file-reference
-# @matrix files : deterministic-run exact-id report-file-reference
 @pytest.mark.unit
 def test_run_report_resolves_report_file_by_exact_url_and_file_prefix(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -247,7 +241,6 @@ def test_run_report_resolves_report_file_by_exact_url_and_file_prefix(monkeypatc
 
 
 
-# @matrix ai-report files : deterministic-run manual-cleanup move-file
 @pytest.mark.unit
 def test_run_report_moves_file_and_records_manual_page_cleanup(monkeypatch):
     user = _test_user("runner-file-move-owner")
@@ -332,7 +325,6 @@ def test_run_report_moves_file_and_records_manual_page_cleanup(monkeypatch):
 
 
 
-# @matrix ai-report files : deterministic-run move-file readable-file-fallback
 @pytest.mark.unit
 def test_run_report_moves_file_by_exact_source_attachment_name(monkeypatch):
     user = _test_user("runner-file-move-name-owner")
@@ -402,7 +394,6 @@ def test_run_report_moves_file_by_exact_source_attachment_name(monkeypatch):
 
 
 
-# @matrix ai-report files : attachment exact-page-name page-reference repair
 @pytest.mark.unit
 def test_run_report_rejects_attachment_target_guessing_from_page_name(
     monkeypatch,
@@ -479,7 +470,6 @@ def test_run_report_rejects_attachment_target_guessing_from_page_name(
 
 
 
-# @matrix ai-report : attachments continue deterministic-run partial-result recoverable
 @pytest.mark.unit
 def test_run_report_marks_missing_file_placements_failed_and_continues(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -638,7 +628,6 @@ def test_run_report_marks_missing_file_placements_failed_and_continues(monkeypat
 
 
 
-# @matrix ai-report : attachments deterministic-run partial-result validation
 @pytest.mark.unit
 def test_run_report_rejects_category_used_as_attachment_page(monkeypatch):
     _patch_fake_keys(monkeypatch)

@@ -13,8 +13,6 @@ from lagniappe.core.tools.database.filter import Filter, Query
 pytestmark = pytest.mark.e2e
 
 
-# @matrix database : count aggregation
-# @matrix home : task-count ownership assignment deduplication
 def test_user_task_count_aggregates_owned_and_assigned_tasks_once():
     client = DATA.datastore
     identity = f"task-count-{uuid4().hex}"
@@ -60,8 +58,6 @@ def test_user_task_count_aggregates_owned_and_assigned_tasks_once():
         client.delete_multi([row.key for row in rows.values()])
 
 
-# @source lagniappe/core/tools/database/filter.py::Query.count
-# @matrix database : count aggregation deduplication
 def test_count_aggregation_deduplicates_array_matches():
     client = DATA.datastore
     identity = f"array-count-{uuid4().hex}"

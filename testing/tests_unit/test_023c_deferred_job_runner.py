@@ -1,6 +1,6 @@
 """Focused deferred-job behavior tests."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 import threading
 from types import SimpleNamespace
 
@@ -52,8 +52,6 @@ from testing.utility.test_entities import TestEntities
 pytestmark = pytest.mark.unit
 
 
-# @matrix observability : attempt contract-version job-type no-job-key
-# @pair deferred-jobs:preparation-context
 @pytest.mark.unit
 def test_runner_supplies_bounded_ai_observability_context_during_prepare(monkeypatch):
     job = RunnerJob(attempt=3)
@@ -87,8 +85,6 @@ def _registered_ai_job_types():
     )
 
 
-# @matrix deferred-jobs : adapter-lookup adapter-registration adapter-registry domain-strategy provider-boundary tier-declaration
-# @pair ai-access:tier-declaration
 @pytest.mark.unit
 def test_registered_adapters_declare_required_ai_tiers():
     registry = DeferredJobService()
@@ -109,7 +105,6 @@ def test_registered_adapters_declare_required_ai_tiers():
     } == expected
 
 
-# @matrix deferred-jobs : adapter-registration adapter-registry
 def test_adapter_registry_rejects_duplicate_job_types():
     registry = DeferredJobAdapterRegistry()
     registry.register(RecordingAdapter())
@@ -118,7 +113,6 @@ def test_adapter_registry_rejects_duplicate_job_types():
         registry.register(RecordingAdapter())
 
 
-# @matrix deferred-jobs : adapter-registry failure-isolation
 def test_adapter_registry_rolls_back_failed_default_loading(monkeypatch):
     registry = DeferredJobAdapterRegistry()
     adapter = RecordingAdapter()
@@ -145,7 +139,6 @@ def test_adapter_registry_rolls_back_failed_default_loading(monkeypatch):
     assert registry._defaults_loaded is True
 
 
-# @matrix deferred-jobs : adapter-registry concurrency
 def test_adapter_registry_loads_defaults_once_across_threads(monkeypatch):
     registry = DeferredJobAdapterRegistry()
     started = threading.Event()
@@ -182,8 +175,6 @@ def test_adapter_registry_loads_defaults_once_across_threads(monkeypatch):
     assert registry._defaults_loaded is True
 
 
-# @matrix ai : access-gate authorization provider-boundary
-# @pair deferred-jobs:authorization
 @pytest.mark.parametrize(
     "job_type",
     _registered_ai_job_types(),
@@ -223,7 +214,6 @@ def test_registered_ai_adapters_reject_restricted_actor_before_prepare(
     assert prepare_calls == []
 
 
-# @pair deferred-jobs:reauthorization
 @pytest.mark.unit
 def test_runner_rechecks_ai_access_before_apply(monkeypatch):
     class RevokedBeforeApplyAdapter(DeferredJobAdapter):
@@ -272,7 +262,6 @@ def test_runner_rechecks_ai_access_before_apply(monkeypatch):
     assert job.actor.checks == 2
 
 
-# @matrix deferred-jobs : checkpoint recovery
 def test_runner_checkpoints_before_apply_and_resumes_without_prepare(monkeypatch):
     job = RunnerJob()
     adapter = RecordingAdapter()
@@ -343,7 +332,6 @@ def test_runner_checkpoints_before_apply_and_resumes_without_prepare(monkeypatch
     assert "started" not in legacy_adapter.calls
 
 
-# @matrix deferred-jobs : no-apply target-fingerprint
 def test_runner_rejects_changed_target_fingerprint_before_apply(monkeypatch):
     job = RunnerJob(checkpoint={"prepared": True})
     target = SimpleNamespace(fingerprint="new-target-state")
@@ -366,11 +354,10 @@ def test_runner_rejects_changed_target_fingerprint_before_apply(monkeypatch):
     assert "apply" not in adapter.calls
 
 
-# @matrix deferred-jobs : blocking-provider cancellation deadline heartbeat lease-loss progress provider-boundary tool-boundary
 def test_execution_control_renews_and_observes_lost_claim(monkeypatch):
     progress = []
     boundary_control = DeferredExecutionControl(
-        deadline_at=datetime.now(timezone.utc) + timedelta(minutes=1),
+        deadline_at=datetime.now(UTC) + timedelta(minutes=1),
         active_check=lambda: True,
         progress_callback=progress.append,
     )
@@ -389,7 +376,7 @@ def test_execution_control_renews_and_observes_lost_claim(monkeypatch):
         _renew_claim=lambda _job, _token: renewed.set() and False,
     )
     control = DeferredExecutionControl(
-        deadline_at=datetime.now(timezone.utc) + timedelta(minutes=1),
+        deadline_at=datetime.now(UTC) + timedelta(minutes=1),
         active_check=lambda: True,
         progress_callback=lambda _progress: None,
     )
@@ -410,7 +397,7 @@ def test_execution_control_renews_and_observes_lost_claim(monkeypatch):
         control.ensure_active()
 
     expired = DeferredExecutionControl(
-        deadline_at=datetime.now(timezone.utc) - timedelta(seconds=1),
+        deadline_at=datetime.now(UTC) - timedelta(seconds=1),
         active_check=lambda: True,
         progress_callback=lambda _progress: None,
     )
@@ -421,8 +408,6 @@ def test_execution_control_renews_and_observes_lost_claim(monkeypatch):
         expired.ensure_active()
 
 
-# @source lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
-# @matrix deferred-jobs : cancellation reauthorization
 @pytest.mark.parametrize("cancel_at", ["prepare", "reauthorize"])
 def test_runner_rechecks_claim_before_applying_prepared_output(monkeypatch, cancel_at):
     job = RunnerJob()
@@ -456,7 +441,6 @@ def test_runner_rechecks_claim_before_applying_prepared_output(monkeypatch, canc
     assert job.result == {}
 
 
-# @pair deferred-jobs:retry
 def test_runner_classifies_wrapped_transient_errors_and_schedules_retry(monkeypatch):
     provider_error = google_exceptions.TooManyRequests("busy")
     wrapped = RuntimeError("provider wrapper")
@@ -481,7 +465,6 @@ def test_runner_classifies_wrapped_transient_errors_and_schedules_retry(monkeypa
     assert dispatched == [(job, 2, 60)]
 
 
-# @matrix deferred-jobs : dependency-wait provider-attempt-isolation retry backoff
 def test_runner_waits_for_dependency_without_consuming_provider_retry(monkeypatch):
     job = RunnerJob(attempt=2)
     job.parameters = {"_dependency_waits": 1}
@@ -517,7 +500,6 @@ def test_runner_waits_for_dependency_without_consuming_provider_retry(monkeypatc
     assert deferred_retry._provider_retry_attempt(job) == 1
 
 
-# @matrix deferred-jobs : dependency-wait provider-attempt-isolation retry backoff
 @pytest.mark.parametrize(
     "prior_waits,expected_delay", [(0, 5), (1, 10), (2, 20), (3, 30), (20, 30)]
 )
@@ -564,7 +546,6 @@ def test_runner_schedules_report_dependency_checks_with_backoff(
     assert deferred_retry._provider_retry_attempt(job) == 1
 
 
-# @matrix deferred-jobs : dependency-failure no-duplicate-capture terminal
 def test_runner_fails_cleanly_when_dependency_failed(monkeypatch):
     error = DeferredJobDependencyFailedError("attached file summary failed")
     job = RunnerJob(attempt=1)
@@ -585,7 +566,6 @@ def test_runner_fails_cleanly_when_dependency_failed(monkeypatch):
     assert captured == []
 
 
-# @matrix deferred-jobs : provider-timeout retry
 def test_runner_retries_sdk_timeout(monkeypatch):
     job = RunnerJob(attempt=1)
 
@@ -612,7 +592,6 @@ def test_runner_retries_sdk_timeout(monkeypatch):
     assert dispatched == [(job, 2, 60)]
 
 
-# @matrix deferred-jobs : provider-errors terminal-message
 def test_runner_retries_sdk_5xx_and_persists_clean_terminal_message(monkeypatch):
     provider_error = genai_errors.ServerError(
         503,
@@ -636,7 +615,6 @@ def test_runner_retries_sdk_5xx_and_persists_clean_terminal_message(monkeypatch)
     assert job.error["message"] == MODEL_BUSY_MESSAGE
 
 
-# @matrix deferred-jobs : backoff jitter quota retry
 def test_runner_increases_later_quota_backoff_without_adding_attempts(monkeypatch):
     quota_error = exceptions.AIQuotaError("quota exhausted")
     transient_error = google_exceptions.ServiceUnavailable("unavailable")
@@ -723,7 +701,6 @@ def test_runner_persists_terminal_domain_failure_without_provider_retry(monkeypa
     ]
 
 
-# @pair deferred-jobs:failure-only-notification
 def test_email_ingest_notification_is_created_only_for_failure(monkeypatch):
     registry = DeferredJobService()
     adapter = email_adapters.EmailIngestAdapter()
@@ -797,7 +774,6 @@ def test_email_ingest_notification_is_created_only_for_failure(monkeypatch):
     assert failed_job.delivery["notification"] is True
 
 
-# @pair deferred-jobs:cancellation
 def test_runner_treats_deleted_active_job_as_cancellation(monkeypatch):
     error = ValueError("stale domain write")
     job = RunnerJob(attempt=1)
@@ -819,8 +795,6 @@ def test_runner_treats_deleted_active_job_as_cancellation(monkeypatch):
     assert captured == []
 
 
-# @source lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
-# @matrix deferred-jobs : cancellation checkpoint reauthorization recovery retry
 @pytest.mark.parametrize("age,attempt,checkpoint,expected", [
     (601, 1, {}, "failed"),
     (0, 2, {}, "failed"),
@@ -828,7 +802,7 @@ def test_runner_treats_deleted_active_job_as_cancellation(monkeypatch):
     (120, 1, {}, "complete"),
 ])
 def test_report_planning_lifetime_and_interrupted_recovery(monkeypatch, age, attempt, checkpoint, expected):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     job = RunnerJob(attempt=attempt, checkpoint=checkpoint)
     job.created = now - timedelta(seconds=age)
     adapter = RecordingAdapter()

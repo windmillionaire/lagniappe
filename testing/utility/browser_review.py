@@ -69,9 +69,6 @@ def _admin_login_url() -> str:
     return f"{SETTINGS.test_config['BASE_URL']}/users/login?test_user={email}"
 
 
-# @testable true
-# @tests tests_tooling/test_004_reports.py::test_browser_review_capture_cleans_failed_folder
-# @matrix browser-review : attachment failure-cleanup
 def capture_review(args: argparse.Namespace) -> int:
     """Capture screenshots and browser diagnostics into a review folder."""
     os.environ["FLASK_ENV"] = "testing"
@@ -122,18 +119,18 @@ def capture_review(args: argparse.Namespace) -> int:
                 http_errors: list[dict[str, Any]] = []
                 page.on(
                     "console",
-                    lambda msg: console_messages.append(f"{msg.type}: {msg.text}"),
+                    lambda msg, *, console_messages=console_messages: console_messages.append(f"{msg.type}: {msg.text}"),
                 )
-                page.on("pageerror", lambda exc: page_errors.append(str(exc)))
+                page.on("pageerror", lambda exc, *, page_errors=page_errors: page_errors.append(str(exc)))
                 page.on(
                     "requestfailed",
-                    lambda request: failed_requests.append(
+                    lambda request, *, failed_requests=failed_requests: failed_requests.append(
                         f"{request.method} {request.url}: {request.failure}"
                     ),
                 )
                 page.on(
                     "response",
-                    lambda response: (
+                    lambda response, *, http_errors=http_errors: (
                         http_errors.append(
                             {"status": response.status, "url": response.url}
                         )
@@ -442,10 +439,7 @@ def render_command(args: argparse.Namespace) -> int:
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
     spec.setdefault("generated_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    if args.output:
-        output_path = Path(args.output)
-    else:
-        output_path = report_dir / "index.html"
+    output_path = Path(args.output) if args.output else report_dir / "index.html"
 
     output_path.write_text(
         render_report(spec, report_dir),

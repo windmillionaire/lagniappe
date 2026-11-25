@@ -1,5 +1,13 @@
 """Creator-owned report history deletion and upload cleanup."""
 
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ...entities.ai_report import AIReport
+    from ...entities.user import User
+
+from contextlib import suppress
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
@@ -10,12 +18,7 @@ from . import external_operations
 from .reporting import uploads as report_uploads
 
 
-# @testable true
-# @tests tests_unit/test_020i_report_history.py::test_report_delete_preserves_referenced_files_and_fences_cleanup
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
-# @matrix ai-report : delete file-cleanup guarded-delete
-# @matrix ai-report : category-editor created-entities file-links
-def delete_report_record(report):
+def delete_report_record(report: AIReport) -> str:
     """Fence every deletion against concurrent execution and correction links."""
     from .reporting.schema_updates import migration_pending
 
@@ -24,10 +27,9 @@ def delete_report_record(report):
         files_to_delete = [file for file in report.input_files if not file.has_references and not _other_report_references(file, report)]
         outcome = external_operations.delete_plan_if_idle(report, snapshot, report, *files_to_delete)
         if outcome == agent_api_store.PLAN_OPERATION_COMMITTED:
-            try:
+            # Obsolete payloads cannot prevent deletion of the report.
+            with suppress(ValueError, TypeError, AttributeError, KeyError):
                 report_uploads.cleanup_report_upload_manifest(report)
-            except (ValueError, TypeError, AttributeError, KeyError):
-                pass  # Obsolete payloads cannot prevent deletion of the report.
         return outcome
     if migration_pending(report):
         return agent_api_store.PLAN_OPERATION_BUSY
@@ -52,11 +54,7 @@ def delete_report_record(report):
     return agent_api_store.PLAN_OPERATION_COMMITTED
 
 
-# @testable true
-# @tests tests_unit/test_020i_report_history.py::test_bulk_delete_scopes_ownership_state_snapshot_and_partial_failures
-# @tests tests_e2e/002_home/test_002n_home_report_filters.py::test_delete_executed_reports_confirms_snapshot_and_preserves_workspace
-# @matrix ai-report : bulk-delete delete-snapshot ownership delete-failure
-def delete_executed_reports(user, keys):
+def delete_executed_reports(user: User, keys: Iterable[str]) -> dict[str, list[str]]:
     """Delete only the supplied, still-executed proposals owned by this user."""
     results = {"deleted": [], "skipped": [], "failed": []}
     for key in dict.fromkeys(keys):
@@ -91,8 +89,5 @@ def delete_executed_reports(user, keys):
     return results
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/report_history.py::delete_report_record
-# @reason shared evidence survives while any linked report still exists
 def _other_report_references(file, report):
     return any(Entities.fetch_one(reference, request=Fetch.root()) is not None for reference in file.db.get("report_refs", []) if reference != report.urlsafe_key)

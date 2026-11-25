@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 import hashlib
 import json
@@ -10,7 +11,8 @@ from pathlib import Path
 import sqlite3
 import subprocess
 import tempfile
-from typing import Any
+from types import TracebackType
+from typing import Any, Self
 
 from installer.data_lifecycle.provider import DataLifecycleError
 from installer.state import _state_dir, _write_json
@@ -20,9 +22,6 @@ LIFECYCLE_STATE_SCHEMA = 1
 ARCHIVE_SQLITE_SCHEMA = 1
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_secure_directory_and_checkpoint_exact_resume
-# @matrix data-lifecycle : private-state resume
 def secure_directory(path: str | Path) -> Path:
     """Create an owner-only directory, failing closed when that cannot be proved."""
     path = Path(path)
@@ -57,9 +56,6 @@ def secure_directory(path: str | Path) -> Path:
     return path
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/state.py::LifecycleCheckpoint
-# @reason normalized command hashing is exercised through exact checkpoint resumption
 def _identity(project_id: str, command: list[str], output_target: str | None) -> str:
     payload = json.dumps(
         {
@@ -73,9 +69,6 @@ def _identity(project_id: str, command: list[str], output_target: str | None) ->
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_secure_directory_and_checkpoint_exact_resume
-# @matrix data-lifecycle : private-state resume
 class LifecycleCheckpoint:
     """Durable exact-command state independent of the rewritten setup journal."""
 
@@ -86,7 +79,7 @@ class LifecycleCheckpoint:
         *,
         output_target: str | None = None,
         state_root: str | Path | None = None,
-    ):
+    ) -> None:
         if not command or not all(isinstance(item, str) and item for item in command):
             raise DataLifecycleError("Lifecycle checkpoint command is invalid.")
         self.project_id = project_id
@@ -117,7 +110,7 @@ class LifecycleCheckpoint:
         self.payload = payload
         return payload
 
-    def start(self, operation_id: str, **values) -> dict[str, Any]:
+    def start(self, operation_id: str, **values: object) -> dict[str, Any]:
         existing = self.load()
         if existing:
             if existing.get("status") == "complete":
@@ -143,7 +136,7 @@ class LifecycleCheckpoint:
             raise DataLifecycleError("Lifecycle checkpoint has not been started.")
         _write_json(self.path, self.payload)
 
-    def update(self, checkpoint: str, **values) -> dict[str, Any]:
+    def update(self, checkpoint: str, **values: object) -> dict[str, Any]:
         if self.payload is None:
             self.load()
         if self.payload is None:
@@ -153,7 +146,7 @@ class LifecycleCheckpoint:
         self.save()
         return self.payload
 
-    def finish(self, **values) -> None:
+    def finish(self, **values: object) -> None:
         self.update("complete", status="complete", **values)
 
     def remove(self) -> None:
@@ -209,18 +202,15 @@ CREATE TABLE IF NOT EXISTS assets (
 """
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_archive_state_is_private_transactional_and_resumable
-# @matrix data-lifecycle : resume sqlite-staging
 class ArchiveState:
     """Owner-only SQLite staging store with bounded transaction checkpoints."""
 
-    def __init__(self, path: str | Path):
+    def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         secure_directory(self.path.parent)
         self.connection: sqlite3.Connection | None = None
 
-    def _connect(self):
+    def _connect(self) -> Self:
         new = not self.path.exists()
         self.connection = sqlite3.connect(self.path)
         self.connection.row_factory = sqlite3.Row
@@ -240,52 +230,56 @@ class ArchiveState:
                 raise DataLifecycleError("Could not restrict archive staging database ACL.")
         return self
 
-    def close(self):
+    def close(self) -> None:
         if self.connection is not None:
             self.connection.close()
             self.connection = None
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self._connect()
 
-    def __exit__(self, exc_type, exc, tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
         self.close()
 
-    @contextmanager
-    def transaction(self):
+    @property
+    def database(self) -> sqlite3.Connection:
         if self.connection is None:
             raise DataLifecycleError("Archive staging database is not open.")
+        return self.connection
+
+    @contextmanager
+    def transaction(self) -> Iterator[sqlite3.Connection]:
+        connection = self.database
         try:
-            yield self.connection
+            yield connection
         except BaseException:
-            self.connection.rollback()
+            connection.rollback()
             raise
         else:
-            self.connection.commit()
+            connection.commit()
 
-    def set_metadata(self, name: str, value: Any):
-        if self.connection is None:
-            raise DataLifecycleError("Archive staging database is not open.")
+    def set_metadata(self, name: str, value: object) -> None:
+        connection = self.database
         serialized = json.dumps(value, sort_keys=True, separators=(",", ":"))
-        self.connection.execute(
+        connection.execute(
             "INSERT INTO metadata(name, value) VALUES(?, ?) "
             "ON CONFLICT(name) DO UPDATE SET value=excluded.value",
             (str(name), serialized),
         )
-        self.connection.commit()
+        connection.commit()
 
-    def get_metadata(self, name: str, default=None):
-        if self.connection is None:
-            raise DataLifecycleError("Archive staging database is not open.")
-        row = self.connection.execute(
+    def get_metadata(self, name: str, default: object = None) -> object:
+        row = self.database.execute(
             "SELECT value FROM metadata WHERE name=?", (str(name),)
         ).fetchone()
         return json.loads(row[0]) if row else default
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason secure temporary work-area selection is exercised by archive publication
 def archive_work_directory(root: str | Path | None = None) -> Path:
     root = secure_directory(root or (_state_dir() / "data_lifecycle" / "archive-work"))
     path = Path(tempfile.mkdtemp(prefix="archive-", dir=root))

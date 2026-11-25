@@ -2,16 +2,15 @@
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
 
 INGRESS_FORMAT_VERSION = 1
 INGRESS_BATCH_SIZE = 25
 
 
-# @testable true
-# @tests tests_unit/test_006d_ingress_service.py::test_transition_table_covers_every_ingress_stage
-# @pair ingress:transition-contract
 class IngressStage(Enum):
     """Strict, ordered stages of the CSV import workflow."""
 
@@ -35,7 +34,6 @@ CONFIGURATION_STAGES = (
 )
 
 
-# @testable infrastructure
 class IngressRunStatus(Enum):
     """Durable execution states for an ingress import."""
 
@@ -49,7 +47,6 @@ class IngressRunStatus(Enum):
     COMPLETED = "completed"
 
 
-# @testable infrastructure
 class IngressAction(Enum):
     """Actions the current durable state permits a client to request."""
 
@@ -75,22 +72,18 @@ INGRESS_TRANSITIONS = {
 }
 
 
-# @testable infrastructure
 class IngressError(ValueError):
     """Base error for an ingress contract violation."""
 
 
-# @testable infrastructure
 class IngressFormatError(IngressError):
     """The persisted ingress record is not supported by this service."""
 
 
-# @testable infrastructure
 class IngressTransitionError(IngressError):
     """The requested state transition is not valid from the current state."""
 
 
-# @testable infrastructure
 @dataclass(frozen=True)
 class IngressMutationPlan:
     """Serializable row mutation description plus executable entity objects."""
@@ -98,10 +91,9 @@ class IngressMutationPlan:
     row_index: int
     idempotency_key: str
     result: dict[str, Any]
-    entities: tuple[Any, ...] = field(default=(), repr=False, compare=False)
+    entities: tuple[Entity, ...] = field(default=(), repr=False, compare=False)
 
-    # @testable infrastructure
-    def to_dict(self):
+    def to_dict(self) -> dict[str, object]:
         return {
             "row_index": self.row_index,
             "idempotency_key": self.idempotency_key,
@@ -117,7 +109,6 @@ class IngressMutationPlan:
         }
 
 
-# @testable infrastructure
 @dataclass(frozen=True)
 class IngressBatchResult:
     """Outcome returned by one worker batch."""
@@ -130,7 +121,6 @@ class IngressBatchResult:
     reason: str | None = None
 
 
-# @testable infrastructure
 @dataclass(frozen=True)
 class IngressProgress:
     """Server-owned ingress state projected to web clients."""
@@ -144,8 +134,7 @@ class IngressProgress:
     actions: tuple[str, ...]
     poll_after_ms: int | None
 
-    # @testable infrastructure
-    def to_dict(self):
+    def to_dict(self) -> dict[str, object]:
         return {
             "stage": self.stage,
             "run_status": self.run_status,

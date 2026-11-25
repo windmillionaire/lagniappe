@@ -4,6 +4,11 @@ import hashlib
 import json
 import re
 from enum import Enum
+from typing import TYPE_CHECKING, BinaryIO, Protocol, TypedDict, cast
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+    from werkzeug.datastructures import FileStorage
 
 from smartypants import smartypants
 
@@ -29,17 +34,11 @@ PRIVATE_BUCKET = CONFIG.PRIVATE_BUCKET
 BUCKET_PREFIX = CONFIG.PREFIX
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_asset_uri_and_public_url_include_bucket_prefix
-# @matrix file storage : bucket-prefix
-def storage_bucket_name(bucket):
+def storage_bucket_name(bucket: str) -> str:
     return f"{BUCKET_PREFIX}{bucket}"
 
 
-# @testable true
-# @tests tests_unit/test_006_file_properties.py::test_asset_uri_and_public_url_include_bucket_prefix
-# @matrix file storage : bucket-prefix public-url
-def public_url():
+def public_url() -> str:
     return f"https://storage.googleapis.com/{storage_bucket_name(PUBLIC_BUCKET)}"
 
 
@@ -55,10 +54,36 @@ class AssetVisibility(Enum, metaclass=DefaultEnum):
     DEFAULT = private
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/mixins/assets.py::AssetMixin.get_asset
-# @covered-by lagniappe/core/mixins/assets.py::AssetMixin.save_asset
-class Asset:
+class AssetDefinition(TypedDict, total=False):
+    type: str | None
+    visibility: str
+    path: str
+    fingerprint: str
+    large: bool | None
+    size: int
+    generation: str
+
+
+class AssetOwner(Protocol):
+    @property
+    def key(self) -> Key | None: ...
+    @property
+    def hash(self) -> str: ...
+    def delete_asset(self, name: str) -> None: ...
+
+
+class _EncodedOwner(AssetOwner, Protocol):
+    @property
+    def encoding(self) -> str: ...
+
+
+type AssetUpload = BinaryIO | FileStorage | database_assets.DirectUploadFile
+
+
+type JSONValue = str | int | float | bool | None | list[JSONValue] | dict[str, JSONValue]
+
+
+class Asset[ReadResult = str, WriteContent = str]:
     """Typed wrapper for an asset definition dict.
 
     Wraps a plain definition dict and exposes type, visibility, path,
@@ -66,16 +91,19 @@ class Asset:
     get/save/delete behaviour.
     """
 
-    _content_type = None
-    _type = None
-    _visibility = None
-    _path = None
-    _fingerprint = None
-    _size = None
-    _large = None
-    _generation = None
+    _content_type: str | None = None
+    _type: str | None = None
+    _visibility = "private"
+    _path: str | None = None
+    _fingerprint: str | None = None
+    _size: int | None = None
+    _large: bool | None = None
+    _generation: str | None = None
 
-    def __init__(self, definition=None, *, name=None, entity=None):
+    def __init__(
+        self, definition: AssetDefinition | None = None, *, name: str | None = None,
+        entity: AssetOwner | None = None,
+    ) -> None:
         definition = definition or {}
         self._visibility = definition.get("visibility", "private")
         self._path = definition.get("path")
@@ -87,66 +115,61 @@ class Asset:
         self.entity = entity
 
     @property
-    def type(self):
+    def _owner(self) -> AssetOwner:
+        if self.entity is None:
+            raise AttributeError("This asset has no owning entity.")
+        return self.entity
+
+    @property
+    def type(self) -> str | None:
         return self._type
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_text_plain_asset_uses_txt_extension
-    # @tests tests_unit/test_006_file_properties.py::test_file_asset_detects_mislabeled_png_upload
-    # @matrix file storage : asset-extension mimetype
     @property
-    def path(self):
+    def path(self) -> str:
         if not self._path:
-            self._path = f"{self.entity.hash}_{self.name}.{self.extension}"
+            self._path = f"{self._owner.hash}_{self.name}.{self.extension}"
         return self._path
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_image_asset_content_type_falls_back_without_recursing
-    # @matrix file : content-type image
     @property
-    def content_type(self):
+    def content_type(self) -> str | None:
         return self._content_type
 
     @content_type.setter
-    def content_type(self, value):
+    def content_type(self, value: str | None) -> None:
         if value and not self._content_type:
             self._content_type = value
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_text_plain_asset_uses_txt_extension
-    # @tests tests_unit/test_006_file_properties.py::test_file_asset_detects_mislabeled_png_upload
-    # @matrix file storage : asset-extension mimetype
     @property
-    def extension(self):
+    def extension(self) -> str | None:
         if self._path:
             return self._path.split(".")[-1]
-        elif self.content_type in MIMETYPE_EXTENSIONS:
+        elif self.content_type is not None and self.content_type in MIMETYPE_EXTENSIONS:
             return MIMETYPE_EXTENSIONS[self.content_type]
         elif self.content_type and self.content_type != "application/octet-stream":
             return self.content_type.split("/")[-1]
         return None
 
     @property
-    def fingerprint(self):
+    def fingerprint(self) -> str | None:
         return self._fingerprint
 
     @fingerprint.setter
-    def fingerprint(self, value):
+    def fingerprint(self, value: str | None) -> None:
         self._fingerprint = value
 
     @property
-    def size(self):
+    def size(self) -> int | None:
         if self._size is None:
             return None
         return int(self._size)
 
     @size.setter
-    def size(self, value):
+    def size(self, value: int | str | None) -> None:
         self._size = int(value) if value is not None else None
         self._large = self._size > LARGE_ASSET_BYTES if self._size is not None else None
 
     @property
-    def large(self):
+    def large(self) -> bool | None:
         if self._large is not None:
             return bool(self._large)
         if self.size is None:
@@ -154,28 +177,25 @@ class Asset:
         return self.size > LARGE_ASSET_BYTES
 
     @property
-    def generation(self):
+    def generation(self) -> str | None:
         return str(self._generation) if self._generation is not None else None
 
     @generation.setter
-    def generation(self, value):
+    def generation(self, value: str | int | None) -> None:
         self._generation = str(value) if value is not None else None
 
     @property
-    def visibility(self):
+    def visibility(self) -> AssetVisibility:
         return AssetVisibility[self._visibility]
 
     @visibility.setter
-    def visibility(self, value):
+    def visibility(self, value: str) -> None:
         visibility = AssetVisibility[value]
         if visibility == AssetVisibility.public:
             self._visibility = value
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_asset_uri_and_public_url_include_bucket_prefix
-    # @matrix file storage : asset-uri bucket-prefix
     @property
-    def uri(self):
+    def uri(self) -> str:
         bucket = (
             PUBLIC_BUCKET
             if self.visibility == AssetVisibility.public
@@ -183,12 +203,9 @@ class Asset:
         )
         return f"gs://{storage_bucket_name(bucket)}/{self.path}"
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_file_asset_definition_records_size_and_large_flag
-    # @matrix file storage : asset-size large-asset
     @property
-    def definition(self):
-        definition = {
+    def definition(self) -> AssetDefinition:
+        definition: AssetDefinition = {
             "type": self.type,
             "path": self.path,
         }
@@ -203,7 +220,7 @@ class Asset:
             definition["generation"] = self.generation
         return definition
 
-    def _record_saved_blob(self, blob):
+    def _record_saved_blob(self, blob: object) -> None:
         size = getattr(blob, "size", None)
         if size is not None:
             self.size = size
@@ -212,62 +229,57 @@ class Asset:
             self.generation = generation
 
     @property
-    def cache_value(self):
+    def cache_value(self) -> str | None:
         return None
 
-    # @testable true
-    # @matrix storage : generation-pinned read copy
-    def get(self):
+    def get(self) -> ReadResult | str:
+        return self._read_text()
+
+    def _read_text(self) -> str:
         return database_assets.get_text(
             self.path, self.visibility.value,
             **({"generation": self.generation} if self.generation else {}),
         )
 
-    def delete(self):
+    def delete(self) -> None:
         database_assets.delete_file(self.path, self.visibility.value)
 
-    def save(self, content):
+    def save(self, content: WriteContent) -> bool:
         if not content:
             return False
 
+        # Binary assets override save, and JSONAsset encodes before using this text writer.
         blob = database_assets.save_text(
-            content, self.path, self.content_type, self.visibility.value
+            cast(str, content), self.path, self.content_type, self.visibility.value
         )
         self._record_saved_blob(blob)
         return True
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_assets.py::Document.add_image
-# @covered-by lagniappe/core/properties/file_assets.py::FileAsset.preview
-# @covered-by lagniappe/core/properties/file_assets.py::TextAsset.asset
-class FileAsset(Asset):
+class FileAsset(Asset[bytes | None, AssetUpload]):
     _type = "file"
 
-    # @testable true
-    # @tests tests_unit/test_006_file_properties.py::test_private_asset_url_uses_asset_name_for_shared_storage_path
-    # @matrix file storage : private-url shared-asset-path
     @property
-    def url(self):
+    def url(self) -> str | None:
         if self.visibility == AssetVisibility.public:
             return f"{public_url()}/{self.path}"
         elif self.visibility == AssetVisibility.private:
-            key = database_get.urlsafe_key(self.entity.key)
+            key = database_get.urlsafe_key(self._owner.key)
             identifier = (
                 f"{self.name}.{self.extension}" if self.extension else self.name
             )
             return f"/assets/{key}/{identifier}"
         return None
 
-    def get(self):
+    def get(self) -> bytes | None:
         return database_assets.download_file(self.path, self.visibility.value)
 
-    def text(self):
+    def text(self) -> str:
         return database_assets.get_text(
-            self.path, self.visibility.value, self.entity.encoding
+            self.path, self.visibility.value, cast(_EncodedOwner, self._owner).encoding
         )
 
-    def save(self, content):
+    def save(self, content: AssetUpload) -> bool:
         if not content:
             return False
 
@@ -280,15 +292,10 @@ class FileAsset(Asset):
         return True
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_assets.py::Document.add_image
 class ImageAsset(FileAsset):
     _type = "image"
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/common_assets.py::Document.add_image
-    # @reason image fingerprinting is a storage detail of document image uploads
-    def save(self, content):
+    def save(self, content: AssetUpload) -> bool:
         if not content:
             return False
 
@@ -307,7 +314,7 @@ class ImageAsset(FileAsset):
         return True
 
     @property
-    def content_type(self):
+    def content_type(self) -> str:
         if self._content_type:
             return self._content_type
         elif self._path and self._path.endswith(".png"):
@@ -320,41 +327,32 @@ class ImageAsset(FileAsset):
         return "image/jpeg"
 
     @content_type.setter
-    def content_type(self, value):
+    def content_type(self, value: str | None) -> None:
         if value and not self._content_type:
             self._content_type = value
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_assets.py::Document.save
-# @covered-by lagniappe/web/routes/assets/editor.py::get_document_history
 class HTMLAsset(Asset):
     _content_type = "text/html"
     _type = "html"
     _updated = False
 
-    # @testable false
-    # @covered-by lagniappe/web/routes/assets/editor.py::get_document_history
-    # @reason stored HTML rendering is exposed through document/history responses
-    def html(self):
+    def html(self) -> str:
         return smartypants(self.get())
 
-    def delete(self):
+    def delete(self) -> None:
         html = self.get()
 
         for image in IMAGE_NAME.findall(html):
-            self.entity.delete_asset(image)
+            self._owner.delete_asset(image)
 
         super().delete()
 
     @property
-    def updated(self):
+    def updated(self) -> bool:
         return self._updated
 
-    # @testable false
-    # @covered-by lagniappe/core/properties/common_assets.py::Document.save
-    # @reason HTML fingerprint and updated-state checks are owned by document save behavior
-    def save(self, content):
+    def save(self, content: str) -> bool:
         if not content:
             return False
 
@@ -368,27 +366,24 @@ class HTMLAsset(Asset):
         return True
 
     @property
-    def cache_value(self):
+    def cache_value(self) -> str:
         return strip_tags(self.get()).strip()
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/file_assets.py::TextAsset.asset
-# @covered-by lagniappe/core/properties/file_assets.py::TextAsset.markup
 class TextAsset(Asset):
     _type = "text"
 
     @property
-    def content_type(self):
+    def content_type(self) -> str:
         return self._content_type or "text/plain"
 
     @content_type.setter
-    def content_type(self, value):
+    def content_type(self, value: str | None) -> None:
         if value and not self._content_type:
             self._content_type = value
 
     @property
-    def extension(self):
+    def extension(self) -> str | None:
         return (
             "txt"
             if self.content_type == "text/plain"
@@ -396,31 +391,27 @@ class TextAsset(Asset):
         )
 
     @property
-    def cache_value(self):
+    def cache_value(self) -> str:
         return self.get().strip()
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_assets.py::Document.save
 class YDocAsset(Asset):
     _content_type = "text/plain"
     _type = "ydoc"
 
     @property
-    def extension(self):
+    def extension(self) -> str | None:
         return "ydoc"
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/file_assets.py::Results.save
-class JSONAsset(Asset):
+class JSONAsset(Asset[JSONValue, JSONValue]):
     _content_type = "application/json"
     _type = "json"
 
-    def get(self):
-        return json.loads(super().get())
+    def get(self) -> JSONValue:
+        return json.loads(self._read_text())
 
-    def save(self, content):
+    def save(self, content: JSONValue) -> bool:
         if not content:
             return False
         return super().save(json.dumps(content))
@@ -437,3 +428,7 @@ class AssetTypes(Enum, metaclass=DefaultEnum):
     JSON = JSONAsset
 
     DEFAULT = None
+
+
+type StoredAsset = TextAsset | YDocAsset | JSONAsset | HTMLAsset | FileAsset | ImageAsset
+type AssetContent = JSONValue | AssetUpload

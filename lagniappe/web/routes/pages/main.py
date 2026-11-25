@@ -1,9 +1,24 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities.page import PageData
+    from lagniappe.core.entities.entity import Entity
+    from werkzeug.datastructures import MultiDict
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 from flask import Response, abort, g, request
 from flask_login import current_user
 
 from lagniappe.core import exceptions
 from lagniappe.core.exceptions import ValidationError
+from lagniappe.core.properties.base_property import Property
 from lagniappe.core.entities import Entities
+from lagniappe.core.definitions.asset import ImageAsset
 from lagniappe.core.definitions import (
     AI,
     FileConsumerLimitError,
@@ -19,6 +34,7 @@ from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_con
 from lagniappe.core.tools.forms import review as form_review
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.web.auth import (
+    authenticated_user,
     abort_public_user_action,
     logged_in,
     permission,
@@ -32,10 +48,6 @@ from lagniappe.web import experiments
 from . import pages
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_own_page_hides_photo_and_file_surfaces
-# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_file_and_photo_actions_are_forbidden
-# @matrix public-users : file-photo-gates own-page
 def _is_public_users_own_page(page):
     return bool(
         getattr(current_user, "is_public", False)
@@ -43,11 +55,6 @@ def _is_public_users_own_page(page):
     )
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_preloads_existing_groups
-# @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_group_restricted_page_opens_for_member_only
-# @matrix user-settings : group-selector preload relation-loading
-# @matrix pages : access-restrictions group-restricted
 def _load_page_settings_relations(page, *, restrictions=False):
     """Attach the group relations rendered by Page settings at the route boundary."""
     entities = [page.form] if restrictions and page.form else []
@@ -59,24 +66,25 @@ def _load_page_settings_relations(page, *, restrictions=False):
     return page
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_empty_notes_skip_fetch_without_hiding_new_notes
-# @matrix notes : empty-presence etag
 def _page_view_fingerprint(page, user):
     """Empty-notes discovery changes initial HTML, not the Page's content revision."""
-    return f"{deferred_autofill.form_fingerprint(page, user)}:{int(page.has_notes)}"
+    base = f"{deferred_autofill.form_fingerprint(page, user)}:{int(page.has_notes)}"
+    if getattr(page, "user", None):
+        from lagniappe.core.tools.ai.auto_execute import site_auto_execute_enabled
+
+        return f"{base}:{int(site_auto_execute_enabled())}"
+    return base
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_is_forbidden_without_model_or_page_permission
-# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
-# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_can_read_document_content
-# @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_page_restriction_summary_does_not_invent_local_badges
-# @matrix pages : document-tab load permission-gates readonly tabs
-# @matrix pages : access-restrictions source-summary
+def _user_settings_fingerprint(page, user):
+    from lagniappe.core.tools.ai.auto_execute import site_auto_execute_enabled
+
+    return f"{page.fingerprint}:{int(site_auto_execute_enabled())}"
+
+
 @pages.route("<key>", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW, fingerprint=_page_view_fingerprint)
-def view(key, **kwargs):
+def view(key: str, **kwargs: Unpack[EntityContext[models.Page]]) -> ResponseReturnValue:
     page = _load_page_settings_relations(
         kwargs["entity"],
         restrictions=Resource.USER.allowed(Action.PERMISSIONS),
@@ -85,21 +93,18 @@ def view(key, **kwargs):
     return responses.page(page)
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-# @matrix ai : autofill completion-refresh deferred
 @pages.route("<key>/info/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
-def info(key, **kwargs):
+def info(key: str, **kwargs: Unpack[EntityContext[models.Page]]) -> ResponseReturnValue:
     page = kwargs["entity"]
     return responses.page_info(page)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::user_settings
 @pages.route("<key>/user-settings/replace", methods=["GET"])
-@permission(Resource.PAGE, Action.VIEW)
-def user_settings(key, **kwargs):
+@permission(Resource.PAGE, Action.VIEW, fingerprint=_user_settings_fingerprint)
+def user_settings(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
     is_own_page = getattr(getattr(current_user, "page", None), "key", None) == page.key
     if not page.user or not (is_own_page or Resource.USER.allowed(Action.PERMISSIONS)):
@@ -110,50 +115,46 @@ def user_settings(key, **kwargs):
     return responses.user_settings(page)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::page_permissions
 @pages.route("<key>/permissions/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.PERMISSIONS)
-def permissions(key, **kwargs):
+def permissions(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = _load_page_settings_relations(kwargs["entity"], restrictions=True)
     return responses.page_permissions(page)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::page_document_settings
 @pages.route("<key>/document-settings/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.PUBLISH)
-def document_settings(key, **kwargs):
+def document_settings(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     return responses.page_document_settings(kwargs["entity"])
 
 
-# @testable true
-# @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
-# @matrix tasks : basic create
-# @matrix tasks cache : conditional-response durable-revision viewer-scope job-lifecycle concurrent-render
-# @matrix tasks cache permissions : conditional-response immediate-revocation inherited-restrictions
 @pages.route("<key>/tasks", methods=["GET"])
 @permission(
     Resource.PAGE, Action.VIEW,
     fingerprint=deferred_autofill.page_tasks_fingerprint,
     context_keys=experiments.task_list_context_keys,
 )
-def tasks(key, **kwargs):
+def tasks(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
     if not g.get("task_list_prepared"):
         # Range/login invalidation may require a body after a matching ETag.
-        deferred_autofill.prepare_form_states(page.tasks, current_user)
+        deferred_autofill.prepare_form_states(page.tasks, authenticated_user())
     response = responses.page_tasks(page)
     deferred_autofill.finish_task_list_validation(page)
     return response
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_sees_empty_files_tab_without_upload_affordances
-# @matrix files : async-load empty-state permission-gates readonly
 @pages.route("<key>/files", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
-def files(key, **kwargs):
+def files(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
     if _is_public_users_own_page(page):
         abort_public_user_action()
@@ -161,13 +162,11 @@ def files(key, **kwargs):
     return responses.page_files(page)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::create
-# @covered-by lagniappe/web/routes/pages/main.py::update
-# @reason page form parsing helper owned by page create/update workflows
-def _page_data(form, page=None, category=None):
+def _page_data(
+    form: MultiDict[str, str], page: models.Page | None = None, category: models.Category | None = None,
+) -> PageData:
     """Resolve form data into a dict suitable for Page.create() or Page.update()."""
-    entities = [page, category]
+    entities: list[Entity | str | None] = [page, category]
     # A user-Page save also persists its owning User, whose requirements use
     # groups, while Page.update() registers forms with the reserved Users model.
     # Make both entities direct roots without widening every Page update to a
@@ -183,7 +182,7 @@ def _page_data(form, page=None, category=None):
     category_keys = form.getlist("category")
     form_key = form.get("form")
     resolver = SubmittedReferenceResolver(
-        current_user,
+        authenticated_user(),
         *category_keys,
         form_key,
     )
@@ -214,17 +213,19 @@ def _page_data(form, page=None, category=None):
     ):
         selected_form = current_form
 
-    page_data = {
+    model = loaded.get(category.urlsafe_key) if category else None
+    page_data: PageData = {
         "name": form.get("name"),
         "description": form.get("description"),
         "email": form.get("email"),
         "categories": categories,
         "form": selected_form,
-        "model": loaded.get(category.urlsafe_key) if category else None,
-        "groups": [loaded.get(k) for k in form.getlist("group") if loaded.get(k)],
+        "model": model if isinstance(model, Entities.CATEGORY) else None,
+        "groups": [group for k in form.getlist("group") if isinstance(group := loaded.get(k), Entities.USER_GROUP)],
     }
     if "reassign-page" in form:
-        page_data["reassign-page"] = loaded.get(form.get("reassign-page"))
+        replacement = loaded.get(form.get("reassign-page") or "")
+        page_data["reassign-page"] = replacement if isinstance(replacement, Entities.PAGE) else None
     if "remove-user" in form:
         page_data["remove-user"] = form.get("remove-user") == "true"
     if "ai_access" in form:
@@ -233,6 +234,8 @@ def _page_data(form, page=None, category=None):
         page_data["notification_email_mode"] = form.get("notification_email_mode")
     if "allow_site_email" in form:
         page_data["allow_site_email"] = form.get("allow_site_email") == "true"
+    if "allow_auto_execute" in form:
+        page_data["allow_auto_execute"] = form.get("allow_auto_execute") == "true"
     for toggle in ("allow_messages_and_mentions", "allow_task_assignments"):
         if toggle in form:
             page_data[toggle] = form.get(toggle) == "true"
@@ -240,34 +243,21 @@ def _page_data(form, page=None, category=None):
     return page_data
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_switch_page_form
-# @matrix pages : form-switch info-form
 def _page_form_submission_response(page):
     return responses.form_submission(page)
 
 
-# @testable true
 # @scaffolding testing/resources/page.py::Page.submit_and_verify_submission
-# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_submission_rejects_hidden_internal_link_target
-# @matrix pages : basic-inputs default-form link-field selection-fields submission submitted-reference
 def _apply_page_submission(page, form):
     page.form_submission(form, actor=current_user)
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_category_to_page
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_remove_category_from_page
-# @matrix pages : category-add category-remove
 def _apply_page_metadata_update(page, page_data, user=None):
     page.update(page_data)
     if page.user:
         page.update_user(page_data, user=user)
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_submit_preserves_attached_form_and_categories
-# @matrix user-settings : attached-form categories restrictions submit-boundary
 def _apply_user_settings_update(page, page_data, user=None):
     if not page.user:
         return
@@ -275,13 +265,10 @@ def _apply_user_settings_update(page, page_data, user=None):
     page.update_user(page_data, user=user)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::update
-# @reason notification persistence policy belongs to page update replay handling
 def _offline_update_notification(page):
     notification = Entities.NOTIFICATION.create(
         {
-            "parent": current_user,
+            "parent": authenticated_user(),
             "target": page,
             "body": "Offline page update synced.",
         }
@@ -290,29 +277,22 @@ def _offline_update_notification(page):
     return notification
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::update
-# @reason form flag parsing is a route coordination detail
 def _is_offline_replay(form):
     return str(form.get("offline", "")).lower() == "true"
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_submit_preserves_attached_form_and_categories
-# @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_invalid_typed_submission_returns_error_without_saving
-# @pair pages:submission-validation
-# @matrix user-settings : restrictions submit-boundary
 @pages.route("<key>/update", methods=["PUT", "GET"])
 @permission(Resource.PAGE, Action.VIEW, fingerprint=deferred_autofill.form_fingerprint)
-def update(key, **kwargs):
+def update(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
 
     if request.method == "GET":
         if request.values.get("form"):
             try:
                 page.form = SubmittedReferenceResolver(
-                    current_user,
+                    authenticated_user(),
                     request.values.get("form"),
                 ).one(
                     request.values.get("form"),
@@ -343,7 +323,8 @@ def update(key, **kwargs):
             "The autofill attachment was not uploaded. Try attaching it again."
         )
 
-    old_image = page.image.path if page.image else None
+    image = page.get_asset("image")
+    old_image = image.path if image else None
 
     try:
         page_data = _page_data(request.form, page=page)
@@ -375,7 +356,7 @@ def update(key, **kwargs):
 
     if role == "autofill-submit":
         require_ai_access(AI.CREATE)
-        if getattr(page_data["form"], "key", None) != getattr(page.form, "key", None):
+        if getattr(page_data.get("form"), "key", None) != getattr(page.form, "key", None):
             return responses.error("Save the form selection before running autofill.")
         draft = None
         if page.form:
@@ -383,14 +364,14 @@ def update(key, **kwargs):
                 draft = page.preview_form_submission(request, actor=current_user)
             except exceptions.ValidationError as error:
                 return responses.error(str(error))
-        target_context = {
-            "name": page_data["name"],
-            "description": page_data["description"],
+        target_context: dict[str, object] = {
+            "name": page_data.get("name"),
+            "description": page_data.get("description"),
         }
         return responses.entity_response(
             deferred_autofill.start_deferred_autofill(
                 page,
-                current_user,
+                authenticated_user(),
                 request.form,
                 multipart_file=bool(request.files.get("autofill-file")),
                 submission=draft["values"] if draft else None,
@@ -409,9 +390,9 @@ def update(key, **kwargs):
     staged_file = None
     try:
         staged_file, staged_cleanup = deferred_autofill.staged_upload_for_update(
-            page, current_user, request.form,
+            page, authenticated_user(), request.form,
         )
-        form_review.acknowledge_reviews(page, current_user, request.form.getlist("reviewed-operation"))
+        form_review.acknowledge_reviews(page, authenticated_user(), request.form.getlist("reviewed-operation"))
         if staged_file:
             Entities.save(staged_file, page)
         else:
@@ -432,7 +413,8 @@ def update(key, **kwargs):
             page,
         )
 
-    new_image = page.image.path if page.image else None
+    image = page.get_asset("image")
+    new_image = image.path if image else None
 
     if old_image != new_image:
         return responses.json_response({"reload": True})
@@ -440,12 +422,11 @@ def update(key, **kwargs):
     return responses.page_info(page)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::update
-# @reason route permission mirrors page update for autofill uploads
 @pages.route("<key>/update/direct-upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
-def update_direct(key, **kwargs):
+def update_direct(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     upload_data = request.get_json(silent=True) or request.form
     if upload_data.get("input_name") == "autofill-file":
         require_ai_access(AI.CREATE)
@@ -455,12 +436,11 @@ def update_direct(key, **kwargs):
     return direct_uploads.direct_upload_response()
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_quick_edit_updates_text_cell
-# @matrix category-index : editable-cell quick-edit
 @pages.route("<key>/patch", methods=["PATCH"])
 @permission(Resource.PAGE, Action.EDIT)
-def patch(key, **kwargs):
+def patch(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
 
     patch_data = request.json
@@ -477,7 +457,7 @@ def patch(key, **kwargs):
 
     if schema_id in page.properties:
         field = page.properties[schema_id]
-        if not field.editable:
+        if not isinstance(field, Property) or not field.editable:
             return responses.error("Field cannot be edited")
         field.value = value
     else:
@@ -504,16 +484,11 @@ def patch(key, **kwargs):
     )
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_from_category_index
-# @matrix pages : required-name
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
-# @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
-# @matrix pages : category-index create mobile-tools
-# @pair deferred-jobs:hosted-e2e
 @pages.route("<key>/create", methods=["POST"])
 @permission(Resource.CATEGORY, Action.EDIT)
-def create(key, **kwargs):
+def create(
+    key: str, **kwargs: Unpack[EntityContext[models.Category]]
+) -> ResponseReturnValue:
     """Create a page within a category. Key is the category key, not a page key."""
     category = kwargs["entity"]
 
@@ -545,7 +520,7 @@ def create(key, **kwargs):
         page.save()
         deferred_response = deferred_autofill.start_deferred_autofill(
             page,
-            current_user,
+            authenticated_user(),
             request.form,
             multipart_file=bool(request.files.get("autofill-file")),
             key=category.urlsafe_key,
@@ -573,24 +548,18 @@ def create(key, **kwargs):
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::create
-# @reason route permission mirrors page create for upload-backed form data
 @pages.route("<key>/create/direct-upload", methods=["POST"])
 @permission(Resource.CATEGORY, Action.EDIT)
-def create_direct(key, **kwargs):
+def create_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     upload_data = request.get_json(silent=True) or request.form
     if upload_data.get("input_name") == "autofill-file":
         require_ai_access(AI.CREATE)
     return direct_uploads.direct_upload_response()
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002k_home_pages.py::test_create_page_from_home
-# @matrix home pages : category-select create default-category
 @pages.route("create", methods=["POST"])
 @logged_in
-def create_from_home():
+def create_from_home() -> ResponseReturnValue:
     """Create a page from the homepage, using a selected or default category."""
     if not current_user.properties.restrictions.category_edit_restrictions:
         abort(403)
@@ -632,14 +601,11 @@ def create_from_home():
     return responses.new_page(page)
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_delete_page_from_title_menu
-# @matrix pages : delete parentless title-menu
-# @pair entities:delete
 @pages.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.PAGE, Action.DELETE)
-def delete(key, **kwargs):
+def delete(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
     if not page:
         return responses.error("page not found")
@@ -663,15 +629,11 @@ def delete(key, **kwargs):
     return responses.ok()
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_document_visibility_can_toggle_public_private
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
-# @matrix pages : document-visibility private public
-# @matrix public-pages : metadata preview
-# @pair public-directory:category
 @pages.route("<key>/visibility", methods=["PUT"])
 @permission(Resource.PAGE, Action.PUBLISH)
-def visibility(key, **kwargs):
+def visibility(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
 
     page.is_public = request.form.get("visibility") == "public"
@@ -695,28 +657,23 @@ def visibility(key, **kwargs):
                 "description": request.form.get("public-description"),
                 "preview_image_asset": preview,
                 "directory_category": directory_category,
+                "directory_order": request.form.get("directory-order"),
             }
         except ValidationError as error:
             return responses.error(error)
     if page.is_public:
-        page.public_id
+        _ = page.public_id
     Entities.save(page)
 
     return responses.page_document_settings(page)
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_public
-# @tests tests_unit/test_008_page_properties.py::test_page_to_cache_public_user
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_document_visibility_can_toggle_public_private
-# @matrix page : public public-user
-# @pair pages:public-document
 @pages.route("public/<public_id>", methods=["GET"])
-def public(public_id):
+def public(public_id: str) -> ResponseReturnValue:
     public_pages = Entities.fetch(
         *database_get.public_pages(public_id), request=Fetch.root()
     )
-    page = next((page for page in public_pages if page.is_public), None)
+    page = next((page for page in public_pages if isinstance(page, Entities.PAGE) and page.is_public), None)
 
     if not page:
         abort(404)
@@ -724,16 +681,13 @@ def public(public_id):
     return responses.public_document(page)
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_public_document_images_are_anonymous_and_revocable
-# @matrix public-pages : document-image public-route revocation
 @pages.route("public/<public_id>/images/<asset_name>", methods=["GET", "HEAD"])
-def public_image(public_id, asset_name):
+def public_image(public_id: str, asset_name: str) -> ResponseReturnValue:
     candidates = Entities.fetch(
         *database_get.public_pages(public_id),
         request=Fetch.root(),
     )
-    page = next((candidate for candidate in candidates if candidate.is_public), None)
+    page = next((candidate for candidate in candidates if isinstance(candidate, Entities.PAGE) and candidate.is_public), None)
     if not page:
         abort(404)
 
@@ -744,7 +698,7 @@ def public_image(public_id, asset_name):
     if asset_key not in referenced:
         abort(404)
     asset = page.get_asset(asset_key)
-    if not asset:
+    if not isinstance(asset, ImageAsset):
         abort(404)
 
     g.NO_CACHE = True
@@ -759,27 +713,21 @@ def public_image(public_id, asset_name):
     return Response(content, mimetype=asset.content_type)
 
 
-# @testable true
-# @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_owner_restricted_page_is_hidden_from_model_viewer
-# @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_group_restricted_page_opens_for_member_only
-# @matrix pages : access-restrictions group-restricted owner-restricted submitted-reference
 def _apply_page_access_restrictions(page, form):
     admin_only = form.get("admin") in {"on", "true"}
     keys = [] if admin_only else form.getlist("group-key")
-    groups = SubmittedReferenceResolver(current_user, *keys).many(
+    groups = SubmittedReferenceResolver(authenticated_user(), *keys).many(
         keys, expected=Entities.USER_GROUP, action=Action.VIEW
     )
     page.groups = groups
     page.properties.restricted_to.materialize(admin_only=admin_only)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/pages/main.py::_apply_page_access_restrictions
-# @covered-by lagniappe/web/responses.py::page_permissions
-# @reason endpoint coordinates page access requests while focused helpers own response and mutation behavior
 @pages.route("<key>/view-access", methods=["GET", "PUT"])
 @permission(Resource.PAGE, Action.PERMISSIONS)
-def view_access(key, **kwargs):
+def view_access(
+    key: str, **kwargs: Unpack[EntityContext[models.Page]]
+) -> ResponseReturnValue:
     page = kwargs["entity"]
 
     if request.method == "PUT":

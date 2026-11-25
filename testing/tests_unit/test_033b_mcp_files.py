@@ -160,8 +160,6 @@ class _RESTClient:
         raise AssertionError(target)
 
 
-# @matrix mcp-upload : regular duplicate batch-preflight cleanup
-# @pair mcp-adapter:product-contract
 def test_opened_batch_rejects_duplicate_objects(
     tmp_path: Path,
 ) -> None:
@@ -179,8 +177,6 @@ def test_opened_batch_rejects_duplicate_objects(
     assert str(tmp_path) not in duplicate_error.value.render()
 
 
-# @matrix mcp-upload : regular missing invalid-path empty directory special cleanup
-# @pair mcp-adapter:product-contract
 def test_opened_batch_rejects_invalid_or_non_regular_inputs(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -209,8 +205,6 @@ def test_opened_batch_rejects_invalid_or_non_regular_inputs(
         assert str(tmp_path) not in caught.value.render()
 
 
-# @matrix mcp-upload : os-readable regular absolute relative parent-traversal symlink descriptor-lifetime
-# @pair mcp-adapter:product-contract
 def test_opened_batch_accepts_readable_regular_files(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -278,8 +272,6 @@ def test_opened_batch_accepts_readable_regular_files(
         batch.close()
 
 
-# @matrix mcp-upload : content-range 308 final-2xx preflight create-once upload-all finalize-once safe-result
-# @pair mcp-adapter:product-contract
 def test_upload_honors_chunks_and_returns_authoritative_inventory(
     tmp_path: Path,
 ) -> None:
@@ -334,8 +326,6 @@ def test_upload_honors_chunks_and_returns_authoritative_inventory(
     assert "upload_batch_id" not in json.dumps(result)
 
 
-# @matrix mcp-upload : batch-preflight preflight
-# @pair mcp-adapter:product-contract
 def test_upload_rejects_contract_count_before_opening_paths(tmp_path: Path) -> None:
     root = tmp_path / "approved"
     root.mkdir()
@@ -358,8 +348,6 @@ def test_upload_rejects_contract_count_before_opening_paths(tmp_path: Path) -> N
     assert storage.requests == []
 
 
-# @matrix mcp-upload : batch-preflight local-limits
-# @pair mcp-adapter:product-contract
 def test_upload_rejects_server_limits_above_frozen_local_ceilings_before_open(
     tmp_path: Path,
 ) -> None:
@@ -390,8 +378,6 @@ def test_upload_rejects_server_limits_above_frozen_local_ceilings_before_open(
         assert storage.requests == []
 
 
-# @matrix mcp-upload : local-limits upload-session
-# @pair mcp-adapter:product-contract
 def test_upload_rejects_a_chunk_below_the_frozen_efficiency_floor(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -423,8 +409,6 @@ def test_upload_rejects_a_chunk_below_the_frozen_efficiency_floor(
     assert storage.requests == []
 
 
-# @matrix mcp-upload : batch-preflight byte-identity
-# @pair mcp-adapter:product-contract
 def test_oversized_file_is_rejected_before_descriptor_read(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -455,8 +439,6 @@ def test_oversized_file_is_rejected_before_descriptor_read(
     assert storage.requests == []
 
 
-# @matrix mcp-upload : cancellation cleanup byte-identity
-# @pair mcp-adapter:product-contract
 def test_cancellation_during_byte_snapshot_closes_descriptors(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -505,8 +487,6 @@ def test_cancellation_during_byte_snapshot_closes_descriptors(
     assert storage.requests == []
 
 
-# @matrix mcp-upload : probe retry
-# @pair mcp-adapter:product-contract
 def test_upload_recovers_only_after_a_verified_status_probe(tmp_path: Path) -> None:
     root = tmp_path / "approved"
     root.mkdir()
@@ -546,8 +526,6 @@ def test_upload_recovers_only_after_a_verified_status_probe(tmp_path: Path) -> N
     assert len(rest.calls) == 2
 
 
-# @matrix mcp-upload : monotonic
-# @pair mcp-adapter:product-contract
 def test_upload_rejects_offset_regression_without_finalizing(tmp_path: Path) -> None:
     root = tmp_path / "approved"
     root.mkdir()
@@ -575,8 +553,6 @@ def test_upload_rejects_offset_regression_without_finalizing(tmp_path: Path) -> 
     assert len(rest.calls) == 1
 
 
-# @matrix mcp-upload : monotonic probe
-# @pair mcp-adapter:product-contract
 def test_upload_probe_cannot_skip_beyond_the_ambiguous_chunk(tmp_path: Path) -> None:
     root = tmp_path / "approved"
     root.mkdir()
@@ -608,8 +584,6 @@ def test_upload_probe_cannot_skip_beyond_the_ambiguous_chunk(tmp_path: Path) -> 
     assert len(rest.calls) == 1
 
 
-# @matrix mcp-upload : retry no-false-finalization
-# @pair mcp-adapter:product-contract
 def test_post_session_recovery_failures_are_not_retryable_as_whole_tool_calls(
     tmp_path: Path,
 ) -> None:
@@ -643,8 +617,6 @@ def test_post_session_recovery_failures_are_not_retryable_as_whole_tool_calls(
         assert [target for _, target, _ in rest.calls] == ["plans/plan-1/uploads"]
 
 
-# @matrix mcp-upload : timeout retry no-false-finalization
-# @pair mcp-adapter:product-contract
 def test_upload_uses_one_total_wall_clock_deadline(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -679,8 +651,6 @@ def test_upload_uses_one_total_wall_clock_deadline(
     assert [target for _, target, _ in rest.calls] == ["plans/plan-1/uploads"]
 
 
-# @matrix mcp-upload : cancellation partial-failure no-false-finalization
-# @pair mcp-adapter:product-contract
 def test_upload_cancellation_and_partial_failure_never_finalize(
     tmp_path: Path,
 ) -> None:
@@ -717,8 +687,6 @@ def test_upload_cancellation_and_partial_failure_never_finalize(
     assert [target for _, target, _ in partial.calls] == ["plans/plan-1/uploads"]
 
 
-# @matrix mcp-upload : finalize-once authoritative-status
-# @pair mcp-adapter:product-contract
 def test_ambiguous_finalization_reads_plan_state_without_replaying(
     tmp_path: Path,
 ) -> None:
@@ -805,8 +773,6 @@ def test_ambiguous_finalization_reads_plan_state_without_replaying(
     assert sum(target.endswith("/uploads/finalize") for _, target, _ in missing.calls) == 1
 
 
-# @matrix mcp-upload : authoritative-status finalize-once last-writer upload-batch-identity
-# @pair mcp-adapter:product-contract
 def test_ambiguous_finalization_rejects_same_metadata_from_replaced_batch(
     tmp_path: Path,
 ) -> None:
@@ -882,8 +848,6 @@ def test_ambiguous_finalization_rejects_same_metadata_from_replaced_batch(
     ]
 
 
-# @matrix mcp-upload : descriptor-lifetime
-# @pair mcp-adapter:product-contract
 def test_replacing_path_after_open_still_uploads_the_open_descriptor(
     tmp_path: Path,
 ) -> None:
@@ -909,8 +873,6 @@ def test_replacing_path_after_open_still_uploads_the_open_descriptor(
     assert storage.requests[0]["body"] == b"original"
 
 
-# @matrix mcp-upload : descriptor-lifetime mutation-snapshot
-# @pair mcp-adapter:product-contract
 def test_open_descriptor_rejects_same_size_rewrite_with_restored_mtime(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -948,8 +910,6 @@ def test_open_descriptor_rejects_same_size_rewrite_with_restored_mtime(
         assert changed.value.code == "local_file_changed"
 
 
-# @matrix mcp-upload : descriptor-lifetime mutation-snapshot byte-identity
-# @pair mcp-adapter:product-contract
 def test_rewritten_descriptor_with_identical_metadata_fails_content_identity_check(tmp_path, monkeypatch):
     selected = tmp_path / "payload.bin"
     selected.write_bytes(b"original")
@@ -970,8 +930,6 @@ def test_rewritten_descriptor_with_identical_metadata_fails_content_identity_che
         assert storage.requests == []
 
 
-# @matrix mcp-upload : descriptor-lifetime mutation-snapshot byte-identity
-# @pair mcp-adapter:product-contract
 def test_unlinked_rewritten_descriptor_fails_content_identity_check(
     tmp_path: Path,
 ) -> None:
@@ -1012,9 +970,6 @@ def test_unlinked_rewritten_descriptor_fails_content_identity_check(
     assert storage.requests == []
 
 
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter._project_file_result
-# @source mcp/src/lagniappe_mcp/presentation.py::_success_result
 def test_complete_long_text_and_late_decision_survive_mcp_presentation():
     early_note = "Initial note: use the western route.\n"
     final_decision = "Final decision: use the eastern route — approved by Zoë.\n"

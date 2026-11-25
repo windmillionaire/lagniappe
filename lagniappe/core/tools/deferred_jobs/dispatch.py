@@ -1,8 +1,21 @@
 """Cloud Tasks and local-provider dispatch for durable deferred jobs."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.deferred_job import DeferredJob
+    from lagniappe.core.definitions import DeferredJobResult
+
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    # Dispatch, recovery, and execution are composed by the same service.
+    from .service import DeferredJobService
+
 import threading
 
-from flask import current_app, url_for
+from flask import Flask, current_app, url_for
+from werkzeug.local import LocalProxy
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions import (
@@ -20,13 +33,10 @@ _task_id = TaskIdentity.create
 _feedback_task_id = TaskIdentity.feedback
 
 
-# @testable infrastructure
 class DeferredJobDispatch:
-    # @testable true
-    # @tests tests_unit/test_023b_deferred_job_service.py::test_production_dispatch_rejects_disabled_task_queue
-    # @matrix deferred-jobs : disabled-queue dispatch task-identity
-    def dispatch(self, job, *, attempt, delay_seconds=0, task_suffix=None):
-        adapter = self.adapter(job.job_type)
+    def dispatch(self, job: DeferredJob, *, attempt: int, delay_seconds: int = 0, task_suffix: str | None = None) -> str | DeferredJobResult | None:
+        service = cast("DeferredJobService", self)
+        adapter = service.adapter(job.job_type)
         if CONFIG.production:
             endpoint = url_for("process.deferred_job_process", _external=True)
             task_identity = task_queue.create_task(
@@ -42,13 +52,13 @@ class DeferredJobDispatch:
                 )
             return task_identity
         if CONFIG.testing and adapter.synchronous_testing:
-            return self.run(job.urlsafe_key)
+            return service.run(job.urlsafe_key)
         if CONFIG.development:
-            app = current_app._get_current_object()
+            app = cast("LocalProxy[Flask]", current_app)._get_current_object()
 
             def run_local():
                 with app.app_context():
-                    self.run(job.urlsafe_key)
+                    service.run(job.urlsafe_key)
 
             if delay_seconds:
                 timer = threading.Timer(delay_seconds, run_local)
@@ -58,10 +68,7 @@ class DeferredJobDispatch:
             threading.Thread(target=run_local, daemon=True).start()
         return None
 
-    # @testable true
-    # @tests tests_unit/test_023b_deferred_job_service.py::test_long_running_feedback_dispatch_is_delayed_and_deterministic
-    # @matrix deferred-jobs notifications : feedback long-running scheduling
-    def dispatch_feedback(self, job):
+    def dispatch_feedback(self, job: DeferredJob) -> str | None:
         """Schedule a bounded user-facing update for unusually long work."""
         if (
             not CONFIG.production

@@ -8,18 +8,28 @@ be imported after ``FLASK_ENV=testing`` is set.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import importlib
 import json
 import os
 import sys
-from typing import Iterable
+from collections.abc import Iterable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import TypedDict
 
 from .artifacts import REPORTS_ROOT
 
 
 LOAD_REPORT = REPORTS_ROOT / "test-server-load.json"
+
+
+class SeedReport(TypedDict):
+    loaded_at: str
+    packs: list[str]
+    owner: dict[str, object]
+    resources: list[dict[str, object]]
+    post_load_actions: list[dict[str, str]]
+    landings: list[dict[str, str]]
 
 
 @dataclass(frozen=True)
@@ -492,7 +502,7 @@ def _resource_summary(ref: str, resource, item: SeedItem) -> dict[str, object]:
     return summary
 
 
-def _write_report(summary: dict[str, object]) -> None:
+def _write_report(summary: SeedReport) -> None:
     LOAD_REPORT.parent.mkdir(parents=True, exist_ok=True)
     LOAD_REPORT.write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n",
@@ -549,10 +559,7 @@ def _run_post_load_actions(
     return actions
 
 
-# @testable true
-# @tests tests_tooling/test_005_test_session.py::test_seed_loading_requires_authority_before_import_or_mutation
-# @matrix test-session : lease-ownership seed-loading
-def load_packs(pack_names: Iterable[str], authority) -> dict[str, object]:
+def load_packs(pack_names: Iterable[str], authority) -> SeedReport:
     """Load one or more seed packs into the testing datastore/cache."""
 
     authority.assert_active(phases={"seeding"})
@@ -599,8 +606,8 @@ def load_packs(pack_names: Iterable[str], authority) -> dict[str, object]:
                 }
             )
 
-    summary = {
-        "loaded_at": datetime.now(timezone.utc).isoformat(),
+    summary: SeedReport = {
+        "loaded_at": datetime.now(UTC).isoformat(),
         "packs": pack_names,
         "owner": {
             "name": owner.name,

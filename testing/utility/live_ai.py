@@ -20,16 +20,10 @@ LIVE_AI_QUOTA_BACKOFF_SECONDS = 30
 LIVE_AI_ATTEMPTS = 2
 
 
-# @testable false
-# @covered-by testing/utility/live_ai.py::run_live_ai
-# @reason sentinel keeps provider availability separate from failed assertions
 class ProviderQuotaBlocked(RuntimeError):
     """A positively identified provider quota failure, never a bad answer."""
 
 
-# @testable true
-# @tests tests_unit/test_023g_live_ai_test_helper.py::test_quota_classification_does_not_accept_application_errors
-# @matrix ai e2e : live-provider quota-fallback
 def is_quota_message(message):
     message = str(message or "").strip()
     message = message.removeprefix("AI unable to generate summary: ")
@@ -39,10 +33,6 @@ def is_quota_message(message):
     )
 
 
-# @testable true
-# @tests tests_unit/test_023g_live_ai_test_helper.py::test_live_provider_retries_only_quota_and_records_the_outcome
-# @tests tests_unit/test_023g_live_ai_test_helper.py::test_live_provider_requires_verified_fallback_after_bounded_attempts
-# @matrix ai e2e : live-provider quota-fallback backoff
 def run_live_ai(attempt, *, results, fallback, sleep=None):
     """Try the real boundary twice; only quota can select an explicit fallback."""
     failures = []
@@ -75,7 +65,6 @@ def run_live_ai(attempt, *, results, fallback, sleep=None):
     return value
 
 
-# @testable infrastructure
 def submit_live_ai(user, *, path, submit, results, browser_failures, fallback,
                    timeout=LIVE_AI_RESPONSE_TIMEOUT_MS):
     """Retry one UI request, accepting only quota-labelled error responses."""
@@ -104,10 +93,6 @@ def submit_live_ai(user, *, path, submit, results, browser_failures, fallback,
     return run_live_ai(attempt, results=results, fallback=fallback)
 
 
-# @testable true
-# @tests tests_unit/test_023g_live_ai_test_helper.py::test_quota_fallback_rejects_non_quota_job
-# @tests tests_unit/test_023g_live_ai_test_helper.py::test_job_quota_classification_requires_provider_evidence
-# @matrix ai deferred-jobs e2e : checkpoint live-provider quota-fallback
 def quota_blocked_job(job):
     error = job.error or {}
     context = error.get("context") or {}
@@ -128,10 +113,6 @@ def quota_blocked_job(job):
     )
 
 
-# @testable true
-# @tests tests_unit/test_023g_live_ai_test_helper.py::test_quota_fallback_injects_resumable_report_checkpoint
-# @tests tests_unit/test_023g_live_ai_test_helper.py::test_quota_fallback_rejects_non_quota_job
-# @matrix ai deferred-jobs e2e : checkpoint live-provider quota-fallback
 def inject_quota_fallback_checkpoint(job, proposal, *, failed_job):
     """Publish a verified answer through a fresh, UI-created retry operation."""
     if (
@@ -164,9 +145,6 @@ def inject_quota_fallback_checkpoint(job, proposal, *, failed_job):
     return checkpoint
 
 
-# @testable true
-# @tests tests_unit/test_023g_live_ai_test_helper.py::test_autofill_fallback_retains_preparation_and_rejects_unrelated_failures
-# @matrix ai deferred-jobs e2e : checkpoint live-provider quota-fallback
 def prepare_autofill_fallback(job, submission, *, failed_job):
     """Stage verified values on a fresh UI retry; never revive a terminal job."""
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
@@ -212,7 +190,6 @@ def prepare_autofill_fallback(job, submission, *, failed_job):
     return deepcopy(job.checkpoint)
 
 
-# @testable infrastructure
 def run_hosted_autofill(user, job, *, results, verify_submission):
     """Exercise live autofill and its normal checkpoint/lock/publication path."""
     from testing.utility.hosted_deferred_jobs import dispatch_hosted_deferred_job

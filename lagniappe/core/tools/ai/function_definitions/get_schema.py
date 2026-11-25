@@ -1,10 +1,17 @@
 """Function declaration and handler for loading a single form schema."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
+from ..references import stored_file_identifiers
 from ..debug import ai_debug
 from ..references import hash_reference
 from ..submission_values import values_by_id
@@ -21,7 +28,7 @@ GET_SCHEMA = types.FunctionDeclaration(
         "by those same field ids. Tables use rows keyed by column id; Todo lists "
         "use items. Numbers and booleans retain their JSON types."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -34,21 +41,15 @@ GET_SCHEMA = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_schema_returns_schema_for_form_bearing_entities
-# @tests tests_unit/test_015_ai_tools.py::test_get_schema_includes_values_by_id_without_label_collisions
-# @tests tests_unit/test_015_ai_tools.py::test_get_schema_preserves_collection_rows_and_typed_cells
-# @matrix ai form-schema : form model-task page task tool-context
-# @matrix ai form-schema : permissions schema
-def execute_get_schema(args, user):
+def execute_get_schema(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     """Return the schema for a form, page, task, or model task."""
     identifier = args.get("id")
     ai_debug("tool.get_schema.request", identifier=identifier)
-    if not identifier:
+    if not isinstance(identifier, str) or not identifier:
         ai_debug("tool.get_schema.result", error="id is required")
         return {"error": "id is required"}
 
@@ -60,7 +61,7 @@ def execute_get_schema(args, user):
         Entities.fetch_one(entity, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
     elif isinstance(entity, Entities.TASK_HISTORY):
         Entities.fetch(
-            entity, entity.properties.task.key, *entity.db.get("files", []),
+            entity, entity.properties.task.key, *stored_file_identifiers(entity),
             request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
         )
     else:
@@ -124,9 +125,6 @@ def execute_get_schema(args, user):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_schema.py::execute_get_schema
-# @reason form source selection is asserted through the public schema tool
 def _schema_form(entity):
     if isinstance(entity, Entities.FORM):
         return entity
@@ -139,9 +137,6 @@ def _schema_form(entity):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_schema.py::execute_get_schema
-# @reason stored form relation access is asserted through the public schema tool
 def _attached_form(entity):
     form_property = getattr(getattr(entity, "properties", None), "form", None)
     if not form_property:
@@ -173,10 +168,7 @@ def _attached_form(entity):
         )
         return loaded
 
-    if loaded:
-        loaded_context = _entity_result(loaded)
-    else:
-        loaded_context = None
+    loaded_context = _entity_result(loaded) if loaded else None
 
     if loaded_context:
         message = "AI get_schema loaded a stored form key that was not a form."
@@ -196,9 +188,6 @@ def _attached_form(entity):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_schema.py::execute_get_schema
-# @reason entity projection is asserted through the public schema tool
 def _entity_result(entity):
     return {
         "hash": hash_reference(entity),
@@ -207,9 +196,6 @@ def _entity_result(entity):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_schema.py::execute_get_schema
-# @reason debug-only compact schema logging is not behavior-bearing
 def _schema_debug_fields(schema):
     fields = []
     for field in schema or []:

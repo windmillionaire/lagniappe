@@ -31,8 +31,6 @@ MODERN_META = {
 }
 
 
-# @matrix mcp-remote : parity privacy
-# @matrix mcp-upload : remote terminal cleanup partial-failure upload-all finalize-once upload-batch-identity safe-result
 @pytest.mark.parametrize("storage_failure", [False, True])
 @pytest.mark.parametrize("terminal", [False, True])
 def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
@@ -210,95 +208,94 @@ def test_remote_attachment_uses_shared_upload_and_preserves_pending_failure(
                     storage=storage_client,
                 ),
             )
-            async with app.router.lifespan_context(app):
-                async with httpx.AsyncClient(
-                    transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
-                ) as client:
-                    if terminal:
-                        path = tmp_path / "notes.txt"
-                        path.write_bytes(content)
-                        metadata = {
-                            "files": [
-                                {
-                                    "filename": path.name,
-                                    "content_type": "text/plain",
-                                    "size": path.stat().st_size,
-                                }
-                            ]
-                        }
-                        prepared = await _rpc(
-                            client,
-                            "tools/call",
-                            params={
-                                "name": "prepare_file_uploads",
-                                "arguments": {"plan_id": "plan-1", **metadata},
-                            },
-                        )
-                        assert not prepared.json()["result"]["isError"], prepared.text
-                        manifest = prepared.json()["result"]["structuredContent"]
-                        # Simulate a terminal's ordinary HTTP client, with no
-                        # Lagniappe helper or MCP client credential on Storage.
-                        uploaded = await storage_client.put(
-                            manifest["uploads"][0]["session_url"],
-                            content=path.read_bytes(),
-                            headers={
-                                "Content-Type": metadata["files"][0]["content_type"]
-                            },
-                        )
-                        if storage_failure:
-                            assert uploaded.status_code == 403
-                            response = prepared
-                            result = {"isError": True}
-                        else:
-                            assert uploaded.status_code == 200
-                            response = await _rpc(
-                                client,
-                                "tools/call",
-                                params={
-                                    "name": "finalize_file_uploads",
-                                    "arguments": {
-                                        key: manifest[key]
-                                        for key in ("plan_id", "upload_batch_id")
-                                    },
-                                },
-                            )
-                            result = response.json()["result"]
+            async with app.router.lifespan_context(app), httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
+            ) as client:
+                if terminal:
+                    path = tmp_path / "notes.txt"
+                    path.write_bytes(content)
+                    metadata = {
+                        "files": [
+                            {
+                                "filename": path.name,
+                                "content_type": "text/plain",
+                                "size": path.stat().st_size,
+                            }
+                        ]
+                    }
+                    prepared = await _rpc(
+                        client,
+                        "tools/call",
+                        params={
+                            "name": "prepare_file_uploads",
+                            "arguments": {"plan_id": "plan-1", **metadata},
+                        },
+                    )
+                    assert not prepared.json()["result"]["isError"], prepared.text
+                    manifest = prepared.json()["result"]["structuredContent"]
+                    # Simulate a terminal's ordinary HTTP client, with no
+                    # Lagniappe helper or MCP client credential on Storage.
+                    uploaded = await storage_client.put(
+                        manifest["uploads"][0]["session_url"],
+                        content=path.read_bytes(),
+                        headers={
+                            "Content-Type": metadata["files"][0]["content_type"]
+                        },
+                    )
+                    if storage_failure:
+                        assert uploaded.status_code == 403
+                        response = prepared
+                        result = {"isError": True}
                     else:
+                        assert uploaded.status_code == 200
                         response = await _rpc(
                             client,
                             "tools/call",
                             params={
-                                "name": "upload_files",
+                                "name": "finalize_file_uploads",
                                 "arguments": {
-                                    "plan_id": "plan-1",
-                                    "files": [attachment],
+                                    key: manifest[key]
+                                    for key in ("plan_id", "upload_batch_id")
                                 },
                             },
                         )
                         result = response.json()["result"]
-                    assert result["isError"] is storage_failure, response.text
-                    if not storage_failure:
-                        value = result["structuredContent"]
-                        assert (
-                            value["plan"]["status"] == "draft"
-                            and value["plan"]["uploads_pending"] is False
-                        )
-                        assert value["upload_inventory"] == inventory()
-                        assert (
-                            value["context"]["contract"]["upload_inventory"]["files"]
-                            == inventory()
-                        )
-                    else:
-                        assert declarations and not finalized
-                    assert (
-                        TOKEN_A not in response.text
-                        and (
-                            terminal
-                            and storage_failure
-                            or session_url not in response.text
-                        )
-                        and attachment["download_url"] not in response.text
+                else:
+                    response = await _rpc(
+                        client,
+                        "tools/call",
+                        params={
+                            "name": "upload_files",
+                            "arguments": {
+                                "plan_id": "plan-1",
+                                "files": [attachment],
+                            },
+                        },
                     )
+                    result = response.json()["result"]
+                assert result["isError"] is storage_failure, response.text
+                if not storage_failure:
+                    value = result["structuredContent"]
+                    assert (
+                        value["plan"]["status"] == "draft"
+                        and value["plan"]["uploads_pending"] is False
+                    )
+                    assert value["upload_inventory"] == inventory()
+                    assert (
+                        value["context"]["contract"]["upload_inventory"]["files"]
+                        == inventory()
+                    )
+                else:
+                    assert declarations and not finalized
+                assert (
+                    TOKEN_A not in response.text
+                    and (
+                        terminal
+                        and storage_failure
+                        or session_url not in response.text
+                    )
+                    and attachment["download_url"] not in response.text
+                )
         assert storage_requests
         if terminal:
             assert len(storage_requests) == 1
@@ -453,7 +450,6 @@ async def _rpc(
     return await client.post("/mcp", json=payload, headers=headers)
 
 
-# @matrix mcp-remote : configuration discovery bounds
 def test_hosted_configuration_and_public_discovery_are_exact():
     for issuer, resource in (
         ("http://example.com", CONFIG.resource),
@@ -466,27 +462,25 @@ def test_hosted_configuration_and_public_discovery_are_exact():
 
     async def scenario():
         app = hosted.create_app(CONFIG)
-        async with app.router.lifespan_context(app):
-            async with httpx.AsyncClient(
-                transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
-            ) as client:
-                response = await client.get("/.well-known/oauth-protected-resource")
-                assert response.json()["resource"] == CONFIG.resource
-                assert response.json()["authorization_servers"] == [CONFIG.issuer]
-                assert "scopes_supported" not in response.json()
-                assert (await client.get("/health")).json() == {"status": "ok"}
-                response = await _rpc(client, "initialize", token=None)
-                assert response.status_code == 401
-                assert response.headers["www-authenticate"] == CONFIG.challenge
-                assert "scope=" not in response.headers["www-authenticate"]
-                assert (
-                    await _rpc(client, "ping", token="lgn_existing-key")
-                ).status_code == 401
+        async with app.router.lifespan_context(app), httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
+        ) as client:
+            response = await client.get("/.well-known/oauth-protected-resource")
+            assert response.json()["resource"] == CONFIG.resource
+            assert response.json()["authorization_servers"] == [CONFIG.issuer]
+            assert "scopes_supported" not in response.json()
+            assert (await client.get("/health")).json() == {"status": "ok"}
+            response = await _rpc(client, "initialize", token=None)
+            assert response.status_code == 401
+            assert response.headers["www-authenticate"] == CONFIG.challenge
+            assert "scope=" not in response.headers["www-authenticate"]
+            assert (
+                await _rpc(client, "ping", token="lgn_existing-key")
+            ).status_code == 401
 
     asyncio.run(scenario())
 
 
-# @matrix mcp-remote : catalog isolation parity discovery bounds
 @pytest.mark.parametrize("version", ["2025-03-26", "2026-07-28"])
 def test_remote_catalog_and_calls_reuse_adapter_behavior_and_isolate_users(version):
     async def scenario():
@@ -494,100 +488,98 @@ def test_remote_catalog_and_calls_reuse_adapter_behavior_and_isolate_users(versi
         app = hosted.create_app(
             CONFIG, adapter_factory=lambda token: _adapter(token, requests, revoked)
         )
-        async with app.router.lifespan_context(app):
-            async with httpx.AsyncClient(
-                transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
-            ) as client:
-                initialized = await _rpc(
+        async with app.router.lifespan_context(app), httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
+        ) as client:
+            initialized = await _rpc(
+                client,
+                "initialize",
+                params={
+                    "protocolVersion": "2025-03-26",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "1"},
+                },
+            )
+            assert initialized.status_code == 200, initialized.text
+            assert initialized.json()["result"]["protocolVersion"] == "2025-03-26"
+            a, b = await asyncio.gather(
+                _rpc(client, "tools/list", version=version),
+                _rpc(client, "tools/list", token=TOKEN_B, version=version),
+            )
+            assert a.status_code == b.status_code == 200
+            alice = {item["name"]: item for item in a.json()["result"]["tools"]}
+            bob = {item["name"]: item for item in b.json()["result"]["tools"]}
+            assert "get_entity" in alice and "get_entity" not in bob
+            assert "upload_files" in alice and "upload_local_files" not in alice
+            upload = alice["upload_files"]
+            assert upload["_meta"]["openai/fileParams"] == ["files"]
+            assert set(
+                upload["inputSchema"]["properties"]["files"]["items"]["properties"]
+            ) == {"download_url", "file_id", "mime_type", "file_name"}
+            for item in alice.values():
+                assert (
+                    item["securitySchemes"]
+                    == item["_meta"]["securitySchemes"]
+                    == [{"type": "oauth2", "scopes": []}]
+                )
+            a, b = await asyncio.gather(
+                _rpc(
                     client,
-                    "initialize",
-                    params={
-                        "protocolVersion": "2025-03-26",
-                        "capabilities": {},
-                        "clientInfo": {"name": "test", "version": "1"},
-                    },
-                )
-                assert initialized.status_code == 200, initialized.text
-                assert initialized.json()["result"]["protocolVersion"] == "2025-03-26"
-                a, b = await asyncio.gather(
-                    _rpc(client, "tools/list", version=version),
-                    _rpc(client, "tools/list", token=TOKEN_B, version=version),
-                )
-                assert a.status_code == b.status_code == 200
-                alice = {item["name"]: item for item in a.json()["result"]["tools"]}
-                bob = {item["name"]: item for item in b.json()["result"]["tools"]}
-                assert "get_entity" in alice and "get_entity" not in bob
-                assert "upload_files" in alice and "upload_local_files" not in alice
-                upload = alice["upload_files"]
-                assert upload["_meta"]["openai/fileParams"] == ["files"]
-                assert set(
-                    upload["inputSchema"]["properties"]["files"]["items"]["properties"]
-                ) == {"download_url", "file_id", "mime_type", "file_name"}
-                for item in alice.values():
-                    assert (
-                        item["securitySchemes"]
-                        == item["_meta"]["securitySchemes"]
-                        == [{"type": "oauth2", "scopes": []}]
-                    )
-                a, b = await asyncio.gather(
-                    _rpc(
-                        client,
-                        "tools/call",
-                        params={"name": "get_actor", "arguments": {}},
-                        version=version,
-                    ),
-                    _rpc(
-                        client,
-                        "tools/call",
-                        token=TOKEN_B,
-                        params={"name": "get_actor", "arguments": {}},
-                        version=version,
-                    ),
-                )
-                assert a.json()["result"]["structuredContent"] == _actor(TOKEN_A)
-                assert b.json()["result"]["structuredContent"] == _actor(TOKEN_B)
-                async with _adapter(TOKEN_A, requests, revoked) as shared:
-                    local = LagniappeAdapter(shared.config, rest=shared.rest)
-                    await local.initialize()
-                    expected = await local.execute("get_actor", {})
-                    assert a.json()["result"]["structuredContent"] == expected.value
-                denied = await _rpc(
+                    "tools/call",
+                    params={"name": "get_actor", "arguments": {}},
+                    version=version,
+                ),
+                _rpc(
                     client,
                     "tools/call",
                     token=TOKEN_B,
-                    params={
-                        "name": "get_entity",
-                        "arguments": {"plan_id": "test", "hash": "hash:abcdefghijkl"},
-                    },
+                    params={"name": "get_actor", "arguments": {}},
                     version=version,
-                )
-                assert denied.json()["error"]["code"] == -32602
-                bad_path = await _rpc(
-                    client,
-                    "tools/call",
-                    params={
-                        "name": "upload_files",
-                        "arguments": {
-                            "plan_id": "test",
-                            "files": [{"path": "/etc/passwd"}],
-                        },
+                ),
+            )
+            assert a.json()["result"]["structuredContent"] == _actor(TOKEN_A)
+            assert b.json()["result"]["structuredContent"] == _actor(TOKEN_B)
+            async with _adapter(TOKEN_A, requests, revoked) as shared:
+                local = LagniappeAdapter(shared.config, rest=shared.rest)
+                await local.initialize()
+                expected = await local.execute("get_actor", {})
+                assert a.json()["result"]["structuredContent"] == expected.value
+            denied = await _rpc(
+                client,
+                "tools/call",
+                token=TOKEN_B,
+                params={
+                    "name": "get_entity",
+                    "arguments": {"plan_id": "test", "hash": "hash:abcdefghijkl"},
+                },
+                version=version,
+            )
+            assert denied.json()["error"]["code"] == -32602
+            bad_path = await _rpc(
+                client,
+                "tools/call",
+                params={
+                    "name": "upload_files",
+                    "arguments": {
+                        "plan_id": "test",
+                        "files": [{"path": "/etc/passwd"}],
                     },
-                    version=version,
-                )
-                assert bad_path.json()["result"]["isError"]
-                rendered = a.text + b.text
-                assert TOKEN_A not in rendered and TOKEN_B not in rendered
-                expected_calls = [
-                    (TOKEN_A, "/api/v1/me"),
-                    (TOKEN_A, "/api/v1"),
-                    (TOKEN_A, "/api/v1/tools"),
-                ]
-                assert sorted(requests[-3:]) == sorted(expected_calls)
+                },
+                version=version,
+            )
+            assert bad_path.json()["result"]["isError"]
+            rendered = a.text + b.text
+            assert TOKEN_A not in rendered and TOKEN_B not in rendered
+            expected_calls = [
+                (TOKEN_A, "/api/v1/me"),
+                (TOKEN_A, "/api/v1"),
+                (TOKEN_A, "/api/v1/tools"),
+            ]
+            assert sorted(requests[-3:]) == sorted(expected_calls)
 
     asyncio.run(scenario())
 
 
-# @matrix mcp-remote : authentication bounds privacy
 @pytest.mark.parametrize("version", ["2025-03-26", "2026-07-28"])
 def test_http_errors_are_private_and_mid_request_expiry_requests_reconnect(
     version, caplog
@@ -606,81 +598,80 @@ def test_http_errors_are_private_and_mid_request_expiry_requests_reconnect(
             CONFIG,
             adapter_factory=lambda token: _adapter(token, requests, revoked, override),
         )
-        async with app.router.lifespan_context(app):
-            async with httpx.AsyncClient(
-                transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
-            ) as client:
-                secret = "https://files.example.com/file?temporary=private"
-                for request_id in (
-                    secret,
-                    "x" * 1000,
-                    {"secret": secret},
-                    True,
-                    None,
-                    1.5,
-                ):
-                    response = await _rpc(
-                        client, "ping", request_id=request_id, version=version
-                    )
-                    assert response.status_code == 400
-                    assert response.json() == {"error": "invalid_request"}
-                headers = {
-                    "Authorization": "bearer " + TOKEN_A,
-                    "Accept": "application/json, text/event-stream",
-                    "MCP-Protocol-Version": version,
-                    "Content-Type": "application/json",
-                }
-                for payload in (
-                    '{"jsonrpc":"2.0","method":"ping","id":1,"id":2}',
-                    json.dumps({"jsonrpc": secret, "method": "ping", "id": 1}),
-                    json.dumps({"jsonrpc": "2.0", "method": [secret], "id": 1}),
-                    '{"jsonrpc":"2.0","method":"ping","id":1,"params":{"value":NaN}}',
-                ):
-                    response = await client.post(
-                        "/mcp", content=payload, headers=headers
-                    )
-                    assert response.status_code == 400
-                    assert response.json() == {"error": "invalid_request"}
-                valid_method = "server/discover" if version == "2026-07-28" else "ping"
-                valid_payload = {"jsonrpc": "2.0", "method": valid_method, "id": 1}
-                if version == "2026-07-28":
-                    valid_payload["params"] = {"_meta": MODERN_META}
-                    headers["Mcp-Method"] = valid_method
-                valid = await client.post("/mcp", json=valid_payload, headers=headers)
-                assert valid.status_code == 200
-                oversized = await client.post(
-                    "/mcp",
-                    content=b" " * (hosted.MAX_REQUEST_FRAME_BYTES + 1),
-                    headers=headers,
+        async with app.router.lifespan_context(app), httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
+        ) as client:
+            secret = "https://files.example.com/file?temporary=private"
+            for request_id in (
+                secret,
+                "x" * 1000,
+                {"secret": secret},
+                True,
+                None,
+                1.5,
+            ):
+                response = await _rpc(
+                    client, "ping", request_id=request_id, version=version
                 )
-                assert oversized.status_code == 413
-                malformed = await _rpc(
-                    client, "tools/call", params={"name": [secret]}, version=version
+                assert response.status_code == 400
+                assert response.json() == {"error": "invalid_request"}
+            headers = {
+                "Authorization": "bearer " + TOKEN_A,
+                "Accept": "application/json, text/event-stream",
+                "MCP-Protocol-Version": version,
+                "Content-Type": "application/json",
+            }
+            for payload in (
+                '{"jsonrpc":"2.0","method":"ping","id":1,"id":2}',
+                json.dumps({"jsonrpc": secret, "method": "ping", "id": 1}),
+                json.dumps({"jsonrpc": "2.0", "method": [secret], "id": 1}),
+                '{"jsonrpc":"2.0","method":"ping","id":1,"params":{"value":NaN}}',
+            ):
+                response = await client.post(
+                    "/mcp", content=payload, headers=headers
                 )
-                assert "error" in malformed.json()
-                unknown = await _rpc(client, secret, version=version)
-                assert unknown.json()["error"]["code"] == -32601
-                assert secret not in malformed.text + unknown.text
+                assert response.status_code == 400
+                assert response.json() == {"error": "invalid_request"}
+            valid_method = "server/discover" if version == "2026-07-28" else "ping"
+            valid_payload = {"jsonrpc": "2.0", "method": valid_method, "id": 1}
+            if version == "2026-07-28":
+                valid_payload["params"] = {"_meta": MODERN_META}
+                headers["Mcp-Method"] = valid_method
+            valid = await client.post("/mcp", json=valid_payload, headers=headers)
+            assert valid.status_code == 200
+            oversized = await client.post(
+                "/mcp",
+                content=b" " * (hosted.MAX_REQUEST_FRAME_BYTES + 1),
+                headers=headers,
+            )
+            assert oversized.status_code == 413
+            malformed = await _rpc(
+                client, "tools/call", params={"name": [secret]}, version=version
+            )
+            assert "error" in malformed.json()
+            unknown = await _rpc(client, secret, version=version)
+            assert unknown.json()["error"]["code"] == -32601
+            assert secret not in malformed.text + unknown.text
 
-                fail_catalog = True
-                listing = await _rpc(client, "tools/list", version=version)
-                assert listing.status_code == 401
-                assert 'error="invalid_token"' in listing.headers["www-authenticate"]
-                call = await _rpc(
-                    client,
-                    "tools/call",
-                    params={"name": "get_actor", "arguments": {}},
-                    version=version,
-                )
-                assert call.status_code == 401
-                result = call.json()["result"]
-                assert result["isError"]
-                assert result["_meta"]["mcp/www_authenticate"] == [
-                    CONFIG.challenge + ', error="invalid_token"'
-                ]
-                assert secret not in listing.text + call.text
-                assert call.headers["cache-control"] == "no-store"
-                assert "x-request-id" in call.headers
+            fail_catalog = True
+            listing = await _rpc(client, "tools/list", version=version)
+            assert listing.status_code == 401
+            assert 'error="invalid_token"' in listing.headers["www-authenticate"]
+            call = await _rpc(
+                client,
+                "tools/call",
+                params={"name": "get_actor", "arguments": {}},
+                version=version,
+            )
+            assert call.status_code == 401
+            result = call.json()["result"]
+            assert result["isError"]
+            assert result["_meta"]["mcp/www_authenticate"] == [
+                CONFIG.challenge + ', error="invalid_token"'
+            ]
+            assert secret not in listing.text + call.text
+            assert call.headers["cache-control"] == "no-store"
+            assert "x-request-id" in call.headers
 
     with caplog.at_level("INFO", logger=hosted.LOGGER.name):
         asyncio.run(scenario())
@@ -710,7 +701,6 @@ def test_http_errors_are_private_and_mid_request_expiry_requests_reconnect(
     )
 
 
-# @matrix mcp-remote : privacy token-separation
 def test_hosted_catalog_and_error_results_cannot_reflect_workload_identity(monkeypatch):
     proof = "google.identity.proof"
 
@@ -729,13 +719,12 @@ def test_hosted_catalog_and_error_results_cannot_reflect_workload_identity(monke
                 token, requests, revoked, override, proof
             ),
         )
-        async with app.router.lifespan_context(app):
-            async with httpx.AsyncClient(
-                transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
-            ) as client:
-                response = await _rpc(client, "tools/list")
-                assert response.json()["error"]["code"] == -32603
-                assert proof not in response.text
+        async with app.router.lifespan_context(app), httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
+        ) as client:
+            response = await _rpc(client, "tools/list")
+            assert response.json()["error"]["code"] == -32603
+            assert proof not in response.text
 
         async def fail(self, name, arguments):
             raise AdapterError("upstream_error", proof)
@@ -747,23 +736,18 @@ def test_hosted_catalog_and_error_results_cannot_reflect_workload_identity(monke
                 token, requests, revoked, proof=proof
             ),
         )
-        async with app.router.lifespan_context(app):
-            async with httpx.AsyncClient(
-                transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
-            ) as client:
-                response = await _rpc(
-                    client, "tools/call", params={"name": "get_actor", "arguments": {}}
-                )
-                assert response.json()["result"]["isError"]
-                assert proof not in response.text
+        async with app.router.lifespan_context(app), httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
+        ) as client:
+            response = await _rpc(
+                client, "tools/call", params={"name": "get_actor", "arguments": {}}
+            )
+            assert response.json()["result"]["isError"]
+            assert proof not in response.text
 
     asyncio.run(scenario())
 
 
-# @matrix mcp-remote : privacy token-separation parity isolation
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/server.py::create_app
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 @pytest.mark.parametrize("version", ["2025-03-26", "2026-07-28"])
 def test_hosted_original_download_preserves_capability_but_rejects_credentials(version):
     proof = "google.identity.proof"
@@ -821,88 +805,85 @@ def test_hosted_original_download_preserves_capability_but_rejects_credentials(v
         app = hosted.create_app(CONFIG, adapter_factory=lambda token: _adapter(
             token, requests, revoked, override=override, proof=proof,
         ))
-        async with app.router.lifespan_context(app):
-            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin) as client:
-                async def read(arguments):
-                    response = await _rpc(client, "tools/call", params={"name": "get_file", "arguments": arguments}, version=version)
-                    assert response.status_code == 200
-                    assert response.headers["cache-control"] == "no-store"
-                    assert TOKEN_A not in response.text and proof not in response.text
-                    return response.json()["result"]
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin) as client,
+        ):
+            async def read(arguments):
+                response = await _rpc(client, "tools/call", params={"name": "get_file", "arguments": arguments}, version=version)
+                assert response.status_code == 200
+                assert response.headers["cache-control"] == "no-store"
+                assert TOKEN_A not in response.text and proof not in response.text
+                return response.json()["result"]
 
-                metadata = await read({"id": "hash:permitted123"})
-                assert metadata["isError"] is False
-                assert metadata["structuredContent"]["delivery"] == {"kind": "none"}
-                assert signed not in json.dumps(metadata)
-                args = {"id": "hash:permitted123", "include_original": True}
-                original = await read(args)
-                assert original["isError"] is False
-                value = original["structuredContent"]
-                assert value["delivery"] == {"kind": "download", "mime_type": "application/pdf"}
-                assert value["original_file"] == {"supported": True, "attached": False, "download_url": signed, "expires_in": 300}
-                assert "content" not in value
-                assert json.loads(original["content"][0]["text"]) == value
-                denied = await read({**args, "id": "hash:deniedfile12"})
-                assert denied["isError"] is True
-                assert signed not in json.dumps(denied)
-                for secret in (TOKEN_A, proof):
-                    for field in ("url", "encoded_url", "summary"):
-                        reflected.update(secret=secret, field=field)
-                        result = await read(args)
-                        assert result["isError"] is True
-                        assert "storage.googleapis.com" not in json.dumps(result)
-                assert not any(path == "/api/v1/plans" for _, path in requests)
+            metadata = await read({"id": "hash:permitted123"})
+            assert metadata["isError"] is False
+            assert metadata["structuredContent"]["delivery"] == {"kind": "none"}
+            assert signed not in json.dumps(metadata)
+            args = {"id": "hash:permitted123", "include_original": True}
+            original = await read(args)
+            assert original["isError"] is False
+            value = original["structuredContent"]
+            assert value["delivery"] == {"kind": "download", "mime_type": "application/pdf"}
+            assert value["original_file"] == {"supported": True, "attached": False, "download_url": signed, "expires_in": 300}
+            assert "content" not in value
+            assert json.loads(original["content"][0]["text"]) == value
+            denied = await read({**args, "id": "hash:deniedfile12"})
+            assert denied["isError"] is True
+            assert signed not in json.dumps(denied)
+            for secret in (TOKEN_A, proof):
+                for field in ("url", "encoded_url", "summary"):
+                    reflected.update(secret=secret, field=field)
+                    result = await read(args)
+                    assert result["isError"] is True
+                    assert "storage.googleapis.com" not in json.dumps(result)
+            assert not any(path == "/api/v1/plans" for _, path in requests)
 
     asyncio.run(scenario())
 
 
-# @matrix mcp-remote : authentication isolation bounds
 def test_http_authentication_preflights_every_request_and_reconnects_on_revocation():
     async def scenario():
         requests, revoked = [], set()
         app = hosted.create_app(
             CONFIG, adapter_factory=lambda token: _adapter(token, requests, revoked)
         )
-        async with app.router.lifespan_context(app):
-            async with httpx.AsyncClient(
-                transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
-            ) as client:
-                assert (await _rpc(client, "ping")).status_code == 200
-                assert requests == [(TOKEN_A, "/api/v1/me")]
-                revoked.add(TOKEN_A)
-                response = await _rpc(client, "ping")
-                assert response.status_code == 401
-                assert 'error="invalid_token"' in response.headers["www-authenticate"]
-                assert len(requests) == 2
-                assert (await _rpc(client, "ping", token=TOKEN_B)).status_code == 200
-                response = await _rpc(
-                    client, "ping", token=TOKEN_B, request_id="x" * 1000
+        async with app.router.lifespan_context(app), httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url=CONFIG.origin
+        ) as client:
+            assert (await _rpc(client, "ping")).status_code == 200
+            assert requests == [(TOKEN_A, "/api/v1/me")]
+            revoked.add(TOKEN_A)
+            response = await _rpc(client, "ping")
+            assert response.status_code == 401
+            assert 'error="invalid_token"' in response.headers["www-authenticate"]
+            assert len(requests) == 2
+            assert (await _rpc(client, "ping", token=TOKEN_B)).status_code == 200
+            response = await _rpc(
+                client, "ping", token=TOKEN_B, request_id="x" * 1000
+            )
+            assert response.status_code == 400
+            for method in ("GET", "DELETE"):
+                response = await client.request(
+                    method,
+                    "/mcp",
+                    headers={
+                        "Authorization": "Bearer " + TOKEN_B,
+                        "Accept": "text/event-stream",
+                    },
                 )
-                assert response.status_code == 400
-                for method in ("GET", "DELETE"):
-                    response = await client.request(
-                        method,
-                        "/mcp",
-                        headers={
-                            "Authorization": "Bearer " + TOKEN_B,
-                            "Accept": "text/event-stream",
-                        },
-                    )
-                    assert response.status_code == 405
-                    assert response.headers["allow"] == "POST"
-                    assert response.headers["cache-control"] == "no-store"
-                response = await client.get(
-                    "/mcp", headers={"Authorization": "Bearer " + TOKEN_A}
-                )
-                assert response.status_code == 401
-                assert requests[-1] == (TOKEN_A, "/api/v1/me")
+                assert response.status_code == 405
+                assert response.headers["allow"] == "POST"
+                assert response.headers["cache-control"] == "no-store"
+            response = await client.get(
+                "/mcp", headers={"Authorization": "Bearer " + TOKEN_A}
+            )
+            assert response.status_code == 401
+            assert requests[-1] == (TOKEN_A, "/api/v1/me")
 
     asyncio.run(scenario())
 
 
-# @matrix mcp-remote : service-identity token-separation
-# @pair mcp-adapter:product-contract
-# @source mcp/src/lagniappe_mcp/url_security.py::validate_api_url
 def test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin(
     monkeypatch,
 ):

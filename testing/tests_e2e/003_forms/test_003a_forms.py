@@ -25,9 +25,6 @@ from testing.utility.live_ai import submit_live_ai
 from testing.utility.network import expect_successful_response, multipart_form_fields, scoped_browser_route
 
 
-# @matrix forms : index tools
-# @matrix indexes : fingerprint-gate rendering
-# @matrix reconnect-refresh : fallback manifest root-fingerprint
 # @template forms/index.html::view
 def test_forms_index_page(get_admin, get_user, browser_failures):
     user = get_admin()
@@ -57,7 +54,6 @@ def test_forms_index_page(get_admin, get_user, browser_failures):
     tools.close()
 
 
-# @matrix forms : delete-modal instance-query preview-limit
 # @template delete/form.html::instance_link
 def test_form_delete_modal_lists_page_and_task_users(get_admin, get_user):
     user = get_admin()
@@ -139,7 +135,6 @@ def _create_form(user, form, create_form):
     return new_row.get_attribute("data-key")
 
 
-# @matrix forms : components create page-form
 # @template forms/tools.html::create_form
 # @template forms/builder.html::main
 def test_create_page_form(get_admin, get_user):
@@ -170,7 +165,6 @@ def test_create_page_form(get_admin, get_user):
         expect(components.locator(element_type.value)).to_be_visible()
 
 
-# @matrix forms : builder-defaults components create task-form
 # @template forms/tools.html::create_form
 # @template forms/builder.html::main
 def test_create_task_form(get_admin, get_user):
@@ -201,9 +195,6 @@ def test_create_task_form(get_admin, get_user):
         expect(components.locator(element_type.value)).to_be_visible()
 
 
-# @matrix entity-menu : builder-copy title-menu
-# @matrix forms : builder-copy builder-form-name delete form-type navigation schema
-# @pair frontend-icons:material-icon-preservation
 # @template forms/builder.html::header
 def test_copy_form_from_builder_title_menu(get_admin, get_user):
     user = get_admin()
@@ -263,7 +254,6 @@ def test_copy_form_from_builder_title_menu(get_admin, get_user):
     assert Builder(user).schema == source_schema
 
 
-# @matrix forms : builder-add-inputs builder-reload builder-save
 def test_add_inputs_to_form(get_admin, get_user):
     user = get_admin()
     form = Forms.test_add_inputs_to_form.get(user)
@@ -286,10 +276,15 @@ def test_add_inputs_to_form(get_admin, get_user):
         expect(element).to_be_visible()
 
 
-# @matrix ai forms : generate-schema live-ai reload saved-state
 # @template forms/builder.html::generate
-@pytest.mark.ai
-@pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+@pytest.mark.parametrize(
+    "live_ai_quota",
+    [
+        pytest.param(False, id="live", marks=pytest.mark.ai),
+        pytest.param(True, id="quota-fallback"),
+    ],
+    indirect=True,
+)
 def test_generate_form_schema_live_saved_state(get_admin, get_user, request, browser_failures, live_ai_quota):
     """
     Exercise real builder generation with bounded quota recovery.
@@ -398,7 +393,6 @@ def test_generate_form_schema_live_saved_state(get_admin, get_user, request, bro
     )
 
 
-# @matrix forms : builder-add-fields builder-reload builder-save
 def test_add_fields_to_form(get_admin, get_user):
     user = get_admin()
     form = Forms.test_add_fields_to_form.get(user)

@@ -16,11 +16,30 @@ permission-bounded read tools as the built-in AI workflows. Ordinary questions
 and task lookups use plan-free reads and are answered in the conversation. Only
 when the user requests saving an answer or workspace changes does the client
 create a Plan. All requests share one contract; the server derives output_kind
-from actions. Ordinary connections require browser approval of proposals. A
-dedicated [experiments installation](INFRA_EXPERIMENTS.md) can grant its admin
-agent the `execute_plan` tool through verified remote MCP; direct API keys
-remain on the browser review workflow. External requests do not call Lagniappe's
-model.
+from actions. Ordinary connections require browser approval of proposals. When an
+Administrator enables **Allow automatic plan execution** (`AI_AUTO_EXECUTE` in
+Admin → Site Settings → AI Models) and a non-public user opts in on their own
+Settings page (`User.allow_auto_execute`), both direct REST API keys and remote
+MCP connections receive `capabilities.execute_plan: true`. A dedicated
+[experiments installation](INFRA_EXPERIMENTS.md) may also grant its designated
+admin agent `execute_plan` through verified remote MCP via
+`EXPERIMENTS_EXECUTION_ENABLED`. When `capabilities.execute_plan` is true,
+clients can execute safe submitted proposals either via standalone
+`POST /api/v1/plans/{plan_id}/execute` (or MCP `execute_plan`) or in one step
+via `submitPlan` / `submit_plan` with `execute: true` and a stable
+`operation_id`. Proposals containing `update_form_schema`, delete actions
+(`delete_page`, `delete_task`, `delete_category`, `delete_project`,
+`delete_model_task`, `delete_file`), `needs_review`
+actions, non-empty `issues`, or per-request `require_review: true` always pause
+in `ready` state for authenticated browser review on standard user
+auto-execution; a designated experiments-installation admin agent over verified
+remote MCP may execute `update_form_schema`, delete actions, `needs_review`, and
+`issues` proposals directly without opting into `User.allow_auto_execute` (still
+honoring explicit `require_review: true`). `POST /plans/{plan_id}/execute`
+returns a compact plan receipt (`include_proposal=false`), and
+`GET /plans/{plan_id}` accepts `?include_proposal=false` (the default for MCP
+`get_plan`, with optional `include_proposal=true`) for compact status polling.
+External requests do not call Lagniappe's model.
 
 Database operation claims and publication notifications use the shared
 `REPORT_FORMAT_VERSION`, just like report creation and availability checks.
@@ -33,7 +52,8 @@ key and use plans and reads within their workspace permissions,
 regardless of their per-user provider entitlement. That entitlement controls
 Lagniappe's built-in provider calls; an external client uses its own model and
 tokens. Revoking the user's API key stops clients using that key. The optional
-remote MCP service has separately revocable ChatGPT and Codex OAuth grants.
+remote MCP service has separately revocable OAuth grants for ChatGPT, Codex,
+Antigravity, Claude, Claude Code, and Pi.
 
 ## Installation policy and access paths
 
@@ -517,8 +537,14 @@ reference its action id in `move_file.data.to_task_action` and `depends_on`.
 Task Form submissions must contain final values.
 
 The cohesive update contracts are `update_task`, `update_model_task`,
-`update_project`, `update_page`, and `update_file`. Every action supplies an exact `entity`
+`update_project`, `update_page`, `update_category`, and `update_file`. Every action supplies an exact `entity`
 and a nonempty `changes` object. Earlier outputs use `$action_id` references.
+Confirmation-gated delete actions (`delete_page`, `delete_task`,
+`delete_category`, `delete_project`, `delete_model_task`, `delete_file`) supply
+an exact `entity` reference and obey live `DELETE` permissions; `Uncategorized
+Pages` and personal user Pages cannot be deleted, and `Uncategorized Pages`
+cannot be renamed. On standard user auto-execution, any delete action pauses
+for browser confirmation.
 
 ```json
 {"id":"edit","type":"update_task","data":{"entity":"hash:012345abcdef","changes":{"name":"Review results","submission":{"textarea-notes":"Updated notes"},"due_date":"2026-10-01"}}}

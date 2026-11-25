@@ -9,10 +9,6 @@ from playwright.sync_api import TimeoutError as BrowserTimeout
 logger = logging.getLogger(__name__)
 
 
-# @testable true
-# @tests tests_tooling/test_004_navigation.py::test_*
-# @tests tests_e2e/001_site/test_001a_environment.py::test_setup_navigation_recovers_a_static_503
-# @matrix e2e : navigation static-assets bounded-retry failure-reporting
 def navigate_with_static_retry(
     page, url, *, expected_status=None, initialize=None, browser_failures=None,
 ):

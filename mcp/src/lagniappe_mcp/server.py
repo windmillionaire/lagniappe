@@ -2,19 +2,27 @@
 
 import asyncio
 import base64
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Callable, Mapping
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from copy import deepcopy
 from dataclasses import dataclass, replace
 import json
 import logging
 import os
 import re
+import ssl
 import time
+from typing import TypedDict, Unpack, cast
 from urllib.parse import urlsplit
 import uuid
 
 import httpx
+from httpx._client import EventHook, UseClientDefault
+from httpx._types import (
+    AuthTypes, CertTypes, CookieTypes, HeaderTypes, ProxyTypes, QueryParamTypes, TimeoutTypes,
+)
 from mcp.server import Server
+from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.shared.exceptions import MCPError
@@ -22,7 +30,10 @@ from mcp_types import (
     INTERNAL_ERROR,
     INVALID_PARAMS,
     METHOD_NOT_FOUND,
+    CallToolRequestParams,
+    CallToolResult,
     ListToolsResult,
+    PaginatedRequestParams,
     Tool,
     jsonrpc_message_adapter,
 )
@@ -31,10 +42,11 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
+from starlette.types import Message, Receive, Scope, Send
 
-from lagniappe_mcp import __version__
+from lagniappe_mcp import JsonObject, JsonValue, __version__
 from lagniappe_mcp.adapter import (
-    LagniappeAdapter, _reject_private_model_data, validate_file_result,
+    AdapterResult, LagniappeAdapter, _reject_private_model_data, validate_file_result,
 )
 from lagniappe_mcp.configuration import ConnectionConfig
 from lagniappe_mcp.errors import AdapterError, ConfigurationError
@@ -43,6 +55,7 @@ from .attachments import spool_attachments
 from . import terminal_files
 from lagniappe_mcp.schema import validate_value
 from lagniappe_mcp.limits import (
+    MAX_STRUCTURED_RESULT_BYTES,
     MAX_REQUEST_FRAME_BYTES,
     MAX_REQUEST_ID_BYTES,
     MCP_INSTRUCTIONS,
@@ -74,17 +87,12 @@ _LOG_METHODS = {
 }
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_hosted_configuration_and_public_discovery_are_exact
-# @matrix mcp-remote : configuration discovery
 @dataclass(frozen=True)
 class HostedConfig:
     issuer: str
     resource: str
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::HostedConfig
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         for value in (self.issuer, self.resource):
             parsed = urlsplit(value)
             if (
@@ -112,44 +120,31 @@ class HostedConfig:
                 "Hosted MCP requires separate issuer and /mcp origins.",
             )
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::HostedConfig
     @property
-    def origin(self):
+    def origin(self) -> str:
         return self.resource.removesuffix("/mcp")
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::HostedConfig
     @property
-    def audience(self):
+    def audience(self) -> str:
         return self.issuer + "/api/v1"
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::HostedConfig
     @property
-    def challenge(self):
+    def challenge(self) -> str:
         return (
             f'Bearer resource_metadata="{self.origin}{_METADATA_PATH}"'
         )
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin
-# @matrix mcp-remote : service-identity token-separation
 class WorkloadIdentity:
     """Cache only this service's short-lived Google identity, never a user token."""
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::WorkloadIdentity
-    def __init__(self, audience):
+    def __init__(self, audience: str) -> None:
         self.audience = audience
-        self._token = None
-        self._until = 0
+        self._token: str | None = None
+        self._until = 0.0
         self._lock = asyncio.Lock()
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::WorkloadIdentity
-    async def token(self):
+    async def token(self) -> str:
         async with self._lock:
             if self._token and time.monotonic() < self._until:
                 return self._token
@@ -192,21 +187,41 @@ class WorkloadIdentity:
             return token
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_workload_identity_uses_only_metadata_and_envelope_uses_fixed_api_origin
-# @matrix mcp-remote : service-identity token-separation
+class _ClientOptions(TypedDict, total=False):
+    """httpx client options that the envelope does not fix itself."""
+    auth: AuthTypes | None
+    params: QueryParamTypes | None
+    headers: HeaderTypes | None
+    cookies: CookieTypes | None
+    verify: ssl.SSLContext | str | bool
+    cert: CertTypes | None
+    http1: bool
+    http2: bool
+    proxy: ProxyTypes | None
+    mounts: Mapping[str, httpx.AsyncBaseTransport | None] | None
+    timeout: TimeoutTypes
+    limits: httpx.Limits
+    max_redirects: int
+    event_hooks: Mapping[str, list[EventHook]] | None
+    base_url: httpx.URL | str
+    transport: httpx.AsyncBaseTransport | None
+    default_encoding: str | Callable[[bytes], str]
+
+
 class EnvelopeClient(httpx.AsyncClient):
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::EnvelopeClient
-    def __init__(self, config, identity, **kwargs):
+    def __init__(
+        self, config: ConnectionConfig, identity: WorkloadIdentity, **kwargs: Unpack[_ClientOptions],
+    ) -> None:
         super().__init__(trust_env=False, follow_redirects=False, **kwargs)
         self.config = config
         self.identity = identity
-        self.workload_token = None
+        self.workload_token: str | None = None
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::EnvelopeClient
-    async def send(self, request, **kwargs):
+    async def send(
+        self, request: httpx.Request, *, stream: bool = False,
+        auth: AuthTypes | UseClientDefault | None = httpx.USE_CLIENT_DEFAULT,
+        follow_redirects: bool | UseClientDefault = httpx.USE_CLIENT_DEFAULT,
+    ) -> httpx.Response:
         validate_api_url(
             self.config.authority,
             str(request.url),
@@ -215,38 +230,29 @@ class EnvelopeClient(httpx.AsyncClient):
         self.workload_token = await self.identity.token()
         request.headers["Authorization"] = "Bearer " + self.workload_token
         request.headers[USER_TOKEN_HEADER] = self.config.api_key
-        return await super().send(request, **kwargs)
+        return await super().send(request, stream=stream, auth=auth, follow_redirects=follow_redirects)
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/server.py::create_app
 class RequestREST(RESTClient):
     """Reuse the actor preflight within this HTTP request only."""
 
-    actor_preflight = None
+    actor_preflight: JsonObject | None = None
     api_json_calls = 0
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::RequestREST
-    async def request_json(self, method, target, **kwargs):
+    async def request_json(
+        self, method: str, target: str, *, body: object = None,
+        max_bytes: int = MAX_STRUCTURED_RESULT_BYTES,
+    ) -> tuple[JsonValue, str | None]:
         if method == "GET" and target == "me" and self.actor_preflight is not None:
             return deepcopy(self.actor_preflight), None
         self.api_json_calls += 1
-        return await super().request_json(method, target, **kwargs)
+        return await super().request_json(method, target, body=body, max_bytes=max_bytes)
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_remote_catalog_and_calls_reuse_adapter_behavior_and_isolate_users
-# @tests tests_unit/test_033c_mcp_server.py::test_hosted_catalog_and_error_results_cannot_reflect_workload_identity
-# @tests tests_unit/test_033c_mcp_server.py::test_remote_attachment_uses_shared_upload_and_preserves_pending_failure
-# @matrix mcp-remote : catalog isolation parity privacy token-separation
-# @matrix mcp-upload : remote cleanup partial-failure upload-all finalize-once
 class HostedAdapter(LagniappeAdapter):
     _remote_initialized = False
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::HostedAdapter
-    async def initialize(self):
+    async def initialize(self) -> None:
         if self._remote_initialized:
             return
         await super().initialize()
@@ -262,7 +268,8 @@ class HostedAdapter(LagniappeAdapter):
             )
         local = self.tools.pop("upload_local_files")
         schema = deepcopy(local.input_schema)
-        schema["properties"]["files"]["items"] = {
+        file_properties = cast(dict[str, dict[str, object]], schema["properties"])
+        file_properties["files"]["items"] = {
             "type": "object",
             "required": ["download_url", "file_id"],
             "properties": {
@@ -284,38 +291,34 @@ class HostedAdapter(LagniappeAdapter):
         )
         self._remote_initialized = True
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/terminal_files.py::prepare_uploads
-    # @covered-by mcp/src/lagniappe_mcp/terminal_files.py::finalize_uploads
-    async def execute(self, name, arguments):
+    async def execute(self, name: str, arguments: object) -> AdapterResult:
         if name not in {"prepare_file_uploads", "finalize_file_uploads"}:
             return await super().execute(name, arguments)
         definition = self.tools[name]
         validate_value(definition.input_schema, arguments, phase="input")
-        operation = (
-            terminal_files.prepare_uploads
-            if name == "prepare_file_uploads"
-            else terminal_files.finalize_uploads
-        )
-        result = await operation(self, arguments)
         if name == "prepare_file_uploads":
+            result = await terminal_files.prepare_uploads(
+                self, cast(terminal_files.PrepareUploadArguments, arguments)
+            )
             terminal_files.validate_manifest(result.value, bearer=self.config.api_key)
         else:
+            result = await terminal_files.finalize_uploads(
+                self, cast(terminal_files.FinalizeUploadArguments, arguments)
+            )
             _reject_private_model_data(result.value, bearer=self.config.api_key)
         validate_value(definition.output_schema, result.value, phase="output")
         self._enforce_result_limits(result)
         return result
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::HostedAdapter
-    async def _upload_files(self, arguments):
+    async def _upload_files(self, arguments: dict[str, object]) -> AdapterResult:
         try:
             async with asyncio.timeout(UPLOAD_OPERATION_TIMEOUT_SECONDS):
-                contract = await self._load_contract(arguments["plan_id"], view="summary")
+                plan_id = cast(str, arguments["plan_id"])
+                contract = await self._load_contract(plan_id, view="summary")
                 _preflight_requested_count(contract, arguments["files"])
                 max_file, max_total = _preflight_contract(contract, ())
                 async with spool_attachments(
-                    arguments["files"],
+                    cast(list[dict[str, str]], arguments["files"]),
                     max_file_bytes=max_file,
                     max_total_bytes=max_total,
                 ) as files:
@@ -329,20 +332,14 @@ class HostedAdapter(LagniappeAdapter):
             ) from None
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_hosted_configuration_and_public_discovery_are_exact
-# @tests tests_unit/test_033c_mcp_server.py::test_remote_catalog_and_calls_reuse_adapter_behavior_and_isolate_users
-# @tests tests_unit/test_033c_mcp_server.py::test_http_authentication_preflights_every_request_and_reconnects_on_revocation
-# @tests tests_unit/test_033c_mcp_server.py::test_http_errors_are_private_and_mid_request_expiry_requests_reconnect
-# @tests tests_unit/test_033c_mcp_server.py::test_hosted_catalog_and_error_results_cannot_reflect_workload_identity
-# @matrix mcp-remote : discovery authentication isolation parity bounds privacy token-separation
-def create_app(config, *, adapter_factory=None):
+def create_app(
+    config: HostedConfig, *,
+    adapter_factory: Callable[[str], AbstractAsyncContextManager[HostedAdapter]] | None = None,
+) -> Starlette:
     identity = WorkloadIdentity(config.audience)
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
     @asynccontextmanager
-    async def request_adapter(token):
+    async def request_adapter(token: str) -> AsyncIterator[HostedAdapter]:
         connection = ConnectionConfig(normalize_site_url(config.issuer), api_key=token)
         async with EnvelopeClient(connection, identity) as client:
             rest = RequestREST(connection, client=client)
@@ -354,10 +351,11 @@ def create_app(config, *, adapter_factory=None):
 
     factory = adapter_factory or request_adapter
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
-    async def list_tools(ctx, _params):
-        adapter = ctx.request.state.mcp_adapter
+    async def list_tools(
+        ctx: ServerRequestContext[dict[str, object], Request], _params: PaginatedRequestParams | None,
+    ) -> ListToolsResult:
+        assert ctx.request is not None
+        adapter: HostedAdapter = ctx.request.state.mcp_adapter
         await adapter.initialize()
         tools = []
         for definition in adapter.tools.values():
@@ -369,10 +367,11 @@ def create_app(config, *, adapter_factory=None):
             tools.append(Tool(**values))
         return ListToolsResult(tools=tools, result_type="complete")
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
-    async def call_tool(ctx, params):
-        adapter = ctx.request.state.mcp_adapter
+    async def call_tool(
+        ctx: ServerRequestContext[dict[str, object], Request], params: CallToolRequestParams,
+    ) -> CallToolResult:
+        assert ctx.request is not None
+        adapter: HostedAdapter = ctx.request.state.mcp_adapter
         try:
             await adapter.initialize()
             definition = adapter.tools.get(params.name)
@@ -450,7 +449,7 @@ def create_app(config, *, adapter_factory=None):
                 )
             )
 
-    server = Server(
+    server = Server[dict[str, object]](
         "lagniappe",
         version=__version__,
         title="Lagniappe",
@@ -460,9 +459,9 @@ def create_app(config, *, adapter_factory=None):
     )
     server.middleware.clear()
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
-    async def chatgpt_metadata(ctx, call_next):
+    async def chatgpt_metadata(
+        ctx: ServerRequestContext[dict[str, object], Request], call_next: CallNext,
+    ) -> HandlerResult:
         # SDK 2.1.1's version serializer strips unknown Tool fields. Its public
         # middleware runs after that serializer, so mirror the standard _meta
         # declaration here for ChatGPT clients that inspect the top-level field.
@@ -470,6 +469,7 @@ def create_app(config, *, adapter_factory=None):
             result = await call_next(ctx)
         except AdapterError as error:
             if error.status == 401:
+                assert ctx.request is not None
                 ctx.request.state.mcp_auth_failed = True
                 raise MCPError(
                     code=-32001, message="Reconnect Lagniappe to continue."
@@ -494,7 +494,7 @@ def create_app(config, *, adapter_factory=None):
                 code=INTERNAL_ERROR,
                 message="The remote adapter could not complete this request.",
             ) from None
-        if ctx.method == "tools/list":
+        if ctx.method == "tools/list" and isinstance(result, dict):
             for tool in result["tools"]:
                 tool["securitySchemes"] = deepcopy(_SCHEMES)
         return result
@@ -507,13 +507,16 @@ def create_app(config, *, adapter_factory=None):
         security_settings=TransportSecuritySettings(
             enable_dns_rebinding_protection=True,
             allowed_hosts=[urlsplit(config.origin).netloc],
-            allowed_origins=[config.origin, "https://chatgpt.com"],
+            allowed_origins=[
+                config.origin,
+                "https://chatgpt.com",
+                "https://claude.ai",
+                "https://claude.com",
+            ],
         ),
     )
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
-    async def metadata(_request):
+    async def metadata(_request: Request) -> JSONResponse:
         return JSONResponse(
             {
                 "resource": config.resource,
@@ -523,24 +526,16 @@ def create_app(config, *, adapter_factory=None):
             }
         )
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
-    async def health(_request):
+    async def health(_request: Request) -> JSONResponse:
         return JSONResponse({"status": "ok"})
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
     @asynccontextmanager
-    async def lifespan(_app):
+    async def lifespan(_app: Starlette) -> AsyncIterator[None]:
         async with manager.run():
             yield
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
     class ProtectedMCP:
-        # @testable false
-        # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
-        async def __call__(self, scope, receive, send):
+        async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
             started, correlation = time.monotonic(), uuid.uuid4().hex
             request = Request(scope, receive)
             authorization = request.headers.get("authorization", "").split(" ")
@@ -552,9 +547,7 @@ def create_app(config, *, adapter_factory=None):
             headers = {"Cache-Control": "no-store", "X-Request-ID": correlation}
             status, method, adapter = 500, "other", None
 
-            # @testable false
-            # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
-            async def annotate(message):
+            async def annotate(message: Message) -> None:
                 nonlocal status
                 if message["type"] == "http.response.start":
                     message["headers"] = list(message.get("headers", [])) + [
@@ -587,7 +580,7 @@ def create_app(config, *, adapter_factory=None):
                     # Even initialize, ping, GET, and notifications validate the
                     # live grant at the main API before the SDK can process them.
                     actor = await adapter._get_actor()
-                    adapter.rest.actor_preflight = actor.value
+                    cast(RequestREST, adapter.rest).actor_preflight = actor.value
                     scope.setdefault("state", {})["mcp_adapter"] = adapter
                     if request.method != "POST":
                         # This service sends complete JSON responses and has no
@@ -647,9 +640,7 @@ def create_app(config, *, adapter_factory=None):
                         sent = False
                         original_receive = receive
 
-                        # @testable false
-                        # @covered-by mcp/src/lagniappe_mcp/server.py::create_app
-                        async def replay():
+                        async def replay() -> Message:
                             nonlocal sent
                             if not sent:
                                 sent = True
@@ -709,17 +700,14 @@ def create_app(config, *, adapter_factory=None):
     )
 
 
-# @testable infrastructure
-def main():
+def main() -> None:
     import uvicorn
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     for name in ("httpx", "httpcore", "httpx2", "httpcore2", "mcp", "mcp.server"):
         logging.getLogger(name).setLevel(logging.CRITICAL)
     if os.environ.get("LAGNIAPPE_MCP_ENABLED", "false") != "true":
-        # @testable false
-        # @covered-by mcp/src/lagniappe_mcp/server.py::main
-        async def unavailable(_request):
+        async def unavailable(_request: Request) -> JSONResponse:
             return JSONResponse({"status": "unavailable"}, 503)
 
         app = Starlette(

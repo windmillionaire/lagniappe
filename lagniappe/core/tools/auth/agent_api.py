@@ -1,6 +1,11 @@
 """Shown-once bearer credentials for the external agent API."""
 
-from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
+from datetime import datetime, timedelta, UTC
 import base64
 import hashlib
 import hmac
@@ -24,27 +29,18 @@ class AgentAPICredentialError(ValueError):
     """Raised when a bearer credential is absent, invalid, revoked, or expired."""
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/agent_api.py::authenticate_credential
-# @reason timestamp normalization is exercised through credential expiry checks
-def _utc(value=None):
-    value = value or datetime.now(timezone.utc)
+def _utc(value: datetime | None = None) -> datetime:
+    value = value or datetime.now(UTC)
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/agent_api.py::credential_id
-# @reason encoding helper is owned by opaque credential id construction
 def _urlsafe(value):
     return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/agent_api.py::issue_credential
-# @reason opaque id construction is exercised through issuance and authentication
-def credential_id(user):
+def credential_id(user: User) -> str:
     """Return a stable opaque lookup id without exposing the user's entity key."""
     digest = hmac.new(
         str(CONFIG.SECRET_KEY).encode("utf-8"),
@@ -54,16 +50,10 @@ def credential_id(user):
     return _urlsafe(digest[:18])
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/agent_api.py::authenticate_credential
-# @reason digest comparison is exercised through tamper rejection
 def _token_digest(token):
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/agent_api.py::issue_credential
-# @reason safe projection is asserted through issuance and status responses
 def _public_metadata(row, *, now=None):
     now = _utc(now)
     expires_at = row.get("expires_at") if row else None
@@ -89,10 +79,7 @@ def _public_metadata(row, *, now=None):
     }
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_issue_authenticate_expire_and_revoke_credential
-# @matrix agent-api : authentication expiry issue shown-once
-def issue_credential(user, *, now=None):
+def issue_credential(user: User, *, now: datetime | None = None) -> tuple[str, dict[str, object]]:
     """Rotate the user's credential and return the secret exactly once."""
     if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED:
         raise AgentAPICredentialError("External AI access is disabled.")
@@ -100,6 +87,8 @@ def issue_credential(user, *, now=None):
     identifier = credential_id(user)
     secret = secrets.token_urlsafe(32)
     token = f"{TOKEN_PREFIX}{identifier}.{secret}"
+    if user.key is None:
+        raise AgentAPICredentialError("External AI access requires a saved user.")
     row = credential_store.rotate_credential(
         identifier,
         user.key,
@@ -111,10 +100,9 @@ def issue_credential(user, *, now=None):
     return token, _public_metadata(row, now=now)
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_issue_authenticate_expire_and_revoke_credential
-# @matrix agent-api : authentication expiry revoke
-def revoke_credential(user, *, now=None):
+def revoke_credential(user: User, *, now: datetime | None = None) -> dict[str, object]:
+    if user.key is None:
+        raise AgentAPICredentialError("External AI access requires a saved user.")
     row = credential_store.revoke_credential(
         credential_id(user),
         user.key,
@@ -123,21 +111,14 @@ def revoke_credential(user, *, now=None):
     return _public_metadata(row, now=now)
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_issue_authenticate_expire_and_revoke_credential
-# @matrix agent-api : authentication expiry
-def credential_status(user, *, now=None):
+def credential_status(user: User, *, now: datetime | None = None) -> dict[str, object]:
     row = credential_store.get_credential(credential_id(user))
     if row is not None and row.get("user") != user.key:
         row = None
     return _public_metadata(row, now=now)
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_issue_authenticate_expire_and_revoke_credential
-# @tests tests_unit/test_032_agent_api.py::test_authenticate_rejects_tampered_and_mismatched_credentials
-# @matrix agent-api : authentication expiry revoke tamper user-binding
-def authenticate_credential(token, *, now=None):
+def authenticate_credential(token: str, *, now: datetime | None = None) -> tuple[User, dict[str, object]]:
     """Return the current User for a valid external-agent bearer token."""
     if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED:
         raise AgentAPICredentialError("External AI access is disabled.")

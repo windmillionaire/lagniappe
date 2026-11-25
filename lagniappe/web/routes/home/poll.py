@@ -1,7 +1,14 @@
 """Versioned adaptive polling for mounted browser state."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.tools.cache.notification_state import NotificationState
+
 from flask import g, request
-from flask_login import current_user
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason
@@ -10,8 +17,8 @@ from lagniappe.core.tools import cache
 from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.deferred_jobs.locks import deferred_job_lock_descriptors
 from lagniappe.core.tools.polling.contract import (
-    POLL_TYPES,
     PollContractError,
+    PollRequest,
     parse_poll_request,
 )
 from lagniappe.core.tools.polling.projections import (
@@ -22,9 +29,13 @@ from lagniappe.core.tools.polling.projections import (
     operation_statuses as _operation_statuses,
 )
 from lagniappe.web import responses
-from lagniappe.web.auth import logged_in
+from lagniappe.web.auth import authenticated_user, logged_in
 
 from . import internal
+
+
+class _NotificationRevisionOptions(TypedDict, total=False):
+    notification_state: NotificationState | None
 
 
 POLL_AFTER_MS = {
@@ -37,10 +48,6 @@ POLL_AFTER_MS = {
 }
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001j_poll_batching.py::test_poll_batches_auth_entities_and_channels
-# @tests tests_e2e/001_site/test_001j_poll_batching.py::test_poll_batching_preserves_validation_and_stale_session_recovery
-# @matrix polling auth : batching session-preload fallback validation
 def _poll_context():
     """Share only validated, bounded polling roots with the fresh auth lookup."""
     try:
@@ -58,14 +65,11 @@ def _poll_context():
         "context_keys": tuple(set(database_utility.site_fingerprint_keys(paths).values())),
         "context_entity_keys": tuple(dict.fromkeys(
             descriptor["key"] for descriptor in descriptors
-            if descriptor["type"] in {"entity", "form-lock", "document", "ingress"}
+            if descriptor["type"] != "channel" and descriptor["type"] != "operation"
         )),
     }
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/poll.py::poll
-# @reason common result envelope is exercised through polling route coverage
 def _result(
     descriptor,
     status,
@@ -91,9 +95,6 @@ def _result(
     return result
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/poll.py::poll
-# @reason per-type changed/unchanged projection is exercised through route coverage
 def _revision_result(descriptor, revision, payload=None):
     changed = descriptor["revision"] != revision
     return _result(
@@ -104,14 +105,11 @@ def _revision_result(descriptor, revision, payload=None):
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/poll.py::poll
-# @reason entity permission projection is exercised through route coverage
 def _entity_result(descriptor, entity, *, ingress=False):
-    if not entity or not entity.allowed(Action.VIEW, user=current_user):
+    if not entity or not entity.allowed(Action.VIEW, user=authenticated_user()):
         return _result(descriptor, "unavailable")
     revision = (
-        filter_revision(entity, current_user)
+        filter_revision(entity, authenticated_user())
         if isinstance(entity, Entities.FILTER) else entity.fingerprint
     )
     payload = (
@@ -125,12 +123,8 @@ def _entity_result(descriptor, entity, *, ingress=False):
     return _revision_result(descriptor, revision, payload)
 
 
-# @testable true
-# @tests tests_e2e/010_sync/test_010d_document_poll.py::test_document_poll_loads_storage_only_on_cache_miss
-# @tests tests_e2e/010_sync/test_010d_document_poll.py::test_document_poll_rejects_unavailable_documents_before_loading_state
-# @matrix polling : authorization document read-path unavailable
 def _document_result(descriptor, entity, client_id):
-    if not entity or not entity.allowed(Action.VIEW, user=current_user):
+    if not entity or not entity.allowed(Action.VIEW, user=authenticated_user()):
         return _result(descriptor, "unavailable")
     document = entity.sync_ids.get("document")
     document_id = document.get("id") if isinstance(document, dict) else None
@@ -140,7 +134,7 @@ def _document_result(descriptor, entity, client_id):
         descriptor["sync_id"],
         seed=lambda: entity.state(descriptor["sync_id"]),
         client_id=client_id,
-        user=current_user.details,
+        user=authenticated_user().details,
         generation=descriptor["generation"],
         revision=descriptor["revision"],
         presence_digest=descriptor["presence_digest"],
@@ -158,25 +152,14 @@ def _document_result(descriptor, entity, client_id):
     )
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001f_edited_entities.py::test_poll_endpoint_batches_entity_changes
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
-# @tests tests_e2e/001_site/test_001f_edited_entities.py::test_cold_notification_state_seeds_through_one_poll
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
-# @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_presence_appears_and_clears
-# @matrix notifications : cold-seed ping redis-projection
-# @matrix polling : authorization batching channel entity fingerprint identifiers operation owner permissions personal-state piggyback progress protocol revision timing unavailable validation
-# @matrix permissions : batching authorization
-# @pairs notifications:deferred sync:presence web-headers:notification-state
 @internal.route("/poll", methods=["POST"])
 @logged_in(context=_poll_context)
-def poll():
+def poll() -> ResponseReturnValue:
     """Resolve every due browser subscription through one typed contract."""
     try:
-        parsed = g.get("poll_request") or parse_poll_request(request.get_json(silent=True))
+        parsed = g.get("poll_request")
+        if not isinstance(parsed, PollRequest):
+            parsed = parse_poll_request(request.get_json(silent=True))
     except PollContractError as error:
         return responses.json_response(
             {
@@ -194,20 +177,11 @@ def poll():
     if closed_documents:
         cache.close_presence(client_id, closed_documents)
 
-    grouped = {
-        subscription_type: [
-            descriptor
-            for descriptor in descriptors
-            if descriptor["type"] == subscription_type
-        ]
-        for subscription_type in POLL_TYPES
-    }
-
     entity_keys = [
-        descriptor["key"]
-        for subscription_type in ("entity", "form-lock", "document", "ingress")
-        for descriptor in grouped[subscription_type]
+        descriptor["key"] for descriptor in descriptors
+        if descriptor["type"] != "channel" and descriptor["type"] != "operation"
     ]
+    operations = [descriptor for descriptor in descriptors if descriptor["type"] == "operation"]
     prefetched = g.get("request_context_entities")
     entities = (
         {key: prefetched[key] for key in entity_keys if key in prefetched}
@@ -224,13 +198,13 @@ def poll():
         request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
     )
     lock_entities = [
-        entities.get(descriptor["key"]) for descriptor in grouped["form-lock"]
+        entities.get(descriptor["key"]) for descriptor in descriptors if descriptor["type"] == "form-lock"
     ]
     lock_entities = [
         entity
         for entity in lock_entities
         if entity
-        and entity.allowed(Action.EDIT, user=current_user)
+        and entity.allowed(Action.EDIT, user=authenticated_user())
         and isinstance(entity, (Entities.PAGE, Entities.TASK))
     ]
     active_locks = deferred_job_lock_descriptors(lock_entities) if lock_entities else {}
@@ -238,11 +212,11 @@ def poll():
     notification_polled = notification_request is not None
     notification_state = None
     prefetched_operation_states = None
-    if grouped["operation"] and notification_polled:
+    if operations and notification_polled:
         try:
             notification_state, prefetched_operation_states = cache.peek_poll_states(
-                current_user,
-                [descriptor["key"] for descriptor in grouped["operation"]],
+                authenticated_user(),
+                [descriptor["key"] for descriptor in operations],
             )
         except Exception as error:
             prefetched_operation_states = {}
@@ -250,8 +224,8 @@ def poll():
 
     operation_statuses, unchanged_operations = (
         _operation_statuses(
-            grouped["operation"],
-            current_user,
+            operations,
+            authenticated_user(),
             state_loader=(
                 (
                     lambda keys: {
@@ -262,16 +236,16 @@ def poll():
                 else cache.peek_operation_states
             ),
         )
-        if grouped["operation"]
+        if operations
         else ({}, set())
     )
 
     if notification_polled:
         try:
             if prefetched_operation_states is None:
-                notification_state = cache.peek_notification_state(current_user)
-            if notification_state is None and notification_request["seed"]:
-                notification_state = cache.seed_notification_state(current_user)
+                notification_state = cache.peek_notification_state(authenticated_user())
+            if notification_state is None and notification_request and notification_request["seed"]:
+                notification_state = cache.seed_notification_state(authenticated_user())
             responses.publish_notification_state(notification_state)
         except Exception as error:
             exceptions.capture(
@@ -279,46 +253,48 @@ def poll():
                 context={"operation": "poll_notification_state"},
             )
 
-    channels = [descriptor["channel"] for descriptor in grouped["channel"]]
+    channels = [descriptor["channel"] for descriptor in descriptors if descriptor["type"] == "channel"]
+    revision_options: _NotificationRevisionOptions = {}
+    if notification_polled:
+        revision_options["notification_state"] = notification_state
     channel_revisions = _channel_revisions(
         channels,
-        current_user,
+        authenticated_user(),
         fingerprint_loader=lambda paths: database_utility.site_fingerprints(
             paths, records=g.get("request_context_records"),
         ),
-        **({"notification_state": notification_state} if notification_polled else {}),
+        **revision_options,
     )
 
     results = []
     for descriptor in descriptors:
         try:
-            subscription_type = descriptor["type"]
-            if subscription_type == "entity":
+            if descriptor["type"] == "entity":
                 result = _entity_result(
                     descriptor,
                     entities.get(descriptor["key"]),
                 )
-            elif subscription_type == "ingress":
+            elif descriptor["type"] == "ingress":
                 result = _entity_result(
                     descriptor,
                     entities.get(descriptor["key"]),
                     ingress=True,
                 )
-            elif subscription_type == "form-lock":
+            elif descriptor["type"] == "form-lock":
                 result = _project_lock_result(
                     descriptor,
                     entities.get(descriptor["key"]),
                     active_locks,
-                    user=current_user,
+                    user=authenticated_user(),
                 )
-            elif subscription_type == "channel":
+            elif descriptor["type"] == "channel":
                 revision = channel_revisions[descriptor["channel"]]
                 result = _revision_result(
                     descriptor,
                     revision,
                     {"refresh": True},
                 )
-            elif subscription_type == "operation":
+            elif descriptor["type"] == "operation":
                 if descriptor["key"] in unchanged_operations:
                     result = _result(
                         descriptor,

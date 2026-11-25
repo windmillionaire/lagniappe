@@ -1,6 +1,6 @@
 """Unit contracts for runtime-safe site administration services."""
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from types import SimpleNamespace
 
 from google.cloud.datastore import Entity as DatastoreEntity, Key
@@ -40,7 +40,6 @@ def _public_page(document, *, assets=None, settings=None, **values):
     return page
 
 
-# @matrix public-pages : config-fallback live-settings
 def test_public_page_runtime_settings_prefer_live_datastore_and_fail_closed(
     monkeypatch,
 ):
@@ -61,7 +60,6 @@ def test_public_page_runtime_settings_prefer_live_datastore_and_fail_closed(
     assert public_pages.runtime_settings(config=config)["PUBLIC_PAGE_INDEXING"] is False
 
 
-# @matrix public-pages : document-image privacy preview
 def test_public_document_images_only_include_embedded_page_assets():
     first = SimpleNamespace(
         url="/assets/page/image_first.png",
@@ -88,7 +86,6 @@ def test_public_document_images_only_include_embedded_page_assets():
     ]
 
 
-# @matrix public-pages : document-image public-rendering
 def test_public_document_rewrites_only_embedded_page_images():
     asset = SimpleNamespace(
         url="/assets/page/image_first.png",
@@ -122,7 +119,6 @@ def test_public_document_rewrites_only_embedded_page_images():
     assert "<img" not in forged
 
 
-# @matrix public-pages : metadata privacy social-preview
 def test_public_metadata_uses_safe_fallbacks_and_selected_document_image(monkeypatch):
     asset = SimpleNamespace(
         url="/assets/page/image_first.png",
@@ -158,8 +154,6 @@ def test_public_metadata_uses_safe_fallbacks_and_selected_document_image(monkeyp
     assert result["robots"] == "index, follow"
 
 
-# @matrix manual : canonical-url metadata search-discovery
-# @matrix manual sitemap : canonical-url public-url
 def test_public_manual_metadata_and_urls_are_canonical(monkeypatch):
     monkeypatch.setattr(
         public_pages,
@@ -201,8 +195,6 @@ def test_public_manual_metadata_and_urls_are_canonical(monkeypatch):
     assert not any("/manual/section/" in url for url in urls)
 
 
-# @matrix public-pages robots : disabled enabled public-assets
-# @matrix manual robots : disabled enabled fragment
 def test_robots_text_allows_public_surface_and_advertises_enabled_sitemap():
     disabled = public_pages.robots_text(
         False,
@@ -230,7 +222,6 @@ def test_robots_text_allows_public_surface_and_advertises_enabled_sitemap():
     assert "Allow: /manual/" not in private_manual
 
 
-# @matrix public-pages sitemap : dedupe limit sorted xml
 def test_sitemap_xml_is_sorted_deduped_and_fails_closed_at_limit(monkeypatch):
     xml = public_pages.sitemap_xml(
         ["https://site.test/z", "https://site.test/a", "https://site.test/z"]
@@ -243,7 +234,6 @@ def test_sitemap_xml_is_sorted_deduped_and_fails_closed_at_limit(monkeypatch):
         public_pages.sitemap_xml(["https://site.test/a", "https://site.test/b"])
 
 
-# @matrix public-pages public-directory : active category description opt-out public-url sorting
 def test_public_directory_snapshot_groups_safe_metadata_and_avoids_documents(
     monkeypatch,
 ):
@@ -326,7 +316,51 @@ def test_public_directory_snapshot_groups_safe_metadata_and_avoids_documents(
     assert [request.depth for request in fetch_requests] == [FetchDepth.DIRECT]
 
 
-# @matrix public-pages public-directory : disabled query-avoidance
+def test_public_directory_snapshot_orders_pinned_pages_and_groups_first(monkeypatch):
+    alpha = SimpleNamespace(urlsafe_key="alpha-key", name="Alpha")
+    pages = [
+        _public_page(
+            "",
+            name="Aardvark Guide",
+            settings={"directory_category": "alpha-key"},
+            categories=[alpha],
+            db={"public_id": "alpha-plain"},
+        ),
+        _public_page(
+            "",
+            name="Why Lagniappe?",
+            settings={"directory_order": 1},
+            db={"public_id": "welcome"},
+        ),
+        _public_page(
+            "",
+            name="Approach to AI",
+            settings={"directory_order": 2},
+            db={"public_id": "ai"},
+        ),
+        _public_page(
+            "",
+            name="About",
+            settings={},
+            db={"public_id": "about"},
+        ),
+    ]
+    monkeypatch.setattr(public_pages.database_get, "discoverable_page_rows", lambda: ["row"])
+    monkeypatch.setattr(public_pages.Entities, "fetch", lambda *_rows, request: pages)
+    monkeypatch.setattr(public_pages, "runtime_settings", lambda: {"PUBLIC_PAGE_INDEXING": True})
+
+    snapshot = public_pages.public_directory_snapshot()
+
+    assert [group["name"] for group in snapshot["groups"]] == ["Public Pages", "Alpha"]
+    assert [page["title"] for page in snapshot["groups"][0]["pages"]] == [
+        "Why Lagniappe?",
+        "Approach to AI",
+        "About",
+    ]
+    assert snapshot["groups"][0]["pages"][0]["order"] == 1
+    assert "order" not in snapshot["groups"][0]["pages"][2]
+
+
 def test_public_directory_snapshot_skips_page_query_when_discovery_is_off(
     monkeypatch,
 ):
@@ -348,7 +382,6 @@ def test_public_directory_snapshot_skips_page_query_when_discovery_is_off(
     }
 
 
-# @matrix public-pages sitemap public-directory : shared-catalog public-url
 def test_discoverable_page_urls_use_cached_directory_snapshot(monkeypatch):
     monkeypatch.setattr(
         public_pages,
@@ -373,7 +406,6 @@ def test_discoverable_page_urls_use_cached_directory_snapshot(monkeypatch):
     ]
 
 
-# @matrix manual public-directory : authored-order public-url
 def test_manual_directory_group_preserves_authored_section_order():
     group = public_pages.manual_directory_group()
 
@@ -385,7 +417,6 @@ def test_manual_directory_group_preserves_authored_section_order():
     assert all(page["description"] is None for page in group["pages"])
 
 
-# @matrix admin : config deployment-settings metadata
 def test_deployment_settings_merge_live_values_over_runtime_defaults(monkeypatch):
     config = SimpleNamespace(
         **{key: value for key, value in site_admin.DEFAULT_DEPLOYMENT_SETTINGS.items()}
@@ -410,7 +441,6 @@ def test_deployment_settings_merge_live_values_over_runtime_defaults(monkeypatch
     assert normalization == [{"enforce_worker_limit": False}]
 
 
-# @matrix admin : ai-settings config metadata
 def test_ai_settings_payload_normalizes_runtime_settings_against_discovery(monkeypatch):
     config = SimpleNamespace(
         GOOGLE_CLOUD_PROJECT="demo-project",
@@ -440,7 +470,6 @@ def test_ai_settings_payload_normalizes_runtime_settings_against_discovery(monke
     assert discovered[0]["current_settings"] is settings
 
 
-# @matrix admin : audit site-update
 def test_site_updates_return_the_migration_report(monkeypatch):
     report = {"status": "current", "counts": {"complete": 2}}
     monkeypatch.setattr(
@@ -452,7 +481,6 @@ def test_site_updates_return_the_migration_report(monkeypatch):
     assert site_admin.run_site_updates() is report
 
 
-# @matrix cache : migration-gate pending
 def test_cache_rebuild_is_blocked_until_migrations_are_current(monkeypatch):
     report = {"status": "pending", "cache_refresh_allowed": False}
     monkeypatch.setattr(
@@ -472,8 +500,6 @@ def test_cache_rebuild_is_blocked_until_migrations_are_current(monkeypatch):
     assert result.migration_status is report
 
 
-# @source lagniappe/core/tools/site/cache_rebuild.py::rebuild_application_cache
-# @matrix cache : batching validation
 @pytest.mark.parametrize("chunk_size", [0, -1])
 def test_cache_rebuild_rejects_invalid_size_before_clearing(monkeypatch, chunk_size):
     monkeypatch.setattr(
@@ -497,7 +523,6 @@ def test_cache_rebuild_rejects_invalid_size_before_clearing(monkeypatch, chunk_s
         cache_rebuild.rebuild_application_cache(chunk_size=chunk_size)
 
 
-# @matrix cache : batching current migration-gate
 def test_cache_rebuild_rehydrates_entities_in_bounded_chunks(monkeypatch):
     report = {"status": "current", "cache_refresh_allowed": True}
     deleted = []
@@ -546,7 +571,7 @@ def test_cache_rebuild_rehydrates_entities_in_bounded_chunks(monkeypatch):
 
 
 def _stored_entity(entity_class, key, **values):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     entity = entity_class(testing=True)
     entity._key = key
     entity._db = {
@@ -575,7 +600,6 @@ def _cache_rows(monkeypatch, rows, stored):
                         lambda keys: [stored[key] for key in keys if key in stored])
 
 
-# @matrix cache : failure-isolation actionable-links
 @pytest.mark.parametrize("missing_type", [False, True])
 def test_cache_rebuild_reports_bad_records_and_continues(monkeypatch, missing_type):
     project = "cache-rebuild-unit-test"
@@ -611,7 +635,6 @@ def test_cache_rebuild_reports_bad_records_and_continues(monkeypatch, missing_ty
     assert len(captured) == 1
 
 
-# @matrix cache : failure-isolation actionable-links
 @pytest.mark.parametrize("wrapped", [False, True])
 def test_cache_rebuild_does_not_hide_provider_failures(monkeypatch, wrapped):
     _cache_rows(monkeypatch, ["one"], {})
@@ -628,8 +651,6 @@ def test_cache_rebuild_does_not_hide_provider_failures(monkeypatch, wrapped):
         cache_rebuild.rebuild_application_cache()
 
 
-# @matrix permissions relations : deleted-form recalculation
-# @matrix cache : nested-relations
 def test_cache_rebuild_recalculates_restrictions_after_form_deletion(monkeypatch):
     project = "cache-rebuild-unit-test"
     form_key = Key("form", "deleted", project=project)
@@ -657,8 +678,6 @@ def test_cache_rebuild_recalculates_restrictions_after_form_deletion(monkeypatch
     assert "restricted_to_page_form" not in cached[page.key]
 
 
-# @matrix permissions relations : unloaded-relation
-# @source lagniappe/core/tools/auth/restrictions.py::permission_relation
 def test_unloaded_optional_form_is_not_mistaken_for_a_deleted_form(monkeypatch):
     from lagniappe.core.mixins import related
     page = _stored_entity(Page, Key("page", "unloaded", project="cache-rebuild-unit-test"),
@@ -672,7 +691,6 @@ def test_unloaded_optional_form_is_not_mistaken_for_a_deleted_form(monkeypatch):
         _ = page.restricted_to
 
 
-# @matrix cache : batching current nested-relations
 def test_cache_rebuild_materializes_nested_relations_across_batch_boundaries(
     monkeypatch,
 ):
@@ -739,7 +757,6 @@ def test_cache_rebuild_materializes_nested_relations_across_batch_boundaries(
     assert projections[page_key]["requires"] == "users,grouped-viewers"
 
 
-# @matrix admin : live-settings recovery-export
 def test_recovery_snapshot_merges_live_settings(monkeypatch):
     persisted = {"SECRET_KEY": "application-secret"}
     monkeypatch.setattr(
@@ -777,7 +794,6 @@ def test_recovery_snapshot_merges_live_settings(monkeypatch):
     assert snapshot["PUBLIC_PAGE_INDEXING"] is True
 
 
-# @matrix admin : failure-isolation recovery-export
 def test_recovery_snapshot_failures_use_safe_public_messages(monkeypatch):
     monkeypatch.setattr(
         recovery.site_database,

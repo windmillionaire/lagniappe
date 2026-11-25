@@ -4,7 +4,7 @@ Tests for project info tab functionality.
 Tests project info editing.
 Verified against:
 - lagniappe/web/templates/projects/info.html
-- src/script/widgets/projectInfo.mjs (ProjectInfo)
+- src/script/widgets/projectInfo.ts (ProjectInfo)
 - lagniappe/web/routes/projects/main.py
 """
 
@@ -34,7 +34,6 @@ def _wait_for_services_ready(user):
     )
 
 
-# @matrix projects : info-form metadata-sync update
 # @template projects/project.html::view_header
 # @template projects/info.html::info_tab
 # @style entity.description
@@ -91,7 +90,6 @@ def test_project_info_form(get_admin, get_user):
     assert description.text_content() == new_description
 
 
-# @matrix edited-entity-notice projects : info-form replacement side-effect-free timestamp-only
 # @template projects/info.html::info_form
 def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revision(
     get_admin,
@@ -121,10 +119,9 @@ def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revisio
         path="/l/poll",
         count=0,
         max_count=1,
-    ):
-        with browser_failures.expect_offline(owner):
-            owner.offline = True
-            expect(owner.locate("[data-role='offline']")).to_be_visible()
+    ), browser_failures.expect_offline(owner):
+        owner.offline = True
+        expect(owner.locate("[data-role='offline']")).to_be_visible()
 
     timestamp_only = Entities.fetch_one(project.key, request=Fetch.direct())
     timestamp_only.properties.modified.update()
@@ -134,14 +131,13 @@ def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revisio
     with expect_poll_result(
         owner.page,
         subscription_id=f"view:entity:{project.key}",
+    ), expect_successful_response(
+        owner.page,
+        method="GET",
+        path=f"/projects/{project.key}/info/replace",
+        entity_key=project.key,
     ):
-        with expect_successful_response(
-            owner.page,
-            method="GET",
-            path=f"/projects/{project.key}/info/replace",
-            entity_key=project.key,
-        ):
-            owner.offline = False
+        owner.offline = False
 
     expect(owner.locate("[data-role='offline']")).to_be_hidden()
     refreshed_form = project.info_form
@@ -155,8 +151,6 @@ def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revisio
     assert after_probe.modified == modified_before_probe
 
 
-# @matrix edited-entity-notice : dirty-state no-reload replacement staged-reset
-# @matrix projects : dirty-state info-form no-reload replacement staged-reset
 # @template projects/info.html::info_form
 def test_project_revision_notice_only_resets_changed_form(
     get_admin, get_user,
@@ -189,10 +183,9 @@ def test_project_revision_notice_only_resets_changed_form(
         path="/l/poll",
         count=0,
         max_count=1,
-    ):
-        with browser_failures.expect_offline(owner):
-            owner.offline = True
-            expect(owner.locate("[data-role='offline']")).to_be_visible()
+    ), browser_failures.expect_offline(owner):
+        owner.offline = True
+        expect(owner.locate("[data-role='offline']")).to_be_visible()
 
     remote_name = f"Remote revision {uuid4().hex[:8]}"
     collaborator.go(project)
@@ -215,14 +208,13 @@ def test_project_revision_notice_only_resets_changed_form(
     with expect_poll_result(
         owner.page,
         subscription_id=f"view:entity:{project.key}",
+    ), expect_successful_response(
+        owner.page,
+        method="GET",
+        path=f"/projects/{project.key}/info/replace",
+        entity_key=project.key,
     ):
-        with expect_successful_response(
-            owner.page,
-            method="GET",
-            path=f"/projects/{project.key}/info/replace",
-            entity_key=project.key,
-        ):
-            owner.offline = False
+        owner.offline = False
 
     expect(owner.locate("[data-role='offline']")).to_be_hidden()
 

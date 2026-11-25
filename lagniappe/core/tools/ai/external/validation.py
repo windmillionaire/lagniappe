@@ -1,5 +1,12 @@
 """External API validation."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..reporting.contracts.actions import ReportProposal
+    from ....entities.ai_report import AIReport
+    from ....entities.user import User
+
 import json
 from copy import deepcopy
 
@@ -28,10 +35,7 @@ from .definitions import (
 )
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_submission_validation_collects_independent_field_errors
-# @matrix agent-api : envelope schema field-path bounded-validation
-def submission_validation_errors(data, report, user):
+def submission_validation_errors(data: object, report: AIReport, user: User) -> list[dict[str, object]]:
     """Collect safe independent envelope/schema errors before semantic validation."""
     errors = []
     if not isinstance(data, dict):
@@ -81,6 +85,47 @@ def submission_validation_errors(data, report, user):
                     "code": "invalid_brief",
                     "path": f"$.{field}",
                     "message": f"{field} must be non-empty text within its {maximum} limit.",
+                }
+            )
+
+    for field in ("require_review", "execute"):
+        if field in data and not isinstance(data[field], bool):
+            errors.append(
+                {
+                    "code": "type",
+                    "path": f"$.{field}",
+                    "message": f"{field} must be a boolean.",
+                    "expected": "boolean",
+                }
+            )
+    if "operation_id" in data:
+        from ..auto_execute import OPERATION_ID_PATTERN
+
+        op_id = data["operation_id"]
+        if not isinstance(op_id, str) or not OPERATION_ID_PATTERN.fullmatch(op_id):
+            errors.append(
+                {
+                    "code": "invalid_operation_id",
+                    "path": "$.operation_id",
+                    "message": "operation_id must be 1–128 ASCII letters, digits, dots, underscores, or hyphens.",
+                }
+            )
+    if data.get("execute") is True:
+        if "operation_id" not in data:
+            errors.append(
+                {
+                    "code": "required",
+                    "path": "$.operation_id",
+                    "message": "operation_id is required when execute is true.",
+                    "expected": "string",
+                }
+            )
+        if data.get("require_review") is True:
+            errors.append(
+                {
+                    "code": "invalid_execution",
+                    "path": "$.execute",
+                    "message": "execute cannot be true when require_review is true.",
                 }
             )
 
@@ -137,22 +182,22 @@ def submission_validation_errors(data, report, user):
             }
         )
     confidence = proposal.get("confidence")
-    if isinstance(confidence, (int, float)) and not isinstance(confidence, bool):
-        if not 0 <= confidence <= 1:
-            errors.append(
-                {
-                    "code": "range",
-                    "path": "$.proposal.confidence",
-                    "message": "confidence must be from 0 to 1.",
-                    "expected": {"minimum": 0, "maximum": 1},
-                }
-            )
+    if (
+        isinstance(confidence, (int, float))
+        and not isinstance(confidence, bool)
+        and not 0 <= confidence <= 1
+    ):
+        errors.append(
+            {
+                "code": "range",
+                "path": "$.proposal.confidence",
+                "message": "confidence must be from 0 to 1.",
+                "expected": {"minimum": 0, "maximum": 1},
+            }
+        )
     return _bounded_validation_errors(errors)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::submission_validation_errors
-# @reason truncation is asserted through the public collector
 def _bounded_validation_errors(errors):
     unique = []
     seen = set()
@@ -175,9 +220,6 @@ def _bounded_validation_errors(errors):
     ]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::submission_validation_errors
-# @reason the public collector exercises this bounded JSON Schema subset
 def _schema_errors(value, schema, root, path):
     if not isinstance(schema, dict):
         return []
@@ -378,9 +420,6 @@ def _schema_errors(value, schema, root, path):
     return errors
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::submission_validation_errors
-# @reason type discrimination is asserted through public field errors
 def _schema_type_matches(value, expected):
     expected = expected if isinstance(expected, list) else [expected]
     checks = {
@@ -397,9 +436,6 @@ def _schema_type_matches(value, expected):
     return any(checks.get(name, lambda _item: True)(value) for name in expected)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @reason recursive string discovery belongs to external proposal validation
 def _walk_strings(value):
     if isinstance(value, dict):
         for key, child in value.items():
@@ -412,9 +448,6 @@ def _walk_strings(value):
         yield value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @reason reference-field traversal belongs to external proposal validation
 def _reference_values(proposal):
     for action in proposal.get("actions") or []:
         data = action.get("data") if isinstance(action, dict) else None
@@ -438,9 +471,6 @@ def _reference_values(proposal):
                 yield field, value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @reason notation checks are exercised through the public validator
 def _validate_reference_notation(proposal):
     for _field, value in _reference_values(proposal):
         if value.startswith(("$", "action:")):
@@ -458,9 +488,6 @@ def _validate_reference_notation(proposal):
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @reason visibility checks are exercised through the public validator
 def _validate_reference_visibility(proposal, report, user):
     hashes = {
         match
@@ -500,9 +527,6 @@ def _validate_reference_visibility(proposal, report, user):
             )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @reason shape and size checks are exercised through the public validator
 def _validate_top_level(proposal):
     if not isinstance(proposal, dict):
         raise exceptions.AIException("Proposal must be a JSON object.")
@@ -543,25 +567,18 @@ def _validate_top_level(proposal):
         raise exceptions.AIException("Proposal contains too many actions.")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @reason Ask hash-token checks distinguish rendered labels from link destinations
 def _answer_visible_text(field, value):
     if field == "answer_markdown":
         return strip_tags(render_markdown(value))
     return value
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_external_proposal_validation_enforces_permissions_files_and_shape
-# @tests tests_unit/test_032_agent_api.py::test_external_ask_submission_allows_hash_token_in_named_link_destination
-# @matrix agent-api ai-report : file-placement file-summary permissions proposal-validation references
-# @pairs agent-api:ask ai-report:answer-only
 def validate_external_proposal(
-    proposal, report, user, *, file_usage, instructions=None, resolved_references=None
-):
+    proposal: object, report: AIReport, user: User, *, file_usage: object, instructions: object = None, resolved_references: dict[str, str] | None = None
+) -> ReportProposal:
     """Validate an external final proposal without provider repair."""
     _validate_top_level(proposal)
+    assert isinstance(proposal, dict)
     proposal = deepcopy(proposal)
     if not report.available:
         raise exceptions.AIException("this plan is no longer available")

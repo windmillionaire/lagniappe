@@ -1,7 +1,7 @@
 """Cancellation reads and lease heartbeats remain independent and fenced."""
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -37,7 +37,7 @@ class CountingDatastore(KeyedDatastore):
 
 @pytest.fixture
 def claimed_job(monkeypatch):
-    now = [datetime(2026, 9, 19, tzinfo=timezone.utc)]
+    now = [datetime(2026, 9, 19, tzinfo=UTC)]
     key = Key("jobs", "claimed", project="test-project")
     row = KeyedEntity(
         key, status="running", lease_token="worker-one",
@@ -59,7 +59,6 @@ def claimed_job(monkeypatch):
     )
 
 
-# @matrix deferred-jobs : cancellation lease read-path
 @pytest.mark.parametrize(
     "state, token, expected",
     [
@@ -89,7 +88,6 @@ def test_claim_checks_observe_durable_ownership_without_writes(claimed_job, stat
     assert case.store.reads == ([] if key is None else [(key, None)])
 
 
-# @matrix deferred-jobs : cancellation heartbeat read-path
 def test_blocking_work_renews_only_on_the_heartbeat_cadence(claimed_job):
     case = claimed_job
     started = case.now[0]
@@ -116,7 +114,6 @@ def test_blocking_work_renews_only_on_the_heartbeat_cadence(claimed_job):
     assert case.job.lease_expires == started + timedelta(minutes=5)
 
 
-# @matrix deferred-jobs : cancellation heartbeat lease-loss
 @pytest.mark.parametrize("loss", ["cancelled", "superseded", "replacement", "deleted"])
 def test_claim_loss_stops_checks_and_prevents_heartbeat_renewal(claimed_job, loss):
     case = claimed_job
@@ -141,7 +138,6 @@ def test_claim_loss_stops_checks_and_prevents_heartbeat_renewal(claimed_job, los
     assert case.store.saved == []
 
 
-# @matrix deferred-jobs : read-path lease-loss
 def test_activity_lookup_failure_is_an_infrastructure_error(claimed_job, monkeypatch):
     case = claimed_job
     error = RuntimeError("Datastore unavailable")
@@ -154,7 +150,6 @@ def test_activity_lookup_failure_is_an_infrastructure_error(claimed_job, monkeyp
     assert case.store.saved == []
 
 
-# @matrix deferred-jobs : cancellation deadline heartbeat
 @pytest.mark.parametrize(
     "stop, expected_error",
     [
@@ -179,7 +174,6 @@ def test_local_stop_state_prevents_activity_reads(claimed_job, stop, expected_er
     assert case.store.saved == []
 
 
-# @matrix deferred-jobs : cancellation deadline heartbeat
 @pytest.mark.parametrize(
     "stop, expected_error",
     [

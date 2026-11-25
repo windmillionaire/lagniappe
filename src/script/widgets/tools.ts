@@ -1,0 +1,172 @@
+import { BaseUpload } from "../elements/base/baseUpload.ts";
+import { UploadMenu, uploadElement } from "../elements/upload.ts";
+import type { FormSubmitOptions } from "../forms/controller.ts";
+
+const AI_DROPZONE_TEXT =
+	"Drop files here, click to upload, or paste a screenshot.";
+
+export class CreateToolReport extends BaseUpload {
+	declare messages: Record<string, string>;
+	declare icon: string;
+	declare header: HTMLElement | null;
+	declare submitGroup: HTMLElement | null;
+	declare submitButton: HTMLButtonElement | null;
+	declare emailSubmissions: HTMLElement | null;
+	declare emailAddress: HTMLElement | null;
+	declare emailCopyButton: HTMLButtonElement | null;
+	declare autoExecuteControl: HTMLLabelElement | null;
+	declare context: ReturnType<typeof uploadElement.contextUpload>;
+	declare dropzone: NonNullable<BaseUpload["dropzone"]> & { show(): void };
+	declare menuOptions: string[];
+	declare emailCopyResetTimer?: number;
+	declare createdReport?: boolean;
+	declare visible?: boolean;
+
+	constructor(
+		attributes: ConstructorParameters<typeof BaseUpload>[0] & {
+			target: HTMLElement;
+		},
+	) {
+		super(attributes);
+		this.messages = {
+			submit: "Start",
+			submitting: "Starting",
+			submitted: "Started",
+		};
+		this.icon = "generate";
+		this.uploadType = "file";
+		this.inputName = "tool-files";
+		this.multiple = true;
+
+		this.header = this.target.querySelector<HTMLElement>(
+			"[data-role='header']",
+		);
+		this.submitGroup = this.target.querySelector<HTMLElement>(
+			"[data-role='submit-group']",
+		);
+		this.submitButton = this.target.querySelector<HTMLButtonElement>(
+			"[data-role='start-report']",
+		);
+		this.emailSubmissions = this.target.querySelector<HTMLElement>(
+			"[data-role='email-submissions']",
+		);
+		this.emailAddress = this.target.querySelector<HTMLElement>(
+			"[data-role='email-address']",
+		);
+		this.emailCopyButton = this.target.querySelector<HTMLButtonElement>(
+			"[data-role='email-copy']",
+		);
+		this.autoExecuteControl = this.target.querySelector<HTMLLabelElement>(
+			"[data-role='auto-execute-control']",
+		);
+		this.context = uploadElement.contextUpload({
+			text: AI_DROPZONE_TEXT,
+			label: false,
+			descriptionName: "instructions",
+			descriptionPlaceholder: "Ask a question or describe what you want done…",
+			descriptionRows: 5,
+			stacked: true,
+		});
+		this.dropzone = this.context.dropzone;
+		this.menuOptions = ["remove", "replace", "paste"];
+		this.uploadMenu = new UploadMenu(this);
+	}
+
+	async init() {
+		await super.init();
+		this.context.description?.addEventListener("input", () => {
+			this.form?.showSubmitButton();
+		});
+		this.emailCopyButton?.addEventListener("click", () => {
+			void this.copyEmailAddress();
+		});
+		this.dropzone?.show();
+	}
+
+	get html() {
+		return [this.context.element, this.autoExecuteControl];
+	}
+
+	async copyEmailAddress() {
+		const button = this.emailCopyButton;
+		const address = this.emailAddress?.textContent?.trim();
+		if (!button || !address) return;
+		let copied = false;
+		try {
+			if (navigator.clipboard?.writeText) {
+				await navigator.clipboard.writeText(address);
+				copied = true;
+			}
+		} catch {
+			copied = false;
+		}
+		if (!copied) {
+			const textarea = document.createElement("textarea");
+			textarea.value = address;
+			textarea.setAttribute("readonly", "");
+			textarea.style.position = "fixed";
+			textarea.style.opacity = "0";
+			document.body.append(textarea);
+			textarea.select();
+			try {
+				copied = document.execCommand("copy");
+			} catch {
+				copied = false;
+			}
+			textarea.remove();
+			button.focus();
+		}
+		button.textContent = copied ? "Copied" : "Copy failed";
+		clearTimeout(this.emailCopyResetTimer);
+		this.emailCopyResetTimer = setTimeout(() => {
+			if (button.isConnected) button.textContent = "Copy";
+		}, 2000);
+	}
+
+	applyDefaultAttachUI(
+		_file: File,
+		_context: Parameters<BaseUpload["applyDefaultAttachUI"]>[1],
+	) {
+		if (this.dropzone) this.dropzone.setText(this.fileLabel);
+		this.form?.showSubmitButton();
+	}
+
+	async prepareSubmit(options: FormSubmitOptions = {}) {
+		if (!this.context.description?.value?.trim() && !this.fileAttached) {
+			this.showError("Add files or instructions before creating a report.");
+			return false;
+		}
+		return super.prepareSubmit(options);
+	}
+
+	async created() {
+		this.form.success();
+		this.createdReport = true;
+	}
+
+	_resetUI() {
+		this.context?.clear();
+		this.dropzone?.show();
+		const autoExecute = this.target.querySelector<HTMLInputElement>(
+			"[name='auto_execute']",
+		);
+		if (autoExecute) {
+			autoExecute.checked = autoExecute.dataset.defaultChecked === "true";
+		}
+		this.form?.hideSubmitButton();
+	}
+
+	reset() {
+		super.reset();
+		this._resetUI();
+	}
+
+	postreconcile() {
+		if (this.createdReport) {
+			this.reset();
+			this.visible = false;
+			this.target.dataset.visible = "false";
+			this.createdReport = false;
+		}
+	}
+}

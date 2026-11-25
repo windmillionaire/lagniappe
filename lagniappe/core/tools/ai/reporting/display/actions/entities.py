@@ -1,5 +1,14 @@
 """Entity-oriented proposal display adapters."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ActionData, ReportAction
+    from lagniappe.core.tools.ai.reporting.display.details import ProposalDetailCollector
+
+
 from ..contracts import (
     InheritedProposalDetail,
     ProposalActionDisplay,
@@ -7,13 +16,19 @@ from ..contracts import (
 )
 
 
-# @testable infrastructure
-def category_details(details, data, action=None):
+def category_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("Form", data, "form")
 
 
-# @testable infrastructure
-def page_details(details, data, action=None):
+def page_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("Category", data, "category", "model")
     details.reference("Form", data, "form")
     details.submission(data, form_present=bool(details.first_value(data, "form")))
@@ -24,8 +39,11 @@ def page_details(details, data, action=None):
         )
 
 
-# @testable infrastructure
-def document_details(details, data, action=None):
+def document_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("Page", data, "page")
     replacing = (action or {}).get("type") == "replace_page_document"
     details.add(
@@ -33,6 +51,15 @@ def document_details(details, data, action=None):
         preview="document",
     )
     details.add("Recovery" if replacing else "Attribution", "The previous document will be pinned; this replaces its content as a collaborative edit." if replacing else "Server-recorded time and source; existing text is preserved.")
+
+
+def delete_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
+    details.reference("Entity", data, "entity")
+    details.add("Effect", "Permanently deletes this record and its dependent data.")
 
 
 ENTITY_ACTION_DISPLAYS = (
@@ -49,5 +76,11 @@ ENTITY_ACTION_DISPLAYS = (
             InheritedProposalDetail(("category", "model"), "Form", ("form",)),
         ),
     ),
+    ProposalActionDisplay("delete_page", "Delete Page", delete_details),
+    ProposalActionDisplay("delete_task", "Delete Task", delete_details),
+    ProposalActionDisplay("delete_category", "Delete Category", delete_details),
+    ProposalActionDisplay("delete_project", "Delete Project", delete_details),
+    ProposalActionDisplay("delete_model_task", "Delete Model Task", delete_details),
+    ProposalActionDisplay("delete_file", "Delete File", delete_details),
     ProposalActionDisplay("suggest_page_deletion", "Suggest Page Deletion", hidden=True),
 )

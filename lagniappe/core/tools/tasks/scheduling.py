@@ -1,7 +1,15 @@
 """Task recurrence, postponement, and durable uncomplete scheduling."""
 
 import hashlib
-from datetime import datetime, timedelta, timezone
+from typing import Literal, TypedDict
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+    from lagniappe.core.entities.task import Task
+
+from datetime import datetime, timedelta, UTC
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import DAILY, MONTHLY, WEEKLY, YEARLY, MO, rrule
 from dateutil.rrule import weekday as rrule_weekday
@@ -16,10 +24,28 @@ from ..dates import (
 from ..services import task_queue
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/scheduling.py::add_uncomplete_task_to_queue
-# @reason midnight delay calculation is part of task uncomplete scheduling
-def user_tomorrow_in_seconds():
+class ReopenArguments(TypedDict, total=False):
+    history_key: Key
+
+
+class Recurrence(TypedDict, total=False):
+    unit: str
+    interval: str | int
+
+
+class ScheduleRule(TypedDict, total=False):
+    mode: str
+    days: list[int]
+
+
+class CalendarRuleArguments(TypedDict, total=False):
+    wkst: rrule_weekday
+    byweekday: rrule_weekday | tuple[rrule_weekday, ...]
+    bymonthday: int
+    bymonth: int
+
+
+def user_tomorrow_in_seconds() -> float:
     """Return seconds until midnight in the user's timezone."""
     now_user = datetime.now(user_timezone())
     tomorrow_user = beginning_of_day(now_user + timedelta(days=1))
@@ -28,20 +54,14 @@ def user_tomorrow_in_seconds():
     return delay_seconds if delay_seconds > 0 else 0
 
 
-# @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_add_uncomplete_task_to_queue_future_due_queues_in_production
-# @matrix task-scheduling : durable-uncomplete timezone
-def scheduled_uncomplete_time():
+def scheduled_uncomplete_time() -> datetime:
     """Return the next user-local midnight as an absolute UTC timestamp."""
     now_user = datetime.now(user_timezone())
     tomorrow_user = beginning_of_day(now_user + timedelta(days=1))
-    return tomorrow_user.astimezone(timezone.utc)
+    return tomorrow_user.astimezone(UTC)
 
 
-# @testable true
-# @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_recurring_due_date_preserves_interval_semantics
-# @matrix task-scheduling : recurring periodic interval-semantics
-def calculate_next_recurring_due_date(date, recurring):
+def calculate_next_recurring_due_date(date: datetime | None, recurring: Recurrence | None) -> datetime | None:
     """Add one interval (day/week/month/year) to a date using a recurring config."""
     if not recurring or not date:
         return None
@@ -67,11 +87,7 @@ def calculate_next_recurring_due_date(date, recurring):
     return date + delta
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_next_scheduled_due_date
-# @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_skipped_scheduled_tasks
-# @reason private validation and translation are exercised by scheduled stepping and skipped counting
-def _scheduled_rrule_args(scheduled):
+def _scheduled_rrule_args(scheduled: object) -> tuple[Literal[0, 1, 2, 3], CalendarRuleArguments] | None:
     """Translate a valid stored calendar schedule into ``rrule`` arguments."""
     if not isinstance(scheduled, dict):
         return None
@@ -94,6 +110,7 @@ def _scheduled_rrule_args(scheduled):
     if mode not in {"monthly", "yearly"}:
         return None
 
+    arguments: CalendarRuleArguments
     schedule_type = scheduled.get("type")
     if schedule_type == "specific_day":
         day = scheduled.get("day")
@@ -126,17 +143,15 @@ def _scheduled_rrule_args(scheduled):
         maximum_day = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)[
             month - 1
         ]
-        if day > maximum_day:
+        if arguments.get("bymonthday", 0) > maximum_day:
             return None
 
-    return YEARLY, {"bymonth": month, **arguments}
+    yearly: CalendarRuleArguments = {"bymonth": month}
+    yearly.update(arguments)
+    return YEARLY, yearly
 
 
-# @testable true
-# @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_scheduled_due_date
-# @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_scheduled_due_date_rejects_invalid_rules
-# @matrix task-scheduling : scheduled calendar-validation exact-boundary timezone
-def calculate_next_scheduled_due_date(due_date, scheduled):
+def calculate_next_scheduled_due_date(due_date: object, scheduled: object) -> datetime | None:
     """Return the first valid calendar occurrence strictly after ``due_date``."""
     if not isinstance(due_date, datetime):
         return None
@@ -146,6 +161,7 @@ def calculate_next_scheduled_due_date(due_date, scheduled):
         return None
 
     frequency, arguments = translated
+    assert isinstance(scheduled, dict)
     mode = scheduled["mode"]
     if mode == "yearly":
         rule_start = datetime(due_date.year, 1, 1, tzinfo=user_timezone())
@@ -166,10 +182,7 @@ def calculate_next_scheduled_due_date(due_date, scheduled):
     return next_date
 
 
-# @testable true
-# @tests tests_unit/test_013d_date_utilities.py::test_find_ordinal_weekday_in_month
-# @pair dates:ordinal-weekday
-def find_ordinal_weekday_in_month(month_start, ordinal, weekday):
+def find_ordinal_weekday_in_month(month_start: object, ordinal: object, weekday: object) -> datetime | None:
     """Find the nth weekday in one month, or the last when ordinal is -1."""
     if not isinstance(month_start, datetime):
         return None
@@ -192,10 +205,7 @@ def find_ordinal_weekday_in_month(month_start, ordinal, weekday):
     return occurrence.replace(microsecond=month_start.microsecond)
 
 
-# @testable true
-# @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_monthly_occurrence
-# @pair dates:monthly-occurrence
-def calculate_next_monthly_occurrence(due_date, scheduled):
+def calculate_next_monthly_occurrence(due_date: object, scheduled: object) -> datetime | None:
     """Find the next monthly calendar occurrence after ``due_date``."""
     if not isinstance(scheduled, dict):
         return None
@@ -203,10 +213,7 @@ def calculate_next_monthly_occurrence(due_date, scheduled):
     return calculate_next_scheduled_due_date(due_date, monthly)
 
 
-# @testable true
-# @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_yearly_occurrence
-# @pair dates:yearly-occurrence
-def calculate_next_yearly_occurrence(due_date, scheduled):
+def calculate_next_yearly_occurrence(due_date: object, scheduled: object) -> datetime | None:
     """Find the next yearly calendar occurrence after ``due_date``."""
     if not isinstance(scheduled, dict):
         return None
@@ -214,10 +221,7 @@ def calculate_next_yearly_occurrence(due_date, scheduled):
     return calculate_next_scheduled_due_date(due_date, yearly)
 
 
-# @testable true
-# @tests tests_unit/test_013d_date_utilities.py::test_calculate_postponed_due_date
-# @pair dates:postponement
-def calculate_postponed_due_date(value):
+def calculate_postponed_due_date(value: str) -> datetime | None:
     """Calculate a new due date from one of the home-page postpone options."""
     now_user = datetime.now(user_timezone())
     this_weekday_targets = {
@@ -261,28 +265,19 @@ def calculate_postponed_due_date(value):
     return new_date
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/scheduling.py::add_uncomplete_task_to_queue
-# @covered-by lagniappe/web/routes/tasks/main.py::_home_task_response
-# @reason home-window visibility is exercised through task queue and home response flows
-def due_in_home_task_window(due_date):
+def due_in_home_task_window(due_date: datetime | None) -> bool:
     """Return whether a due date belongs in the home task list window."""
     if not due_date:
         return False
 
-    next_week = datetime.now(timezone.utc) + timedelta(days=7)
+    next_week = datetime.now(UTC) + timedelta(days=7)
     return due_date <= next_week
 
 
-# @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_near_term_schedule_uncompletes_immediately
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_add_uncomplete_task_to_queue_future_due_queues_in_production
-# @tests tests_unit/test_020h_ai_report_execution.py::test_complete_task_action_preserves_details_and_retries
-# @matrix task-completion task-scheduling : complete schedule-queue
-def add_uncomplete_task_to_queue(task, *, history_key=None):
+def add_uncomplete_task_to_queue(task: Task, *, history_key: Key | None = None) -> str | None:
     """Record an uncompletion intent or apply a near-term recurrence now."""
     next_due = task.due_date
-    history_args = {} if history_key is None else {"history_key": history_key}
+    history_args: ReopenArguments = {} if history_key is None else {"history_key": history_key}
 
     if due_in_home_task_window(next_due):
         task.uncomplete(**history_args)
@@ -298,10 +293,7 @@ def add_uncomplete_task_to_queue(task, *, history_key=None):
     return task.scheduled_uncomplete_token
 
 
-# @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_add_uncomplete_task_to_queue_future_due_queues_in_production
-# @matrix cloud-tasks task-scheduling : durable-uncomplete idempotency post-commit
-def dispatch_scheduled_uncomplete(task, *, task_id_suffix=None):
+def dispatch_scheduled_uncomplete(task: Task, *, task_id_suffix: str | None = None) -> str | None:
     """Dispatch the durable marker currently persisted on ``task``."""
     token = task.scheduled_uncomplete_token
     schedule_at = task.scheduled_uncomplete_at
@@ -319,21 +311,14 @@ def dispatch_scheduled_uncomplete(task, *, task_id_suffix=None):
     )
 
 
-# @testable true
-# @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_recurring
-# @matrix task-scheduling : next-due-date recurring
-def get_next_recurring_date(recurring, starting_due_date=None):
+def get_next_recurring_date(recurring: Recurrence, starting_due_date: datetime | None = None) -> datetime | None:
     """Get the next recurring date from today (or a starting date)."""
     if starting_due_date is None:
         starting_due_date = user_today()
     return calculate_next_recurring_due_date(starting_due_date, recurring)
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.set_next_due_date
-# @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.skipped
-# @reason schedule baseline selection is owned by next-due/skipped behaviors
-def get_starting_due_date(task):
+def get_starting_due_date(task: Task) -> datetime:
     """Get the earliest of postponed_from/due_date, or now if neither exists."""
     candidates = [d for d in [task.postponed_from, task.due_date] if d]
     if candidates:
@@ -342,10 +327,7 @@ def get_starting_due_date(task):
     return datetime.now(user_timezone())
 
 
-# @testable true
-# @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_scheduled
-# @matrix task-scheduling : next-due-date postponed scheduled
-def get_next_scheduled_date(starting_due_date, scheduled):
+def get_next_scheduled_date(starting_due_date: datetime, scheduled: Mapping[str, object]) -> datetime | None:
     """Get the next scheduled date that falls after today."""
     next_due_date = calculate_next_scheduled_due_date(starting_due_date, scheduled)
     while next_due_date and next_due_date <= user_today():
@@ -354,10 +336,7 @@ def get_next_scheduled_date(starting_due_date, scheduled):
     return next_due_date
 
 
-# @testable true
-# @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_periodic
-# @matrix task-scheduling : next-due-date periodic postponed
-def get_next_periodic_date(starting_due_date, periodic):
+def get_next_periodic_date(starting_due_date: datetime, periodic: Recurrence) -> datetime | None:
     """Get the next periodic date that falls after today."""
     next_due_date = calculate_next_recurring_due_date(starting_due_date, periodic)
     while next_due_date and next_due_date <= user_today():
@@ -366,13 +345,7 @@ def get_next_periodic_date(starting_due_date, periodic):
     return next_due_date
 
 
-# @testable true
-# @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled
-# @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled_calendar_boundaries
-# @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled_counts_only_occurrences_between_baseline_and_today
-# @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled_preserves_earliest_due_date_baseline
-# @matrix task-scheduling : scheduled skipped exact-boundary timezone postponed
-def calculate_skipped_scheduled_tasks(task, scheduled):
+def calculate_skipped_scheduled_tasks(task: Task, scheduled: ScheduleRule) -> int:
     """Count extra occurrences strictly after the baseline and before local today."""
     if _scheduled_rrule_args(scheduled) is None:
         return 0
@@ -422,10 +395,7 @@ def calculate_skipped_scheduled_tasks(task, scheduled):
     return count
 
 
-# @testable true
-# @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_recurring
-# @matrix task-scheduling : periodic recurring skipped
-def calculate_skipped_recurring_tasks(task, periodic):
+def calculate_skipped_recurring_tasks(task: Task, periodic: Recurrence) -> int:
     """Calculate how many times a recurring task should have been completed between the starting due date and today"""
     if not periodic:
         return 0
@@ -469,10 +439,7 @@ def calculate_skipped_recurring_tasks(task, periodic):
     return count
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_skipped_scheduled_tasks
-# @reason monthly occurrence lookup is part of skipped scheduled-task counting
-def calculate_monthly_occurrence_for_date(month_start, scheduled):
+def calculate_monthly_occurrence_for_date(month_start: object, scheduled: object) -> datetime | None:
     """Calculate the configured occurrence bounded to one month."""
     if not isinstance(month_start, datetime) or not isinstance(scheduled, dict):
         return None
@@ -495,10 +462,7 @@ def calculate_monthly_occurrence_for_date(month_start, scheduled):
     return occurrence.replace(microsecond=month_start.microsecond)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/tasks/scheduling.py::calculate_skipped_scheduled_tasks
-# @reason yearly occurrence lookup is part of skipped scheduled-task counting
-def calculate_yearly_occurrence_for_year(year, scheduled):
+def calculate_yearly_occurrence_for_year(year: object, scheduled: object) -> datetime | None:
     """Calculate the configured occurrence bounded to one year."""
     if type(year) is not int or not isinstance(scheduled, dict):
         return None

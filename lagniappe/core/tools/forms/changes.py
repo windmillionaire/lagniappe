@@ -1,7 +1,8 @@
 """Saved Form-change orchestration and guarded batch application."""
-
-from copy import deepcopy
 import json
+from collections.abc import Collection, Mapping, Sequence
+from copy import deepcopy
+from typing import TYPE_CHECKING, TypedDict, cast
 from uuid import uuid4
 
 from ...definitions import (
@@ -14,18 +15,55 @@ from ...definitions import (
 )
 from ...entities import Entities
 from ...exceptions import MutationConflict, ValidationError
-from . import conversions, population
-from .contracts import ANSWER_FIELDS, NOTICE, PENDING, RECEIPT, check_size, json_value
 from ..database import get as database_get
 from ..database.utility import ExactEntityState
+from . import conversions, population
+from .contracts import (
+    ANSWER_FIELDS,
+    NOTICE,
+    PENDING,
+    RECEIPT,
+    PendingFormChange,
+    ChangeRejection,
+    FormPublication,
+    check_size,
+    json_value,
+    migration_notice,
+    pending_change,
+    persisted_key,
+)
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Entity as DatastoreEntity
+    from google.cloud.datastore import Key
+
+    from ...definitions.mutations import MutationEffect
+    from ...entities.ai_report import AIReport
+    from ...entities.deferred_job import DeferredJob
+    from ...entities.form import Form
+    from ...entities.history import TaskHistory
+    from ...entities.page import Page
+    from ...entities.task import Task
+    from ...entities.user import User
+    from ..deferred_jobs.context import DeferredJobContext
+    from .drafts import DraftImages
 
 
+class SchemaAction(TypedDict):
+    id: str
+    data: dict[str, object]
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_start_stages_intent_without_enumerating_submissions
-# @matrix form-migration : save no-submission-read durable-intent
-def start_change(form, draft, save_id, actor, *, images=None, report=None, schema_action=None):
+def start_change(
+    form: Form,
+    draft: Mapping[str, object],
+    save_id: str,
+    actor: User,
+    *,
+    images: DraftImages | None = None,
+    report: AIReport | None = None,
+    schema_action: SchemaAction | None = None,
+) -> FormPublication:
     from .. import dates
     from . import drafts
     from ..deferred_jobs.service import DeferredJobs
@@ -48,7 +86,7 @@ def start_change(form, draft, save_id, actor, *, images=None, report=None, schem
     )
     if not operations:
         raise ValidationError("There are no submission changes to apply.")
-    pending = json_value(form.db, PENDING)
+    pending = pending_change(form.db)
     digest = drafts._digest(draft)
     if pending:
         if pending["id"] != save_id or pending["digest"] != digest:
@@ -70,19 +108,20 @@ def start_change(form, draft, save_id, actor, *, images=None, report=None, schem
         expected_scope = (schema_action or {}).get("data", {}).get("scope_fingerprint")
         if expected_scope and scope["scope_fingerprint"] != expected_scope:
             raise ValidationError(schema_updates.STALE_MESSAGE)
-    target = Entities.FORM(deepcopy(form.db))
-    target.name = draft["name"].strip()
+    target = Entities.FORM(cast("DatastoreEntity", deepcopy(form.db)))
+    target.name = cast(str, draft["name"]).strip()
     target.set_schema(schema)
     target.generation = form.generation + 1
     drafts._validate_content(schema, draft["html_fields"], images or {})
+    html_fields = cast(dict[str, str], draft["html_fields"])
     committed = False
     try:
         image_urls = drafts._stage_content(
-            target, draft["html_fields"], images or {}
+            target, html_fields, images or {}
         )
         drafts.stage_form_content(target)
         target.properties.version.update()
-        change = {
+        change: PendingFormChange = {
             "id": save_id,
             "digest": digest,
             "source_generation": form.generation,
@@ -100,9 +139,9 @@ def start_change(form, draft, save_id, actor, *, images=None, report=None, schem
                 "schema": target.schema,
                 "assets": target.assets,
                 "generation": target.generation,
-                "version": target.version,
+                "version": cast(str | None, target.version),
                 "html_fields": {
-                    field["id"]: target.get_html_field(field["id"]) or ""
+                    cast(str, field["id"]): target.get_html_field(cast(str, field["id"])) or ""
                     for field in target.schema
                     if field["type"] == "html"
                 },
@@ -111,10 +150,11 @@ def start_change(form, draft, save_id, actor, *, images=None, report=None, schem
         if report is not None:
             from ...properties.ai_report_proposal import proposal_fingerprint
 
+            assert schema_action is not None
             change["report"] = report.urlsafe_key
             change["report_fingerprint"] = proposal_fingerprint(report.proposal)
             change["action_id"] = schema_action["id"]
-            change["scope_fingerprint"] = schema_action["data"].get("scope_fingerprint")
+            change["scope_fingerprint"] = cast(str | None, schema_action["data"].get("scope_fingerprint"))
         check_size({**form.db, PENDING: change})
         form._starting_form_change = change
         # Atomic start owns the staged assets from here, even if dispatch acknowledgement fails.
@@ -137,27 +177,26 @@ def start_change(form, draft, save_id, actor, *, images=None, report=None, schem
         if not committed:
             cleanup_rejected_attempt(target)
         raise
-    current = Entities.fetch_one(form.key, request=Fetch.direct())
+    current = cast("Form | None", Entities.fetch_one(form.key, request=Fetch.direct()))
+    if current is None:
+        raise MutationConflict("The Form was deleted during the update.")
     return change_response(current, actor)
 
 
-# @testable true
-# @tests tests_unit/test_004l_form_schema_updates.py::test_conversion_failure_status_names_columns_and_checks_target_visibility
-# @matrix form-migration : status recovery permissions
-def change_response(form, actor=None):
+def change_response(form: Form, actor: User | None = None) -> FormPublication:
     from . import drafts
 
-    change = json_value(form.db, PENDING)
+    change = pending_change(form.db)
     if not change:
         receipt = json_value(form.db, "form_draft_receipt")
-        response = drafts._saved_response(form, receipt.get("image_urls", {}))
+        response = drafts._saved_response(form, cast(dict[str, str], receipt.get("image_urls", {})))
         rejection = json_value(form.db, "form_change_rejection")
         if rejection:
-            response["rejected_change"] = rejection
+            response["rejected_change"] = cast(ChangeRejection, rejection)
         return response
     job = (
-        Entities.fetch_one(change["job"], request=Fetch.direct())
-        if change.get("job")
+        cast("DeferredJob | None", Entities.fetch_one(job_id, request=Fetch.direct()))
+        if (job_id := change.get("job"))
         else None
     )
     target = change["target"]
@@ -185,22 +224,21 @@ def change_response(form, actor=None):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/changes.py::change_response
-# @reason status messages and permission-checked failure links are exercised through the browser response
-def _conversion_failure_status(change, job, form, actor):
+def _conversion_failure_status(
+    change: PendingFormChange, job: DeferredJob | None, form: Form, actor: User | None
+) -> tuple[str | None, dict[str, object] | None]:
     if job is None:
         return "The form update could not be found. Retry to resume it.", None
     error = job.error or {}
-    message = error.get("message")
-    context = error.get("context") or {}
+    message = cast(str | None, error.get("message"))
+    context = cast(dict[str, str], error.get("context") or {})
     fields = change["target"]["schema"]
     # Already-failed jobs retain their old error string after a deployment.
     prefix = "Invalid converted table cell for column "
     if message and message.startswith(prefix) and message.endswith("."):
         column_id = message[len(prefix):-1]
         column = next((
-            column for field in fields for column in field.get("columns", [])
+            column for field in fields for column in conversions._columns(field)
             if column["id"] == column_id
         ), None)
         if column:
@@ -209,7 +247,7 @@ def _conversion_failure_status(change, job, form, actor):
                 "number": "a number", "checkbox": "a checked or unchecked value",
                 "date": "a date", "time": "a time", "email": "an email address",
                 "tel": "a phone number", "text": "text", "out": "a web link",
-            }.get(conversions.field_kind(column), "a value in the expected format")
+            }.get(conversions.field_kind(column) or "", "a value in the expected format")
             message = f'The AI could not produce {expected} for “{title}”.'
     field = next((
         field for field in fields
@@ -238,17 +276,16 @@ def _conversion_failure_status(change, job, form, actor):
     return message, failed_entity
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/forms/changes.py::apply_target
-# @reason each batch reloads its durable Form owner and validates the executing actor
-def owned_change(context):
+def owned_change(context: DeferredJobContext) -> tuple[Form, PendingFormChange]:
     context.ensure_active()
-    form = Entities.fetch_one(context.input("form").key, request=Fetch.direct())
+    from ..deferred_jobs.context import required_input
+
+    form = cast("Form | None", Entities.fetch_one(required_input(context, "form").key, request=Fetch.direct()))
     if not form or not form.allowed(Action.EDIT, user=context.actor):
         raise ValidationError(
             "This Form is unavailable or you no longer have permission to update it."
         )
-    change = json_value(form.db, PENDING)
+    change = pending_change(form.db)
     if (
         not change
         or change.get("id") != context.parameters["change_id"]
@@ -259,16 +296,17 @@ def owned_change(context):
     return form, change
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_prepare_target_preserves_completion_and_original_answers
-# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_deleted_migrated_form_retains_completed_submissions_and_history
-# @matrix form-migration : completed-task legacy-generation notice masked-write
-def prepare_target(entity, change, *, ai_values=None):
+def prepare_target(
+    entity: Page | Task,
+    change: PendingFormChange,
+    *,
+    ai_values: Mapping[str, object] | None = None,
+) -> Page | Task:
     values = json_value(entity.db, "submission")
     converted, notice = conversions.convert_submission(
         values,
         change["operations"],
-        previous_notice=json_value(entity.db, NOTICE),
+        previous_notice=migration_notice(entity.db),
         generation=entity.generation,
         zone=change["zone"],
         ai_values=ai_values,
@@ -278,7 +316,7 @@ def prepare_target(entity, change, *, ai_values=None):
     row.pop("autofill_reviews", None)
     if (
         entity.entity_kind == "task"
-        and entity.completed
+        and cast("Task", entity).completed
         and not row.get("completed_submission")
     ):
         row["completed_submission"] = json.dumps(
@@ -297,16 +335,15 @@ def prepare_target(entity, change, *, ai_values=None):
     row["schema_version"] = change["target"]["version"]
     row[RECEIPT] = change["id"]
     check_size(row)
-    return type(entity)(row)
+    return type(entity)(cast("DatastoreEntity", row))
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_apply_is_guarded_idempotent_and_retries_effects
-# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_form_editor_migrates_restricted_submissions
-# @matrix form-migration : duplicate-delivery guarded-write effects-retry
-# @matrix form-migration : partial-read generation removed-link
-# @matrix form-migration : form-authority restricted-submissions
-def apply_target(context, raw, *, ai_values=None):
+def apply_target(
+    context: DeferredJobContext,
+    raw: DatastoreEntity,
+    *,
+    ai_values: Mapping[str, object] | None = None,
+) -> None:
     from ...mutations import execute_mutation, planner_for
     from ...mutations.base import MutationPlanBuilder
 
@@ -330,8 +367,11 @@ def apply_target(context, raw, *, ai_values=None):
     converted = entity if applied else prepare_target(entity, change, ai_values=ai_values)
     if converted.entity_kind == "page":
         # The converted copy needs its own relations for post-commit projections.
-        converted = Entities.fetch_one(converted, request=Fetch.direct())
-    converted.properties.form.attach({form.key: form})
+        loaded_page = Entities.fetch_one(converted, request=Fetch.direct())
+        if loaded_page is None:
+            raise MutationConflict("A submission disappeared during the update.")
+        converted = loaded_page
+    converted.properties.form.attach({persisted_key(form): form})
     converted._form_change_write = True
     builder = MutationPlanBuilder(
         MutationOperation.SAVE, (converted,), registry=Entities, planner_for=planner_for
@@ -352,25 +392,28 @@ def apply_target(context, raw, *, ai_values=None):
         builder.cache_refresh(converted, reason="form-change-retry-effects")
     if entity.entity_kind == "task":
         # Recompute linked Page projections with the effective target definition.
-        converted = Entities.fetch_one(
-            converted, request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS)
+        loaded_task = Entities.fetch_one(
+            cast("Task", converted), request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS)
         )
+        if loaded_task is None:
+            raise MutationConflict("A submission disappeared during the update.")
+        converted = loaded_task
         converted._form_change_write = True
-        converted.linked_pages = Entities.fetch(
+        converted.linked_pages = cast("list[Page]", Entities.fetch(
             *converted.derived_page_keys, request=Fetch.direct()
-        )
+        ))
         builder.consume_intents(converted)
         builder.patch(converted, "linked_pages", reason="form-change-links")
         for owner in converted.task_list_owners:
             builder.touch(owner, reason="form-change-task-list")
     else:
-        for owner in entity.categories:
+        for owner in cast("Page", entity).categories:
             builder.touch(owner, reason="form-change-page-list")
-    guards = [
-        (form.key, {PENDING: form.db.get(PENDING)}),
-        (entity.key, ExactEntityState(dict(entity.db))),
+    guards: list[tuple[Key, Mapping[str, object] | None]] = [
+        (persisted_key(form), {PENDING: form.db.get(PENDING)}),
+        (persisted_key(entity), ExactEntityState(dict(entity.db))),
         (
-            context.job.key,
+            persisted_key(context.job),
             {"lease_token": context.job.lease_token, "status": "running"},
         ),
     ]
@@ -381,19 +424,15 @@ def apply_target(context, raw, *, ai_values=None):
         )
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_mutation_guard_blocks_locked_and_stale_answer_writes
-# @tests tests_unit/test_004k_form_changes.py::test_new_attachments_adopt_current_generation_without_accepting_stale_answers
-# @tests tests_unit/test_004k_form_changes.py::test_pending_change_fences_conflicting_writes
-# @matrix form-migration : writer-fence stale-generation completion-race creation reassignment
-# @matrix form-migration : pending-delete masked-write attachment
-def mutation_guards(writes, deletes):
+def mutation_guards(
+    writes: Sequence[MutationEffect], deletes: Collection[MutationEffect]
+) -> list[tuple[Key, Mapping[str, object] | None]]:
     """Fence full and masked mutations without adding constructors or DB read hooks."""
-    guards = []
+    guards: list[tuple[Key, Mapping[str, object] | None]] = []
     for effect in [*writes, *deletes]:
         entity = effect.entity
         kind = getattr(entity, "entity_kind", None)
-        if kind not in {"page", "task", "form", "model", "category", "users"}:
+        if entity is None or kind not in {"page", "task", "form", "model", "category", "users"}:
             continue
         mask = effect.property_mask
         deleting = any(effect is deletion for deletion in deletes)
@@ -407,43 +446,45 @@ def mutation_guards(writes, deletes):
             continue
         if kind == "form":
             persisted = database_get.entity(entity.key)
-            if persisted and json_value(persisted, PENDING):
+            if persisted and pending_change(persisted):
                 raise ValidationError(
                     "This Form is being updated. Wait for the update to finish."
                 )
             if persisted:
-                guards.append((entity.key, {PENDING: persisted.get(PENDING)}))
+                guards.append((persisted_key(entity), {PENDING: persisted.get(PENDING)}))
             continue
         persisted = database_get.entity(entity.key)
+        attached_key = cast("Key | None", entity.db.get("form"))
         keys = {
-            entity.db.get("form"),
+            attached_key,
             (persisted or {}).get("form"),
-            *entity.db.get("forms", []),
+            *cast("list[Key]", entity.db.get("forms", [])),
             *(persisted or {}).get("forms", []),
         } - {None}
-        forms = {form.key: form for form in Entities.fetch(*keys, request=Fetch.root())}
+        forms = {form.key: cast("Form", form) for form in Entities.fetch(*keys, request=Fetch.root())}
         for form in forms.values():
-            pending = json_value(form.db, PENDING)
+            pending = pending_change(form.db)
             if pending:
                 raise ValidationError(
                     "This Form is being updated. These changes were not saved; try again when the update finishes."
                 )
             guards.append(
                 (
-                    form.key,
+                    persisted_key(form),
                     {
                         PENDING: form.db.get(PENDING),
                         "generation": form.db.get("generation"),
                     },
                 )
             )
-        form = forms.get(entity.db.get("form"))
+        form = forms.get(attached_key)
         if kind in {"page", "task"} and form and not deleting:
+            entity = cast("Page | Task", entity)
             attached = persisted is None or persisted.get("form") != form.key
             if attached:
                 if (
                     entity.db.get("submission")
-                    and entity.form.generation != form.generation
+                    and (entity.form is None or entity.form.generation != form.generation)
                 ):
                     raise MutationConflict(
                         "The form fields changed before these answers were prepared. Reload and try again."
@@ -464,7 +505,7 @@ def mutation_guards(writes, deletes):
                 )
             if persisted:
                 guards.append(
-                    (entity.key, {name: persisted.get(name) for name in ANSWER_FIELDS})
+                    (persisted_key(entity), {name: persisted.get(name) for name in ANSWER_FIELDS})
                 )
                 if (
                     not attached
@@ -476,11 +517,7 @@ def mutation_guards(writes, deletes):
     return guards
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_recovery_retains_partial_changes_and_cancels_only_before_apply
-# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_failed_preflight_recovers_after_reload
-# @matrix form-migration : retry cancellation ownership
-def recover_change(form, actor, action):
+def recover_change(form: Form, actor: User, action: str) -> FormPublication:
     from ..deferred_jobs.service import DeferredJobs
     from ...properties.deferred_job_lifecycle import ACTIVE_STATUSES
     from ...mutations import execute_mutation
@@ -488,13 +525,17 @@ def recover_change(form, actor, action):
     from ..database import deferred_jobs
     from ..deferred_jobs.locks import deferred_job_lock_key
 
-    form = Entities.fetch_one(form.key, request=Fetch.direct())
-    if not form or not form.allowed(Action.EDIT, user=actor):
+    loaded = cast("Form | None", Entities.fetch_one(form.key, request=Fetch.direct()))
+    if not loaded or not loaded.allowed(Action.EDIT, user=actor):
         raise ValidationError("You do not have permission to update this Form.")
-    pending = json_value(form.db, PENDING)
+    form = loaded
+    pending = pending_change(form.db)
     if not pending:
         return change_response(form, actor)
-    job = Entities.fetch_one(pending["job"], request=Fetch.direct())
+    job_id = pending.get("job")
+    if job_id is None:
+        raise MutationConflict("The Form update has no job owner.")
+    job = cast("DeferredJob | None", Entities.fetch_one(job_id, request=Fetch.direct()))
     if action == "cancel":
         if pending["applied"]:
             raise ValidationError(
@@ -508,10 +549,10 @@ def recover_change(form, actor, action):
         form._form_change_write = True
         execute_mutation(
             RootMutation.plan(form, property_mask=(PENDING,)),
-            guards=[(form.key, {PENDING: expected})],
+            guards=[(persisted_key(form), {PENDING: expected})],
         )
         deferred_jobs.release_deferred_job_lock(
-            deferred_job_lock_key(form, "form-change"), pending["job"]
+            deferred_job_lock_key(form, "form-change"), job_id
         )
         from ..database.assets import cleanup_rejected_attempt
 
@@ -537,23 +578,22 @@ def recover_change(form, actor, action):
             idempotency_key=f"form-change:{form.hash}:{uuid4()}",
         )
     )
-    return change_response(Entities.fetch_one(form.key, request=Fetch.direct()), actor)
+    resumed = cast("Form | None", Entities.fetch_one(form.key, request=Fetch.direct()))
+    if resumed is None:
+        raise MutationConflict("The Form was deleted during the update.")
+    return change_response(resumed, actor)
 
 
-# @testable true
-# @tests tests_unit/test_004k_form_changes.py::test_notice_shows_only_changed_fields_and_cells
-# @matrix form-migration : informational-notice changed-cells
-def notice_projection(entity):
+def notice_projection(entity: Page | Task | TaskHistory) -> list[dict[str, object]]:
     """A read-only display of changed values; no restore choices or writes."""
     from .. import dates
 
-    notice = json_value(entity.db, NOTICE)
+    notice = migration_notice(entity.db)
     current = json_value(entity.db, "submission")
     schema = {field["id"]: field for field in entity.submission_schema}
     result = []
     zone = str(dates.user_timezone())
 
-    # @testable infrastructure
     def display(value, field):
         if value is None:
             return "Not provided"
@@ -562,7 +602,6 @@ def notice_projection(entity):
         except (ValueError, TypeError, KeyError):
             return json.dumps(value, ensure_ascii=False)
 
-    # @testable infrastructure
     def changed(label, before, after, source, target, reason):
         if json.dumps(before, sort_keys=True) != json.dumps(after, sort_keys=True):
             if target is None:
@@ -592,9 +631,9 @@ def notice_projection(entity):
             and isinstance(before, list)
             and isinstance(after, list)
         ):
-            columns = {column["id"]: column for column in target.get("columns", [])}
+            columns = {column["id"]: column for column in conversions._columns(target)}
             for index, row in enumerate(before):
-                for column in source.get("columns", []):
+                for column in conversions._columns(source):
                     cell_id = column["id"]
                     next_row = after[index] if index < len(after) else {}
                     changed(

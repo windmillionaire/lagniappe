@@ -1,3 +1,6 @@
+from typing import TypedDict
+
+
 import json
 from copy import deepcopy
 
@@ -7,10 +10,16 @@ from ..mixins import AIMixin, ColumnMixin, SearchMixin
 from .base_schema import SchemaProperty
 
 
-# @testable true
-# @tests tests_unit/test_003g_todo_lists.py::test_todo_list_validation_and_import
-# @matrix form-todo : normalization validation
-def _todo_items(value, *, allow_scalar=False):
+class TodoItem(TypedDict):
+    text: str
+    checked: bool
+
+
+class TodoValue(TypedDict):
+    items: list[TodoItem]
+
+
+def _todo_items(value: object, *, allow_scalar: bool = False) -> list[TodoItem]:
     """Return canonical ordered todo items from a supported value shape."""
 
     if value in (None, ""):
@@ -30,7 +39,7 @@ def _todo_items(value, *, allow_scalar=False):
     if not isinstance(value, list):
         raise ValidationError("Todo list submission must contain an items list.")
 
-    items = []
+    items: list[TodoItem] = []
     for item in value:
         if allow_scalar and not isinstance(item, dict):
             item = {"text": item, "checked": False}
@@ -51,83 +60,75 @@ def _todo_items(value, *, allow_scalar=False):
     return items
 
 
-# @testable true
-# @tests tests_unit/test_003g_todo_lists.py::test_todo_list_submission_projections
-# @tests tests_unit/test_003g_todo_lists.py::test_todo_list_validation_and_import
-# @matrix form-todo : ai-value column db-value form-value import search-value submission validation
-class TodoList(SearchMixin, AIMixin, ColumnMixin, SchemaProperty):
+class TodoList(SearchMixin, AIMixin, ColumnMixin, SchemaProperty[TodoValue]):
     """Ordered single-line checklist stored as text/checked item objects."""
 
     _icon = "checklist"
     _ordering = Ordering.EXISTS
 
     @property
-    def value(self):
+    def value(self) -> TodoValue | None:
         return deepcopy(super().value) if self.is_set else None
 
     @value.setter
-    def value(self, value):
+    def value(self, value: object) -> None:
         items = _todo_items(value)
         if items:
-            SchemaProperty.value.fset(self, {"items": items})
+            self._value = {"items": items}
         else:
             self.unset()
 
-    def validate_submission(self, value):
+    def validate_submission(self, value: object) -> None:
         self.value = value
 
-    def validate_ai(self, value):
+    def validate_ai(self, value: object) -> None:
         if value in (None, ""):
             self.unset()
             return
         items = _todo_items(value, allow_scalar=True)
         if items:
-            SchemaProperty.value.fset(self, {"items": items})
+            self._value = {"items": items}
         else:
             self.unset()
 
-    # @testable true
-    # @tests tests_unit/test_003g_todo_lists.py::test_todo_list_validation_and_import
-    # @tests tests_unit/test_006b_ingress_entity.py::test_importer_rejects_entire_malformed_todo_row
-    # @matrix form-todo : import validation
-    def validate_import(self, value):
+    def validate_import(self, value: object) -> None:
         """Raise on malformed input so the importer rejects the whole row."""
         items = _todo_items(value, allow_scalar=True)
         if items:
-            SchemaProperty.value.fset(self, {"items": items})
+            self._value = {"items": items}
         else:
             self.unset()
 
     @property
-    def items(self):
+    def items(self) -> list[TodoItem]:  # pyright: ignore[reportIncompatibleMethodOverride] -- checklist items are a public read-only projection.
         return self.value.get("items", []) if self.value else []
 
     @property
-    def form_value(self):
+    def form_value(self) -> TodoValue | None:
         return self.value
 
     @property
-    def db_value(self):
+    def db_value(self) -> TodoValue | None:
         return self.value
 
     @db_value.setter
-    def db_value(self, value):
+    def db_value(self, value: object) -> None:
         self.value = value
 
     @property
-    def ai_value(self):
+    def ai_value(self) -> TodoValue | None:
         return deepcopy(self.value) or None
 
     @property
-    def search_key(self):
+    def search_key(self) -> list[str | None]:
         return [self.label for _item in self.items]
 
     @property
-    def search_value(self):
+    def search_value(self) -> list[str]:
         return [item["text"] for item in self.items]
 
     @property
-    def column_value(self):
+    def column_value(self) -> str | None:
         total = len(self.items)
         if not total:
             return None
@@ -135,5 +136,5 @@ class TodoList(SearchMixin, AIMixin, ColumnMixin, SchemaProperty):
         return f"{checked} of {total} complete"
 
     @property
-    def sort_value(self):
+    def sort_value(self) -> bool:
         return bool(self.items)

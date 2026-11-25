@@ -15,12 +15,15 @@ session.
 | Suite | Location | Use it for |
 | --- | --- | --- |
 | Unit | `testing/tests_unit/` | Deterministic backend entities, properties, permissions, validation, and services. |
+| HTTP | `testing/tests_http/` | Offline Flask `test_client()` route, CSRF, header/CSP, OIDC, API envelope, and negative auth/403 contracts (no browser, no cloud services). |
 | JavaScript | `testing/tests_js/` | Frontend modules in Node with jsdom and simulated persistence; no live browser/server. |
-| E2E | `testing/tests_e2e/` | Browser/server workflows, DOM, routing, storage lifecycle, rendering, and multi-user behavior. |
+| E2E | `testing/tests_e2e/` | Browser/server workflows, happy paths, DOM, routing, storage lifecycle, rendering, and multi-user behavior. |
 | Tooling | `testing/tests_tooling/` | Setup/config smoke, runner, reporters, and repository health. |
 
 Tooling tests must not import `lagniappe.core` or `lagniappe.web` and must not
-execute Node. Only E2E may import `lagniappe.web`.
+execute Node. Unit and JavaScript suites must not import `lagniappe.web`. Only
+HTTP (`test_client()`, offline) and E2E may import `lagniappe.web`, and HTTP
+tests must not import Playwright or browser-harness modules.
 
 ## Dependencies
 
@@ -42,6 +45,7 @@ Use the repository virtualenv and runner:
 ```bash
 venv/bin/python run.py test
 venv/bin/python run.py test unit
+venv/bin/python run.py test http
 venv/bin/python run.py test js
 venv/bin/python run.py test tooling
 venv/bin/python run.py test setup
@@ -92,10 +96,12 @@ suite:
 venv/bin/python run.py test --strict unit --tb=short
 ```
 
-The runner activates the checkout's complete saved gcloud target before pytest.
-An unconfigured checkout can run offline tests; a partial target fails before
-collection. E2E and managed-server startup also verify ADC. Use
-`venv/bin/python run.py auth` when alignment is needed.
+The runner activates the checkout's complete saved gcloud target and verifies
+ADC before cloud-aware runs (`e2e`, unfiltered full-suite runs, and
+`setup_provider` / `provider`). Offline suites (`unit`, `js`, `tooling`, and
+ordinary `setup`) skip `gcloud` preflight so they run without cloud CLI access
+or writable gcloud config. Use `venv/bin/python run.py auth` when alignment is
+needed.
 
 Start with one nodeid or file. Expand after focused probes pass. Local E2E and
 `test-server` share one durable checkout session plus a cross-machine data
@@ -134,8 +140,8 @@ so adding a setup module cannot silently omit it from the alias.
 
 | Marker | Meaning |
 | --- | --- |
-| `unit`, `js`, `e2e`, `tooling` | Suite ownership. |
-| `ai` | Live AI behavior with a longer operation budget and result report. |
+| `unit`, `http`, `js`, `e2e`, `tooling` | Suite ownership. |
+| `ai` | Live-LLM behavior (opt-in via `-m ai`; excluded from default runs so routine E2E stays deterministic and fast; uses a longer operation budget and result report). |
 | `setup_drift` | Read-only provider/config audit. |
 | `setup_provider` | Sequential live-provider runtime contract. |
 | `unfinished` | Explicit backlog stub, excluded by default. |
@@ -157,28 +163,41 @@ leave a reviewable artifact.
 Keep the `testing/` root clean. Place test files by suite, not by the location
 of a helper they happen to import.
 
-## Traceability and template tools
+## Static typing, linting, and cross-boundary contracts
+
+The application and installer target Python 3.14. The root type check covers
+config, the application, runner, installer and entry points. The adapter shares
+the standard-mode policy and resolves dependencies against its locked `mcp/.venv`.
 
 ```bash
-venv/bin/python run.py traceability --changed --check
-venv/bin/python run.py traceability --source lagniappe/core/tools/cache/core.py
-venv/bin/python run.py traceability --test testing/tests_unit/test_file.py
-venv/bin/python run.py template-contracts --changed --check
-venv/bin/python run.py traceability --styles
+venv/bin/python -m basedpyright --warnings
+venv/bin/python -m runner.uv_bootstrap install --non-interactive
+venv/bin/python -c 'from runner.mcp_environment import prepare_environment; prepare_environment()'
+venv/bin/python -m basedpyright --warnings --project mcp/pyrightconfig.json
+venv/bin/python -m ruff check .
+npm run check
+venv/bin/python run.py template-contracts --check
+venv/bin/python run.py style-contracts --check
+venv/bin/python run.py mutation-contracts --check
 ```
 
-`run.py test` records exact outcomes in `testing/evidence/latest.json`.
-Traceability checks whether referenced tests are current for their declared
-source/template/style dependencies. Use:
+Declare the inputs and results of public and shared functions. Describe stored
+records, request bodies, service results and dynamic properties at the boundary
+where callers rely on their shape. Ruff enforces its selected bug-risk,
+modernization and simplification rules across the repository. Each local
+exception should explain the supported behavior it preserves.
 
-- [TESTING_TRACEABILITY_TOOL.md](TESTING_TRACEABILITY_TOOL.md) for syntax and
-  report behavior;
-- [TESTING_SOURCE_REVIEW.md](TESTING_SOURCE_REVIEW.md) when reviewing source
-  ownership;
-- [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md#basic-test-review-checklist)
-  for the behavior checklist when writing or reviewing a test; and
-- [TESTING_TEMPLATE_CONTRACTS.md](TESTING_TEMPLATE_CONTRACTS.md) for Jinja DOM
-  contracts.
+Template checks resolve tagged tests to Jinja macros and inspect selectors used
+by JavaScript. Style checks match styles and icons to their consumers and
+recorded test evidence. Mutation checks verify declared entity relationships
+and save requirements. In a checkout without an installation, CI loads the
+real entity registry with `FLASK_ENV=testing` and
+`LAGNIAPPE_CONFIG_ROOT="$PWD/testing/fixtures/offline-runtime"`.
+For a behavioral change, find the entry point and its
+callers and run tests that exercise the changed behavior. See
+[writing tests](TESTING_WRITING_TESTS.md),
+[template contracts](TESTING_TEMPLATE_CONTRACTS.md) and
+[style review](INFRA_BUILD_STYLE_REVIEW.md).
 
 ## Artifacts and evidence
 
@@ -191,12 +210,17 @@ Generated artifacts live under `reports/`:
   `reports/test-session.lock`;
 - managed server log: `reports/test-server.log`;
 - hosted bundles: `reports/hosted-e2e/`; and
-- traceability/template/style reports at their named report paths.
+- template and style reports at their respective report paths.
 
-`testing/evidence/latest.json` is tracked current evidence, not a run log. It
-keeps one result per exact nodeid and only the newest session invocation
-metadata. Semantic fingerprints ignore comments, documentation, generated
-evidence, GitHub workflow files, and the random build ID while retaining
+`testing/evidence/latest.json` is tracked release/contract evidence, not a local
+run log. Ordinary local `run.py test` runs leave `testing/evidence/latest.json`
+untouched so focused development does not create diff noise or multi-agent merge
+conflicts. Pass `--write-test-evidence` (or set `LAGNIAPPE_WRITE_TEST_EVIDENCE=1`)
+to update it locally; hosted release validation (`LAGNIAPPE_HOSTED_E2E=true`)
+writes it automatically, and `--no-test-evidence` force-skips writing in any mode.
+When written, it keeps one result per exact nodeid and only the newest session
+invocation metadata. Semantic fingerprints ignore comments, documentation,
+generated evidence, GitHub workflow files, and the random build ID while retaining
 behavior-bearing source/template dependencies. Review failed tracebacks before
 commit because diagnostics must not contain credentials or private data.
 

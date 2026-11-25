@@ -1,19 +1,33 @@
-target-version = "py312"
+target-version = "py314"
 line-length = 88
 
 exclude = [
     ".git",
     ".pytest_cache",
     "lagniappe/web/static",
+    "mcp/.uv-cache",
+    "mcp/.venv",
     "node_modules",
     "reports",
     "venv",
 ]
 
 [lint]
-select = ["E4", "E7", "E9", "F"]
+select = ["E4", "E7", "E9", "F", "B", "UP", "SIM"]
 
 [lint.per-file-ignores]
-"**/__init__.py" = ["E402", "F401"]
+# The facade modules publish imports as package attributes for existing callers.
+"installer/__init__.py" = ["F401"]
+"installer/domain/__init__.py" = ["F401"]
+"lagniappe/__init__.py" = ["F401"]
+"lagniappe/core/definitions/__init__.py" = ["F401"]
+"lagniappe/core/mixins/__init__.py" = ["F401"]
+# Configuration and exception initialization precede their dependent imports.
+"config/__init__.py" = ["E402"]
+"lagniappe/core/exceptions/__init__.py" = ["E402"]
+# Flask discovers decorated routes when the modules import their blueprint.
+"lagniappe/web/__init__.py" = ["E402", "F401"]
+"lagniappe/web/routes/*/__init__.py" = ["E402", "F401"]
+# These setup modules expose shared settings helpers after their bootstrap definitions.
 "installer/ai_settings.py" = ["E402"]
 "installer/deployment.py" = ["E402"]

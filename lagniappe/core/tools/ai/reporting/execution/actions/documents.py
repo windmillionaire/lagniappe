@@ -1,7 +1,20 @@
 """Reviewed Page document edits with durable recovery versions and receipts."""
 
-from datetime import datetime, timezone
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ReportAction
+    from lagniappe.core.tools.ai.reporting.execution.batch import WorkingEntities
+    from lagniappe.core.tools.ai.reporting.execution.ledger import ActionRecord
+    from typing import Literal
+
+
+from datetime import datetime, UTC
 from html import escape
+
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import MutationIntent
@@ -11,6 +24,7 @@ from lagniappe.core.tools.document_crdt import (
     append_fragment,
     replace_fragment,
     load_document,
+    report_receipts,
 )
 from lagniappe.core.tools.document_updates import (
     checkpointed_document,
@@ -22,10 +36,7 @@ from .references import _resolve_entity, _load_result_entity
 from .results import _entity_result
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_source_quote_uses_trusted_origin
-# @matrix agent-api email editor : document source-attribution
-def document_source_quote(report, timestamp):
+def document_source_quote(report: models.AIReport, timestamp: str) -> str:
     origin = getattr(report, "origin", "web")
     source = {
         "web": "Application",
@@ -41,21 +52,20 @@ def document_source_quote(report, timestamp):
     return f"<blockquote><p>{escape(timestamp)} · {source}</p></blockquote>"
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
-# @matrix ai-report editor : document append retry
-def prepare_document_append(action, report, user, created, record):
+def prepare_document_append(
+    action: ReportAction,
+    report: models.AIReport,
+    user: models.User,
+    created: WorkingEntities,
+    record: ActionRecord,
+) -> None:
     page = _resolve_entity(
         _first_data_reference(_data(action), "page"), created, expected=Entities.PAGE
     )
     record["before"] = {"entity": _entity_result(page)}
-    record["document_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    record["document_at"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
-# @matrix ai-report editor : document append retry
-# @matrix ai-report editor sync : document append browser-review persistence source-attribution
 def _append_page_document(action, report, user, created, context):
     record = context["action_record"]
     page = _resolve_entity(
@@ -66,12 +76,13 @@ def _append_page_document(action, report, user, created, context):
         raise exceptions.ValidationError("Document is unavailable or no longer editable.")
     with document_write_lock(page.properties.document.sync_id):
         document = page.properties.document
-        receipt = load_document(document.ydoc)["lagniappeReports"].get(
+        receipt = report_receipts(load_document(document.ydoc)).get(
             record["idempotency_key"]
         )
         if receipt:
             # This operation already committed. Later user edits are authoritative;
             # retry must not restore or duplicate the originally appended content.
+            assert "signature" in receipt
             return page, [], {"document_after": receipt["signature"]}
         batch = context["batch"]
         first_append = page.key not in batch.documents
@@ -98,30 +109,33 @@ def _append_page_document(action, report, user, created, context):
             )
         html = addition if replacing else (document.html or "") + addition
         if replacing:
+            assert history is not None
             snapshot, receipt = replace_fragment(
                 document.ydoc, html, record["idempotency_key"],
-                previous_version=history.urlsafe_key, name=history.name,
+                previous_version=history.urlsafe_key, name="Before document replacement",
             )
         else:
             snapshot, receipt = append_fragment(
                 document.ydoc, addition, record["idempotency_key"], html_after=html
             )
         document.save(html=html, ydoc=snapshot)
+        assert "signature" in receipt
         return page, [], {"document_after": receipt["signature"]}
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
-# @matrix ai-report editor : document append retry
-def inspect_document_append(record, user):
+def inspect_document_append(
+    record: ActionRecord, user: models.User
+) -> Literal["applied", "drifted", "not-applied"]:
     page = _load_result_entity((record.get("before") or {}).get("entity"))
     if page is None:
         return "not-applied" if not record.get("prepared") else "drifted"
     try:
         page = fresh_document(page, user)
+        if not isinstance(page, Entities.PAGE):
+            return "drifted"
     except exceptions.ValidationError:
         return "drifted"
-    receipt = load_document(page.properties.document.ydoc)["lagniappeReports"].get(
+    receipt = report_receipts(load_document(page.properties.document.ydoc)).get(
         record["idempotency_key"]
     )
     if not receipt:
@@ -131,5 +145,6 @@ def inspect_document_append(record, user):
     record["entity"] = _entity_result(page)
     # The applied receipt is historical proof, not a guard on current content.
     # Reconcile a lost Report checkpoint without treating later user edits as drift.
+    assert "signature" in receipt
     record.setdefault("document_after", receipt["signature"])
     return "applied"

@@ -69,9 +69,10 @@ the behavior.
 
 | Layer | Use it for |
 | --- | --- |
-| Unit | Deterministic backend entities, properties, permissions, validation, retries, and service logic without a live app server. |
+| Unit | Deterministic backend entities, properties, permissions, validation, retries, and service logic without Flask or a live app server. |
+| HTTP | Offline Flask `test_client()` contracts for non-UI and negative route paths: auth/403s, CSRF exemptions, security headers/CSP, OIDC/webhook gates, and API envelopes (no browser, no live cloud I/O). |
 | JavaScript | Frontend module behavior in Node, including jsdom DOM operations and simulated persistence; no live browser/server. |
-| E2E | User workflows or browser lifecycle behavior that requires a real browser/server boundary, DOM, routing, storage, rendering, or multi-user interaction. |
+| E2E | User workflows, happy paths, or browser lifecycle behavior that requires a real browser/server boundary, DOM, routing, storage, rendering, or multi-user interaction. |
 | Tooling | Setup/config smoke tests, repository health, reporters, and runner behavior. Tooling tests must not import `lagniappe.core` or `lagniappe.web`, or execute Node. |
 
 Do not keep procedural coverage in E2E merely because an E2E test can reach it.
@@ -454,14 +455,12 @@ Tooling tests belong in `testing/tests_tooling/`. They test the repository and
 runner without importing `lagniappe.core` or `lagniappe.web` and without
 executing Node.
 
-## Traceability and Template Contracts
+## Template and style contracts
 
-Use supported `@matrix`, exact `@pair`, `@source`, `@template`, and `@todo`
-tags as evidence, not decoration. A test should claim only behavior that its
-assertions prove. Follow
-[TESTING_TRACEABILITY_TOOL.md](TESTING_TRACEABILITY_TOOL.md) before adding or
-changing source annotations, and [TESTING_SOURCE_REVIEW.md](TESTING_SOURCE_REVIEW.md)
-when judging whether a test really covers a source symbol.
+Identify the observable result each test proves, including relevant missing or
+invalid input behavior. Use `@style semantic.id` when the test directly
+exercises that style. The style checker also derives evidence from referenced
+template macros.
 
 Use `@template path.html::macro` when a template's DOM skeleton is part of the
 test contract. Run the template-contract reporter after changing tagged UI
@@ -477,7 +476,6 @@ change warrants:
 ```bash
 venv/bin/python run.py test testing/tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel
 venv/bin/python run.py test testing/tests_e2e/003_forms/test_003b_form_builder.py
-venv/bin/python run.py traceability --changed --check
 venv/bin/python run.py template-contracts --changed --check
 ```
 

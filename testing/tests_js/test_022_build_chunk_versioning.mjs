@@ -29,7 +29,6 @@ function writeAt(root, relative, content) {
 	writeFileSync(path, content);
 }
 
-// @matrix cache frontend-build : bundle-consistency chunk-versioning
 test("test_rollup_versions_generated_chunk_imports_and_precache_urls", async () => {
 	const buildId = "btest123";
 	const modules = new Map([
@@ -107,7 +106,6 @@ test("test_rollup_versions_generated_chunk_imports_and_precache_urls", async () 
 	]);
 });
 
-// @matrix frontend-build : build-identity service-worker
 test("test_service_worker_records_the_build_identity", () => {
 	const originalDirectory = process.cwd();
 	const outputDirectory = mkdtempSync(join(tmpdir(), "lagniappe-build-mode-"));
@@ -117,19 +115,22 @@ test("test_service_worker_records_the_build_identity", () => {
 		mkdirSync("config", { recursive: true });
 		mkdirSync("lagniappe/web/static", { recursive: true });
 		writeFileSync(
-			"src/script/sw.template.mjs",
+			"src/script/sw.template.ts",
 			[
-				'const BUILD_ID = "__BUILD_ID__";',
-				"const PROTOCOL = /* __BROWSER_PROTOCOL__ */ null;",
-				"const PRECACHE = /* __PRECACHE_URLS__ */ [];",
+				"declare const __BUILD_ID__: string;",
+				"const BUILD_ID: string = __BUILD_ID__;",
+				"const PROTOCOL = __BROWSER_PROTOCOL__;",
+				"const PRECACHE = __PRECACHE_URLS__;",
 			].join("\n"),
 		);
 		writeFileSync("config/browser_protocol.json", '{"version": 1}\n');
 
 		updateServiceWorker("b1234567").writeBundle({}, {});
-		assert.match(
-			readFileSync("lagniappe/web/static/sw.js", "utf8"),
-			/b1234567/,
+		const output = readFileSync("lagniappe/web/static/sw.js", "utf8");
+		assert.match(output, /b1234567/);
+		assert.doesNotMatch(
+			output,
+			/__BUILD_ID__|__BROWSER_PROTOCOL__|__PRECACHE_URLS__|: string/,
 		);
 	} finally {
 		process.chdir(originalDirectory);
@@ -137,7 +138,6 @@ test("test_service_worker_records_the_build_identity", () => {
 	}
 });
 
-// @matrix frontend-build : artifact-inventory completion-marker nested-chunks source-integrity
 test("test_frontend_publication_records_recursive_artifacts_and_source_identity", async () => {
 	const originalDirectory = process.cwd();
 	const originalInventory = process.env.LAGNIAPPE_FRONTEND_ARTIFACT_INVENTORY;
@@ -172,7 +172,7 @@ test("test_frontend_publication_records_recursive_artifacts_and_source_identity"
 		);
 		writeAt(
 			outputDirectory,
-			"src/script/main.mjs",
+			"src/script/main.ts",
 			"export const current = true;\n",
 		);
 		writeAt(outputDirectory, "package.json", '{"version":"1.2.3"}\n');
@@ -251,7 +251,6 @@ test("test_frontend_publication_records_recursive_artifacts_and_source_identity"
 	}
 });
 
-// @matrix frontend-build : artifact-integrity safe-failure source-integrity
 test("test_frontend_publication_rejects_missing_outputs_and_source_drift", async () => {
 	const publication = await import(
 		`../../build/publication.mjs?test=failure-${Date.now()}`
@@ -274,7 +273,7 @@ test("test_frontend_publication_rejects_missing_outputs_and_source_drift", async
 		);
 		writeAt(
 			outputDirectory,
-			"src/script/main.mjs",
+			"src/script/main.ts",
 			"export const current = true;\n",
 		);
 		writeAt(outputDirectory, "package.json", '{"version":"1.2.3"}\n');
@@ -327,7 +326,7 @@ test("test_frontend_publication_rejects_missing_outputs_and_source_drift", async
 
 		writeAt(
 			outputDirectory,
-			"src/script/main.mjs",
+			"src/script/main.ts",
 			"export const current = false;\n",
 		);
 		assert.throws(
@@ -351,7 +350,6 @@ test("test_frontend_publication_rejects_missing_outputs_and_source_drift", async
 	}
 });
 
-// @matrix frontend-build icons : cache font-delivery stale-cleanup subset
 test("test_material_symbols_subset_font_is_emitted_with_content_hash", () => {
 	const source = readFileSync("./src/fonts/material-symbols-rounded.woff2");
 	const hash = createHash("sha256").update(source).digest("hex").slice(0, 12);
@@ -396,7 +394,6 @@ test("test_material_symbols_subset_font_is_emitted_with_content_hash", () => {
 	}
 });
 
-// @matrix frontend-build icons : css-url-resolution font-delivery
 test("test_material_symbols_css_points_to_the_content_hashed_font", async () => {
 	const result = await postcss([resolveFonts()]).process(
 		`
@@ -418,7 +415,6 @@ test("test_material_symbols_css_points_to_the_content_hashed_font", async () => 
 	);
 });
 
-// @matrix frontend-build icons : cache css-url-resolution font-delivery subset
 test("test_text_fonts_share_css_preload_and_asset_identity", async () => {
 	const assets = [];
 	emitFonts().generateBundle.call({
@@ -471,7 +467,6 @@ test("test_text_fonts_share_css_preload_and_asset_identity", async () => {
 	);
 });
 
-// @matrix frontend-build licensing : browser-notice-delivery
 test("test_third_party_notices_are_emitted_with_browser_assets", () => {
 	const emitted = [];
 	emitThirdPartyLicenses().generateBundle.call({

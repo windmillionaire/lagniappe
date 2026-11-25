@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 import json
 import os
 from pathlib import Path
@@ -23,7 +23,7 @@ EVIDENCE_PATH = REPOSITORY_ROOT / "testing/evidence/latest.json"
 MAX_FOCUSED_TARGETS = 50
 HOSTED_E2E_ENVIRONMENTS = ("standard",)
 STANDARD_JOB = "lagniappe-e2e"
-TEST_SUITES = ("tests_unit", "tests_js", "tests_tooling", "tests_e2e")
+TEST_SUITES = ("tests_unit", "tests_http", "tests_js", "tests_tooling", "tests_e2e")
 
 
 def _required_environment(name: str) -> str:
@@ -42,9 +42,6 @@ def _hosted_environment() -> str:
     return value
 
 
-# @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_individual_nodeids
-# @matrix hosted-e2e : argument-injection focused-execution target-validation
 def validate_focused_targets(targets) -> tuple[str, ...]:
     """Validate individual nodeid syntax and file scope before job overrides."""
     normalized = tuple(str(target).strip() for target in targets or ())
@@ -104,11 +101,6 @@ def validate_focused_targets(targets) -> tuple[str, ...]:
     return normalized
 
 
-# @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_individual_nodeids
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract
-# @matrix hosted-e2e : argument-injection focused-execution target-validation
-# @pair hosted-e2e:suite-scope
 def _pytest_command(
     targets=(),
     *,
@@ -147,14 +139,11 @@ def _pytest_command(
     ]
 
 
-# @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_complete_run_merges_all_phases_without_hiding_failure
-# @matrix hosted-e2e testing : suite-scope result-aggregation failure-retention
 def _run_complete_suites(environment):
     """Keep non-browser suites serial, then coordinate the complete E2E suite."""
     from runner.pytest_reports import merge_junit_reports
-    from testing.utility.traceability_common import load_json
-    from testing.utility.traceability_results import _write_manifest
+    from testing.utility.test_evidence import load_json
+    from testing.utility.evidence_results import _write_manifest
 
     # Each hosted execution owns its container. Historical or partial evidence
     # must never masquerade as part of this execution's complete selection.
@@ -163,7 +152,7 @@ def _run_complete_suites(environment):
     destination.unlink(missing_ok=True)
     statuses, reports = [], []
     for name, options in (
-        ("support", {"suites": ("unit", "js", "tooling")}),
+        ("support", {"suites": ("unit", "http", "js", "tooling")}),
         ("e2e", {"parallel": True}),
     ):
         report = HOSTED_REPORT_ROOT / f"{name}.xml"
@@ -179,7 +168,7 @@ def _run_complete_suites(environment):
     merge_junit_reports(reports, destination)
     evidence = load_json(EVIDENCE_PATH)
     if not evidence or evidence.get("kind") != "test-run":
-        raise RuntimeError("Hosted phases did not produce traceability evidence")
+        raise RuntimeError("Hosted phases did not produce test evidence")
     _write_manifest(REPOSITORY_ROOT, _pytest_command(environment=environment), evidence["tests"], status)
     return status
 
@@ -202,9 +191,9 @@ def _artifact_manifest(
     manifest = {
         "schema_version": 1,
         "kind": "hosted-e2e-result",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "suite_started_at": started_at.astimezone(timezone.utc).isoformat(),
-        "suite_finished_at": finished_at.astimezone(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
+        "suite_started_at": started_at.astimezone(UTC).isoformat(),
+        "suite_finished_at": finished_at.astimezone(UTC).isoformat(),
         "execution": execution,
         "job": job,
         "project": _required_environment("GOOGLE_CLOUD_PROJECT"),
@@ -233,11 +222,11 @@ def _archive_reports(destination: Path) -> None:
 
 
 def _stamp_evidence(manifest: dict) -> None:
-    from testing.utility.traceability_common import load_json, write_json
+    from testing.utility.test_evidence import load_json, write_json
 
     evidence = load_json(EVIDENCE_PATH)
     if not evidence or evidence.get("kind") != "test-run":
-        raise RuntimeError("pytest did not produce valid traceability evidence")
+        raise RuntimeError("pytest did not produce valid test evidence")
     provenance = dict(evidence.get("provenance") or {})
     provenance["hosted_e2e"] = {
         key: manifest[key]
@@ -279,7 +268,7 @@ def _upload_artifacts(manifest: dict) -> None:
         )
         _archive_reports(archive_path)
         if not EVIDENCE_PATH.is_file():
-            raise RuntimeError("pytest did not produce traceability evidence")
+            raise RuntimeError("pytest did not produce test evidence")
         uploads = (
             ("evidence.json", EVIDENCE_PATH),
             ("junit.xml", HOSTED_REPORT_ROOT / "junit.xml"),
@@ -292,9 +281,6 @@ def _upload_artifacts(manifest: dict) -> None:
                 bucket.blob(f"{prefix}/{name}").upload_from_filename(path)
 
 
-# @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_container_runs_complete_or_nodeids_and_records_scope
-# @matrix hosted-e2e : cli-routing suite-scope focused-execution target-validation
 def main(arguments=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -318,7 +304,7 @@ def main(arguments=None) -> int:
 
     execution = _required_environment("CLOUD_RUN_EXECUTION")
     HOSTED_REPORT_ROOT.mkdir(parents=True, exist_ok=True)
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     if suite == "all":
         exit_status = _run_complete_suites(environment)
     else:
@@ -327,7 +313,7 @@ def main(arguments=None) -> int:
             cwd=REPOSITORY_ROOT,
         )
         exit_status = result.returncode
-    finished_at = datetime.now(timezone.utc)
+    finished_at = datetime.now(UTC)
     manifest = _artifact_manifest(
         suite=suite,
         exit_status=exit_status,

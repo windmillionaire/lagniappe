@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
 
@@ -13,6 +14,8 @@ from runner.frontend_build import (
 
 
 pytestmark = pytest.mark.tooling
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _sha256(content):
@@ -37,7 +40,7 @@ def _write_completed_build(root, *, mode="production", version="1.2.3"):
     sources = {
         "build/publication.json": f"{json.dumps(contract, sort_keys=True)}\n",
         "package.json": f'{{"version": "{version}"}}\n',
-        "src/script/main.mjs": "export const current = true;\n",
+        "src/script/main.ts": "export const current = true;\n",
     }
     artifacts = {
         "lagniappe/web/static/chunks/shared.js": "export const shared = true;\n",
@@ -79,7 +82,6 @@ def _write_completed_build(root, *, mode="production", version="1.2.3"):
     return metadata
 
 
-# @matrix frontend-build : artifact-integrity build-metadata source-integrity
 def test_frontend_build_validator_checks_recursive_artifacts_and_source_identity(
     tmp_path,
 ):
@@ -118,7 +120,6 @@ def test_frontend_build_validator_checks_recursive_artifacts_and_source_identity
     assert any("not in the artifact inventory" in issue for issue in issues)
 
 
-# @matrix frontend-build : artifact-integrity build-identity path-safety
 def test_frontend_build_validator_rejects_unsafe_and_incoherent_metadata(tmp_path):
     metadata = _write_completed_build(tmp_path, mode="development")
     metadata["artifacts"][0]["path"] = "../outside.js"
@@ -142,7 +143,6 @@ def test_frontend_build_validator_rejects_unsafe_and_incoherent_metadata(tmp_pat
     assert any("different build IDs" in issue for issue in issues)
 
 
-# @matrix deploy frontend-build : safe-failure validation
 def test_verify_frontend_build_reports_actionable_failure(tmp_path):
     with pytest.raises(RuntimeError, match="Rerun the appropriate npm build command"):
         verify_frontend_build(
@@ -150,3 +150,44 @@ def test_verify_frontend_build_reports_actionable_failure(tmp_path):
             expected_mode="production",
             expected_version="1.2.3",
         )
+
+
+def test_authored_frontend_scripts_and_tsconfig_stay_strict_typescript():
+    script_root = REPO_ROOT / "src" / "script"
+    allowed_generated_js = {
+        "src/script/generated/icons.mjs",
+        "src/script/generated/styles.mjs",
+    }
+    js_files = sorted(
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in script_root.rglob("*")
+        if path.is_file() and path.suffix in {".js", ".mjs", ".cjs"}
+    )
+    assert set(js_files) <= allowed_generated_js, (
+        "Authored frontend modules under src/script/ must be TypeScript (.ts/.mts); "
+        f"found unexpected JS files: {sorted(set(js_files) - allowed_generated_js)}"
+    )
+
+    tsconfig = json.loads((REPO_ROOT / "tsconfig.json").read_text(encoding="utf-8"))
+    compiler_options = tsconfig["compilerOptions"]
+    assert compiler_options["strict"] is True
+    assert compiler_options["noEmit"] is True
+    assert compiler_options["erasableSyntaxOnly"] is True
+    assert compiler_options["allowImportingTsExtensions"] is True
+    assert compiler_options["allowJs"] is True
+    assert compiler_options["checkJs"] is False
+    assert tsconfig["include"] == ["src/script/**/*.ts", "src/script/**/*.mts"]
+    assert tsconfig["exclude"] == ["testing/"]
+
+    package = json.loads((REPO_ROOT / "package.json").read_text(encoding="utf-8"))
+    assert package["scripts"]["typecheck"] == "tsc --noEmit"
+
+
+def test_package_json_matches_canonical_config_serialization():
+    package_path = REPO_ROOT / "package.json"
+    raw = package_path.read_text(encoding="utf-8")
+    canonical = f"{json.dumps(json.loads(raw), indent=2, sort_keys=True)}\n"
+    assert raw == canonical, (
+        "package.json must match File.PACKAGE_JSON's sorted JSON serialization "
+        "so setup/upgrade saves do not rewrite it and invalidate build.json."
+    )

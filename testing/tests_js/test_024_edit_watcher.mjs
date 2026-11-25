@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
-import { incompatibleSchema } from "../../src/script/forms/representation.mjs";
+import { incompatibleSchema } from "../../src/script/forms/representation.ts";
 
 const areEqual = (left, right) =>
 	JSON.stringify(left) === JSON.stringify(right);
@@ -28,37 +28,36 @@ async function loadEditOwners({
 	},
 } = {}) {
 	const { EditReconciler } = await esmock.strict(
-		"../../src/script/forms/revisions/reconciler.mjs",
+		"../../src/script/forms/revisions/reconciler.ts",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError,
 			},
-			"../../src/script/shared/request.mjs": { request },
-			"../../src/script/shared/transitions.mjs": { withTransition },
-			"../../src/script/shared/utilities.mjs": { areEqual },
-			"../../src/script/forms/representation.mjs": { incompatibleSchema },
-			"../../src/script/forms/revisions/modals.mjs": {
+			"../../src/script/shared/request.ts": { request },
+			"../../src/script/shared/transitions.ts": { withTransition },
+			"../../src/script/shared/utilities.ts": { areEqual },
+			"../../src/script/forms/representation.ts": { incompatibleSchema },
+			"../../src/script/forms/revisions/modals.ts": {
 				FormRevisionModal: class {},
 				WholeFormRevisionModal: class {},
 			},
-			"../../src/script/forms/revisions/preview.mjs": {
+			"../../src/script/forms/revisions/preview.ts": {
 				loadRevisionPreview,
 			},
 		},
 	);
 	const { EditWatcher } = await esmock.strict(
-		"../../src/script/forms/revisions/watcher.mjs",
+		"../../src/script/forms/revisions/watcher.ts",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError,
 			},
-			"../../src/script/forms/revisions/reconciler.mjs": { EditReconciler },
+			"../../src/script/forms/revisions/reconciler.ts": { EditReconciler },
 		},
 	);
 	return { EditReconciler, EditWatcher };
 }
 
-/** @matrix forms unsaved-state : change input non-sync reset success */
 test("test_base_form_tracks_unsaved_state_without_sync", async () => {
 	const listeners = new Map();
 	const target = {
@@ -81,20 +80,20 @@ test("test_base_form_tracks_unsaved_state_without_sync", async () => {
 		unsavedState: false,
 	};
 	const { FormController } = await esmock.strict(
-		"../../src/script/forms/controller.mjs",
+		"../../src/script/forms/controller.ts",
 		{
-			"../../src/script/elements/primitives.mjs": {
+			"../../src/script/elements/primitives.ts": {
 				primitives: { error: () => ({}) },
 			},
-			"../../src/script/shared/icons.mjs": { createIcon: () => ({}) },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/icons.ts": { createIcon: () => ({}) },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
-			"../../src/script/shared/utilities.mjs": { showBriefly() {} },
-			"../../src/script/forms/controls/loader.mjs": {
+			"../../src/script/shared/utilities.ts": { showBriefly() {} },
+			"../../src/script/forms/controls/loader.ts": {
 				initFormControls: async () => [],
 			},
-			"../../src/script/forms/renderer.mjs": { FormRenderer: class {} },
+			"../../src/script/forms/renderer.ts": { FormRenderer: class {} },
 		},
 	);
 	const form = new FormController(widget);
@@ -120,7 +119,6 @@ test("test_base_form_tracks_unsaved_state_without_sync", async () => {
 	assert.equal(widget.unsavedState, false);
 });
 
-/** @matrix edited-entity-notice forms : canonicalization formdata repeated-values revision-only-state */
 test("test_form_revision_snapshot_is_canonical_and_memory_only", async () => {
 	class FakeFormData {
 		constructor(entries = []) {
@@ -138,16 +136,16 @@ test("test_form_revision_snapshot_is_canonical_and_memory_only", async () => {
 		setAttribute() {},
 	};
 	const { FormWidget } = await esmock.strict(
-		"../../src/script/widgets/base/formWidget.mjs",
+		"../../src/script/widgets/base/formWidget.ts",
 		{
-			"../../src/script/forms/controller.mjs": { FormController: class {} },
-			"../../src/script/forms/migrationNotice.mjs": {
+			"../../src/script/forms/controller.ts": { FormController: class {} },
+			"../../src/script/forms/migrationNotice.ts": {
 				installMigrationNotice() {},
 			},
-			"../../src/script/forms/representation.mjs": {
+			"../../src/script/forms/representation.ts": {
 				compatibleField: () => true,
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
 		},
@@ -182,9 +180,6 @@ test("test_form_revision_snapshot_is_canonical_and_memory_only", async () => {
 	assert.equal(Boolean(target.dataset?.revisionFingerprint), false);
 });
 
-/**
- * @matrix edited-entity-notice : acknowledgement acknowledgement-no-probe active-state batching clean-state comparison entity-ancestor focused-state overlap-follow-up per-form reload-fallback subscription-lifecycle targeted-reset transition visibility
- */
 test("test_edit_watcher_compares_and_resets_each_form_independently", async (t) => {
 	const events = [];
 	const focusedElement = {};
@@ -417,7 +412,6 @@ test("test_edit_watcher_compares_and_resets_each_form_independently", async (t) 
 	assert.equal(pollTriggers.length, triggersBefore + 1);
 });
 
-/** @matrix edited-entity-notice : clean-state coalescing overlap-follow-up */
 test("test_edit_watcher_coalesces_overlapping_revision_probes", async (t) => {
 	const requests = [];
 	const applications = [];
@@ -519,7 +513,6 @@ test("test_edit_watcher_coalesces_overlapping_revision_probes", async (t) => {
 	);
 });
 
-/** @matrix edited-entity-notice : conflict-fallback */
 test("test_conflict_preview_failure_offers_reload_without_losing_draft", async () => {
 	const errors = [];
 	const { EditReconciler } = await loadEditOwners({
@@ -566,8 +559,6 @@ test("test_conflict_preview_failure_offers_reload_without_losing_draft", async (
 	assert.equal(reconciler._state(marker).conflictPromise, null);
 });
 
-/** @pair edited-entity-notice:unchanged-form */
-/** @source src/script/forms/revisions/reconciler.mjs::EditReconciler */
 test("test_metadata_only_revision_preserves_clean_and_dirty_forms", async (t) => {
 	replaceGlobal(t, "document", { activeElement: null });
 	const { EditReconciler } = await loadEditOwners({
@@ -627,8 +618,6 @@ test("test_metadata_only_revision_preserves_clean_and_dirty_forms", async (t) =>
 	}
 });
 
-/** @matrix offline : conflict-durability reload submission-choice */
-/** @source src/script/forms/revisions/reconciler.mjs::EditReconciler */
 test("test_reloaded_saved_form_does_not_cancel_different_queued_answers", async (t) => {
 	replaceGlobal(t, "document", { activeElement: null });
 	const { EditReconciler } = await loadEditOwners({

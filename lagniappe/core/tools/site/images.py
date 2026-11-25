@@ -1,4 +1,9 @@
 import io
+from typing import TYPE_CHECKING, BinaryIO, cast
+
+if TYPE_CHECKING:
+    from werkzeug.datastructures import FileStorage
+    from ..database.assets import DirectUploadFile
 
 from PIL import Image, ImageDraw, ImageFilter
 
@@ -14,10 +19,7 @@ from ..database import assets as storage_database
 from ..database import site as site_database
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/images.py::create_site_image
-# @reason background removal is part of the site image admin workflow gap
-def flood_fill_background(image, tolerance=30):
+def flood_fill_background(image: Image.Image, tolerance: int = 30) -> Image.Image:
     """
     Background removal using flood fill from corners.
 
@@ -42,7 +44,7 @@ def flood_fill_background(image, tolerance=30):
         corner_color = image.getpixel((corner_x, corner_y))
 
         # Skip if corner is already transparent
-        if len(corner_color) == 4 and corner_color[3] == 0:
+        if isinstance(corner_color, tuple) and len(corner_color) == 4 and corner_color[3] == 0:
             continue
 
         # Use ImageDraw for flood fill
@@ -53,11 +55,7 @@ def flood_fill_background(image, tolerance=30):
     return result
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @tests tests_unit/test_018_database_assets.py::test_site_image_rejects_oversized_input_before_decode
-# @matrix admin : generated-images metadata site-image-upload
-def create_site_image(image, remove_bg=True, bg_tolerance=30):
+def create_site_image(image: FileStorage | DirectUploadFile, remove_bg: bool = True, bg_tolerance: int = 30) -> dict[str, str]:
     """
     Save site image with optional background removal.
     Uploads to the public bucket and stores paths in datastore.
@@ -82,7 +80,8 @@ def create_site_image(image, remove_bg=True, bg_tolerance=30):
 
     try:
         image.stream.seek(0)
-        source_image = Image.open(image.stream)
+        # Pillow reads, seeks and tells on the bounded direct-upload stream.
+        source_image = Image.open(cast(BinaryIO, image.stream))
     except Exception as e:
         context = {
             "image_processing": {
@@ -92,7 +91,7 @@ def create_site_image(image, remove_bg=True, bg_tolerance=30):
             },
         }
         exceptions.capture(e, context)
-        raise exceptions.SiteImageError(f"Invalid image file: {str(e)}")
+        raise exceptions.SiteImageError(f"Invalid image file: {str(e)}") from e
 
     if source_image.mode != "RGBA":
         try:
@@ -106,10 +105,10 @@ def create_site_image(image, remove_bg=True, bg_tolerance=30):
                 },
             }
             exceptions.capture(e, context)
-            raise exceptions.SiteImageError(f"Failed to convert image: {str(e)}")
+            raise exceptions.SiteImageError(f"Failed to convert image: {str(e)}") from e
 
-    pixels = list(source_image.getdata())
-    transparent_count = sum(1 for p in pixels if len(p) == 4 and p[3] < 255)
+    pixels = source_image.get_flattened_data()
+    transparent_count = sum(1 for p in pixels if isinstance(p, tuple) and len(p) == 4 and p[3] < 255)
     total_pixels = len(pixels)
     transparency_percent = (transparent_count / total_pixels) * 100
 
@@ -127,6 +126,7 @@ def create_site_image(image, remove_bg=True, bg_tolerance=30):
             exceptions.capture(e, context)
 
     image_paths = {}
+    generated_images: dict[str, bytes] = {}
     try:
         generated_images = generate_site_images(source_image)
         image_generations = {}
@@ -149,20 +149,17 @@ def create_site_image(image, remove_bg=True, bg_tolerance=30):
                 "operation": "generate_and_upload",
                 "filename": getattr(image, "filename", "unknown"),
                 "generated_count": (
-                    len(generated_images) if "generated_images" in locals() else 0
+                    len(generated_images)
                 ),
             },
         }
         exceptions.capture(e, context)
-        raise exceptions.SiteImageError(f"Error during image generation: {str(e)}")
+        raise exceptions.SiteImageError(f"Error during image generation: {str(e)}") from e
 
     return image_paths
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/images.py::generate_site_images
-# @reason source image validation is part of generated site image output
-def validate_source_image(image):
+def validate_source_image(image: Image.Image) -> tuple[bool, str]:
     """
     Validate if the source image is suitable for favicon/icon generation.
 
@@ -196,10 +193,7 @@ def validate_source_image(image):
     return True, "Image is suitable for favicon generation."
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/images.py::generate_site_images
-# @reason maskable icon shaping is part of generated site image output
-def create_maskable_icon(image, size, padding_percent=20):
+def create_maskable_icon(image: Image.Image, size: int, padding_percent: int = 20) -> Image.Image:
     """
     Create a maskable icon by adding padding and ensuring the icon fits within the safe area.
     Preserves transparency from the source image.
@@ -236,10 +230,7 @@ def create_maskable_icon(image, size, padding_percent=20):
     return maskable
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/images.py::generate_site_images
-# @reason image resizing is part of generated site image output
-def resize_image_smooth(image, size):
+def resize_image_smooth(image: Image.Image, size: tuple[int, int]) -> Image.Image:
     """
     Resize image with high quality resampling and sharpening while preserving transparency.
 
@@ -273,10 +264,7 @@ def resize_image_smooth(image, size):
     return resized
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/images.py::generate_site_images
-# @reason ICO assembly is part of generated site image output
-def create_ico_file(image):
+def create_ico_file(image: Image.Image) -> bytes:
     """
     Create a multi-size ICO file containing 16x16, 32x32, and 48x48 versions.
     Preserves transparency from the source image.
@@ -303,12 +291,9 @@ def create_ico_file(image):
     return ico_buffer.getvalue()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/site/images.py::generate_site_images
-# @reason splash image composition is part of generated site image output
 def create_splash_screen(
-    source_image, app_name, size=(1242, 2688), theme_color="#4f46e5"
-):
+    source_image: Image.Image, app_name: str, size: tuple[int, int] = (1242, 2688), theme_color: str = "#4f46e5"
+) -> Image.Image:
     """
     Create a splash screen with the app logo and name.
 
@@ -365,9 +350,9 @@ def create_splash_screen(
         splash.paste(logo_resized, (logo_x, logo_y))
 
     # Add app name below logo
+    font_size = width // 20
     try:
         # Try to use a nice font, fall back to default
-        font_size = width // 20  # Responsive font size
         font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
     except OSError:
         try:
@@ -401,10 +386,7 @@ def create_splash_screen(
     return splash
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008g_site_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @pair admin:generated-images
-def generate_site_images(source_image):
+def generate_site_images(source_image: Image.Image) -> dict[str, bytes]:
     """
     Generate all necessary favicon, icon, and splash screen files from a source image.
     Preserves transparency in all formats except ICO (which doesn't support it well).

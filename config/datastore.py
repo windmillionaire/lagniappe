@@ -5,8 +5,35 @@ from __future__ import annotations
 import base64
 import binascii
 import re
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Protocol, cast
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
 
 from google.protobuf.message import DecodeError
+
+
+class _ReferencePath(Protocol):
+    element: Sequence[object]
+
+
+class _KeyReference(Protocol):
+    # Fields from google/cloud/datastore/_app_engine_key.proto.
+    app: str
+    name_space: str
+    database_id: str
+    path: _ReferencePath
+
+    def ParseFromString(self, data: bytes, /) -> int: ...
+    def SerializeToString(self) -> bytes: ...
+
+
+def _new_key_reference() -> _KeyReference:
+    from google.cloud.datastore import _app_engine_key_pb2
+
+    # The SDK creates the protobuf class and its fields at import time.
+    return cast(_KeyReference, _app_engine_key_pb2.Reference())
 
 
 DEFAULT_DATABASE_ID = "(default)"
@@ -16,10 +43,7 @@ UUID_PATTERN = re.compile(
 )
 
 
-# @testable true
-# @tests tests_unit/test_016_config.py::test_installer_database_id_validation
-# @pair data-lifecycle:named-scratch-database
-def validate_database_id(value, *, allow_default=True):
+def validate_database_id(value: object, *, allow_default: bool = True) -> str:
     value = str(value or "").strip()
     if allow_default and value == DEFAULT_DATABASE_ID:
         return value
@@ -36,10 +60,7 @@ def validate_database_id(value, *, allow_default=True):
     return value
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_database_aware_urlsafe_key_round_trip
-# @pair database:named-key-encoding
-def encode_urlsafe_key(key):
+def encode_urlsafe_key(key: Key) -> str:
     """Encode a Datastore Key, retaining a named database when present."""
     raw_database_id = getattr(key, "database", None)
     database_id = str(raw_database_id or DEFAULT_DATABASE_ID)
@@ -54,7 +75,6 @@ def encode_urlsafe_key(key):
             )
         return key.to_legacy_urlsafe().decode("ascii")
     from google.cloud.datastore import Key
-    from google.cloud.datastore import key as key_module
 
     default_key = Key(
         *key.flat_path,
@@ -63,16 +83,13 @@ def encode_urlsafe_key(key):
     )
     token = default_key.to_legacy_urlsafe()
     padding = b"=" * (-len(token) % 4)
-    reference = key_module._app_engine_key_pb2.Reference()
+    reference = _new_key_reference()
     reference.ParseFromString(base64.urlsafe_b64decode(token + padding))
     reference.database_id = validate_database_id(database_id, allow_default=False)
     return base64.urlsafe_b64encode(reference.SerializeToString()).rstrip(b"=").decode("ascii")
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_database_aware_urlsafe_key_round_trip
-# @pair database:named-key-encoding
-def decode_urlsafe_key(value):
+def decode_urlsafe_key(value: str | bytes) -> Key:
     """Decode default or named-database legacy Reference tokens."""
     from google.cloud.datastore import Key
     from google.cloud.datastore import key as key_module
@@ -83,7 +100,7 @@ def decode_urlsafe_key(value):
     if not encoded or not re.fullmatch(rb"[A-Za-z0-9_-]+", encoded):
         raise ValueError("Datastore key token is not canonical urlsafe base64.")
     padding = b"=" * (-len(encoded) % 4)
-    reference = key_module._app_engine_key_pb2.Reference()
+    reference = _new_key_reference()
     try:
         reference.ParseFromString(base64.b64decode(encoded + padding, altchars=b"-_", validate=True))
     except (binascii.Error, DecodeError, ValueError) as error:

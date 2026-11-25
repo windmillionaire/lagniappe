@@ -1,6 +1,6 @@
 """Focused deferred-job behavior tests."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 import json
 from types import SimpleNamespace
 
@@ -37,7 +37,6 @@ from testing.utility.deferred_job_fakes import operation_projection  # noqa: F40
 pytestmark = pytest.mark.unit
 
 
-# @matrix deferred-jobs : cancellation deterministic-task-id
 def test_cancel_deletes_tasks_and_persists_a_tombstone(
     monkeypatch,
     operation_projection,  # noqa: F811
@@ -102,7 +101,6 @@ def test_cancel_deletes_tasks_and_persists_a_tombstone(
     assert operation_projection == [job]
 
 
-# @matrix deferred-jobs : cache-failure-isolation redis-projection
 def test_operation_projection_failure_is_nonfatal(monkeypatch):
     job = SimpleNamespace(urlsafe_key="durable-job")
     captured = []
@@ -134,7 +132,6 @@ def test_operation_projection_failure_is_nonfatal(monkeypatch):
     }
 
 
-# @matrix deferred-jobs : batching owner progress status timing
 def test_statuses_returns_only_jobs_visible_to_the_actor(monkeypatch):
     registry = DeferredJobService()
     registry.adapter_registry._defaults_loaded = True
@@ -161,7 +158,7 @@ def test_statuses_returns_only_jobs_visible_to_the_actor(monkeypatch):
     statuses = registry.statuses(
         [owner_job.key, other_job.key, owner_job.key, "missing-job"],
         actor,
-        now=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        now=datetime(2026, 1, 1, tzinfo=UTC),
     )
 
     assert fetched == [[owner_job.key, other_job.key, "missing-job"]]
@@ -170,7 +167,6 @@ def test_statuses_returns_only_jobs_visible_to_the_actor(monkeypatch):
     assert statuses[0]["phase"] == DeferredJobPhase.QUEUED.value
 
 
-# @pair deferred-jobs:batching
 def test_statuses_rejects_more_than_fifty_jobs():
     with pytest.raises(exceptions.ValidationError, match="At most 50"):
         DeferredJobService().statuses(
@@ -179,7 +175,6 @@ def test_statuses_rejects_more_than_fifty_jobs():
         )
 
 
-# @pairs cloud-scheduler:datastore-read-isolation deferred-jobs:terminal-delivery
 def test_terminal_release_reuses_committed_scheduler_control(monkeypatch):
     registry = DeferredJobService()
     job = RunnerJob()
@@ -218,7 +213,6 @@ def test_terminal_release_reuses_committed_scheduler_control(monkeypatch):
     assert synchronized == [{"control": control}]
 
 
-# @matrix deferred-jobs notifications : feedback long-running terminal-safety
 def test_long_running_feedback_updates_pending_notification(monkeypatch):
     registry = DeferredJobService()
     registry.adapter_registry._defaults_loaded = True
@@ -247,7 +241,6 @@ def test_long_running_feedback_updates_pending_notification(monkeypatch):
     assert saved == []
 
 
-# @matrix deferred-jobs notifications : feedback long-running scheduling
 def test_long_running_feedback_dispatch_is_delayed_and_deterministic(monkeypatch):
     registry = DeferredJobService()
     registry.adapter_registry._defaults_loaded = True
@@ -285,7 +278,6 @@ def test_long_running_feedback_dispatch_is_delayed_and_deterministic(monkeypatch
     ]
 
 
-# @matrix deferred-jobs : disabled-queue dispatch task-identity
 def test_production_dispatch_rejects_disabled_task_queue(monkeypatch):
     registry = DeferredJobService()
     job = RunnerJob()
@@ -313,8 +305,6 @@ def test_production_dispatch_rejects_disabled_task_queue(monkeypatch):
         registry.dispatch(job, attempt=1)
 
 
-# @matrix deferred-jobs : no-apply transient-dispatch
-# @pair notifications:pending-state
 def test_start_retains_generic_intent_after_dispatch_failure(monkeypatch):
     actor, state = fake_start_entities(monkeypatch)
     registry = DeferredJobService()
@@ -357,7 +347,6 @@ def test_start_retains_generic_intent_after_dispatch_failure(monkeypatch):
     assert adapter.calls == []
 
 
-# @matrix deferred-jobs : compare-and-set dispatch-worker-race
 def test_start_dispatch_marker_does_not_overwrite_a_fast_worker(monkeypatch):
     actor, state = fake_start_entities(monkeypatch)
     registry = DeferredJobService()
@@ -388,7 +377,6 @@ def test_start_dispatch_marker_does_not_overwrite_a_fast_worker(monkeypatch):
     assert getattr(returned_job, "task_identity", None) is None
 
 
-# @matrix deferred-jobs : mismatch operation-fingerprint start
 def test_start_rejects_operation_id_reuse_for_different_request(monkeypatch):
     actor, state = fake_start_entities(monkeypatch)
     existing = SimpleNamespace(
@@ -419,9 +407,8 @@ def test_start_rejects_operation_id_reuse_for_different_request(monkeypatch):
     assert "job" not in state
 
 
-# @matrix deferred-jobs : retention terminal-delivery
 def test_delete_terminal_jobs_preserves_active_and_incomplete_delivery(monkeypatch):
-    now = datetime(2026, 7, 20, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 20, tzinfo=UTC)
 
     class Record(dict):
         def __init__(self, key, **values):
@@ -502,7 +489,6 @@ def test_delete_terminal_jobs_preserves_active_and_incomplete_delivery(monkeypat
     assert len(query.filters) == 1
 
 
-# @matrix deferred-jobs : deterministic-task-id dispatch-deadline task-payload
 def test_cloud_task_dispatch_uses_key_payload_stable_id_and_deadline(monkeypatch):
     client = FakeTasksClient()
     monkeypatch.setattr(

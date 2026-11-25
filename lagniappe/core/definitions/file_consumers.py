@@ -1,8 +1,16 @@
 """Explicit byte limits for file consumers that inspect uploaded content."""
 
+import os
 from dataclasses import dataclass
 from enum import Enum
-import os
+from typing import Protocol, runtime_checkable
+
+
+@runtime_checkable
+class _Seekable(Protocol):
+    def seek(self, offset: int, whence: int = 0, /) -> object: ...
+    def tell(self) -> int: ...
+
 
 
 MIB = 1024 * 1024
@@ -10,9 +18,6 @@ LARGE_ASSET_BYTES = 30 * MIB
 INDIVIDUAL_FILES_ONLY_ERROR = "Only individual files are supported"
 
 
-# @testable false
-# @covered-by lagniappe/core/definitions/file_consumers.py::enforce_file_consumer
-# @reason enum values are exercised through the public consumer boundary
 class FileConsumer(Enum):
     """Named reasons an application path may inspect file content."""
 
@@ -28,9 +33,6 @@ class FileConsumer(Enum):
     SITE_IMAGE = "site-image"
 
 
-# @testable false
-# @covered-by lagniappe/core/definitions/file_consumers.py::enforce_file_consumer
-# @reason immutable capability records are exercised through enforcement
 @dataclass(frozen=True)
 class FileConsumerCapability:
     """Resource contract for one named file consumer."""
@@ -66,23 +68,24 @@ FILE_CONSUMER_CAPABILITIES = {
 }
 
 
-# @testable false
-# @covered-by lagniappe/core/definitions/file_consumers.py::enforce_file_consumer
-# @reason exception attributes are exercised through enforcement failures
 class FileConsumerLimitError(ValueError):
     """Raised before a file consumer would exceed its byte contract."""
 
-    def __init__(self, message, *, consumer, size=None, max_bytes=None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        consumer: FileConsumer | None,
+        size: int | None = None,
+        max_bytes: int | None = None,
+    ) -> None:
         super().__init__(message)
         self.consumer = consumer
         self.size = size
         self.max_bytes = max_bytes
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_file_consumer_limits_use_metadata_before_reading
-# @pair files:size-limit
-def known_file_size(source):
+def known_file_size(source: object) -> int | None:
     """Return a file-like object's byte size without reading its contents."""
     if isinstance(source, int):
         return source
@@ -107,6 +110,8 @@ def known_file_size(source):
 
     stream = getattr(source, "stream", source)
     try:
+        if not isinstance(stream, _Seekable):
+            return None
         position = stream.tell()
         stream.seek(0, os.SEEK_END)
         size = stream.tell()
@@ -116,19 +121,18 @@ def known_file_size(source):
         return None
 
 
-# @testable false
-# @covered-by lagniappe/core/definitions/file_consumers.py::enforce_file_consumer
-# @reason error formatting is owned by the public consumer boundary
 def _megabyte_label(size):
     megabytes = size / MIB
     return str(int(megabytes)) if megabytes.is_integer() else f"{megabytes:.1f}"
 
 
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_file_consumer_limits_use_metadata_before_reading
-# @tests tests_unit/test_018_database_assets.py::test_direct_upload_full_read_requires_named_bounded_consumer
-# @matrix files : bounded-consumer size-limit
-def enforce_file_consumer(source, consumer, *, filename=None, size=None):
+def enforce_file_consumer(
+    source: object,
+    consumer: FileConsumer | str,
+    *,
+    filename: str | None = None,
+    size: int | None = None,
+) -> int | None:
     """Authorize a named consumer after checking size without reading bytes."""
     if not isinstance(consumer, FileConsumer):
         consumer = FileConsumer(consumer)
@@ -142,7 +146,7 @@ def enforce_file_consumer(source, consumer, *, filename=None, size=None):
             max_bytes=capability.max_bytes,
         )
 
-    if capability.max_bytes is not None and size > capability.max_bytes:
+    if capability.max_bytes is not None and size is not None and size > capability.max_bytes:
         name = f"{filename} is" if filename else "File is"
         raise FileConsumerLimitError(
             f"{name} too large for {capability.label} "

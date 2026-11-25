@@ -38,13 +38,16 @@ CUSTOM = {
 }
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_operator_grants_stay_in_experiments
-# @matrix hosted-e2e setup : iam project-identity
 def bindings(
-    project, app, setup, build_account, *, app_engine_account=None,
-    hosted_job_exists=False, project_job_policy=False,
-):
+    project: str,
+    app: dict[str, object],
+    setup: dict[str, str],
+    build_account: str,
+    *,
+    app_engine_account: str | None = None,
+    hosted_job_exists: bool = False,
+    project_job_policy: bool = False,
+) -> list[tuple[list[str], str]]:
     from runner.hosted_e2e import JOB
 
     policy = normalize_experiments_config(app)
@@ -181,9 +184,6 @@ def bindings(
     return grants
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_operator_checks_both_build_accounts_before_granting_access
-# @matrix hosted-e2e setup : iam project-identity
 def _build_accounts(base, project, *, apply):
     """Discover the two build identities and check the privileges actAs would convey."""
     build = subprocess.check_output(
@@ -218,8 +218,7 @@ def _build_accounts(base, project, *, apply):
     return build, app_engine
 
 
-# @testable infrastructure
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", required=True)
     parser.add_argument("--from-checkout", type=Path, required=True)
@@ -234,9 +233,10 @@ def main():
     bundle = cloud_settings._local_bundle(root, project, cloud_settings._receipt(root))
     app, dev = cloud_settings.validate_bundle(bundle, project)
     target = dev["gcloud_config"]
-    setup = json.loads(
-        cloud_settings._read(root, Path("reports/hosted-e2e/setup.json"))
-    )
+    setup_text = cloud_settings._read(root, Path("reports/hosted-e2e/setup.json"))
+    if setup_text is None:
+        raise SystemExit("The selected checkout has no hosted E2E setup.")
+    setup = json.loads(setup_text)
     base = [
         GCLOUD_CLI,
         "--quiet",

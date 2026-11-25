@@ -1,5 +1,12 @@
 """Function declaration and handler for workspace entity search."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ...cache.details import SearchRecord
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason, SearchFacets
@@ -36,10 +43,7 @@ CANDIDATE_SEARCH_DESCRIPTION = (
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_urls_and_result_scrubbing
-# @pair ai:search-url
-def entity_url(result):
+def entity_url(result: SearchRecord) -> str:
     entity_ref = result["id"]
     details = result.get("details")
     parent = result.get("parent")
@@ -58,12 +62,7 @@ def entity_url(result):
         return f"/{result['kind']}s/{entity_ref}"
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_urls_and_result_scrubbing
-# @tests tests_unit/test_015e_ai_candidate_search.py::test_external_candidates_use_cached_context_without_entity_loading
-# @matrix ai : parent-hydration result-scrubbing
-# @pair ai:search-url
-def format_search_result(result):
+def format_search_result(result: SearchRecord) -> SearchRecord:
     formatted = dict(result)
     # Build browser links before projecting canonical IDs into tool references.
     formatted["url"] = entity_url(result)
@@ -82,9 +81,6 @@ def format_search_result(result):
     return formatted
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/search.py::format_search_result
-# @reason nested hash-token projection is covered through formatted search results
 def _format_detail_hashes(details):
     if not isinstance(details, dict):
         return details
@@ -100,7 +96,7 @@ def _format_detail_hashes(details):
 SEARCH_ENTITIES = types.FunctionDeclaration(
     name="search_entities",
     description=CANDIDATE_SEARCH_DESCRIPTION,
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "query": {
@@ -144,19 +140,14 @@ SEARCH_ENTITIES = types.FunctionDeclaration(
             },
         },
         "required": ["query"],
-    },
+    }),
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_filter_arguments
-# @covered-by lagniappe/core/tools/ai/function_definitions/search.py::format_search_result
-# @matrix ai : search-filter search-limit
-# @tests tests_unit/test_015e_ai_candidate_search.py::test_external_candidates_use_cached_context_without_entity_loading
-# @tests tests_unit/test_015e_ai_candidate_search.py::test_candidate_scope_preserves_full_text_and_exact_modes
-# @matrix ai search : candidate-routing cached-details parent-scope
-def execute_search(args, user, *, candidate_search=False):
+def execute_search(args: Mapping[str, object], user: User, *, candidate_search: bool = False) -> Mapping[str, object] | list[dict[str, object]]:
     query = args.get("query", "")
+    if not isinstance(query, str):
+        return {"error": "query must be a string"}
     restrictions = user.properties.restrictions.search
     belongs_to = user.properties.restrictions.belongs_to
     kinds, invalid_kinds = _search_kinds(args.get("kinds"))
@@ -176,7 +167,7 @@ def execute_search(args, user, *, candidate_search=False):
             "allowed_match_modes": list(SEARCH_MATCH_MODES),
         }
     parent_hash = None
-    if args.get("parent_id"):
+    if parent_id := args.get("parent_id"):
         if (match_mode != "exact_name" and not candidate_search) or kinds != ["page"]:
             return {
                 "error": (
@@ -186,7 +177,9 @@ def execute_search(args, user, *, candidate_search=False):
                     "kinds=[\"page\"]."
                 )
             }
-        parent = Entities.fetch_one(args["parent_id"], request=Fetch.direct())
+        if not isinstance(parent_id, str):
+            return {"error": "Parent Category not found."}
+        parent = Entities.fetch_one(parent_id, request=Fetch.direct())
         if not isinstance(parent, Entities.CATEGORY):
             return {"error": "Parent Category not found."}
         if not parent.allowed(Action.VIEW, user=user):
@@ -232,9 +225,6 @@ def execute_search(args, user, *, candidate_search=False):
     return [format_search_result(result) for result in results]
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_exact_name_search_is_parent_scoped_and_returns_permissions
-# @matrix ai search : exact-name parent-scope permissions
 def _exact_results_with_permissions(results, user):
     entities = Entities.fetch(
         *[result.get("id") for result in results if result.get("id")],
@@ -256,9 +246,6 @@ def _exact_results_with_permissions(results, user):
     return formatted
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_filter_arguments
-# @pair ai:search-filter
 def _search_kinds(value):
     if value is None:
         return None, []
@@ -285,9 +272,6 @@ def _search_kinds(value):
     return kinds or None, []
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_search_entity_filter_arguments
-# @pair ai:search-limit
 def _search_limit(value):
     try:
         limit = int(value)

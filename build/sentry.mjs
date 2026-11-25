@@ -1,9 +1,6 @@
 /**
  * Decide whether a production build can generate and upload hidden source maps.
  *
- * @testable true
- * @tests tests_js/test_032_build_configuration.mjs::test_sentry_build_uses_package_release_and_requires_upload_token
- * @matrix build : optional-credentials release-version sentry source-maps
  */
 export const resolveSentryBuild = (settings = {}, packageMetadata = {}) => {
 	const authToken =

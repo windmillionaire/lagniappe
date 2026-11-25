@@ -1,5 +1,12 @@
 """Browser-session controls for the user's external-agent API credential."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import abort, g, request
 from flask_login import current_user
 
@@ -8,14 +15,11 @@ from lagniappe.core import exceptions
 from lagniappe.core.tools.auth import agent_api
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
 from lagniappe.web import responses
-from lagniappe.web.auth import logged_in
+from lagniappe.web.auth import authenticated_user, logged_in
 
 from . import users
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/users/api_key.py::api_key
-# @reason user eligibility is owned by the public key-management route
 def _enabled_actor():
     if (
         not CONFIG.AI_ENABLED
@@ -24,12 +28,9 @@ def _enabled_actor():
     ):
         abort(403)
     g.NO_CACHE = True
-    return current_user._get_current_object()
+    return authenticated_user()
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/users/api_key.py::api_key
-# @reason shared rate-limiter plumbing is owned by the key-management route
 def _rotation_limit(actor):
     try:
         state = check_limit(
@@ -57,13 +58,9 @@ def _rotation_limit(actor):
     return None
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013a_agent_api.py::test_user_can_rotate_and_revoke_external_agent_api_key
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_without_provider_access_can_manage_external_agent_api_key
-# @matrix agent-api user-settings : entitlement-independent expiry revoke rotate shown-once
 @users.route("/me/api-key", methods=["GET", "POST", "DELETE"])
 @logged_in
-def api_key():
+def api_key() -> ResponseReturnValue:
     """Inspect, rotate, or revoke the current user's single API credential."""
     actor = _enabled_actor()
     if request.method == "GET":

@@ -1,0 +1,360 @@
+import { getMarkRange, type Range } from "@tiptap/core";
+import { FormController } from "../../../forms/controller.ts";
+import { STYLES } from "../../../generated/styles.mjs";
+import { ENDPOINTS } from "../../../shared/endpoints.ts";
+import { request } from "../../../shared/request.ts";
+import { buttons } from "../../buttons.ts";
+import {
+	type ComboboxQueryResponse,
+	type RemoteInputEvent,
+	RemoteQueryCombobox,
+} from "../../combobox/remote.ts";
+import { Results } from "../../combobox/results.ts";
+import { primitives } from "../../primitives.ts";
+import { normalizeLinkAttributes } from "../extensions/linkAttributes.ts";
+import type { Toolbar } from "../toolbar.ts";
+
+const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:/i;
+const BARE_DOMAIN_PATTERN = /^[^\s/]+\.[^\s]+(?:\/.*)?$/;
+
+class LinkSearchBox extends RemoteQueryCombobox {
+	declare addLink: AddLink;
+	declare results: Results;
+	declare endpoints: typeof ENDPOINTS.search;
+	constructor(element: HTMLInputElement, addLink: AddLink) {
+		super(element);
+		this.addLink = addLink;
+		this.index = "search";
+		this.results = new Results(this.index);
+		this.endpoints = ENDPOINTS.search;
+		this.placement = "bottom-start";
+	}
+
+	init() {
+		this.styles.panel = `${STYLES.dropdown.panel} ${STYLES.editor.toolbar.portalIconContext} w-64 sm:w-96 mt-2`;
+		super.init();
+	}
+
+	_input(event: RemoteInputEvent) {
+		const query = event.target.value.trim();
+		if (this.addLink.linkHref(query)) {
+			this.settleQueryInput({ clear: true });
+			return;
+		}
+
+		if (query.length > 2) {
+			return this._search(query);
+		}
+		this.settleQueryInput({ clear: true });
+	}
+
+	elementClick(event: MouseEvent) {
+		super.elementClick(event);
+		if (!this.panelOpen && this.options.length > 0) this.showPanel();
+	}
+
+	_search(query: string) {
+		const params = new URLSearchParams();
+		params.set("q", query);
+		return this.runQuery(
+			query,
+			(token) =>
+				request.get<ComboboxQueryResponse>(this.endpoints.bar, params, {
+					signal: token.signal,
+				}),
+			(response) => {
+				if (response?.ok) {
+					this.updatePanel(response.results || null);
+				} else {
+					this.clearQueryResults();
+				}
+				return this.showPanel();
+			},
+		);
+	}
+
+	selectOption(option: HTMLElement) {
+		if (!option.dataset.url) return;
+
+		this.results.save(option);
+		this.hidePanel();
+		this.addLink.applySearchResult(option.dataset.url);
+	}
+}
+
+interface LinkState {
+	attrs: { href?: string | null };
+	range: Range;
+}
+
+class AddLink {
+	declare editor: Toolbar["editor"];
+	declare usedWithEditor: boolean;
+	declare _active: boolean;
+	declare toolbar: Toolbar;
+	declare name: "addLink";
+	declare messages: Record<string, string>;
+	declare target: HTMLFormElement;
+	declare link: HTMLInputElement;
+	declare html: HTMLElement[];
+	declare form: FormController;
+	declare linkState: LinkState | null;
+	declare combobox: LinkSearchBox | null;
+
+	constructor(toolbar: Toolbar) {
+		this.toolbar = toolbar;
+		this.editor = toolbar.editor;
+		this.submit = this.submit.bind(this);
+		this.name = "addLink" as const;
+		this.messages = {
+			select: "Please select some text first",
+			link: "Please add a URL",
+			submit: "Set Link",
+		};
+		this.usedWithEditor = false;
+		this._onSelectionUpdate = this._onSelectionUpdate.bind(this);
+		this._active = false;
+		this.linkState = null;
+		this.combobox = null;
+	}
+
+	get active() {
+		return this._active;
+	}
+
+	set active(value: boolean) {
+		this._active = value;
+		if (value) {
+			this.captureSelection();
+			this.focus();
+			this.editor.on("selectionUpdate", this._onSelectionUpdate);
+		} else {
+			this.editor.off("selectionUpdate", this._onSelectionUpdate);
+			this.editor.commands.clearSelectionHighlight();
+		}
+	}
+
+	get emailMode() {
+		return this.toolbar.kind === "email";
+	}
+
+	_onSelectionUpdate() {
+		if (this._active) {
+			this.captureSelection();
+		}
+	}
+
+	init() {
+		this.target = this.toolbar.element.appendChild(
+			document.createElement("form"),
+		);
+		this.target.className = `mt-4 hidden flex-col gap-4 rounded-md bg-slate-200 p-4 group-data-[open-form="addLink"]/toolbar:flex`;
+		this.target.dataset.option = this.name;
+
+		this.link = primitives.input({
+			name: "link",
+			placeholder: "Paste URL or search...",
+			type: "search",
+		});
+		this.combobox = new LinkSearchBox(this.link, this);
+
+		const submit = buttons.submit({
+			kind: "editor",
+		});
+		this.html = [this.link, submit];
+
+		this.form = new FormController(this);
+		this.form.init();
+		this.form.destroyables.push(this.combobox);
+		this.combobox.init();
+	}
+
+	focus() {
+		this.link?.focus();
+		this.link?.select();
+	}
+
+	captureSelection() {
+		const { from, to } = this.editor.state.selection;
+		if (from !== to) {
+			this.editor.commands.setSelectionHighlight();
+		} else {
+			this.editor.commands.clearSelectionHighlight();
+		}
+		this.linkState = this.findCurrentLink();
+		this.link.value = this.displayHref(this.linkState?.attrs?.href || "");
+	}
+
+	findCurrentLink() {
+		const linkType = this.editor.state.schema.marks.link;
+		if (!linkType) return null;
+
+		const { selection } = this.editor.state;
+		if (selection.empty) {
+			const range = getMarkRange(selection.$from, linkType);
+			return range ? this.singleLinkInRange(range) : null;
+		}
+
+		return this.singleLinkInRange({
+			from: selection.from,
+			to: selection.to,
+		});
+	}
+
+	singleLinkInRange(range: Range): LinkState | null {
+		const linkType = this.editor.state.schema.marks.link;
+		const links = new Map<string, Range & { attrs: LinkState["attrs"] }>();
+
+		this.editor.state.doc.nodesBetween(range.from, range.to, (node, pos) => {
+			if (!node.isText) return true;
+
+			const mark = node.marks.find((mark) => mark.type === linkType);
+			if (!mark) return true;
+
+			const key = JSON.stringify(mark.attrs);
+			const from = Math.max(range.from, pos);
+			const to = Math.min(range.to, pos + node.nodeSize);
+			const link = links.get(key) || { attrs: mark.attrs, from, to };
+			link.from = Math.min(link.from, from);
+			link.to = Math.max(link.to, to);
+			links.set(key, link);
+
+			return true;
+		});
+
+		const values = Array.from(links.values());
+		if (values.length !== 1) return null;
+
+		const link = values[0];
+		return {
+			attrs: link.attrs,
+			range: { from: link.from, to: link.to },
+		};
+	}
+
+	highlightRange() {
+		return this.editor.commands.getSelectionHighlightRange();
+	}
+
+	activeRange() {
+		return this.linkState?.range || this.highlightRange();
+	}
+
+	displayHref(href: string) {
+		if (!href || !this.emailMode) return href;
+
+		return this.fullyQualifiedUrl(href) || href;
+	}
+
+	linkHref(value: string) {
+		const href = value.trim();
+		if (!href) return "";
+
+		if (this.emailMode) {
+			return this.fullyQualifiedUrl(href);
+		}
+
+		if (
+			ABSOLUTE_URL_PATTERN.test(href) ||
+			href.startsWith("//") ||
+			href.startsWith("/") ||
+			href.startsWith("#") ||
+			href.startsWith("?")
+		) {
+			return href;
+		}
+
+		if (BARE_DOMAIN_PATTERN.test(href)) {
+			return `https://${href}`;
+		}
+
+		return null;
+	}
+
+	fullyQualifiedUrl(value: string) {
+		const href = value.trim();
+		if (!href) return "";
+
+		try {
+			if (ABSOLUTE_URL_PATTERN.test(href)) {
+				return new URL(href).href;
+			}
+
+			if (href.startsWith("//")) {
+				return new URL(`${window.location.protocol}${href}`).href;
+			}
+
+			if (
+				href.startsWith("/") ||
+				href.startsWith("#") ||
+				href.startsWith("?")
+			) {
+				return new URL(href, window.location.origin).href;
+			}
+
+			return new URL(`https://${href}`).href;
+		} catch (_error) {
+			return null;
+		}
+	}
+
+	linkAttributes(href: string) {
+		if (this.emailMode) return { href };
+
+		return normalizeLinkAttributes({ href });
+	}
+
+	applySearchResult(url: string) {
+		const href = this.emailMode ? this.fullyQualifiedUrl(url) : url;
+		if (!href) {
+			this.form.showError(this.messages.link);
+			return;
+		}
+
+		this.link.value = href;
+		this.submit();
+	}
+
+	reset() {
+		this.linkState = null;
+		this.link.value = "";
+		this.combobox?.hidePanel();
+		this.form?.resetSubmitButton();
+	}
+
+	submit() {
+		const range = this.activeRange();
+		const href = this.linkHref(this.link.value);
+
+		if (href && range) {
+			this.editor
+				.chain()
+				.focus()
+				.setTextSelection(range)
+				.setLink(this.linkAttributes(href))
+				.run();
+			this.form.resetSubmitButton();
+			this.toolbar.closeForm(this.name);
+		} else if (!this.link.value.trim() && range) {
+			const linkRange =
+				this.linkState?.range || this.singleLinkInRange(range)?.range;
+			if (!linkRange) {
+				this.form.showError(this.messages.link);
+				return;
+			}
+			this.editor.chain().focus().setTextSelection(linkRange).unsetLink().run();
+			this.form.resetSubmitButton();
+			this.toolbar.closeForm(this.name);
+		} else if (!range) {
+			this.form.showError(this.messages.select);
+		} else {
+			this.form.showError(this.messages.link);
+		}
+	}
+
+	destroy() {
+		this.form?.destroy();
+	}
+}
+
+export { AddLink as addLink };

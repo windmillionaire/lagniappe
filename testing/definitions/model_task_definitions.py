@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 from .forms import Forms
 from .projects import Projects
@@ -10,7 +9,7 @@ class ModelTaskDefinition:
     name: str
     project: Projects
     description: str = ""
-    form: Optional[Forms] = None
+    form: Forms | None = None
 
 
 create_model_task = ModelTaskDefinition(

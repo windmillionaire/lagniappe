@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import esmock from "esmock";
 
-import { BuilderDraft } from "../../src/script/views/builder/draft.mjs";
+import { BuilderDraft } from "../../src/script/views/builder/draft.ts";
 
 function replaceGlobal(t, name, value) {
 	const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
@@ -19,7 +19,6 @@ function replaceGlobal(t, name, value) {
 	});
 }
 
-/** @matrix forms : builder-save retryable-action single-flight stale-acknowledgement */
 test("test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state", async (t) => {
 	const requests = [];
 	const classes = new Set();
@@ -108,15 +107,15 @@ test("test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
 		},
 	};
 	const { Header } = await esmock.strict(
-		"../../src/script/views/builder/panels/header.mjs",
+		"../../src/script/views/builder/panels/header.ts",
 		{
-			"../../src/script/forms/renderer.mjs": { FormRenderer: class {} },
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/forms/renderer.ts": { FormRenderer: class {} },
+			"../../src/script/shared/index.ts": {
 				areEqual: (a, b) => JSON.stringify(a) === JSON.stringify(b),
 				captureError() {},
 				request,
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 		},
@@ -380,10 +379,10 @@ test("test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
 
 async function loadFormSettings({ request }) {
 	return await esmock.strict(
-		"../../src/script/views/builder/panels/formSettings.mjs",
+		"../../src/script/views/builder/panels/formSettings.ts",
 		{
-			"../../src/script/forms/controller.mjs": { FormController: class {} },
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/forms/controller.ts": { FormController: class {} },
+			"../../src/script/shared/index.ts": {
 				captureError() {},
 				ENDPOINTS: { createSchema: "/forms/create-schema" },
 				Modal: class {},
@@ -393,7 +392,6 @@ async function loadFormSettings({ request }) {
 	);
 }
 
-/** @matrix forms ui-action : persistent-error retryable-action schema-generation single-flight */
 test("test_builder_generation_failure_stays_visible_and_releases_submitter", async (t) => {
 	let finishRequest;
 	let requestCount = 0;
@@ -486,13 +484,13 @@ function emptyClass() {
 }
 
 async function loadBuilder({ connectivity, generateElementId, ModelElement }) {
-	return await esmock.strict("../../src/script/views/builder/builder.mjs", {
-		"../../src/script/elements/combobox/search.mjs": {
+	return await esmock.strict("../../src/script/views/builder/builder.ts", {
+		"../../src/script/elements/combobox/search.ts": {
 			SearchBox: emptyClass(),
 		},
-		"../../src/script/elements/entityMenu.mjs": { EntityMenu: emptyClass() },
-		"../../src/script/shared/directUpload.mjs": { directUpload() {} },
-		"../../src/script/shared/index.mjs": {
+		"../../src/script/elements/entityMenu.ts": { EntityMenu: emptyClass() },
+		"../../src/script/shared/directUpload.ts": { directUpload() {} },
+		"../../src/script/shared/index.ts": {
 			captureError() {},
 			connectivity,
 			DeleteModal: emptyClass(),
@@ -501,44 +499,43 @@ async function loadBuilder({ connectivity, generateElementId, ModelElement }) {
 			OfflineModal: emptyClass(),
 			request: {},
 		},
-		"../../src/script/shared/transitions.mjs": {
+		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
-		"../../src/script/views/builder/changeStatus.mjs": {
+		"../../src/script/views/builder/changeStatus.ts": {
 			FormChangeStatus: emptyClass(),
 		},
-		"../../src/script/views/builder/conditions/loader.mjs": {
+		"../../src/script/views/builder/conditions/loader.ts": {
 			loadCondition: async () => null,
 		},
-		"../../src/script/views/builder/draft.mjs": { BuilderDraft: emptyClass() },
-		"../../src/script/views/builder/migrations.mjs": {
+		"../../src/script/views/builder/draft.ts": { BuilderDraft: emptyClass() },
+		"../../src/script/views/builder/migrations.ts": {
 			fieldKind: () => null,
 			needsMigration: () => false,
 			repairConditions: () => {},
 		},
-		"../../src/script/views/builder/panels/components.mjs": {
+		"../../src/script/views/builder/panels/components.ts": {
 			ComponentsPanel: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/condition.mjs": {
+		"../../src/script/views/builder/panels/condition.ts": {
 			ConditionPanel: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/elementSettings.mjs": {
+		"../../src/script/views/builder/panels/elementSettings.ts": {
 			ElementSettings: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/formSettings.mjs": {
+		"../../src/script/views/builder/panels/formSettings.ts": {
 			FormSettings: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/header.mjs": {
+		"../../src/script/views/builder/panels/header.ts": {
 			Header: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/model.mjs": {
+		"../../src/script/views/builder/panels/model.ts": {
 			ModelElement,
 			ModelPanel: emptyClass(),
 		},
 	});
 }
 
-/** @matrix form-table forms : builder-defaults empty-columns unsaved-preview */
 test("test_table_creation_defaults_columns_for_unsaved_preview", async () => {
 	const ModelElement = { table: (schema) => ({ id: schema.id }) };
 	const { default: FormBuilder } = await loadBuilder({
@@ -559,7 +556,6 @@ test("test_table_creation_defaults_columns_for_unsaved_preview", async () => {
 	assert.equal(element.id, schema.id, "renders normalized schema");
 });
 
-/** @matrix forms offline : builder-lifecycle */
 test("test_builder_sync_uses_shared_connectivity_without_orphaned_global_state", async (t) => {
 	const search = { dataset: {} };
 	const indicator = {
@@ -650,7 +646,6 @@ class TestNode {
 	}
 }
 
-/** @matrix forms : action-button-centering builder-list-actions */
 test("test_builder_schema_lists_use_button_surfaces_and_centered_actions", async (t) => {
 	const styles = {
 		builder: {
@@ -684,14 +679,14 @@ test("test_builder_schema_lists_use_button_surfaces_and_centered_actions", async
 		},
 	};
 	const { ElementSettings } = await esmock.strict(
-		"../../src/script/views/builder/panels/elementSettings.mjs",
+		"../../src/script/views/builder/panels/elementSettings.ts",
 		{
-			"../../src/script/elements/primitives.mjs": { primitives },
+			"../../src/script/elements/primitives.ts": { primitives },
 			"../../src/script/generated/styles.mjs": { STYLES: styles },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
-			"../../src/script/views/builder/config.mjs": {
+			"../../src/script/views/builder/config.ts": {
 				CONFIG: {
 					DEFAULT_SETTINGS: {
 						conditional: ["visibility"],
@@ -764,7 +759,6 @@ test("test_builder_schema_lists_use_button_surfaces_and_centered_actions", async
 	}
 });
 
-/** @matrix forms : access-restrictions explicit-submit retryable-action single-flight */
 test("test_restriction_save_submits_snapshot_and_releases_failed_submitter", async (t) => {
 	const requests = [];
 	let settle;

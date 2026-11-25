@@ -5,12 +5,12 @@ import {
 	clearRecentSearchResults,
 	localStore,
 	sessionStore,
-} from "../../src/script/shared/storage.mjs";
+} from "../../src/script/shared/storage.ts";
 import {
 	areEqual,
 	debounce,
 	waitForAttribute,
-} from "../../src/script/shared/utilities.mjs";
+} from "../../src/script/shared/utilities.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 function replace(t, target, name, value) {
@@ -50,8 +50,8 @@ async function setupUser(t) {
 		posts.push(args);
 		return postImplementation(...args);
 	});
-	const user = await esmock.strict("../../src/script/shared/user.mjs", {
-		"../../src/script/shared/request.mjs": { request: { post } },
+	const user = await esmock.strict("../../src/script/shared/user.ts", {
+		"../../src/script/shared/request.ts": { request: { post } },
 	});
 
 	return {
@@ -70,7 +70,6 @@ async function setupUser(t) {
 	};
 }
 
-/** @pair async-query:debounce-teardown */
 test("test_debounce_cancel_prevents_delayed_callback", async () => {
 	let calls = 0;
 	const delayed = debounce(() => {
@@ -82,7 +81,6 @@ test("test_debounce_cancel_prevents_delayed_callback", async () => {
 	assert.equal(calls, 0, "Cancelled debounce callback still ran");
 });
 
-/** @matrix frontend-utilities : cleanup mutation-observer */
 test("test_wait_for_attribute_resolves_and_cleans_up_observers", async (t) => {
 	const observers = [];
 	replace(
@@ -131,7 +129,6 @@ test("test_wait_for_attribute_resolves_and_cleans_up_observers", async (t) => {
 	assert.equal(observers[1].disconnected, true, "timed-out observer leaked");
 });
 
-/** @matrix frontend-utilities : array-order deep-equality */
 test("test_are_equal_normalizes_object_keys_but_preserves_array_order", () => {
 	assert.equal(
 		areEqual(
@@ -156,10 +153,6 @@ test("test_are_equal_normalizes_object_keys_but_preserves_array_order", () => {
 	);
 });
 
-/**
- * @matrix browser-storage : availability json
- * @pair browser-storage:recent-search-cleanup
- */
 test("test_safe_storage_adapters_handle_browser_failures_and_json", (t) => {
 	replace(t, globalThis, "localStorage", null);
 	Object.defineProperty(globalThis, "localStorage", {
@@ -237,10 +230,6 @@ test("test_safe_storage_adapters_handle_browser_failures_and_json", (t) => {
 	assert.equal(sessionStore.setJSON("quota", { active: true }), false);
 });
 
-/**
- * @matrix timezone : page-load session-update
- * @pair location:permission-deferral
- */
 test("test_user_data_sync_posts_timezone_without_requesting_location", async (t) => {
 	const env = await setupUser(t);
 	assert.equal(
@@ -264,10 +253,6 @@ test("test_user_data_sync_posts_timezone_without_requesting_location", async (t)
 	assert.equal(sessionStorage.getItem("userHash"), "user-hash");
 });
 
-/**
- * @matrix location : deduplication geolocation on-demand session-update
- * @pair timezone:serialized-update
- */
 test("test_user_location_sync_starts_on_demand_and_deduplicates", async (t) => {
 	const env = await setupUser(t);
 	const startup = env.updateUserData();
@@ -302,7 +287,6 @@ test("test_user_location_sync_starts_on_demand_and_deduplicates", async (t) => {
 	});
 });
 
-/** @matrix location : retry session-update */
 test("test_user_location_sync_retries_failed_session_update", async (t) => {
 	const env = await setupUser(t);
 	await env.updateUserData();
@@ -327,7 +311,6 @@ test("test_user_location_sync_retries_failed_session_update", async (t) => {
 	assert.equal(env.posts.length, 2, "Failed update was not retried");
 });
 
-/** @pairs location:unavailable timezone:session-update */
 test("test_unavailable_user_location_does_not_affect_timezone_sync", async (t) => {
 	const env = await setupUser(t);
 	env.setGeolocationImplementation((_success, error) => error({ code: 1 }));

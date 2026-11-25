@@ -13,9 +13,6 @@ from installer.commands import _fail
 from installer import admin, credentials, project_bootstrap, setup_target
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_authentication_is_kept_only_after_project_permission_confirmation
-# @matrix setup : adc permissions transactional-state
 def _confirm_operator_permissions(
     project_id,
     *,
@@ -36,9 +33,6 @@ def _confirm_operator_permissions(
     return missing
 
 
-# @testable false
-# @covered-by installer/create_config.py::set_application_defaults
-# @reason secret-free console summary owned by the fresh-install confirmation flow
 def _display_install_identity_summary(preflight, adc_identity):
     from config import SETTINGS
 
@@ -89,9 +83,6 @@ def _display_install_identity_summary(preflight, adc_identity):
     print(ui.value("Required APIs pending", len(preflight["missing_apis"])))
 
 
-# @testable false
-# @covered-by installer/create_config.py::_set_default_config
-# @reason generates missing secrets and applies the deterministic application document
 def _build_app_settings():
     from config import SETTINGS
     from installer import config_builders
@@ -112,10 +103,6 @@ def _build_app_settings():
     SETTINGS.APP.update(app)
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_deep_copies_templates
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_generates_fresh_settings
-# @pair setup:config-files
 def _set_default_config():
     from config import SETTINGS
     from installer import config_builders
@@ -143,11 +130,7 @@ def _set_default_config():
     SETTINGS.save()
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_update_config_sets_application_version_from_package
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_update_config_refreshes_preloaded_builders_and_current_settings
-# @matrix setup : config-files config-version git-upgrade
-def update_config():
+def update_config() -> str:
     """Refresh generated config defaults and return the active package version."""
     from importlib import reload
     from installer import config_builders
@@ -173,19 +156,11 @@ def update_config():
     return version
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_persists_prompted_name_before_cloud_change
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_existing_project_prepares_bootstrap_apis_before_adc
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_write
-# @matrix setup : adc config-files existing-project gcloud-config interactive-input preconfirmation provider-apis recovery
-def set_application_defaults():
+def set_application_defaults() -> bool:
     with credentials._adc_auth_transaction() as transaction:
         return _set_application_defaults(transaction)
 
 
-# @testable false
-# @covered-by installer/create_config.py::set_application_defaults
-# @reason installer implementation runs within the public ADC transaction boundary
 def _set_application_defaults(transaction):
     from config import File, SETTINGS
     from config.recovery import (
@@ -257,7 +232,7 @@ def _set_application_defaults(transaction):
     project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
     target = setup_target.SetupTarget(
         app_name=app_name,
-        configuration_name=SETTINGS.GCLOUD_CONFIG["NAME"],
+        configuration_name=str(SETTINGS.GCLOUD_CONFIG["NAME"]),
         account=account,
         project_id=project_id,
     )
@@ -334,9 +309,6 @@ def _set_application_defaults(transaction):
         if preflight["project"]["state"] != "available":
             transaction.refresh_required = True
 
-    # @testable false
-    # @covered-by installer/create_config.py::set_application_defaults
-    # @reason spinner closure for the parent install preflight sequence
     def align_target_adc():
         if defer_adc_for_api_preparation:
             credentials._ensure_adc_principal(target, transaction=transaction)
@@ -420,15 +392,7 @@ def _set_application_defaults(transaction):
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_reports_missing_areas
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_requires_google_client_only_when_enabled
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_rejects_keyless_identity_mismatch
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_reports_invalid_redis_tls
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_upgrade_collects_missing_ai_choices
-# @matrix setup : config-files google-oauth keyless-config optional project-identity redis-tls validation
-# @matrix setup : ai-policy git-upgrade interactive-input
-def verify_application_config(upgrade=False):
+def verify_application_config(upgrade: bool = False) -> bool:
     """Validate settings and collect the new AI policy during source upgrades."""
     from installer import FORMATTER
 
@@ -534,8 +498,5 @@ def verify_application_config(upgrade=False):
     return True
 
 
-# @testable false
-# @covered-by installer/setup_target.py::validate_project_id
-# @reason public compatibility entrypoint for target syntax validation
-def validate_project_id(project_id):
+def validate_project_id(project_id: str) -> bool:
     return setup_target.validate_project_id(project_id)

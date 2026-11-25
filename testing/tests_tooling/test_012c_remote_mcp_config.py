@@ -5,7 +5,6 @@ import pytest
 from config.remote_mcp import CLIENT_ID, REDIRECT_URI, mcp_connection_name, mcp_issuer, normalize_mcp_config
 
 
-# @matrix mcp-oauth : configuration validation
 @pytest.mark.tooling
 def test_mcp_connection_name_is_safe_for_copyable_commands():
     assert mcp_connection_name() == "lagniappe-remote"
@@ -17,7 +16,6 @@ def test_mcp_connection_name_is_safe_for_copyable_commands():
             normalize_mcp_config({"MCP_NAME": name})
 
 
-# @matrix mcp-oauth : configuration validation
 @pytest.mark.tooling
 def test_remote_mcp_configuration_is_opt_in_and_exact():
     assert normalize_mcp_config({}) == {
@@ -59,20 +57,52 @@ def test_remote_mcp_configuration_is_opt_in_and_exact():
         normalize_mcp_config({**valid, "CUSTOM_DOMAIN": "pilot.run.app"})
 
 
-# @matrix mcp-oauth : configuration validation loopback
 @pytest.mark.tooling
 def test_supported_clients_require_exact_callbacks():
-    from config.remote_mcp import CODEX_CLIENT_ID, client_allowed, redirect_allowed
+    from config.remote_mcp import (
+        ANTIGRAVITY_CLIENT_ID,
+        ANTIGRAVITY_REDIRECT_URI,
+        CLAUDE_CLIENT_ID,
+        CLAUDE_CODE_CLIENT_ID,
+        CLAUDE_REDIRECT_URI,
+        CODEX_CLIENT_ID,
+        PI_CLIENT_ID,
+        client_allowed,
+        redirect_allowed,
+    )
 
     assert client_allowed(CLIENT_ID)
     assert redirect_allowed(CLIENT_ID, REDIRECT_URI)
+    assert client_allowed(ANTIGRAVITY_CLIENT_ID)
+    assert redirect_allowed(ANTIGRAVITY_CLIENT_ID, ANTIGRAVITY_REDIRECT_URI)
+    assert client_allowed(CLAUDE_CLIENT_ID)
+    assert redirect_allowed(CLAUDE_CLIENT_ID, CLAUDE_REDIRECT_URI)
+    assert not redirect_allowed(CLAUDE_CLIENT_ID, REDIRECT_URI)
+    assert not redirect_allowed(CLAUDE_CLIENT_ID, CLAUDE_REDIRECT_URI + "/")
+    assert not redirect_allowed(ANTIGRAVITY_CLIENT_ID, REDIRECT_URI)
+    assert not redirect_allowed(CLIENT_ID, ANTIGRAVITY_REDIRECT_URI)
+    assert not redirect_allowed(ANTIGRAVITY_CLIENT_ID, ANTIGRAVITY_REDIRECT_URI + "/")
     assert client_allowed(CODEX_CLIENT_ID)
+    assert client_allowed(CLAUDE_CODE_CLIENT_ID)
+    assert client_allowed(PI_CLIENT_ID)
     assert not redirect_allowed(CODEX_CLIENT_ID, REDIRECT_URI)
+    assert not redirect_allowed(CODEX_CLIENT_ID, ANTIGRAVITY_REDIRECT_URI)
+    assert not redirect_allowed(CLAUDE_CODE_CLIENT_ID, CLAUDE_REDIRECT_URI)
+    assert not redirect_allowed(PI_CLIENT_ID, REDIRECT_URI)
     assert not redirect_allowed(CLIENT_ID, REDIRECT_URI + "/")
     assert not redirect_allowed("unregistered", REDIRECT_URI)
     for target in ("http://127.0.0.1/callback", "http://127.0.0.1:54321/callback"):
         assert redirect_allowed(CODEX_CLIENT_ID, target)
+        assert redirect_allowed(CLAUDE_CODE_CLIENT_ID, target)
+        assert redirect_allowed(PI_CLIENT_ID, target)
         assert not redirect_allowed(CLIENT_ID, target)
+        assert not redirect_allowed(ANTIGRAVITY_CLIENT_ID, target)
+        assert not redirect_allowed(CLAUDE_CLIENT_ID, target)
+    for target in ("http://localhost/callback", "http://localhost:54321/callback"):
+        assert redirect_allowed(CLAUDE_CODE_CLIENT_ID, target)
+        assert redirect_allowed(PI_CLIENT_ID, target)
+        assert not redirect_allowed(CODEX_CLIENT_ID, target)
+        assert not redirect_allowed(CLAUDE_CLIENT_ID, target)
     for target in (
         "http://localhost:54321/callback", "http://127.0.0.2:54321/callback",
         "http://127.0.0.1:0/callback", "http://127.0.0.1:65536/callback",
@@ -83,4 +113,13 @@ def test_supported_clients_require_exact_callbacks():
         "http://127.0.0.1:54321/callback\\evil", None,
     ):
         assert not redirect_allowed(CODEX_CLIENT_ID, target)
+    for target in (
+        "http://localhost:0/callback", "http://localhost:65536/callback",
+        "http://localhost:00080/callback", "http://localhost:54321/callback/",
+        "http://localhost:54321/callback?", "http://localhost:54321/callback#",
+        "http://localhost.attacker.test/callback", "https://localhost:54321/callback",
+        "http://127.0.0.2:54321/callback", None,
+    ):
+        assert not redirect_allowed(CLAUDE_CODE_CLIENT_ID, target)
+        assert not redirect_allowed(PI_CLIENT_ID, target)
     assert not client_allowed("unregistered")

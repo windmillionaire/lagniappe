@@ -9,8 +9,8 @@ Related Files:
         - lagniappe/web/routes/projects/main.py: Project routes
         - lagniappe/web/templates/home/projects.html: Project component template
         - lagniappe/web/templates/projects/: Project page templates
-        - src/script/widgets/home/lists.mjs: HomeProjectList widget
-        - src/script/views/home.mjs: Project initialization
+        - src/script/widgets/home/lists.ts: HomeProjectList widget
+        - src/script/views/home.ts: Project initialization
 
     Core Entity:
         - lagniappe/core/entities/project.py: Project entity
@@ -46,7 +46,6 @@ from testing.utility.live_ai import submit_live_ai
 pytestmark = pytest.mark.e2e
 
 
-# @matrix projects : ai-form create-help manual-form
 # @template home/projects.html::create
 def test_create_project_form(get_admin, get_user):
     """
@@ -96,7 +95,6 @@ def test_create_project_form(get_admin, get_user):
     expect(form).not_to_be_visible()
 
 
-# @matrix projects : create-manual navigate search
 # @template home/projects.html::create
 def test_create_project_manual_mode(get_admin, get_user):
     """
@@ -119,11 +117,16 @@ def test_create_project_manual_mode(get_admin, get_user):
     expect(user.page).to_have_title(re.compile(project.definition.name))
 
 
-# @matrix projects : ai-create ai-form ai-generated
 # @template home/projects.html::create
 # @template home/projects.html::project
-@pytest.mark.ai
-@pytest.mark.parametrize("live_ai_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+@pytest.mark.parametrize(
+    "live_ai_quota",
+    [
+        pytest.param(False, id="live", marks=pytest.mark.ai),
+        pytest.param(True, id="quota-fallback"),
+    ],
+    indirect=True,
+)
 def test_create_project_ai_mode(get_admin, get_user, results, browser_failures, live_ai_quota):
     """
     Verify project creation in AI mode.
@@ -166,7 +169,6 @@ def test_create_project_ai_mode(get_admin, get_user, results, browser_failures, 
     results.record("project", project.entity.db)
 
 
-# @pair projects:delete
 # @template projects/project.html::view_header
 # @template menus.html::title
 # @template menus.html::delete

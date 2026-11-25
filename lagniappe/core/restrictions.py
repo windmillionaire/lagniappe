@@ -1,9 +1,9 @@
 """Framework-neutral restriction sentinels for data queries."""
 
 from enum import Enum
+from typing import Literal, TypeIs
 
 
-# @testable infrastructure
 class Restriction(Enum):
     """Sentinel values for permission restriction filters.
 
@@ -19,20 +19,23 @@ class Restriction(Enum):
     BELONGS_TO_NONE = "BELONGS_TO_NONE"
 
     @classmethod
-    def is_unrestricted(cls, value):
+    def is_unrestricted(cls, value: object) -> TypeIs[Literal[Restriction.UNRESTRICTED]]:
         return value is cls.UNRESTRICTED
 
     @classmethod
-    def is_denied(cls, value):
+    def is_denied(cls, value: object) -> bool:
         return isinstance(value, list) and not value
 
     @classmethod
-    def from_session(cls, value):
+    def from_session[T](cls, value: T) -> Restriction | T:
         for marker in cls:
             if value == marker.value:
                 return marker
         return value
 
     @classmethod
-    def to_session(cls, value):
+    def to_session[T](cls, value: T) -> str | T:
         return value.value if isinstance(value, cls) else value
+
+
+type QueryHashes = list[str] | Literal[Restriction.UNRESTRICTED]

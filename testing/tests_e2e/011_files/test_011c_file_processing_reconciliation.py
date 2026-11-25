@@ -2,9 +2,9 @@
 Tests for authoritative file reconciliation after processing completes.
 
 Verified against:
-- src/script/forms/revisions/watcher.mjs
-- src/script/widgets/fileInfo.mjs
-- src/script/views/file.mjs
+- src/script/forms/revisions/watcher.ts
+- src/script/widgets/fileInfo.ts
+- src/script/views/file.ts
 - lagniappe/web/routes/files/main.py
 - lagniappe/web/routes/process/main.py
 """
@@ -24,7 +24,6 @@ from testing.utility.polling import expect_poll_result
 pytestmark = pytest.mark.e2e
 
 
-# @matrix file : active-reset polling status summarize summary
 def test_file_summary_completion_stages_authoritative_info_until_reset(
     get_admin, get_user,
     browser_failures,
@@ -81,14 +80,13 @@ def test_file_summary_completion_stages_authoritative_info_until_reset(
     with expect_poll_result(
         user.page,
         subscription_id=f"view:entity:{file.key}",
+    ), expect_successful_response(
+        user.page,
+        method="GET",
+        path=f"/files/{file.key}/info/replace",
+        entity_key=file.key,
     ):
-        with expect_successful_response(
-            user.page,
-            method="GET",
-            path=f"/files/{file.key}/info/replace",
-            entity_key=file.key,
-        ):
-            user.offline = False
+        user.offline = False
 
     info_form = file.info_form
     marker = info_form.locator("[lp-edited-marker]")

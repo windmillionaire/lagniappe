@@ -19,7 +19,6 @@ from testing.resources import Page
 pytestmark = pytest.mark.e2e
 
 
-# @matrix home pages : list load
 # @template home/pages.html::list
 # @template home/pages.html::page
 def test_home_page_list_loads_recent_pages(get_admin, get_user):
@@ -35,7 +34,6 @@ def test_home_page_list_loads_recent_pages(get_admin, get_user):
     expect(page_item).to_be_visible()
 
 
-# @matrix home pages : category-select create default-category
 # @template home/pages.html::create
 # @template home/pages.html::page
 def test_create_page_from_home(get_admin, get_user):
@@ -62,7 +60,6 @@ def test_create_page_from_home(get_admin, get_user):
     expect(user.page).to_have_title(re.compile(page_name))
 
 
-# @pairs combobox:permission-filter permissions:category-edit
 # @template home/home.html::create
 # @template home/pages.html::create
 @pytest.mark.e2e_group("owner")

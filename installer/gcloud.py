@@ -1,3 +1,9 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+
+from contextlib import suppress
 from runner import presentation as ui
 from runner.presentation import output as print, read_input as input
 import re
@@ -13,6 +19,7 @@ from .package_install import install_if_missing
 from .commands import run_gcloud_command
 from .errors import (
     ProviderConflict,
+    ProviderInvalidInput,
     ProviderNotFound,
     ProviderTimeout,
     ProviderTransientError,
@@ -24,6 +31,10 @@ from .errors import (
 from .state import record_mutation
 
 
+if TYPE_CHECKING:
+    from google.cloud.appengine_admin_v1 import Application
+
+
 GCLOUD_SERVICE_DISCOVERY_TIMEOUT = 60
 GCLOUD_SERVICE_ENABLE_TIMEOUT = 300
 GCLOUD_API_PROPAGATION_ATTEMPTS = 8
@@ -32,9 +43,6 @@ APP_ENGINE_RPC_TIMEOUT = 60
 APP_ENGINE_CREATE_TIMEOUT = 300
 
 
-# @testable false
-# @covered-by installer/gcloud.py::enable_gcloud_apis
-# @reason interactive terms recovery is exercised through required-API reconciliation
 def _guide_google_service_terms_acceptance(
     terms_error,
     *,
@@ -65,32 +73,32 @@ def _guide_google_service_terms_acceptance(
         print()
         print(
             wrap_text(
-                (
+
                     "Google requires the active setup account '"
                     f"{ui.literal(selected_account)}' to complete the "
                     f"{ui.literal(agreement_name)}."
-                )
+
             )
         )
         if delegated_maps:
             print(
                 wrap_text(
-                    (
+
                         f"Permanent Owner '{ui.literal(permanent_owner)}' must first review "
                         "the Google Maps Platform agreement and authorize the temporary "
                         "installer to acknowledge it with the business-controlled installer "
                         "account. The Owner does not need to enable Places API manually; "
                         "setup will retry and enable it."
-                    )
+
                 )
             )
         print(
             wrap_text(
-                (
+
                     "The terms page may first show Google Cloud's welcome agreement. "
                     "Complete every agreement it presents, and confirm the browser profile "
                     f"is '{ui.literal(selected_account)}'."
-                )
+
             )
         )
         print(
@@ -102,10 +110,8 @@ def _guide_google_service_terms_acceptance(
                 standalone=True,
             )
         )
-        try:
+        with suppress(webbrowser.Error):
             webbrowser.open_new_tab(terms_error.terms_url)
-        except webbrowser.Error:
-            pass
         answer = input(
             format_prompt("Complete the agreement", hint="Enter to retry API activation; x to cancel")
         )
@@ -117,9 +123,6 @@ def _guide_google_service_terms_acceptance(
         spinner.start()
 
 
-# @testable false
-# @covered-by installer/gcloud.py::enable_gcloud_apis
-# @reason provider listing adapter is exercised through required-API reconciliation
 def _enabled_google_cloud_apis(project_id):
     result = run_gcloud_command(
         [
@@ -138,11 +141,7 @@ def _enabled_google_cloud_apis(project_id):
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_reuses_confirmed_preflight
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_guides_maps_terms_then_retries_activation
-# @matrix setup : browser gcloud-command google-service-terms identity interactive-input preflight provider-apis timeout
-def enable_gcloud_apis():
+def enable_gcloud_apis() -> bool:
     """Enable only APIs missing from the confirmed target preflight."""
     from config import SETTINGS
 
@@ -150,7 +149,7 @@ def enable_gcloud_apis():
     required_apis = constants.REQUIRED_GOOGLE_CLOUD_APIS
 
     feedback_text = ui.info("Enabling required Google Cloud APIs")
-    project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
+    project_id = str(SETTINGS.GCLOUD_CONFIG["PROJECT"])
     enabled_apis = getattr(
         SETTINGS,
         "_SETUP_ENABLED_GOOGLE_CLOUD_APIS",
@@ -173,9 +172,6 @@ def enable_gcloud_apis():
                     wrap_text("Enabling Google Cloud APIs may take up to 5 minutes...")
                 )
             )
-            # @testable false
-            # @covered-by installer/gcloud.py::enable_gcloud_apis
-            # @reason local adapter converts captured gcloud failures before retry
             guided_terms = set()
 
             def enable_missing_services():
@@ -195,14 +191,14 @@ def enable_gcloud_apis():
                     detail = (result.stderr or result.stdout or "").strip()
                     terms_error = google_service_terms_error(
                         detail,
-                        account=SETTINGS.GCLOUD_CONFIG.get("ACCOUNT"),
+                        account=str(SETTINGS.GCLOUD_CONFIG.get("ACCOUNT") or ""),
                     )
                     if terms_error is not None:
                         if terms_error.terms_id in guided_terms:
                             raise terms_error
                         _guide_google_service_terms_acceptance(
                             terms_error,
-                            account=SETTINGS.GCLOUD_CONFIG.get("ACCOUNT"),
+                            account=str(SETTINGS.GCLOUD_CONFIG.get("ACCOUNT") or ""),
                             owner_email=SETTINGS.APP.get("ADMIN_EMAIL"),
                             spinner=sp,
                         )
@@ -260,11 +256,7 @@ def enable_gcloud_apis():
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_service_account_waits_for_newly_enabled_iam
-# @matrix setup : provider-convergence service-account
-def configure_service_account():
+def configure_service_account() -> dict[str, str]:
     """Create or update the explicit keyless runtime service account."""
     from config import SETTINGS
 
@@ -276,8 +268,9 @@ def configure_service_account():
         package_name="google-cloud-iam",
     )
     from google.cloud import iam_admin_v1
+    from google.cloud.iam_admin_v1 import types as iam_types
 
-    project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
+    project_id = str(SETTINGS.GCLOUD_CONFIG["PROJECT"])
     project_name = SETTINGS.GCLOUD_CONFIG.get("NAME") or re.sub(
         r"[^a-z0-9]", "-", project_id.lower()
     )
@@ -295,19 +288,13 @@ def configure_service_account():
     deployer_email = SETTINGS.APP.get(
         "DEPLOYER_EMAIL"
     ) or SETTINGS.GCLOUD_CONFIG.get("ACCOUNT")
-    if not deployer_email:
+    if not isinstance(deployer_email, str) or not deployer_email:
         raise RuntimeError("A deployer Google account is required.")
 
     iam_admin_client = iam_admin_v1.IAMClient()
     resource = f"projects/{project_id}"
 
-    # @testable false
-    # @covered-by installer/gcloud.py::configure_service_account
-    # @reason bounded IAM retry is exercised through account provisioning
     def retry_iam(operation, description):
-        # @testable false
-        # @covered-by installer/gcloud.py::configure_service_account
-        # @reason retry feedback and delays are exercised through IAM propagation
         def wait_for_retry(delay):
             print(
                 f.info(
@@ -325,9 +312,6 @@ def configure_service_account():
             sleep=wait_for_retry,
         )
 
-    # @testable false
-    # @covered-by installer/gcloud.py::configure_service_account
-    # @reason exact runtime and service-account grants belong to provisioning
     def apply_iam_policy(email):
         iam_access.reconcile_runtime_project_policy(
             project_id,
@@ -340,10 +324,10 @@ def configure_service_account():
         )
 
     name = f"projects/{project_id}/serviceAccounts/{runtime_email}"
-    request = iam_admin_v1.types.GetServiceAccountRequest(name=name)
+    lookup = iam_types.GetServiceAccountRequest(name=name)
     try:
         account = retry_iam(
-            lambda: iam_admin_client.get_service_account(request=request),
+            lambda: iam_admin_client.get_service_account(request=lookup),
             f"Discover service account {name}",
         )
         record_mutation(
@@ -361,12 +345,12 @@ def configure_service_account():
         raise ProviderTransientError(message) from e
     except ProviderNotFound:
         try:
-            request = iam_admin_v1.types.CreateServiceAccountRequest()
+            request = iam_types.CreateServiceAccountRequest()
             request.account_id = runtime_email.split("@", 1)[0]
             request.name = resource
 
-            new_service_account = iam_admin_v1.types.ServiceAccount()
-            new_service_account.display_name = SETTINGS.APP["APP_NAME"]
+            new_service_account = iam_types.ServiceAccount()
+            new_service_account.display_name = str(SETTINGS.APP["APP_NAME"])
             request.service_account = new_service_account
 
             account = retry_iam(
@@ -394,14 +378,11 @@ def configure_service_account():
                 message="Failed to create service account.",
             ) from e
 
-    # @testable false
-    # @covered-by installer/gcloud.py::configure_service_account
-    # @reason provider readback is exercised through account provisioning
     def wait_for_service_account(name):
         active, count = False, 0
         while not active:
             try:
-                request = iam_admin_v1.types.GetServiceAccountRequest(name=name)
+                request = iam_types.GetServiceAccountRequest(name=name)
                 iam_admin_client.get_service_account(request=request)
                 break
             except Exception as e:
@@ -410,9 +391,45 @@ def configure_service_account():
                     raise e
                 time.sleep(1)
 
+    def _is_sa_policy_propagation_error(error: Exception) -> bool:
+        classified = classify_provider_error(error)
+        if isinstance(classified, ProviderTransientError):
+            return True
+        if isinstance(classified, (ProviderInvalidInput, ProviderNotFound)):
+            text = str(error).casefold()
+            return any(
+                marker in text
+                for marker in (
+                    "does not exist",
+                    "not found",
+                    "service account",
+                    "unknown service account",
+                )
+            )
+        return False
+
     try:
         wait_for_service_account(account.name)
-        apply_iam_policy(account.email)
+        propagation_delays = (3, 5, 10, 15)
+        for attempt in range(len(propagation_delays) + 1):
+            try:
+                apply_iam_policy(account.email)
+                break
+            except Exception as exc:
+                if (
+                    attempt < len(propagation_delays)
+                    and _is_sa_policy_propagation_error(exc)
+                ):
+                    delay = propagation_delays[attempt]
+                    print(
+                        f.info(
+                            "New service account IAM is still propagating; "
+                            f"retrying in {delay} seconds..."
+                        )
+                    )
+                    time.sleep(delay)
+                    continue
+                raise
     except Exception as e:
         classified = classify_provider_error(e)
         if isinstance(classified, ProviderTransientError):
@@ -431,10 +448,9 @@ def configure_service_account():
     return {"client_email": account.email}
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_storage_provisioning_is_bucket_scoped_and_idempotent
-# @matrix iam setup storage : bucket-location bucket-scope idempotence provisioning storage-class
-def configure_storage_buckets(*, include_production=True, include_test=False):
+def configure_storage_buckets(
+    *, include_production: bool = True, include_test: bool = False
+) -> bool:
     """Provision the selected production or developer bucket families."""
     from config import SETTINGS
     from config.hosted_e2e import hosted_test_service_cors_origin
@@ -456,9 +472,9 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
     from google.api_core import exceptions as api_exceptions
     from google.cloud import storage
 
-    project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
+    project_id = str(SETTINGS.GCLOUD_CONFIG["PROJECT"])
     runtime_email = SETTINGS.APP.get("RUNTIME_SERVICE_ACCOUNT_EMAIL")
-    if not runtime_email:
+    if not isinstance(runtime_email, str) or not runtime_email:
         raise RuntimeError(
             "Cloud Storage provisioning requires "
             "RUNTIME_SERVICE_ACCOUNT_EMAIL."
@@ -468,7 +484,7 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
         or SETTINGS.APP.get("INSTALLER_EMAIL")
         or SETTINGS.GCLOUD_CONFIG.get("ACCOUNT")
     )
-    if not operator_email:
+    if not isinstance(operator_email, str) or not operator_email:
         raise RuntimeError(
             "Cloud Storage provisioning requires an installer/deployer account."
         )
@@ -509,7 +525,7 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
             SERVER_PORT=port,
         )
         test_names = storage_bucket_names(dict(SETTINGS.APP, PREFIX=test_prefix))
-        service_origin = hosted_test_service_cors_origin(project_id, site_origins["APP_URL"])
+        service_origin = hosted_test_service_cors_origin(project_id, str(site_origins["APP_URL"] or ""))
         managed_buckets.update(
             (name, (kind, test_config, service_origin)) for kind, name in test_names.items()
         )
@@ -625,12 +641,7 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_app_engine_persists_provider_location_hostname_and_oidc_subject
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_app_engine_creation_prompt_and_bounded_failures
-# @matrix setup : app-engine failure-isolation immutable-location interactive-input provider-state timeout
-def create_app_engine_app():
+def create_app_engine_app(*, confirm: bool = True) -> Application:
     """Get the immutable App Engine application or create it after confirmation."""
     from config import SETTINGS
     from config.locations import normalize_app_engine_location
@@ -647,7 +658,7 @@ def create_app_engine_app():
     )
     from google.cloud import appengine_admin_v1
 
-    project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
+    project_id = str(SETTINGS.GCLOUD_CONFIG["PROJECT"])
     location = normalize_app_engine_location(
         SETTINGS.APP["APP_ENGINE_LOCATION"]
     )
@@ -689,22 +700,23 @@ def create_app_engine_app():
             wrap_text("Creating the App Engine application may take up to 5 minutes.")
         )
     )
-    try:
-        confirmation = input(
-            format_prompt(
-                f"Create the App Engine application in '{location}'? [y/N]: "
+    if confirm:
+        try:
+            confirmation = input(
+                format_prompt(
+                    f"Create the App Engine application in '{location}'? [y/N]: "
+                )
             )
-        )
-    except EOFError as error:
-        message = (
-            "App Engine confirmation could not read from this terminal. "
-            "Run setup again in an interactive terminal."
-        )
-        print(f.error(message))
-        raise SetupCancelled(message) from error
-    if confirmation.strip().lower() not in ("y", "yes"):
-        print(ui.status(wrap_text("App Engine application creation cancelled.")))
-        raise SetupCancelled("App Engine application creation was cancelled.")
+        except EOFError as error:
+            message = (
+                "App Engine confirmation could not read from this terminal. "
+                "Run setup again in an interactive terminal."
+            )
+            print(f.error(message))
+            raise SetupCancelled(message) from error
+        if confirmation.strip().lower() not in ("y", "yes"):
+            print(ui.status(wrap_text("App Engine application creation cancelled.")))
+            raise SetupCancelled("App Engine application creation was cancelled.")
 
     with f.progress(
         text="Create App Engine application (may take up to 5 minutes)",
@@ -727,6 +739,8 @@ def create_app_engine_app():
                 identifier=project_id,
             )
 
+            if created_app is None:
+                raise RuntimeError("App Engine creation did not return an application.")
             sp.ok(f"App Engine application created in {created_app.location_id}")
             return created_app
         except Exception as e:
@@ -768,10 +782,7 @@ def create_app_engine_app():
             raise classified from e
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
-# @pair setup:cloud-tasks
-def create_task_queue():
+def create_task_queue() -> bool:
     """Creates a Cloud Tasks queue named 'lagniappe-tasks' if it doesn't exist."""
     from config import SETTINGS
 
@@ -790,9 +801,10 @@ def create_task_queue():
             "google.api_core", "Google API Core", package_name="google-api-core"
         )
         from google.cloud import tasks_v2
+        from google.cloud.tasks_v2 import types as task_types
 
-        project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
-        region = SETTINGS.APP["RESOURCE_REGION"]
+        project_id = str(SETTINGS.GCLOUD_CONFIG["PROJECT"])
+        region = str(SETTINGS.APP["RESOURCE_REGION"])
         queue_name = SETTINGS.APP.get(
             "TASK_QUEUE_NAME", constants.DEFAULT_TASK_QUEUE_NAME
         )
@@ -817,7 +829,7 @@ def create_task_queue():
             sp.ok()
             return True
         except ProviderNotFound:
-            queue = tasks_v2.types.Queue(name=queue_path)
+            queue = task_types.Queue(name=queue_path)
             try:
                 retry_provider_call(
                     lambda: client.create_queue(parent=parent, queue=queue),
@@ -858,25 +870,22 @@ def create_task_queue():
             ) from e
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_deferred_job_reconciler_contract
-# @matrix deferred-jobs setup : cloud-scheduler iam oidc recovery runtime-isolation
-def create_deferred_job_reconciler():
+def create_deferred_job_reconciler() -> bool:
     """Create or update the five-minute durable-job recovery schedule."""
     from config import SETTINGS
 
     f = FORMATTER.initialize()
-    project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
-    region = SETTINGS.APP["RESOURCE_REGION"]
+    project_id = str(SETTINGS.GCLOUD_CONFIG["PROJECT"])
+    region = str(SETTINGS.APP["RESOURCE_REGION"])
     runtime_service_account = SETTINGS.APP.get("RUNTIME_SERVICE_ACCOUNT_EMAIL")
     service_account = SETTINGS.APP.get(
         "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL"
     )
     app_url = str(SETTINGS.APP.get("APP_URL") or "").rstrip("/")
-    account = SETTINGS.GCLOUD_CONFIG.get("ACCOUNT")
+    account = str(SETTINGS.GCLOUD_CONFIG.get("ACCOUNT") or "")
     if (
-        not runtime_service_account
-        or not service_account
+        not isinstance(runtime_service_account, str) or not runtime_service_account
+        or not isinstance(service_account, str) or not service_account
         or not app_url
         or not account
     ):
@@ -984,16 +993,13 @@ def create_deferred_job_reconciler():
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_data_protection_contract
-# @matrix disaster-recovery setup : idempotent native-backups pitr retention runtime-isolation
-def configure_data_protection():
+def configure_data_protection() -> bool:
     """Enable PITR and reconcile daily/weekly native backup schedules."""
     import json
 
     from config import SETTINGS
 
-    project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
+    project_id = str(SETTINGS.GCLOUD_CONFIG["PROJECT"])
     database = "(default)"
     retry_provider_call(
         lambda: run_gcloud_command(
@@ -1083,10 +1089,7 @@ def configure_data_protection():
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
-# @pair setup:ocr
-def create_ocr_processor():
+def create_ocr_processor() -> bool | None:
     from config import SETTINGS
 
     f = FORMATTER.initialize()
@@ -1107,8 +1110,8 @@ def create_ocr_processor():
         from google.cloud import documentai
         from google.api_core import exceptions as api_exceptions
 
-        project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
-        location = SETTINGS.APP["OCR_LOCATION"]
+        project_id = str(SETTINGS.GCLOUD_CONFIG["PROJECT"])
+        location = str(SETTINGS.APP["OCR_LOCATION"])
 
         try:
             opts = ClientOptions(api_endpoint=f"{location}-documentai.googleapis.com")
@@ -1118,7 +1121,7 @@ def create_ocr_processor():
                 "OCR_PROCESSOR", constants.DEFAULT_OCR_PROCESSOR_NAME
             )
             saved_processor = SETTINGS.APP.get("OCR_PROCESSOR_ID")
-            if saved_processor:
+            if isinstance(saved_processor, str) and saved_processor:
                 try:
                     processor = client.get_processor(name=saved_processor)
                     if processor.display_name != display_name:
@@ -1187,11 +1190,7 @@ def create_ocr_processor():
             ) from e
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_app_engine_persists_provider_location_hostname_and_oidc_subject
-# @matrix setup : app-engine immutable-location keyless-config oidc provider-state service-account
-def setup_app_engine():
+def setup_app_engine(*, confirm: bool = True) -> None:
     """Configure App Engine and service account."""
     from config import SETTINGS
 
@@ -1211,10 +1210,24 @@ def setup_app_engine():
     if SETTINGS.DEPLOY.get("service_account") != runtime_email:
         SETTINGS.DEPLOY["service_account"] = runtime_email
         settings_changed = True
+    from config.secrets import DEFAULT_RUNTIME_SECRET_NAME, uses_secret_manager
+
+    if uses_secret_manager(SETTINGS.APP) and runtime_email:
+        from installer.secrets import ensure_runtime_secrets_infrastructure
+
+        ensure_runtime_secrets_infrastructure(
+            str(SETTINGS.GCLOUD_CONFIG["PROJECT"]),
+            str(runtime_email),
+            secret_name=str(
+                SETTINGS.APP.get("SECRETS_SECRET_NAME") or DEFAULT_RUNTIME_SECRET_NAME
+            ),
+        )
     if settings_changed:
         SETTINGS.save()
 
-    application = create_app_engine_app()
+    application = (
+        create_app_engine_app() if confirm else create_app_engine_app(confirm=False)
+    )
     location = str(getattr(application, "location_id", "") or "").strip()
     hostname = str(getattr(application, "default_hostname", "") or "").strip()
     if not location or not hostname:

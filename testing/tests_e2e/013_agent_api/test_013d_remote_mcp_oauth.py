@@ -169,7 +169,6 @@ def _consent_fields(page):
     }
 
 
-# @matrix mcp-oauth : discovery consent csrf login redirect
 def test_oauth_metadata_login_consent_and_csrf(pilot):
     metadata = _open(pilot, "GET", "/.well-known/oauth-authorization-server")
     assert metadata.status_code == 200
@@ -213,8 +212,6 @@ def test_oauth_metadata_login_consent_and_csrf(pilot):
     )
 
 
-# @matrix error-handling : csrf
-# @source lagniappe/web/start/errors.py::handle_http_error
 @pytest.mark.parametrize("csrf_failure", ["changed-session", "missing-token"])
 def test_oauth_csrf_failure_shows_connection_restart_guidance(pilot, csrf_failure):
     _login(pilot)
@@ -252,7 +249,6 @@ def test_oauth_csrf_failure_shows_connection_restart_guidance(pilot, csrf_failur
     assert parse_qs(urlsplit(denied.location).query)["error"] == ["access_denied"]
 
 
-# @matrix mcp-oauth : consent consent-binding
 def test_oauth_consent_rejects_replaced_request_and_changed_account(pilot, monkeypatch):
     _login(pilot)
     original_form = _consent_page(pilot)
@@ -306,7 +302,6 @@ def test_oauth_consent_rejects_replaced_request_and_changed_account(pilot, monke
     assert len(code_rows) == 1 and code_rows[0]["user"] == second.key
 
 
-# @matrix mcp-oauth : login login-continuation consent redirect
 # Flask-Login's remember-cookie implementation still uses utcnow on Python 3.14.
 # Keep this dependency warning scoped to the real callback that exercises it.
 @pytest.mark.filterwarnings(
@@ -417,8 +412,6 @@ def test_oauth_pending_survives_google_callback_session_replacement(pilot, monke
     )
 
 
-# @matrix mcp-oauth : token revocation csrf-exemption csrf browser-settings
-# @matrix agent-api : bearer-only session-independent request-recheck
 def test_oauth_token_api_envelope_and_browser_revocation(pilot, monkeypatch):
     _login(pilot)
     form = _consent_page(pilot)
@@ -514,8 +507,6 @@ def test_oauth_token_api_envelope_and_browser_revocation(pilot, monkeypatch):
     )
 
 
-# @matrix agent-api : rate-limit bearer-only
-# @source lagniappe/web/routes/api/main.py::authenticate_request
 def test_remote_mcp_rate_limit_precedes_workload_verification(pilot, monkeypatch):
     key = pilot.limiter_keys["remote-mcp-envelope"]
     rate_limiter.cache.redis.set(key, 60, ex=17)
@@ -541,7 +532,6 @@ def test_remote_mcp_rate_limit_precedes_workload_verification(pilot, monkeypatch
     assert rate_limiter.cache.redis.get(pilot.limiter_keys["agent-api-general"]) is None
 
 
-# @matrix mcp-oauth : consent loopback csrf client-isolation
 def test_codex_browser_consent_names_client_and_revokes_only_its_connection(pilot):
     from config.remote_mcp import CODEX_CLIENT_ID
 
@@ -647,8 +637,6 @@ def codex_loopback():
         thread.join(timeout=10)
 
 
-# @matrix mcp-oauth : consent loopback browser-callback submit-progress
-# @matrix web-headers : security
 @pytest.mark.parametrize("decision", ["allow", "deny"])
 def test_codex_native_consent_reaches_loopback_and_shows_submit_progress(
     pilot, browser, codex_loopback, decision
@@ -732,10 +720,6 @@ def test_codex_native_consent_reaches_loopback_and_shows_submit_progress(
             assert pilot.rows.keys() == before.keys()
 
 
-# @matrix mcp-oauth : site-policy discovery
-# @matrix agent-api : site-policy bearer-only
-# @source lagniappe/web/routes/oauth/main.py::metadata
-# @source lagniappe/web/routes/api/main.py::authenticate_request
 @pytest.mark.parametrize("flag", ["AI_ENABLED", "EXTERNAL_AI_ENABLED"])
 def test_site_policy_closes_oauth_discovery_and_external_routes(pilot, monkeypatch, flag):
     monkeypatch.setattr(CONFIG, flag, False)
@@ -747,8 +731,6 @@ def test_site_policy_closes_oauth_discovery_and_external_routes(pilot, monkeypat
         assert response.json["error"]["code"] == "external_ai_disabled"
 
 
-# @matrix manual : site-policy address-redaction anonymous-access ajax-section
-# @source lagniappe/web/responses.py::manual_content
 def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pilot, monkeypatch):
     pilot.actor.access = lambda _: False
     monkeypatch.setattr(CONFIG, "MCP_NAME", "cwright-mcp")
@@ -811,9 +793,6 @@ def test_external_ai_manual_shows_connection_details_only_to_eligible_readers(pi
     assert 'data-role="external-ai-account-details"' not in response.text
 
 
-# @matrix mcp-oauth : consent user-binding
-# @source lagniappe/web/routes/oauth/main.py::authorize
-# @source lagniappe/core/tools/auth/remote_mcp.py::eligible_user
 @pytest.mark.parametrize("client", ["chatgpt", "codex"])
 def test_public_user_cannot_authorize_with_valid_client_setup(pilot, client):
     from config.remote_mcp import CODEX_CLIENT_ID
@@ -837,8 +816,6 @@ def test_public_user_cannot_authorize_with_valid_client_setup(pilot, client):
     assert not any(name.startswith(("c-", "a-", "r-", "grant-")) for name in pilot.rows)
 
 
-# @matrix ai-access : site-policy
-# @source lagniappe/core/entities/user.py::User.access
 # @template pages/photo.html::image
 # @template home/site_settings.html::site_settings
 # @template home/categories.html::create

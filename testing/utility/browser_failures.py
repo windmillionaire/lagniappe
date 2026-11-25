@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 import json
 import logging
 from pathlib import Path
@@ -63,10 +63,6 @@ class BrowserFailure:
         }
 
 
-# @testable true
-# @tests tests_tooling/test_004_browser_failures.py
-# @tests tests_e2e/001_site/test_001a_environment.py::test_browser_failure_guard_detects_unhandled_page_errors
-# @matrix browser-failures e2e : console expectations pageerror requestfailed
 class BrowserFailureCollector:
     """Monitor every page in a test's browser contexts and retain failures."""
 
@@ -110,7 +106,9 @@ class BrowserFailureCollector:
         text_contains: str | None = None,
         failure: str | None = None,
         source_path: str | None = None,
-    ) -> "ExpectedBrowserFailure":
+        http_method: str | None = None,
+        http_body: str | None = None,
+    ) -> ExpectedBrowserFailure:
         """Return a scope that consumes an intentional failure pattern."""
         if count is not None and count < 0:
             raise ValueError("Expected browser failure count cannot be negative.")
@@ -135,6 +133,8 @@ class BrowserFailureCollector:
                 "text_contains": text_contains,
                 "failure": failure,
                 "source_path": source_path,
+                "http_method": http_method,
+                "http_body": http_body,
             },
         )
 
@@ -144,10 +144,12 @@ class BrowserFailureCollector:
         *,
         status: int,
         path: str,
+        method: str | None = None,
+        body: str | None = None,
         count: int | None = None,
         max_count: int | None = None,
-    ) -> "ExpectedBrowserFailure":
-        """Allow Chromium's optional diagnostic; callers assert the HTTP/UI result."""
+    ) -> ExpectedBrowserFailure:
+        """Allow an expected Chromium diagnostic, optionally matching its captured 5xx response."""
         source_path = urlsplit(path).path
         return self.expect(
             user,
@@ -157,6 +159,8 @@ class BrowserFailureCollector:
             console_type="error",
             text_contains=f"status of {status} ",
             source_path=source_path,
+            http_method=method,
+            http_body=body,
         )
 
     @contextmanager
@@ -190,9 +194,8 @@ class BrowserFailureCollector:
             if ping_count > 0
             else nullcontext()
         )
-        with expectation:
-            with native_failure:
-                yield
+        with expectation, native_failure:
+            yield
 
     def assert_clean(self) -> None:
         """Raise one teardown-friendly failure for unaccounted browser events."""
@@ -418,7 +421,7 @@ def write_diagnostic_report(
     """Write one ignored, machine-readable report for a diagnostic E2E session."""
     payload = {
         "schema_version": 1,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "tests": records,
     }
     path.parent.mkdir(parents=True, exist_ok=True)

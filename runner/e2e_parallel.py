@@ -1,14 +1,26 @@
 """Bounded E2E batches under one owner, with private results and conflict lanes."""
 
-from dataclasses import dataclass
+from __future__ import annotations
+
 import json
 import math
 import os
-from pathlib import Path
 import signal
 import subprocess
 import time
+from collections.abc import Callable, Mapping, Sequence
+from contextlib import suppress
+from dataclasses import dataclass
+from pathlib import Path
+from typing import NotRequired, TypedDict
 from xml.etree import ElementTree as ET
+
+
+class WorkerEvent(TypedDict):
+    batch: str
+    event: str
+    at: float
+    status: NotRequired[int]
 
 
 @dataclass(frozen=True)
@@ -20,15 +32,11 @@ class Batch:
     additional_nodeids: tuple[str, ...] = ()
 
     @property
-    def nodeids(self):
+    def nodeids(self) -> tuple[str, ...]:
         return (self.nodeid, *self.additional_nodeids)
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_worker_messages_allow_publication_during_completion
-# @tests tests_tooling/test_015_e2e_parallel.py::test_worker_messages_reject_missing_completed_messages
-# @matrix testing : parallel-e2e
-def await_worker_file(path):
+def await_worker_file(path: Path) -> dict[str, object]:
     """Wait for an atomic harness message, never for browser/app state."""
     deadline = time.monotonic() + 90
     while not path.is_file():
@@ -41,12 +49,16 @@ def await_worker_file(path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_scheduler_overlaps_independent_work_and_serializes_conflicts
-# @tests tests_tooling/test_015_e2e_parallel.py::test_scheduler_stops_children_before_returning_on_lost_authority
-# @tests tests_tooling/test_015_e2e_parallel.py::test_scheduler_reaps_a_crashed_workers_remaining_children
-# @matrix testing : parallel-e2e
-def schedule(batches, launch, assert_active, *, workers=2, timeout=180, finished=None, events=None):
+def schedule(
+    batches: Sequence[Batch],
+    launch: Callable[[Batch], subprocess.Popen],
+    assert_active: Callable[[], object],
+    *,
+    workers: int = 2,
+    timeout: float = 180,
+    finished: dict[str, int] | None = None,
+    events: list[WorkerEvent] | None = None,
+) -> tuple[dict[str, int], list[WorkerEvent]]:
     """Run nonconflicting batches; an exclusive entry is a draining barrier."""
     pending = list(batches)
     running = {}
@@ -60,15 +72,13 @@ def schedule(batches, launch, assert_active, *, workers=2, timeout=180, finished
             if now >= next_check:
                 assert_active()
                 next_check = now + 1
-            for name, (batch, process, began) in list(running.items()):
+            for name, (_batch, process, began) in list(running.items()):
                 status = process.poll()
                 if status is not None:
                     # A crashed pytest can leave a browser in its process group.
                     # Even successful workers must not leave live descendants.
-                    try:
+                    with suppress(ProcessLookupError):
                         os.killpg(process.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
                     finished[name] = status
                     events.append({"batch": name, "event": "finish", "at": now - started,
                                    "status": status})
@@ -101,10 +111,8 @@ def schedule(batches, launch, assert_active, *, workers=2, timeout=180, finished
         # Reap every remaining worker before the caller can clean shared data.
         for _, process, _ in running.values():
             if process.poll() is None:
-                try:
+                with suppress(ProcessLookupError):
                     os.killpg(process.pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
         for _, process, _ in running.values():
             try:
                 process.wait(timeout=5)
@@ -112,19 +120,20 @@ def schedule(batches, launch, assert_active, *, workers=2, timeout=180, finished
                 pass
             finally:
                 # A parent can exit on TERM while a descendant ignores it.
-                try:
+                with suppress(ProcessLookupError):
                     os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
                 process.wait(timeout=5)
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_merge_preserves_failures_and_rejects_missing_corrupt_or_duplicate_evidence
-# @tests tests_tooling/test_015_e2e_parallel.py::test_merge_preserves_each_parameter_and_reports_missing_batch_cases
-# @tests tests_tooling/test_015_e2e_parallel.py::test_merge_checks_each_case_identity_and_outcome
-# @matrix testing : parallel-e2e
-def merge_results(batches, directory, statuses, *, attempt, snapshot, destination):
+def merge_results(
+    batches: Sequence[Batch],
+    directory: Path,
+    statuses: Mapping[str, int],
+    *,
+    attempt: str,
+    snapshot: str,
+    destination: str | Path,
+) -> tuple[dict[str, dict[str, object]], list[str]]:
     """Account for every selected nodeid without consulting earlier evidence."""
     outcomes = {}
     errors = []
@@ -147,7 +156,7 @@ def merge_results(batches, directory, statuses, *, attempt, snapshot, destinatio
                 if not isinstance(row, dict) or row.get("outcome") not in {"passed", "failed", "skipped"}:
                     raise ValueError("missing terminal outcome")
                 duration = row.get("duration")
-                if type(duration) not in {int, float} or not math.isfinite(duration) or duration < 0:
+                if (type(duration) is not int and type(duration) is not float) or not math.isfinite(duration) or duration < 0:
                     raise ValueError("invalid worker duration")
             failed = any(row["outcome"] == "failed" for row in rows.values())
             if (status == 0) == failed:

@@ -1,5 +1,16 @@
 """Durable direct-upload staging for AI report input files."""
 
+from __future__ import annotations
+
+from typing import Protocol, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.tools.database.assets import DirectUploadFile
+
+
 from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
 from lagniappe.core.definitions import (
@@ -11,6 +22,20 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.tools.database import assets as storage_assets
 
+
+class SaveUploadProgress(Protocol):
+    def __call__(self, *entities: Entity) -> object: ...
+
+
+class FileFactory(Protocol):
+    def __call__(self, *, upload: DirectUploadFile, data: dict[str, object]) -> models.File: ...
+
+
+class FailedFileCleanup(Protocol):
+    def __call__(
+        self, *, file: models.File | None, upload: DirectUploadFile,
+        error: BaseException, checkpoint_disposition: str,
+    ) -> None: ...
 
 DIRECT_UPLOAD_RECORD_KEYS = (
     "token",
@@ -25,16 +50,12 @@ CHECKPOINT_NOT_COMMITTED = "not_committed"
 CHECKPOINT_AMBIGUOUS = "ambiguous"
 
 
-# @testable true
-# @tests tests_unit/test_020c_ai_report_uploads.py::test_prepare_report_upload_manifest_normalizes_browser_records
-# @tests tests_unit/test_032_agent_api.py::test_external_upload_batch_identity_is_preserved_in_every_record
-# @matrix ai-report direct-upload : normalization upload-batch-identity upload-manifest validation
 def prepare_report_upload_manifest(
-    records,
-    input_name="tool-files",
+    records: Iterable[object] | None,
+    input_name: str = "tool-files",
     *,
-    upload_batch_id=None,
-):
+    upload_batch_id: str | None = None,
+) -> list[dict[str, object]]:
     """Return bounded signed-upload metadata safe to persist on a report."""
     if upload_batch_id is not None and (
         not isinstance(upload_batch_id, str) or not upload_batch_id
@@ -64,9 +85,9 @@ def prepare_report_upload_manifest(
             )
 
         normalized = {
-            key: record.get(key)
+            key: value
             for key in DIRECT_UPLOAD_RECORD_KEYS
-            if record.get(key) is not None
+            if (value := record.get(key)) is not None
         }
         normalized["token"] = token.strip()
         normalized["filename"] = filename.strip()
@@ -101,31 +122,22 @@ def prepare_report_upload_manifest(
     return manifest
 
 
-# @testable true
-# @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_resumes_and_checkpoints
-# @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_retains_source_until_checkpoint
-# @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_accepts_actual_oversized_object
-# @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_marks_default_files_as_report_only
-# @matrix ai-report direct-upload : active-request background-finalization checkpoint-failure large-file pre-execution progress resume upload-manifest
-# @pairs ai-report:generation-cleanup direct-upload:generation-cleanup
-# @pairs ai-report:lease-renewal direct-upload:lease-renewal
-# @pairs ai-report:factory-failure direct-upload:factory-failure
-# @pairs ai-report:cleanup direct-upload:cleanup
-# @pairs ai-report:partial-progress direct-upload:partial-progress
-# @pairs ai-report:retry direct-upload:retry
 def finalize_report_upload_manifest(
-    report,
-    user,
+    report: models.AIReport,
+    user: models.User,
     *,
-    save=None,
-    upload_loader=None,
-    file_factory=None,
-    upload_cleanup=None,
-    failed_file_cleanup=None,
-    ensure_active=None,
-):
+    save: SaveUploadProgress | None = None,
+    upload_loader: Callable[[dict[str, object]], DirectUploadFile] | None = None,
+    file_factory: FileFactory | None = None,
+    upload_cleanup: Callable[[dict[str, object]], bool] | None = None,
+    failed_file_cleanup: FailedFileCleanup | None = None,
+    ensure_active: Callable[[], None] | None = None,
+) -> list[models.File]:
     """Finalize staged uploads before removing their checkpointed sources."""
-    manifest = list(report.upload_manifest or [])
+    stored = report.upload_manifest
+    if stored is not None and not isinstance(stored, list):
+        raise exceptions.ValidationError("Report upload manifest is invalid.")
+    manifest = list(stored or [])
     if not manifest:
         return []
 
@@ -133,15 +145,14 @@ def finalize_report_upload_manifest(
     upload_loader = upload_loader or storage_assets.direct_upload_file
     if file_factory is None:
 
-        # @testable false
-        # @covered-by lagniappe/core/tools/ai/reporting/uploads.py::finalize_report_upload_manifest
-        # @reason default factory ownership is asserted through the public finalizer
-        def file_factory(*, upload, data):
+        def create_report_file(*, upload, data):
             return Entities.FILE.create(
                 upload=upload,
                 data=data,
                 report_user=user,
             )
+
+        file_factory = create_report_file
 
     upload_cleanup = upload_cleanup or storage_assets.delete_direct_upload
     input_files = list(report.input_files or [])
@@ -150,9 +161,6 @@ def finalize_report_upload_manifest(
     prepared = 0
     finalized = []
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/reporting/uploads.py::finalize_report_upload_manifest
-    # @reason source-cleanup retry behavior is asserted through the public finalizer
     def cleanup_source(record):
         if not upload_cleanup(record):
             raise exceptions.ValidationError(
@@ -174,11 +182,12 @@ def finalize_report_upload_manifest(
             continue
 
         upload = upload_loader(record)
+        filename = getattr(upload, "filename", record.get("filename"))
         try:
             enforce_file_consumer(
                 upload,
                 FileConsumer.AI_REPORT,
-                filename=getattr(upload, "filename", record.get("filename")),
+                filename=filename if isinstance(filename, str) else None,
             )
         except FileConsumerLimitError as error:
             raise exceptions.ValidationError(str(error)) from error
@@ -254,14 +263,17 @@ def finalize_report_upload_manifest(
     return finalized
 
 
-# @testable true
-# @tests tests_unit/test_020c_ai_report_uploads.py::test_cleanup_report_upload_manifest_deletes_all_temporary_sources
-# @matrix ai-report direct-upload : cleanup partial-progress upload-manifest
-def cleanup_report_upload_manifest(report, delete_upload=None):
+def cleanup_report_upload_manifest(
+    report: models.AIReport,
+    delete_upload: Callable[[dict[str, object]], bool] | None = None,
+) -> int:
     """Delete every temporary source still represented by an upload manifest."""
     delete_upload = delete_upload or storage_assets.delete_direct_upload
     deleted = 0
-    for record in report.upload_manifest or []:
+    manifest = report.upload_manifest
+    if not isinstance(manifest, list):
+        return 0
+    for record in manifest:
         if not isinstance(record, dict):
             continue
         if delete_upload(record):

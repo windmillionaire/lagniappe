@@ -25,7 +25,6 @@ def _draft():
     }
 
 
-# @matrix forms ai : draft-generation stable-identity validation no-side-effects
 @pytest.mark.unit
 def test_generated_changes_patch_exact_identities_without_mutating_draft():
     draft = _draft()
@@ -50,7 +49,6 @@ def test_generated_changes_patch_exact_identities_without_mutating_draft():
     assert proposal["html_fields"] == {"intro": "<p><strong>Updated</strong> content</p>"}
 
 
-# @matrix forms ai : draft-generation stable-identity validation no-side-effects
 @pytest.mark.unit
 @pytest.mark.parametrize("operation", [
     {"op": "remove_field", "field_id": "notes"},
@@ -86,7 +84,6 @@ def test_generated_changes_reject_entire_invalid_proposal(operation):
     assert result == raw
 
 
-# @matrix forms ai : draft-generation stable-identity validation no-side-effects
 @pytest.mark.unit
 def test_generated_changes_preserve_noop_and_intentional_empty_html():
     draft = _draft()
@@ -100,9 +97,6 @@ def test_generated_changes_preserve_noop_and_intentional_empty_html():
     assert draft["html_fields"]["intro"] == "<p>Original content</p>"
 
 
-# @source lagniappe/core/tools/files/html.py::render_markdown
-# @matrix forms ai : draft-generation stable-identity validation no-side-effects
-# @matrix form-html security : html-sanitization owned-image
 @pytest.mark.unit
 def test_generated_static_content_retains_only_known_images():
     url = "https://example.test/assets/original/image"
@@ -122,9 +116,6 @@ def test_generated_static_content_retains_only_known_images():
     assert "<script" not in html
 
 
-# @source lagniappe/core/tools/files/html.py::render_markdown
-# @matrix forms ai : draft-generation validation no-side-effects
-# @matrix form-html security : html-sanitization owned-image
 @pytest.mark.unit
 @pytest.mark.parametrize("source", ["https://example.test/assets/original/image", "draft-image:local-one"])
 @pytest.mark.parametrize(("style", "suffix"), [
@@ -164,8 +155,6 @@ def test_generated_text_preserves_draft_image_layout(source, style, suffix):
     assert draft == original
 
 
-# @source lagniappe/core/tools/ai/schema.py::form_generation_prompt
-# @matrix ai : output-format prompt-builders thinking
 @pytest.mark.unit
 def test_draft_prompt_includes_live_schema_and_operation_contract():
     draft = _draft()

@@ -1,5 +1,10 @@
 """Deferred-job orchestration and domain-boundary errors."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ...entities.deferred_job import DeferredJob
+
 from lagniappe.core import exceptions
 
 
@@ -41,10 +46,9 @@ class DeferredJobDriftError(exceptions.ValidationError):
 
 
 
-# @testable infrastructure
 class DeferredJobLockedError(exceptions.ValidationError):
     """A target-scoped operation already owns the requested mutation surface."""
 
-    def __init__(self, job):
+    def __init__(self, job: DeferredJob) -> None:
         super().__init__("Autofill is already running for this form.")
         self.job = job

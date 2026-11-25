@@ -3,6 +3,21 @@ import { test } from "node:test";
 import esmock from "esmock";
 import { createBrowser } from "../utility/js/environment.mjs";
 
+test("test_dropzone_renders_file_labels_as_text", async (t) => {
+	createBrowser(t);
+	const { uploadElement } = await import("../../src/script/elements/upload.ts");
+	const dropzone = uploadElement.dropzone({});
+	const label = dropzone.element.querySelector("p");
+	const filename = "Budget <draft> & notes.pdf";
+	dropzone.setText(filename);
+	assert.equal(label.textContent, filename);
+	assert.equal(label.children.length, 0);
+	const spinner = document.createElement("span");
+	dropzone.setContent(spinner, " Uploading...");
+	assert.equal(label.firstChild, spinner);
+	assert.equal(label.textContent, " Uploading...");
+});
+
 const cloneHeaders = (headers) =>
 	headers instanceof Headers
 		? Object.fromEntries(headers.entries())
@@ -50,9 +65,9 @@ async function setupDirectUpload(t) {
 	t.mock.method(globalThis, "fetch", fetchImpl);
 	t.mock.method(window, "fetch", fetchImpl);
 	const { directUpload } = await esmock.strict(
-		"../../src/script/shared/directUpload.mjs",
+		"../../src/script/shared/directUpload.ts",
 		{
-			"../../src/script/shared/request.mjs": {
+			"../../src/script/shared/request.ts": {
 				request: {
 					post: (...args) => post(...args),
 				},
@@ -74,19 +89,18 @@ async function setupBaseUpload(t) {
 	const errors = [];
 	const directUpload = {};
 	const { BaseUpload } = await esmock.strict(
-		"../../src/script/elements/base/baseUpload.mjs",
+		"../../src/script/elements/base/baseUpload.ts",
 		{
-			"../../src/script/forms/controller.mjs": {
+			"../../src/script/forms/controller.ts": {
 				FormController: class {},
 			},
-			"../../src/script/shared/directUpload.mjs": { directUpload },
-			"../../src/script/elements/upload.mjs": { uploadElement: {} },
+			"../../src/script/shared/directUpload.ts": { directUpload },
+			"../../src/script/elements/upload.ts": { uploadElement: {} },
 		},
 	);
 	return { BaseUpload, directUpload, errors };
 }
 
-/** @matrix direct-upload : resumable-range retry */
 test("test_direct_upload_resumes_after_network_reset", async (t) => {
 	const context = await setupDirectUpload(t);
 	const file = new File(["abcdefghijkl"], "file.txt", { type: "text/plain" });
@@ -111,7 +125,6 @@ test("test_direct_upload_resumes_after_network_reset", async (t) => {
 	);
 });
 
-/** @matrix direct-upload forms : retryable-action persistent-error */
 test("test_builder_direct_upload_failure_preserves_owner_page", async (t) => {
 	const context = await setupDirectUpload(t);
 	context.setPost(async (route, _body, options) => {
@@ -130,7 +143,6 @@ test("test_builder_direct_upload_failure_preserves_owner_page", async (t) => {
 	);
 });
 
-/** @matrix direct-upload : compatibility multipart-fallback single-file */
 test("test_single_file_keeps_compatibility_multipart_fallback", async (t) => {
 	const { BaseUpload, directUpload, errors } = await setupBaseUpload(t);
 	const file = new File(["one"], "one.txt", { type: "text/plain" });
@@ -147,7 +159,6 @@ test("test_single_file_keeps_compatibility_multipart_fallback", async (t) => {
 	assert.deepEqual(instance.directUploads, []);
 });
 
-/** @matrix upload : directory-rejection drag-drop */
 test("test_directory_drop_is_rejected_before_file_processing", async (t) => {
 	const { BaseUpload, errors } = await setupBaseUpload(t);
 	let dropHandler;
@@ -181,7 +192,6 @@ test("test_directory_drop_is_rejected_before_file_processing", async (t) => {
 	assert.deepEqual(errors, ["Only individual files are supported"]);
 });
 
-/** @pair upload:async-file-snapshot */
 test("test_file_drop_survives_async_directory_check", async (t) => {
 	const { BaseUpload } = await setupBaseUpload(t);
 	let dropHandler;
@@ -217,7 +227,6 @@ test("test_file_drop_survives_async_directory_check", async (t) => {
 	assert.deepEqual(received, [file]);
 });
 
-/** @matrix direct-upload : aggregate-limit multipart-fallback partial-resume */
 test("test_large_multi_file_retry_preserves_completed_direct_uploads", async (t) => {
 	const { BaseUpload, directUpload, errors } = await setupBaseUpload(t);
 	const files = Array.from(

@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from werkzeug.datastructures import FileStorage
 
 from lagniappe.core.definitions import asset as asset_defs
 from lagniappe.core.definitions import Action, LARGE_ASSET_BYTES
@@ -20,12 +21,13 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import DeferredJobType
 from lagniappe.core.tools.ai import summarize as file_summary
 from lagniappe.core.tools.files import extract as file_extract
+from lagniappe.core.tools.files import utility as file_utility
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.properties.file_assets import FileAsset
 from testing.utility.test_entities import TestEntities
+from datetime import UTC
 
 
-# @matrix file : display-name filename-fallback
 @pytest.mark.unit
 def test_display_name(get_test_entities):
     """Test DisplayName property returns name if set, otherwise filename without extension."""
@@ -48,7 +50,6 @@ def test_display_name(get_test_entities):
         )
 
 
-# @matrix file : encoding mimetype property
 @pytest.mark.unit
 def test_filename_mimetype_encoding(get_test_entities):
     """Test simple DBProperty getters/setters for filename, mimetype, encoding."""
@@ -67,7 +68,6 @@ def test_filename_mimetype_encoding(get_test_entities):
         assert file.encoding == expected["encoding"]
 
 
-# @matrix file : cache summary
 @pytest.mark.unit
 def test_summary(get_test_entities):
     """Test Summary property with conditional description cache projection."""
@@ -85,7 +85,6 @@ def test_summary(get_test_entities):
         assert file.properties.summary.cache_value == expected.get("cache_value")
 
 
-# @matrix file : cache description
 @pytest.mark.unit
 def test_file_description_form_field_populates_search_cache():
     """File info's description field should save to the searchable cache desc."""
@@ -98,7 +97,6 @@ def test_file_description_form_field_populates_search_cache():
     assert file.to_cache["desc"] == "Generated permit packet description."
 
 
-# @pairs ai-report:pre-execution files:search-visibility
 @pytest.mark.unit
 def test_report_file_is_searchable_only_after_workspace_attachment():
     user = TestEntities.get("USER", {"name": "Report owner", "hash": "reportowner"})
@@ -116,7 +114,6 @@ def test_report_file_is_searchable_only_after_workspace_attachment():
     assert file.searchable is True
 
 
-# @matrix file : option-preservation update
 @pytest.mark.unit
 def test_file_update_preserves_processing_options_when_controls_absent():
     """File info saves should not clear search flags when option controls are absent."""
@@ -134,7 +131,6 @@ def test_file_update_preserves_processing_options_when_controls_absent():
     assert file.properties.summarize.search is True
 
 
-# @matrix ai file : large-file metadata mimetype permissions uri
 @pytest.mark.unit
 def test_file_to_ai_exports_metadata_and_uri_to_ai():
     user = SimpleNamespace(
@@ -195,7 +191,6 @@ def test_file_to_ai_exports_metadata_and_uri_to_ai():
     assert file.properties.file.uri_to_ai is None
 
 
-# @matrix file : asset-metadata large-file size
 @pytest.mark.unit
 def test_file_size_and_large_use_asset_metadata():
     stored_size = asset_defs.LARGE_ASSET_BYTES + 1
@@ -218,7 +213,6 @@ def test_file_size_and_large_use_asset_metadata():
     assert file.large is True
 
 
-# @matrix file : html-preview text-asset
 @pytest.mark.unit
 def test_as_html(get_test_entities):
     """Test AsHTML property converts text to HTML using the focused helper."""
@@ -233,7 +227,6 @@ def test_as_html(get_test_entities):
         assert (str(result).strip() if result is not None else None) == file.test_spec["expected"]["html"]
 
 
-# @matrix file : fallback html-preview text-asset
 @pytest.mark.unit
 def test_text_asset_falls_back_to_original_text_file():
     """TextAsset should treat uploaded text files as available text content."""
@@ -254,7 +247,6 @@ def test_text_asset_falls_back_to_original_text_file():
         assert file.html == "<h1>Markdown Content</h1>"
 
 
-# @pair file:text-asset
 @pytest.mark.unit
 def test_text_asset_skips_oversized_original_before_download():
     file_asset = SimpleNamespace(
@@ -274,7 +266,6 @@ def test_text_asset_skips_oversized_original_before_download():
     assert file.properties.text.markup is None
 
 
-# @matrix file : extractable mimetype text-asset
 @pytest.mark.unit
 def test_text_asset_extractable_only_for_non_text_document_ai_mimetypes():
     """Only non-text OCR-supported mimetypes should be considered extractable."""
@@ -291,7 +282,6 @@ def test_text_asset_extractable_only_for_non_text_document_ai_mimetypes():
     assert markdown.properties.text.extractable is False
 
 
-# @matrix file : extract process-complete text-asset
 @pytest.mark.unit
 def test_extract_update_completes_immediately_for_text_files():
     """Enabling extract on a text file should complete without async work."""
@@ -313,7 +303,6 @@ def test_extract_update_completes_immediately_for_text_files():
     assert file.properties.extract.error is None
 
 
-# @matrix file : extract process update
 @pytest.mark.unit
 def test_extract_process(get_test_entities):
     """Test Extract ProcessProperty attributes and extract kickoff behavior."""
@@ -347,7 +336,6 @@ def test_extract_process(get_test_entities):
             assert file.properties.extract.enabled is True
 
 
-# @matrix file : process summarize update
 @pytest.mark.unit
 def test_summarize_process(get_test_entities):
     """Test Summarize ProcessProperty attributes and summarize kickoff behavior."""
@@ -381,7 +369,6 @@ def test_summarize_process(get_test_entities):
             assert file.properties.summarize.enabled is True
 
 
-# @matrix file : summarize update
 @pytest.mark.unit
 def test_summarize_update_uses_enable_field_name():
     """File-info summarize enablement should make generated descriptions searchable."""
@@ -395,7 +382,6 @@ def test_summarize_update_uses_enable_field_name():
     summarize.assert_called_once_with(file, dispatch=False)
 
 
-# @matrix file : search-opt-in summarize update
 @pytest.mark.unit
 def test_summarize_update_upload_search_summary_remains_opt_in():
     """Upload summarize search should still follow the search-summary checkbox."""
@@ -420,7 +406,6 @@ def test_summarize_update_upload_search_summary_remains_opt_in():
     assert indexed_file.properties.summarize.search is True
 
 
-# @matrix deferred-jobs file : deferred-dispatch extraction-follow-up post-save-dispatch summary-first
 @pytest.mark.unit
 def test_file_processing_dispatches_summary_before_extraction():
     """Selecting both operations queues one summary with extraction as its successor."""
@@ -482,7 +467,6 @@ def test_file_processing_dispatches_summary_before_extraction():
     start_extract.assert_not_called()
 
 
-# @matrix file deferred-jobs : explicit-actor deferred-dispatch
 @pytest.mark.unit
 @pytest.mark.parametrize("operation", ["summarize", "extract"])
 def test_file_processing_dispatch_uses_explicit_actor(monkeypatch, operation):
@@ -513,7 +497,6 @@ def test_file_processing_dispatch_uses_explicit_actor(monkeypatch, operation):
     assert spec.delay_seconds == (10 if operation == "summarize" else 5)
 
 
-# @matrix file deferred-jobs : explicit-actor validation
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "dispatch",
@@ -545,7 +528,6 @@ def test_file_dispatch_rejects_missing_actor_before_changing_status(
     assert started == []
 
 
-# @matrix file deferred-jobs : deferred-dispatch retry
 @pytest.mark.unit
 def test_file_processing_preserves_pending_request_when_dispatch_fails(monkeypatch):
     file = TestEntities.get("FILE", {"filename": "photo.png"})
@@ -554,9 +536,8 @@ def test_file_processing_preserves_pending_request_when_dispatch_fails(monkeypat
     file.update({"extract": "on"})
     with patch.object(
         DeferredJobs, "start", side_effect=RuntimeError("Queue unavailable")
-    ):
-        with pytest.raises(RuntimeError, match="Queue unavailable"):
-            file.dispatch_pending_processing(actor=actor)
+    ), pytest.raises(RuntimeError, match="Queue unavailable"):
+        file.dispatch_pending_processing(actor=actor)
 
     started = []
     monkeypatch.setattr(DeferredJobs, "start", lambda spec: started.append(spec))
@@ -567,7 +548,6 @@ def test_file_processing_preserves_pending_request_when_dispatch_fails(monkeypat
     assert file.dispatch_pending_processing(actor=actor) is None
 
 
-# @matrix file : asset mimetype preview
 @pytest.mark.unit
 def test_preview_url_when_mimetype_supported_and_file_present():
     """Preview returns file URL when mimetype is in PREVIEW_MIMETYPES and asset exists."""
@@ -580,7 +560,6 @@ def test_preview_url_when_mimetype_supported_and_file_present():
     assert file.preview == "https://example.test/signed-file"
 
 
-# @matrix file : mimetype preview unsupported
 @pytest.mark.unit
 def test_preview_none_when_mimetype_not_supported():
     """Preview is None when mimetype is not eligible for inline preview."""
@@ -593,7 +572,6 @@ def test_preview_none_when_mimetype_not_supported():
     assert file.preview is None
 
 
-# @matrix file : missing-asset preview
 @pytest.mark.unit
 def test_preview_none_when_no_file_asset():
     """Preview is None when preview mimetype is set but file asset is missing."""
@@ -603,7 +581,6 @@ def test_preview_none_when_no_file_asset():
     assert file.preview is None
 
 
-# @matrix file : extract options summarize
 @pytest.mark.unit
 def test_options(get_test_entities):
     """Test Options property returns combined extract/summarize options."""
@@ -623,7 +600,6 @@ def test_options(get_test_entities):
         assert options == expected
 
 
-# @matrix file : asset-lifecycle encoding metadata upload
 @pytest.mark.unit
 def test_uploaded_file_story_records_metadata_before_asset_save():
     class FakeFile:
@@ -740,7 +716,6 @@ def test_uploaded_file_story_records_metadata_before_asset_save():
     assert vcard_upload.lagniappe_content_type == "text/vcard"
 
 
-# @matrix file storage : direct-upload large-video metadata
 @pytest.mark.unit
 def test_direct_upload_file_asset_sniffs_generic_video_from_sample_without_full_read():
     class FakeFile:
@@ -806,7 +781,6 @@ def test_direct_upload_file_asset_sniffs_generic_video_from_sample_without_full_
     ]
 
 
-# @matrix file storage : asset-uri bucket-prefix public-url
 @pytest.mark.unit
 def test_asset_uri_and_public_url_include_bucket_prefix(monkeypatch):
     monkeypatch.setattr(asset_defs, "BUCKET_PREFIX", "test-")
@@ -829,7 +803,6 @@ def test_asset_uri_and_public_url_include_bucket_prefix(monkeypatch):
     )
 
 
-# @matrix file storage : asset-size large-asset
 @pytest.mark.unit
 def test_file_asset_definition_records_size_and_large_flag(monkeypatch):
     entity = SimpleNamespace(hash="asset123", key=None)
@@ -899,7 +872,6 @@ def test_file_asset_direct_upload_uses_storage_copy_without_seek_or_read():
     assert asset.large is True
 
 
-# @matrix file storage : private-url shared-asset-path
 @pytest.mark.unit
 def test_private_asset_url_uses_asset_name_for_shared_storage_path(monkeypatch):
     monkeypatch.setattr(
@@ -920,7 +892,6 @@ def test_private_asset_url_uses_asset_name_for_shared_storage_path(monkeypatch):
     assert asset.url == "/assets/history-key/task-signature-field.png"
 
 
-# @matrix file storage : asset-extension mimetype
 @pytest.mark.unit
 def test_text_plain_asset_uses_txt_extension():
     """Text/plain storage paths should use a familiar .txt extension."""
@@ -931,7 +902,6 @@ def test_text_plain_asset_uses_txt_extension():
     assert asset.path == "assettext_file.txt"
 
 
-# @matrix file : asset-extension mimetype upload
 @pytest.mark.unit
 def test_file_asset_detects_mislabeled_png_upload():
     """Magic-byte detection corrects pasted images mislabeled by the browser."""
@@ -968,7 +938,6 @@ def test_file_asset_detects_mislabeled_png_upload():
     assert asset.value.path == "pasteimg_file.png"
 
 
-# @matrix file : content-type image
 @pytest.mark.unit
 def test_image_asset_content_type_falls_back_without_recursing():
     """New image assets with no upload mimetype should still get a path."""
@@ -986,7 +955,6 @@ def test_image_asset_content_type_falls_back_without_recursing():
     assert png_asset.content_type == "image/png"
 
 
-# @matrix file : attached-pages permissions
 @pytest.mark.unit
 def test_uploaded_file_story_lists_pages_that_reference_it():
     file = TestEntities.get("FILE", {"filename": "linked.pdf", "hash": "linkedfile"})
@@ -999,7 +967,6 @@ def test_uploaded_file_story_lists_pages_that_reference_it():
     assert file.allowed(Action.VIEW) is False
 
 
-# @matrix file : attached-tasks badges permissions references reverse-links task-history
 @pytest.mark.unit
 def test_file_reverse_task_links_drive_permissions_and_references():
     parent = TestEntities.get("PAGE", {"name": "Parent", "hash": "pgfile1"})
@@ -1025,10 +992,9 @@ def test_file_reverse_task_links_drive_permissions_and_references():
     assert file.owner is task
 
 
-# @matrix files : ownership parent-key fingerprint restrictions
 @pytest.mark.unit
 def test_file_save_normalizes_task_page_and_restriction_fingerprint(monkeypatch):
-    from datetime import datetime, timezone
+    from datetime import datetime
     from lagniappe.core.definitions import MutationEffectType, MutationOperation
     from lagniappe.core.entities import Entities
     from lagniappe.core.mutations import plan_mutation
@@ -1039,7 +1005,7 @@ def test_file_save_normalizes_task_page_and_restriction_fingerprint(monkeypatch)
     first = TestEntities.get("PAGE", {"hash": "first-file-page", "restricted_to": ["a"]})
     destination = TestEntities.get("PAGE", {"hash": "next-file-page", "restricted_to": ["b"]})
     task = TestEntities.get("TASK", {"hash": "file-owner-task"}, page=first)
-    file = TestEntities.get("FILE", {"hash": "normalized-file", "modified": datetime(2026, 9, 9, tzinfo=timezone.utc)})
+    file = TestEntities.get("FILE", {"hash": "normalized-file", "modified": datetime(2026, 9, 9, tzinfo=UTC)})
     file.task = task
     before = file.fingerprint
     assert file.page is None and file.task_page is first and file.restricted_to == {"page": ["a"]}
@@ -1052,11 +1018,10 @@ def test_file_save_normalizes_task_page_and_restriction_fingerprint(monkeypatch)
     assert file.db["task"] == task.key and file.db["task_page"] == destination.key
     assert not file.db.get("page")
     assert file.restricted_to == {"page": ["b"]} and file.fingerprint != before
-    assert file.modified == datetime(2026, 9, 9, tzinfo=timezone.utc)
+    assert file.modified == datetime(2026, 9, 9, tzinfo=UTC)
     assert any(effect.effect is MutationEffectType.CACHE_REFRESH and effect.entity is file for effect in plan.effects)
 
 
-# @matrix files : uploads temporary-view-ownership search-visibility
 @pytest.mark.unit
 def test_unattached_upload_is_private_to_its_uploader_and_admin():
     uploader = TestEntities.get("USER", {"hash": "private-uploader", "owner": False, "admin": False})
@@ -1073,11 +1038,9 @@ def test_unattached_upload_is_private_to_its_uploader_and_admin():
     assert file.allowed(Action.EDIT, user=admin)
 
 
-# @matrix files tasks : task-history parent-key restrictions
-# @pair tasks:single-batch
 @pytest.mark.unit
 def test_history_loading_resolves_moved_task_and_independently_moved_files(monkeypatch):
-    from datetime import datetime, timezone
+    from datetime import datetime
     from google.cloud import datastore
     from lagniappe.core.entities import Entities
     from lagniappe.core.tools.database import get as database_get
@@ -1087,7 +1050,7 @@ def test_history_loading_resolves_moved_task_and_independently_moved_files(monke
 
     def record(kind, name, *, parent=None, **values):
         row = datastore.Entity(key=datastore.Key(kind.value, name, project="history-loading", parent=parent))
-        row.update(hash=name, modified=datetime(2026, 9, 9, tzinfo=timezone.utc), **values)
+        row.update(hash=name, modified=datetime(2026, 9, 9, tzinfo=UTC), **values)
         records[row.key] = row
         return row
 
@@ -1100,7 +1063,7 @@ def test_history_loading_resolves_moved_task_and_independently_moved_files(monke
     file_task = record(KINDS.instances, "file-task", type="task", page=file_page.key)
     file_row = record(KINDS.files, "moved-file", type="file", task=file_task.key, task_page=file_page.key)
     history = record(KINDS.history, "snapshot", parent=task_row.key, type="task_history",
-                     page=old_page.key, files=[file_row.key], created=datetime(2025, 1, 1, tzinfo=timezone.utc))
+                     page=old_page.key, files=[file_row.key], created=datetime(2025, 1, 1, tzinfo=UTC))
     monkeypatch.setattr(database_get, "entities", lambda keys: [records[key] for key in keys if key in records])
     monkeypatch.setattr(database_get, "task_history", lambda _task: [history])
     task = Entities.TASK(task_row)
@@ -1128,7 +1091,6 @@ def test_history_loading_resolves_moved_task_and_independently_moved_files(monke
     assert attached.restricted_to == {"page_form": ["elsewhere"]}
 
 
-# @matrix files : ownership task-move history parent-key retry
 @pytest.mark.unit
 def test_task_move_updates_history_only_file_page_without_consuming_pending_move(monkeypatch):
     from lagniappe.core.definitions import MutationEffectType, MutationOperation
@@ -1156,3 +1118,13 @@ def test_task_move_updates_history_only_file_page_without_consuming_pending_move
     assert file.page is None and file.task_page is destination and file.owner is task
     assert file.restricted_to == {"page": ["b"]} and task.files == []
     assert task._page_changed is True
+
+
+def test_unnamed_text_upload_preserves_stream_and_uses_text_mimetype():
+    upload = FileStorage(stream=BytesIO(b"hello"), filename=None)
+    upload.stream.seek(2)
+
+    encoding = file_utility.determine_encoding(upload)
+    assert encoding
+    assert file_utility.determine_mimetype(upload, upload.filename, None, encoding) == "text/plain"
+    assert upload.stream.tell() == 2

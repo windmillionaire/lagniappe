@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import os
 import re
 from urllib.parse import urlparse
@@ -30,36 +31,24 @@ HOSTED_E2E_RESERVED_HOST_RE = re.compile(
 )
 
 
-# @testable false
-# @covered-by config/hosted_e2e.py::hosted_e2e_settings_overrides
-# @reason normalization helper owned by the fail-closed hosted configuration contract
 def _enabled(value: object) -> bool:
     return str(value or "").strip().casefold() in {"1", "true", "yes", "on"}
 
 
-# @testable false
-# @covered-by config/hosted_e2e.py::hosted_e2e_settings_overrides
-# @reason required-value helper owned by the fail-closed hosted configuration contract
-def _required(environ: dict[str, str], name: str) -> str:
+def _required(environ: Mapping[str, str], name: str) -> str:
     value = str(environ.get(name) or "").strip()
     if not value:
         raise RuntimeError(f"Hosted E2E configuration requires {name}.")
     return value
 
 
-# @testable true
-# @tests tests_unit/test_016_config.py::test_reserved_hosted_e2e_hostname_is_exact
-# @matrix hosted-e2e testing : authentication deletion-safety soft-routing
 def is_reserved_hosted_e2e_hostname(hostname: str) -> bool:
     """Return whether an App Engine hostname is reserved for ephemeral E2E."""
     normalized = str(hostname or "").strip().rstrip(".").casefold()
     return HOSTED_E2E_RESERVED_HOST_RE.fullmatch(normalized) is not None
 
 
-# @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_cors_only_recognizes_this_test_service
-# @matrix hosted-e2e storage : cors project-identity
-def hosted_test_service_cors_origin(project, url, *, from_candidate=False):
+def hosted_test_service_cors_origin(project: str, url: str, *, from_candidate: bool = False) -> str | None:
     """Return the test-service origin pattern for this project's App Engine URL."""
     scheme, _, hostname = str(url or "").removesuffix("/").partition("://")
     if scheme != "https" or not re.fullmatch(
@@ -76,14 +65,10 @@ def hosted_test_service_cors_origin(project, url, *, from_candidate=False):
     return f"https://*-dot-{HOSTED_E2E_SERVICE_NAME}-dot-{hostname}"
 
 
-# @testable true
-# @tests tests_unit/test_016_config.py::test_hosted_e2e_overrides_require_exact_runtime_identity
-# @tests tests_unit/test_016_config.py::test_hosted_e2e_server_rejects_wrong_app_engine_version
-# @matrix hosted-e2e testing : configuration deployment-binding fail-closed identity prefix
 def hosted_e2e_settings_overrides(
-    app_settings: dict[str, object],
+    app_settings: Mapping[str, object],
     *,
-    environ: dict[str, str] | None = None,
+    environ: Mapping[str, str] | None = None,
 ) -> dict[str, object]:
     """Return validated non-secret test overrides for a hosted E2E process."""
     environ = os.environ if environ is None else environ

@@ -1,5 +1,8 @@
 """Submitter mixin for entities with form submissions."""
 
+from collections.abc import Container, Iterable, Mapping
+from typing import TYPE_CHECKING, Protocol, cast
+
 import hashlib
 import json
 
@@ -17,15 +20,41 @@ from ..tools.auth.references import (
 )
 
 
-# @testable true
-# @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_skips_keys_not_in_schema
-# @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_multipart_keys_merge_under_field_id
-# @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_drops_falsy_entries_in_lists
-# @matrix submission : list-filtering multipart normalize unknown-keys
-def normalize_submission_values(values, fields):
-    updated = {}
+if TYPE_CHECKING:
+    from flask import Request
+    from google.cloud.datastore import Key
+    from werkzeug.local import LocalProxy
 
-    for field in values.keys():
+    from ..entities.entity import Entity
+    from ..entities.history import TaskHistory
+    from ..entities.page import Page
+    from ..entities.task import Task
+    from ..entities.user import User
+    from ..mixins.field_host import FieldUser
+    from ..properties.row_submission import ImportSettings
+    from ..tools.forms.definitions import SubmissionDefinition
+
+    type SubmissionOwner = Page | Task | TaskHistory
+    type SubmissionActor = User | LocalProxy[User | None]
+
+
+class FormValues(Protocol):
+    def keys(self) -> Iterable[str]: ...
+    def get(self, key: str, default: object = None, /) -> object: ...
+
+
+class _Revision(Protocol):
+    @property
+    def fingerprint(self) -> str: ...
+
+
+type NormalizedValues = dict[str, list[object] | dict[str, object]]
+
+
+def normalize_submission_values(values: FormValues | Mapping[str, object], fields: Container[str]) -> NormalizedValues:
+    updated: NormalizedValues = {}
+
+    for field in values.keys():  # noqa: SIM118 -- form adapters may expose keys() without implementing iteration.
         parts = field.split(":", 1)
         schema_id = parts[0]
         part = parts[1] if len(parts) > 1 else None
@@ -41,17 +70,16 @@ def normalize_submission_values(values, fields):
             update = [source_values] if source_values else []
 
         if part:
-            updated.setdefault(schema_id, {})[part] = update[0] if update else None
+            # Multipart controls use a dictionary; a colliding single-value key still raises.
+            parts_by_name = cast("dict[str, object]", updated.setdefault(schema_id, {}))
+            parts_by_name[part] = update[0] if update else None
         else:
             updated[schema_id] = update
 
     return updated
 
 
-# @testable false
-# @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.validate_browser_submission_references
-# @reason link identifier extraction is exercised through browser submission preflight
-def _link_identifier(value):
+def _link_identifier(value: object) -> str | None:
     if isinstance(value, str):
         return value or None
     if isinstance(value, dict):
@@ -60,10 +88,7 @@ def _link_identifier(value):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.validate_browser_submission_references
-# @reason recursive link discovery is exercised through browser submission preflight
-def _internal_link_ids(field, value) -> set[str]:
+def _internal_link_ids(field: object, value: object) -> set[str]:
     """Extract internal Link identifiers without resolving or mutating fields."""
     from ..properties.form_links import Link
     from ..properties.form_table import Table
@@ -111,10 +136,6 @@ def _internal_link_ids(field, value) -> set[str]:
     return identifiers
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.form_submission
-# @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.patch_submission
-# @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.import_submission
 class SubmitterMixin:
     """Adds form submission handling to entities with a Form schema.
 
@@ -130,19 +151,22 @@ class SubmitterMixin:
             schema version, and every effective restriction group.
     """
 
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_autofill_preview_validates_draft_without_saving_or_changing_cached_fields
-    # @matrix submission ai : autofill draft snapshot no-save
-    def preview_form_submission(self, values, *, actor):
+    @property
+    def _submission_owner(self) -> SubmissionOwner:
+        # These three registered entity classes supply the concrete field and datastore contracts.
+        return cast("SubmissionOwner", self)
+
+    def preview_form_submission(self, values: Request | FormValues, *, actor: SubmissionActor) -> dict[str, dict[str, object]]:
         """Validate a browser draft without changing the entity or its saved answers."""
         from ..properties.form_submission import FormSubmission
         from ..tools.ai.submission_values import values_by_id
 
-        require_mutable_submission(self)
-        form_values = getattr(values, "form", values)
+        owner = self._submission_owner
+        require_mutable_submission(owner)
+        form_values = cast(FormValues, getattr(values, "form", values))
         if str(form_values.get("form-generation", "0")) != str(self.submission_definition.generation):
             raise ValidationError("The form fields changed. Your answers were not saved. Review the updated form before trying again.")
-        submission = FormSubmission(entity=self)
+        submission = FormSubmission(entity=owner)
         updated = normalize_submission_values(form_values, submission.fields)
         preserved = self.validate_browser_submission_references(
             updated, actor=actor, normalized=True,
@@ -160,17 +184,11 @@ class SubmitterMixin:
             "ai_values": values_by_id(submission.fields, actor),
         }
 
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_full_form_submit_missing_checkbox_persists_explicit_false
-    # @tests tests_unit/test_004e_submission_behavior.py::test_empty_submission_pops_submission_db_key
-    # @tests tests_unit/test_004e_submission_behavior.py::test_html_field_is_ignored_by_form_submission
-    # @tests tests_unit/test_004e_submission_behavior.py::test_invalid_typed_browser_submission_preserves_saved_answers
-    # @matrix submission : asset-isolation blank-persistence empty-submission explicit-false form-submit preservation submit-boundary validation
-    # @matrix form-migration : stale-generation direct-write
-    def form_submission(self, values, *, actor=None):
-        require_mutable_submission(self)
-        submission = self.properties.submission
-        form_values = getattr(values, "form", values)
+    def form_submission(self, values: Request | FormValues, *, actor: SubmissionActor | None = None) -> None:
+        owner = self._submission_owner
+        require_mutable_submission(owner)
+        submission = owner.properties.submission
+        form_values = cast(FormValues, getattr(values, "form", values))
         if actor is not None and str(form_values.get("form-generation", "0")) != str(self.submission_definition.generation):
             raise ValidationError("The form fields changed. Your answers were not saved. Review the updated form before trying again.")
         files = getattr(values, "files", None)
@@ -200,25 +218,22 @@ class SubmitterMixin:
 
         self.save_submission()
 
-    # @testable true
-    # @tests tests_unit/test_031_submitted_references.py::test_browser_submission_references_require_view_and_preserve_hidden_existing_values
-    # @tests tests_unit/test_031_submitted_references.py::test_browser_submission_references_validate_table_links_before_mutation
-    # @matrix submitted-references : browser internal-link no-partial-mutation preflight preservation table
     def validate_browser_submission_references(
         self,
-        values,
+        values: FormValues | Mapping[str, object],
         *,
-        actor,
-        normalized=False,
+        actor: SubmissionActor,
+        normalized: bool = False,
     ) -> set[str]:
         """Authorize changed internal Link values before applying a browser form."""
         from ..definitions import Action
         from ..properties.form_links import Link
         from ..properties.form_table import Table
 
-        submission = self.properties.submission
+        owner = self._submission_owner
+        submission = owner.properties.submission
         updated = (
-            values
+            cast("Mapping[str, object]", values)
             if normalized
             else normalize_submission_values(values, submission.fields)
         )
@@ -243,7 +258,7 @@ class SubmitterMixin:
         if not all_ids:
             return set()
 
-        expected = (
+        expected: tuple[type[Entity], ...] = (
             Entities.CATEGORY,
             Entities.PAGE,
             Entities.USER,
@@ -254,11 +269,10 @@ class SubmitterMixin:
             Entities.FILE,
             Entities.FORM,
         )
-        resolver = SubmittedReferenceResolver(actor, *all_ids)
+        resolver = SubmittedReferenceResolver(cast("User", actor), *all_ids)
         preserved = set()
 
         for field_id, submitted_ids in submitted_by_field.items():
-            field = submission.fields[field_id]
             existing_ids = existing_by_field[field_id]
             changed_ids = submitted_ids - existing_ids
             resolver.many(changed_ids, expected=expected, action=Action.VIEW)
@@ -280,13 +294,9 @@ class SubmitterMixin:
 
         return preserved
 
-    # @testable true
-    # @tests tests_unit/test_003f_submission_normalize_patch.py::test_patch_submission_merges_single_field
-    # @tests tests_unit/test_003f_submission_normalize_patch.py::test_patch_submission_accepts_json_string
-    # @tests tests_unit/test_004d_submitter.py::test_patch_submission_merges_multiple_fields
-    # @matrix submission : json-payload multiple-fields patch single-field
-    def patch_submission(self, update, *, actor=None):
-        require_mutable_submission(self)
+    def patch_submission(self, update: str | Mapping[str, object], *, actor: SubmissionActor | None = None) -> None:
+        owner = self._submission_owner
+        require_mutable_submission(owner)
         updated = json.loads(update) if isinstance(update, str) else update
         if actor is not None:
             self.validate_browser_submission_references(
@@ -295,54 +305,45 @@ class SubmitterMixin:
                 normalized=True,
             )
         for field_id, field_value in updated.items():
-            self.properties.submission.patch(field_id, field_value)
+            owner.properties.submission.patch(field_id, field_value)
 
         self.save_submission()
 
-    # @testable true
-    # @tests tests_unit/test_004i_form_definitions.py::test_generated_answers_reject_unknown_fields_before_resetting_values
-    # @matrix submission : ai unknown-fields preservation validation
-    def ai_submission(self, generated_submission, *, actor=None, preserve_existing=False):
+    def ai_submission(self, generated_submission: Mapping[str, object], *, actor: FieldUser = None, preserve_existing: bool = False) -> None:
         from ..properties.schema import SchemaFields
 
-        require_mutable_submission(self)
-        unknown = set(generated_submission) - set(self.properties.submission.fields)
+        owner = self._submission_owner
+        require_mutable_submission(owner)
+        unknown = set(generated_submission) - set(owner.properties.submission.fields)
         if unknown:
             raise ValidationError("Generated answers include unavailable fields and need review.")
         prepared = {}
-        for field_id, field in self.properties.submission.fields.items():
+        for field_id, field in owner.properties.submission.fields.items():
             if preserve_existing and field.is_set and field.db_value not in (None, "", [], {}):
                 continue
             prepared[field_id] = SchemaFields.prepare_ai_field(
-                field, generated_submission.get(field_id), self, user=actor
+                field, generated_submission.get(field_id), owner, user=actor
             )
         for field_id, candidate in prepared.items():
-            field = self.properties.submission.fields[field_id]
+            field = owner.properties.submission.fields[field_id]
             field.reset()
             if candidate.is_set:
                 field.db_value = candidate.db_value
 
         self.save_submission()
 
-    # @testable true
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_validation_error_includes_field_and_payload
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_space_joins_input_list_values
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_preserves_table_row_lists_during_input_list_normalization
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_internal_link_fuzzy_match_warning
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_fuzzy_match_warning
-    # @tests tests_unit/test_006b_ingress_entity.py::test_importer_rejects_entire_malformed_todo_row
-    # @matrix form-table submission text-input : error-message fuzzy-match import list-normalization save validation
-    def import_submission(self, imported_submission, import_process):
-        require_mutable_submission(self)
-        for field_id, field in self.properties.submission.fields.items():
+    def import_submission(self, imported_submission: Mapping[str, object], import_process: ImportSettings) -> None:
+        owner = self._submission_owner
+        require_mutable_submission(owner)
+        for field_id, field in owner.properties.submission.fields.items():
             try:
                 field.reset()
                 if hasattr(field, "fuzzy_match"):
-                    field.fuzzy_match = import_process.fuzzy_match(field_id)
+                    setattr(field, "fuzzy_match", import_process.fuzzy_match(field_id))  # noqa: B010 -- optional CSV capability.
                 if hasattr(field, "separator"):
-                    field.separator = import_process.separator
+                    setattr(field, "separator", import_process.separator)  # noqa: B010 -- optional CSV capability.
                 if hasattr(field, "set_import_process"):
-                    field.set_import_process(import_process)
+                    getattr(field, "set_import_process")(import_process)  # noqa: B009 -- optional nested table hook.
                 value = imported_submission.get(field_id, None)
                 if isinstance(value, list) and field.get("type") == "input":
                     value = " ".join(
@@ -354,76 +355,58 @@ class SubmitterMixin:
             except Exception as e:
                 raise ValidationError(
                     f"{field_id}:{imported_submission.get(field_id, None)} - {str(e)}"
-                )
+                ) from e
 
         self.save_submission()
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/forms/definitions.py::original_completion
-    # @reason cache revision metadata remains independent from original-completion generation
     @property
-    def schema_version(self):
-        return self.db.get("schema_version")
-
-    # @testable false
-    # @covered-by lagniappe/core/tools/forms/definitions.py::definition_for
-    # @reason missing generation is the shared legacy baseline for flat submissions
-    @property
-    def generation(self):
-        return self.db.get("generation", 0) or 0
-
-    # @testable false
-    # @covered-by lagniappe/core/tools/forms/definitions.py::definition_for
-    # @reason shared read boundary delegates exact-version resolution
-    @property
-    def submission_definition(self):
-        return definition_for(self)
+    def schema_version(self) -> str | None:
+        return cast("str | None", self._submission_owner.db.get("schema_version"))
 
     @property
-    def submission_schema(self):
+    def generation(self) -> int:
+        return cast(int, self._submission_owner.db.get("generation", 0) or 0)
+
+    @property
+    def submission_definition(self) -> SubmissionDefinition:
+        return definition_for(self._submission_owner)
+
+    @property
+    def submission_schema(self) -> list[dict[str, object]]:
         return self.submission_definition.schema
 
     @property
-    def submission_schema_error(self):
+    def submission_schema_error(self) -> str | None:
         return self.submission_definition.error
 
-    # @testable true
-    # @tests tests_unit/test_004e_submission_behavior.py::test_stored_explicit_checkbox_false_survives_load_save
-    # @tests tests_unit/test_004e_submission_behavior.py::test_stored_null_checkbox_normalizes_away_on_resave
-    # @tests tests_unit/test_004e_submission_behavior.py::test_empty_submission_pops_submission_db_key
-    # @tests tests_unit/test_004d_submitter.py::test_save_submission_discards_legacy_defaults_and_keeps_current_answers
-    # @matrix submission : blank-persistence empty-submission load-save normalization reconciliation stored-false stored-null
-    def save_submission(self):
-        require_mutable_submission(self)
-        if self.entity_kind in {"page", "task"}:
-            self._submission_input_generation = self.generation
-        submission_value = self.properties.submission.db_value
-        self.properties.submission.value = submission_value
-        self.db.pop("default_submission", None)
-        self.db.pop("pre_migration", None)
-        if self.form and self.entity_kind != "task_history":
-            self.db["schema_version"] = self.form.version
-            self.db["generation"] = self.form.generation
+    def save_submission(self) -> None:
+        owner = self._submission_owner
+        require_mutable_submission(owner)
+        if owner.entity_kind in {"page", "task"}:
+            owner._submission_input_generation = self.generation
+        submission_value = owner.properties.submission.db_value
+        owner.properties.submission.value = submission_value
+        owner.db.pop("default_submission", None)
+        owner.db.pop("pre_migration", None)
+        if owner.form and owner.entity_kind != "task_history":
+            owner.db["schema_version"] = owner.form.version
+            owner.db["generation"] = owner.form.generation
         if "name" in submission_value:
-            self.name = submission_value["name"]
+            owner.name = cast("str | list[object] | None", submission_value["name"])
         if "description" in submission_value:
-            self.description = submission_value["description"]
+            owner.description = cast("str | None", submission_value["description"])
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/forms/changes.py::notice_projection
-    # @reason shared Page and Task read-only template projection
     @property
-    def migration_notice(self):
+    def migration_notice(self) -> list[dict[str, object]]:
         from lagniappe.core.tools.forms.changes import notice_projection
-        return notice_projection(self) if self.db.get("pre_migration") else []
+        owner = self._submission_owner
+        return notice_projection(owner) if owner.db.get("pre_migration") else []
 
-    # @testable true
-    # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_links_internal_top_level_and_table_row
-    # @pairs form-table:derived-page-keys submission:derived-page-keys
     @property
-    def derived_page_keys(self):
+    def derived_page_keys(self) -> list[Key]:
+        owner = self._submission_owner
         keys = []
-        for link in self.properties.submission.links:
+        for link in owner.properties.submission.links:
             if not isinstance(link, dict) or link.get("kind") not in ("page", "user"):
                 continue
 
@@ -433,30 +416,27 @@ class SubmitterMixin:
 
         return keys
 
-    # @testable true
-    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_restricted_fingerprints_share_the_entity_and_cache_formula
-    # @matrix permissions cache : fingerprint form-version
     @property
-    def fingerprint(self):
-        form = self.form
+    def fingerprint(self) -> str:
+        # TaskHistory resolves Entity.fingerprint before this mixin.
+        owner = cast("Page | Task", self._submission_owner)
+        form = owner.form
         version = (
             str(self.generation)
-            if self.entity_kind == "task_history"
+            if owner.entity_kind == "task_history"
             else (form.version if form else "")
         )
         return restricted_fingerprint(
-            super().fingerprint,
-            self.restricted_to,
+            cast(_Revision, super()).fingerprint,
+            owner.restricted_to,
             form_version=version or "",
         )
 
-    # @testable true
-    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_revision_tracks_only_form_apply_state
-    # @pairs ai:autofill deferred-jobs:form-revision
     @property
-    def autofill_revision(self):
+    def autofill_revision(self) -> str:
         """Stable revision for state that autofill reads and may overwrite."""
-        form = self.form
+        owner = self._submission_owner
+        form = owner.form
         schema_ids = {
             field.get("id")
             for field in (getattr(form, "schema", None) or [])
@@ -464,16 +444,16 @@ class SubmitterMixin:
         }
         mirrored = {}
         if "name" in schema_ids:
-            mirrored["name"] = self.name
+            mirrored["name"] = owner.name
         if "description" in schema_ids:
-            mirrored["description"] = self.description
+            mirrored["description"] = owner.description
 
         canonical = json.dumps(
             {
                 "form": getattr(form, "urlsafe_key", None),
                 "form_version": getattr(form, "version", None),
                 "schema_version": self.schema_version,
-                "submission": self.properties.submission.value or {},
+                "submission": owner.properties.submission.value or {},
                 "mirrored": mirrored,
             },
             sort_keys=True,

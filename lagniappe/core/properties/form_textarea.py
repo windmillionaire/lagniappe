@@ -1,13 +1,12 @@
+from typing import cast
+
 from ..definitions import FieldType, FilterOptions, Ordering
 from ..exceptions import ValidationError
 from ..mixins import AIMixin, ColumnMixin, FilterMixin, SearchMixin
 from .base_schema import SchemaProperty
 
 
-# @testable true
-# @tests tests_unit/test_003a_submission_basic.py::test_submission_textarea
-# @matrix textarea : ai-value filter-value import search-value
-class Textarea(ColumnMixin, AIMixin, FilterMixin, SearchMixin, SchemaProperty):
+class Textarea(ColumnMixin, AIMixin, FilterMixin, SearchMixin, SchemaProperty[str]):
     """Multi-line text field.
 
     Sorted by existence (has content or not) rather than lexically.
@@ -26,13 +25,13 @@ class Textarea(ColumnMixin, AIMixin, FilterMixin, SearchMixin, SchemaProperty):
     _ordering = Ordering.EXISTS
 
     @property
-    def sort_value(self):
-        return True if self.value else False
+    def sort_value(self) -> bool:
+        return bool(self.value)
 
     # Ingress Attributes
-    def validate_import(self, value):
+    def validate_import(self, value: object) -> None:
         try:
-            self.value = value if value else None
+            self.value = cast(str, value) if value else None
         except ValidationError as e:
             self.errors.append(e)
         except (ValueError, TypeError):
@@ -46,11 +45,11 @@ class Textarea(ColumnMixin, AIMixin, FilterMixin, SearchMixin, SchemaProperty):
 
     # AI Attributes
     @property
-    def ai_value(self):
+    def ai_value(self) -> str | None:
         return self.value or None
 
     @property
-    def search_value(self):
+    def search_value(self) -> object:
         if self.id == "description":
             return None
         return super().search_value

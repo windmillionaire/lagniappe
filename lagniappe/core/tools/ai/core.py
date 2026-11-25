@@ -1,8 +1,14 @@
 """Gemini AI client wrapper for content and image generation."""
 
+from collections.abc import Callable
 from io import BytesIO
 import json
 import re
+from typing import TYPE_CHECKING, Never, Unpack, cast, overload
+
+if TYPE_CHECKING:
+    from ...entities.user import User
+    from .prompt import Prompt
 
 from google import genai
 from google.genai import types
@@ -10,7 +16,7 @@ from google.genai import types
 from lagniappe import CONFIG
 
 from ... import exceptions
-from .settings import runtime_ai_settings
+from .settings import RuntimeAISettings, runtime_ai_settings
 from .provider_policy import (
     is_provider_quota_error as is_provider_quota_error,
     is_provider_transient_error as is_provider_transient_error,
@@ -18,7 +24,7 @@ from .provider_policy import (
     provider_error_message as provider_error_message,
     retry_http_options as retry_http_options,
 )
-from .provider_session import ProviderSession, current_session
+from .provider_session import ContentRequest, ProviderSession, current_session
 from .functions import (
     FUNCTION_TOOL,
     MAX_TOOL_ITERATIONS,
@@ -31,8 +37,12 @@ from .observability import (
     GenerationObserver,
     current_execution_control,
     current_observer,
+    generation_timing,
     mark_outcome,
 )
+
+type ModelValue = str | int | float | bool | None | list[ModelValue] | dict[str, ModelValue]
+
 
 MINIMUM_SAFETY_SETTINGS = [
     types.SafetySetting(
@@ -78,13 +88,10 @@ EMPTY_TEXT_RETRY_ATTEMPTS = 2
 DEFERRED_AI_RETRY_ATTEMPTS = 2
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/provider_policy.py::is_provider_quota_error
-# @reason wrapper message is exercised through provider quota tests
-def _raise_provider_error(error):
+def _raise_provider_error(error: Exception) -> Never:
     if is_provider_quota_error(error):
         details = provider_error_details(error)
-        context = {
+        context: dict[str, object] = {
             "ai_provider": {
                 "quota_exhausted": True,
                 "code": details.get("code"),
@@ -99,25 +106,15 @@ def _raise_provider_error(error):
     raise error
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_image
-# @reason private model-routing branch for image provider selection
-def _is_imagen_model(model):
+def _is_imagen_model(model: str) -> bool:
     return str(model or "").startswith("imagen-")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/core.py::GenAI._generate_imagen_image
-# @reason private prompt adapter for Imagen's text-only request shape
-def _image_prompt_text(prompt):
+def _image_prompt_text(prompt: Prompt) -> str:
     return "\n\n".join(part for part in (prompt.intro, prompt.build()) if part)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/core.py::GenAI._extract_text
-# @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_image
-# @reason provider enum normalization is asserted through text and image extraction
-def _finish_reason_name(reason):
+def _finish_reason_name(reason: object) -> str | None:
     """Normalize SDK enum and string finish reasons to their provider value."""
     if reason is None:
         return None
@@ -125,10 +122,7 @@ def _finish_reason_name(reason):
     return str(value).rsplit(".", 1)[-1].upper()
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
-# @matrix ai : citations cleanup
-def clean_json_references(obj):
+def clean_json_references(obj: ModelValue) -> ModelValue:
     """Recursively remove numeric reference citations from JSON strings."""
     if isinstance(obj, dict):
         return {k: clean_json_references(v) for k, v in obj.items()}
@@ -139,10 +133,7 @@ def clean_json_references(obj):
     return obj
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
-# @matrix ai : cleanup json-extraction
-def extract_first_json_value(response_text):
+def extract_first_json_value(response_text: str) -> str | None:
     """Return the first balanced JSON object or array from model output."""
     start = next(
         (index for index, char in enumerate(response_text) if char in "{["),
@@ -178,40 +169,45 @@ def extract_first_json_value(response_text):
     return None
 
 
-# @testable infrastructure
+_THINKING_LEVEL_MODEL_RE = re.compile(
+    r"(?:^|/)gemini-(?:[3-9]|\d{2,})(?:\.|-|$)"
+)
+
+
+def _uses_thinking_level_model(model: str | None) -> bool:
+    if not model:
+        return False
+    return bool(_THINKING_LEVEL_MODEL_RE.search(model.strip().casefold()))
+
+
 class GenAI:
     """Singleton wrapper around the Google GenAI client for Vertex AI."""
 
-    _client = None
+    _client: genai.Client | None = None
 
     @property
-    def client(self):
+    def client(self) -> genai.Client:
         if not self._client:
             self.initialize()
+        assert self._client is not None
         return self._client
 
-    # @testable infrastructure
     @classmethod
-    def initialize(cls):
+    def initialize(cls) -> None:
         """Initialize the GenAI client if not already connected."""
         if cls._client:
             return
 
-        client_kwargs = {
-            "project": CONFIG.GOOGLE_CLOUD_PROJECT,
-            "location": CONFIG.AI_LOCATION,
-            "vertexai": True,
-            "http_options": retry_http_options(api_version="v1"),
-        }
-        client_kwargs["credentials"] = CONFIG.google_credentials
+        cls._client = genai.Client(
+            project=CONFIG.GOOGLE_CLOUD_PROJECT,
+            location=CONFIG.AI_LOCATION,
+            vertexai=True,
+            http_options=retry_http_options(api_version="v1"),
+            credentials=CONFIG.google_credentials,
+        )
 
-        cls._client = genai.Client(**client_kwargs)
-
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
-    # @matrix ai : citations cleanup
     @staticmethod
-    def cleanup(response_text, output_format):
+    def cleanup(response_text: str, output_format: str | None) -> ModelValue:
         """Strip code fences and numeric reference citations from model output.
 
         Args:
@@ -242,13 +238,10 @@ class GenAI:
             result = REFERENCE_REGEX.sub(r"", response_text)
         return result
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_config_combines_search_tools_json_and_thinking_settings
-    # @tests tests_unit/test_015_ai_tools.py::test_deferred_ai_config_uses_short_sdk_retry_profile
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_model_tier_routes_generation_to_primary_or_utility_model
-    # @matrix ai : config output-format retry-config retry-ownership search service-tier thinking tools
     @staticmethod
-    def create_config(prompt, **overrides):
+    def create_config(
+        prompt: Prompt, *, model: str | None = None, **overrides: object
+    ) -> types.GenerateContentConfig:
         """Build a GenerateContentConfig from a Prompt's settings."""
         execution_control = current_execution_control()
         service_tier_headers = (
@@ -259,7 +252,7 @@ class GenAI:
             if prompt.service_tier in {"priority", "flex"}
             else None
         )
-        config = {
+        config: dict[str, object] = {
             "http_options": retry_http_options(
                 attempts=(DEFERRED_AI_RETRY_ATTEMPTS if execution_control else None),
                 headers=service_tier_headers,
@@ -292,13 +285,16 @@ class GenAI:
             config["tools"] = [function_tool]
 
         if prompt.thinking_level is not None:
-            config["thinking_config"] = types.ThinkingConfig(
-                thinking_level=prompt.thinking_level
-            )
+            config["thinking_config"] = types.ThinkingConfig.model_validate({"thinking_level": prompt.thinking_level})
         elif prompt.thinking_budget is not None:
-            config["thinking_config"] = types.ThinkingConfig(
-                thinking_budget=prompt.thinking_budget
-            )
+            if _uses_thinking_level_model(model):
+                config["thinking_config"] = types.ThinkingConfig.model_validate(
+                    {"thinking_level": "LOW"}
+                )
+            else:
+                config["thinking_config"] = types.ThinkingConfig(
+                    thinking_budget=prompt.thinking_budget
+                )
 
         output_type = prompt.output_format.get("type") if prompt.output_format else None
         if output_type == "JSON":
@@ -307,25 +303,18 @@ class GenAI:
                 config["response_schema"] = prompt.response_schema
 
         config.update(overrides)
-        return types.GenerateContentConfig(**config)
+        return types.GenerateContentConfig.model_validate(config)
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_model_tier_routes_generation_to_primary_or_utility_model
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_json_generation_pins_runtime_model_through_structured_final_pass
-    # @matrix ai : model-routing request-pinning runtime-settings
     @staticmethod
-    def _model_for_prompt(prompt, settings=None):
+    def _model_for_prompt(prompt: Prompt, settings: RuntimeAISettings | None = None) -> str:
         """Choose the configured text model for a prompt's requested tier."""
         settings = settings or runtime_ai_settings()
         if prompt.model_tier == "utility":
             return settings["AI_UTILITY_MODEL"]
         return settings["AI_MODEL"]
 
-    # @testable true
-    # @tests tests_unit/test_015b_ai_prompt_builders.py::test_prompt_tracks_context_output_examples_and_attachments
-    # @matrix ai : attachments prompt
-    def _build_contents(self, prompt):
-        contents = [prompt.build()]
+    def _build_contents(self, prompt: Prompt) -> list[types.ContentUnionDict]:
+        contents: list[types.ContentUnionDict] = [prompt.build()]
         for data in prompt.bytes:
             contents.append(
                 types.Part.from_bytes(data=data["bytes"], mime_type=data["mime_type"])
@@ -336,12 +325,8 @@ class GenAI:
             )
         return contents
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_accepts_empty_json_object_without_retry
-    # @matrix ai : empty-json response-extraction safety
     @staticmethod
-    def _extract_text(response, output_format):
+    def _extract_text(response: types.GenerateContentResponse, output_format: str | None):
         if response.candidates:
             candidate = response.candidates[0]
 
@@ -371,16 +356,13 @@ class GenAI:
 
         return None
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_model_tier_routes_generation_to_primary_or_utility_model
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_retries_empty_text_response_once
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_accepts_empty_json_object_without_retry
-    # @tests tests_unit/test_015_ai_tools.py::test_autofill_accepts_summary_backed_json_without_tool_or_final_call
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_search_json_generation_keeps_provider_response_unconstrained
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_tool_loop
-    # @matrix ai : output-format provider-errors quota search tool-loop
-    # @matrix ai : empty-response-retry model-routing site-policy provider-boundary
-    def generate_content(self, prompt, *, validator=None, validation_retries=0):
+    @overload
+    def generate_content[T](self, prompt: Prompt, *, validator: Callable[[object], T], validation_retries: int = 0) -> T: ...
+    @overload
+    def generate_content(self, prompt: Prompt, *, validator: None = None, validation_retries: int = 0) -> ModelValue: ...
+
+
+    def generate_content[T](self, prompt: Prompt, *, validator: Callable[[object], T] | None = None, validation_retries: int = 0) -> T | ModelValue:
         """Generate and optionally validate text under one observable call boundary."""
         if not CONFIG.AI_ENABLED:
             raise exceptions.AIException("AI is disabled for this installation.")
@@ -388,7 +370,7 @@ class GenAI:
         token = observer.install()
         terminal_error = None
         control = current_execution_control()
-        session = ProviderSession(control) if (
+        session = ProviderSession(control) if control is not None and (
             getattr(control, "report_planning", False)
             or getattr(control, "cancellable_provider", False)
         ) else None
@@ -446,22 +428,28 @@ class GenAI:
                 observer.reset(token)
                 observer.persist()
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_content
-    def _request_content(self, **kwargs):
+    def _request_content(self, **kwargs: Unpack[ContentRequest]) -> types.GenerateContentResponse:
         session = current_session.get()
         if session is not None:
             return session.request(**kwargs)
         return self.client.models.generate_content(**kwargs)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_content
-    # @covered-by lagniappe/core/tools/ai/category.py::generate_category
-    # @covered-by lagniappe/core/tools/ai/project.py::generate_project
-    # @reason single-attempt provider flow is exercised through the public retry wrapper and downstream generators
-    def _generate_content_once(self, prompt, model, validator=None, validation_retries=0):
+    def _request_text(self, stage: str, **kwargs: Unpack[ContentRequest]) -> types.GenerateContentResponse:
+        observer = current_observer()
+        if observer is not None:
+            observer.start_round(stage)
+        control = current_execution_control()
+        if control is not None:
+            control.before_provider(stage)
+        if observer is not None:
+            observer.request(stage)
+        with generation_timing("provider"):
+            return self._request_content(**kwargs)
+
+    def _generate_content_once(self, prompt: Prompt, model: str, validator=None, validation_retries: int = 0):
         """Generate text content from a Prompt, including optional tool-call loops."""
         contents = self._build_contents(prompt)
+        assert prompt.output_format is not None
         output_format = prompt.output_format.get("type")
         if validator is not None and prompt.response_schema:
             # Keep the contract visible when provider-side schema constraints are
@@ -470,7 +458,7 @@ class GenAI:
                 text="Return the complete proposal using this JSON schema:\n"
                 + json.dumps(prompt.response_schema)
             )]))
-        config = GenAI.create_config(prompt)
+        config = GenAI.create_config(prompt, model=model)
         final_config = None
         if (prompt.tools or prompt.search) and output_format == "JSON":
             # Search/tool turns can return empty candidates when combined with
@@ -479,23 +467,21 @@ class GenAI:
             # constrained final pass below.
             config = GenAI.create_config(
                 prompt,
+                model=model,
                 response_mime_type=None,
                 response_schema=None,
             )
             if prompt.response_schema and validator is None:
                 final_config = GenAI.create_config(
                     prompt,
+                    model=model,
                     tools=list(GOOGLE_SEARCH_TOOL) if prompt.search else None,
                 )
+        observer = current_observer()
+        execution_control = current_execution_control()
         try:
-            observer = current_observer()
-            execution_control = current_execution_control()
-            if execution_control is not None:
-                execution_control.before_provider("initial")
-            if observer is not None:
-                observer.request("initial")
-            response = self._request_content(
-                model=model, contents=contents, config=config
+            response = self._request_text(
+                "initial", model=model, contents=contents, config=config
             )
         except Exception as e:
             if execution_control is not None:
@@ -540,8 +526,6 @@ class GenAI:
             validation_retries=validation_retries,
         )
 
-    # @testable false
-    # @reason debug-only console logging, not a behavior contract
     @staticmethod
     def _log_response(response, label=""):
         usage = getattr(response, "usage_metadata", None)
@@ -577,23 +561,24 @@ class GenAI:
                     preview = part.text[:200].replace("\n", " ")
                     debug_log(f"[ai:{label}] Model text: {preview}...")
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_loop_limit_exception_includes_trace
-    # @matrix ai : error-context tool-dispatch trace validation repair
     def _tool_loop(
         self,
-        response,
-        contents,
-        config,
-        prompt,
-        output_format,
+        response: types.GenerateContentResponse,
+        contents: list[types.ContentUnionDict],
+        config: types.GenerateContentConfig,
+        prompt: Prompt,
+        output_format: str | None,
         final_config=None,
         model=None,
         validator=None,
         validation_retries=0,
     ):
+        context: dict[str, object]
         max_iterations = prompt.max_tool_iterations or MAX_TOOL_ITERATIONS
         model = model or GenAI._model_for_prompt(prompt)
+        from .report_payloads import ReportToolPayloads
+
+        report_payloads = ReportToolPayloads() if getattr(prompt, "prompt_type", None) == "ai report" else None
         tool_cache = {}
         tool_trace = []
         validation_attempts = 0
@@ -664,19 +649,22 @@ class GenAI:
 
                 if debug_enabled():
                     debug_log(f"[ai:tool-loop] Iteration {iteration + 1}/{max_iterations}")
+                assert response.candidates and response.candidates[0].content
                 contents.append(response.candidates[0].content)
 
                 try:
                     observer = current_observer()
-                    tool_responses, file_parts = execute_function_calls(
-                        response.function_calls,
-                        prompt.user,
-                        cache=tool_cache,
-                        debug=debug_enabled(),
-                        trace=iteration_trace["calls"],
-                        max_file_parts=prompt.max_tool_file_parts_per_turn,
-                        execution_control=current_execution_control(),
-                    )
+                    with generation_timing("tool"):
+                        tool_responses, file_parts = execute_function_calls(
+                            response.function_calls,
+                            cast("User", prompt.user),
+                            cache=tool_cache,
+                            report_payloads=report_payloads,
+                            debug=debug_enabled(),
+                            trace=iteration_trace["calls"],
+                            max_file_parts=prompt.max_tool_file_parts_per_turn,
+                            execution_control=execution_control,
+                        )
                 except Exception as e:
                     execution_control = current_execution_control()
                     if execution_control is not None:
@@ -717,7 +705,7 @@ class GenAI:
                     ]
                     contents.append(types.Content(role="user", parts=uri_parts))
 
-            if getattr(execution_control, "report_planning", False) and (
+            if execution_control is not None and getattr(execution_control, "report_planning", False) and (
                 len(tool_trace) >= min(16, max_iterations)
                 or execution_control.remaining_seconds <= 180
             ):
@@ -737,12 +725,8 @@ class GenAI:
 
             try:
                 execution_control = current_execution_control()
-                if execution_control is not None:
-                    execution_control.before_provider(provider_stage)
-                if observer is not None:
-                    observer.request(provider_stage)
-                response = self._request_content(
-                    model=model, contents=contents, config=config
+                response = self._request_text(
+                    provider_stage, model=model, contents=contents, config=config
                 )
             except Exception as e:
                 if execution_control is not None:
@@ -764,13 +748,11 @@ class GenAI:
                         quota=is_provider_quota_error(e),
                     )
                 if is_provider_quota_error(e):
-                    quota_error = None
                     try:
                         _raise_provider_error(e)
-                    except exceptions.AIQuotaError as caught:
-                        quota_error = caught
-                    quota_error.context.update(context)
-                    raise quota_error from e
+                    except exceptions.AIQuotaError as quota_error:
+                        quota_error.context.update(context)
+                        raise quota_error from e
                 raise
             if execution_control is not None:
                 execution_control.after_provider(provider_stage)
@@ -801,10 +783,6 @@ class GenAI:
             return text
         raise exceptions.AIException(EMPTY_TEXT_RESPONSE_MESSAGE)
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_json_generation_pins_runtime_model_through_structured_final_pass
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_json_generation_preserves_no_call_response_in_structured_final
-    # @matrix ai : config response-preservation structured-output tool-loop
     def _generate_structured_final(
         self,
         contents,
@@ -834,14 +812,11 @@ class GenAI:
                 ],
             )
         )
+        observer = current_observer()
+        execution_control = current_execution_control()
         try:
-            observer = current_observer()
-            execution_control = current_execution_control()
-            if execution_control is not None:
-                execution_control.before_provider("structured_final")
-            if observer is not None:
-                observer.request("structured_final")
-            response = self._request_content(
+            response = self._request_text(
+                "structured_final",
                 model=model,
                 contents=final_contents,
                 config=config,
@@ -856,19 +831,17 @@ class GenAI:
                     quota=is_provider_quota_error(e),
                 )
             if tool_trace and is_provider_quota_error(e):
-                quota_error = None
                 try:
                     _raise_provider_error(e)
-                except exceptions.AIQuotaError as caught:
-                    quota_error = caught
-                quota_error.context["ai_tool_loop"] = {
-                    "prompt_type": prompt.prompt_type,
-                    "search_enabled": prompt.search,
-                    "tools_enabled": prompt.tools,
-                    "final_response": True,
-                    "trace": tool_trace,
-                }
-                raise quota_error from e
+                except exceptions.AIQuotaError as quota_error:
+                    quota_error.context["ai_tool_loop"] = {
+                        "prompt_type": prompt.prompt_type,
+                        "search_enabled": prompt.search,
+                        "tools_enabled": prompt.tools,
+                        "final_response": True,
+                        "trace": tool_trace,
+                    }
+                    raise quota_error from e
             _raise_provider_error(e)
         if execution_control is not None:
             execution_control.after_provider("structured_final")
@@ -881,11 +854,7 @@ class GenAI:
             return text
         raise exceptions.AIException(EMPTY_TEXT_RESPONSE_MESSAGE)
 
-    # @testable true
-    # @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
-    # @matrix ai pages : image-generate site-policy provider-boundary
-    def generate_image(self, prompt, aspect_ratio=None):
+    def generate_image(self, prompt: Prompt, aspect_ratio: str | None = None) -> GeneratedImage:
         """Generate an image from a Prompt and return a BytesIO buffer."""
         if not CONFIG.AI_ENABLED:
             raise exceptions.AIException("AI is disabled for this installation.")
@@ -894,10 +863,10 @@ class GenAI:
             return self._generate_imagen_image(prompt, model, aspect_ratio=aspect_ratio)
 
         contents = self._build_contents(prompt)
-        overrides = {"response_modalities": IMAGE_RESPONSE_MODALITIES}
+        overrides: dict[str, object] = {"response_modalities": IMAGE_RESPONSE_MODALITIES}
         if aspect_ratio:
             overrides["image_config"] = types.ImageConfig(aspect_ratio=aspect_ratio)
-        config = GenAI.create_config(prompt, **overrides)
+        config = GenAI.create_config(prompt, model=model, **overrides)
 
         execution_control = current_execution_control()
         if execution_control is not None:
@@ -924,22 +893,18 @@ class GenAI:
         if candidate.content and candidate.content.parts:
             for part in candidate.content.parts:
                 if part.inline_data and part.inline_data.data:
-                    output = BytesIO(part.inline_data.data)
+                    output = GeneratedImage(part.inline_data.data)
                     output.seek(0)
                     output.content_type = part.inline_data.mime_type or "image/png"
                     return output
 
         raise exceptions.AIException("No image data in response")
 
-    # @testable true
-    # @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
-    # @matrix ai : config image-generate imagen
-    def _generate_imagen_image(self, prompt, model, aspect_ratio=None):
+    def _generate_imagen_image(self, prompt: Prompt, model: str, aspect_ratio: str | None = None) -> GeneratedImage:
         """Generate an image through Imagen's generate_images endpoint."""
-        config_data = {"number_of_images": 1}
+        config = types.GenerateImagesConfig(number_of_images=1)
         if aspect_ratio:
-            config_data["aspect_ratio"] = aspect_ratio
-        config = types.GenerateImagesConfig(**config_data)
+            config.aspect_ratio = aspect_ratio
 
         execution_control = current_execution_control()
         if execution_control is not None:
@@ -960,7 +925,7 @@ class GenAI:
         for generated in response.generated_images or []:
             image = getattr(generated, "image", None)
             if image and image.image_bytes:
-                output = BytesIO(image.image_bytes)
+                output = GeneratedImage(image.image_bytes)
                 output.seek(0)
                 output.content_type = image.mime_type or "image/png"
                 return output
@@ -977,6 +942,12 @@ class GenAI:
             raise exceptions.AIException(f"Image generation blocked: {filtered}")
 
         raise exceptions.AIException("No image data in response")
+
+
+class GeneratedImage(BytesIO):
+    """Image data and the corresponding MIME type returned by the provider."""
+
+    content_type: str
 
 
 ai_model = GenAI()

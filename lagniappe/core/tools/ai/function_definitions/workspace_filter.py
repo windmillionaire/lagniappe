@@ -1,5 +1,12 @@
 """AI declarations and handlers for shared-cache workspace filter queries."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+    from lagniappe.core.tools.filters.contract import FilterParent
+
 from google.genai import types
 
 from lagniappe.core import exceptions
@@ -40,7 +47,7 @@ GET_FILTER_SCHEMA = types.FunctionDeclaration(
         "values. Call this before query_workspace_filter when the needed fields "
         "or comparators are not already known."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -52,7 +59,7 @@ GET_FILTER_SCHEMA = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 
@@ -66,7 +73,7 @@ QUERY_WORKSPACE_FILTER = types.FunctionDeclaration(
         "values. All conditions are combined with AND. Values are strings even "
         "for numbers and dates; use ISO YYYY-MM-DD dates."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -125,33 +132,29 @@ QUERY_WORKSPACE_FILTER = types.FunctionDeclaration(
             },
         },
         "required": ["id", "conditions"],
-    },
+    }),
 )
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_filter_query.py::test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors
-# @matrix ai-filter : permissions tool-handler validation
-def execute_get_filter_schema(args, user):
+def execute_get_filter_schema(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     """Return a permission-filtered filter schema for a project/category."""
     parent, error = _filter_parent(args, user)
     if error:
         return error
     try:
+        assert parent is not None
         return describe_filter_fields(parent, user)
     except exceptions.ValidationError as error:
         return {"error": str(error)}
 
 
-# @testable true
-# @tests tests_unit/test_015c_ai_filter_query.py::test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors
-# @matrix ai-filter : permissions tool-handler validation
-def execute_query_workspace_filter(args, user):
+def execute_query_workspace_filter(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     """Compile and execute a permission-filtered shared-cache query."""
     parent, error = _filter_parent(args, user)
     if error:
         return error
     try:
+        assert parent is not None
         return query_workspace_filter(
             parent,
             args.get("conditions"),
@@ -164,18 +167,14 @@ def execute_query_workspace_filter(args, user):
         return {"error": str(error)}
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/workspace_filter.py::execute_get_filter_schema
-# @covered-by lagniappe/core/tools/ai/function_definitions/workspace_filter.py::execute_query_workspace_filter
-# @reason parent loading and permission checks are asserted through both public handlers
 def _filter_parent(args, user):
     args = args or {}
     identifier = args.get("id")
-    if not identifier:
+    if not isinstance(identifier, str) or not identifier:
         return None, {"error": "id is required"}
     parent = Entities.fetch_one(identifier, request=Fetch.direct())
     if not parent or parent.kind not in {"project", "category"}:
         return None, {"error": "Project or category not found"}
     if not parent.allowed(Action.VIEW, user=user):
         return None, {"error": "Access denied"}
-    return parent, None
+    return cast("FilterParent", parent), None

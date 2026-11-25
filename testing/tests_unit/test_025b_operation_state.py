@@ -117,8 +117,6 @@ def job(key="job-one", *, revision=1, status="running"):
     )
 
 
-# @matrix deferred-jobs : redis-projection ttl
-# @pair polling:batching
 def test_operation_projection_is_revisioned_and_slides_ttl(redis):
     current = job()
     operations.update_operation_projection(current, now=100)
@@ -132,7 +130,6 @@ def test_operation_projection_is_revisioned_and_slides_ttl(redis):
     assert operations.operation_state_current(state, 1, now=160) is False
 
 
-# @matrix deferred-jobs : concurrency redis-projection revision
 def test_operation_projection_rejects_delayed_older_revision(redis):
     latest = job(revision=5, status="succeeded")
     operations.update_operation_projection(latest, now=200)
@@ -143,7 +140,6 @@ def test_operation_projection_rejects_delayed_older_revision(redis):
     assert state == {"revision": 5, "terminal": True, "verified_at": 200.0}
 
 
-# @pair deferred-jobs:redis-projection
 def test_operation_projection_deletes_with_durable_job(redis):
     current = job()
     operations.update_operation_projection(current, now=100)
@@ -155,8 +151,6 @@ def test_operation_projection_deletes_with_durable_job(redis):
     }
 
 
-# @matrix deferred-jobs notifications : redis-projection
-# @pair polling:batching
 def test_poll_state_read_batches_notifications_and_operations(redis, monkeypatch):
     user = SimpleNamespace(urlsafe_key="user-one")
     current = job()

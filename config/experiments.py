@@ -1,12 +1,10 @@
 """Opt-in, project-bound experiments installation settings."""
 
 import re
+from collections.abc import Mapping
 
 
-# @testable true
-# @tests tests_tooling/test_001l_setup_experiments.py::test_experiments_settings_are_opt_in_and_project_bound
-# @matrix experiments : configuration
-def normalize_experiments_config(settings):
+def normalize_experiments_config(settings: Mapping[str, object]) -> dict[str, object]:
     """Validate execution and diagnostics without creating application authority."""
     enabled = settings.get("EXPERIMENTS_ENABLED", False)
     execution = settings.get("EXPERIMENTS_EXECUTION_ENABLED", False)

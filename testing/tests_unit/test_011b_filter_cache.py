@@ -37,7 +37,6 @@ class _FilterExpression:
         return "$..filter-expression"
 
 
-# @matrix cache filters permissions : restrictions shared-key
 @pytest.mark.unit
 def test_filter_cache_uses_shared_cache_key_without_user_restrictions():
     parent = _parent("category")
@@ -49,7 +48,6 @@ def test_filter_cache_uses_shared_cache_key_without_user_restrictions():
     assert owner_cache.cache_key.endswith(":all-v2")
 
 
-# @matrix cache filters permissions : allowed query related-load
 @pytest.mark.unit
 def test_filter_cache_query_filters_loaded_entities_by_view_permission():
     viewer = _user()
@@ -66,16 +64,14 @@ def test_filter_cache_query_filters_loaded_entities_by_view_permission():
 
     with patch(
         "lagniappe.core.tools.filters.cache.FilterExpression", _FilterExpression
-    ):
-        with patch(
-            "lagniappe.core.tools.filters.cache.filter_cache.query",
-            return_value=["visible-key", "hidden-key"],
-        ) as query:
-            with patch(
-                "lagniappe.core.tools.filters.cache.Entities.fetch",
-                return_value=[visible, hidden],
-            ) as load:
-                results = FilterCache(parent, user=viewer).query(entity_filter)
+    ), patch(
+        "lagniappe.core.tools.filters.cache.filter_cache.query",
+        return_value=["visible-key", "hidden-key"],
+    ) as query, patch(
+        "lagniappe.core.tools.filters.cache.Entities.fetch",
+        return_value=[visible, hidden],
+    ) as load:
+        results = FilterCache(parent, user=viewer).query(entity_filter)
 
     query.assert_called_once_with(
         FilterCache(parent, user=viewer).cache_key,
@@ -87,7 +83,6 @@ def test_filter_cache_query_filters_loaded_entities_by_view_permission():
     assert results == [visible]
 
 
-# @matrix cache filters : query-boundary validation
 @pytest.mark.unit
 def test_filter_cache_rejects_uncompiled_query_definitions():
     parent = _parent("project")
@@ -98,7 +93,6 @@ def test_filter_cache_rejects_uncompiled_query_definitions():
         )
 
 
-# @matrix filters : escaping punctuation regex-literal run-results string-condition
 @pytest.mark.parametrize("comparator", [Comparator.EQUALS, Comparator.SUBSTRING])
 @pytest.mark.parametrize("with_scope", [False, True])
 def test_filter_cache_matches_escaped_string_literals_after_redis_predicates(monkeypatch, comparator, with_scope):
@@ -126,7 +120,6 @@ def test_filter_cache_matches_escaped_string_literals_after_redis_predicates(mon
     assert ('"completed"' in calls[0]) is with_scope
 
 
-# @matrix filters : cache category-pagination restrictions source-query
 @pytest.mark.unit
 def test_filter_cache_loads_category_pages_without_restrictions():
     parent = _parent("category")
@@ -147,13 +140,12 @@ def test_filter_cache_loads_category_pages_without_restrictions():
             SimpleNamespace(results=["page-key-1"], next_cursor="cursor-2"),
             SimpleNamespace(results=["page-key-2"], next_cursor=None),
         ],
-    ) as pages:
-        with patch(
-            "lagniappe.core.tools.filters.cache.Entities.fetch",
-            side_effect=lambda *keys, **_kwargs: [pages_by_key[key] for key in keys],
-        ):
-            cache = FilterCache(parent, user=_user(models=["restricted"]))
-            cache._load()
+    ) as pages, patch(
+        "lagniappe.core.tools.filters.cache.Entities.fetch",
+        side_effect=lambda *keys, **_kwargs: [pages_by_key[key] for key in keys],
+    ):
+        cache = FilterCache(parent, user=_user(models=["restricted"]))
+        cache._load()
 
     assert pages.call_args_list == [
         call(
@@ -205,7 +197,6 @@ class _FakeQuery:
         return ["active-task-key", "completed-task-key"]
 
 
-# @matrix cache filters project task : all-tasks completed restrictions source-query
 @pytest.mark.unit
 def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filters():
     parent = _parent("project")
@@ -223,18 +214,20 @@ def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filt
     )
     _FakeQuery.instances = []
 
-    with patch("lagniappe.core.tools.filters.cache.Filter", _FakeFilter):
-        with patch("lagniappe.core.tools.filters.cache.Query", _FakeQuery):
-            with patch(
-                "lagniappe.core.tools.filters.cache.database_get.datastore_key",
-                return_value=parent.key,
-            ) as datastore_key:
-                with patch(
-                    "lagniappe.core.tools.filters.cache.Entities.fetch",
-                    return_value=[active, task],
-                ) as load:
-                    cache = FilterCache(parent, user=_user(task=["restricted"]))
-                    cache._load_project_tasks()
+    with (
+        patch("lagniappe.core.tools.filters.cache.Filter", _FakeFilter),
+        patch("lagniappe.core.tools.filters.cache.Query", _FakeQuery),
+        patch(
+            "lagniappe.core.tools.filters.cache.database_get.datastore_key",
+            return_value=parent.key,
+        ) as datastore_key,
+        patch(
+            "lagniappe.core.tools.filters.cache.Entities.fetch",
+            return_value=[active, task],
+        ) as load,
+    ):
+        cache = FilterCache(parent, user=_user(task=["restricted"]))
+        cache._load_project_tasks()
 
     datastore_key.assert_called_once_with(parent)
     load.assert_called_once_with(

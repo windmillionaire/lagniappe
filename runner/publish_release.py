@@ -3,19 +3,18 @@
 import argparse
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
+from collections.abc import Callable
+from pathlib import Path
 
 
-# @testable infrastructure
 def _run(*args):
     return subprocess.run(
         args, check=True, capture_output=True, text=True
     ).stdout.strip()
 
 
-# @testable infrastructure
 def _api(path):
     env = os.environ.copy()
     if "RELEASE_VALIDATION_TOKEN" in env:
@@ -23,12 +22,12 @@ def _api(path):
     return json.loads(subprocess.check_output(["gh", "api", path], env=env))
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_release_rejects_unverified_heads
-# @matrix release : protected-branch source-integrity
-def verified_version(repo, sha, pr, api=_api):
+def verified_version(
+    repo: str, sha: str, pr: object, api: Callable[[str], object] = _api
+) -> str:
     if (
-        not pr.get("merged")
+        not isinstance(pr, dict)
+        or not pr.get("merged")
         or pr["merge_commit_sha"] != sha
         or pr["base"]["ref"] != "main"
         or any(pr[k]["repo"]["full_name"] != repo for k in ("base", "head"))
@@ -44,6 +43,8 @@ def verified_version(repo, sha, pr, api=_api):
         raise ValueError("Expected a versioned hotfix or next branch.")
     head = pr["head"]["sha"]
     statuses = api(f"repos/{repo}/commits/{head}/statuses?per_page=100")
+    if not isinstance(statuses, list):
+        raise ValueError("Expected GitHub commit statuses for the release head.")
     attestations = [
         s for s in statuses if s["context"] == "Source quality and traceability"
     ]
@@ -63,7 +64,8 @@ def verified_version(repo, sha, pr, api=_api):
         )
     run = api(f"repos/{repo}/actions/runs/{url[1]}")
     if (
-        run["path"] != ".github/workflows/hosted-e2e.yml"
+        not isinstance(run, dict)
+        or run["path"] != ".github/workflows/hosted-e2e.yml"
         or run["head_sha"] != head
         or run["conclusion"] != "success"
         or run["head_repository"]["full_name"] != repo
@@ -74,10 +76,7 @@ def verified_version(repo, sha, pr, api=_api):
     return branch[1]
 
 
-# @testable true
-# @tests tests_tooling/test_016_cloud_operator.py::test_publication_retries_with_annotated_tag
-# @matrix release : git-upgrade source-integrity
-def publish_tag(repo, sha, version, notes):
+def publish_tag(repo: str, sha: str, version: str, notes: Path) -> None:
     tag = f"v{version}"
     ref = f"refs/tags/{tag}"
     remote = _run("git", "ls-remote", "--refs", "origin", ref)
@@ -132,8 +131,7 @@ def publish_tag(repo, sha, version, notes):
         )
 
 
-# @testable infrastructure
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("repo")
     parser.add_argument("sha")

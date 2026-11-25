@@ -1,3 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.tools.ai.form_draft import FormDraft
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 import json
 import re
 
@@ -6,22 +17,20 @@ from flask_login import current_user
 
 from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core import exceptions
+from lagniappe.core.properties.form_table import Table
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.mixins.submitter import normalize_submission_values
 from lagniappe.core.tools.ai import schema as ai_schema
 from lagniappe.core.tools.forms import drafts as form_drafts
 from lagniappe.core.tools.ai.form_draft import prepare_generated_changes
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
-from lagniappe.web.auth import permission, require_ai_access
+from lagniappe.web.auth import authenticated_user, load_route_entity, permission, require_ai_access
 
 from . import forms
+from lagniappe.web.pagination import pagination_options
 from lagniappe.web import responses, direct_uploads
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::update
-# @covered-by lagniappe/web/routes/forms/main.py::create_schema
-# @reason request parsing delegates domain validation to the shared draft service
 def _draft_json(data, name, default=None):
     value = data.get(name, default)
     try:
@@ -30,10 +39,6 @@ def _draft_json(data, name, default=None):
         raise exceptions.ValidationError(f"Invalid builder {name}. Reload the builder and retry.") from error
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::update
-# @covered-by lagniappe/web/routes/forms/main.py::copy_form
-# @reason complete draft and lazy upload parsing are owned by publication routes
 def _builder_request(data, form):
     draft = {
         "name": data.get("name", form.name),
@@ -64,10 +69,6 @@ def _builder_request(data, form):
     return draft, images
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::update
-# @covered-by lagniappe/web/routes/forms/main.py::create_schema
-# @reason conflict presentation preserves local work at the existing request boundary
 def _draft_conflict(error, form):
     return responses.json_response({
         "code": "stale_form_draft", "error": str(error),
@@ -75,9 +76,6 @@ def _draft_conflict(error, form):
     }, status=409)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::create_schema
-# @reason generation may retain only saved owned images and current local draft tokens
 def _draft_image_sources(form, html_fields):
     result = {}
     for field_id, content in html_fields.items():
@@ -94,79 +92,65 @@ def _draft_image_sources(form, html_fields):
     return result
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
-# @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_form_index_*
-# @matrix forms : create-control index index-view permission-gates tools
 @forms.route("/index", methods=["GET"])
 @permission(Resource.FORMS, Action.VIEW)
-def form_index():
+def form_index() -> ResponseReturnValue:
     form_index = index.FormIndex()
 
     return responses.index("forms", form_index)
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_form_index_lists_forms_*
-# @pair forms:index-view
 @forms.route("/rows", methods=["GET"])
 @permission(Resource.FORMS, Action.VIEW)
-def rows():
-    form_index = index.FormIndex(**request.values)
+def rows() -> ResponseReturnValue:
+    form_index = index.FormIndex(**pagination_options())
     forms = form_index.forms
 
     return responses.rows(forms, form_index)
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_form_builder_*
-# @matrix forms : builder-edit permission-gates restriction-control
 @forms.route("/<key>", methods=["GET"])
 @permission(Resource.FORM, Action.VIEW, no_store=True)
-def view(key, **kwargs):
+def view(key: str, **kwargs: Unpack[EntityContext[models.Form]]) -> ResponseReturnValue:
     form = kwargs["entity"]
 
     from lagniappe.core.tools.forms import changes as form_changes, conversions as form_conversions
-    draft = form_drafts.builder_draft(form)
+    draft = dict(form_drafts.builder_draft(form))
     if form.db.get(form_changes.PENDING):
-        result = form_changes.change_response(form, current_user)
-        draft.update(result["draft"], pending_change=result["pending_change"])
+        result = form_changes.change_response(form, authenticated_user())
+        draft.update(result["draft"])
+        if "pending_change" in result:
+            draft["pending_change"] = result["pending_change"]
     return render_template("forms/builder.html", form=form, builder_draft=draft,
                            conversion_catalog=form_conversions.conversion_catalog())
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003g_form_changes.py::test_failed_preflight_recovers_after_reload
-# @matrix form-migration : status recovery
 @forms.route("/<key>/change", methods=["GET", "POST"])
 @permission(Resource.FORM, Action.EDIT, no_store=True)
-def form_change(key, **kwargs):
+def form_change(
+    key: str, **kwargs: Unpack[EntityContext[models.Form]]
+) -> ResponseReturnValue:
     from lagniappe.core.tools.forms import changes as form_changes
     try:
-        result = (form_changes.change_response(kwargs["entity"], current_user) if request.method == "GET"
-                  else form_changes.recover_change(kwargs["entity"], current_user,
-                      (request.get_json(silent=True) or request.form).get("action")))
+        result = (form_changes.change_response(kwargs["entity"], authenticated_user()) if request.method == "GET"
+                  else form_changes.recover_change(kwargs["entity"], authenticated_user(),
+                      (request.get_json(silent=True) or request.form).get("action") or ""))
         return responses.json_response(result)
     except (exceptions.ValidationError, exceptions.MutationConflict) as error:
         return responses.error(str(error))
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
-# @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_builder_publication_rejects_incompatible_payload_and_reuses_receipt
-# @tests tests_e2e/003_forms/test_003f_builder_drafts.py::test_stale_save_preserves_local_draft_after_another_editor_saves
-# @matrix forms : builder-add-fields builder-add-inputs builder-reload builder-save
-# @matrix forms : migration-required save-receipt stale-acknowledgement persistent-error concurrent-edit
 @forms.route("<key>/update", methods=["PUT"])
 @permission(Resource.FORM, Action.EDIT)
-def update(key, **kwargs):
+def update(
+    key: str, **kwargs: Unpack[EntityContext[models.Form]]
+) -> ResponseReturnValue:
     form = kwargs["entity"]
     data = request.get_json(silent=True) or request.form
     try:
         draft, images = _builder_request(data, form)
         result = form_drafts.save_form_draft(
-            form, draft, data.get("baseline"), data.get("save_id"), current_user,
+            form, draft, data.get("baseline") or "", data.get("save_id") or "", authenticated_user(),
             images=images,
         )
     except form_drafts.FormDraftConflict as error:
@@ -177,40 +161,32 @@ def update(key, **kwargs):
     return responses.json_response(result)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::update
-# @reason signed upload creation has the same permission as final draft publication
 @forms.route("<key>/update/direct-upload", methods=["POST"])
 @permission(Resource.FORM, Action.EDIT)
-def update_direct(key, **kwargs):
+def update_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
-# @matrix forms : create page-form task-form
 @forms.route("/create", methods=["POST"])
 @permission(Resource.FORM, Action.CREATE)
-def create():
+def create() -> ResponseReturnValue:
     new_form = Entities.FORM.create(request.form)
     new_form.save()
 
     return responses.rows(new_form, index.FormIndex())
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
-# @matrix forms : builder-copy form-type navigation schema
 @forms.route("<key>/copy", methods=["POST"])
 @permission(Resource.FORM, Action.CREATE)
-def copy_form(key, **kwargs):
+def copy_form(
+    key: str, **kwargs: Unpack[EntityContext[models.Form]]
+) -> ResponseReturnValue:
     source = kwargs["entity"]
     data = request.get_json(silent=True) or request.form
     try:
         draft, images = _builder_request(data, source)
         result = form_drafts.copy_form_draft(
-            source, draft, data.get("baseline"), data.get("save_id"), current_user,
+            source, draft, data.get("baseline") or "", data.get("save_id") or "", authenticated_user(),
             images=images,
         )
     except form_drafts.FormDraftConflict as error:
@@ -218,44 +194,40 @@ def copy_form(key, **kwargs):
     except (exceptions.ValidationError, ValueError) as error:
         return responses.error(str(error))
     direct_uploads.cleanup_direct_uploads(request.form)
-    result["url"] = url_for("forms.view", key=result.pop("form_key"))
-    return responses.json_response(result)
+    payload = dict(result)
+    payload["url"] = url_for("forms.view", key=payload.pop("form_key"))
+    return responses.json_response(payload)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/forms/main.py::copy_form
-# @reason signed upload creation has the same permission as final draft copy
 @forms.route("<key>/copy/direct-upload", methods=["POST"])
 @permission(Resource.FORM, Action.CREATE)
-def copy_direct(key, **kwargs):
+def copy_direct(key: str, **kwargs: object) -> ResponseReturnValue:
     return direct_uploads.direct_upload_response()
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
-# @matrix forms : page-form task-form
 @forms.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.FORM, Action.DELETE)
-def delete(key, **kwargs):
+def delete(
+    key: str, **kwargs: Unpack[EntityContext[models.Form]]
+) -> ResponseReturnValue:
     form = kwargs["entity"]
     Entities.delete(form)
 
     return responses.ok()
 
 
-# @testable true
-# @tests tests_unit/test_003e_tables.py::test_table_row_submission_text_email_checkbox
-# @tests tests_unit/test_003e_tables.py::test_table_form_mixed_column_types
-# @matrix form-table : mixed-columns row-submission
 @forms.route("<key>/validate-row/<table_id>", methods=["GET"])
 @permission(requested=Action.EDIT)
-def validate_row(key, table_id, **kwargs):
-    entity = Entities.fetch_one(
+def validate_row(
+    key: str, table_id: str, **kwargs: Unpack[EntityContext[models.Page | models.Task]]
+) -> ResponseReturnValue:
+    entity = load_route_entity(
         kwargs["entity"],
         request=Fetch.direct(),
     )
     field = entity.properties.submission.fields.get(table_id)
+    if not isinstance(field, Table):
+        return responses.error("The original table definition is unavailable.")
     field.user = current_user
 
     values = normalize_submission_values(request.values, field.fields)
@@ -267,28 +239,27 @@ def validate_row(key, table_id, **kwargs):
         )
     except exceptions.ValidationError as error:
         return responses.error(str(error))
-    row_submission = field.validate_row_submission(values)
+    row_submission = field.validate_row_submission(dict(values))
     return responses.json_response({"row": row_submission})
 
 
-# @testable true
-# @tests tests_unit/test_003e_tables.py::test_table_form_single_row
-# @tests tests_unit/test_003e_tables.py::test_table_row_submission_text_email_checkbox
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_expands_table_submission_cell
-# @matrix form-table table-controls : form-table-column table-cell-expand
-# @matrix form-table : form-submission row-submission
 @forms.route("<key>/expand-table-cell/<table_id>", methods=["GET"])
 @permission(requested=Action.VIEW)
-def expand_table_cell(key, table_id, **kwargs):
-    entity = Entities.fetch_one(
+def expand_table_cell(
+    key: str,
+    table_id: str,
+    **kwargs: Unpack[EntityContext[models.Page | models.Task | models.TaskHistory]],
+) -> ResponseReturnValue:
+    entity = load_route_entity(
         kwargs["entity"],
         request=Fetch.direct(),
     )
 
     field = entity.properties.submission.fields.get(table_id)
-    if field is None:
+    if not isinstance(field, Table):
         return responses.error("The original table definition is unavailable.")
-    field.value = entity.submission.get(table_id)
+    submission = entity.properties.submission.value
+    field.value = submission.get(table_id) if isinstance(submission, dict) else None
     field.kind = (
         entity.kind if not isinstance(entity, Entities.TASK_HISTORY) else "form"
     )
@@ -296,19 +267,19 @@ def expand_table_cell(key, table_id, **kwargs):
     return responses.expanded_table_cell(field)
 
 
-# @testable true
 # @scaffolding testing/resources/form.py::Builder.restrict_to_owner
 # @scaffolding testing/resources/form.py::Builder.restrict_to_group
-# @matrix forms : access-restrictions group-restricted owner-restricted
 @forms.route("<key>/restrictions", methods=["PUT"])
 @permission(Resource.FORM, Action.EDIT)
-def restrictions(key, **kwargs):
+def restrictions(
+    key: str, **kwargs: Unpack[EntityContext[models.Form]]
+) -> ResponseReturnValue:
     form = kwargs["entity"]
 
     admin_only = request.form.get("admin") in {"on", "true"}
     keys = [] if admin_only else request.form.getlist("group-key")
     try:
-        resolver = SubmittedReferenceResolver(current_user, *keys)
+        resolver = SubmittedReferenceResolver(authenticated_user(), *keys)
         groups = [resolver.one(key, expected=Entities.USER_GROUP, action=Action.VIEW, required=True)
                   for key in keys]
         form.groups = groups
@@ -319,17 +290,13 @@ def restrictions(key, **kwargs):
     return responses.ok()
 
 
-# @testable true
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_generate_form_schema_live_saved_state
-# @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_schema_generation_requires_edit_access_to_submitted_form
-# @matrix ai forms : generate-schema live-ai reload saved-state submitted-reference
 @forms.route("/create-schema", methods=["POST"])
 @permission(Resource.FORMS, Action.EDIT)
-def create_schema():
+def create_schema() -> ResponseReturnValue:
     description = request.form.get("description", "")
     form_key = request.form.get("form-key")
     try:
-        form = SubmittedReferenceResolver(current_user, form_key).one(
+        form = SubmittedReferenceResolver(authenticated_user(), form_key).one(
             form_key,
             expected=Entities.FORM,
             action=Action.EDIT,
@@ -360,14 +327,17 @@ def create_schema():
         revision = int(request.form.get("draft_revision", "-1"))
         if not isinstance(request_id, str) or not form_drafts.IMAGE_ID.fullmatch(request_id) or revision < 0:
             raise exceptions.ValidationError("Generation needs a valid draft request identity.")
-        draft = {"schema": schema, "html_fields": html_fields}
-        prompt = ai_schema.form_generation_prompt(form.form_type, description=description, draft=draft)
+        draft: FormDraft = {"schema": schema, "html_fields": html_fields}
+        form_type = form.form_type
+        if form_type is None:
+            raise exceptions.ValidationError("The Form type is unavailable.")
+        prompt = ai_schema.form_generation_prompt(form_type, description=description, draft=dict(draft))
         sources = _draft_image_sources(form, html_fields)
         result = ai_schema.generate_schema(prompt, validator=lambda value: prepare_generated_changes(
-            value, draft, form_type=form.form_type, image_sources=sources,
+            value, draft, form_type=form_type, image_sources=sources,
         ))
         current = Entities.fetch_one(form.key, request=Fetch.direct())
-        if current is None or not current.allowed(Action.EDIT, user=current_user):
+        if not isinstance(current, Entities.FORM) or not current.allowed(Action.EDIT, user=current_user):
             raise exceptions.ValidationError("This Form is no longer editable.")
         if form_drafts.builder_draft(current)["baseline"] != baseline:
             raise form_drafts.FormDraftConflict("The saved Form changed during generation. Your draft is preserved.")
@@ -380,11 +350,10 @@ def create_schema():
     return responses.json_response({**result, "request_id": request_id, "draft_revision": revision})
 
 
-# @testable true
-# @tests tests_unit/test_004_form_properties.py::test_form_schema
-# @pair form-schema:property
 @forms.route("<key>/schema", methods=["GET"])
 @permission(Resource.FORM, Action.VIEW)
-def schema(key, **kwargs):
+def schema(
+    key: str, **kwargs: Unpack[EntityContext[models.Form]]
+) -> ResponseReturnValue:
     form = kwargs["entity"]
     return responses.json_response({"schema": form.schema})

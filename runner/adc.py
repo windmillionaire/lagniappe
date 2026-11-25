@@ -1,13 +1,22 @@
 """Application Default Credentials alignment for repository-local commands."""
 
+from __future__ import annotations
+
 import os
 import sys
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING
 
 from runner import presentation as ui
-from runner.presentation import output as print
-from runner.context import GCLOUD_CLI, format_command, python_command, setup_command
 from runner.console import wrap_text
+from runner.context import GCLOUD_CLI, format_command, python_command, setup_command
+from runner.presentation import output as print
 from runner.process import run_command
+
+if TYPE_CHECKING:
+    from google.auth.credentials import Credentials
+    from google.auth.transport.requests import Request
+    from requests import Response
 
 
 ADC_SCOPES = (
@@ -18,15 +27,12 @@ ADC_SCOPES = (
 ADC_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_adc_identity_is_secret_free_and_project_bound
-# @matrix development setup testing : adc identity project-identity
 def read_adc_identity(
     *,
-    auth_default=None,
-    request_factory=None,
-    token_lookup=None,
-):
+    auth_default: Callable[..., tuple[Credentials, str | None]] | None = None,
+    request_factory: Callable[[], Request] | None = None,
+    token_lookup: Callable[..., Response] | None = None,
+) -> dict[str, str]:
     """Return a secret-free view of the current Application Default Credentials."""
     if auth_default is None:
         import google.auth
@@ -76,9 +82,6 @@ def read_adc_identity(
         }
 
 
-# @testable false
-# @covered-by runner/adc.py::ensure_adc_target
-# @reason ADC mismatch normalization is exercised through target verification
 def _identity_mismatches(identity, *, principals, project):
     if identity.get("state") != "success":
         return ["ADC identity is unavailable"]
@@ -98,22 +101,17 @@ def _identity_mismatches(identity, *, principals, project):
     return mismatches
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_source_login_refreshes_stale_token
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_source_login_stops_before_authentication_by_default
-# @matrix auth : gcloud-token interactive refresh
-# @matrix setup : gcloud-token safe-failure
-def ensure_gcloud_source_login(account, *, allow_login=False):
+def ensure_gcloud_source_login(account: str, *, allow_login: bool = False) -> None:
     """Verify that the saved gcloud account can mint a fresh access token."""
     token_check = run_command(
-        [GCLOUD_CLI, "auth", "print-access-token", account],
+        [GCLOUD_CLI or "gcloud", "auth", "print-access-token", account],
         check=False,
         timeout=60,
     )
     if token_check.returncode == 0:
         return
 
-    login_command = [GCLOUD_CLI, "auth", "login", account, "--force"]
+    login_command = [GCLOUD_CLI or "gcloud", "auth", "login", account, "--force"]
     if not allow_login:
         raise RuntimeError(
             f"The saved gcloud login for '{account}' needs to be refreshed. "
@@ -137,7 +135,7 @@ def ensure_gcloud_source_login(account, *, allow_login=False):
     if result.returncode != 0:
         raise RuntimeError("The saved gcloud account login did not complete.")
     token_check = run_command(
-        [GCLOUD_CLI, "auth", "print-access-token", account],
+        [GCLOUD_CLI or "gcloud", "auth", "print-access-token", account],
         check=False,
         timeout=60,
     )
@@ -147,39 +145,30 @@ def ensure_gcloud_source_login(account, *, allow_login=False):
         )
 
 
-# @testable false
-# @covered-by runner/adc.py::ensure_adc_target
-# @reason ordered gcloud selection is exercised through explicit local ADC alignment
 def _select_gcloud_auth_target(account, project):
     print(wrap_text(f"Selecting gcloud account '{account}'..."))
     run_command(
-        [GCLOUD_CLI, "config", "set", "account", account],
+        [GCLOUD_CLI or "gcloud", "config", "set", "account", account],
         timeout=60,
     )
     ensure_gcloud_source_login(account, allow_login=True)
 
     print(wrap_text(f"Selecting gcloud project '{project}'..."))
     run_command(
-        [GCLOUD_CLI, "config", "set", "project", project],
+        [GCLOUD_CLI or "gcloud", "config", "set", "project", project],
         timeout=60,
     )
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_adc_alignment_reauthenticates_and_sets_quota_project
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_adc_auth_selects_account_then_project_before_login
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_local_adc_mismatch_directs_to_auth_command
-# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_adc_alignment_updates_only_stale_quota_project
-# @matrix auth development setup testing : adc automatic-activation identity project-identity quota-project
 def ensure_adc_target(
-    account,
-    project,
+    account: str,
+    project: str,
     *,
-    allowed_principals=(),
-    allow_login=None,
-    select_gcloud_target=False,
-    announce=True,
-):
+    allowed_principals: Sequence[str | None] = (),
+    allow_login: bool | None = None,
+    select_gcloud_target: bool = False,
+    announce: bool = True,
+) -> dict[str, str]:
     """Align local ADC with the requested repository identity and project."""
     account = str(account or "").strip()
     project = str(project or "").strip()

@@ -1,4 +1,7 @@
-from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Self, TypedDict, cast, overload
+from collections.abc import Callable, Iterable, Mapping
+
+from datetime import datetime, UTC
 from copy import deepcopy
 
 from .entity import Entity, EntityProperties
@@ -20,12 +23,40 @@ from lagniappe.core.tools.forms import definitions as form_definitions
 from ..tools.database import get as database_get
 
 
-# @testable true
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_snapshots_completed_task_state
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_legacy_task_history_snapshot_text_defaults_to_none
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_fingerprint_ignores_later_form_versions
-# @matrix task-completion : asset-copy description history immutable-fingerprint legacy linked-pages name schema-version snapshot submission
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+
+    from ..definitions import Action
+    from ..definitions.asset import HTMLAsset, ImageAsset
+    from ..mixins.field_host import FieldUser
+    from ..properties.base_schema import SchemaProperty
+    from ..properties.form_special import HTML
+
+    from . import property_types
+    from .page import Page
+    from .project import Project
+    from .task import Task
+    from .file import File
+    from .user import User
+    from .form import Form
+
+
+class TaskHistoryOverrides(TypedDict, total=False):
+    copy_assets: bool
+    _key: Key
+    completed_on: datetime | None
+    completed_by: Page | User | None
+    page: Page | None
+    name: str
+    description: str | None
+    linked_pages: list[Page]
+    files: list[File]
+    form: Form | None
+    generation: int
+    submission: dict[str, object] | None
+    created: datetime | None
+
+
 class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     """Immutable task snapshot with a stable entity fingerprint.
 
@@ -36,21 +67,47 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
     generic entity/ETag contract for directly loaded history rows; it is not an
     edit-revision signal.
     """
+    if TYPE_CHECKING:
+        form: Form | None
+        task: Task | None
+        description: str | None
+        @property
+        def submission(self) -> dict[str, object]: ...
+
+        @submission.setter
+        def submission(self, value: dict[str, object] | str | None) -> None: ...
+
+        page: Page | None
+        linked_pages: list[Page]
+        files: list[File]
+
+        @property
+        def completed_on(self) -> datetime | None: ...
+
+        @completed_on.setter
+        def completed_on(self, value: datetime | None) -> None: ...
+
+        @property
+        def completed_by(self) -> Page | None: ...
+
+        @completed_by.setter
+        def completed_by(self, value: Page | User | None) -> None: ...
+
+        @property
+        def properties(self) -> property_types.TaskHistoryProperties: ...
+
 
     entity_kind = "task_history"
 
     @property
-    def readonly(self):
+    def readonly(self) -> bool:
         return True
 
-    # @testable true
-    # @tests tests_unit/test_009g_restriction_reconciliation.py::test_history_permissions_follow_live_task
-    # @matrix permissions tasks : task-history live-task
-    def allowed(self, action, user=None):
-        return permission_relation(self, "task", required=True).allowed(action, user=user)
+    def allowed(self, action: Action, user: FieldUser = None) -> bool:
+        return cast("Task", permission_relation(self, "task", required=True)).allowed(action, user=user)
 
     @property
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         exclude = {
             "submission",
             "schema",
@@ -58,7 +115,7 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
         return frozenset(exclude)
 
     @property
-    def hash(self):
+    def hash(self) -> str | None:  # pyright: ignore[reportIncompatibleMethodOverride] -- Unsaved history rows have no hash.
         if not self.key:
             return None
 
@@ -66,7 +123,7 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
         return short_hash(urlsafe_key) if urlsafe_key else None
 
     @property
-    def required(self):
+    def required(self) -> list[str]:
         task = self.task
         if task:
             return task.required
@@ -74,18 +131,18 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
         return self.page.required if self.page else []
 
     @property
-    def modified(self):
+    def modified(self) -> datetime | None:  # pyright: ignore[reportIncompatibleMethodOverride] -- Immutable snapshots expose their creation time.
         return self.created
 
     @property
-    def generation(self):
-        return self.db.get("generation", 0) or 0
+    def generation(self) -> int:
+        return cast(int, self.db.get("generation", 0) or 0)
 
     @generation.setter
-    def generation(self, value):
+    def generation(self, value: int) -> None:
         self.db["generation"] = value
 
-    def _get_properties(self):
+    def _get_properties(self) -> EntityProperties:
         properties = {
             "name": common_entity.Name,
             "created": common_entity.Created,
@@ -103,35 +160,26 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
         }
         return EntityProperties(self, properties)
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_snapshots_completed_task_state
-    # @matrix task-completion : asset-copy history
-    # @pair signature:asset-copy
-    def copy_assets(self, task):
+    def copy_assets(self, task: Task | TaskHistory) -> None:
         try:
             for name in list(getattr(task, "assets", {}).keys()):
                 asset = task.get_asset(name)
                 copied = self.copy_asset(asset, isolated=True) if asset else None
                 if not copied:
                     raise ValidationError("A saved answer attachment could not be preserved. Try reopening again.")
-                record_attempt_asset(self, copied.definition)
+                record_attempt_asset(self, dict(copied.definition))
         except Exception:
             cleanup_rejected_attempt(self)
             raise
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_snapshots_completed_task_state
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_clones_another_task_and_existing_history
-    # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
-    # @matrix task-combine : asset-copy attachments existing-history metadata schema-version source-snapshot
-    # @matrix task-completion : asset-copy snapshot
-    # @matrix task-completion : history schema-version
-    # @pair signature:asset-copy
     @classmethod
-    def create(cls, task, overrides=None, *, source=None, submission_source="original"):
-        overrides = dict(overrides or {})
+    def create(
+        cls, task: Task, overrides: TaskHistoryOverrides | None = None, *,
+        source: Task | TaskHistory | None = None, submission_source: str = "original",
+    ) -> Self:
+        overrides = overrides or {}
         source = source or task
-        history_key = overrides.pop("_key", None)
+        history_key = overrides.get("_key")
         new_history = cls(history_key, parent=task)
         if history_key is not None and new_history.key is None:
             new_history._key = history_key
@@ -188,22 +236,22 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
         return new_history
 
 
-# @testable true
-# @tests tests_unit/test_004f_form_drafts.py::test_archived_generation_preserves_schema_html_and_images
-# @matrix form-schema html-field : history generation immutable-assets
 class FormHistory(Entity, AssetMixin):
+    if TYPE_CHECKING:
+        schema: list[dict[str, object]]
+
+        @property
+        def properties(self) -> property_types.FormHistoryProperties: ...
+
     entity_kind = "form_history"
 
-    # @testable true
-    # @tests tests_unit/test_004f_form_drafts.py::test_definition_snapshot_requires_submitter_scoped_authorization
-    # @matrix form-schema html-field : history permission-boundary
-    def allowed(self, action, user=None):
+    def allowed(self, action: Action, user: FieldUser = None) -> bool:
         # An internal definition is not a standalone resource. Readers must
         # authorize the live Task/TaskHistory that selected this exact version.
         return False
 
     @property
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         exclude = {
             "schema",
             "schema_format",
@@ -213,62 +261,68 @@ class FormHistory(Entity, AssetMixin):
         return frozenset(exclude)
 
     @property
-    def hash(self):
+    def hash(self) -> str | None:  # pyright: ignore[reportIncompatibleMethodOverride] -- Unsaved history rows have no hash.
         return short_hash(self.urlsafe_key) if self.key else None
 
     @property
-    def form_type(self):
-        return self.db.get("form_type")
+    def form_type(self) -> str | None:
+        return cast("str | None", self.db.get("form_type"))
 
     @property
-    def content_available(self):
+    def content_available(self) -> bool:
         return self.db.get("form_content_version") == 1
 
     @property
-    def source_form_key(self):
-        return self.db.get("form") or self.key.parent
+    def source_form_key(self) -> Key | None:
+        if form_key := self.db.get("form"):
+            return cast("Key", form_key)
+        if self.key is None:
+            raise AttributeError("The form history has no key")
+        return self.key.parent
 
     @property
-    def fields(self):
-        return self.properties.schema.fields
+    def fields(self) -> Mapping[str, SchemaProperty]:
+        # Schema.fields always creates the field map on the first access.
+        return cast("Mapping[str, SchemaProperty]", self.properties.schema.fields)
 
     @property
-    def html_fields(self):
+    def html_fields(self) -> list[HTML]:
         return self.properties.schema.html_fields
 
-    # @testable true
-    # @tests tests_unit/test_004f_form_drafts.py::test_archived_generation_preserves_schema_html_and_images
-    # @matrix html-field : history immutable-assets
-    def get_html_field(self, field_id):
+    def get_html_field(self, field_id: str) -> str | None:
         if not self.content_available:
             return None
-        asset = self.get_asset(field_id)
+        asset = cast("HTMLAsset | None", self.get_asset(field_id))
         content = asset.html() if asset else None
         if not content:
             return content
-        for name, source_url in self.db.get("source_asset_urls", {}).items():
-            image = self.get_asset(name)
+        source_urls = cast("dict[str, str]", self.db.get("source_asset_urls", {}))
+        for name, source_url in source_urls.items():
+            image = cast("ImageAsset | None", self.get_asset(name))
             if image and source_url:
-                content = content.replace(source_url, image.url)
+                image_url = image.url
+                if image_url is None:
+                    raise TypeError("The archived image has no URL")
+                content = content.replace(source_url, image_url)
         return content
 
     @property
-    def required(self):
+    def required(self) -> None:
         return None
 
     @property
-    def modified(self):
+    def modified(self) -> datetime | None:  # pyright: ignore[reportIncompatibleMethodOverride] -- Immutable snapshots expose their creation time.
         return self.created
 
     @property
-    def generation(self):
-        return self.db.get("generation", 0) or 0
+    def generation(self) -> int:
+        return cast(int, self.db.get("generation", 0) or 0)
 
     @generation.setter
-    def generation(self, value):
+    def generation(self, value: int) -> None:
         self.db["generation"] = value
 
-    def _get_properties(self):
+    def _get_properties(self) -> EntityProperties:
         properties = {
             "created": common_entity.Created,
             "name": common_entity.Name,
@@ -279,11 +333,8 @@ class FormHistory(Entity, AssetMixin):
         }
         return EntityProperties(self, properties)
 
-    # @testable true
-    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_form_history_create_copies_explicit_saved_definition_without_asset_copy
-    # @matrix form-schema html-field : history content-version
     @classmethod
-    def create(cls, source, previous_generation):
+    def create(cls, source: Form, previous_generation: int) -> Self:
         """Build the old definition from the saved source supplied by Form Save."""
         history = cls(parent=source)
         history.kind = cls.entity_kind
@@ -292,22 +343,18 @@ class FormHistory(Entity, AssetMixin):
         history.schema = deepcopy(source.schema)
         history.schema_format = source.schema_format
         history.name = source.name
-        history.created = datetime.now(timezone.utc)
+        history.created = datetime.now(UTC)
         history.db["form_type"] = source.form_type
         if source.db.get("form_content_version") is not None:
             history.db["form_content_version"] = source.db["form_content_version"]
         return history
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_saves_do_not_create_automatic_history
-# @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_document_history_create_copies_document_asset
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_document_history_named_versions_order_and_delete_in_bounded_batches
-# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_document_history_named_version_rejects_invalid_name_or_content
-# @matrix document-history : asset-copy asset-path batch-delete current-content legacy named ordering validation
-# @matrix editor : history-list validation
 class DocumentHistory(AssetMixin, Entity):
+    if TYPE_CHECKING:
+        @property
+        def properties(self) -> property_types.DocumentHistoryProperties: ...
+
     entity_kind = "document_history"
 
     DOCUMENT_ASSET = "document"
@@ -315,31 +362,31 @@ class DocumentHistory(AssetMixin, Entity):
     MAX_NAME_LENGTH = 100
 
     @property
-    def exclude_from_index(self):
+    def exclude_from_index(self) -> frozenset[str]:
         return frozenset({"assets"})
 
     @property
-    def hash(self):
-        return self.db.get("hash")
+    def hash(self) -> str | None:  # pyright: ignore[reportIncompatibleMethodOverride] -- Unsaved history rows have no hash.
+        return cast("str | None", self.db.get("hash"))
 
     @hash.setter
-    def hash(self, value):
+    def hash(self, value: str) -> None:
         self.db["hash"] = value
 
     @property
-    def required(self):
+    def required(self) -> None:
         return None
 
     @property
-    def modified(self):
+    def modified(self) -> datetime | None:  # pyright: ignore[reportIncompatibleMethodOverride] -- Immutable snapshots expose their creation time.
         return self.created
 
     @property
-    def pinned(self):
+    def pinned(self) -> bool:
         return bool(self.name)
 
     @property
-    def entry(self):
+    def entry(self) -> dict[str, object]:
         return {
             "key": self.urlsafe_key,
             "name": self.name or None,
@@ -347,7 +394,7 @@ class DocumentHistory(AssetMixin, Entity):
             "created": self.created.isoformat() if self.created else None,
         }
 
-    def _get_properties(self):
+    def _get_properties(self) -> EntityProperties:
         properties = {
             "created": common_entity.Created,
             "kind": common_entity.Kind,
@@ -355,8 +402,19 @@ class DocumentHistory(AssetMixin, Entity):
         }
         return EntityProperties(self, properties)
 
+    @overload
     @classmethod
-    def create(cls, entity, *, name=None, html=None, key=None, allow_empty=False):
+    def create(cls, entity: Page | Project, *, name: str, html: str, key: Key | None = None, allow_empty: bool = False) -> Self: ...
+
+    @overload
+    @classmethod
+    def create(cls, entity: Page | Project, *, name: str | None = None, html: str | None = None, key: Key | None = None, allow_empty: bool = False) -> Self | None: ...
+
+    @classmethod
+    def create(
+        cls, entity: Page | Project, *, name: str | None = None, html: str | None = None,
+        key: Key | None = None, allow_empty: bool = False,
+    ) -> Self | None:
         named = name is not None or html is not None
         if named:
             name = cls.validate_name(name)
@@ -371,6 +429,8 @@ class DocumentHistory(AssetMixin, Entity):
         new_history.hash = key_identity
 
         if named:
+            # Named snapshots pass validate_name above.
+            assert name is not None
             new_history.name = name
             new_history.save_asset(html or "<p></p>", cls.DOCUMENT_ASSET, "html")
             return new_history
@@ -384,7 +444,7 @@ class DocumentHistory(AssetMixin, Entity):
         return new_history
 
     @classmethod
-    def validate_name(cls, value):
+    def validate_name(cls, value: object) -> str:
         if not isinstance(value, str):
             raise ValidationError("Version name is required")
 
@@ -398,7 +458,7 @@ class DocumentHistory(AssetMixin, Entity):
         return name
 
     @staticmethod
-    def validate_html(value):
+    def validate_html(value: object) -> str:
         if not isinstance(value, str) or not value.strip():
             raise ValidationError("Document content is required")
 
@@ -413,24 +473,16 @@ class DocumentHistory(AssetMixin, Entity):
         return value
 
     @classmethod
-    def ordered(cls, histories):
-        def newest(history):
-            return history.created or datetime.min.replace(tzinfo=timezone.utc)
-
-        pinned = sorted(
-            (history for history in histories if history.pinned),
-            key=newest,
+    def ordered(cls, histories: Iterable[Self]) -> list[Self]:
+        oldest = datetime.min.replace(tzinfo=UTC)
+        return sorted(
+            histories,
+            key=lambda history: (history.pinned, history.created or oldest),
             reverse=True,
         )
-        unpinned = sorted(
-            (history for history in histories if not history.pinned),
-            key=newest,
-            reverse=True,
-        )
-        return pinned + unpinned
 
     @classmethod
-    def delete_unpinned(cls, histories, *, batch_size=None, delete=None):
+    def delete_unpinned(cls, histories: Iterable[Entity], *, batch_size: int | None = None, delete: Callable[..., object] | None = None) -> int:
         from . import Entities
 
         delete = delete or Entities.delete

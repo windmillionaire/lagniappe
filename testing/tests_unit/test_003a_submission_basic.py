@@ -1,6 +1,6 @@
 """Basic form field submission paths (form, AI, import) via ``test_submission_values``."""
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -21,13 +21,12 @@ def fixed_date_clock(monkeypatch):
     class FixedDateTime(datetime):
         @classmethod
         def now(cls, tz=None):
-            instant = datetime(2026, 9, 19, 12, 34, 56, 123456, tzinfo=timezone.utc)
+            instant = datetime(2026, 9, 19, 12, 34, 56, 123456, tzinfo=UTC)
             return instant.astimezone(tz) if tz else instant.replace(tzinfo=None)
 
     monkeypatch.setattr(dates, "datetime", FixedDateTime)
 
 
-# @matrix date-input : ai-value column filter-value import
 def test_submission_date_input(
     get_test_entities, get_schema, test_submission_values, fixed_date_clock
 ):
@@ -37,8 +36,6 @@ def test_submission_date_input(
         test_submission_values(entity)
 
 
-# @source lagniappe/core/properties/form_inputs.py::DateInput
-# @matrix date-input : ai-value column filter-value form-submission import timezone
 @pytest.mark.parametrize(
     "method", ["validate_ai", "validate_import", "validate_submission"]
 )
@@ -82,7 +79,7 @@ def test_date_input_uses_explicit_actor_without_request(
     # Form dates preserve today's local clock; AI/import date-only values use midnight.
     stored_utc = form_utc if method == "validate_submission" else midnight_utc
     expected_utc = datetime.fromisoformat(stored_utc)
-    assert field.value.tzinfo == timezone.utc
+    assert field.value.tzinfo == UTC
     assert field.value == expected_utc
     assert field.value.astimezone(ZoneInfo(zone)).date().isoformat() == day
     assert field.db_value == stored_utc
@@ -95,8 +92,6 @@ def test_date_input_uses_explicit_actor_without_request(
     assert restored.filter_value == expected_utc.timestamp()
 
 
-# @source lagniappe/core/properties/form_inputs.py::DateInput
-# @matrix date-input : ai-value timezone
 def test_date_input_preserves_explicit_timezone_offset(monkeypatch):
     monkeypatch.setattr(CONFIG, "TEST_CURRENT_USER", None)
     user = _test_user("date-offset-owner")
@@ -107,11 +102,13 @@ def test_date_input_preserves_explicit_timezone_offset(monkeypatch):
         user=user,
     )
     field.validate_ai("2026-09-24T12:00:00+09:00")
-    assert field.value == datetime(2026, 9, 24, 3, tzinfo=timezone.utc)
+    assert field.value == datetime(2026, 9, 24, 3, tzinfo=UTC)
     assert field.ai_value == "2026-09-23"
+    assert field.set_utc_datetime([None, ["2026-09-24 03:00:00"]]) == [
+        None, [datetime(2026, 9, 24, 3, tzinfo=UTC)]
+    ]
 
 
-# @matrix time-input : ai-value column filter-value import
 def test_submission_time_input(get_test_entities, get_schema, test_submission_values):
     """Test TimeInput field outputs."""
     for entity in get_test_entities():
@@ -119,7 +116,6 @@ def test_submission_time_input(get_test_entities, get_schema, test_submission_va
         test_submission_values(entity)
 
 
-# @matrix text-input : ai-value filter-value import search-value
 def test_submission_text_input(get_test_entities, get_schema, test_submission_values):
     """Test TextInput field outputs."""
     for entity in get_test_entities():
@@ -127,7 +123,6 @@ def test_submission_text_input(get_test_entities, get_schema, test_submission_va
         test_submission_values(entity)
 
 
-# @matrix submission text-input : column empty-field empty-value
 def test_submission_text_input_empty_column_value_is_blank(
     get_test_entities, get_schema
 ):
@@ -142,7 +137,6 @@ def test_submission_text_input_empty_column_value_is_blank(
     assert field.column_value is None
 
 
-# @matrix number-input : ai-value filter-value import
 def test_submission_number_input(get_test_entities, get_schema, test_submission_values):
     """Test NumberInput field outputs."""
     for entity in get_test_entities():
@@ -150,7 +144,6 @@ def test_submission_number_input(get_test_entities, get_schema, test_submission_
         test_submission_values(entity)
 
 
-# @matrix email-input : ai-value filter-value import
 def test_submission_email_input(get_test_entities, get_schema, test_submission_values):
     """Test EmailInput field outputs."""
     for entity in get_test_entities():
@@ -158,7 +151,6 @@ def test_submission_email_input(get_test_entities, get_schema, test_submission_v
         test_submission_values(entity)
 
 
-# @matrix tel-input : ai-value filter-value formatting import
 def test_submission_tel_input(get_test_entities, get_schema, test_submission_values):
     """Test TelInput field outputs with E.164 normalization."""
     for entity in get_test_entities():
@@ -166,7 +158,6 @@ def test_submission_tel_input(get_test_entities, get_schema, test_submission_val
         test_submission_values(entity)
 
 
-# @matrix checkbox : ai-value filter-value import
 def test_submission_checkbox(get_test_entities, get_schema, test_submission_values):
     """Test Checkbox field outputs."""
     for entity in get_test_entities():
@@ -174,7 +165,6 @@ def test_submission_checkbox(get_test_entities, get_schema, test_submission_valu
         test_submission_values(entity)
 
 
-# @matrix textarea : ai-value filter-value import search-value
 def test_submission_textarea(get_test_entities, get_schema, test_submission_values):
     """Test Textarea field outputs."""
     for entity in get_test_entities():

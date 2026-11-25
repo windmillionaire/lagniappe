@@ -1,13 +1,14 @@
 """Read public-page settings saved by the deployed application."""
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+
 from runner import presentation as ui
 from runner.presentation import output as print
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_public_page_settings_applies_saved_app_config
-# @matrix setup : datastore public-page-indexing
-def get_public_page_settings():
+def get_public_page_settings() -> Entity | None:
     from installer.utils import ensure_datastore_dependency
     from installer.image import DATASTORE_TIMEOUT, get_datastore_client
     from installer import FORMATTER
@@ -39,3 +40,7 @@ from config.public_pages import (  # noqa: E402
     apply_public_page_settings as apply_public_page_settings,
     normalize_public_page_settings as normalize_public_page_settings,
 )
+
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Entity

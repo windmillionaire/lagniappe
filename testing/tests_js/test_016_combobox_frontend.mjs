@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
-import { Submitter } from "../../src/script/elements/combobox/submitter.mjs";
+import { Submitter } from "../../src/script/elements/combobox/submitter.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 function replace(t, target, name, value) {
@@ -72,6 +72,29 @@ function interactionEvent(options = {}) {
 	};
 }
 
+test("test_search_combobox_enter_only_follows_rows_with_a_destination", async (t) => {
+	installBrowserBoundaries(t, { html: "<label><input></label>" });
+	const { SearchBox } = await import(
+		"../../src/script/elements/combobox/search.ts"
+	);
+	const box = new SearchBox(document.querySelector("label"));
+	const location = { href: "" };
+	replace(t, globalThis, "window", { location });
+
+	const choose = (markup) => {
+		box.updatePanel(markup);
+		box.panel.querySelector('[role="option"]').scrollIntoView = () => {};
+		box.panelOpen = true;
+		box.elementKeydown(interactionEvent({ key: "ArrowDown" }));
+		box.elementKeydown(interactionEvent({ key: "Enter" }));
+	};
+	choose('<div role="option" class="pointer-events-none">No Results</div>');
+	assert.equal(location.href, "");
+
+	choose('<div role="option" data-url="/search?q=notes">All Results</div>');
+	assert.equal(location.href, "/search?q=notes");
+});
+
 async function setupFloating(t) {
 	installBrowserBoundaries(t);
 	const autoUpdateCalls = [];
@@ -94,7 +117,7 @@ async function setupFloating(t) {
 	const offset = (value) => ({ name: "offset", value });
 	const shift = (options) => ({ name: "shift", options });
 	const { Combobox } = await esmock.strict(
-		"../../src/script/elements/combobox/combobox.mjs",
+		"../../src/script/elements/combobox/combobox.ts",
 		{
 			"@floating-ui/dom": {
 				autoUpdate,
@@ -106,9 +129,9 @@ async function setupFloating(t) {
 		},
 	);
 	const { Dropdown } = await esmock.strict(
-		"../../src/script/elements/combobox/dropdown.mjs",
+		"../../src/script/elements/combobox/dropdown.ts",
 		{
-			"../../src/script/elements/combobox/combobox.mjs": { Combobox },
+			"../../src/script/elements/combobox/combobox.ts": { Combobox },
 		},
 	);
 	return {
@@ -122,16 +145,15 @@ async function setupFloating(t) {
 	};
 }
 
-/** @matrix location : initialization on-demand */
 test("test_location_combobox_starts_location_sync_on_init", async (t) => {
 	installBrowserBoundaries(t, {
 		html: '<label><input name="place" placeholder="Search for a place"></label>',
 	});
 	const updateUserLocation = t.mock.fn(async () => true);
 	const { LocationBox } = await esmock.strict(
-		"../../src/script/elements/combobox/location.mjs",
+		"../../src/script/elements/combobox/location.ts",
 		{
-			"../../src/script/shared/user.mjs": { updateUserLocation },
+			"../../src/script/shared/user.ts": { updateUserLocation },
 		},
 	);
 	const element = document.querySelector("input");
@@ -148,7 +170,6 @@ test("test_location_combobox_starts_location_sync_on_init", async (t) => {
 	box.destroy();
 });
 
-/** @matrix location : request-ordering session-update */
 test("test_location_combobox_waits_for_session_sync_before_search", async (t) => {
 	installBrowserBoundaries(t, { html: "<label><input></label>" });
 	const calls = [];
@@ -165,10 +186,10 @@ test("test_location_combobox_waits_for_session_sync_before_search", async (t) =>
 		return { ok: false };
 	});
 	const { LocationBox } = await esmock.strict(
-		"../../src/script/elements/combobox/location.mjs",
+		"../../src/script/elements/combobox/location.ts",
 		{
-			"../../src/script/shared/request.mjs": { request: { get } },
-			"../../src/script/shared/user.mjs": { updateUserLocation },
+			"../../src/script/shared/request.ts": { request: { get } },
+			"../../src/script/shared/user.ts": { updateUserLocation },
 		},
 	);
 	const element = document.querySelector("input");
@@ -193,7 +214,6 @@ test("test_location_combobox_waits_for_session_sync_before_search", async (t) =>
 });
 
 /**
- * @matrix combobox dropdown : positioning
  * @style dropdown.panel
  * @style dropdown.menu
  */
@@ -252,7 +272,6 @@ test("test_combobox_positioning_uses_live_element_by_default_and_explicit_refere
 });
 
 /**
- * @pair combobox:teardown
  * @style dropdown.panel
  */
 test("test_combobox_positioning_stops_after_destroy", async (t) => {
@@ -282,7 +301,6 @@ test("test_combobox_positioning_stops_after_destroy", async (t) => {
 });
 
 /**
- * @matrix combobox : positioning-readiness readiness
  * @style dropdown.panel
  */
 test("test_combobox_exposes_initial_positioning_readiness", async (t) => {
@@ -315,7 +333,6 @@ test("test_combobox_exposes_initial_positioning_readiness", async (t) => {
 });
 
 /**
- * @matrix combobox : positioning-readiness transition-race
  * @style dropdown.panel
  */
 test("test_combobox_initial_position_ignores_superseded_transition_geometry", async (t) => {
@@ -348,7 +365,6 @@ test("test_combobox_initial_position_ignores_superseded_transition_geometry", as
 });
 
 /**
- * @matrix combobox : aria keyboard
  * @style dropdown.panel
  */
 test("test_combobox_aria_and_keyboard_state_follow_the_open_panel", async (t) => {
@@ -402,7 +418,6 @@ test("test_combobox_aria_and_keyboard_state_follow_the_open_panel", async (t) =>
 });
 
 /**
- * @matrix combobox : dismissal pointer
  * @style dropdown.panel
  */
 test("test_combobox_pointer_and_dismissal_events_preserve_trigger_focus", async (t) => {
@@ -460,7 +475,6 @@ test("test_combobox_pointer_and_dismissal_events_preserve_trigger_focus", async 
 });
 
 /**
- * @pair combobox:empty-results
  * @style dropdown.panel
  */
 test("test_combobox_hides_empty_recent_panel_but_keeps_server_empty_result_row", async (t) => {
@@ -489,7 +503,6 @@ test("test_combobox_hides_empty_recent_panel_but_keeps_server_empty_result_row",
 });
 
 /**
- * @pair combobox:dataset-configuration
  * @style dropdown.panel
  */
 test("test_combobox_copies_only_supported_dataset_configuration", async (t) => {
@@ -561,7 +574,6 @@ test("test_combobox_copies_only_supported_dataset_configuration", async (t) => {
 	assert.equal(new env.Combobox(single.parent).multiple, false);
 });
 
-/** @pair combobox:clear-notification */
 test("test_submitter_clear_can_suppress_change_notification", async (t) => {
 	const env = await setupFloating(t);
 	const { parent } = makeComboboxElements();
@@ -583,7 +595,6 @@ test("test_submitter_clear_can_suppress_change_notification", async (t) => {
 });
 
 /**
- * @matrix dropdown : callback-index dynamic-options mixed-options rerender
  * @style dropdown.panel
  */
 test("test_dynamic_dropdown_rerenders_each_open_and_keeps_mixed_option_indexes", async (t) => {
@@ -630,7 +641,6 @@ test("test_dynamic_dropdown_rerenders_each_open_and_keeps_mixed_option_indexes",
 });
 
 /**
- * @matrix entity-menu : readiness state-linking title-menu title-positioning
  * @style dropdown.menu
  */
 test("test_entity_title_menu_anchors_to_the_title_bottom_left", async (t) => {
@@ -671,9 +681,9 @@ test("test_entity_title_menu_anchors_to_the_title_bottom_left", async (t) => {
 		}
 	}
 	const { EntityMenu } = await esmock.strict(
-		"../../src/script/elements/entityMenu.mjs",
+		"../../src/script/elements/entityMenu.ts",
 		{
-			"../../src/script/elements/combobox/dropdown.mjs": {
+			"../../src/script/elements/combobox/dropdown.ts": {
 				Dropdown: FakeDropdown,
 			},
 		},

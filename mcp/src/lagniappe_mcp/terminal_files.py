@@ -6,12 +6,13 @@ Normal MCP results retain the shared adapter's private-data boundary.
 
 from copy import deepcopy
 from dataclasses import replace
-from types import SimpleNamespace
+from typing import TypedDict, cast
 
-from lagniappe_mcp.adapter import AdapterResult, _reject_private_model_data
-from lagniappe_mcp.catalog import ENRICHED_UPLOAD_RESULT_SCHEMA, UPLOAD_RESULT_SCHEMA
+from lagniappe_mcp.adapter import AdapterResult, LagniappeAdapter, _reject_private_model_data
+from lagniappe_mcp.catalog import ENRICHED_UPLOAD_RESULT_SCHEMA, UPLOAD_RESULT_SCHEMA, ToolDefinition
 from lagniappe_mcp.errors import AdapterError, TransportError
 from lagniappe_mcp.files import (
+    UploadFileDeclaration,
     _preflight_contract,
     _preflight_requested_count,
     _validate_sessions,
@@ -23,6 +24,28 @@ from lagniappe_mcp.limits import (
 )
 from lagniappe_mcp.schema import validate_value
 from lagniappe_mcp.url_security import quote_path_segment
+
+
+class PrepareUploadArguments(TypedDict):
+    plan_id: str
+    files: list[UploadFileDeclaration]
+
+
+class FinalizeUploadArguments(TypedDict):
+    plan_id: str
+    upload_batch_id: str
+
+
+class _UploadEntry(TypedDict):
+    index: int
+    filename: str
+    session_url: str
+    chunk_size: int
+
+
+class _Manifest(PrepareUploadArguments):
+    upload_batch_id: str
+    uploads: list[_UploadEntry]
 
 
 FILE_SCHEMA = {
@@ -79,9 +102,7 @@ MANIFEST_SCHEMA = {
 }
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/terminal_files.py::prepare_uploads
-def tool_definitions(local):
+def tool_definitions(local: ToolDefinition) -> tuple[ToolDefinition, ToolDefinition]:
     return (
         replace(
             local,
@@ -134,39 +155,36 @@ def tool_definitions(local):
     )
 
 
-# @testable true
-# @tests tests_unit/test_033e_mcp_terminal_files.py::test_manifest_allows_only_validated_storage_writes_and_never_oauth_secrets
-# @matrix mcp-upload : terminal validation token-separation
-def validate_manifest(value, *, bearer):
+def validate_manifest(value: object, *, bearer: str) -> tuple[str, list[tuple[str, int]]]:
     validate_value(MANIFEST_SCHEMA, value, phase="upload_manifest")
-    files = [SimpleNamespace(**item) for item in value["files"]]
-    if sum(item.size for item in files) > MAX_UPLOAD_TOTAL_BYTES:
+    manifest = cast(_Manifest, value)
+    files = manifest["files"]
+    if sum(item["size"] for item in files) > MAX_UPLOAD_TOTAL_BYTES:
         raise TransportError(
             "invalid_upload_session", "The upload manifest exceeds the batch limit."
         )
-    sessions = _validate_sessions(value, value["plan_id"], files)
+    sessions = _validate_sessions(value, manifest["plan_id"], files)
     # Deliberate, narrow capability boundary: the fully validated URLs may
     # carry upload_id; nothing else may carry transport data or either bearer.
-    screened = deepcopy(value)
-    for entry in screened["uploads"]:
-        url = entry.pop("session_url")
+    screened_entries = []
+    for entry in manifest["uploads"]:
+        screened_entry = dict(entry)
+        url = cast(str, screened_entry.pop("session_url"))
         if bearer in url:
             raise TransportError(
                 "unsafe_transport_extension",
                 "Upload instructions contain private authentication data.",
             )
-    _reject_private_model_data(screened, bearer=bearer)
+        screened_entries.append(screened_entry)
+    _reject_private_model_data({**manifest, "uploads": screened_entries}, bearer=bearer)
     return sessions
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_remote_attachment_uses_shared_upload_and_preserves_pending_failure
-# @matrix mcp-upload : terminal upload-batch-identity safe-result
-async def prepare_uploads(adapter, arguments):
+async def prepare_uploads(adapter: LagniappeAdapter, arguments: PrepareUploadArguments) -> AdapterResult:
     plan_id, files = arguments["plan_id"], arguments["files"]
     contract = await adapter._load_contract(plan_id, view="summary")
     _preflight_requested_count(contract, files)
-    _preflight_contract(contract, [SimpleNamespace(**item) for item in files])
+    _preflight_contract(contract, files)
     created, _ = await adapter.rest.request_json(
         "POST",
         f"plans/{quote_path_segment(plan_id)}/uploads",
@@ -179,7 +197,7 @@ async def prepare_uploads(adapter, arguments):
     # Validate the upstream envelope before projecting; unknown fields may
     # evolve, but they are never passed through to the terminal.
     batch, sessions = _validate_sessions(
-        created, plan_id, [SimpleNamespace(**item) for item in files]
+        created, plan_id, files
     )
     return AdapterResult(
         {
@@ -201,11 +219,7 @@ async def prepare_uploads(adapter, arguments):
     )
 
 
-# @testable true
-# @tests tests_unit/test_033c_mcp_server.py::test_remote_attachment_uses_shared_upload_and_preserves_pending_failure
-# @tests tests_unit/test_033e_mcp_terminal_files.py::test_terminal_finalize_never_accepts_incomplete_or_replaced_batch
-# @matrix mcp-upload : terminal finalize-once upload-batch-identity safe-result
-async def finalize_uploads(adapter, arguments):
+async def finalize_uploads(adapter: LagniappeAdapter, arguments: FinalizeUploadArguments) -> AdapterResult:
     plan_id, batch = arguments["plan_id"], arguments["upload_batch_id"]
     route = f"plans/{quote_path_segment(plan_id)}"
     try:

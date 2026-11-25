@@ -12,7 +12,6 @@ from testing.resources.form import Builder, Form
 pytestmark = pytest.mark.e2e
 
 
-# @matrix forms : access-restrictions owner-restricted
 # @template forms/restrictions.html::restrict_access
 @pytest.mark.e2e_group("owner")
 def test_owner_can_restrict_form_to_site_owner(get_user, browser_failures):
@@ -27,7 +26,6 @@ def test_owner_can_restrict_form_to_site_owner(get_user, browser_failures):
         expect(viewer.page).to_have_title("Error 403")
 
 
-# @matrix forms : access-restrictions group-restricted
 # @template forms/restrictions.html::restrict_access
 @pytest.mark.e2e_group("owner")
 def test_group_restricted_form_opens_for_group_member_only(
@@ -41,7 +39,7 @@ def test_group_restricted_form_opens_for_group_member_only(
 
     member = get_user(Users.general_forms_view_only)
     form.user = member
-    form.builder
+    _ = form.builder
     expect(member.locate(Builder.FORM_NAME)).to_have_text(form.definition.name)
 
     outsider = get_user(Users.admin)
@@ -50,7 +48,6 @@ def test_group_restricted_form_opens_for_group_member_only(
         expect(outsider.page).to_have_title("Error 403")
 
 
-# @matrix forms : access-restrictions index-filter
 @pytest.mark.e2e_group("owner")
 def test_form_index_lists_group_restricted_form_only_for_group_member(get_user):
     owner = get_user(Users.OWNER)
@@ -69,8 +66,6 @@ def test_form_index_lists_group_restricted_form_only_for_group_member(get_user):
     expect(outsider_table.get_row(form.definition.name)).not_to_be_attached()
 
 
-# @matrix forms : access-restrictions explicit-submit group-restricted owner-restricted
-# @source lagniappe/web/routes/forms/main.py::restrictions
 # @template forms/restrictions.html::restrict_access
 @pytest.mark.e2e_group("owner")
 def test_form_admin_only_replaces_groups_until_explicitly_selected_again(get_user):

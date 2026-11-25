@@ -1,8 +1,22 @@
 """Prepare cohesive entity edits without clearing omitted fields or writing data."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
+    from ..entities.user import User
+    from ..entities.category import Category
+    from ..entities.page import Page
+    from ..entities.project import Project
+    from ..entities.model_task import ModelTask
+    from ..entities.task import Task
+    from ..entities.form import Form
+
+from typing import Any, cast
+
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone as utc_timezone
+from datetime import date, datetime, time, UTC
 
 from lagniappe.core.definitions import Action, Fetch, MutationIntent
 from lagniappe.core.entities import Entities
@@ -17,23 +31,15 @@ PATCH_FIELDS = {
     "task": frozenset({"name", "description", "page", "project", "model", "form", "submission", "assigned_to", "due_date", "schedule"}),
     "model": frozenset({"name", "form"}),
     "project": frozenset({"name", "description", "model_tasks"}),
+    "category": frozenset({"name", "description", "form"}),
     "page": frozenset({"name", "description", "categories", "form", "submission"}),
     "file": frozenset({"name", "description"}),
 }
 
 
-# @testable true
-# @tests tests_unit/test_032g_entity_patches.py::test_task_patch_preserves_omitted_values_and_source
-# @tests tests_unit/test_032g_entity_patches.py::test_reassignment_requires_complete_values_and_reviews_removals
-# @tests tests_unit/test_032g_entity_patches.py::test_patch_rejects_completed_locked_invalid_and_unauthorized_targets
-# @tests tests_unit/test_032g_entity_patches.py::test_model_and_project_patches_preserve_defaults_and_validate_order
-# @tests tests_unit/test_032g_entity_patches.py::test_page_patch_preserves_omitted_membership
-# @tests tests_unit/test_032g_entity_patches.py::test_patch_validates_classification_assignee_and_explicit_clears
-# @tests tests_unit/test_032g_entity_patches.py::test_page_form_registration_is_detached_and_pending_checklist_stays_unchecked
-# @tests tests_unit/test_032g_entity_patches.py::test_page_form_registration_preserves_unloaded_category_forms
-# @tests tests_unit/test_032g_entity_patches.py::test_patch_schedule_and_form_type_and_permission_validation
-# @matrix entity-patch : preservation validation preparation permissions
-def prepare_patch(entity, changes, actor):
+def prepare_patch(
+    entity: Entity, changes: dict[str, Any], actor: User
+) -> PreparedPatch:
     """Return detached writes and before/after values for one reviewed edit.
 
     Relationship values are resolved entities, never names. Callers resolve exact
@@ -55,13 +61,14 @@ def prepare_patch(entity, changes, actor):
     sources = {entity.key: entity}
     related_sources = []
     if kind == "task":
-        related_sources = [entity.page, entity.project, entity.model]
+        task = cast("Task", entity)
+        related_sources = [task.page, task.project, task.model]
     elif kind == "model":
-        related_sources = [entity.project]
+        related_sources = [cast("ModelTask", entity).project]
     elif kind == "page":
-        related_sources = list(entity.categories)
+        related_sources = list(cast("Page", entity).categories)
     for related in related_sources:
-        if getattr(related, "key", None):
+        if related is not None and getattr(related, "key", None):
             sources[related.key] = related
     candidate = _copy_entity(entity)
     writes = [candidate]
@@ -69,7 +76,7 @@ def prepare_patch(entity, changes, actor):
     removed = {}
 
     if "form" in PATCH_FIELDS[kind]:
-        old_form = entity.form
+        old_form = cast("Form | None", entity.form)
         if old_form:
             _unlocked(old_form)
             sources[old_form.key] = old_form
@@ -78,7 +85,7 @@ def prepare_patch(entity, changes, actor):
             if form is not None:
                 _reference(form, "form", actor)
                 _unlocked(form)
-                expected_type = "page" if kind == "page" else "task"
+                expected_type = "page" if kind in {"page", "category"} else "task"
                 if form.form_type != expected_type:
                     raise ValidationError(f"This edit requires a {expected_type} Form.")
                 sources[form.key] = form
@@ -87,7 +94,7 @@ def prepare_patch(entity, changes, actor):
             if changed_form and kind in {"task", "page"}:
                 if "submission" not in changes:
                     raise ValidationError("Form reassignment requires a complete target submission.")
-                removed = deepcopy(entity.submission or {})
+                removed = deepcopy(cast(dict[str, object], entity.submission or {}))
                 candidate.properties.submission.value = {}
                 candidate._submission_definition = None
                 candidate.properties.submission._fields = None
@@ -131,7 +138,7 @@ def prepare_patch(entity, changes, actor):
         if "assigned_to" in changes and getattr(assignee, "key", None) != getattr(entity.assigned_to, "key", None):
             candidate.assigned_to = assignee
             candidate.assigned_by = actor.page
-            candidate.db["assignment_revision"] = int(entity.db.get("assignment_revision") or 0) + 1
+            candidate.db["assignment_revision"] = int(cast(int, entity.db.get("assignment_revision") or 0)) + 1
             candidate._add_assignment_notice(actor, assignee)
 
     if kind == "project" and "model_tasks" in changes:
@@ -143,7 +150,7 @@ def prepare_patch(entity, changes, actor):
             if model.project.key != entity.key:
                 raise ValidationError("Model ordering contains another Project's model task.")
         keys = [model.key for model in ordered]
-        if len(keys) != len(set(keys)) or set(keys) != {model.key for model in entity.model_tasks}:
+        if len(keys) != len(set(keys)) or set(keys) != {model.key for model in cast("Project", entity).model_tasks}:
             raise ValidationError("Model ordering must include every model task exactly once.")
         for order, model in enumerate(ordered, 1):
             sources[model.key] = model
@@ -162,7 +169,7 @@ def prepare_patch(entity, changes, actor):
         if len({category.key for category in categories}) != len(categories):
             raise ValidationError("Page categories cannot repeat.")
         candidate.model, candidate.categories = categories[0], categories[1:]
-        for owner in entity.page_list_owners:
+        for owner in cast("Page", entity).page_list_owners:
             candidate.add_mutation_intents(MutationIntent.touch(owner, reason="page-patch-previous-owner"))
 
     if kind == "page" and candidate.form and {"categories", "form"} & changes.keys():
@@ -191,6 +198,13 @@ def prepare_patch(entity, changes, actor):
         value = changes[field]
         if field == "name" and (not isinstance(value, str) or not value.strip()):
             raise ValidationError("Name cannot be cleared.")
+        if (
+            kind == "category"
+            and field == "name"
+            and cast("Category", entity).name == UNCATEGORIZED_PAGES_NAME
+            and value != UNCATEGORIZED_PAGES_NAME
+        ):
+            raise ValidationError("Uncategorized Pages cannot be renamed.")
         if value is not None and not isinstance(value, str):
             raise ValidationError(f"{field} must be text or null.")
         if kind == "file" and field == "description":
@@ -206,23 +220,17 @@ def prepare_patch(entity, changes, actor):
     return PreparedPatch(candidate, tuple(writes), tuple(guards), before, _projection(candidate), removed, tuple(source for source in sources.values() if source.entity_kind == "form"))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason typed preparation result carries review values and transaction inputs
 @dataclass(frozen=True)
 class PreparedPatch:
-    entity: object
-    writes: tuple
-    guards: tuple
-    before: dict
-    after: dict
-    removed_values: dict
-    forms: tuple
+    entity: Entity
+    writes: tuple[Entity, ...]
+    guards: tuple[tuple[object, object], ...]
+    before: dict[str, object]
+    after: dict[str, object]
+    removed_values: dict[str, object]
+    forms: tuple[Entity, ...]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason detached copies preserve storage and already-loaded relations
 def _copy_entity(entity):
     cls = {"task": Entities.TASK, "page": Entities.PAGE, "project": Entities.PROJECT, "model": Entities.MODEL_TASK, "category": Entities.CATEGORY, "file": Entities.FILE}[entity.entity_kind]
     result = cls(entity.key)
@@ -236,34 +244,22 @@ def _copy_entity(entity):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason exact entity types and permissions are validated before edits
 def _reference(entity, kind, actor, *, edit=False):
     if getattr(entity, "entity_kind", None) != kind or not getattr(entity, "key", None):
         raise ValidationError(f"Expected an exact {kind} reference.")
     _require(entity, actor, Action.EDIT if edit else Action.VIEW)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason shared authorization guard applies to source and proposed state
 def _require(entity, actor, action):
     if actor is None or not entity.allowed(action, user=actor):
         raise ValidationError("You do not have permission to make this edit.")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason migration locks are checked on both old and new Forms
 def _unlocked(form):
     if form.db.get("pending_form_change"):
         raise ValidationError("Wait for the Form update to finish before editing its tasks or answers.")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason selected fields are validated on detached candidates before assignment
 def _patch_answers(entity, values, actor, *, complete):
     if not isinstance(values, dict):
         raise ValidationError("Submission must be an object.")
@@ -273,8 +269,12 @@ def _patch_answers(entity, values, actor, *, complete):
         return
     submission = entity.properties.submission
     fields = {key: field for key, field in submission.fields.items() if not isinstance(field, HTML)}
-    if set(values) - set(fields):
-        raise ValidationError("Submission contains unknown fields.")
+    unknown = set(values) - set(fields)
+    if unknown:
+        valid = ", ".join(sorted(fields)) or "(none)"
+        raise ValidationError(
+            f"Submission contains unknown fields: {', '.join(sorted(unknown))}. Valid fields: {valid}."
+        )
     if complete and set(values) != set(fields):
         raise ValidationError("Form reassignment requires every target answer field, including empty values.")
     prepared = {key: SchemaFields.prepare_ai_field(fields[key], value, entity, user=actor) for key, value in values.items()}
@@ -283,9 +283,6 @@ def _patch_answers(entity, values, actor, *, complete):
     entity.save_submission()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/entity_patches.py::prepare_patch
-# @reason review uses exact answer IDs and complete editable values
 def _projection(entity):
     result = {}
     for field in PATCH_FIELDS[entity.entity_kind]:
@@ -295,12 +292,12 @@ def _projection(entity):
         value = entity.summary if entity.entity_kind == "file" and field == "description" else getattr(entity, field, None)
         if field == "schedule":
             value = entity.properties.schedule.value
-        if hasattr(value, "urlsafe_key"):
+        if value is not None and hasattr(value, "urlsafe_key"):
             value = {"id": value.urlsafe_key, "name": value.name}
         elif field == "categories":
             value = [{"id": item.urlsafe_key, "name": item.name} for item in value or []]
         elif isinstance(value, datetime):
-            value = value.astimezone(utc_timezone.utc).isoformat() if value.tzinfo else value.isoformat()
+            value = value.astimezone(UTC).isoformat() if value.tzinfo else value.isoformat()
         elif isinstance(value, date):
             value = value.isoformat()
         result[field] = deepcopy(value)

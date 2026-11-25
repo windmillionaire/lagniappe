@@ -6,7 +6,7 @@ from runner import presentation as ui
 from runner.presentation import output as print
 
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 import hashlib
 import json
 import os
@@ -47,9 +47,6 @@ PRIVATE_ARCHIVE_NOTICE = (
 )
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason terminal animation wraps tested archive phases without changing their contracts
 @contextmanager
 def _progress(formatter, message):
     with formatter.progress(text=message) as spinner:
@@ -61,24 +58,15 @@ def _progress(formatter, message):
         spinner.ok()
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason timestamp formatting is an internal archive-orchestration detail
 def _now():
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason default path selection is exercised through archive publication
 def _default_output(backup_id, zip_output):
     suffix = ".zip" if zip_output else ""
     return REPOSITORY_ROOT / "archives" / f"{backup_id}{suffix}"
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason output normalization is exercised through archive publication
 def _output_path(path, *, zip_output):
     path = Path(path).expanduser().resolve()
     if zip_output and path.suffix.casefold() != ".zip":
@@ -86,30 +74,22 @@ def _output_path(path, *, zip_output):
     return path
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason overwrite protection is part of the public archive workflow
 def _validate_output(path, *, zip_output):
     path = _output_path(path, zip_output=zip_output)
-    if path.exists():
-        if path.is_symlink() or zip_output or not path.is_dir() or any(path.iterdir()):
-            raise DataLifecycleError(f"Refusing to overwrite existing archive output: {path}")
+    if path.exists() and (
+        path.is_symlink() or zip_output or not path.is_dir() or any(path.iterdir())
+    ):
+        raise DataLifecycleError(f"Refusing to overwrite existing archive output: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason scratch naming is validated through the resumable archive workflow
 def _scratch_database_id(backup_id, checkpoint_identity):
     stamp = backup_id[:8].casefold()
     value = f"lag-archive-{stamp}-{checkpoint_identity[:8]}"
     return validate_database_id(value, allow_default=False)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason conflict recovery is exercised through the resumable archive workflow
 def _wait_for_scratch_database(context, database_id, *, timeout=600):
     """Wait for an already-started scratch creation operation to become visible."""
     deadline = context.monotonic() + timeout
@@ -117,19 +97,16 @@ def _wait_for_scratch_database(context, database_id, *, timeout=600):
     while True:
         try:
             return context.database(database_id)
-        except ProviderNotFound:
+        except ProviderNotFound as error:
             if context.monotonic() >= deadline:
                 raise DataLifecycleError(
                     "The reserved archive scratch database did not become available."
-                )
+                ) from error
             delays = (1, 2, 4, 8, 15, 30)
             context.sleep(delays[min(attempt, len(delays) - 1)])
             attempt += 1
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason private file creation is exercised by archive publication and validation
 def _write_private(path, payload, *, binary=False):
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     if binary:
@@ -140,18 +117,12 @@ def _write_private(path, payload, *, binary=False):
         os.chmod(path, 0o600)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason provider response extraction is an internal orchestration adapter
 def _provider_operation(payload):
     if not isinstance(payload, dict):
         return None
     return str(payload.get("name") or "").strip() or None
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_asset_bucket_preserves_original_generation_identity
-# @matrix portable-archive : recovery-copy generation-binding
 class _RecoveryAssetBlob:
     """Read an immutable recovery copy under its original generation identity."""
 
@@ -161,25 +132,27 @@ class _RecoveryAssetBlob:
         self._recovery_generation = str(recovery_generation)
 
     @property
-    def generation(self):
+    def generation(self) -> int | str:
         return self._source_generation
 
     @property
-    def size(self):
+    def size(self) -> int | None:
         return self._blob.size
 
     @property
-    def content_type(self):
+    def content_type(self) -> str | None:
         return self._blob.content_type
 
-    def reload(self):
+    def reload(self) -> None:
         self._blob.reload()
         if str(self._blob.generation or "") != self._recovery_generation:
             raise DataLifecycleError(
                 "Manual backup recovery asset generation is no longer available."
             )
 
-    def download_as_bytes(self, *args, if_generation_match=None, **kwargs):
+    def download_as_bytes(
+        self, *args: object, if_generation_match: int | None = None, **kwargs: object
+    ) -> bytes:
         if (
             if_generation_match is not None
             and str(if_generation_match) != self._source_generation
@@ -194,9 +167,6 @@ class _RecoveryAssetBlob:
         )
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_asset_bucket_preserves_original_generation_identity
-# @matrix portable-archive : recovery-copy generation-binding
 class _RecoveryAssetBucket:
     """Present immutable recovery objects through their original asset identity."""
 
@@ -208,7 +178,9 @@ class _RecoveryAssetBucket:
         self.name = bucket_name
         self.entries = entries
 
-    def blob(self, name, generation=None):
+    def blob(
+        self, name: str, generation: int | str | None = None
+    ) -> _RecoveryAssetBlob:
         key = (str(name), str(generation or ""))
         asset = self.entries.get(key)
         if asset is None:
@@ -229,9 +201,6 @@ class _RecoveryAssetBucket:
         )
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason exact recovery bindings are exercised through portable archive asset collection
 def _recovery_buckets(context, backup):
     from config import SETTINGS
     from config.storage import storage_bucket_names
@@ -253,12 +222,9 @@ def _recovery_buckets(context, backup):
     }
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason warning projection is exercised through archive publication and validation
 def _warnings(state):
     values = []
-    for row in state.connection.execute("SELECT id, code, details FROM warnings ORDER BY id"):
+    for row in state.database.execute("SELECT id, code, details FROM warnings ORDER BY id"):
         try:
             details = json.loads(row["details"])
         except json.JSONDecodeError:
@@ -267,9 +233,6 @@ def _warnings(state):
     return values
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_archive_readme_explains_conversion_notices
-# @matrix portable-archive : conversion-notices owner-readable-readme
 def _write_bundle(
     bundle,
     *,
@@ -426,9 +389,6 @@ uses the manual backup retained in Google Cloud, not this directory.
     return catalog, html_result
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason completion-manifest assembly is exercised through archive validation
 def _root_manifest(bundle, *, backup, catalog, warnings, html_result, created_at):
     files = sorted(
         (
@@ -466,9 +426,6 @@ def _root_manifest(bundle, *, backup, catalog, warnings, html_result, created_at
     }
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason atomic directory publication is part of the public archive workflow
 def _publish_directory(bundle, output):
     temporary_parent = Path(
         tempfile.mkdtemp(prefix=f".{output.name}.publishing-", dir=output.parent)
@@ -481,9 +438,6 @@ def _publish_directory(bundle, output):
     temporary_parent.rmdir()
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason atomic ZIP publication is part of the public archive workflow
 def _publish_zip(bundle, output, manifest):
     temporary_parent = Path(
         tempfile.mkdtemp(prefix=f".{output.name}.publishing-", dir=output.parent)
@@ -501,9 +455,6 @@ def _publish_zip(bundle, output, manifest):
     temporary_parent.rmdir()
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason final permission hardening is exercised through archive publication
 def _restrict_tree(root):
     if os.name == "nt":
         secure_directory(root)
@@ -513,9 +464,6 @@ def _restrict_tree(root):
     os.chmod(root, 0o700)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason cleanup and retained failure state are archive workflow invariants
 def _cleanup_successful_archive(context, checkpoint, output):
     scratch_database = checkpoint.payload.get("scratch_database")
     work = Path(checkpoint.payload.get("work_directory") or checkpoint.root)
@@ -533,16 +481,13 @@ def _cleanup_successful_archive(context, checkpoint, output):
     checkpoint.remove()
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_archive_build_publishes_manifest_last_and_retains_failed_scratch_state
-# @matrix portable-archive : cleanup publication workflow
 def build_archive(
-    backup_id=None,
+    backup_id: str | None = None,
     *,
-    output=None,
-    zip_output=False,
-    context=None,
-):
+    output: str | Path | None = None,
+    zip_output: bool = False,
+    context: ProviderContext | None = None,
+) -> Path:
     """Create/resume one portable archive and publish only after validation."""
     from installer import FORMATTER
 
@@ -570,8 +515,7 @@ def build_archive(
         backup_id = validate_backup_id(state["backup_id"])
     else:
         backup_id = backup_id or new_backup_id()
-        checkpoint.start(backup_id, backup_id=backup_id, zip=bool(zip_output))
-        state = checkpoint.payload
+        state = checkpoint.start(backup_id, backup_id=backup_id, zip=bool(zip_output))
     output = requested_output or _default_output(backup_id, zip_output).resolve()
     if state and state.get("status") == "complete":
         result = validate_archive(output)
@@ -587,13 +531,13 @@ def build_archive(
             checkpoint.update("cleanup-failed", cleanup_error=str(error))
             raise DataLifecycleError(
                 f"Archive remains valid at {output}, but scratch cleanup failed again. "
-                f"Retained scratch database: {checkpoint.payload.get('scratch_database')}."
+                f"Retained scratch database: {state.get('scratch_database')}."
             ) from error
         print(ui.success(f"Archive published at {output}. {PRIVATE_ARCHIVE_NOTICE}"))
         return output
     _validate_output(output, zip_output=zip_output)
 
-    if explicit_backup or checkpoint.payload.get("recovery_set_ready"):
+    if explicit_backup or state.get("recovery_set_ready"):
         backup, _blob = load_backup(context, backup_id)
     else:
         backup = create_backup(
@@ -608,15 +552,15 @@ def build_archive(
     work = secure_directory(checkpoint.root / "archive-work" / checkpoint.identity)
     raw_state_path = work / "staging.sqlite3"
     bundle = secure_directory(work / "bundle")
-    scratch_database = checkpoint.payload.get("scratch_database") or _scratch_database_id(
+    scratch_database = state.get("scratch_database") or _scratch_database_id(
         backup_id, checkpoint.identity
     )
     checkpoint.update("scratch-reserved", scratch_database=scratch_database, work_directory=str(work))
 
-    if not checkpoint.payload.get("scratch_created"):
+    if not state.get("scratch_created"):
         record_step("create archive scratch Datastore database")
         created = False
-        operation = checkpoint.payload.get("scratch_create_operation")
+        operation = state.get("scratch_create_operation")
         try:
             existing = context.database(scratch_database)
         except ProviderNotFound:
@@ -649,6 +593,8 @@ def build_archive(
                         )
                         created = True
                 if existing is None:
+                    if not isinstance(operation, str):
+                        raise DataLifecycleError("Missing scratch database creation operation.")
                     context.wait_for_operation(
                         operation, database_id=scratch_database
                     )
@@ -677,8 +623,8 @@ def build_archive(
                 identifier=scratch_database,
             )
 
-    if not checkpoint.payload.get("import_complete"):
-        operation = checkpoint.payload.get("import_operation")
+    if not state.get("import_complete"):
+        operation = state.get("import_operation")
         record_step("import managed backup into archive scratch database")
         with _progress(
             formatter,

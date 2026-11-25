@@ -1,6 +1,6 @@
 """Unit tests for base Entity properties shared across all entity types."""
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from types import SimpleNamespace
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -135,7 +135,6 @@ def _cache_payload(entity):
     return cache
 
 
-# @matrix active : property public-user
 def test_entity_active(get_test_entities):
     """Test that Active property returns correct boolean value.
 
@@ -156,7 +155,6 @@ def test_entity_active(get_test_entities):
         assert entity.active == test_value == entity.properties.active.value
 
 
-# @pair active:validation
 def test_entity_active_rejects_non_bool():
     entity = TestEntities.get("PROJECT", {"name": "Active Validation", "hash": "actv"})
 
@@ -164,7 +162,6 @@ def test_entity_active_rejects_non_bool():
         entity.active = "yes"
 
 
-# @matrix permissions : authenticated-user filter-index-neutral
 def test_context_exports_authentication_and_filter_index_neutrality():
     entity = TestEntities.get("PROJECT", {"name": "Auth Export", "hash": "authx"})
     anonymous = SimpleNamespace(is_authenticated=False)
@@ -175,7 +172,6 @@ def test_context_exports_authentication_and_filter_index_neutrality():
     assert entity.to_filter_index(user=anonymous)["name"] == "Auth Export"
 
 
-# @matrix ai entity submission : single-merge submission-fields
 def test_entity_to_ai_merges_submission_fields_without_nested_duplicate():
     form = TestEntities.get("FORM", {"name": "Contact Form", "hash": "aiform"})
     form.schema = [
@@ -207,7 +203,6 @@ def test_entity_to_ai_merges_submission_fields_without_nested_duplicate():
     assert "submission" not in ai_values
 
 
-# @pair ai:browser-url
 @pytest.mark.parametrize("kind", ["PAGE", "TASK", "FORM", "FILE", "CATEGORY", "PROJECT"])
 def test_entity_to_ai_keeps_browser_urls_separate_from_hash_references(kind):
     entity = TestEntities.get(kind, {"name": "Linked record", "hash": "abc123def456"})
@@ -220,7 +215,6 @@ def test_entity_to_ai_keeps_browser_urls_separate_from_hash_references(kind):
     assert values["url"] == f"/test/{kind.lower()}/abc123def456"
 
 
-# @pair entity:key-validation
 def test_entity_key_access_without_key_raises_runtime_error():
     entity = _KeylessEntity(testing=True)
     entity._testing = False
@@ -235,7 +229,6 @@ def test_entity_key_access_without_key_raises_runtime_error():
         _ = entity.db
 
 
-# @matrix entity : dedupe key-validation typed-intent validation
 def test_entity_add_mutation_intents_requires_typed_intents_and_dedupes():
     entity = _KeylessEntity(testing=True)
     relation = SimpleNamespace(key="relation-key")
@@ -254,7 +247,6 @@ def test_entity_add_mutation_intents_requires_typed_intents_and_dedupes():
         entity.add_mutation_intents(relation)
 
 
-# @pairs entities:save-order requires:hash-before-requires
 def test_save_entities_updates_hash_before_requires():
     entity = _SaveOrderEntity()
 
@@ -272,7 +264,6 @@ def test_save_entities_updates_hash_before_requires():
     assert list(database_save.call_args.args[0]) == [(entity, None)]
 
 
-# @matrix mutations entity : retired-field save-time-cleanup
 def test_save_preparation_discards_retired_entity_fields():
     for entity_type in ("PAGE", "PROJECT", "CATEGORY"):
         entity = TestEntities.get(
@@ -293,7 +284,6 @@ def test_save_preparation_discards_retired_entity_fields():
         assert "attributes" not in entity.db
 
 
-# @pairs requires:persisted-requires users:user-before-page
 def test_save_entities_updates_and_persists_user_before_owned_page():
     class EntityDict(dict):
         pass
@@ -330,13 +320,11 @@ def test_save_entities_updates_and_persists_user_before_owned_page():
     assert list(database_save.call_args.args[0]) == [(user, None), (page, None)]
 
 
-# @matrix entity : initialization validation
 def test_entity_requires_subclass_entity_kind():
     with pytest.raises(NotImplementedError, match="requires entity_kind"):
         _MissingKindEntity(testing=True)
 
 
-# @matrix entity : empty-datastore-entity initialization key-preservation
 def test_entity_preserves_key_from_empty_datastore_entity():
     raw = DatastoreEntity(
         key=Key(
@@ -352,7 +340,6 @@ def test_entity_preserves_key_from_empty_datastore_entity():
     assert entity.key == raw.key
 
 
-# @matrix property : initialization validation
 def test_property_contract_errors_are_explicit():
     entity = SimpleNamespace(entity_kind="fake")
 
@@ -370,7 +357,6 @@ def test_property_contract_errors_are_explicit():
         _ = _SiteLazyProperty(entity=entity).icon
 
 
-# @matrix property : explicit-false explicit-none unset
 def test_property_unset_state_is_distinct_from_explicit_values():
     entity = SimpleNamespace(entity_kind="fake")
     prop = _SiteLazyProperty(entity=entity)
@@ -394,7 +380,6 @@ def test_property_unset_state_is_distinct_from_explicit_values():
     assert prop.value is None
 
 
-# @matrix db-property : blank-values explicit-false missing-key
 def test_db_property_blanks_pop_but_explicit_false_persists():
     entity = SimpleNamespace(entity_kind="fake", db={})
     prop = _DBBlankProperty(entity=entity)
@@ -420,7 +405,6 @@ def test_db_property_blanks_pop_but_explicit_false_persists():
     assert "blank" not in entity.db
 
 
-# @pair db-property:custom-blank-values
 def test_db_property_custom_blank_values_can_keep_empty_lists():
     entity = SimpleNamespace(entity_kind="fake", db={})
     prop = _DBKeepListProperty(entity=entity)
@@ -435,7 +419,6 @@ def test_db_property_custom_blank_values_can_keep_empty_lists():
     assert "keep" not in entity.db
 
 
-# @matrix forms : access-restrictions inheritance side-effect-free stable-order stored-projection
 @pytest.mark.parametrize("parent_name", ["page", "form"])
 def test_restricted_to_effective_projection_does_not_alias_sources(parent_name):
     stored = ["stored-group", "stored-group"]
@@ -462,8 +445,6 @@ def test_restricted_to_effective_projection_does_not_alias_sources(parent_name):
     assert from_parent.value[source] is not inherited
     assert inherited == ["inherited-group", "inherited-group"]
 
-# @matrix permissions : source-clauses
-# @source lagniappe/core/properties/common_entity.py::RestrictedTo.value
 @pytest.mark.parametrize("form_type,source", [("page", "page_form"), ("task", "task_form")])
 def test_form_restrictions_keep_local_storage_and_select_source(form_type, source):
     form = TestEntities.get("FORM", {"hash": "typedform", "restricted_to": ["b", "a", "b"]})
@@ -474,7 +455,6 @@ def test_form_restrictions_keep_local_storage_and_select_source(form_type, sourc
     assert form.db["restricted_to"] == ["b", "a", "b"]
 
 
-# @matrix permissions relations : attached-groups local-restrictions materialization
 @pytest.mark.parametrize("kind", ["PAGE", "FORM"])
 @pytest.mark.parametrize("admin_only", [False, True])
 def test_direct_fetch_materializes_local_restrictions_from_attached_groups(
@@ -524,9 +504,6 @@ def test_direct_fetch_materializes_local_restrictions_from_attached_groups(
     assert source.properties.groups.keys == [groups[0].key, groups[1].key, groups[0].key]
 
 
-# @source lagniappe/core/properties/common_entity.py::RestrictedTo.materialize
-# @matrix permissions relations : local-restrictions materialization unresolved
-# @matrix permissions : owner-only
 @pytest.mark.parametrize("kind", ["PAGE", "FORM"])
 @pytest.mark.parametrize("groups_loaded", [False, True])
 def test_admin_only_replaces_local_groups_without_restoring_them(kind, groups_loaded):
@@ -553,7 +530,6 @@ def test_admin_only_replaces_local_groups_without_restoring_them(kind, groups_lo
     assert "groups" not in source.db
 
 
-# @matrix permissions relations : local-restrictions materialization unresolved
 @pytest.mark.parametrize("stored", [[], ["storedgroup"]])
 def test_materialize_preserves_hashes_until_groups_are_attached(monkeypatch, stored):
     form = TestEntities.get("FORM", {"name": "Unresolved groups", "hash": "unresolvedform"})
@@ -572,7 +548,6 @@ def test_materialize_preserves_hashes_until_groups_are_attached(monkeypatch, sto
     assert form.properties.groups.is_set is False
 
 
-# @matrix permissions relations : stored-restrictions group-free no-extra-read
 def test_task_file_restrictions_use_stored_hashes_without_group_reads(monkeypatch):
     page_form = TestEntities.get("FORM", {
         "name": "Page form", "hash": "hashpageform", "restricted_to": ["groupa"],
@@ -624,7 +599,6 @@ def test_task_file_restrictions_use_stored_hashes_without_group_reads(monkeypatc
     assert file.restricted_to["page_form"] == task.restricted_to["page_form"] == ["groupc"]
 
 
-# @matrix forms : access-restrictions owner-restricted side-effect-free stable-order
 def test_restricted_to_add_preserves_first_seen_order():
     stored = ["group-two", "group-one", "group-two"]
     entity = SimpleNamespace(
@@ -644,7 +618,6 @@ def test_restricted_to_add_preserves_first_seen_order():
     assert restricted_to.value == {"page_form": ["group-one", "group-three", "group-two"]}
 
 
-# @matrix permissions cache : source-clauses stable-order
 def test_restriction_fields_keep_source_boundaries():
     from lagniappe.core.tools.auth.restrictions import normalize_restrictions, restriction_fields
 
@@ -668,7 +641,6 @@ def test_restriction_fields_keep_source_boundaries():
     assert "restricted_to" not in cached
 
 
-# @matrix permissions cache : source-clauses fingerprint form-version stable-order
 def test_restriction_fingerprint_preserves_source_boundaries():
     from lagniappe.core.definitions.fingerprints import restricted_fingerprint
 
@@ -682,7 +654,6 @@ def test_restriction_fingerprint_preserves_source_boundaries():
     assert baseline != restricted_fingerprint("base", {"page": ["a", "b"]}, form_version="v2")
 
 
-# @matrix property : column filter validation
 def test_column_and_filter_contract_errors_are_explicit():
     entity = SimpleNamespace(entity_kind="fake")
     column = _ColumnProperty(entity=entity)
@@ -704,7 +675,6 @@ def test_column_and_filter_contract_errors_are_explicit():
         _ = _BadColumns(entity=entity).fields
 
 
-# @matrix site : db-key validation
 def test_site_missing_key_raises_runtime_error():
     site = _TestSite("missing-site")
 
@@ -716,7 +686,6 @@ def test_site_missing_key_raises_runtime_error():
             _ = site.db
 
 
-# @matrix requires : cache details property
 def test_entity_requires(get_test_entities):
     """Test Requires property returns list and cache_value is comma-separated.
 
@@ -747,7 +716,6 @@ def test_entity_requires(get_test_entities):
         assert set(entity.details["requires"]) == expected
 
 
-# @matrix hash : cache details filter property
 def test_entity_hash(get_test_entities):
     """Test that Hash property returns correct value."""
     for entity in get_test_entities():
@@ -771,7 +739,6 @@ def test_entity_hash(get_test_entities):
             assert cache["hash"] == test_value
 
 
-# @matrix description : html-stripping whitespace
 @pytest.mark.parametrize("kind", ["PAGE", "TASK", "PROJECT", "CATEGORY"])
 def test_entity_description_preserves_whitespace(kind):
     entity = getattr(Entities, kind)(testing=True)
@@ -788,7 +755,6 @@ def test_entity_description_preserves_whitespace(kind):
     assert entity.description is None
 
 
-# @matrix name : ai cache column details filter property sort
 def test_entity_name(get_test_entities):
     """Test Name property with all mixins: Cache, Column, Details, AI, Filter.
 
@@ -813,7 +779,6 @@ def test_entity_name(get_test_entities):
         assert entity.column("name").column_value == entity.details
 
 
-# @matrix name : import list-normalization
 def test_entity_name_list_values_normalized_on_write_and_import():
     entity = TestEntities.get("PAGE", {"name": "Original", "hash": "name_list"})
 
@@ -828,7 +793,6 @@ def test_entity_name_list_values_normalized_on_write_and_import():
     assert entity.db["name"] == "Grace Hopper"
 
 
-# @pair db-property:cache-invalidation
 def test_db_property_write_refreshes_entity_details_and_cache():
     entity = TestEntities.get(
         "PROJECT",
@@ -846,7 +810,6 @@ def test_db_property_write_refreshes_entity_details_and_cache():
     assert entity.to_cache["name"] == "Updated Cache Name"
 
 
-# @matrix cache related-properties : cache-invalidation column-value details parent-pointer
 def test_related_property_writes_refresh_entity_and_column_projections():
     page = TestEntities.get(
         "PAGE",
@@ -910,7 +873,6 @@ def test_related_property_writes_refresh_entity_and_column_projections():
     }
 
 
-# @matrix cache : details-key parent-key
 def test_entity_to_cache_stores_detail_parent_pointers():
     page = TestEntities.get(
         "PAGE",
@@ -928,7 +890,6 @@ def test_entity_to_cache_stores_detail_parent_pointers():
     assert "details" not in cache
 
 
-# @matrix modified : column date filter property
 def test_entity_modified(get_test_entities):
     """Test Modified property with DateMixin, ColumnMixin, FilterMixin.
 
@@ -946,7 +907,7 @@ def test_entity_modified(get_test_entities):
 
         with patch("lagniappe.core.tools.dates.user_timezone", return_value=test_tz):
             assert entity.modified == stored
-            assert entity.modified.tzinfo == timezone.utc
+            assert entity.modified.tzinfo == UTC
             assert entity.properties.modified.value == stored
             # Datetime equality alone accepts the right instant in the wrong zone.
             assert (
@@ -958,22 +919,21 @@ def test_entity_modified(get_test_entities):
             entity.modified = input_local
 
             assert entity.modified.isoformat() == entity.test_spec["expected_stored"]
-            assert entity.modified.tzinfo == timezone.utc
+            assert entity.modified.tzinfo == UTC
             assert (
                 entity.column("modified").column_value.isoformat()
                 == input_local.isoformat()
             )
 
 
-# @matrix created : initialized-once update
 def test_entity_created_update_initializes_once():
     entity = TestEntities.get(
         "PROJECT",
         {"name": "Created Project", "hash": "created_project"},
     )
     entity.db.pop("created", None)
-    first_created = datetime(2024, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
-    later_created = datetime(2024, 6, 7, 8, 9, 10, tzinfo=timezone.utc)
+    first_created = datetime(2024, 1, 2, 3, 4, 5, tzinfo=UTC)
+    later_created = datetime(2024, 6, 7, 8, 9, 10, tzinfo=UTC)
 
     with patch("lagniappe.core.properties.common_entity.datetime") as mock_datetime:
         mock_datetime.now.return_value = first_created
@@ -990,7 +950,6 @@ def test_entity_created_update_initializes_once():
     assert entity.db["created"] == first_created
 
 
-# @matrix public-id : generation persistence uniqueness
 def test_public_id_generation_is_unique_and_persisted():
     entity = TestEntities.get(
         "PROJECT",
@@ -1031,7 +990,6 @@ def test_public_id_generation_is_unique_and_persisted():
     short_uuid.assert_not_called()
 
 
-# @matrix property : descriptor error-wrapping
 def test_property_getattribute_wraps_descriptor_attribute_error():
     class BrokenProperty(Property):
         _id = "broken"
@@ -1044,7 +1002,7 @@ def test_property_getattribute_wraps_descriptor_attribute_error():
     prop = BrokenProperty(entity=entity, user=object())
 
     with pytest.raises(PropertyError) as error:
-        prop.fragile
+        _ = prop.fragile
 
     assert error.value.entity is entity
     assert isinstance(error.value.__cause__, AttributeError)
@@ -1053,7 +1011,6 @@ def test_property_getattribute_wraps_descriptor_attribute_error():
     assert getattr(prop, "missing", "fallback") == "fallback"
 
 
-# @matrix site : db-key error-wrapping lazy-properties
 def test_site_lazy_properties_database_key_and_error_context():
     site_key = object()
     site_db = {"name": "Site DB"}
@@ -1075,7 +1032,7 @@ def test_site_lazy_properties_database_key_and_error_context():
         assert site.db == site_db
 
         with pytest.raises(PropertyError) as error:
-            site.broken
+            _ = site.broken
 
     assert error.value.entity is site
     assert isinstance(error.value.__cause__, RuntimeError)
@@ -1083,7 +1040,6 @@ def test_site_lazy_properties_database_key_and_error_context():
     assert "_TestSite" in str(error.value)
 
 
-# @matrix kind : cache db-key details property
 def test_entity_kind(get_test_entities):
     """Test Kind property with DetailsMixin, CacheMixin.
 
@@ -1103,3 +1059,69 @@ def test_entity_kind(get_test_entities):
         assert entity.details["kind"] == expected_details_kind
         if cache := _cache_payload(entity):
             assert cache["kind"] == expected_details_kind
+
+
+def test_typed_property_interfaces_match_each_registered_entity():
+    import ast
+    import inspect
+    from collections import defaultdict
+    from typing import get_args, get_type_hints
+
+    from lagniappe.core.entities import property_types
+    from lagniappe.core.entities.types import EntityType
+    from lagniappe.core.mixins import AIMixin
+
+    observed = defaultdict(set)
+    for member in EntityType.__members__.values():
+        entity_type = member.value
+        if not issubclass(entity_type, Entity):
+            continue
+        # UserCategory inherits Category's registry. PublicGroup overrides the
+        # permissions implementation exposed by UserGroup's two concrete kinds.
+        shape = None
+        for owner in entity_type.__mro__:
+            if not issubclass(owner, Entity):
+                continue
+            getters = (
+                node for node in ast.walk(ast.parse(inspect.getsource(owner)))
+                if isinstance(node, ast.FunctionDef) and node.name == "properties"
+            )
+            getter = next(getters, None)
+            if getter is not None:
+                assert isinstance(getter.returns, ast.Attribute), owner.__name__
+                assert ast.unparse(getter.returns.value) == "property_types"
+                shape = getattr(property_types, getter.returns.attr)
+                break
+        assert shape is not None, entity_type.__name__
+        declarations = get_type_hints(shape)
+        entity = object.__new__(entity_type)
+        registry = entity._get_properties()._registry
+        assert set(declarations) == set(registry), entity_type.__name__
+        for key, implementation in registry.items():
+            declaration = declarations[key]
+            assert implementation in (get_args(declaration) or (declaration,)), key
+            observed[declaration].add(implementation)
+            if issubclass(implementation, AIMixin):
+                # Default AI keys are labels. Custom keys use the property ID
+                # or owner kind and are available before any stored value is read.
+                field = object.__new__(implementation)
+                object.__setattr__(field, "_entity", entity)
+                assert isinstance(field.ai_key, str) and field.ai_key, (member, key)
+
+    for declaration, implementations in observed.items():
+        assert implementations == set(get_args(declaration) or (declaration,))
+
+
+def test_property_registry_update_preserves_cached_instances_and_lazy_names():
+    from lagniappe.core.entities.entity import EntityProperties
+
+    owner = object()
+    properties = EntityProperties(owner, {"display": _SiteLazyProperty})
+    assert not properties._instances
+    instance = properties.display
+    properties.update({"display": _DBBlankProperty, "extra": _DBBlankProperty})
+    assert properties["display"] is instance
+    assert properties.get("display") is instance
+    assert isinstance(properties.extra, _DBBlankProperty)
+    assert properties.extra is properties["extra"]
+    assert properties.get("missing") is None

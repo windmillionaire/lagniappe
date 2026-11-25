@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import NotRequired, TypedDict, cast
+from .provider import ProviderContext
+from .state import LifecycleCheckpoint
+
+
+from google.cloud.datastore import Client
+
+
 from runner.presentation import read_input as input
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 from google.cloud.datastore import Entity, Key
@@ -29,6 +38,35 @@ from .provider import (
 RESTORE_NORMALIZE_PAGE_SIZE = 250
 SERIALIZED_REFERENCE_PROPERTIES = frozenset({"submission", "default_submission"})
 DEFERRED_JOB_CONTROL_ID = "deferred-jobs-control"
+class RestorePlan(TypedDict):
+    restore_id: str
+    backup_id: str
+    project_id: str
+    application_version: str
+    old_database: str
+    target_database: str
+    safety_database: str
+    backup_source_database: NotRequired[str]
+    database_location: NotRequired[str]
+    export_output_prefix: str
+    assets_uri: str
+    queue: str
+    queue_location: str
+    reconciler: str
+    maintenance_version: str
+    kind_prefix: str
+    owner_email: str
+    runtime_service_account: str
+    app_url: str
+    original_traffic: dict[str, float]
+    traffic_split_by: str
+    consistency: str
+    snapshot_time: NotRequired[str]
+    merge: dict[str, int | str]
+    provider_observations: dict[str, object]
+    sequence: list[str]
+
+
 QUEUE_SNAPSHOT_FORMAT = "lagniappe-purged-cloud-tasks"
 RESTORE_ARTIFACT_SCHEMA = 1
 RESTORE_JOURNAL_FORMAT = "lagniappe-restore-journal"
@@ -89,10 +127,7 @@ RESTORE_JOURNAL_BOOLEAN_KEYS = frozenset(
 )
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
-# @reason resume-plan compatibility is enforced before any restore mutation
-def _validate_in_place_restore_plan(plan):
+def _validate_in_place_restore_plan(plan: object) -> RestorePlan:
     if not isinstance(plan, dict):
         raise DataLifecycleError("In-place restore checkpoint plan is invalid.")
     try:
@@ -134,7 +169,18 @@ def _validate_in_place_restore_plan(plan):
         "provider_observations",
         "sequence",
     }
-    if not required.issubset(plan):
+    structured_fields = {"merge", "provider_observations", "original_traffic", "sequence"}
+    if (not required.issubset(plan)
+        or any(not isinstance(plan[key], str) for key in required - structured_fields)
+        or any(key in plan and not isinstance(plan[key], str) for key in ("database_location", "backup_source_database", "snapshot_time"))
+        or not isinstance(plan["original_traffic"], dict)
+        or any(not isinstance(key, str) or not isinstance(value, (float, int)) for key, value in plan["original_traffic"].items())
+        or not isinstance(plan["merge"], dict)
+        or any(not isinstance(key, str) or not isinstance(value, (str, int)) for key, value in plan["merge"].items())
+        or not isinstance(plan["provider_observations"], dict)
+        or not isinstance(plan["sequence"], list)
+        or any(not isinstance(step, str) for step in plan["sequence"])
+    ):
         raise DataLifecycleError("In-place restore checkpoint plan is invalid.")
     try:
         validate_backup_id(plan["backup_id"])
@@ -143,12 +189,9 @@ def _validate_in_place_restore_plan(plan):
         raise DataLifecycleError(
             "In-place restore checkpoint plan is invalid."
         ) from error
-    return plan
+    return cast(RestorePlan, plan)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
-# @reason journal projection is exercised through the resumable in-place state machine
 def _remote_journal_payload(context, checkpoint, filename):
     state = checkpoint.payload
     if not isinstance(state, dict) or not isinstance(state.get("plan"), dict):
@@ -170,15 +213,12 @@ def _remote_journal_payload(context, checkpoint, filename):
             for key in sorted(RESTORE_JOURNAL_STATE_KEYS)
             if key in state
         },
-        "updated_at": datetime.now(timezone.utc)
+        "updated_at": datetime.now(UTC)
         .isoformat()
         .replace("+00:00", "Z"),
     }
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
-# @reason remote journal trust checks are exercised through state-machine mirroring
 def _validate_remote_journal(context, payload, *, restore_id=None, filename=None):
     plan = payload.get("plan") if isinstance(payload, dict) else None
     state = payload.get("state") if isinstance(payload, dict) else None
@@ -211,11 +251,16 @@ def _validate_remote_journal(context, payload, *, restore_id=None, filename=None
     return payload
 
 
-# @testable infrastructure
 class MirroredRestoreCheckpoint:
     """Mirror a private local checkpoint into a secret-free recovery object."""
 
-    def __init__(self, local, context, *, filename="journal.json"):
+    def __init__(
+        self,
+        local: LifecycleCheckpoint,
+        context: ProviderContext,
+        *,
+        filename: str = "journal.json",
+    ) -> None:
         if filename != "journal.json":
             raise DataLifecycleError("Remote restore journal filename is invalid.")
         self.local = local
@@ -223,10 +268,10 @@ class MirroredRestoreCheckpoint:
         self.filename = filename
 
     @property
-    def payload(self):
+    def payload(self) -> dict[str, object] | None:
         return self.local.payload
 
-    def load(self):
+    def load(self) -> dict[str, object] | None:
         return self.local.load()
 
     def _sync(self):
@@ -246,22 +291,25 @@ class MirroredRestoreCheckpoint:
         remote_revision = existing["state"]["journal_revision"]
         local_revision = desired["state"]["journal_revision"]
         if remote_revision > local_revision:
-            self.local.payload.update(existing["state"])
-            self.local.payload["plan"] = _localize_remote_plan(existing["plan"])
+            state = self.local.payload
+            if state is None:
+                raise DataLifecycleError("Restore journal has no active state.")
+            state.update(existing["state"])
+            state["plan"] = _localize_remote_plan(existing["plan"])
             self.local.save()
             return
         if remote_revision == local_revision:
             return
         self.context.upload_json_replace(object_name, desired)
 
-    def start(self, operation_id, **values):
+    def start(self, operation_id: str, **values: object) -> dict[str, object]:
         payload = self.local.start(
             operation_id, journal_revision=1, **values
         )
         self._sync()
         return payload
 
-    def update(self, checkpoint, **values):
+    def update(self, checkpoint: str, **values: object) -> dict[str, object]:
         revision = int((self.local.payload or {}).get("journal_revision") or 0) + 1
         payload = self.local.update(
             checkpoint, journal_revision=revision, **values
@@ -269,13 +317,10 @@ class MirroredRestoreCheckpoint:
         self._sync()
         return payload
 
-    def finish(self, **values):
+    def finish(self, **values: object) -> None:
         self.update("complete", status="complete", **values)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
-# @reason remote plans are localized only at public resumption boundaries
 def _localize_remote_plan(plan):
     localized = dict(plan)
     if "index_path" in localized:
@@ -285,9 +330,6 @@ def _localize_remote_plan(plan):
     return localized
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
-# @reason remote discovery is exercised through public restore resumption
 def _remote_restore_for_backup(context, backup_id):
     matches = []
     for blob in context.list_objects(f"{RESTORE_ROOT_PREFIX}/"):
@@ -306,26 +348,20 @@ def _remote_restore_for_backup(context, backup_id):
     return matches[0] if matches else None
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
-# @reason remote-to-local hydration is exercised through public restore resumption
 def _hydrate_local_checkpoint(local, remote):
     plan = _localize_remote_plan(remote["plan"])
-    local.start(
+    payload = local.start(
         plan["restore_id"],
         backup_id=plan["backup_id"],
         plan=plan,
         journal_revision=remote["state"]["journal_revision"],
     )
-    local.payload.update(remote["state"])
-    local.payload["plan"] = plan
+    payload.update(remote["state"])
+    payload["plan"] = plan
     local.save()
-    return local.payload
+    return payload
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_support.py::capture_queue_snapshot
-# @reason restore artifact paths are exercised through queue-snapshot publication
 def _restore_object_name(restore_id, filename):
     restore_id = str(restore_id or "").strip()
     if (
@@ -338,9 +374,6 @@ def _restore_object_name(restore_id, filename):
     return f"{RESTORE_ROOT_PREFIX}/{restore_id}/{filename}"
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_support.py::capture_queue_snapshot
-# @reason canonical audit hashing is exercised through immutable restore artifacts
 def _audit_sha256(payload):
     encoded = json.dumps(
         payload,
@@ -351,9 +384,6 @@ def _audit_sha256(payload):
     return hashlib.sha256(encoded).hexdigest()
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_support.py::capture_queue_snapshot
-# @reason immutable snapshot validation is exercised through capture resumption
 def _queue_snapshot_descriptor(context, plan, payload, object_name):
     queue_path = (
         f"projects/{context.project_id}/locations/{plan['queue_location']}"
@@ -387,17 +417,14 @@ def _queue_snapshot_descriptor(context, plan, payload, object_name):
     }
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_queue_snapshot_preserves_full_task_definitions
-# @matrix data-lifecycle : immutable-restore-record queue-purge-audit
 def capture_queue_snapshot(
-    context,
-    plan,
+    context: ProviderContext,
+    plan: Mapping[str, object],
     *,
-    captured_at=None,
-    filename="purged-tasks.json",
-    observation="full-view tasks visible after queue pause and maintenance",
-):
+    captured_at: datetime | None = None,
+    filename: str = "purged-tasks.json",
+    observation: str = "full-view tasks visible after queue pause and maintenance",
+) -> dict[str, object]:
     """Persist the complete tasks observed immediately before a restore purge."""
     restore_id = str(plan["restore_id"])
     queue_name = str(plan["queue"])
@@ -409,10 +436,10 @@ def capture_queue_snapshot(
     if snapshot_blob.exists():
         payload, _blob = context.load_json_object(object_name)
         return _queue_snapshot_descriptor(context, plan, payload, object_name)
-    captured_at = captured_at or datetime.now(timezone.utc)
+    captured_at = captured_at or datetime.now(UTC)
     if not isinstance(captured_at, datetime) or captured_at.tzinfo is None:
         raise DataLifecycleError("Queue snapshot time must include a timezone.")
-    timestamp = captured_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    timestamp = captured_at.astimezone(UTC).isoformat().replace("+00:00", "Z")
     tasks = sorted(
         context.list_queue_tasks(queue_name, location),
         key=lambda task: str(task.get("name") or ""),
@@ -434,9 +461,6 @@ def capture_queue_snapshot(
     return descriptor
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_support.py::normalize_restored_entity
-# @reason partition validation is exercised through complete entity normalization
 def _rebind_restored_key(key, *, project_id, source_database_id, target_database_id):
     if not isinstance(key, Key):
         return key, 0
@@ -461,9 +485,6 @@ def _rebind_restored_key(key, *, project_id, source_database_id, target_database
     return rebound, 1
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_support.py::normalize_restored_entity
-# @reason recursive native values are exercised through complete entity normalization
 def _normalize_native_value(value, *, project_id, source_database_id, target_database_id):
     if isinstance(value, Key):
         return _rebind_restored_key(
@@ -530,9 +551,6 @@ def _normalize_native_value(value, *, project_id, source_database_id, target_dat
     return value, 0
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_support.py::normalize_restored_entity
-# @reason entity-details recognition is exercised through serialized submission normalization
 def _normalize_reference_details(value, *, project_id, source_database_id, target_database_id):
     changed = 0
     if isinstance(value, list):
@@ -578,20 +596,18 @@ def _normalize_reference_details(value, *, project_id, source_database_id, targe
     return normalized, changed
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_restore_normalizes_persisted_keys_before_cache_rebuild
-# @tests tests_tooling/test_008_data_lifecycle.py::test_restore_discards_deferred_execution_state
-# @matrix data-lifecycle : deferred-state-retirement restore-key-normalization serialized-entity-details
 def normalize_restored_entity(
-    entity,
+    entity: Entity,
     *,
-    project_id,
-    source_database_id,
-    target_database_id,
-):
+    project_id: str,
+    source_database_id: str,
+    target_database_id: str,
+) -> dict[str, int]:
     """Rebind durable references and clear stale active-operation pointers."""
     source_database_id = validate_database_id(source_database_id)
     target_database_id = validate_database_id(target_database_id)
+    if entity.key is None:
+        raise DataLifecycleError("Restored entity has no Datastore key.")
     key_database = str(entity.key.database or DEFAULT_DATABASE_ID)
     if str(entity.key.project or "") != project_id or key_database != target_database_id:
         raise DataLifecycleError("Restored entity is not stored in the expected target database.")
@@ -656,9 +672,6 @@ def normalize_restored_entity(
     return counts
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_support.py::normalize_restored_database
-# @reason provider pagination is exercised through the bounded database normalizer
 def _restore_query_pages(query, *, page_size):
     cursor = None
     while True:
@@ -675,10 +688,6 @@ def _restore_query_pages(query, *, page_size):
             return
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_support.py::normalize_restored_database
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_generation_bound_assets
-# @reason provider reads may spell the default database differently from its write client
 def _bind_key_to_client_database(client, key):
     """Return the same logical key using the client's database spelling."""
     client_project = getattr(client, "project", key.project)
@@ -700,10 +709,6 @@ def _bind_key_to_client_database(client, key):
     raise DataLifecycleError("Datastore write key belongs to another database.")
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_support.py::normalize_restored_database
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_generation_bound_assets
-# @reason entity identity rebinding is exercised through the complete restore write paths
 def _bind_entities_to_client_database(client, entities):
     entities = list(entities)
     for entity in entities:
@@ -717,20 +722,15 @@ def _bind_entities_to_client_database(client, entities):
     return entities
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_restore_normalizes_persisted_keys_before_cache_rebuild
-# @tests tests_tooling/test_008_data_lifecycle.py::test_restore_discards_deferred_execution_state
-# @tests tests_tooling/test_008_data_lifecycle.py::test_restore_default_database_writes_use_client_partition
-# @matrix data-lifecycle : bounded-restore-scan default-database-write-partition deferred-state-retirement restore-key-normalization
 def normalize_restored_database(
-    client,
+    client: Client,
     *,
-    project_id,
-    source_database_id,
-    target_database_id,
-    page_size=RESTORE_NORMALIZE_PAGE_SIZE,
-    kind_prefix=None,
-):
+    project_id: str,
+    source_database_id: str,
+    target_database_id: str,
+    page_size: int = RESTORE_NORMALIZE_PAGE_SIZE,
+    kind_prefix: str | None = None,
+) -> dict[str, int]:
     """Normalize durable references and discard restored execution state."""
     source_database_id = validate_database_id(source_database_id)
     target_database_id = validate_database_id(target_database_id)
@@ -823,30 +823,21 @@ def normalize_restored_database(
     return counts
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_plan
-# @reason provider location aliases are exercised by restore preflight
 def _location(value):
     value = str(value or "").strip().casefold()
     return {"us": "nam5", "eu": "eur3"}.get(value, value)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_plan
-# @reason location compatibility is a restore-preflight implementation detail
 def _compatible_locations(first, second):
     return bool(_location(first) and _location(first) == _location(second))
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_target_validation_requires_owner_and_reserved_models
-# @matrix data-lifecycle : owner-invariant restore-validation
 def validate_restored_database(
-    client,
+    client: Client,
     *,
-    kind_prefix="",
-    owner_email,
-):
+    kind_prefix: str = "",
+    owner_email: str,
+) -> dict[str, int]:
     """Verify the minimum data invariants needed before a restored app can serve."""
     prefix = str(kind_prefix or "")
     owner_email = str(owner_email or "").strip().casefold()
@@ -882,9 +873,6 @@ def validate_restored_database(
     }
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_plan
-# @reason provider traffic response variants are exercised through restore preflight
 def _traffic_observation(service, versions):
     split = service.get("split") or service.get("trafficSplit") or {}
     allocations = split.get("allocations") or {}
@@ -913,9 +901,6 @@ def _traffic_observation(service, versions):
     return allocations, split_by
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
-# @reason exact typed confirmation is exercised by the public in-place workflow
 def _confirm_mutation(expected, *, confirmation=None):
     from installer import FORMATTER
 

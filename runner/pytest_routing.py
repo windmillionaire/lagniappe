@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import ast
 import importlib
 import os
-from pathlib import Path
 import re
 import sys
+from contextlib import suppress
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pytest
 
 
 PYTEST_CONFIG = "testing/pytest.ini"
-TRACEABILITY_RESULTS_PLUGIN = "testing.utility.traceability_results"
+TEST_RESULTS_PLUGIN = "testing.utility.evidence_results"
 PYTEST_ROUTING_PLUGIN = "runner.pytest_routing"
 MCP_ADAPTER_TEST = "testing/tests_unit/test_033_mcp_adapter.py"
 MCP_TEST_FILES = (
@@ -43,6 +49,7 @@ SETUP_TEST_GROUPS = {
 }
 TEST_SUITE_ALIASES = {
     "unit": ("testing/tests_unit/",),
+    "http": ("testing/tests_http/",),
     "e2e": ("testing/tests_e2e/",),
     "js": ("testing/tests_js/",),
     "tooling": ("testing/tests_tooling/",),
@@ -62,14 +69,11 @@ class PytestRoutingError(ValueError):
     """Raised when the runner cannot construct an unambiguous test selection."""
 
 
-# @testable infrastructure
 class _IndexedArgument(str):
     """A command-line token that retains its source position through argparse."""
 
     argument_index: int
 
-    # @testable false
-    # @covered-by runner/pytest_routing.py::normalize_pytest_invocation
     def __new__(cls, value: str, argument_index: int):
         instance = super().__new__(cls, value)
         instance.argument_index = argument_index
@@ -94,10 +98,7 @@ class PytestPartitions:
     mcp_args: tuple[str, ...] | None
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_pytest_invocation_routes_registered_option_values
-# @pair testing:pytest-options
-def pytest_addoption(parser) -> None:
+def pytest_addoption(parser: pytest.Parser) -> None:
     """Register options that must be known before suite conftests are imported."""
     group = parser.getgroup("lagniappe")
     group.addoption(
@@ -107,36 +108,51 @@ def pytest_addoption(parser) -> None:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_pytest_routing_plugin_normalizes_provider_marker_tokens
-# @matrix setup testing : pytest-markers
 def normalize_marker_expression(expression: str) -> str:
     """Expand the documented provider marker alias without substring matches."""
     return _PROVIDER_MARKER_PATTERN.sub("(setup_drift or setup_provider)", expression)
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_pytest_routing_plugin_normalizes_provider_marker_tokens
-# @matrix setup testing : pytest-markers
-def pytest_configure(config) -> None:
+def pytest_configure(config: pytest.Config) -> None:
     """Apply runner-owned marker aliases before pytest evaluates collection."""
     expression = str(getattr(config.option, "markexpr", "") or "")
     config.option.markexpr = normalize_marker_expression(expression)
 
 
-# @testable false
-# @covered-by runner/pytest_routing.py::normalize_pytest_invocation
 def _consume_runner_separator(arguments: list[str]) -> list[str]:
     routed = list(arguments)
-    try:
+    with suppress(ValueError):
         routed.remove("--")
-    except ValueError:
-        pass
     return routed
 
 
-# @testable false
-# @covered-by runner/pytest_routing.py::normalize_pytest_invocation
+def _positive_markers(expression: str) -> set[str]:
+    """Return marker names referenced positively (outside ``not``) in an expression."""
+    if not expression.strip():
+        return set()
+    try:
+        tree = ast.parse(expression, mode="eval")
+    except SyntaxError:
+        return set(_MARKER_TOKEN_PATTERN.findall(expression))
+
+    selected: set[str] = set()
+
+    def visit(node: ast.AST, *, negated: bool) -> None:
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+            visit(node.operand, negated=not negated)
+        elif isinstance(node, ast.BoolOp):
+            for value in node.values:
+                visit(value, negated=negated)
+        elif isinstance(node, ast.Name) and not negated:
+            selected.add(node.id)
+        else:
+            for child in ast.iter_child_nodes(node):
+                visit(child, negated=negated)
+
+    visit(tree.body, negated=False)
+    return selected
+
+
 def _expand_targets(targets: list[str], marker_expression: str) -> tuple[str, ...]:
     aliases = [target for target in targets if target in TEST_SUITE_ALIASES]
     explicit = [target for target in targets if target not in TEST_SUITE_ALIASES]
@@ -146,7 +162,7 @@ def _expand_targets(targets: list[str], marker_expression: str) -> tuple[str, ..
             "nodeids; choose aliases only or paths only"
         )
 
-    selected_markers = set(_MARKER_TOKEN_PATTERN.findall(marker_expression))
+    selected_markers = _positive_markers(marker_expression)
     normalized = []
     for target in targets:
         if target not in TEST_SUITE_ALIASES:
@@ -167,8 +183,6 @@ def _expand_targets(targets: list[str], marker_expression: str) -> tuple[str, ..
     return tuple(normalized)
 
 
-# @testable false
-# @covered-by runner/pytest_routing.py::targets_include_e2e
 def _target_path(target: str, repository_root: Path) -> Path:
     path_text = target.replace("\\", "/").split("::", 1)[0]
     path = Path(path_text)
@@ -177,10 +191,6 @@ def _target_path(target: str, repository_root: Path) -> Path:
     return path.resolve(strict=False)
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_pytest_invocation_routes_registered_option_values
-# @tests tests_tooling/test_007_run_py_test_command.py::test_normalized_targets_control_actual_pytest_collection
-# @matrix testing : cli-routing target-selection
 def targets_include_e2e(targets: tuple[str, ...], repository_root: Path) -> bool:
     """Return whether targets collect from or above the repository E2E root."""
     e2e_root = (repository_root / "testing/tests_e2e").resolve()
@@ -195,9 +205,6 @@ def targets_include_e2e(targets: tuple[str, ...], repository_root: Path) -> bool
     return False
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_partition_mcp_adapter_test_selection
-# @matrix mcp-package testing : cli-routing environment-isolation no-duplicate-collection
 def partition_mcp_adapter_tests(
     invocation: PytestInvocation, repository_root: Path
 ) -> PytestPartitions:
@@ -243,9 +250,6 @@ def partition_mcp_adapter_tests(
     return PytestPartitions(root_args=root_args, mcp_args=(*passthrough, *mcp_targets))
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_targets_include_repository_file
-# @matrix mcp-package testing : cli-routing local-preflight
 def targets_include_repository_file(
     targets: tuple[str, ...], relative_path: str, repository_root: Path
 ) -> bool:
@@ -258,12 +262,6 @@ def targets_include_repository_file(
     )
 
 
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_pytest_invocation_routes_registered_option_values
-# @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_pytest_invocation_rejects_ambiguous_or_indirect_targets
-# @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_pytest_invocation_adds_setup_opt_in_targets_without_filenames
-# @matrix setup : cli-routing opt-in pytest-markers
-# @matrix testing : cli-routing opt-in pytest-markers pytest-options target-selection
 def normalize_pytest_invocation(
     test_args: list[str], repository_root: Path
 ) -> PytestInvocation:
@@ -281,7 +279,7 @@ def normalize_pytest_invocation(
         "--noconftest",
         *indexed_args,
     ]
-    traceability_plugin = importlib.import_module(TRACEABILITY_RESULTS_PLUGIN)
+    results_plugin = importlib.import_module(TEST_RESULTS_PLUGIN)
 
     previous_cwd = Path.cwd()
     config = None
@@ -290,7 +288,7 @@ def normalize_pytest_invocation(
         try:
             config = _prepareconfig(
                 parser_args,
-                plugins=[sys.modules[__name__], traceability_plugin],
+                plugins=[sys.modules[__name__], results_plugin],
                 prog="run.py test",
             )
         except UsageError as error:
@@ -304,11 +302,11 @@ def normalize_pytest_invocation(
         }
         reserved_plugins = {
             PYTEST_ROUTING_PLUGIN,
-            TRACEABILITY_RESULTS_PLUGIN,
+            TEST_RESULTS_PLUGIN,
         }
         if disabled_plugins.intersection(reserved_plugins):
             raise PytestRoutingError(
-                "run.py's routing and traceability pytest plugins cannot be disabled"
+                "run.py's routing and results pytest plugins cannot be disabled"
             )
         if bool(getattr(namespace, "pyargs", False)):
             raise PytestRoutingError(

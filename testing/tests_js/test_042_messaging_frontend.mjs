@@ -15,7 +15,6 @@ function replaceGlobal(t, name, value) {
 	});
 }
 
-/** @matrix mentions : keyboard mouse node-attributes pending-occurrence profile-link query-detection */
 test("test_mention_node_collection_insertion_and_keyboard_contract", async () => {
 	const searches = [];
 	const queryKeys = [];
@@ -31,7 +30,7 @@ test("test_mention_node_collection_insertion_and_keyboard_contract", async () =>
 	}
 	const { LagniappeMention, MentionSuggestions, collectMentions } =
 		await esmock.strict(
-			"../../src/script/elements/editor/extensions/mention.mjs",
+			"../../src/script/elements/editor/extensions/mention.ts",
 			{
 				"@floating-ui/dom": {
 					autoUpdate: () => () => {},
@@ -41,13 +40,13 @@ test("test_mention_node_collection_insertion_and_keyboard_contract", async () =>
 					shift: () => null,
 				},
 				"../../src/script/generated/styles.mjs": { STYLES: { dropdown: {} } },
-				"../../src/script/shared/errors.mjs": {
+				"../../src/script/shared/errors.ts": {
 					captureError(error) {
 						throw error;
 					},
 				},
-				"../../src/script/shared/queryLifecycle.mjs": { QueryLifecycle },
-				"../../src/script/shared/request.mjs": {
+				"../../src/script/shared/queryLifecycle.ts": { QueryLifecycle },
+				"../../src/script/shared/request.ts": {
 					request: {
 						async get(endpoint, params) {
 							searches.push([endpoint, params.get("q")]);
@@ -55,7 +54,7 @@ test("test_mention_node_collection_insertion_and_keyboard_contract", async () =>
 						},
 					},
 				},
-				"../../src/script/shared/utilities.mjs": {
+				"../../src/script/shared/utilities.ts": {
 					debounce(callback) {
 						const debounced = (...args) => callback(...args);
 						debounced.cancel = () => {};
@@ -260,7 +259,6 @@ test("test_mention_node_collection_insertion_and_keyboard_contract", async () =>
 	assert.deepEqual(searches.at(-1), ["/l/search-index/user", "New"]);
 });
 
-/** @matrix messaging : compose-modal operation-id prefilled-peer selection-focus user-kind */
 test("test_message_composer_prefills_peer_and_reuses_operation_on_submit", async (t) => {
 	const posts = [];
 	const calls = [];
@@ -284,7 +282,7 @@ test("test_message_composer_prefills_peer_and_reuses_operation_on_submit", async
 		createElement: () => ({ dataset: {}, setAttribute() {} }),
 	});
 	const { MessageComposer } = await esmock.strict(
-		"../../src/script/elements/messageComposer.mjs",
+		"../../src/script/elements/messageComposer.ts",
 		{
 			"../../src/script/generated/styles.mjs": {
 				STYLES: {
@@ -294,10 +292,10 @@ test("test_message_composer_prefills_peer_and_reuses_operation_on_submit", async
 					textarea: "",
 				},
 			},
-			"../../src/script/shared/icons.mjs": {
+			"../../src/script/shared/icons.ts": {
 				createIcon: () => ({ outerHTML: "" }),
 			},
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/shared/index.ts": {
 				ENDPOINTS: { messages: { send: "/l/messages" } },
 				Modal: class {},
 				request: {
@@ -311,7 +309,7 @@ test("test_message_composer_prefills_peer_and_reuses_operation_on_submit", async
 					},
 				},
 			},
-			"../../src/script/elements/combobox/index.mjs": { FacetsBox: class {} },
+			"../../src/script/elements/combobox/index.ts": { FacetsBox: class {} },
 		},
 	);
 	const textarea = { value: "hello", focus: () => calls.push("focus-body") };
@@ -373,31 +371,30 @@ async function loadNotifications({
 	renderNotificationBadge,
 	composer,
 }) {
-	return await esmock.strict.p("../../src/script/elements/notifications.mjs", {
+	return await esmock.strict.p("../../src/script/elements/notifications.ts", {
 		"../../src/script/generated/styles.mjs": {
 			STYLES: { dropdown: { panel: "", option: { action: "" }, icon: "" } },
 		},
-		"../../src/script/shared/icons.mjs": {
+		"../../src/script/shared/icons.ts": {
 			createIcon: () => ({ outerHTML: "" }),
 		},
-		"../../src/script/shared/index.mjs": {
+		"../../src/script/shared/index.ts": {
 			ENDPOINTS: { notifications: "/l/notifications" },
 			request,
 		},
-		"../../src/script/shared/notificationState.mjs": {
+		"../../src/script/shared/notificationState.ts": {
 			renderNotificationBadge,
 		},
-		"../../src/script/shared/transitions.mjs": {
+		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
-		"../../src/script/elements/combobox/dropdown.mjs": { Dropdown: class {} },
-		"../../src/script/elements/messageComposer.mjs": {
+		"../../src/script/elements/combobox/dropdown.ts": { Dropdown: class {} },
+		"../../src/script/elements/messageComposer.ts": {
 			ensureMessageComposer: composer,
 		},
 	});
 }
 
-/** @matrix notifications : bounded-page exact-count message-ordering */
 test("test_notification_menu_keeps_authoritative_aggregate_count", async (t) => {
 	replaceGlobal(t, "window", {});
 	const rendered = [];
@@ -448,7 +445,6 @@ test("test_notification_menu_keeps_authoritative_aggregate_count", async (t) => 
 	assert.deepEqual(actions[0], ["compose", menu.view]);
 });
 
-/** @matrix notifications : menu-open reconnect */
 test("test_notification_refresh_waits_for_pending_connectivity", async (t) => {
 	const windowBoundary = {};
 	replaceGlobal(t, "window", windowBoundary);
@@ -500,7 +496,6 @@ test("test_notification_refresh_waits_for_pending_connectivity", async (t) => {
 	assert.equal(calls.length, 1);
 });
 
-/** @matrix messaging : active-polling clear-confirmation inline-reply list-race polling-revision preserve-selection read-race responsive-peer-selector selection-race */
 test("test_messages_view_refreshes_read_races_and_uses_delete_modal", async (t) => {
 	const calls = [];
 	const stored = new Map();
@@ -542,18 +537,18 @@ test("test_messages_view_refreshes_read_races_and_uses_delete_modal", async (t) 
 		}
 	}
 	const { default: Messages } = await esmock.strict(
-		"../../src/script/views/messages.mjs",
+		"../../src/script/views/messages.ts",
 		{
-			"../../src/script/elements/messageComposer.mjs": {
+			"../../src/script/elements/messageComposer.ts": {
 				ensureMessageComposer: () => {},
 			},
 			"../../src/script/generated/styles.mjs": {
 				STYLES: { list: { itemHeader: "item-header" } },
 			},
-			"../../src/script/shared/icons.mjs": {
+			"../../src/script/shared/icons.ts": {
 				createIcon: () => ({ outerHTML: "" }),
 			},
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/shared/index.ts": {
 				ENDPOINTS: {
 					messages: {
 						clearModal: (key) => `/clear/${key}`,
@@ -564,7 +559,7 @@ test("test_messages_view_refreshes_read_races_and_uses_delete_modal", async (t) 
 				},
 				request,
 			},
-			"../../src/script/views/base/core.mjs": { default: Core },
+			"../../src/script/views/base/core.ts": { default: Core },
 		},
 	);
 	let pollDescriptor = null;

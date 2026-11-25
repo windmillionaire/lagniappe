@@ -14,7 +14,6 @@ from installer.errors import ProviderTransientError, SetupError
 pytestmark = pytest.mark.tooling
 
 
-# @matrix setup : interactive-input settings-save validation
 @pytest.mark.parametrize(
     "app,answers,expected",
     [
@@ -239,7 +238,6 @@ def cloud(monkeypatch):
     return cloud
 
 
-# @matrix mcp-install : source-version upload-boundary
 def test_mcp_version_tracks_only_build_inputs_and_rejects_symlinks(tmp_path, monkeypatch):
     source = tmp_path / "mcp/src/lagniappe_mcp/server.py"
     source.parent.mkdir(parents=True)
@@ -261,7 +259,6 @@ def test_mcp_version_tracks_only_build_inputs_and_rejects_symlinks(tmp_path, mon
         mcp.source_version(tmp_path)
 
 
-# @matrix mcp-install : configuration opt-in legacy-settings
 def test_mcp_policy_preserves_legacy_api_without_implicitly_installing_service():
     from config.ai_settings import normalize_ai_features
     assert normalize_ai_features({})["EXTERNAL_AI_ENABLED"]
@@ -272,11 +269,10 @@ def test_mcp_policy_preserves_legacy_api_without_implicitly_installing_service()
     assert not mcp.requested({"EXTERNAL_AI_ENABLED": False, "MCP_RESOURCE": "https://mcp.example.test/mcp"})
 
 
-# @matrix mcp-install : fail-closed provider-discovery
 def test_mcp_discovery_distinguishes_absence_from_unavailable_state(monkeypatch):
     target = mcp._deployment(settings())
     for error in ("PERMISSION_DENIED", "PERMISSION_DENIED: resource NOT_FOUND or inaccessible", "network timeout", "service API disabled"):
-        monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=error))
+        monkeypatch.setattr(mcp, "_run", lambda *a, error=error, **k: SimpleNamespace(returncode=1, stderr=error))
         with pytest.raises(SetupError, match="discovery failed"):
             mcp.describe(target, ["run", "services", "describe"], optional=True)
     monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr="NOT_FOUND"))
@@ -295,7 +291,7 @@ def test_mcp_discovery_distinguishes_absence_from_unavailable_state(monkeypatch)
         "network timeout contacting gs://demo-project-mcp-builds",
         "HTTP 404: service API disabled",
     ):
-        monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=error))
+        monkeypatch.setattr(mcp, "_run", lambda *a, error=error, **k: SimpleNamespace(returncode=1, stderr=error))
         with pytest.raises(SetupError, match="discovery failed"):
             mcp.describe(target, arguments, optional=True)
     arguments = ["artifacts", "docker", "images", "describe", target.image]
@@ -310,7 +306,7 @@ def test_mcp_discovery_distinguishes_absence_from_unavailable_state(monkeypatch)
         "ERROR: (gcloud.artifacts.docker.images.describe) Invalid Docker image.",
         "ERROR: (gcloud.artifacts.docker.images.describe) network timeout",
     ):
-        monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=1, stderr=error))
+        monkeypatch.setattr(mcp, "_run", lambda *a, error=error, **k: SimpleNamespace(returncode=1, stderr=error))
         with pytest.raises(SetupError, match="discovery failed"):
             mcp.describe(target, arguments, optional=True)
     monkeypatch.setattr(mcp, "_run", lambda *a, **k: SimpleNamespace(returncode=0, stdout="[]"))
@@ -318,7 +314,6 @@ def test_mcp_discovery_distinguishes_absence_from_unavailable_state(monkeypatch)
         mcp.describe(target, ["run", "services", "describe"])
 
 
-# @matrix mcp-install : iam preflight
 def test_mcp_permissions_are_checked_before_resource_mutation(monkeypatch):
     target = mcp._deployment(settings())
     client = SimpleNamespace(test_iam_permissions=lambda **kwargs: SimpleNamespace(permissions=[]))
@@ -330,7 +325,6 @@ def test_mcp_permissions_are_checked_before_resource_mutation(monkeypatch):
         mcp.reconcile_resources(target, "owner@example.test")
 
 
-# @matrix mcp-install : iam idempotence handoff
 def test_mcp_iam_preserves_conditions_etags_and_skips_noop_writes(cloud):
     key = ("run", "services", mcp.SERVICE)
     original = {"role": "roles/run.admin", "members": ["user:owner@example.test"], "condition": {"expression": "true", "title": "conditional"}}
@@ -348,7 +342,6 @@ def test_mcp_iam_preserves_conditions_etags_and_skips_noop_writes(cloud):
     assert not cloud.policies[key]["bindings"]
 
 
-# @matrix mcp-install : iam resources keyless
 def test_mcp_resources_use_separate_build_identity_and_scoped_roles(cloud):
     mcp.reconcile_resources(cloud.target, "owner@example.test")
     assert set(cloud.accounts) == {cloud.target.runtime, cloud.target.build_account}
@@ -373,7 +366,6 @@ def test_mcp_resources_use_separate_build_identity_and_scoped_roles(cloud):
         assert not any("set-iam-policy" in call for call in cloud.calls)
 
 
-# @matrix mcp-install : configuration iam resources recovery
 @pytest.mark.parametrize(
     "app_name,internal_name,saved_name,runtime_name,build_name",
     [
@@ -443,7 +435,6 @@ def test_mcp_install_keeps_app_runtime_and_build_accounts_separate(
     assert not any(call[:2] in (["builds", "submit"], ["run", "deploy"]) for call in cloud.calls)
 
 
-# @matrix mcp-install : iam resources provider-convergence idempotence
 def test_mcp_account_creation_waits_for_visibility(cloud, monkeypatch, capsys):
     pending_reads = {cloud.target.runtime: 2, cloud.target.build_account: 2}
     mutations, waits = [], []
@@ -479,7 +470,6 @@ def test_mcp_account_creation_waits_for_visibility(cloud, monkeypatch, capsys):
     assert not any("create" in call for call in cloud.calls)
 
 
-# @matrix mcp-install : iam resources provider-convergence fail-closed
 @pytest.mark.parametrize("failure", ["missing", "permission"])
 def test_mcp_account_readback_failure_stops_before_more_resources(cloud, monkeypatch, failure):
     mutations, waits = [], []
@@ -514,7 +504,6 @@ def test_mcp_account_readback_failure_stops_before_more_resources(cloud, monkeyp
         assert waits == []
 
 
-# @matrix mcp-install : resources privacy idempotence
 @pytest.mark.parametrize("current_filter,disabled", [(False, False), (False, True), (True, True)])
 def test_mcp_resource_upgrade_covers_oauth_referrers_and_preserves_other_exclusions(cloud, current_filter, disabled):
     legacy_filter = 'resource.type="gae_app" AND (protoPayload.resource=~"^/oauth/" OR httpRequest.requestUrl=~"/oauth/")'
@@ -544,7 +533,6 @@ def test_mcp_resource_upgrade_covers_oauth_referrers_and_preserves_other_exclusi
     assert not any(call[:3] == ["logging", "sinks", "update"] for call in cloud.calls)
 
 
-# @matrix mcp-install : bootstrap configuration source-version update-order
 def test_mcp_prepare_bootstraps_disabled_and_saves_exact_resource_before_app(cloud, capsys):
     config = settings()
     prepared = mcp.prepare_deployment(config, announce_progress=False)
@@ -564,7 +552,6 @@ def test_mcp_prepare_bootstraps_disabled_and_saves_exact_resource_before_app(clo
     assert capsys.readouterr().out == ""
 
 
-# @matrix mcp-install : source-version update-order verification
 def test_mcp_unchanged_update_skips_build_and_revision(cloud, capsys, monkeypatch):
     import installer
 
@@ -586,9 +573,6 @@ def test_mcp_unchanged_update_skips_build_and_revision(cloud, capsys, monkeypatc
     assert not mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
 
 
-# @matrix mcp-install : source-version update-order verification
-# @source installer/mcp.py::prepare_deployment
-# @source installer/mcp.py::finish_deployment
 def test_mcp_changed_source_update_builds_then_activates_new_image(cloud, monkeypatch):
     config = settings()
     previous = mcp.prepare_deployment(config, announce_progress=False)
@@ -609,7 +593,6 @@ def test_mcp_changed_source_update_builds_then_activates_new_image(cloud, monkey
     assert mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
 
 
-# @matrix mcp-install : disable failure-recovery update-order verification
 def test_mcp_disable_and_failed_activation_do_not_claim_success(cloud, capsys):
     config = settings()
     prepared = mcp.prepare_deployment(config)
@@ -631,7 +614,6 @@ def test_mcp_disable_and_failed_activation_do_not_claim_success(cloud, capsys):
     assert mcp._matches(cloud.service, prepared, config["MCP_RESOURCE"])
 
 
-# @matrix mcp-install : doctor recovery source-version
 def test_mcp_inspection_is_read_only_and_detects_version_drift(cloud):
     config = settings()
     prepared = mcp.prepare_deployment(config)
@@ -643,7 +625,6 @@ def test_mcp_inspection_is_read_only_and_detects_version_drift(cloud):
     assert all(call[:3] == ["run", "services", "describe"] for call in cloud.calls)
 
 
-# @matrix mcp-install : handoff iam
 @pytest.mark.parametrize("app_name", ["ordinary-app", "lagniappe-mcp", "lagniappe-mcp-build"])
 def test_mcp_handoff_uses_selected_accounts_and_scoped_resources(cloud, app_name):
     config = settings()
@@ -662,7 +643,6 @@ def test_mcp_handoff_uses_selected_accounts_and_scoped_resources(cloud, app_name
     assert ("iam", "service-accounts", config["RUNTIME_SERVICE_ACCOUNT_EMAIL"]) not in cloud.policies
 
 
-# @matrix mcp-install : cli-routing retry confirmation
 def test_focused_mcp_command_uses_normal_deployment_path(monkeypatch):
     from installer import verify, deploy
     events = []
@@ -685,7 +665,6 @@ def test_focused_mcp_command_uses_normal_deployment_path(monkeypatch):
     assert events[2:] == [("deploy", False)]
 
 
-# @matrix mcp-install : confirmation default-no no-mutation
 @pytest.mark.parametrize("answer", ["", "n", "no", "not now"])
 def test_mcp_deployment_decline_preserves_configuration(monkeypatch, capsys, answer):
     from installer import verify, deploy
@@ -711,8 +690,6 @@ def test_mcp_deployment_decline_preserves_configuration(monkeypatch, capsys, ans
     assert "MCP server is ready" not in output
 
 
-# @matrix deploy : app-failure update-order
-# @source runner/deploy.py::deploy
 def test_app_failure_never_activates_mcp(monkeypatch):
     from runner import deploy
     announce_progress = False
@@ -737,8 +714,6 @@ def test_app_failure_never_activates_mcp(monkeypatch):
     ]
 
 
-# @matrix setup : optional site-policy settings-save
-# @source installer/optional.py::configure_ai_features
 def test_disabling_ai_skips_model_and_external_prompts(monkeypatch, capsys):
     import config
     from installer import optional
@@ -757,7 +732,6 @@ def test_disabling_ai_skips_model_and_external_prompts(monkeypatch, capsys):
     assert "AI models:" not in capsys.readouterr().out
 
 
-# @matrix mcp-install : bootstrap configuration source-version update-order
 def test_cloud_operator_requires_preprovisioned_mcp_and_oauth_controls(cloud, monkeypatch):
     config = dict(settings(), EXPERIMENTS_ENABLED=True, EXPERIMENTS_PROJECT="demo-project")
     prepared = mcp.prepare_deployment(config)

@@ -6,7 +6,7 @@ Verified against:
 - lagniappe/web/templates/files/ingress.html
 - lagniappe/web/templates/files/status.html
 - lagniappe/web/templates/files/status/*.html
-- src/script/widgets/ingress.mjs
+- src/script/widgets/ingress.ts
 """
 
 import re
@@ -100,7 +100,6 @@ def _create_task_target_pages(user):
     return category
 
 
-# @matrix ingress : process-csv stage-wizard upload-counts
 # @template home/ingress.html::upload_ingress_file
 # @template files/ingress.html::ingress
 # @template files/status.html::column_values
@@ -118,7 +117,6 @@ def test_import_wizard_opens_with_processed_csv_status(get_admin, get_user):
     expect(wizard.stage_button("CHOOSE_TYPE")).to_contain_text("Select Entity Type")
 
 
-# @matrix ingress : assign-columns choose-form choose-parent choose-type stage-wizard verify-import
 # @template files/status.html::row_type_choices
 # @template files/status/parent.html::category_choice
 # @template files/status/form.html::form_choice
@@ -135,7 +133,6 @@ def test_import_wizard_advances_through_page_import_stages(get_admin, get_user):
     expect(wizard.progress).to_contain_text("{ description }")
 
 
-# @matrix ingress : assign-columns choose-form choose-parent choose-type stage-wizard task-name verify-import
 # @template files/status.html::row_type_choices
 # @template files/status/parent.html::project_choice
 # @template files/status/form.html::form_choice
@@ -175,7 +172,6 @@ def test_import_wizard_advances_through_task_import_stages(get_admin, get_user):
     expect(wizard.progress).to_contain_text("{ name }")
 
 
-# @matrix ingress : error-handling set-stage stage-wizard
 # @template files/status/parent.html::category_choice
 def test_import_wizard_stage_navigation_reconciles_downstream_status(get_admin, get_user):
     user = get_admin()
@@ -196,7 +192,6 @@ def test_import_wizard_stage_navigation_reconciles_downstream_status(get_admin, 
     wizard.continue_stage("CHOOSE_PARENT", "Choose or Create a Project")
 
 
-# @matrix ingress : completed import-results
 # @template files/status/results.html::importing
 # @template files/status/results.html::completed
 def test_import_wizard_importing_stage_streams_results_and_completes(get_admin, get_user):
@@ -211,8 +206,6 @@ def test_import_wizard_importing_stage_streams_results_and_completes(get_admin, 
     expect(results).to_contain_text("Beta Follow Up")
 
 
-# @matrix ingress : non-csv validation
-# @pair request-errors:plain-validation
 def test_import_wizard_rejects_non_csv_upload(get_admin, get_user, browser_failures):
     user = get_admin()
     form = _open_import_upload_form(user)
@@ -232,7 +225,6 @@ def test_import_wizard_rejects_non_csv_upload(get_admin, get_user, browser_failu
         )
 
 
-# @matrix ingress : error-handling persistence reopen
 def test_import_wizard_error_state_persists_after_reopen(get_admin, get_user):
     user = get_admin()
     file, wizard = _upload_ingress_file(user, Uploads.ingress_pages_error_csv)
@@ -257,7 +249,6 @@ def test_import_wizard_error_state_persists_after_reopen(get_admin, get_user):
     )
 
 
-# @matrix ingress : existing-form existing-parent
 def test_import_wizard_selects_existing_parent_and_form(get_admin, get_user):
     user = get_admin()
     category = Categories.test_empty_category.get(user)
@@ -282,7 +273,6 @@ def test_import_wizard_selects_existing_parent_and_form(get_admin, get_user):
     expect(wizard.progress).to_contain_text(form.definition.name)
 
 
-# @matrix ingress : ignored-columns verify-import
 def test_import_wizard_ignored_columns_are_not_imported(get_admin, get_user):
     user = get_admin()
     _, wizard = _advance_page_import_to_assign(user, Uploads.ingress_pages_ignored_csv)
@@ -298,7 +288,6 @@ def test_import_wizard_ignored_columns_are_not_imported(get_admin, get_user):
     expect(wizard.progress).not_to_contain_text("{ status }")
 
 
-# @matrix ingress : page-form-lookup task-import
 def test_import_wizard_task_page_form_lookup_updates_index_fields(get_admin, get_user):
     user = get_admin()
     page_form = Forms.test_create_category_with_form.get(user)

@@ -15,7 +15,6 @@ function replaceGlobal(t, name, value) {
 	});
 }
 
-/** @matrix ai-report : absent-markup clipboard-fallback email-address-selection status-reset */
 test("test_ai_email_address_selection_and_copy_controls", async (t) => {
 	const appended = [];
 	const timers = [];
@@ -49,12 +48,12 @@ test("test_ai_email_address_selection_and_copy_controls", async (t) => {
 	});
 	replaceGlobal(t, "clearTimeout", () => {});
 	const { CreateToolReport } = await esmock.strict(
-		"../../src/script/widgets/tools.mjs",
+		"../../src/script/widgets/tools.ts",
 		{
-			"../../src/script/elements/base/baseUpload.mjs": {
+			"../../src/script/elements/base/baseUpload.ts": {
 				BaseUpload: class {},
 			},
-			"../../src/script/elements/upload.mjs": {
+			"../../src/script/elements/upload.ts": {
 				UploadMenu: class {},
 				uploadElement: {},
 			},
@@ -91,4 +90,49 @@ test("test_ai_email_address_selection_and_copy_controls", async (t) => {
 	absent.emailAddress = null;
 	absent.emailCopyButton = null;
 	await absent.copyEmailAddress();
+});
+
+test("test_create_tool_report_preserves_and_resets_auto_execute_control", async () => {
+	const autoExecuteInput = {
+		checked: false,
+		dataset: { defaultChecked: "true" },
+	};
+	const autoExecuteControl = { role: "auto-execute-control" };
+	const contextElement = { role: "context-upload" };
+	const { CreateToolReport } = await esmock.strict(
+		"../../src/script/widgets/tools.ts",
+		{
+			"../../src/script/elements/base/baseUpload.ts": {
+				BaseUpload: class {
+					constructor(attributes) {
+						Object.assign(this, attributes);
+					}
+					reset() {}
+				},
+			},
+			"../../src/script/elements/upload.ts": {
+				UploadMenu: class {},
+				uploadElement: {
+					contextUpload: () => ({
+						element: contextElement,
+						dropzone: { show() {} },
+						clear() {},
+					}),
+				},
+			},
+		},
+	);
+	const widget = new CreateToolReport({
+		target: {
+			querySelector(selector) {
+				if (selector === "[data-role='auto-execute-control']")
+					return autoExecuteControl;
+				if (selector === "[name='auto_execute']") return autoExecuteInput;
+				return null;
+			},
+		},
+	});
+	assert.deepEqual(widget.html, [contextElement, autoExecuteControl]);
+	widget._resetUI();
+	assert.equal(autoExecuteInput.checked, true);
 });

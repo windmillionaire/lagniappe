@@ -9,7 +9,6 @@ from pathlib import Path
 _active = None
 
 
-# @testable infrastructure
 @contextmanager
 def resource_registry():
     """Serialize lazy fixture creation, including recursive prerequisites."""
@@ -40,9 +39,6 @@ def resource_registry():
             _active = None
 
 
-# @testable true
-# @tests tests_unit/test_031_e2e_resources.py::test_enum_identity_is_reused_after_forgetting_and_across_process_state
-# @matrix testing : parallel-e2e
 def resolve_resource(member, user, create=True):
     resource = member.value
     resource.user = user
@@ -61,9 +57,6 @@ def resolve_resource(member, user, create=True):
     return resource
 
 
-# @testable true
-# @tests tests_unit/test_031_e2e_resources.py::test_publishing_keys_preserves_the_first_shared_identity
-# @matrix testing : parallel-e2e
 def publish_resource_keys():
     """Publish new identities without replacing another worker's shared fixture."""
     if not os.environ.get("LAGNIAPPE_E2E_WORKER_CONTEXT"):

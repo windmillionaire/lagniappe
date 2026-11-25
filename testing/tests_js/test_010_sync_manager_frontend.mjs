@@ -15,11 +15,6 @@ function replaceGlobal(t, name, value) {
 	});
 }
 
-/**
- * @matrix offline : offline-replay queue-preserved reconnect-generation retry-boundary
- * @matrix polling : active-widget document visibility
- * @matrix sync : active-widget checkpoint dirty-state offline-replay persistence reconnect-generation retry-boundary visibility
- */
 test("test_sync_manager_uses_polling_subscriptions", async (t) => {
 	const requestCalls = [];
 	const offlineWrites = [];
@@ -119,17 +114,17 @@ test("test_sync_manager_uses_polling_subscriptions", async (t) => {
 		removeEventListener() {},
 	});
 	const { SyncManager } = await esmock.strict(
-		"../../src/script/shared/sync.mjs",
+		"../../src/script/shared/sync.ts",
 		{
-			"../../src/script/elements/editor/headless.mjs": {
+			"../../src/script/elements/editor/headless.ts": {
 				loadHeadlessWidget: (settings) => headlessFactory(settings),
 			},
-			"../../src/script/shared/endpoints.mjs": {
+			"../../src/script/shared/endpoints.ts": {
 				ENDPOINTS: { sync: "/l/sync" },
 			},
-			"../../src/script/shared/offline.mjs": offline,
-			"../../src/script/shared/request.mjs": { request },
-			"../../src/script/shared/utilities.mjs": {
+			"../../src/script/shared/offline.ts": offline,
+			"../../src/script/shared/request.ts": { request },
+			"../../src/script/shared/utilities.ts": {
 				waitForAttribute: async () => undefined,
 			},
 		},

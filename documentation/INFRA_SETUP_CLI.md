@@ -199,7 +199,7 @@ The setup console tests cover widths 12, 40, 60, 80, and 100; styled and plain
 output; literal brackets; Unicode cell widths; prompts and defaults; copyable
 values; and progress pause, resume, and cleanup. Run focused tests first, then
 `venv/bin/python run.py test setup`, affected lifecycle/runner tests, and
-`venv/bin/python run.py traceability --changed --check`.
+`venv/bin/python -m basedpyright --warnings`.
 
 Review representative transcripts for success, cancellation, validation retry,
 provider failure, and manual next steps. Visually review Linux, macOS, and

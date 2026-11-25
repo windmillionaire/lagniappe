@@ -1,5 +1,11 @@
 """Function declaration and handler for loading sample pages from a category."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch
@@ -24,7 +30,7 @@ GET_CATEGORY_PAGES = types.FunctionDeclaration(
         "specific type. Call get_category_forms first to discover available "
         "form types, then pass a form hash token here to get focused examples."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -67,21 +73,17 @@ GET_CATEGORY_PAGES = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_category_pages_compact_returns_lightweight_page_refs
-# @tests tests_unit/test_015_ai_tools.py::test_get_category_pages_reports_effective_limit_and_pagination
-# @matrix ai category-pages : compact pagination tool-context
-def execute_get_category_pages(args, user):
+def execute_get_category_pages(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
     form_identifier = args.get("form_id")
     compact = _bool_arg(args.get("compact"))
     names_only = _bool_arg(args.get("names_only"))
     maximum = NAMES_LIMIT if names_only else SEARCH_LIMIT
-    if not identifier:
+    if not isinstance(identifier, str) or not identifier:
         return {"error": "id is required"}
 
     category = Entities.fetch_one(identifier, request=Fetch.direct())
@@ -91,6 +93,8 @@ def execute_get_category_pages(args, user):
         return {"error": "Access denied"}
     form = None
     if form_identifier:
+        if not isinstance(form_identifier, str):
+            return {"error": "Form not found"}
         form = Entities.fetch_one(form_identifier, request=Fetch.direct())
         if not form or not isinstance(form, Entities.FORM):
             return {"error": "Form not found"}
@@ -112,8 +116,10 @@ def execute_get_category_pages(args, user):
         return {"error": "cursor must be a string"}
     cursor = cursor.strip() if cursor else None
     restrictions = user.properties.restrictions.unrestricted_pages(category)
+    category_key = category.key
+    assert category_key is not None
     db = database_get.pages(
-        category.key,
+        category_key,
         form=form,
         start_cursor=cursor,
         limit=effective_limit,
@@ -152,18 +158,12 @@ def execute_get_category_pages(args, user):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_pages.py::execute_get_category_pages
-# @reason boolean argument coercion is exercised through the public tool handler
 def _bool_arg(value):
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes"}
     return bool(value)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_pages.py::execute_get_category_pages
-# @reason compact page projection is exercised through the public tool handler
 def _compact_page_reference(page, user):
     ai_url = getattr(page, "_ai_url", None)
     data = {
@@ -190,9 +190,6 @@ def _compact_page_reference(page, user):
     return {key: value for key, value in data.items() if value not in (None, [], {})}
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_pages.py::_compact_page_reference
-# @reason compact related projection is exercised through compact page results
 def _compact_entity_reference(entity, user):
     if not entity or not entity.allowed(Action.VIEW, user):
         return None

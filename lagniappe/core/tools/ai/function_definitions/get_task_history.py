@@ -1,5 +1,12 @@
 """Function declaration and handler for loading task completion history."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.task import Task
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason
@@ -27,7 +34,7 @@ GET_TASK_HISTORY = types.FunctionDeclaration(
         "answers. Set include_original=true for its original completed answers "
         "and recorded schema; this requires edit access, as on the website."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -50,18 +57,13 @@ GET_TASK_HISTORY = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_task_history_returns_dates_submissions_and_files
-# @tests tests_unit/test_015_ai_tools.py::test_get_task_history_original_answers_use_saved_schema_and_permissions
-# @matrix ai tasks : original-completion permissions schema-version
-# @matrix ai tasks : files task-history tool-context
-def execute_get_task_history(args, user):
+def execute_get_task_history(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
-    if not identifier:
+    if not isinstance(identifier, str) or not identifier:
         return {"error": "id is required"}
 
     task = Entities.fetch_one(identifier, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
@@ -93,10 +95,7 @@ def execute_get_task_history(args, user):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_task_history.py::execute_get_task_history
-# @reason original snapshot selection and safe projection are exercised through the public read
-def _original_answers(task, user):
+def _original_answers(task: Task, user: User) -> dict[str, object]:
     original = original_completion(task)
     definition = original["definition"]
     result = {
@@ -112,7 +111,7 @@ def _original_answers(task, user):
     fields, signatures = {}, {}
     for schema in definition.schema:
         field_id = schema["id"]
-        if field_id not in original["submission"]:
+        if not isinstance(field_id, str) or field_id not in original["submission"]:
             continue
         value = original["submission"][field_id]
         if schema["type"] == "signature":
@@ -128,9 +127,6 @@ def _original_answers(task, user):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_task_history.py::execute_get_task_history
-# @reason defensive argument normalization is covered through the public handler
 def _history_limit(value):
     try:
         limit = int(value)

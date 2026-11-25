@@ -1,5 +1,37 @@
 """AI report action vocabulary and data contracts."""
 
+from typing import Required, TypedDict
+
+
+type ActionData = dict[str, object]
+
+
+class ActionReferences(TypedDict, total=False):
+    data: ActionData
+
+
+class ReportAction(ActionReferences, total=False):
+    """Validated action and server-owned annotations accumulated during review."""
+
+    type: Required[str]
+    id: str
+    display_label: str
+    reason: str
+    depends_on: list[str]
+    skip: bool
+    _entity_update: dict[str, object]
+    _schema_change: dict[str, object]
+
+
+class ReportProposal(TypedDict, total=False):
+    actions: Required[list[ReportAction]]
+    issues: list[str]
+    summary: str
+    confidence: float
+    answer_html: str
+    answer_markdown: str
+
+
 READ_ONLY_CONTEXT_TOOLS = (
     "get_help",
     "list_workspace_resources",
@@ -18,9 +50,20 @@ READ_ONLY_CONTEXT_TOOLS = (
     "get_category_details",
 )
 
+DELETE_TARGETS = {
+    "delete_page": "page",
+    "delete_task": "task",
+    "delete_category": "category",
+    "delete_project": "project",
+    "delete_model_task": "model",
+    "delete_file": "file",
+}
+
 REPORT_ACTION_DATA_CONTRACTS = {
     **{name: {"fields": ("entity", "changes"), "required": ("entity", "changes")}
-       for name in ("update_task", "update_model_task", "update_project", "update_page", "update_file")},
+       for name in ("update_task", "update_model_task", "update_project", "update_category", "update_page", "update_file")},
+    **{name: {"fields": ("entity", "entity_name"), "required": ("entity",)}
+       for name in DELETE_TARGETS},
     "create_form": {
         "fields": ("name", "form_type", "schema"),
         "required": ("name", "form_type", "schema"),

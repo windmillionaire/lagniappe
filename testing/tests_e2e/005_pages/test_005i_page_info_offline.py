@@ -36,8 +36,6 @@ def _fill_form_element(form, selector, value):
     field_input.fill(value)
 
 
-# @matrix offline : dropdown-refresh durable-queue notification queue-submit replay target-link
-# @pair pages:lp-offline
 # @template pages/info.html::info_form
 # @template pages/document.html::document_settings
 # @template notifications.html::list
@@ -50,7 +48,7 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_admin, browser_fai
     info_form = page.info_form
     expect(_main_submit(info_form)).to_contain_text("Update Page")
 
-    page.document_tab
+    _ = page.document_tab
     owner.locate(Page.DOCUMENT_SETTINGS_TOGGLE).click()
     document_settings = owner.locate(Page.DOCUMENT_SETTINGS_FORM)
     expect(document_settings).to_be_visible()
@@ -65,7 +63,7 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_admin, browser_fai
         expect(blocked_submit.locator("[data-icon='offline']")).to_be_visible()
         expect(blocked_submit).to_have_class(re.compile("opacity-75"))
 
-        Tabs(owner).info
+        _ = Tabs(owner).info
         info_form = page.info_form
         _fill_form_element(info_form, Page.INFO_NAME, updated_name)
         owner.page.keyboard.press("Tab")
@@ -105,8 +103,6 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_admin, browser_fai
     expect(option).not_to_be_attached()
 
 
-# @matrix offline : queue-submit reload replay-reconciliation
-# @pairs edited-entity-notice:replayed-response pages:lp-offline polling:freshness
 # @template pages/info.html::info_form
 def test_page_info_replay_reconciles_after_reload(get_admin, browser_failures):
     owner = get_admin()
@@ -124,33 +120,32 @@ def test_page_info_replay_reconciles_after_reload(get_admin, browser_failures):
         owner,
         status=503,
         path="/analytics/track",
+    ), browser_failures.expect_offline(
+        owner,
+        ping_count=2,
+        max_ping_count=3,
     ):
-        with browser_failures.expect_offline(
-            owner,
-            ping_count=2,
-            max_ping_count=3,
-        ):
-            owner.offline = True
-            info_submit = _main_submit(info_form)
-            info_submit.click()
-            expect(info_submit).to_contain_text("Queued Sync")
-            wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
+        owner.offline = True
+        info_submit = _main_submit(info_form)
+        info_submit.click()
+        expect(info_submit).to_contain_text("Queued Sync")
+        wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
 
-            page = page.reload()
-            expect(owner.locate(OFFLINE_INDICATOR)).to_be_visible()
+        page = page.reload()
+        expect(owner.locate(OFFLINE_INDICATOR)).to_be_visible()
 
-            current_form = page.info_form
-            current_submission = current_form.locator("[id^='sync-text-renderer-']")
-            expect(current_submission.locator("input")).to_have_value(
-                original_submission
-            )
-            current_submit = _main_submit(current_form)
-            expect(current_submit).to_contain_text("Update Page")
-            expect(current_submit.locator("[data-icon='offline']")).to_have_count(0)
+        current_form = page.info_form
+        current_submission = current_form.locator("[id^='sync-text-renderer-']")
+        expect(current_submission.locator("input")).to_have_value(
+            original_submission
+        )
+        current_submit = _main_submit(current_form)
+        expect(current_submit).to_contain_text("Update Page")
+        expect(current_submit.locator("[data-icon='offline']")).to_have_count(0)
 
-            with owner.page.expect_response("**/pages/*/update", timeout=15000):
-                owner.offline = False
-            wait_for_offline_mutations(owner, record_id=mutation_id, exact=0)
+        with owner.page.expect_response("**/pages/*/update", timeout=15000):
+            owner.offline = False
+        wait_for_offline_mutations(owner, record_id=mutation_id, exact=0)
 
     marker = current_form.locator("[lp-edited-marker]")
     expect(marker).to_be_visible()
@@ -177,9 +172,6 @@ def test_page_info_replay_reconciles_after_reload(get_admin, browser_failures):
     )
 
 
-# @matrix forms : queued-conflict submission-choice
-# @matrix offline : reload
-# @source src/script/forms/revisions/reconciler.mjs::EditReconciler
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
 def test_offline_submission_conflict_keeps_queue_until_choice(get_admin, get_user, browser_failures):

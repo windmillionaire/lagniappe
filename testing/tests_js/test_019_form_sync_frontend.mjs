@@ -20,17 +20,16 @@ const emptyRequest = {};
 class EmptySiteSetting {}
 class EmptySelectBox {}
 
-/** @matrix admin : deployment-settings memory-pressure scaling-controls */
 test("test_site_deployment_caps_workers_only_for_f2_and_b2", async () => {
 	const { SiteDeployment } = await esmock.strict(
-		"../../src/script/widgets/siteSettings/deployment.mjs",
+		"../../src/script/widgets/siteSettings/deployment.ts",
 		{
-			"../../src/script/elements/buttons.mjs": { buttons: emptyButtons },
-			"../../src/script/elements/combobox/index.mjs": {
+			"../../src/script/elements/buttons.ts": { buttons: emptyButtons },
+			"../../src/script/elements/combobox/index.ts": {
 				SelectBox: EmptySelectBox,
 			},
-			"../../src/script/shared/index.mjs": { request: emptyRequest },
-			"../../src/script/widgets/siteSettings/base.mjs": {
+			"../../src/script/shared/index.ts": { request: emptyRequest },
+			"../../src/script/widgets/siteSettings/base.ts": {
 				SiteSetting: EmptySiteSetting,
 			},
 		},
@@ -81,7 +80,6 @@ test("test_site_deployment_caps_workers_only_for_f2_and_b2", async () => {
 	}
 });
 
-/** @matrix admin : composite-widgets persistence sections site-settings */
 test("test_site_settings_coordinates_section_widgets", async (t) => {
 	class FakeToggle {
 		constructor() {
@@ -156,12 +154,12 @@ test("test_site_settings_coordinates_section_widgets", async (t) => {
 		removeItem: (key) => storage.delete(key),
 	});
 	const { SiteSettings } = await esmock.strict(
-		"../../src/script/widgets/siteSettings.mjs",
+		"../../src/script/widgets/siteSettings.ts",
 		{
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => await callback(),
 			},
-			"../../src/script/widgets/siteSettings/publicPages.mjs": {
+			"../../src/script/widgets/siteSettings/publicPages.ts": {
 				SitePublicPages: class {},
 			},
 		},
@@ -228,24 +226,23 @@ test("test_site_settings_coordinates_section_widgets", async (t) => {
 
 async function loadAiModels() {
 	return await esmock.strict(
-		"../../src/script/widgets/siteSettings/aiModels.mjs",
+		"../../src/script/widgets/siteSettings/aiModels.ts",
 		{
-			"../../src/script/elements/buttons.mjs": { buttons: emptyButtons },
-			"../../src/script/elements/combobox/index.mjs": {
+			"../../src/script/elements/buttons.ts": { buttons: emptyButtons },
+			"../../src/script/elements/combobox/index.ts": {
 				SelectBox: EmptySelectBox,
 			},
-			"../../src/script/shared/index.mjs": { request: emptyRequest },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/index.ts": { request: emptyRequest },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => await callback(),
 			},
-			"../../src/script/widgets/siteSettings/base.mjs": {
+			"../../src/script/widgets/siteSettings/base.ts": {
 				SiteSetting: EmptySiteSetting,
 			},
 		},
 	);
 }
 
-/** @matrix admin : ai-settings model-options saved-values */
 test("test_site_settings_initializes_ai_selects_before_syncing_saved_values", async () => {
 	const { SiteAiModels } = await loadAiModels();
 	const calls = [];
@@ -284,7 +281,6 @@ test("test_site_settings_initializes_ai_selects_before_syncing_saved_values", as
 	);
 });
 
-/** @matrix admin : ai-settings model-selection submission */
 test("test_site_settings_ai_submission_uses_visible_combobox_values", async (t) => {
 	class FormDataBoundary {
 		constructor(form) {
@@ -309,6 +305,7 @@ test("test_site_settings_ai_submission_uses_visible_combobox_values", async (t) 
 		value: "native-utility",
 		closest: () => ({ _lp_combobox: { values: new Set() } }),
 	};
+	const autoExecuteInput = { checked: true };
 	const form = {
 		initialData: [
 			["AI_MODEL", "stale-form-primary"],
@@ -317,6 +314,8 @@ test("test_site_settings_ai_submission_uses_visible_combobox_values", async (t) 
 			["AI_LOCATION", "global"],
 		],
 		querySelectorAll: () => [primary, utility],
+		querySelector: (selector) =>
+			selector === "[name='AI_AUTO_EXECUTE']" ? autoExecuteInput : null,
 	};
 	const settings = Object.create(SiteAiModels.prototype);
 	settings.aiForm = form;
@@ -336,25 +335,35 @@ test("test_site_settings_ai_submission_uses_visible_combobox_values", async (t) 
 		["saved-image", "global"],
 		"preserves non-combobox fields",
 	);
+	assert.equal(
+		data.get("AI_AUTO_EXECUTE"),
+		"true",
+		"submits AI_AUTO_EXECUTE checkbox state",
+	);
+	autoExecuteInput.checked = false;
+	assert.equal(
+		settings._aiSettingsFormData().get("AI_AUTO_EXECUTE"),
+		"false",
+		"submits false when AI_AUTO_EXECUTE is unchecked",
+	);
 });
 
-/** @matrix form-schema forms : canonical-list legacy-object-rejected visibility */
 test("test_renderer_visibility_requires_canonical_condition_lists", async () => {
 	const { FormRenderer } = await esmock.strict(
-		"../../src/script/forms/renderer.mjs",
+		"../../src/script/forms/renderer.ts",
 		{
-			"../../src/script/elements/loader.mjs": {
+			"../../src/script/elements/loader.ts": {
 				getFormElement: async () => null,
 			},
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
 				},
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => await callback(),
 			},
-			"../../src/script/shared/utilities.mjs": {
+			"../../src/script/shared/utilities.ts": {
 				generateElementId: () => "renderer-test",
 			},
 		},
@@ -413,7 +422,6 @@ class BuilderNode {
 	}
 }
 
-/** @matrix form-schema forms : builder immutable-schema presentation-defaults */
 test("test_builder_model_defaults_are_presentation_only", async (t) => {
 	const calls = [];
 	const primitive = (kind) => (attributes) => {
@@ -425,10 +433,10 @@ test("test_builder_model_defaults_are_presentation_only", async (t) => {
 		getElementById: () => new BuilderNode(),
 	});
 	const { ModelElement } = await esmock.strict(
-		"../../src/script/views/builder/panels/model.mjs",
+		"../../src/script/views/builder/panels/model.ts",
 		{
 			sortablejs: { default: { create: () => ({ destroy() {} }) } },
-			"../../src/script/elements/primitives.mjs": {
+			"../../src/script/elements/primitives.ts": {
 				primitives: {
 					badge: primitive("badge"),
 					checkbox: primitive("checkbox"),
@@ -446,7 +454,7 @@ test("test_builder_model_defaults_are_presentation_only", async (t) => {
 					radio: { fieldset: { column: "" }, label: "" },
 				},
 			},
-			"../../src/script/views/builder/config.mjs": {
+			"../../src/script/views/builder/config.ts": {
 				CONFIG: {
 					PRESENTATION_DEFAULTS: {
 						input: { title: "Input", input: "text" },
@@ -572,18 +580,18 @@ async function loadMaintenance({
 	clear = () => {},
 } = {}) {
 	return await esmock.strict(
-		"../../src/script/widgets/siteSettings/maintenance.mjs",
+		"../../src/script/widgets/siteSettings/maintenance.ts",
 		{
-			"../../src/script/elements/buttons.mjs": { buttons },
+			"../../src/script/elements/buttons.ts": { buttons },
 			"../../src/script/generated/styles.mjs": { STYLES: maintenanceStyles },
-			"../../src/script/shared/index.mjs": { Modal: class {}, request },
-			"../../src/script/shared/storage.mjs": {
+			"../../src/script/shared/index.ts": { Modal: class {}, request },
+			"../../src/script/shared/storage.ts": {
 				clearRecentSearchResults: clear,
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => await callback(),
 			},
-			"../../src/script/widgets/siteSettings/base.mjs": {
+			"../../src/script/widgets/siteSettings/base.ts": {
 				SiteSetting: EmptySiteSetting,
 			},
 		},
@@ -630,7 +638,6 @@ const completedMigration = {
 };
 
 /**
- * @matrix admin database-migrations : actionable-links audit-error cache-gate current failed fresh-install pending repair-filtering repairs running version-history
  * @template home/site_settings.html::site_settings
  */
 test("test_site_settings_migration_status_uses_generic_release_states", async (t) => {
@@ -867,7 +874,6 @@ test("test_site_settings_migration_status_uses_generic_release_states", async (t
 });
 
 /**
- * @matrix cache : failure-isolation actionable-links
  * @template home/site_settings.html::site_settings
  */
 test("test_site_settings_cache_refresh_displays_linked_failures", async (t) => {

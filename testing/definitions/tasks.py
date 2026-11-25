@@ -9,7 +9,7 @@ Maps to:
 - Entity: lagniappe/core/entities/task.py
 - Routes: lagniappe/web/routes/tasks/
 - Templates: lagniappe/web/templates/pages/tasks.html, home/tasks.html
-- View: src/script/views/page.mjs, home.mjs
+- View: src/script/views/page.ts, home.mjs
 
 Test Framework:
 - testing/definitions/task_definitions.py: TaskDefinition dataclass

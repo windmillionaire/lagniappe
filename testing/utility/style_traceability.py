@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field, replace
 import ast
@@ -12,20 +13,19 @@ from pathlib import Path
 import re
 import subprocess
 import sys
-from typing import Iterable
+from collections.abc import Iterable
 
 import yaml
 from yaml.nodes import MappingNode, ScalarNode
 
-from testing.utility import icon_traceability, style_candidates, style_registry
+from testing.utility import contract_common, icon_traceability, style_candidates, style_registry
 from testing.utility.artifacts import write_markdown_report
-from testing.utility.traceability_common import (
+from testing.utility.test_evidence import load_json, write_json
+from testing.utility.contract_common import (
     git_changed_paths,
-    load_json,
     provenance,
     stable_finding_id,
     structured_report_payload,
-    write_json,
 )
 
 
@@ -1348,17 +1348,12 @@ def _attach_style_evidence(
     styles: dict[str, StyleEntry],
 ) -> tuple[dict[str, StyleEntry], list[dict[str, str]]]:
     """Connect explicit/test-template evidence and apply result freshness."""
-    config_path = repo_root / "testing/utility/traceability.yaml"
-    if not config_path.is_file():
+    from testing.utility import template_contracts
+
+    tests = contract_common.collect_contract_tests(repo_root)
+    if not tests:
         return styles, []
-
-    from testing.utility import template_contracts, traceability
-
-    config = traceability.load_config(
-        Path("testing/utility/traceability.yaml"), repo_root
-    )
-    tests = traceability.collect_tests(repo_root, config["test_roots"])
-    dependencies: dict[str, set[str]] = defaultdict(set)
+    current = contract_common.attach_contract_results(repo_root, tests)
     pending: dict[str, set[tuple[str, str, str]]] = defaultdict(set)
     issues: list[dict[str, str]] = []
 
@@ -1366,7 +1361,7 @@ def _attach_style_evidence(
         pending[style_id].add((nodeid, kind, source))
 
     for test in tests.values():
-        for style_id in test.metadata.styles:
+        for style_id in test.styles:
             if style_id not in styles:
                 issues.append(
                     {
@@ -1379,7 +1374,7 @@ def _attach_style_evidence(
                 continue
             add(style_id, test.nodeid, "explicit", test.location)
 
-    template_report = template_contracts.build_report(repo_root)
+    template_report = template_contracts.build_report(repo_root, tests=tests)
     styles_by_template_ref: dict[str, set[str]] = defaultdict(set)
     parsed_templates: dict[str, template_contracts.TemplateFile] = {}
     for style in styles.values():
@@ -1412,7 +1407,6 @@ def _attach_style_evidence(
     for entry in template_report.entries:
         owned_refs = {entry.reference.template_ref, *entry.included_macros}
         for template_ref in owned_refs:
-            template_path = template_ref.split("::", 1)[0]
             for style_id in styles_by_template_ref.get(template_ref, set()):
                 add(
                     style_id,
@@ -1438,7 +1432,7 @@ def _attach_style_evidence(
         }
         pending[style_id] = explicit | representatives
 
-    dependencies.clear()
+    dependencies: dict[str, set[str]] = defaultdict(set)
     for style_id, rows in pending.items():
         for nodeid, kind, source in rows:
             dependencies[nodeid].add(f"@style/{style_id}")
@@ -1448,9 +1442,9 @@ def _attach_style_evidence(
                     f"lagniappe/web/templates/{source.split('::', 1)[0]}"
                 )
 
-    traceability.apply_test_dependency_fingerprints(
-        tests, dict(dependencies), repo_root
-    )
+    for nodeid, paths in dependencies.items():
+        test = tests[nodeid]
+        test.execution_current = test.execution_current and test.matches(paths, current)
     result: dict[str, StyleEntry] = {}
     for style_id, style in styles.items():
         evidence = []
@@ -1921,9 +1915,29 @@ def baseline_finding_ids(path: Path | None, repo_root: Path) -> set[str]:
     return {str(value) for value in values}
 
 
-def run_from_traceability(args: object, argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Inspect style, icon and CSS contracts.")
+    parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[2])
+    query = parser.add_mutually_exclusive_group()
+    query.add_argument("--style", metavar="ID")
+    query.add_argument("--style-source", metavar="PATH")
+    query.add_argument("--style-consumer", metavar="PATH")
+    query.add_argument("--changed", nargs="?", const="HEAD", metavar="BASE")
+    parser.add_argument("--check", action="store_true")
+    parser.add_argument("--fail-on", choices=("error", "warning"), default="error")
+    parser.add_argument("--baseline", type=Path)
+    parser.add_argument("--write-baseline", type=Path)
+    parser.add_argument("--report-path", type=Path)
+    parser.add_argument("--manifest-path", type=Path, default=DEFAULT_MANIFEST_PATH)
+    parser.add_argument("--no-report", action="store_true")
+    parser.add_argument("--no-manifest", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    arguments = sys.argv[1:] if argv is None else argv
+    return run_contracts(parser.parse_args(arguments), ["style-contracts", *arguments])
+
+
+def run_contracts(args: argparse.Namespace, command: list[str]) -> int:
     repo_root = args.repo_root.resolve()
-    command = ["traceability", *(argv or [])]
     try:
         report, manifest = build_report(repo_root, command=command)
         changed = []
@@ -1943,7 +1957,7 @@ def run_from_traceability(args: object, argv: list[str] | None = None) -> int:
         )
         baseline_ids = baseline_finding_ids(args.baseline, repo_root)
     except Exception as exc:
-        print(f"traceability styles: {exc}", file=sys.stderr)
+        print(f"style-contracts: {exc}", file=sys.stderr)
         return 2
 
     if not args.no_manifest:
@@ -2055,5 +2069,5 @@ __all__ = [
     "report_findings",
     "report_payload",
     "report_to_json",
-    "run_from_traceability",
+    "main",
 ]

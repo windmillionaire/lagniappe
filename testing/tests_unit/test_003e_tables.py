@@ -14,6 +14,7 @@ from lagniappe.core.properties.row_submission import RowSubmission
 from lagniappe.core.properties.form_table import Table
 from testing.utility.mock_submission import WebFormSubmission
 from testing.utility.test_entities import TestEntities
+from datetime import UTC
 
 
 class _MinimalImportProcess:
@@ -23,8 +24,6 @@ class _MinimalImportProcess:
     separator = ","
 
 
-# @source lagniappe/core/properties/row_submission.py::TableColumnFields.create_field
-# @pair form-table:timezone
 @pytest.mark.unit
 @pytest.mark.parametrize("zone, day", [
     ("America/Los_Angeles", "2026-09-24"),
@@ -32,7 +31,7 @@ class _MinimalImportProcess:
     ("Asia/Tokyo", "2026-09-24"),
 ])
 def test_table_date_columns_keep_explicit_actor_timezone(monkeypatch, zone, day):
-    from datetime import datetime, timezone
+    from datetime import datetime
     from zoneinfo import ZoneInfo
     from lagniappe import CONFIG
     from testing.utility.ai_report_fakes import _test_user
@@ -47,7 +46,7 @@ def test_table_date_columns_keep_explicit_actor_timezone(monkeypatch, zone, day)
     table = Table(definition, entity=page, user=actor)
     table.validate_ai({"rows": [{"day": day}]})
 
-    expected = datetime.fromisoformat(day).replace(tzinfo=ZoneInfo(zone)).astimezone(timezone.utc)
+    expected = datetime.fromisoformat(day).replace(tzinfo=ZoneInfo(zone)).astimezone(UTC)
     assert table.rows[0].fields["day"].value == expected
     restored = Table(definition, entity=page, user=actor)
     restored.db_value = table.db_value
@@ -82,7 +81,6 @@ def _run_row_submission_case(entity, get_schema):
             )
 
 
-# @matrix form-table : column db-value form-submission
 @pytest.mark.unit
 def test_table_form_single_row(get_test_entities, get_schema, test_submission_values):
     """Hidden JSON input with one row round-trips through validate_submission."""
@@ -91,7 +89,6 @@ def test_table_form_single_row(get_test_entities, get_schema, test_submission_va
         test_submission_values(entity)
 
 
-# @matrix form-table : ai-value multiple-rows
 @pytest.mark.unit
 def test_table_ai_multiple_rows(get_test_entities, get_schema, test_submission_values):
     """AI ingress supplies ``{rows: [{col_id: v}, ...]}``."""
@@ -100,7 +97,6 @@ def test_table_ai_multiple_rows(get_test_entities, get_schema, test_submission_v
         test_submission_values(entity)
 
 
-# @matrix form-table : ai-value validation
 @pytest.mark.unit
 @pytest.mark.parametrize("invalid", ["Flight", [], {}, {"rows": {}}, {"rows": ["Airline & Flight #"]}, {"rows": [["UA1434"]]}, {"rows": [{"Flight": "UA1434"}]}])
 def test_table_ai_rejects_malformed_rows_without_losing_values(invalid):
@@ -114,7 +110,6 @@ def test_table_ai_rejects_malformed_rows_without_losing_values(invalid):
     assert table.db_value == original
 
 
-# @matrix form-table : column empty form-submission
 @pytest.mark.unit
 def test_table_form_empty(get_test_entities, get_schema, test_submission_values):
     """Empty ``rows`` yields null ``form_value`` and null ``column_value``."""
@@ -123,7 +118,6 @@ def test_table_form_empty(get_test_entities, get_schema, test_submission_values)
         test_submission_values(entity)
 
 
-# @pair form-table:import
 @pytest.mark.unit
 def test_table_import_single_row(get_test_entities, get_schema, test_submission_values):
     """CSV-style list of values per row matches column field order."""
@@ -132,7 +126,6 @@ def test_table_import_single_row(get_test_entities, get_schema, test_submission_
         test_submission_values(entity)
 
 
-# @matrix form-table : ai-value filter-value import multiple-rows
 @pytest.mark.unit
 def test_table_import_multiple_rows(get_test_entities, get_schema, test_submission_values):
     """Multiple import rows preserve order for filter/AI projections."""
@@ -141,7 +134,6 @@ def test_table_import_multiple_rows(get_test_entities, get_schema, test_submissi
         test_submission_values(entity)
 
 
-# @pair form-table:row-submission
 @pytest.mark.unit
 def test_table_row_submission_text_email_checkbox(get_test_entities, get_schema):
     """Row validator coerces checkbox ``on`` and builds column ``form_value`` dict."""
@@ -149,7 +141,6 @@ def test_table_row_submission_text_email_checkbox(get_test_entities, get_schema)
         _run_row_submission_case(entity, get_schema)
 
 
-# @matrix link : external metadata row-submission
 @pytest.mark.unit
 def test_table_row_submission_external_link_column(get_test_entities, get_schema):
     """Multipart external link keys collapse to ``{url, title}`` (metadata mocked)."""
@@ -157,7 +148,6 @@ def test_table_row_submission_external_link_column(get_test_entities, get_schema
         _run_row_submission_case(entity, get_schema)
 
 
-# @matrix form-table : column form-submission mixed-columns search-value
 @pytest.mark.unit
 def test_table_form_mixed_column_types(get_test_entities, get_schema, test_submission_values):
     """Table row: text (search), time, number, tel (date columns use same path as top-level dates)."""
@@ -166,7 +156,6 @@ def test_table_form_mixed_column_types(get_test_entities, get_schema, test_submi
         test_submission_values(entity)
 
 
-# @pair form-table:import
 @pytest.mark.unit
 def test_table_import_mixed_column_types(get_test_entities, get_schema, test_submission_values):
     """Import row order matches columns for text, time, number, tel."""
@@ -175,7 +164,6 @@ def test_table_import_mixed_column_types(get_test_entities, get_schema, test_sub
         test_submission_values(entity)
 
 
-# @matrix link : entity-resolution internal row-submission
 @pytest.mark.unit
 def test_table_row_submission_internal_link_column(get_test_entities, get_schema):
     """Internal link column resolves via ``Entities.fetch_one`` on validation."""
@@ -212,7 +200,6 @@ def test_table_row_submission_internal_link_column(get_test_entities, get_schema
         assert hashes == spec["expected_link_hashes"]
 
 
-# @matrix form-table : import validation
 @pytest.mark.unit
 def test_table_import_row_length_mismatch(get_test_entities, get_schema):
     for entity in get_test_entities():
@@ -232,7 +219,6 @@ def test_table_import_row_length_mismatch(get_test_entities, get_schema):
         assert json.loads(entity.db["submission"]) == original_submission
 
 
-# @matrix form-table : import validation
 @pytest.mark.unit
 def test_table_validate_import_row_length_mismatch_raises_value_error(
     get_schema,
@@ -256,7 +242,6 @@ def test_table_validate_import_row_length_mismatch_raises_value_error(
         table.validate_import([["only_one_cell"]])
 
 
-# @matrix form-table : form-submission validation
 @pytest.mark.unit
 def test_table_validate_submission_invalid_json(get_test_entities, get_schema):
     for entity in get_test_entities():
@@ -267,3 +252,12 @@ def test_table_validate_submission_invalid_json(get_test_entities, get_schema):
         with pytest.raises(json.JSONDecodeError):
             table.validate_submission("{not valid json")
         assert table.db_value == original
+
+
+@pytest.mark.unit
+def test_empty_row_name_does_not_inherit_the_parent_entity_name():
+    table = Table(
+        {"id": "places", "columns": [{"id": "name", "input": "text"}]},
+        entity=TestEntities.get("PAGE", {"name": "Parent page", "hash": "row-name"}),
+    )
+    assert RowSubmission(table).form_value == {}

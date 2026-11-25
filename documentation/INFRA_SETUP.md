@@ -25,6 +25,7 @@ environment exists is `venv/bin/python -m installer ...`.
 | Command | Purpose |
 | --- | --- |
 | no arguments | Install or recover a complete instance. |
+| `--agent --answers FILE [--json]` | Non-interactive agent-assisted install using GCP Secret Manager (`SECRETS_BACKEND: secret_manager`) and the localhost one-shot browser secret vault; see [INSTALL_WITH_AI.md](INSTALL_WITH_AI.md). |
 | `--experiments` | Enable experiments mode during creation of a dedicated installation, with an admin agent, MCP execution and request measurements; see [INFRA_EXPERIMENTS.md](INFRA_EXPERIMENTS.md). |
 | `auth` | Refresh the saved gcloud account and align human ADC. |
 | `doctor` | Read-only local/provider audit. |
@@ -37,6 +38,7 @@ environment exists is `venv/bin/python -m installer ...`.
 | `mcp` | Confirm app deployment, then build/reconcile the selected MCP component and publish its app configuration. |
 | `ai-email` | Configure Resend receiving and the AI email webhook. |
 | `security` | Configure verified Redis TLS. |
+| `secrets migrate` | Migrate an existing `local_yaml` installation's runtime secrets into GCP Secret Manager, strip them from disk, and offer deployment. |
 | `jobs` | Reconcile deferred-job Cloud Scheduler infrastructure. |
 | `handoff` | Transfer a delegated installation to the permanent Owner/deployer. |
 | `update` | Regenerate configuration and restore app-saved settings without replacing source. |

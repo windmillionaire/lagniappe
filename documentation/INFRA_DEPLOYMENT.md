@@ -83,7 +83,7 @@ Passing the local tree check alone does not establish release eligibility.
 
 Hosted E2E exports that exact commit for both its App Engine version and Cloud
 Run runner image and never rebuilds it. `hosted-e2e create` runs source-quality,
-tooling tests, full and changed traceability, and release checks before gcloud
+both Python type checks, tooling tests, template/style/mutation checks, and release checks before gcloud
 activation or provider mutation. The GitHub workflow then requires the prepared
 Cloud Run job to identify the exact release candidate. Manual diagnostic runs
 cannot publish release attestation. See

@@ -1,6 +1,7 @@
 """Page lookup helpers for CSV import workflows."""
 
 import re
+from typing import TypedDict
 
 from thefuzz import process
 
@@ -8,19 +9,19 @@ from ...definitions import Restriction
 from .. import cache
 
 
+class PageMatch(TypedDict):
+    id: str | None
+    warnings: list[str]
+    errors: list[str]
+
+
 FUZZY_MATCH_THRESHOLD = 80
 WEAK_MATCH_THRESHOLD = 90
 
 
-# @testable true
-# @tests tests_unit/test_006c_files_find_page.py::test_find_page_exact_name_match
-# @tests tests_unit/test_006c_files_find_page.py::test_find_page_no_match_returns_error
-# @tests tests_unit/test_006c_files_find_page.py::test_find_page_fuzzy_weak_match_returns_warning
-# @tests tests_unit/test_006c_files_find_page.py::test_find_page_fuzzy_low_confidence_returns_error
-# @matrix ingress link : fuzzy-match no-match page-match weak-match
-def find_page(value, match_field_label="Name", fuzzy=False, error_label=None):
+def find_page(value: object, match_field_label: str = "Name", fuzzy: bool | None = False, error_label: str | None = None) -> PageMatch:
     """Find a page by name or cached form-field snippet for CSV imports."""
-    result = {"id": None, "warnings": [], "errors": []}
+    result: PageMatch = {"id": None, "warnings": [], "errors": []}
     lookup_value = _lookup_value(value)
     label = error_label or match_field_label
 
@@ -60,9 +61,6 @@ def find_page(value, match_field_label="Name", fuzzy=False, error_label=None):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/find_page.py::find_page
-# @reason helper-owned-by page lookup normalization contract
 def _lookup_value(value):
     if isinstance(value, list):
         value = " ".join(
@@ -75,9 +73,6 @@ def _lookup_value(value):
     return value or None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/files/find_page.py::find_page
-# @reason helper-owned-by page lookup candidate extraction contract
 def _page_candidates(search_results, match_field_label):
     if match_field_label.lower() == "name":
         return {r["name"]: r["id"] for r in search_results if r.get("name")}

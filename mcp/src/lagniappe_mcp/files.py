@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass, field
 import hashlib
 import mimetypes
@@ -12,11 +12,13 @@ import os
 from pathlib import Path
 import re
 import stat
-from typing import Any, Protocol
+from typing import Protocol, TypedDict, TypeGuard
+
 from urllib.parse import parse_qsl, urlsplit
 
 import httpx
 
+from . import JsonObject, JsonValue
 from .errors import AdapterError, FileBoundaryError, TransportError
 from .limits import (
     CONNECT_TIMEOUT_SECONDS,
@@ -40,25 +42,25 @@ _READ_BLOCK_BYTES = 64 * 1024
 _UPLOAD_BATCH_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::upload_local_files
+class UploadFileDeclaration(TypedDict):
+    filename: str
+    content_type: str
+    size: int
+
+
 class _RESTLike(Protocol):
     storage_client: httpx.AsyncClient
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/files.py::upload_local_files
     async def request_json(
         self,
         method: str,
         target: str,
         *,
-        body: Any = None,
+        body: object = None,
         max_bytes: int = MAX_STRUCTURED_RESULT_BYTES,
-    ) -> tuple[Any, str | None]: ...
+    ) -> tuple[JsonValue, str | None]: ...
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::OpenedFileBatch
 def _file_error(
     code: str, message: str, *, index: int | None = None
 ) -> FileBoundaryError:
@@ -66,8 +68,6 @@ def _file_error(
     return FileBoundaryError(code, message, details=details)
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::OpenedFileBatch
 def _read_descriptor_block(
     descriptor: int,
     *,
@@ -98,8 +98,6 @@ def _read_descriptor_block(
     return bytes(block)
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::OpenedFileBatch
 async def _capture_descriptor_hashes(
     descriptor: int,
     metadata: os.stat_result,
@@ -149,14 +147,6 @@ async def _capture_descriptor_hashes(
     return tuple(hashes)
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033b_mcp_files.py::test_opened_batch_accepts_readable_regular_files
-# @tests tests_unit/test_033b_mcp_files.py::test_replacing_path_after_open_still_uploads_the_open_descriptor
-# @tests tests_unit/test_033b_mcp_files.py::test_open_descriptor_rejects_same_size_rewrite_with_restored_mtime
-# @tests tests_unit/test_033b_mcp_files.py::test_unlinked_rewritten_descriptor_fails_content_identity_check
-# @tests tests_unit/test_033b_mcp_files.py::test_rewritten_descriptor_with_identical_metadata_fails_content_identity_check
-# @matrix mcp-upload : os-readable regular absolute parent-traversal symlink descriptor-lifetime mutation-snapshot byte-identity
 @dataclass(slots=True)
 class OpenedFile:
     """One regular file whose verified descriptor remains the byte authority."""
@@ -174,7 +164,7 @@ class OpenedFile:
     block_hashes: tuple[bytes, ...] = field(repr=False)
 
     @property
-    def declaration(self) -> dict[str, Any]:
+    def declaration(self) -> UploadFileDeclaration:
         return {
             "filename": self.filename,
             "content_type": self.content_type,
@@ -220,15 +210,6 @@ class OpenedFile:
             self.fd = -1
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033b_mcp_files.py::test_opened_batch_rejects_duplicate_objects
-# @tests tests_unit/test_033b_mcp_files.py::test_opened_batch_rejects_invalid_or_non_regular_inputs
-# @tests tests_unit/test_033b_mcp_files.py::test_opened_batch_accepts_readable_regular_files
-# @tests tests_unit/test_033b_mcp_files.py::test_upload_rejects_contract_count_before_opening_paths
-# @tests tests_unit/test_033b_mcp_files.py::test_oversized_file_is_rejected_before_descriptor_read
-# @tests tests_unit/test_033b_mcp_files.py::test_cancellation_during_byte_snapshot_closes_descriptors
-# @matrix mcp-upload : os-readable batch-preflight cancellation cleanup regular missing empty relative symlink directory special byte-identity duplicate invalid-path
 class OpenedFileBatch:
     """Explicit OS-readable regular files retained for one upload batch."""
 
@@ -402,8 +383,6 @@ class OpenedFileBatch:
         self.close()
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::ResumableUploader
 class _DescriptorChunkStream(httpx.AsyncByteStream):
     """Re-readable bounded request content sourced only from one open descriptor."""
 
@@ -416,9 +395,7 @@ class _DescriptorChunkStream(httpx.AsyncByteStream):
         self.index = index
         self.bytes_read = 0
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/files.py::ResumableUploader
-    async def __aiter__(self):
+    async def __aiter__(self) -> AsyncIterator[bytes]:
         while self.bytes_read < self.length:
             absolute_offset = self.start + self.bytes_read
             block_index = absolute_offset // _READ_BLOCK_BYTES
@@ -455,25 +432,17 @@ class _DescriptorChunkStream(httpx.AsyncByteStream):
             self.bytes_read += len(payload)
             yield payload
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/files.py::ResumableUploader
     async def aclose(self) -> None:
         return None
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::upload_local_files
 def _strict_int(value: object, *, minimum: int = 0) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
         return None
     return value
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @matrix mcp-upload : batch-preflight local-limits
-# @tests tests_unit/test_033b_mcp_files.py::test_upload_rejects_server_limits_above_frozen_local_ceilings_before_open
-def _bounded_contract_limits(contract: Mapping[str, Any]) -> tuple[int, int, int]:
+def _bounded_contract_limits(contract: Mapping[str, object]) -> tuple[int, int, int]:
     limits = contract.get("limits")
     if not isinstance(limits, Mapping):
         raise TransportError(
@@ -498,9 +467,7 @@ def _bounded_contract_limits(contract: Mapping[str, Any]) -> tuple[int, int, int
     return max_files, max_file_bytes, max_total_bytes
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::ResumableUploader
-def _valid_chunk_size(value: object, *, file_size: int) -> bool:
+def _valid_chunk_size(value: object, *, file_size: int) -> TypeGuard[int]:
     if isinstance(value, bool) or not isinstance(value, int):
         return False
     if value < MIN_UPLOAD_CHUNK_BYTES or value > MAX_UPLOAD_CHUNK_BYTES:
@@ -508,9 +475,7 @@ def _valid_chunk_size(value: object, *, file_size: int) -> bool:
     return (file_size + value - 1) // value <= MAX_UPLOAD_CHUNKS_PER_FILE
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::upload_local_files
-def _preflight_requested_count(contract: Mapping[str, Any], file_items: object) -> None:
+def _preflight_requested_count(contract: Mapping[str, object], file_items: object) -> None:
     """Reject an oversized batch before consuming one descriptor per item."""
     if (
         contract.get("uploads_supported") is not True
@@ -552,10 +517,8 @@ def _preflight_requested_count(contract: Mapping[str, Any], file_items: object) 
         )
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::upload_local_files
 def _preflight_contract(
-    contract: Mapping[str, Any], files: Sequence[OpenedFile]
+    contract: Mapping[str, object], files: Sequence[UploadFileDeclaration]
 ) -> tuple[int, int]:
     if (
         contract.get("uploads_supported") is not True
@@ -614,12 +577,12 @@ def _preflight_contract(
             "too_many_files",
             "The upload batch exceeds the current Plan file-count limit.",
         )
-    if any(opened.size > max_file_bytes for opened in files):
+    if any(file["size"] > max_file_bytes for file in files):
         raise _file_error(
             "file_too_large",
             "A selected file exceeds the current per-file upload limit.",
         )
-    if current_total + sum(opened.size for opened in files) > max_total_bytes:
+    if current_total + sum(file["size"] for file in files) > max_total_bytes:
         raise _file_error(
             "files_too_large",
             "The selected files exceed the current Plan total-size limit.",
@@ -627,8 +590,6 @@ def _preflight_contract(
     return max_file_bytes, max_total_bytes - current_total
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::ResumableUploader
 def _confirmed_offset(response: httpx.Response, *, previous: int, maximum: int) -> int:
     value = response.headers.get("range")
     if value is None:
@@ -648,8 +609,6 @@ def _confirmed_offset(response: httpx.Response, *, previous: int, maximum: int) 
     return confirmed
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::ResumableUploader
 async def _storage_send(
     client: httpx.AsyncClient,
     url: str,
@@ -683,15 +642,6 @@ async def _storage_send(
     )
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033b_mcp_files.py::test_upload_honors_chunks_and_returns_authoritative_inventory
-# @tests tests_unit/test_033b_mcp_files.py::test_upload_recovers_only_after_a_verified_status_probe
-# @tests tests_unit/test_033b_mcp_files.py::test_upload_rejects_offset_regression_without_finalizing
-# @tests tests_unit/test_033b_mcp_files.py::test_upload_probe_cannot_skip_beyond_the_ambiguous_chunk
-# @tests tests_unit/test_033b_mcp_files.py::test_upload_rejects_a_chunk_below_the_frozen_efficiency_floor
-# @tests tests_unit/test_033b_mcp_files.py::test_post_session_recovery_failures_are_not_retryable_as_whole_tool_calls
-# @matrix mcp-upload : content-range 308 monotonic probe retry final-2xx local-limits upload-session no-false-finalization
 class ResumableUploader:
     """Bounded GCS resumable protocol over an already-created session."""
 
@@ -833,7 +783,7 @@ class ResumableUploader:
         maximum: int,
         deadline: float,
     ) -> tuple[int, bool]:
-        last_error: httpx.HTTPError | None = None
+        last_error: httpx.HTTPError | TimeoutError | None = None
         for _attempt in range(MAX_UPLOAD_STATUS_PROBES):
             try:
                 response = await _storage_send(
@@ -881,25 +831,17 @@ class ResumableUploader:
         ) from last_error
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::ResumableUploader
 class _EmptyStream(httpx.AsyncByteStream):
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/files.py::ResumableUploader
-    async def __aiter__(self):
+    async def __aiter__(self) -> AsyncIterator[bytes]:
         if False:
             yield b""
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/files.py::ResumableUploader
     async def aclose(self) -> None:
         return None
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::upload_local_files
 def _validate_sessions(
-    value: Any, plan_id: str, files: Sequence[OpenedFile]
+    value: object, plan_id: str, files: Sequence[UploadFileDeclaration]
 ) -> tuple[str, list[tuple[str, int]]]:
     if not isinstance(value, Mapping) or value.get("plan_id") != plan_id:
         raise TransportError(
@@ -923,7 +865,7 @@ def _validate_sessions(
         )
     sessions: list[tuple[str, int]] = []
     seen_sessions: set[tuple[str, str]] = set()
-    for index, (entry, opened) in enumerate(zip(uploads, files, strict=True)):
+    for index, (entry, declared) in enumerate(zip(uploads, files, strict=True)):
         if not isinstance(entry, Mapping):
             raise TransportError(
                 "invalid_upload_session", "The API returned an invalid upload session."
@@ -933,8 +875,8 @@ def _validate_sessions(
         if (
             isinstance(returned_index, bool)
             or returned_index != index
-            or entry.get("filename") != opened.filename
-            or not _valid_chunk_size(chunk_size, file_size=opened.size)
+            or entry.get("filename") != declared["filename"]
+            or not _valid_chunk_size(chunk_size, file_size=declared["size"])
         ):
             raise TransportError(
                 "invalid_upload_session",
@@ -963,11 +905,9 @@ def _validate_sessions(
     return upload_batch_id, sessions
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::upload_local_files
 def _validate_finalized_inventory(
-    finalized: Mapping[str, Any],
-    contract: Mapping[str, Any],
+    finalized: Mapping[str, object],
+    contract: Mapping[str, object],
     files: Sequence[OpenedFile],
 ) -> None:
     """Prove an ambiguous success contains this complete uploaded batch."""
@@ -979,9 +919,6 @@ def _validate_finalized_inventory(
             "invalid_response", "The API returned invalid finalized file inventory."
         )
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/files.py::_validate_finalized_inventory
-    # @reason inventory identity normalization is owned by final-batch validation
     def identity(item: object) -> tuple[str, str, int] | None:
         if not isinstance(item, Mapping):
             return None
@@ -1003,25 +940,13 @@ def _validate_finalized_inventory(
         )
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033b_mcp_files.py::test_upload_honors_chunks_and_returns_authoritative_inventory
-# @tests tests_unit/test_033b_mcp_files.py::test_upload_rejects_contract_count_before_opening_paths
-# @tests tests_unit/test_033b_mcp_files.py::test_upload_rejects_offset_regression_without_finalizing
-# @tests tests_unit/test_033b_mcp_files.py::test_ambiguous_finalization_reads_plan_state_without_replaying
-# @tests tests_unit/test_033b_mcp_files.py::test_ambiguous_finalization_rejects_same_metadata_from_replaced_batch
-# @tests tests_unit/test_033b_mcp_files.py::test_upload_cancellation_and_partial_failure_never_finalize
-# @tests tests_unit/test_033b_mcp_files.py::test_oversized_file_is_rejected_before_descriptor_read
-# @tests tests_unit/test_033b_mcp_files.py::test_cancellation_during_byte_snapshot_closes_descriptors
-# @tests tests_unit/test_033b_mcp_files.py::test_upload_uses_one_total_wall_clock_deadline
-# @matrix mcp-upload : authoritative-status create-once finalize-once last-writer preflight safe-result upload-all upload-batch-identity cancellation partial-failure no-false-finalization byte-identity timeout retry
 async def upload_local_files(
     rest: _RESTLike,
     *,
     plan_id: str,
     file_items: object,
-    contract: Mapping[str, Any],
-) -> dict[str, Any]:
+    contract: Mapping[str, object],
+) -> JsonObject:
     """Upload one explicit batch and return final Plan state plus file inventory."""
     deadline = asyncio.get_running_loop().time() + UPLOAD_OPERATION_TIMEOUT_SECONDS
     try:
@@ -1041,16 +966,14 @@ async def upload_local_files(
         ) from error
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/files.py::upload_local_files
 async def _upload_local_files(
     rest: _RESTLike,
     *,
     plan_id: str,
     file_items: object,
-    contract: Mapping[str, Any],
+    contract: Mapping[str, object],
     deadline: float,
-) -> dict[str, Any]:
+) -> JsonObject:
     encoded_plan_id = quote_path_segment(plan_id)
     _preflight_requested_count(contract, file_items)
     max_file_bytes, max_batch_bytes = _preflight_contract(contract, ())
@@ -1060,14 +983,14 @@ async def _upload_local_files(
         max_total_bytes=max_batch_bytes,
     )
     with batch:
-        _preflight_contract(contract, batch.files)
         declarations = [opened.declaration for opened in batch.files]
+        _preflight_contract(contract, declarations)
         created, _request_id = await rest.request_json(
             "POST",
             f"plans/{encoded_plan_id}/uploads",
             body={"files": declarations},
         )
-        upload_batch_id, sessions = _validate_sessions(created, plan_id, batch.files)
+        upload_batch_id, sessions = _validate_sessions(created, plan_id, declarations)
         uploader = ResumableUploader(rest.storage_client)
         for index, (opened, session) in enumerate(
             zip(batch.files, sessions, strict=True)

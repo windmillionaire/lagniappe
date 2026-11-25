@@ -1,9 +1,21 @@
 """External API definitions."""
 
+from typing import TypedDict
+
+
+
 from lagniappe.core.report_contracts import (
     MAX_PROPOSAL_ACTIONS as MAX_PROPOSAL_ACTIONS,
     UPLOAD_BATCH_ID_PATTERN as UPLOAD_BATCH_ID_PATTERN,
 )
+
+
+class ObjectSchema(TypedDict):
+    type: str
+    additionalProperties: bool
+    required: list[str]
+    properties: dict[str, dict[str, object]]
+
 
 
 CONTRACT_VERSION = 10
@@ -40,17 +52,11 @@ REFERENCE_FIELDS = frozenset(
 )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/plans.py::create_plan
-# @reason byte-count helper enforces the public draft-creation limit
 def _text_bytes(value):
     return len(str(value or "").encode("utf-8"))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/openapi.py::build_openapi_document
-# @reason runtime field checks and the published request share these definitions
-def create_plan_request_schema():
+def create_plan_request_schema() -> ObjectSchema:
     return {
         "type": "object",
         "additionalProperties": False,
@@ -70,15 +76,15 @@ def create_plan_request_schema():
                 "minLength": 1,
                 "description": "Optional creator-owned stopped execution to correct. Omit or use null for a new independent Plan.",
             },
+            "require_review": {
+                "type": "boolean",
+                "description": "When true, lock this Plan to browser review only so external execution is rejected.",
+            },
         },
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/openapi.py::build_openapi_document
-# @covered-by lagniappe/core/tools/ai/external/validation.py::submission_validation_errors
-# @reason the schema documents the envelope while the collector preserves its diagnostic format
-def submission_request_schema():
+def submission_request_schema() -> ObjectSchema:
     from ..planner import file_usage_schema
 
     return {
@@ -98,14 +104,24 @@ def submission_request_schema():
                 "minLength": 1,
                 "description": f"Updated current brief, at most {MAX_INSTRUCTIONS_BYTES} UTF-8 bytes. Original brief is retained; updates are atomic with proposal submission.",
             },
+            "require_review": {
+                "type": "boolean",
+                "description": "When true, lock this submitted Plan to browser review only.",
+            },
+            "execute": {
+                "type": "boolean",
+                "description": "When true and execution is enabled for this connection, immediately start executing the submitted proposal (requires operation_id).",
+            },
+            "operation_id": {
+                "type": "string",
+                "pattern": r"^[A-Za-z0-9._-]{1,128}$",
+                "description": "Stable client operation ID (1–128 ASCII letters, digits, dots, underscores, or hyphens) when execute is true.",
+            },
         },
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/openapi.py::build_openapi_document
-# @reason uploads use the same fields and limits as their public schema
-def upload_file_schema():
+def upload_file_schema() -> ObjectSchema:
     return {
         "type": "object",
         "additionalProperties": False,
@@ -124,10 +140,7 @@ def upload_file_schema():
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/openapi.py::build_openapi_document
-# @reason upload batch validation and documentation share the exact identity pattern
-def upload_batch_schema():
+def upload_batch_schema() -> dict[str, object]:
     return {
         "type": "string",
         "pattern": UPLOAD_BATCH_ID_PATTERN,
@@ -135,10 +148,7 @@ def upload_batch_schema():
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/openapi.py::build_openapi_document
-# @reason the upload request envelope is shared with its runtime field checks
-def upload_request_schema():
+def upload_request_schema() -> ObjectSchema:
     return {
         "type": "object", "additionalProperties": False, "required": ["files"],
         "properties": {"files": {
@@ -148,10 +158,7 @@ def upload_request_schema():
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/external/openapi.py::build_openapi_document
-# @reason finalization uses the same batch identity and request fields as OpenAPI
-def finalize_request_schema():
+def finalize_request_schema() -> ObjectSchema:
     return {
         "type": "object", "additionalProperties": False,
         "required": ["upload_batch_id"],

@@ -1,5 +1,11 @@
 """Function declaration and handler for loading pages/tasks that use a form."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason
@@ -32,7 +38,7 @@ GET_FORM_INSTANCES = types.FunctionDeclaration(
         "current submission data keyed by schema field id. Use this before "
         "proposing reviewed batch submission updates for a form."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -61,17 +67,14 @@ GET_FORM_INSTANCES = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_form_instances_filters_permissions_status_and_truncates
-# @matrix ai form-schema : form-instances permissions status submission truncation
-def execute_get_form_instances(args, user):
+def execute_get_form_instances(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     """Return viewable page/task instances attached to a form."""
     identifier = args.get("id")
-    if not identifier:
+    if not isinstance(identifier, str) or not identifier:
         return {"error": "id is required"}
 
     form = Entities.fetch_one(identifier, request=Fetch.direct())
@@ -100,7 +103,9 @@ def execute_get_form_instances(args, user):
         }
 
     limit = _limit(args.get("limit"))
-    loaded = Entities.fetch(*database_get.form_instance_users(form.key), request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
+    form_key = form.key
+    assert form_key is not None
+    loaded = Entities.fetch(*database_get.form_instance_users(form_key), request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))
     instances = [entity for entity in loaded if _include_instance(entity, user, kinds, task_completed)]
     instances.sort(key=lambda entity: (entity.kind, (entity.name or "").lower()))
     returned = instances[:limit]
@@ -116,9 +121,6 @@ def execute_get_form_instances(args, user):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_form_instances.py::execute_get_form_instances
-# @reason argument normalization is covered through the public tool handler
 def _instance_kinds(value):
     if value is None:
         return set(ALLOWED_KINDS), []
@@ -141,9 +143,6 @@ def _instance_kinds(value):
     return kinds or set(ALLOWED_KINDS), invalid
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_form_instances.py::execute_get_form_instances
-# @reason argument normalization is covered through the public tool handler
 def _task_status(value):
     if value is None:
         return None, None
@@ -155,9 +154,6 @@ def _task_status(value):
     return TASK_STATUS_ALIASES[normalized], None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_form_instances.py::execute_get_form_instances
-# @reason result limiting is covered through the public tool handler
 def _limit(value):
     try:
         limit = int(value)
@@ -166,24 +162,16 @@ def _limit(value):
     return max(1, min(limit, MAX_LIMIT))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_form_instances.py::execute_get_form_instances
-# @reason permission and status filters are covered through the public tool handler
 def _include_instance(entity, user, kinds, task_completed):
     if isinstance(entity, Entities.PAGE):
         return "page" in kinds and entity.allowed(Action.VIEW, user=user)
     if isinstance(entity, Entities.TASK):
         if "task" not in kinds or not entity.allowed(Action.VIEW, user=user):
             return False
-        if task_completed is not None and bool(entity.completed) is not task_completed:
-            return False
-        return True
+        return not (task_completed is not None and bool(entity.completed) is not task_completed)
     return False
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_form_instances.py::execute_get_form_instances
-# @reason result projection is covered through the public tool handler
 def _entity_result(entity):
     return {
         "hash": hash_reference(entity),
@@ -192,9 +180,6 @@ def _entity_result(entity):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_form_instances.py::execute_get_form_instances
-# @reason result projection is covered through the public tool handler
 def _instance_result(entity, user):
     result = {
         **_entity_result(entity),

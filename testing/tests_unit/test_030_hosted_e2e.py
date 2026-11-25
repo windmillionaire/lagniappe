@@ -13,7 +13,6 @@ from lagniappe.core.tools.hosted_e2e.auth import (
 pytestmark = pytest.mark.unit
 
 
-# @matrix hosted-e2e : authentication cookie
 @pytest.mark.parametrize("inherited", [True, False])
 def test_worker_inherits_run_cookie_without_replaying_bootstrap(monkeypatch, inherited):
     from types import SimpleNamespace
@@ -37,16 +36,17 @@ def test_worker_inherits_run_cookie_without_replaying_bootstrap(monkeypatch, inh
 
     monkeypatch.setattr(e2e_runtime, "hosted_e2e_browser_cookie", forbidden_exchange)
     if not inherited:
-        with pytest.raises(RuntimeError, match="coordinator's run cookie"):
-            with e2e_worker.worker_runtime():
-                pytest.fail("A hosted worker started without its inherited cookie")
+        with (
+            pytest.raises(RuntimeError, match="coordinator's run cookie"),
+            e2e_worker.worker_runtime(),
+        ):
+            pytest.fail("A hosted worker started without its inherited cookie")
     else:
         with e2e_worker.worker_runtime() as runtime:
             assert runtime.run_id == "test-run"
             assert runtime.browser_cookies == (cookie,)
 
 
-# @matrix hosted-e2e : audience authentication identity issuer
 def test_validate_google_claims_requires_exact_verified_identity():
     expected = {
         "iss": "https://accounts.google.com",
@@ -79,7 +79,6 @@ def test_validate_google_claims_requires_exact_verified_identity():
             )
 
 
-# @matrix hosted-e2e : authentication cookie deployment-binding expiry
 def test_hosted_e2e_cookie_is_signed_scoped_and_expiring():
     secret = "s" * 48
     value = sign_hosted_e2e_cookie(

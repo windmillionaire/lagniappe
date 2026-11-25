@@ -1,5 +1,11 @@
 """Function declaration and handler for loading a page and its related context."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch
@@ -22,7 +28,7 @@ GET_PAGE_DETAILS = types.FunctionDeclaration(
         "describes counts, continuation and partial errors. Use get_page_tasks "
         "with compact=true when discovery also needs completed tasks."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "view": {"type": "string", "enum": ["default", "edit"]},
@@ -55,18 +61,13 @@ GET_PAGE_DETAILS = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_page_details_includes_file_summaries_by_default
-# @matrix ai files pages tasks : exclusions page-details projection summary
-# @matrix ai tasks : compact pagination permissions
-# @tests tests_unit/test_015f_ai_task_lists.py::test_compact_page_details_*
-def execute_get_page_details(args, user):
+def execute_get_page_details(args: Mapping[str, object], user: User) -> Mapping[str, object]:
     identifier = args.get("id")
-    if not identifier:
+    if not isinstance(identifier, str) or not identifier:
         return {"error": "id is required"}
 
     page = Entities.fetch_one(identifier, request=Fetch.direct())
@@ -77,7 +78,7 @@ def execute_get_page_details(args, user):
         return {"error": "Access denied"}
 
     from .get_entity import edit_entity
-    result = {"page": edit_entity(page, user) if args.get("view") == "edit" else page.to_ai(user)}
+    result: dict[str, object] = {"page": edit_entity(page, user) if args.get("view") == "edit" else page.to_ai(user)}
 
     if page.model:
         result["category"] = page.model.to_ai(user)

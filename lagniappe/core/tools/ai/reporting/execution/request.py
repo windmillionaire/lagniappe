@@ -1,25 +1,49 @@
-"""Shared browser and experiments-MCP request to execute a saved proposal."""
+"""Shared browser, auto-execute, and external-API/MCP request to execute a saved proposal."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypedDict, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.entities.ai_report import AIReport
+    from lagniappe.core.entities.user import User
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ReportProposal
+
 
 import hashlib
+
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, DeferredJobSpec, DeferredJobType, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
+from lagniappe.core.tools.ai.auto_execute import (
+    can_auto_execute_onsite_plan,
+    can_execute_external_plan,
+    experiments_execution_allowed,
+    plan_requires_review,
+)
 from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
-from lagniappe.core.tools.experiments import can_execute
 from . import ledger
 
 
-# @testable true
-# @tests tests_unit/test_034_experiments.py::test_execution_rejects_stale_proposals_and_reuses_exact_operations
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_stale_schema_plan_keeps_review_and_explains_recovery
-# @matrix experiments : execution-policy
-# @matrix ai-report : browser-review stale-proposal
+class _MigrationCheckpoint(TypedDict, total=False):
+    migration_id: str
+    migration_form: str
+
+
 def request_execution(
-    report, actor, *, operation_id=None, expected_fingerprint=None, remote_mcp=False
-):
+    report: AIReport,
+    actor: User,
+    *,
+    operation_id: str | None = None,
+    expected_fingerprint: str | None = None,
+    remote_mcp: bool = False,
+    external_execution: bool = False,
+    auto_execute: bool = False,
+) -> tuple[models.DeferredJob | None, models.Notification | None]:
     """Validate current state, then use the ordinary idempotent deferred runner."""
     if not report.available or not report.allowed(Action.EDIT, user=actor):
         raise exceptions.ValidationError(
@@ -29,11 +53,13 @@ def request_execution(
         raise exceptions.ValidationError(
             "This execution was superseded by an approved correction."
         )
-    parameters = {}
-    if remote_mcp:
-        if not can_execute(actor, remote_mcp=True):
+    is_external = bool(external_execution or remote_mcp)
+    is_experiments = False
+    parameters: dict[str, bool] = {}
+    if is_external:
+        if not can_execute_external_plan(actor, remote_mcp=remote_mcp):
             raise exceptions.ValidationError(
-                "Experiments execution is unavailable for this actor."
+                "Automatic plan execution is unavailable for this actor."
             )
         if report.origin != "api" or report.properties.user.key != actor.key:
             raise exceptions.ValidationError(
@@ -48,7 +74,20 @@ def request_execution(
             raise exceptions.ValidationError(
                 "The submitted proposal changed. Read and submit the current plan before execution."
             )
-        parameters = {"experiments_execution": True}
+        is_experiments = experiments_execution_allowed(actor, remote_mcp=remote_mcp)
+        if is_experiments:
+            parameters = {"experiments_execution": True}
+        else:
+            parameters = {
+                "external_execution": True,
+                "remote_mcp": bool(remote_mcp),
+            }
+    elif auto_execute:
+        if not can_auto_execute_onsite_plan(actor):
+            raise exceptions.ValidationError(
+                "Automatic plan execution is unavailable for this actor."
+            )
+        parameters = {"auto_execute": True}
 
     spec = DeferredJobSpec(
         job_type=DeferredJobType.REPORT_EXECUTION,
@@ -74,14 +113,21 @@ def request_execution(
             # plan, proposal and execution origin, before returning the receipt.
             return DeferredJobs.start(spec)
 
-    if remote_mcp and expected_fingerprint != proposal_fingerprint(report.proposal):
+    if is_external and expected_fingerprint != proposal_fingerprint(report.proposal):
         raise exceptions.ValidationError(
             "The submitted proposal changed. Read and submit the current plan before execution."
         )
+    if is_external or auto_execute:
+        pause_reason = plan_requires_review(
+            report, enforce_safety_pause=not is_experiments
+        )
+        if pause_reason:
+            raise exceptions.ValidationError(pause_reason)
 
     result = report.result if isinstance(report.result, dict) else {}
     if (
-        not remote_mcp
+        not is_external
+        and not auto_execute
         and report.status == "complete"
         and result.get("status") == "complete"
     ):
@@ -106,14 +152,18 @@ def request_execution(
 
     try:
         if not retryable:
-            prepare_schema_updates(report.proposal, actor, verify=True)
+            saved = report.proposal
+            if not isinstance(saved, dict) or not isinstance(saved.get("actions"), list):
+                raise exceptions.ValidationError("This report has no executable proposal.")
+            # Published proposals have already passed the action validator.
+            prepare_schema_updates(cast("ReportProposal", saved), actor, verify=True)
         else:
-            for record in result.get("actions", []):
+            for record in cast(list[_MigrationCheckpoint], result.get("actions", [])):
                 if record.get("migration_id"):
                     form = Entities.fetch_one(
                         record.get("migration_form"), request=Fetch.direct()
                     )
-                    if form and form.db.get(form_changes.PENDING):
+                    if isinstance(form, Entities.FORM) and form.db.get(form_changes.PENDING):
                         form_changes.recover_change(form, actor, "retry")
     except exceptions.ValidationError as error:
         if not retryable and str(error).startswith(form_schema_updates.STALE_MESSAGE):

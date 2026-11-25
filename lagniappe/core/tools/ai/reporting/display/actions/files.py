@@ -1,10 +1,22 @@
 """File-oriented proposal display adapters."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ActionData, ReportAction
+    from lagniappe.core.tools.ai.reporting.display.details import ProposalDetailCollector
+
+
 from ..contracts import ProposalActionDisplay, ProposalActionGrouping
 
 
-# @testable infrastructure
-def move_file_details(details, data, action=None):
+def move_file_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("File", data, "file")
     details.reference("From Page", data, "from_page", "source_page", "page_from")
     details.reference("From Task", data, "from_task", "source_task", "task_from")
@@ -26,24 +38,25 @@ def move_file_details(details, data, action=None):
     )
 
 
-# @testable infrastructure
-def attachment_details(details, data, action=None):
+def attachment_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("Target", data, "entity")
     details.reference("File", data, "file")
 
 
-# @testable infrastructure
-def summary_details(details, data, action=None):
+def summary_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("File", data, "file")
     details.add("Summary", data.get("summary"))
 
 
-# @testable true
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_move_files_under_target_page
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_existing_page_category_for_attachments
-# @matrix ai-report : details move-file proposal
-# @matrix files : attachment-grouping details existing-page-category move-file proposal
-def file_action_displays():
+def file_action_displays() -> tuple[ProposalActionDisplay, ...]:
     return (
         ProposalActionDisplay(
             "move_file",

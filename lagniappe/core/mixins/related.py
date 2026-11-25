@@ -1,15 +1,32 @@
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, cast, overload
+
+from .field_host import FieldHost
 from ..definitions import Action, FieldType, FilterOptions, MutationIntent, Ordering
 from ..properties.base_db import DBProperty
 from ..properties.base_property import UNSET
 from ..exceptions import capture_unloaded_relation
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_related.py::Categories
-# @covered-by lagniappe/core/properties/common_related.py::Projects
-# @covered-by lagniappe/core/properties/page_related.py::PageCategories
-# @covered-by lagniappe/core/properties/user_related.py::Groups
-class RelatedEntityListMixin:
+if TYPE_CHECKING:
+    from google.cloud.datastore import Key
+
+    from ..entities.condition import Condition
+    from ..entities.entity import Entity
+
+    class _RelationHost(FieldHost):
+        _value: object
+        _reported_unloaded_keys: tuple[str, tuple[str, ...]] | None
+
+        def unset(self) -> None: ...
+        def filter_details(self, condition: Condition) -> dict[str, object]: ...
+else:
+    class _RelationHost:
+        """The host contracts come from each concrete field at runtime."""
+
+
+class RelatedEntityListMixin[Related: Entity = "Entity"](_RelationHost):
+    _value: object
     _touch_members = True
     """Adds storage for a list of related entities.
 
@@ -32,24 +49,23 @@ class RelatedEntityListMixin:
 
     # Column Attributes
     _ordering = Ordering.CATEGORICAL
+    _column_value: list[dict[str, object]] | None
+    _attached: dict[Key, Related] | None
 
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_related_property_writes_refresh_entity_and_column_projections
-    # @matrix cache related-properties : cache-invalidation column-value details parent-pointer
-    def _invalidate_projections(self):
+    def _invalidate_projections(self) -> None:
         self._column_value = None
         if self.entity:
             self.entity._details = None
             self.entity._to_cache = None
 
     @property
-    def sort_value(self):
-        return {e["hash"]: e["name"] for e in self.column_value}
+    def sort_value(self) -> dict[str, str | None] | int | None:
+        return {cast(str, e["hash"]): cast("str | None", e["name"]) for e in self.column_value}
 
     @property
-    def column_value(self):
-        if getattr(self, "_column_value", None) is not None:
-            return self._column_value
+    def column_value(self) -> list[dict[str, object]]:
+        if (cached := getattr(self, "_column_value", None)) is not None:
+            return cached
         elif not self.value:
             return []
 
@@ -62,41 +78,43 @@ class RelatedEntityListMixin:
         return self._column_value
 
     # DB Attributes
-    def attach(self, key_map):
+    def attach(self, key_map: Mapping[Key, Related]) -> None:
         if not isinstance(self, DBProperty):
             return
-        self._value = [
-            key_map[k] for k in self.entity.db.get(self.id, []) if k in key_map
-        ]
+        keys = cast("list[Key]", self.entity.db.get(self.id, []))
+        self._value = [key_map[key] for key in keys if key in key_map]
         self._cache_attached_entities()
         self._invalidate_projections()
 
-    def _attached_entities_from_value(self):
+    def _attached_entities_from_value(self) -> dict[Key, Related]:
         value = getattr(self, "_value", UNSET)
         if not isinstance(value, list):
             return {}
 
         return {item.key: item for item in value if getattr(item, "key", None)}
 
-    def _cache_attached_entities(self):
+    def _cache_attached_entities(self) -> dict[Key, Related]:
         self._attached = self._attached_entities_from_value()
         return self._attached
 
     @property
-    def attached_entities(self):
-        if getattr(self, "_attached", None) is None:
+    def attached_entities(self) -> dict[Key, Related]:
+        if (attached := getattr(self, "_attached", None)) is None:
             return self._cache_attached_entities()
 
-        return self._attached
+        return attached
 
     # Property Attributes
     @property
-    def value(self):
+    def value(self) -> list[Related]:
+        return self._read_related_list()
+
+    def _read_related_list(self) -> list[Related]:
         if self.is_set:
-            return self._value
+            return cast("list[Related]", self._value)
 
         if isinstance(self, DBProperty) and self.entity:
-            keys = self.entity.db.get(self.id, [])
+            keys = cast("list[Key]", self.entity.db.get(self.id, []))
             if keys:
                 capture_unloaded_relation(self, relation_type="list", keys=keys)
             self._value = []
@@ -106,7 +124,10 @@ class RelatedEntityListMixin:
         return self._value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: list[Related] | None) -> None:
+        self._write_related_list(value)
+
+    def _write_related_list(self, value: list[Related] | None) -> None:
         if value is not None and not isinstance(value, list):
             raise TypeError("Value must be a list")
         for item in value or []:
@@ -125,7 +146,7 @@ class RelatedEntityListMixin:
         self._invalidate_projections()
 
     # Entity Attributes
-    def add(self, value):
+    def add(self, value: Related) -> bool | None:
         key = getattr(value, "key", None)
         if not key:
             raise ValueError("Value must have a key")
@@ -152,7 +173,10 @@ class RelatedEntityListMixin:
             return True
         return False
 
-    def remove(self, value):
+    def remove(self, value: Related) -> bool | None:
+        return self._remove_related(value)
+
+    def _remove_related(self, value: Related) -> bool:
         key = getattr(value, "key", None)
         if not key:
             raise ValueError("Value must have a key")
@@ -163,14 +187,14 @@ class RelatedEntityListMixin:
         return False
 
     @property
-    def keys(self):
+    def keys(self) -> list[Key]:
         if not isinstance(self, DBProperty):
             return []
-        return self.entity.db.get(self.id, [])
+        return cast("list[Key]", self.entity.db.get(self.id, []))
 
     # AI Attributes
     @property
-    def ai_value(self):
+    def ai_value(self) -> list[dict[str, object]] | None:
         return [
             _ai_entity_reference(e)
             for e in self.value
@@ -183,33 +207,29 @@ class RelatedEntityListMixin:
     _is_entity_valued = True
 
     @property
-    def filter_value(self):
+    def filter_value(self) -> list[str] | None:
         hashes = [e.hash for e in self.value if not e.reserved]
         return hashes if hashes else None
 
-    def filter_details(self, condition):
+    def filter_details(self, condition: Condition) -> dict[str, object]:
         details = super().filter_details(condition)
-        if len(condition.value_list) > 1:
+        # Entity-valued conditions store hashes in their value list.
+        hashes = cast("list[str]", condition.value_list)
+        if len(hashes) > 1:
             details["text"] = "is any of"
             details["or"] = [
                 condition.entity_map[h].reference_details
-                for h in condition.value_list
+                for h in hashes
             ]
-        elif len(condition.value_list) == 1:
+        elif len(hashes) == 1:
             details["text"] = "is"
             details["entity"] = condition.entity_map[
-                condition.value_list[0]
+                hashes[0]
             ].reference_details
         return details
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_related.py::AttachedForm
-# @covered-by lagniappe/core/properties/common_related.py::RelatedForm
-# @covered-by lagniappe/core/properties/common_related.py::AttachedProject
-# @covered-by lagniappe/core/properties/project.py::ModelTaskProject
-# @covered-by lagniappe/core/properties/task_related.py::AssignedTo
-class RelatedEntityMixin:
+class RelatedEntityMixin[Related: Entity = "Entity"](_RelationHost):
     """Adds storage for a single related entity.
 
     Stores the entity key in entity.db and expects loaded values to be attached
@@ -232,85 +252,83 @@ class RelatedEntityMixin:
         attach(key_map): Populate from a pre-loaded key map.
     """
 
+    _value: object
+    _column_value: dict[str, object] | None
+    _attached: dict[Key, Related] | None
+
     # Entity Attributes
-    # @testable true
-    # @tests tests_unit/test_002_entity_general_properties.py::test_related_property_writes_refresh_entity_and_column_projections
-    # @matrix cache related-properties : cache-invalidation column-value details parent-pointer
-    def _invalidate_projections(self):
+    def _invalidate_projections(self) -> None:
         self._column_value = None
         if self.entity:
             self.entity._details = None
             self.entity._to_cache = None
 
     @property
-    def keys(self):
+    def keys(self) -> list[Key | None]:
         if not isinstance(self, DBProperty) or not self.entity:
             return []
-        return [self.entity.db.get(self.id)]
+        return [cast("Key | None", self.entity.db.get(self.id))]
 
-    # @testable true
-    # @tests tests_unit/test_001_test_general_and_utilities.py::test_related_attach_caches_attached_entity_map
-    # @pair relations:attach-cache
-    def attach(self, key_map):
+    def attach(self, key_map: Mapping[Key, Related]) -> None:
         if not isinstance(self, DBProperty) or not self.entity:
             return
-        self._value = key_map.get(self.entity.db.get(self.id))
+        key = cast("Key", self.entity.db.get(self.id))
+        self._value = key_map.get(key)
         self._cache_attached_entities()
         self._invalidate_projections()
 
-    def _attached_entities_from_value(self):
+    def _attached_entities_from_value(self) -> dict[Key, Related]:
         value = getattr(self, "_value", UNSET)
         if not value or not getattr(value, "key", None):
             return {}
 
-        return {value.key: value}
+        value = cast("Related", value)
+        return {cast("Key", value.key): value}
 
-    def _cache_attached_entities(self):
+    def _cache_attached_entities(self) -> dict[Key, Related]:
         self._attached = self._attached_entities_from_value()
         return self._attached
 
     @property
-    def attached_entities(self):
-        if getattr(self, "_attached", None) is None:
+    def attached_entities(self) -> dict[Key, Related]:
+        if (attached := getattr(self, "_attached", None)) is None:
             return self._cache_attached_entities()
 
-        return self._attached
+        return attached
 
     @property
-    def key(self):
+    def key(self) -> Key | None:
         if self.is_set and self._value:
-            return self._value.key
+            return cast("Related", self._value).key
         elif isinstance(self, DBProperty) and self.entity:
-            return self.entity.db.get(self.id)
+            return cast("Key | None", self.entity.db.get(self.id))
         else:
             return None
 
     @property
-    def exists(self):
+    def exists(self) -> bool:
         return self.entity.db.get(self.id) is not None
 
     @property
-    def urlsafe_key(self):
+    def urlsafe_key(self) -> str | None:
         return self.value.urlsafe_key if self.value else None
 
     @property
-    def hash(self):
+    def hash(self) -> str | None:
         return self.value.hash if self.value else None
 
     @property
-    def name(self):
+    def name(self) -> str | None:
         return self.value.name if self.value else None
 
     # Property Attributes
-    # @testable true
-    # @tests tests_unit/test_026_site_admin.py::test_unloaded_optional_form_is_not_mistaken_for_a_deleted_form
-    # @tests tests_unit/test_006b_ingress_entity.py::test_related_entity_setter_rejects_values_without_key
-    # @matrix permissions relations : unloaded-relation
-    # @matrix relations : key-validation validation
     @property
-    def value(self):
+    def value(self) -> Related | None:
+        return self._read_related()
+
+    def _read_related(self) -> Related | None:
         if self.is_set:
-            return self._value
+            return cast("Related | None", self._value)
 
         if isinstance(self, DBProperty) and self.entity:
             key = self.entity.db.get(self.id)
@@ -326,7 +344,10 @@ class RelatedEntityMixin:
         return self._value
 
     @value.setter
-    def value(self, value):
+    def value(self, value: Related | None) -> None:
+        self._write_related(value)
+
+    def _write_related(self, value: Related | None) -> None:
         if value is not None and not getattr(value, "key", None):
             raise ValueError("Value must have a key")
 
@@ -345,18 +366,18 @@ class RelatedEntityMixin:
 
     # Details Attributes
     @property
-    def details_value(self):
+    def details_value(self) -> dict[str, object] | None:
         return self.value.reference_details if self.value else None
 
     # Column Attributes
     _ordering = Ordering.CATEGORICAL
 
     @property
-    def sort_value(self):
+    def sort_value(self) -> dict[str, str | None] | None:
         return {self.value.hash: self.value.name} if self.value else None
 
     @property
-    def column_value(self):
+    def column_value(self) -> dict[str, object] | None:
         if getattr(self, "_column_value", None) is not None:
             return self._column_value
         elif not self.value:
@@ -372,7 +393,7 @@ class RelatedEntityMixin:
 
     # AI Attributes
     @property
-    def ai_value(self):
+    def ai_value(self) -> dict[str, object] | None:
         if (
             not self.value
             or not self.value.allowed(Action.VIEW, self.user)
@@ -388,43 +409,44 @@ class RelatedEntityMixin:
     _is_entity_valued = True
 
     @property
-    def filter_value(self):
+    def filter_value(self) -> str | None:
         if not self.value:
             return None
 
         return self.value.hash if not self.value.reserved else None
 
-    def filter_details(self, condition):
+    def filter_details(self, condition: Condition) -> dict[str, object]:
         details = super().filter_details(condition)
-        if len(condition.value_list) > 1:
+        # Entity-valued conditions store hashes in their value list.
+        hashes = cast("list[str]", condition.value_list)
+        if len(hashes) > 1:
             details["text"] = "is one of"
             details["or"] = [
                 condition.entity_map[h].reference_details
-                for h in condition.value_list
+                for h in hashes
             ]
-        elif len(condition.value_list) == 1:
+        elif len(hashes) == 1:
             details["text"] = "is"
             details["entity"] = condition.entity_map[
-                condition.value_list[0]
+                hashes[0]
             ].reference_details
         return details
 
 
-# @testable false
-# @covered-by lagniappe/core/mixins/related.py::RelatedEntityMixin
-# @covered-by lagniappe/core/mixins/related.py::RelatedEntityListMixin
-# @reason AI reference projection is exercised through related property output
-def _ai_entity_reference(entity):
+def _ai_entity_reference(entity: Entity) -> dict[str, object]:
     details = _ai_reference_value(entity.reference_details)
     if getattr(entity, "hash", None):
         details["hash"] = f"hash:{entity.hash}"
     return details
 
 
-# @testable false
-# @covered-by lagniappe/core/mixins/related.py::_ai_entity_reference
-# @reason recursive sanitization is covered through related AI reference projection
-def _ai_reference_value(value):
+@overload
+def _ai_reference_value(value: dict[str, object]) -> dict[str, object]: ...
+
+@overload
+def _ai_reference_value(value: object) -> object: ...
+
+def _ai_reference_value(value: object) -> object:
     if isinstance(value, dict):
         reference = {}
         for key, child in value.items():

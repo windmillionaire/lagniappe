@@ -18,8 +18,6 @@ def enabled_ai_policy(monkeypatch):
     monkeypatch.setattr(CONFIG, "EXTERNAL_AI_ENABLED", True)
 
 
-# @matrix ai-access : fail-closed hierarchy validation
-# @source lagniappe/core/definitions/ai_access.py::AI.implies
 @pytest.mark.unit
 def test_ai_access_tiers_are_hierarchical_and_fail_closed():
     assert AI.CREATE.implies(AI.CREATE)
@@ -37,7 +35,6 @@ def test_ai_access_tiers_are_hierarchical_and_fail_closed():
         AI.name_for("DEFAULT")
 
 
-# @matrix ai-access : cache-invalidation legacy-default persistence public validation
 @pytest.mark.unit
 def test_user_ai_access_legacy_defaults_validation_and_invalidation():
     regular = TestEntities.get(
@@ -82,7 +79,6 @@ def test_user_ai_access_legacy_defaults_validation_and_invalidation():
     assert "ai_access" in public.exclude_from_index
 
 
-# @matrix ai-access : authentication hierarchy owner-no-bypass permissions-independent
 @pytest.mark.unit
 def test_user_access_is_independent_hierarchical_and_fail_closed():
     powerful = TestEntities.get(
@@ -120,7 +116,6 @@ def test_user_access_is_independent_hierarchical_and_fail_closed():
     assert not anonymous.access(AI.ASK)
 
 
-# @matrix ai-access cache : authorization-fingerprint entitlement permissions
 @pytest.mark.unit
 def test_authorization_fingerprint_tracks_ai_access():
     user = TestEntities.get(
@@ -141,7 +136,6 @@ def test_authorization_fingerprint_tracks_ai_access():
     assert user.permissions_fingerprint == permissions_before
 
 
-# @pair user:new-user-default
 @pytest.mark.unit
 def test_user_create_defaults_non_owner_to_none():
     page = TestEntities.get(
@@ -193,10 +187,6 @@ def test_user_create_defaults_non_owner_to_none():
     assert user.db["ai_access"] == "NONE"
 
 
-# @matrix ai-access : site-policy authorization-fingerprint permissions-independent
-# @matrix cache : site-policy authorization-fingerprint
-# @source lagniappe/core/entities/user.py::User.access
-# @source lagniappe/core/entities/user.py::User.authorization_fingerprint
 @pytest.mark.unit
 def test_site_ai_policy_denies_generation_and_invalidates_cached_authorization(monkeypatch):
     user = TestEntities.get("USER", {"name": "AI Policy", "hash": "ai-policy", "permissions": {"models": "ALL"}})

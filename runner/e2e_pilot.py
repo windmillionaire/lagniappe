@@ -1,20 +1,29 @@
 """Coordinated protocol checks and automatically grouped browser stories."""
 
-from contextlib import contextmanager, ExitStack
+from __future__ import annotations
+
 import argparse
 import json
 import os
-from pathlib import Path
 import signal
 import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Iterator, Sequence
+from contextlib import ExitStack, contextmanager
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal
 from uuid import uuid4
 
 from runner.context import REPOSITORY_ROOT
-from runner.e2e_parallel import Batch, merge_results, schedule
 from runner.e2e_inventory import duration_estimates, story_batches
+from runner.e2e_parallel import Batch, merge_results, schedule
+
+if TYPE_CHECKING:
+    from lagniappe.core.tools.hosted_e2e.lease import E2ELease
+    from runner.e2e_inventory import CollectedTest
+    from runner.test_session import TestSessionAuthority
 
 
 PILOT_FILE = "testing/tests_e2e/001_site/test_001h_parallel_pilot.py"
@@ -22,8 +31,8 @@ CASES = ("independent-a", "independent-b", "shared-a", "shared-b", "exclusive")
 PROTOCOL_TARGETS = tuple(f"{PILOT_FILE}::test_worker_page_and_task[{case}]" for case in CASES)
 STORY_TARGETS = (
     'testing/tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag',
-    'testing/tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode',
-    'testing/tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode',
+    'testing/tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode[quota-fallback]',
+    'testing/tests_e2e/002_home/test_002c_home_categories.py::test_create_category_manual_mode',
     'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_category',
     'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_project',
     'testing/tests_e2e/002_home/test_002e_home_starred.py::test_star_page',
@@ -70,10 +79,9 @@ STORY_TARGETS = (
 TARGETS = (*PROTOCOL_TARGETS, *STORY_TARGETS)
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_pilot_arguments_are_bounded_and_keep_normal_runs_unchanged
-# @matrix testing : parallel-e2e
-def pilot_arguments(arguments):
+def pilot_arguments(
+    arguments: list[str],
+) -> tuple[str | Literal[False], int, list[str]]:
     parser = argparse.ArgumentParser(add_help=False, exit_on_error=False, allow_abbrev=False)
     parser.add_argument("--workers", "--experiments-workers", dest="experiments_workers", type=int)
     try:
@@ -100,9 +108,10 @@ def pilot_arguments(arguments):
     return scope, workers, [*rest, *(TARGETS if scope == "pilot" else ("e2e",))]
 
 
-# @testable infrastructure
 @contextmanager
-def pilot_authority(local_authority):
+def pilot_authority(
+    local_authority: TestSessionAuthority | None,
+) -> Iterator[TestSessionAuthority | E2ELease]:
     if local_authority is not None:
         yield local_authority
         return
@@ -122,10 +131,9 @@ def pilot_authority(local_authority):
             cleanup_test_data(authority)
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_pilot_targets_resolve_collected_browser_parameters
-# @matrix testing : parallel-e2e collection browser-parameters
-def resolve_pilot_targets(records, targets):
+def resolve_pilot_targets(
+    records: Sequence[CollectedTest], targets: Sequence[str]
+) -> list[CollectedTest]:
     """Resolve bounded selectors to actual pytest IDs, failing on missing cases."""
     selected = {}
     for target in targets:
@@ -147,15 +155,22 @@ def resolve_pilot_targets(records, targets):
     return list(selected.values())
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task
-# @matrix testing : parallel-e2e
-def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
+def run_pilot(
+    authority: TestSessionAuthority | E2ELease,
+    command: list[str],
+    pytest_args: Sequence[str],
+    *,
+    scope: str = "pilot",
+    workers: int = 3,
+) -> int:
     from lagniappe import CONFIG
     from lagniappe.core.entities import Entities
     from runner.test_session import capture_process_identity, load_session_state
-    from testing.utility.traceability_common import behavior_snapshot
-    from testing.utility.traceability_results import _write_manifest
+    from testing.utility.test_evidence import behavior_snapshot
+    from testing.utility.evidence_results import (
+        _write_manifest,
+        should_write_test_evidence,
+    )
 
     authority.assert_active()
     Entities.initialize()
@@ -170,7 +185,9 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
     owner = capture_process_identity(os.getpid())
     if owner is None:
         raise RuntimeError("Cannot identify E2E pilot coordinator")
-    run_id = getattr(authority, "run_id", None) or authority.nonce
+    run_id = getattr(authority, "run_id", None) or getattr(authority, "nonce", None)
+    if not isinstance(run_id, str) or not run_id:
+        raise RuntimeError("A coordinated E2E run requires an owner identity.")
     cookies = ()
     if CONFIG.hosted_e2e_runner:
         from testing.utility.e2e_runtime import hosted_e2e_browser_cookie
@@ -178,6 +195,11 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
         # callers. Exchange once for the run, then share only its scoped cookie.
         cookies = (hosted_e2e_browser_cookie(run_id),)
     local = load_session_state() if not CONFIG.hosted_e2e_runner else None
+    server_pid = None
+    if local:
+        if local["server"] is None:
+            raise RuntimeError("The local E2E session has no registered server.")
+        server_pid = local["server"]["pid"]
     collection = root / "collection.json"
     story_targets = tuple(dict.fromkeys(target.split("::", 1)[0] for target in TARGETS)) if scope == "pilot" else ("testing/tests_e2e", "-m", "not unfinished")
     collected = subprocess.run(
@@ -194,7 +216,7 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
     batches = [Batch(case, "testing/" + record["nodeid"].removeprefix("testing/"),
                      frozenset({"shared-page"}) if case.startswith("shared") else frozenset(),
                      exclusive=case == "exclusive")
-               for case, record in zip(CASES, protocol)]
+               for case, record in zip(CASES, protocol, strict=True)]
     story_records = resolve_pilot_targets(records, STORY_TARGETS) if scope == "pilot" else [
         record for record in records
         if not record["nodeid"].removeprefix("testing/").startswith(PILOT_FILE.removeprefix("testing/") + "::")
@@ -230,6 +252,16 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
                 state = f"exit={statuses[name]}" if name in statuses else "running"
                 print(f"{name}: {counts['completed']}/{counts['total']} complete, "
                       f"{counts['failed']} failed ({state}); {counts['last_nodeid']}", flush=True)
+                first_failed = counts.get("first_failed_nodeid")
+                if first_failed:
+                    diagnostic = counts.get("first_failed_diagnostic") or "see JUnit artifact"
+                    rerun = counts.get("first_failed_rerun") or (
+                        f"venv/bin/python run.py hosted-e2e execute --target {first_failed}"
+                    )
+                    print(
+                        f"  first failure: {first_failed} — {diagnostic} | rerun: {rerun}",
+                        flush=True,
+                    )
 
     def cancel(signum, frame):
         raise KeyboardInterrupt(f"E2E pilot cancelled by signal {signum}")
@@ -245,7 +277,7 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
                       "base_url": CONFIG.BASE_URL, "fixtures": fixtures,
                       "browser_cookies": cookies,
                       "resource_registry": str(contexts),
-                      "server_pid": local["server"]["pid"] if local else None,
+                      "server_pid": server_pid,
                       "artifacts": str(artifacts)}
             if batch.name.startswith("stories-"):
                 record["test_resources"] = {
@@ -256,7 +288,7 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
             path.chmod(0o600)
             output = stack.enter_context((artifacts / "pytest.log").open("w", encoding="utf-8"))
             child_command = [sys.executable, "-m", "pytest", "-c", "testing/pytest.ini",
-                             "-p", "testing.utility.traceability_results", "-p", "runner.pytest_routing",
+                             "-p", "testing.utility.evidence_results", "-p", "runner.pytest_routing",
                              "-p", "runner.e2e_claims",
                              "-o", f"cache_dir={artifacts / 'pytest-cache'}",
                              f"--junitxml={artifacts / 'junit.xml'}", "-m", "not unfinished", *batch.nodeids]
@@ -292,7 +324,13 @@ def run_pilot(authority, command, pytest_args, *, scope="pilot", workers=3):
                             "exclusive": b.exclusive} for b in batches], "events": events,
                "exit_status": status, "errors": errors}
     (root / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    if not any("Source changed" in error for error in errors):
+    if (
+        not any("Source changed" in error for error in errors)
+        and should_write_test_evidence(
+            write_flag="--write-test-evidence" in command,
+            skip_flag="--no-test-evidence" in command,
+        )
+    ):
         _write_manifest(REPOSITORY_ROOT, command, outcomes, status)
     print(f"Pilot: {sum(row['outcome'] == 'passed' for row in outcomes.values())}/{len(outcomes)} passed; {root}", flush=True)
     for error in errors:

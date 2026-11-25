@@ -13,16 +13,21 @@ from lagniappe.core.tools.ai.reporting.uploads import (
 )
 
 
-# @pair agent-api:contract
 def test_openapi_publishes_runtime_defaults_limits_and_independent_documents():
     document = build_openapi_document(app_name="Example", server_url="https://example.test")
     assert document["info"]["title"] == "Example External Agent API"
     assert document["servers"] == [{"url": "https://example.test"}]
     paths = document["paths"]
     create = paths["/api/v1/plans"]["post"]["requestBody"]["content"]["application/json"]["schema"]
-    assert set(create["properties"]) == {"instructions", "name", "revises_plan_id"}
+    assert set(create["properties"]) == {"instructions", "name", "require_review", "revises_plan_id"}
     assert create["properties"]["revises_plan_id"]["type"] == ["string", "null"]
     assert create["properties"]["name"]["maxLength"] == 120
+    assert create["properties"]["require_review"]["type"] == "boolean"
+    get_plan = paths["/api/v1/plans/{plan_id}"]["get"]
+    include_proposal = next(
+        item["schema"] for item in get_plan["parameters"] if item["name"] == "include_proposal"
+    )
+    assert include_proposal == {"type": "boolean", "default": True}
     contract = paths["/api/v1/plans/{plan_id}/contract"]["get"]
     view = next(item["schema"] for item in contract["parameters"] if item["name"] == "view")
     assert view["enum"] == ["full", "summary", "schema"]
@@ -30,6 +35,7 @@ def test_openapi_publishes_runtime_defaults_limits_and_independent_documents():
     submit = paths["/api/v1/plans/{plan_id}/submit"]["post"]["requestBody"]["content"]["application/json"]["schema"]
     assert submit["required"] == ["contract_version", "proposal", "file_usage"]
     assert submit["additionalProperties"] is False
+    assert {"execute", "operation_id", "require_review"}.issubset(submit["properties"])
     upload = document["components"]["schemas"]["UploadFile"]
     assert upload["required"] == ["filename", "size"]
     assert upload["properties"]["size"] == {
@@ -44,7 +50,6 @@ def test_openapi_publishes_runtime_defaults_limits_and_independent_documents():
     assert build_openapi_document(app_name="Example", server_url="https://example.test") == original
 
 
-# @matrix agent-api : checkpoint concurrency
 @pytest.mark.parametrize("failure,reason,disposition", [
     ("prepare", None, CHECKPOINT_NOT_COMMITTED),
     ("transaction", None, CHECKPOINT_AMBIGUOUS),
@@ -86,7 +91,6 @@ def test_claimed_save_preserves_definite_and_ambiguous_checkpoint_failures(monke
         assert caught.value.reason == reason
 
 
-# @matrix agent-api : checkpoint concurrency
 def test_claimed_save_advances_snapshot_and_isolates_post_commit_failure(monkeypatch):
     report = SimpleNamespace(key="report", db={"revision": 1})
     actor = object()

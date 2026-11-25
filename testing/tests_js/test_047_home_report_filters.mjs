@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
+import { createBrowser } from "../utility/js/environment.mjs";
 
 function replaceGlobal(t, name, value) {
 	const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
@@ -18,9 +19,9 @@ function replaceGlobal(t, name, value) {
 async function loadToolReportList() {
 	let stored = null;
 	const { ToolReportList } = await esmock.strict(
-		"../../src/script/widgets/home/lists.mjs",
+		"../../src/script/widgets/home/lists.ts",
 		{
-			"../../src/script/shared/storage.mjs": {
+			"../../src/script/shared/storage.ts": {
 				localStore: {
 					getJSON: () => stored,
 					setJSON: (_key, value) => {
@@ -28,7 +29,7 @@ async function loadToolReportList() {
 					},
 				},
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (commit) => await commit(),
 			},
 		},
@@ -44,6 +45,7 @@ async function loadToolReportList() {
 
 function fixture(ToolReportList) {
 	const items = [];
+	const flashed = [];
 	const buttons = ["active", "executed", "answers"].map((filter) => ({
 		dataset: { filter },
 		count: {},
@@ -85,7 +87,9 @@ function fixture(ToolReportList) {
 		},
 	};
 	const view = {
-		addFlash() {},
+		addFlash(row) {
+			flashed.push(row.dataset.key);
+		},
 		async _refreshHomeWidget() {},
 	};
 	const widget = new ToolReportList({
@@ -106,21 +110,36 @@ function fixture(ToolReportList) {
 		items.push(item);
 		return item;
 	}
-	return { widget, items, buttons, empty, clear, result, add, target };
+	return { widget, items, flashed, buttons, empty, clear, result, add, target };
 }
+
+test("test_report_list_flashes_each_new_row_in_a_batch", async (t) => {
+	createBrowser(t);
+	const { ToolReportList } = await loadToolReportList();
+	const f = fixture(ToolReportList);
+	const html = new DOMParser().parseFromString(
+		`<ul>
+			<li lp-entity data-kind="report" data-key="first" data-output-kind="answer" data-status="complete"></li>
+			<li lp-entity data-kind="report" data-key="second" data-output-kind="answer" data-status="complete"></li>
+		</ul>`,
+		"text/html",
+	);
+	f.widget.created({ html });
+	f.widget.postreconcile();
+	assert.deepEqual(new Set(f.flashed), new Set(["first", "second"]));
+});
 
 function renderedCategory(ToolReportList, dataset) {
 	const f = fixture(ToolReportList);
 	f.add("report", dataset.outputKind, dataset.status);
 	f.widget._renderFilters();
 	const populated = f.buttons.filter(
-		(button) => button.count.textContent === 1,
+		(button) => button.count.textContent === "1",
 	);
 	assert.equal(populated.length, 1);
 	return populated[0].dataset.filter;
 }
 
-// @matrix ai-report : filter-categories
 test("test_report_categories_and_saved_filter_selection", async () => {
 	const state = await loadToolReportList();
 	for (const status of [
@@ -177,8 +196,8 @@ test("test_report_categories_and_saved_filter_selection", async () => {
 	);
 });
 
-// @matrix ai-report : filter-categories filter-counts filter-empty filter-persistence filter-create
-test("test_report_filters_count_hidden_categories_and_empty_selections", async () => {
+test("test_report_filters_count_hidden_categories_and_empty_selections", async (t) => {
+	createBrowser(t);
 	const state = await loadToolReportList();
 	const f = fixture(state.ToolReportList);
 	const ready = f.add("ready", "proposal", "ready");
@@ -190,7 +209,7 @@ test("test_report_filters_count_hidden_categories_and_empty_selections", async (
 	assert.equal(answer.hidden, false);
 	assert.deepEqual(
 		f.buttons.map((button) => button.count.textContent),
-		[1, 1, 1],
+		["1", "1", "1"],
 	);
 	assert.equal(f.clear.hidden, true);
 	for (const selection of [
@@ -229,18 +248,20 @@ test("test_report_filters_count_hidden_categories_and_empty_selections", async (
 	assert.equal(ready.hidden, false);
 	assert.deepEqual(
 		f.buttons.map((button) => button.count.textContent),
-		[0, 1, 1],
+		["0", "1", "1"],
 	);
-	const created = {
-		dataset: { key: "new", outputKind: "answer", status: "pending" },
-	};
-	f.widget.created({ html: { querySelectorAll: () => [created] } });
+	const html = new DOMParser().parseFromString(
+		'<ul><li lp-entity data-kind="report" data-key="new" data-output-kind="answer" data-status="pending"></li></ul>',
+		"text/html",
+	);
+	const created = html.querySelector("li");
+	f.widget.created({ html });
 	f.widget.postreconcile();
 	assert.equal(created.hidden, false);
 	assert.deepEqual([...f.widget.filters], ["executed", "answers"]);
 
 	f.widget.filters = new Set(["executed"]);
-	f.widget.created({ html: { querySelectorAll: () => [created] } });
+	f.widget.created({ html });
 	f.widget.postreconcile();
 	assert.equal(f.items.filter((item) => item.dataset.key === "new").length, 1);
 	assert.equal(created.hidden, false);
@@ -248,10 +269,40 @@ test("test_report_filters_count_hidden_categories_and_empty_selections", async (
 	assert.deepEqual(state.getStored(), ["executed", "answers"]);
 });
 
-// @matrix ai-report : bulk-delete delete-failure delete-snapshot loading-indicator
+test("test_paginated_report_list_clarifies_page_scoped_empty_and_delete_labels", async () => {
+	const state = await loadToolReportList();
+	const f = fixture(state.ToolReportList);
+	const clearLabel = { textContent: "" };
+	f.clear.querySelector = (selector) =>
+		selector === "[data-role='delete-executed-label']" ? clearLabel : null;
+	const originalQuery = f.target.querySelector.bind(f.target);
+	f.target.querySelector = (selector) => {
+		if (selector === "[lp-control='next'], [lp-control='previous']") {
+			return { dataset: { route: "/internal/get/tools?cursor=next" } };
+		}
+		return originalQuery(selector);
+	};
+	f.add("done-1", "proposal", "complete");
+	f.widget.filters = new Set(["active", "answers"]);
+	f.widget._renderFilters();
+	assert.equal(f.empty.hidden, false);
+	assert.equal(
+		f.empty.textContent,
+		"No reports match the selected types on this page.",
+	);
+
+	f.widget.filters = new Set(["executed"]);
+	f.widget._renderFilters();
+	assert.equal(f.clear.hidden, false);
+	assert.equal(
+		clearLabel.textContent,
+		"Delete executed proposals on this page",
+	);
+});
+
 test("test_bulk_delete_recovers_from_partial_and_network_failures", async (t) => {
 	replaceGlobal(t, "DOMParser", class {});
-	const { request } = await import("../../src/script/shared/request.mjs");
+	const { request } = await import("../../src/script/shared/request.ts");
 	const originalDelete = request.delete;
 	t.after(() => {
 		request.delete = originalDelete;

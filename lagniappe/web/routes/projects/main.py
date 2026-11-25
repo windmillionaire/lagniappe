@@ -1,3 +1,17 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities import types as models
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+    from werkzeug.datastructures import MultiDict
+
+from lagniappe.core.entities.project import ProjectData
+from lagniappe.core.entities.model_task import ModelTaskData
+
 from flask import abort, request
 
 from lagniappe.core.entities import Entities
@@ -16,17 +30,11 @@ from lagniappe.web import responses
 from . import projects
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
-# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_is_forbidden_without_model_permission
-# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_reads_project_without_editing_controls
-# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_can_read_document_content
-# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_url_rejects_model_task_key
-# @pair projects:wrong-entity-type
-# @matrix projects : document-tab load navigate permission-gates readonly
 @projects.route("/<key>", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
-def view(key, **kwargs):
+def view(
+    key: str, **kwargs: Unpack[EntityContext[models.Project]]
+) -> ResponseReturnValue:
     project = kwargs["entity"]
     if not isinstance(project, Entities.PROJECT):
         abort(404)
@@ -35,32 +43,26 @@ def view(key, **kwargs):
     return responses.project_view(project)
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004b_info.py::test_project_info_replacement_is_side_effect_free_for_timestamp_only_revision
-# @tests tests_e2e/004_projects/test_004b_info.py::test_project_revision_notice_only_resets_changed_form
-# @matrix edited-entity-notice projects : dirty-state info-form no-reload replacement side-effect-free staged-reset timestamp-only
 @projects.route("/<key>/info/replace", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
-def info(key, **kwargs):
+def info(
+    key: str, **kwargs: Unpack[EntityContext[models.Project]]
+) -> ResponseReturnValue:
     return responses.project_info(kwargs["entity"])
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
-# @matrix projects : create-manual
-def create_update_data(form):
+def create_update_data(form: MultiDict[str, str]) -> ProjectData:
     return {
         "name": form.get("name"),
         "description": form.get("description"),
     }
 
 
-# @testable true
-# @tests tests_e2e/004_projects/test_004b_info.py::test_project_info_form
-# @matrix projects : info-form update
 @projects.route("<key>/update", methods=["PUT"])
 @permission(Resource.PROJECT, Action.EDIT)
-def update(key, **kwargs):
+def update(
+    key: str, **kwargs: Unpack[EntityContext[models.Project]]
+) -> ResponseReturnValue:
     project = kwargs["entity"]
 
     update_data = create_update_data(request.form)
@@ -71,18 +73,29 @@ def update(key, **kwargs):
     return responses.project_info(project)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/projects/main.py::create
-# @reason AI response shaping is exercised through the project create route
-def _create_project(generated_data):
-    project_data = {
+class _GeneratedForm(TypedDict):
+    name: str | None
+    schema: object
+    form_type: str
+
+
+class _GeneratedModelTask(ModelTaskData, total=False):
+    form_data: _GeneratedForm
+
+
+class _GeneratedProject(ProjectData):
+    model_tasks: list[_GeneratedModelTask]
+
+
+def _create_project(generated_data: ai_project.GeneratedProject) -> _GeneratedProject:
+    project_data: _GeneratedProject = {
         "name": generated_data.get("project_name"),
         "description": generated_data.get("project_description"),
         "model_tasks": [],
     }
 
     for model_task in generated_data.get("model_tasks"):
-        new_model_task_data = {
+        new_model_task_data: _GeneratedModelTask = {
             "name": model_task.get("name"),
         }
         project_data["model_tasks"].append(new_model_task_data)
@@ -91,26 +104,22 @@ def _create_project(generated_data):
             new_model_task_data["form_data"] = {
                 "name": model_task.get("name"),
                 "schema": model_task.get("form_schema"),
-                "form-type": "task",
+                "form_type": "task",
             }
 
     return project_data
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
-# @matrix projects : ai-create create-manual
 @projects.route("/create", methods=["POST"])
 @permission(Resource.PROJECTS, Action.CREATE)
-def create():
+def create() -> ResponseReturnValue:
     generate = request.form.get("generate")
     if request.form.get("role") == "explain" or request.form.get("explain"):
         return responses.error("Initial Prompt is no longer available.")
 
     if generate:
         require_ai_access(AI.CREATE)
-        prompt = ai_project.project_creation_prompt(request.form.get("user_description"))
+        prompt = ai_project.project_creation_prompt(request.form.get("user_description") or "")
         try:
             generated_data = ai_project.generate_project(prompt)
         except (exceptions.AIException, Exception) as e:
@@ -120,7 +129,7 @@ def create():
         new_project = Entities.PROJECT.create(project_data)
         new_project.ai_generated = True
 
-        for model_task in project_data.get("model_tasks"):
+        for model_task in project_data.get("model_tasks") or []:
             new_model_task = Entities.MODEL_TASK.create(new_project, model_task)
             new_project.add_mutation_intents(
                 MutationIntent.standard(
@@ -128,12 +137,11 @@ def create():
                     reason="generated-project-model-task",
                 )
             )
-            if model_task.get("form_data"):
-                form_data = model_task.get("form_data")
+            if form_data := model_task.get("form_data"):
                 form = Entities.FORM.create(
                     {
                         "name": form_data.get("name"),
-                        "form-type": form_data.get("form-type"),
+                        "form-type": form_data["form_type"],
                     }
                 )
                 form.properties.schema.validate_ai(form_data.get("schema"))
@@ -153,12 +161,11 @@ def create():
     return responses.new_project(new_project)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002b_home_projects.py::test_delete_project
-# @pair projects:delete
 @projects.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.PROJECT, Action.DELETE)
-def delete(key, **kwargs):
+def delete(
+    key: str, **kwargs: Unpack[EntityContext[models.Project]]
+) -> ResponseReturnValue:
     project = kwargs["entity"]
     if not project:
         return responses.not_found("project not found")

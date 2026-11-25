@@ -1,6 +1,16 @@
 """Durable ledger construction and restoration for report execution."""
 
+from __future__ import annotations
+
+from typing import Required, TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ReportProposal
+
+
 import hashlib
+
 
 from lagniappe.core import exceptions
 from lagniappe.core.properties.ai_report_proposal import (
@@ -14,12 +24,36 @@ from .actions.results import (
     _remember_created,
 )
 
+class ActionRecord(TypedDict, total=False):
+    id: str | None
+    type: str
+    display_label: str | None
+    idempotency_key: Required[str]
+    status: str
+    attempts: int
+    prepared: bool
+    expected: dict[str, object]
+    before: dict[str, object]
+    note: str
+    error: str
+    document_at: str
+    document_after: dict[str, str | None]
+    entity: dict[str, object]
+    migration_id: str
+    batch_skipped: bool
+
+
+class ReportLedger(TypedDict, total=False):
+    ledger_version: int
+    proposal_fingerprint: str
+    status: str
+    actions: Required[list[ActionRecord]]
+    failed_at: int
+
+
 REPORT_LEDGER_VERSION = 1
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason action identity is asserted through public retry behavior
 def _action_idempotency_key(report, proposal_fingerprint, index, action):
     value = ":".join(
         (
@@ -33,10 +67,9 @@ def _action_idempotency_key(report, proposal_fingerprint, index, action):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason ledger construction is asserted through public retry behavior
-def _new_report_ledger(report, proposal, proposal_fingerprint):
+def _new_report_ledger(
+    report: models.AIReport, proposal: ReportProposal, proposal_fingerprint: str
+) -> ReportLedger:
     return {
         "ledger_version": REPORT_LEDGER_VERSION,
         "proposal_fingerprint": proposal_fingerprint,
@@ -44,7 +77,7 @@ def _new_report_ledger(report, proposal, proposal_fingerprint):
         "actions": [
             {
                 "id": action.get("id"),
-                "type": action.get("type"),
+                "type": action["type"],
                 "display_label": action.get("display_label"),
                 "idempotency_key": _action_idempotency_key(
                     report,
@@ -60,15 +93,12 @@ def _new_report_ledger(report, proposal, proposal_fingerprint):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason ledger validation is exercised through public resume behavior
 def _validate_report_ledger(proposal, result):
     actions = proposal.get("actions") or []
     records = result.get("actions") or []
     if len(actions) != len(records):
         raise exceptions.ValidationError("Stored report recovery ledger is invalid.")
-    for action, record in zip(actions, records):
+    for action, record in zip(actions, records, strict=True):
         if (
             record.get("id") != action.get("id")
             or record.get("type") != action.get("type")
@@ -79,9 +109,6 @@ def _validate_report_ledger(proposal, result):
             )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason created-reference restoration is exercised through dependent retries
 def _restore_completed_action_entities(result):
     created = {}
     for record in result.get("actions") or []:
@@ -91,9 +118,6 @@ def _restore_completed_action_entities(result):
     return created
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason created-reference restoration is exercised through dependent retries
 def _restore_created_action_entity(created, record):
     if not str(record.get("type") or "").startswith("create_"):
         return

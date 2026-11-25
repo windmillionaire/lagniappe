@@ -22,7 +22,6 @@ def _results():
     return SimpleNamespace(record=lambda name, value: entries.append((name, deepcopy(value)))), entries
 
 
-# @matrix ai e2e : live-provider quota-fallback
 @pytest.mark.parametrize("message,expected", [
     ("AI quota is temporarily exhausted. The report can retry shortly.", True),
     ("429 RESOURCE_EXHAUSTED. Resource exhausted, please try again later.", True),
@@ -38,7 +37,6 @@ def test_quota_classification_does_not_accept_application_errors(message, expect
     assert live_ai.is_quota_message(message) is expected
 
 
-# @matrix ai e2e : live-provider quota-fallback backoff
 @pytest.mark.parametrize("error", [live_ai.ProviderQuotaBlocked("quota"), AssertionError("bad answer"), RuntimeError("bad save")])
 def test_live_provider_retries_only_quota_and_records_the_outcome(error):
     results, entries = _results()
@@ -61,7 +59,6 @@ def test_live_provider_retries_only_quota_and_records_the_outcome(error):
         assert attempts == [1] and not waits
 
 
-# @matrix ai e2e : live-provider quota-fallback backoff
 @pytest.mark.parametrize("fallback_fails", [False, True])
 def test_live_provider_requires_verified_fallback_after_bounded_attempts(fallback_fails):
     results, entries = _results()
@@ -95,7 +92,6 @@ def _jobs():
     return failed, retry
 
 
-# @matrix ai deferred-jobs e2e : checkpoint live-provider quota-fallback
 @pytest.mark.parametrize("error_type,provider,expected", [
     ("AIException", {"quota_exhausted": True, "code": 429, "status": "RESOURCE_EXHAUSTED"}, True),
     ("AIException", {"quota_exhausted": True, "code": "429"}, True),
@@ -122,7 +118,6 @@ def test_job_quota_classification_requires_provider_evidence(error_type, provide
     assert live_ai.quota_blocked_job(failed) is False
 
 
-# @matrix ai deferred-jobs e2e : checkpoint live-provider quota-fallback
 @pytest.mark.parametrize("wrapped", [False, True])
 def test_quota_fallback_injects_resumable_report_checkpoint(monkeypatch, wrapped):
     failed, retry = _jobs()
@@ -146,7 +141,6 @@ def test_quota_fallback_injects_resumable_report_checkpoint(monkeypatch, wrapped
     assert len(saved) == 1
 
 
-# @matrix ai deferred-jobs e2e : checkpoint live-provider quota-fallback
 @pytest.mark.parametrize("change", ["non_quota", "active", "checkpoint", "different_report", "different_actor", "same_job", "started"])
 def test_quota_fallback_rejects_non_quota_job(change):
     failed, retry = _jobs()
@@ -168,7 +162,6 @@ def test_quota_fallback_rejects_non_quota_job(change):
         live_ai.inject_quota_fallback_checkpoint(retry, {}, failed_job=failed)
 
 
-# @matrix ai deferred-jobs e2e : checkpoint live-provider quota-fallback
 @pytest.mark.parametrize("failure", [None, "non_quota", "terminal", "wrong_type", "permission", "drift", "schema", "file", "actor", "target", "started", "checkpoint", "prompt", "upload"])
 @pytest.mark.parametrize("wrapped", [False, True])
 def test_autofill_fallback_retains_preparation_and_rejects_unrelated_failures(monkeypatch, failure, wrapped):

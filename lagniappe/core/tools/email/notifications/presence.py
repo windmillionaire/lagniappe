@@ -1,5 +1,11 @@
 """Best-effort Redis presence used for email suppression."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+    from datetime import datetime
+
 from collections import OrderedDict
 from threading import Lock
 
@@ -19,9 +25,6 @@ _activity_memo = OrderedDict()
 _activity_memo_lock = Lock()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/presence.py::record_site_activity
-# @reason bounded worker-local timing hints never authorize access or replace shared presence
 def _activity_check_due(key, timestamp):
     with _activity_memo_lock:
         previous = _activity_memo.get(key)
@@ -31,9 +34,6 @@ def _activity_check_due(key, timestamp):
     return True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/presence.py::record_site_activity
-# @reason remember only successful Redis observations; do not hold the lock during I/O
 def _remember_activity(key, timestamp, recorded):
     deadline = min(timestamp + SITE_ACTIVITY_WRITE_SECONDS, recorded + SITE_ACTIVITY_WRITE_SECONDS)
     with _activity_memo_lock:
@@ -43,30 +43,17 @@ def _remember_activity(key, timestamp, recorded):
             _activity_memo.popitem(last=False)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/presence.py::record_site_activity
-# @reason Redis key construction is owned by coarse activity recording
 def _activity_key(user):
     return f"{CONFIG.PREFIX}SITE_ACTIVITY:{identity(email_database.encoded_key(user))}"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/presence.py::record_site_activity
-# @reason Redis wire normalization is exercised through coarse activity recording
 def _timestamp(value):
     if isinstance(value, bytes):
         value = value.decode("utf-8")
     return float(value)
 
 
-# @testable true
-# @tests tests_unit/test_029a_notification_email_policy.py::test_site_activity_is_coarse_and_expires
-# @tests tests_unit/test_029a_notification_email_policy.py::test_site_activity_memo_bounds_reads_and_redis_loss_delay
-# @tests tests_unit/test_029a_notification_email_policy.py::test_activity_memo_retries_failures_and_bounds_memory
-# @tests tests_unit/test_029a_notification_email_policy.py::test_activity_memo_is_safe_for_concurrent_workers_and_clock_changes
-# @matrix notification-email : coarse-request-activity presence
-# @matrix notification-email : bounded failure clock concurrency redis-loss
-def record_site_activity(user, *, now=None):
+def record_site_activity(user: User, *, now: datetime | None = None) -> bool:
     """Record coarse authenticated activity without creating browser traffic."""
     now = utc(now)
     timestamp = now.timestamp()
@@ -86,11 +73,7 @@ def record_site_activity(user, *, now=None):
         return False
 
 
-# @testable true
-# @tests tests_unit/test_029a_notification_email_policy.py::test_site_activity_is_coarse_and_expires
-# @tests tests_unit/test_029b_notification_email_events.py::test_immediate_notification_is_delayed_escaped_and_delivered
-# @matrix notification-email : presence presence-suppression
-def recently_active(user, *, now=None):
+def recently_active(user: User, *, now: datetime | None = None) -> bool:
     """Return a best-effort recent-activity hint; cache failure fails open."""
     now = utc(now)
     try:

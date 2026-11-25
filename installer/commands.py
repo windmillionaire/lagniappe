@@ -1,6 +1,7 @@
 """Installer gcloud command execution and prerequisite checks."""
 
 import subprocess
+from typing import Literal, Never, overload
 
 from runner import presentation as ui
 from runner.presentation import output as print
@@ -10,10 +11,7 @@ from . import GCLOUD_CLI
 from .errors import GCLOUD_TIMEOUT, SetupError, classify_provider_error
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_prerequisite_gcloud_and_deploy_helpers
-# @pair setup:gcloud-command
-def check_gcloud_cli():
+def check_gcloud_cli() -> None:
     if not GCLOUD_CLI:
         print(
             ui.error(wrap_text(
@@ -25,12 +23,22 @@ def check_gcloud_cli():
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_prerequisite_gcloud_and_deploy_helpers
-# @pair setup:gcloud-command
-# @pair setup:timeout
-def run_gcloud_command(command, check=True, timeout=GCLOUD_TIMEOUT):
+@overload
+def run_gcloud_command(command: list[str], check: Literal[True] = True, timeout: float = GCLOUD_TIMEOUT) -> subprocess.CompletedProcess[str]: ...
+
+
+@overload
+def run_gcloud_command(command: list[str], check: bool, timeout: float = GCLOUD_TIMEOUT) -> subprocess.CompletedProcess[str] | subprocess.CalledProcessError: ...
+
+
+def run_gcloud_command(
+    command: list[str],
+    check: bool = True,
+    timeout: float = GCLOUD_TIMEOUT,
+) -> subprocess.CompletedProcess[str] | subprocess.CalledProcessError:
     """Run a shell command and return the result."""
+    if GCLOUD_CLI is None:
+        raise SetupError("gcloud CLI not found. Install the Google Cloud CLI and retry.")
     try:
         result = subprocess.run(
             [GCLOUD_CLI] + command,
@@ -61,17 +69,13 @@ def run_gcloud_command(command, check=True, timeout=GCLOUD_TIMEOUT):
 GOOGLE_CLOUD_TERMS_URL = "https://console.developers.google.com/terms/cloud"
 
 
-# @testable false
-# @covered-by installer/create_config.py::verify_application_config
-# @reason small typed-failure adapter exercised through configuration validation
-def _fail(message="Setup configuration failed.", *, repair_action=None):
+def _fail(
+    message: str = "Setup configuration failed.", *, repair_action: str | None = None
+) -> Never:
     raise SetupError(message, repair_action=repair_action)
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_google_cloud_terms_failure_has_account_specific_repair
-# @matrix setup : error-guidance google-cloud-terms
-def _is_google_cloud_terms_error(detail):
+def _is_google_cloud_terms_error(detail: object) -> bool:
     """Recognize Google's account-level Cloud service-terms rejection."""
     normalized = str(detail or "").casefold()
     return any(
@@ -84,10 +88,7 @@ def _is_google_cloud_terms_error(detail):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_google_cloud_terms_failure_has_account_specific_repair
-# @matrix setup : error-guidance google-cloud-terms identity
-def _google_cloud_terms_repair_action(account):
+def _google_cloud_terms_repair_action(account: str) -> str:
     """Return safe first-use guidance for the exact selected Cloud identity."""
     from runner.context import setup_command
 

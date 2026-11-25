@@ -94,13 +94,13 @@ def _run_cli(arguments, *, behavior="return", status=0):
     )
 
 
-def _module(monkeypatch, setup_package, name, **members):
-    module_name = f"installer.{name}"
+def _module(monkeypatch, package, name, **members):
+    module_name = f"{package.__name__}.{name}"
     module = types.ModuleType(module_name)
     for member_name, value in members.items():
         setattr(module, member_name, value)
     monkeypatch.setitem(sys.modules, module_name, module)
-    monkeypatch.setattr(setup_package, name, module, raising=False)
+    monkeypatch.setattr(package, name, module, raising=False)
     return module
 
 
@@ -114,7 +114,6 @@ def _install_harness(
     import config
     import installer as setup_package
     from installer import install as install_module
-    from installer import mcp as mcp_module
 
     events = []
     settings = types.SimpleNamespace(
@@ -124,7 +123,8 @@ def _install_harness(
         GCLOUD_CONFIG={},
         save=lambda: events.append("settings.save"),
     )
-    monkeypatch.setattr(config, "SETTINGS", settings)
+    # SETTINGS is lazy. Looking up the previous attribute would load saved files.
+    monkeypatch.setitem(vars(config), "SETTINGS", settings)
     monkeypatch.setattr(config, "File", types.SimpleNamespace(
         INDEX_YAML=types.SimpleNamespace(value="index.yaml"),
         APP_YAML=types.SimpleNamespace(value="lagniappe.yaml"),
@@ -172,7 +172,7 @@ def _install_harness(
         "deploy",
         deploy_to_app_engine=deploy_to_app_engine,
     )
-    _module(monkeypatch, setup_package, "mcp", requested=mcp_module.requested)
+    _module(monkeypatch, setup_package, "mcp", requested=lambda app: False)
     gcloud_module = _module(
         monkeypatch,
         setup_package,
@@ -264,7 +264,6 @@ def _install_harness(
     return install_module, settings, events
 
 
-# @matrix setup : prerequisites virtualenv
 def test_default_install_characterization_starts_empty_and_reaches_all_boundaries(
     monkeypatch,
     capsys,
@@ -306,7 +305,6 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
     assert "Manual deployment steps" not in output
 
 
-# @matrix setup : explicit-project manual-deploy
 def test_default_install_only_prints_manual_deployment_steps_when_declined(
     monkeypatch,
     capsys,
@@ -327,7 +325,6 @@ def test_default_install_only_prints_manual_deployment_steps_when_declined(
     assert "deploy_to_app_engine" not in events
 
 
-# @pairs ai-email:activation setup:main-install
 def test_default_install_activates_ai_email_after_deploy_and_jobs(
     monkeypatch,
 ):
@@ -360,7 +357,6 @@ def test_recovery_install_skips_optional_reconfiguration(monkeypatch):
     assert settings._deploy_options == {"print_final_summary": False, "first_install": False}
 
 
-# @matrix setup : failure-isolation recovery
 def test_recovery_is_announced_before_dependency_or_provider_mutation(
     monkeypatch,
     tmp_path,
@@ -396,7 +392,6 @@ def test_recovery_is_announced_before_dependency_or_provider_mutation(
     assert "Recovery mode detected" in events[0][1]
 
 
-# @matrix setup : dependency-bootstrap focused-mode gcloud-token operation-journal portability prerequisites python-version virtualenv
 def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
     from runner import gcloud as runner_gcloud
     import installer as setup_package
@@ -412,9 +407,10 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
     spec.loader.exec_module(setup_cli)
     verify_runtime = setup_package.verify_setup_runtime
 
+    events = []
     for parameters in CLI_MODES:
         arguments = list(parameters.values[0])
-        events = []
+        events.clear()
         monkeypatch.setattr(
             setup_package,
             "verify_setup_runtime",
@@ -472,11 +468,11 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
         assert events == expected
 
     monkeypatch.setattr(setup_package, "verify_setup_runtime", verify_runtime)
-    monkeypatch.setattr(setup_package.sys, "version_info", (3, 11))
+    monkeypatch.setattr(setup_package.sys, "version_info", (3, 13))
     with pytest.raises(SetupError):
         setup_package.verify_setup_runtime()
 
-    monkeypatch.setattr(setup_package.sys, "version_info", (3, 12))
+    monkeypatch.setattr(setup_package.sys, "version_info", (3, 14))
     monkeypatch.setattr(setup_package, "project_virtualenv_active", lambda: False)
     with pytest.raises(SetupError):
         setup_package.verify_setup_runtime()
@@ -485,16 +481,15 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
     assert setup_package.verify_setup_runtime() is None
 
 
-# @matrix setup : focused-mode gcloud-token prerequisites deploy-surface gcloud-config transactional-state
-# @source installer/__main__.py::_prepare_setup_dependencies
-# @source installer/verify.py::validate_installation
 def test_ai_command_checks_credentials_once_before_local_validation(monkeypatch):
     import config
+    import runner
     from installer import __main__ as setup_cli
     from installer import commands, optional, package_install
-    from runner import deploy, gcloud
+    from runner import gcloud
 
     events = []
+    monkeypatch.setitem(vars(config), "SETTINGS", types.SimpleNamespace(APP={}))
     monkeypatch.setattr(package_install, "ensure_pip_is_available", lambda: None)
     monkeypatch.setattr(package_install, "ensure_setup_dependencies", lambda: None)
     monkeypatch.setattr(
@@ -507,7 +502,12 @@ def test_ai_command_checks_credentials_once_before_local_validation(monkeypatch)
     )
     monkeypatch.setattr(commands, "check_gcloud_cli", lambda: None)
     monkeypatch.setattr(config, "verify_generation_manifest", lambda: events.append("generation"))
-    monkeypatch.setattr(deploy, "verify_runtime_deploy_surface", lambda: events.append("deploy-surface"))
+    _module(
+        monkeypatch,
+        runner,
+        "deploy",
+        verify_runtime_deploy_surface=lambda: events.append("deploy-surface"),
+    )
     monkeypatch.setattr(optional, "configure_ai_features", lambda: events.append("AI prompt") or False)
     monkeypatch.setattr("builtins.input", lambda prompt: "n")
 
@@ -520,7 +520,6 @@ def test_ai_command_checks_credentials_once_before_local_validation(monkeypatch)
     ]
 
 
-# @matrix auth setup : adc explicit-command gcloud-token interactive
 def test_setup_auth_uses_explicit_browser_flow(monkeypatch, capsys):
     from installer import auth
     from runner import gcloud as runner_gcloud
@@ -548,7 +547,6 @@ def test_setup_auth_uses_explicit_browser_flow(monkeypatch, capsys):
     )
 
 
-# @matrix setup : gcloud-token safe-failure
 def test_stale_gcloud_token_stops_with_setup_auth_instruction(
     monkeypatch,
     capsys,
@@ -579,7 +577,6 @@ def test_stale_gcloud_token_stops_with_setup_auth_instruction(
     assert "gcloud auth login" not in output
 
 
-# @matrix setup : generated-command instructions portability repository-root virtualenv
 def test_portable_runtime_paths_commands_and_virtualenv_instructions():
     from runner import context as runner_context
 
@@ -621,7 +618,10 @@ def test_portable_runtime_paths_commands_and_virtualenv_instructions():
     assert '"$LAGNIAPPE_VENV_PYTHON" -E -m installer "$@"' in posix_launcher
     assert '"$@"' in posix_launcher
     assert "gcloud info" not in windows_launcher
+    assert "python3.14 python3 python" in posix_launcher
     assert "Python.Python.3.14" in windows_launcher
+    assert "-3.14" in windows_launcher
+    assert "314 313 312" not in windows_launcher
     assert "winget install" in windows_launcher
     assert "bundledpython" in windows_launcher
     assert 'rmdir /s /q "%LAGNIAPPE_VENV_DIR%"' in windows_launcher
@@ -633,7 +633,6 @@ def test_portable_runtime_paths_commands_and_virtualenv_instructions():
     assert "%*" in windows_launcher
 
 
-# @pair setup:recovery
 def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_write(
     monkeypatch,
     tmp_path,
@@ -843,12 +842,12 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
 
     assert create_config.set_application_defaults()
     assert selections == [(recovered_project, "recovered-app")]
-    assert settings.GCLOUD_CONFIG == {
+    assert {
         "NAME": "recovered-app",
         "ACCOUNT": deployer,
         "PROJECT": recovered_project,
         "BILLING_ACCOUNT": "billing-1",
-    }
+    } == settings.GCLOUD_CONFIG
     assert settings.APP["GOOGLE_CLOUD_PROJECT"] == recovered_project
     assert settings.APP["ADMIN_EMAIL"] == owner
     assert settings.APP["INSTALLER_EMAIL"] == deployer
@@ -907,7 +906,6 @@ def _recovery_provider_settings():
     }
 
 
-# @matrix setup : failure-isolation provider-discovery recovery
 def test_recovery_provider_states_distinguish_absent_from_unavailable(monkeypatch):
     from installer import recovery
 
@@ -933,7 +931,6 @@ def test_recovery_provider_states_distinguish_absent_from_unavailable(monkeypatc
     assert recovery._probe_gcloud_json(["three"])["state"] == recovery.UNAVAILABLE
 
 
-# @matrix setup : project-identity project-number provider-discovery recovery
 def test_recovery_provider_discovery_targets_only_recovered_project(monkeypatch):
     from installer import recovery
 
@@ -1107,7 +1104,6 @@ def test_recovery_provider_discovery_targets_only_recovered_project(monkeypatch)
     assert ocr_calls == []
 
 
-# @matrix setup : keyless-config provider-discovery recovery repair
 def test_recovery_reports_missing_signing_setup_as_repairable_drift(monkeypatch):
     from installer import recovery
 
@@ -1214,7 +1210,6 @@ def test_recovery_reports_missing_signing_setup_as_repairable_drift(monkeypatch)
     }
 
 
-# @matrix setup : failure-isolation project-identity provider-discovery recovery
 def test_recovery_provider_mismatch_or_unavailable_stops_before_mutation(
     monkeypatch,
 ):
@@ -1301,7 +1296,6 @@ def test_recovery_provider_mismatch_or_unavailable_stops_before_mutation(
         recovery.verify_recovery_resources(settings, "recovered-project-1")
 
 
-# @matrix setup : cli-routing cli-status lazy-imports
 @pytest.mark.parametrize(("arguments", "entry_point"), CLI_MODES)
 def test_cli_subprocess_routes_every_mode_and_returns_status(arguments, entry_point):
     status = 7
@@ -1316,7 +1310,6 @@ def test_cli_subprocess_routes_every_mode_and_returns_status(arguments, entry_po
         assert "CALL verify" in result.stdout
 
 
-# @matrix setup : failure-propagation unexpected-errors
 @pytest.mark.parametrize(("arguments", "entry_point"), CLI_MODES)
 def test_cli_subprocess_provider_failures_are_nonzero(arguments, entry_point):
     result = _run_cli(arguments, behavior="raise")
@@ -1326,7 +1319,6 @@ def test_cli_subprocess_provider_failures_are_nonzero(arguments, entry_point):
     assert "provider failure" in result.stdout
 
 
-# @matrix setup : cli-status failure-propagation
 def test_cli_subprocess_treats_none_cancellation_as_failure():
     result = _run_cli([], behavior="cancel")
 
@@ -1334,7 +1326,6 @@ def test_cli_subprocess_treats_none_cancellation_as_failure():
     assert "CALL install" in result.stdout
 
 
-# @matrix setup : argument-validation cli-routing
 def test_cli_subprocess_rejects_multiple_or_dashed_commands():
     result = _run_cli(["url", "ai"], status=0)
 
@@ -1496,31 +1487,31 @@ def test_settings_save_targets_only_requested_file(monkeypatch):
     assert writes == ["APP_SETTINGS_YAML"]
 
 
-# @matrix setup : operation-journal process-lock recovery
 def test_setup_process_lock_and_operation_journal(tmp_path, capsys):
     lock_path = tmp_path / "installer.lock"
     journal_path = tmp_path / "operation.json"
 
-    with SetupProcessLock(lock_path):
-        with pytest.raises(SetupError, match="already running"):
-            SetupProcessLock(lock_path).acquire()
+    with (
+        SetupProcessLock(lock_path),
+        pytest.raises(SetupError, match="already running"),
+    ):
+        SetupProcessLock(lock_path).acquire()
     assert not lock_path.exists()
 
-    with pytest.raises(SetupError, match="interrupted"):
-        with setup_operation(
-            "install",
-            ["jobs"],
-            lock_path=lock_path,
-            journal_path=journal_path,
-        ):
-            record_step("enable API")
-            record_mutation(
-                "enable API",
-                action="enabled",
-                resource="provider-api",
-                identifier="tasks.googleapis.com",
-            )
-            raise KeyboardInterrupt
+    with pytest.raises(SetupError, match="interrupted"), setup_operation(
+        "install",
+        ["jobs"],
+        lock_path=lock_path,
+        journal_path=journal_path,
+    ):
+        record_step("enable API")
+        record_mutation(
+            "enable API",
+            action="enabled",
+            resource="provider-api",
+            identifier="tasks.googleapis.com",
+        )
+        raise KeyboardInterrupt
 
     journal = json.loads(journal_path.read_text(encoding="utf-8"))
     assert not lock_path.exists()

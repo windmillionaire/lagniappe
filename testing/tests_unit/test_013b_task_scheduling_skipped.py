@@ -1,7 +1,7 @@
 import pytest
+from datetime import UTC
 
 
-# @matrix task-scheduling : periodic recurring skipped
 @pytest.mark.unit
 def test_skipped_recurring(get_test_entities):
     """Test skipped calculation for recurring/periodic schedules.
@@ -9,7 +9,7 @@ def test_skipped_recurring(get_test_entities):
     Tests calculate_skipped_recurring_tasks which counts how many
     intervals have passed between starting_due_date and today.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
     from unittest.mock import patch
 
     from zoneinfo import ZoneInfo
@@ -22,33 +22,34 @@ def test_skipped_recurring(get_test_entities):
     tasks = get_test_entities()
     assert tasks
 
-    with patch(
-        "lagniappe.core.tools.tasks.scheduling.user_today", return_value=mock_today
-    ):
-        with patch(
+    with (
+        patch(
+            "lagniappe.core.tools.tasks.scheduling.user_today", return_value=mock_today
+        ),
+        patch(
             "lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz
-        ):
-            for task in tasks:
-                schedule_data = task.test_spec.get("schedule", {})
-                expected = task.test_spec["expected"]
-                task_name = task.test_spec["name"]
-                due = datetime.fromisoformat(task.test_spec["starting_due_date"]).replace(tzinfo=tz)
-                task.due_date = due.astimezone(timezone.utc)
+        ),
+    ):
+        for task in tasks:
+            schedule_data = task.test_spec.get("schedule", {})
+            expected = task.test_spec["expected"]
+            task_name = task.test_spec["name"]
+            due = datetime.fromisoformat(task.test_spec["starting_due_date"]).replace(tzinfo=tz)
+            task.due_date = due.astimezone(UTC)
 
-                # Set up the periodic section
-                periodic = task.properties.periodic
-                periodic.section.update(schedule_data)
+            # Set up the periodic section
+            periodic = task.properties.periodic
+            periodic.section.update(schedule_data)
 
-                # Calculate skipped through schedule property
-                schedule = task.properties.schedule
-                skipped = schedule.skipped
+            # Calculate skipped through schedule property
+            schedule = task.properties.schedule
+            skipped = schedule.skipped
 
-                assert skipped == expected["skipped"], (
-                    f"Failed for '{task_name}': expected {expected['skipped']}, got {skipped}"
-                )
+            assert skipped == expected["skipped"], (
+                f"Failed for '{task_name}': expected {expected['skipped']}, got {skipped}"
+            )
 
 
-# @matrix task-scheduling : scheduled skipped
 @pytest.mark.unit
 def test_skipped_scheduled(get_test_entities):
     """Test skipped calculation for scheduled schedules.
@@ -60,7 +61,7 @@ def test_skipped_scheduled(get_test_entities):
     - monthly: count monthly occurrences
     - yearly: count yearly occurrences
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
     from unittest.mock import patch
 
     from zoneinfo import ZoneInfo
@@ -73,35 +74,36 @@ def test_skipped_scheduled(get_test_entities):
     tasks = get_test_entities()
     assert tasks
 
-    with patch(
-        "lagniappe.core.tools.tasks.scheduling.user_today", return_value=mock_today
-    ):
-        with patch(
+    with (
+        patch(
+            "lagniappe.core.tools.tasks.scheduling.user_today", return_value=mock_today
+        ),
+        patch(
             "lagniappe.core.tools.tasks.scheduling.user_timezone", return_value=tz
-        ):
-            for task in tasks:
-                schedule_data = task.test_spec.get("schedule", {})
-                expected = task.test_spec.get("expected", {})
-                task_name = task.test_spec.get("name", "Unknown")
+        ),
+    ):
+        for task in tasks:
+            schedule_data = task.test_spec.get("schedule", {})
+            expected = task.test_spec.get("expected", {})
+            task_name = task.test_spec.get("name", "Unknown")
 
-                due_date_user_tz = datetime.fromisoformat(task.test_spec["starting_due_date"]).replace(tzinfo=tz)
-                task.due_date = due_date_user_tz.astimezone(timezone.utc)
+            due_date_user_tz = datetime.fromisoformat(task.test_spec["starting_due_date"]).replace(tzinfo=tz)
+            task.due_date = due_date_user_tz.astimezone(UTC)
 
-                # Set up the scheduled section
-                scheduled = task.properties.scheduled
-                scheduled.section.update(schedule_data)
+            # Set up the scheduled section
+            scheduled = task.properties.scheduled
+            scheduled.section.update(schedule_data)
 
-                # Calculate skipped through schedule property
-                schedule = task.properties.schedule
-                skipped = schedule.skipped
+            # Calculate skipped through schedule property
+            schedule = task.properties.schedule
+            skipped = schedule.skipped
 
-                assert skipped == expected["skipped"], (
-                    f"Failed for '{task_name}': due={due_date_user_tz}, today={mock_today}, "
-                    f"expected {expected['skipped']}, got {skipped}"
-                )
+            assert skipped == expected["skipped"], (
+                f"Failed for '{task_name}': due={due_date_user_tz}, today={mock_today}, "
+                f"expected {expected['skipped']}, got {skipped}"
+            )
 
 
-# @matrix task-scheduling : scheduled skipped
 @pytest.mark.unit
 def test_skipped_scheduled_calendar_boundaries():
     """Both endpoints are excluded, and invalid calendar dates are skipped."""
@@ -163,7 +165,6 @@ def test_skipped_scheduled_calendar_boundaries():
         ) == 0
 
 
-# @matrix task-scheduling : scheduled skipped exact-boundary timezone
 @pytest.mark.unit
 @pytest.mark.parametrize("rule, start, today, expected", [
     pytest.param({"mode": "daily"}, "2025-06-17", "2025-06-18", 0, id="daily-yesterday"),
@@ -197,7 +198,7 @@ def test_skipped_scheduled_calendar_boundaries():
 def test_skipped_scheduled_counts_only_occurrences_between_baseline_and_today(
     monkeypatch, rule, start, today, expected
 ):
-    from datetime import datetime, timezone
+    from datetime import datetime
     from zoneinfo import ZoneInfo
 
     from lagniappe.core.tools.tasks import scheduling
@@ -207,17 +208,16 @@ def test_skipped_scheduled_counts_only_occurrences_between_baseline_and_today(
     monkeypatch.setattr(scheduling, "user_timezone", lambda: tz)
     monkeypatch.setattr(scheduling, "user_today", lambda: datetime.fromisoformat(today).replace(tzinfo=tz))
     task = TestEntities.get("TASK", {"name": "Missed occurrences"})
-    task.due_date = datetime.fromisoformat(start).replace(tzinfo=tz).astimezone(timezone.utc)
+    task.due_date = datetime.fromisoformat(start).replace(tzinfo=tz).astimezone(UTC)
     task.properties.scheduled.section.update(rule)
 
     assert task.properties.schedule.skipped == expected
 
 
-# @matrix task-scheduling : scheduled skipped postponed
 @pytest.mark.unit
 @pytest.mark.parametrize("due, postponed", [("2025-06-17", "2025-06-15"), ("2025-06-15", "2025-06-17")])
 def test_skipped_scheduled_preserves_earliest_due_date_baseline(monkeypatch, due, postponed):
-    from datetime import datetime, timezone
+    from datetime import datetime
     from zoneinfo import ZoneInfo
 
     from lagniappe.core.tools.tasks import scheduling
@@ -227,8 +227,8 @@ def test_skipped_scheduled_preserves_earliest_due_date_baseline(monkeypatch, due
     monkeypatch.setattr(scheduling, "user_timezone", lambda: tz)
     monkeypatch.setattr(scheduling, "user_today", lambda: datetime(2025, 6, 18, tzinfo=tz))
     task = TestEntities.get("TASK", {"name": "Postponed occurrences"})
-    task.due_date = datetime.fromisoformat(due).replace(tzinfo=tz).astimezone(timezone.utc)
-    task.db["postponed_from"] = datetime.fromisoformat(postponed).replace(tzinfo=tz).astimezone(timezone.utc)
+    task.due_date = datetime.fromisoformat(due).replace(tzinfo=tz).astimezone(UTC)
+    task.db["postponed_from"] = datetime.fromisoformat(postponed).replace(tzinfo=tz).astimezone(UTC)
     task.properties.scheduled.section.update({"mode": "daily"})
 
     assert task.properties.schedule.skipped == 2  # June 16 and 17.

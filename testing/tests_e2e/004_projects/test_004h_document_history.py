@@ -6,7 +6,7 @@ remain restorable, and legacy automatic versions can still be cleared.
 
 Related Files:
     Application:
-        - src/script/elements/editor/options/documentHistory.mjs: History button
+        - src/script/elements/editor/options/documentHistory.ts: History button
         - lagniappe/core/properties/common_assets.py: Document.save current state
         - lagniappe/web/routes/assets/editor.py: History list/restore endpoints
 
@@ -32,7 +32,6 @@ from testing.utility.network import assert_lagniappe_error_response, expect_succ
 pytestmark = pytest.mark.e2e
 
 
-# @pair editor:history-list
 def test_document_saves_do_not_create_automatic_history(get_admin, get_user):
     user = get_admin()
     project = user.go(Projects.test_document_history_created)
@@ -73,8 +72,6 @@ def test_document_saves_do_not_create_automatic_history(get_admin, get_user):
     expect(editor.text_entry).to_have_text("Second version of the document")
 
 
-# @pair editor:history-restore
-# @matrix editor sync : preview restore
 def test_document_history_restore(get_admin, get_user):
     user = get_admin()
     project = user.go(Projects.test_document_history_restore)
@@ -145,8 +142,6 @@ def test_document_history_restore(get_admin, get_user):
     expect(editor.text_entry).to_contain_text("Further edits")
 
 
-# @matrix editor : confirmation current-content history-clear history-pin history-positioning parent-scope validation
-# @pair request-errors:plain-validation
 # @template delete/document_history.html::confirmation
 def test_pin_and_clear_document_history(get_admin, get_user, browser_failures):
     user = get_admin()
@@ -297,9 +292,6 @@ def test_pin_and_clear_document_history(get_admin, get_user, browser_failures):
         )
 
 
-# @source lagniappe/core/tools/document_history.py::list_backups
-# @source lagniappe/core/tools/document_history.py::read_backup
-# @matrix editor document-history : backups permissions preview
 # @template projects/document.html::document_tab
 def test_storage_backup_preview_is_read_only(get_admin, get_user):
     from uuid import uuid4

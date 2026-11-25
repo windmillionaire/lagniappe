@@ -16,7 +16,6 @@ from lagniappe.core.tools.cache.keys import SEARCH_SCORE_FIELD, Keys, Search
 from lagniappe.core.tools.hosted_e2e import lease as e2e_lease
 
 
-# @matrix cache : redis-connection redis-tls
 def test_runtime_redis_client_uses_shared_tls_options(monkeypatch):
     settings = SimpleNamespace(REDIS_TLS=True)
     calls = []
@@ -26,7 +25,7 @@ def test_runtime_redis_client_uses_shared_tls_options(monkeypatch):
         calls.append((received_settings, kwargs))
         return {"ssl": True, "ssl_cert_reqs": "required"}
 
-    monkeypatch.setattr(cache_core, "redis_client_kwargs", fake_options)
+    monkeypatch.setattr(cache_core, "redis_connection_kwargs", fake_options)
     monkeypatch.setattr(
         cache_core.redis,
         "Redis",
@@ -51,7 +50,6 @@ def _cached_json(value):
     return json.dumps(value).encode("utf-8")
 
 
-# @matrix cache sitemap : epoch public-manual-variant redis-race ttl
 def test_sitemap_cache_only_publishes_for_unchanged_epoch(monkeypatch):
     built = []
     published = []
@@ -105,7 +103,6 @@ def test_sitemap_cache_only_publishes_for_unchanged_epoch(monkeypatch):
     ]
 
 
-# @matrix cache public-directory sitemap : invalidation redis-failure shared-epoch
 def test_public_discovery_invalidation_advances_epoch_and_deletes_outputs(monkeypatch):
     commands = []
 
@@ -152,7 +149,6 @@ def test_public_discovery_invalidation_advances_epoch_and_deletes_outputs(monkey
     ]
 
 
-# @matrix cache public-directory : epoch json redis-race ttl
 def test_public_directory_cache_only_publishes_for_unchanged_epoch(monkeypatch):
     snapshot = {"schema": 1, "site_indexing": True, "groups": []}
     published = []
@@ -198,7 +194,6 @@ def test_public_directory_cache_only_publishes_for_unchanged_epoch(monkeypatch):
     ) == snapshot
 
 
-# @matrix cache public-directory : durable-fallback redis-failure single-rebuild
 def test_public_directory_publish_failure_does_not_repeat_durable_build(monkeypatch):
     snapshot = {"schema": 1, "site_indexing": True, "groups": []}
     builds = []
@@ -250,7 +245,6 @@ class _FakeDetailsCache:
         ]
 
 
-# @matrix search : exact-match partial-match special-characters stopwords term-normalization
 @pytest.mark.unit
 def test_search_term_list_normalizes_stopwords_and_special_characters():
     assert query._build_term_list("The A+ R&D plan, in 2024!") == [
@@ -268,7 +262,6 @@ def test_search_term_list_normalizes_stopwords_and_special_characters():
     assert query._build_term_list("a an the x y") == []
 
 
-# @matrix search : form-value highlighted-text html-escaping pipe-escaping snippets
 @pytest.mark.unit
 def test_search_snippet_extracts_highlighted_text_and_form_values():
     result = {}
@@ -320,7 +313,6 @@ def test_search_snippet_extracts_highlighted_text_and_form_values():
     )
 
 
-# @matrix search : malformed-cache snippets
 @pytest.mark.unit
 def test_search_snippet_skips_highlighted_value_without_matching_key():
     result = {}
@@ -336,7 +328,6 @@ def test_search_snippet_skips_highlighted_value_without_matching_key():
     assert "form_value" not in result
 
 
-# @matrix cache : details parent-key redis-storage
 @pytest.mark.unit
 def test_redis_details_store_parent_key_not_parent_blob():
     entity = SimpleNamespace(entity_kind="page", restricted_to={},
@@ -369,8 +360,6 @@ def test_redis_details_store_parent_key_not_parent_blob():
     }
 
 
-# @source lagniappe/core/tools/cache/add.py::_redis_details
-# @matrix cache : details redis-storage
 @pytest.mark.unit
 @pytest.mark.parametrize("state", ["attached", "reserved", "none", "missing"])
 def test_redis_details_store_own_form_pointer_without_resolving_relations(state):
@@ -389,7 +378,6 @@ def test_redis_details_store_own_form_pointer_without_resolving_relations(state)
     assert details["form_version"] == ("version-1" if state in {"attached", "reserved"} else "")
 
 
-# @matrix cache : details redis-storage source-clauses
 @pytest.mark.unit
 def test_redis_details_preserve_restriction_sources():
     entity = SimpleNamespace(
@@ -406,7 +394,6 @@ def test_redis_details_preserve_restriction_sources():
     assert "restricted_to" not in cache_add._redis_details(entity)
 
 
-# @matrix cache : kind-score search-ranking
 @pytest.mark.unit
 def test_kind_search_score_prioritizes_high_level_entities():
     assert cache_add._kind_search_score("category") == "1.0"
@@ -418,7 +405,6 @@ def test_kind_search_score_prioritizes_high_level_entities():
     assert cache_add._kind_search_score("form") == "0.75"
 
 
-# @matrix cache : details parent-key redis-storage
 @pytest.mark.unit
 def test_cache_update_writes_pointer_search_rows_and_parent_free_details(monkeypatch):
     hset_calls = []
@@ -495,7 +481,6 @@ def test_cache_update_writes_pointer_search_rows_and_parent_free_details(monkeyp
     assert "parent" not in details
 
 
-# @pair cache:search-visibility
 @pytest.mark.unit
 def test_cache_update_keeps_non_searchable_entity_hash_addressable(monkeypatch):
     deleted = []
@@ -558,7 +543,6 @@ def test_cache_update_keeps_non_searchable_entity_hash_addressable(monkeypatch):
     assert json.loads(details_call[1][1])["id"] == "staged-file-id"
 
 
-# @pairs cache:delete search:user-projection
 def test_cache_delete_removes_page_and_user_search_projections(monkeypatch):
     deleted = []
 
@@ -602,7 +586,6 @@ def test_cache_delete_removes_page_and_user_search_projections(monkeypatch):
     }
 
 
-# @matrix cache : details-hydration missing-parent parent-key string-input
 @pytest.mark.unit
 def test_get_details_by_hash_hydrates_parent_and_hides_internal_keys(monkeypatch):
     fake_cache = _FakeDetailsCache(
@@ -667,7 +650,6 @@ def test_get_details_by_hash_hydrates_parent_and_hides_internal_keys(monkeypatch
     assert "parent_key" not in details["orphan-hash"]
 
 
-# @matrix cache search : details-hydration parent-key snippets
 @pytest.mark.unit
 def test_search_results_are_hydrated_from_details_hashes(monkeypatch):
     doc = SimpleNamespace(
@@ -718,7 +700,6 @@ def test_search_results_are_hydrated_from_details_hashes(monkeypatch):
     assert str(full_results[0]["text"]) == "Page description <b>needle</b>"
 
 
-# @pairs cache:self-repair search:stale-row
 def test_search_prunes_stale_rows_without_entity_details(monkeypatch):
     deleted = []
     monkeypatch.setattr(
@@ -749,7 +730,6 @@ def test_search_prunes_stale_rows_without_entity_details(monkeypatch):
     assert deleted == [Search.user.value.format("deleted-user-page")]
 
 
-# @matrix search : permissions redis-cloud tag-syntax
 @pytest.mark.unit
 def test_search_queries_use_redis_cloud_compatible_tag_syntax(monkeypatch):
     calls = []
@@ -796,7 +776,6 @@ def test_search_queries_use_redis_cloud_compatible_tag_syntax(monkeypatch):
     )
 
 
-# @matrix search : exact-name parent-scope permissions bounded-query
 @pytest.mark.unit
 def test_exact_name_search_is_bounded_permission_and_parent_scoped(monkeypatch):
     captured = {}
@@ -862,7 +841,6 @@ def test_exact_name_search_is_bounded_permission_and_parent_scoped(monkeypatch):
     assert captured["query"]._num == 25
 
 
-# @matrix search : empty-access permissions
 @pytest.mark.unit
 def test_search_empty_access_returns_without_querying_redis(monkeypatch):
     class FailingCache:
@@ -876,7 +854,6 @@ def test_search_empty_access_returns_without_querying_redis(monkeypatch):
     assert query.search("Alpha", [], [], kinds=["task"]) == ([], 0)
 
 
-# @matrix search : permissions validation
 @pytest.mark.unit
 def test_search_permission_fragments_validate_scope_and_membership():
     with pytest.raises(TypeError, match="Required must be a list"):
@@ -895,7 +872,6 @@ def test_search_permission_fragments_validate_scope_and_membership():
         query.search("Alpha", False, [])
 
 
-# @matrix search permissions : source-clauses canonical-policy
 @pytest.mark.parametrize("groups", [["a", "b", "c"], ["c", "a", "b", "a"]])
 @pytest.mark.unit
 def test_search_restrictions_require_membership_in_each_source(monkeypatch, groups):
@@ -914,7 +890,6 @@ def test_search_restrictions_require_membership_in_each_source(monkeypatch, grou
         )
 
 
-# @matrix search permissions : model-expansion restricted-access
 @pytest.mark.unit
 def test_model_expansion_keeps_viewer_restrictions(monkeypatch):
     calls = []
@@ -927,7 +902,6 @@ def test_model_expansion_keeps_viewer_restrictions(monkeypatch):
     assert calls == [f"@kind:{{ model }} @requires:{{ projecthash }} {clause}"]
 
 
-# @matrix cache : empty-requires index-schema redis-cloud search-ranking tag-syntax
 @pytest.mark.unit
 def test_search_index_indexes_empty_requires_tags():
     captured = {}
@@ -976,7 +950,6 @@ def test_search_index_indexes_empty_requires_tags():
     assert SEARCH_SCORE_FIELD in captured["definition"].args
 
 
-# @matrix search : parser redis-cloud redis-py
 @pytest.mark.unit
 def test_cache_search_delegates_to_redisearch_client():
     captured = {}
@@ -1002,13 +975,11 @@ def test_cache_search_delegates_to_redisearch_client():
     assert captured == {"index": cache.INDEX, "query": redis_query}
 
 
-# @matrix cache : empty-parent-lookup parent-index redis-cloud tag-syntax
 @pytest.mark.unit
 def test_json_parent_lookup_skips_empty_parent_query():
     assert CacheJSON().get_new_parents([]) == []
 
 
-# @matrix cache : flush-db rebuild
 @pytest.mark.unit
 def test_delete_cache_flushes_db_and_recreates_indexes(monkeypatch):
     from lagniappe.core.tools.cache import help as help_cache
@@ -1044,7 +1015,6 @@ def test_delete_cache_flushes_db_and_recreates_indexes(monkeypatch):
     ]
 
 
-# @matrix cache : prefix-isolation rebuild
 @pytest.mark.unit
 def test_delete_cache_clears_only_prefixed_keys_and_recreates_indexes(monkeypatch):
     from lagniappe.core.tools.cache import help as help_cache
@@ -1093,7 +1063,6 @@ def test_delete_cache_clears_only_prefixed_keys_and_recreates_indexes(monkeypatc
     ]
 
 
-# @matrix cache : cleanup missing-search-index
 @pytest.mark.unit
 def test_cleanup_test_data_ignores_redis_missing_search_index_errors(monkeypatch):
     missing_index_messages = (
@@ -1107,14 +1076,14 @@ def test_cleanup_test_data_ignores_redis_missing_search_index_errors(monkeypatch
         class FakeCache:
             INDEX = "search-idx"
 
-            def keys(self, pattern):
+            def keys(self, pattern, *, calls=calls):
                 calls.append(("keys", pattern))
                 return ["test-one"]
 
-            def delete(self, *keys):
+            def delete(self, *keys, calls=calls):
                 calls.append(("delete", keys))
 
-            def drop_index(self, index):
+            def drop_index(self, index, *, calls=calls, missing_index_message=missing_index_message):
                 calls.append(("drop", index))
                 raise ResponseError(missing_index_message)
 
@@ -1136,7 +1105,6 @@ def test_cleanup_test_data_ignores_redis_missing_search_index_errors(monkeypatch
         ]
 
 
-# @matrix cache : cleanup redis-errors
 @pytest.mark.unit
 def test_cleanup_test_data_reraises_unexpected_drop_index_errors(monkeypatch):
     class FakeCache:
@@ -1183,7 +1151,6 @@ class _LeaseRedis:
         return 1
 
 
-# @matrix hosted-e2e : lease prefix-isolation
 def test_e2e_lease_key_is_outside_test_cleanup_prefix(monkeypatch):
     monkeypatch.setattr(
         e2e_lease,
@@ -1197,7 +1164,6 @@ def test_e2e_lease_key_is_outside_test_cleanup_prefix(monkeypatch):
     assert not key.startswith("test-")
 
 
-# @matrix hosted-e2e : authentication concurrency deployment-binding expiry heartbeat lease ownership replay
 def test_e2e_lease_acquire_heartbeat_and_owner_release(monkeypatch):
     monkeypatch.setattr(
         e2e_lease,
@@ -1265,7 +1231,6 @@ def test_e2e_lease_acquire_heartbeat_and_owner_release(monkeypatch):
     assert e2e_lease.current_e2e_lease(client=client) is None
 
 
-# @matrix hosted-e2e : heartbeat lease-ownership transfer
 def test_e2e_lease_handoff_keeps_owner_for_heartbeat_adoption(monkeypatch):
     monkeypatch.setattr(
         e2e_lease,
@@ -1295,7 +1260,6 @@ def test_e2e_lease_handoff_keeps_owner_for_heartbeat_adoption(monkeypatch):
     assert e2e_lease.release_e2e_lease(owner, client=client)
 
 
-# @matrix cache : parent-index redis-protocol pipeline
 @pytest.mark.parametrize("protocol", [2, 3])
 def test_existing_filter_parents_execute_before_pipeline_closes(monkeypatch, protocol):
     from redis.client import Pipeline

@@ -1,5 +1,12 @@
 """Function declaration and handler for retrieving file content."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+    from lagniappe.core.properties.file_assets import FilePart
+
 from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason
@@ -13,7 +20,7 @@ GET_FILE = types.FunctionDeclaration(
         "direct analysis. Transport adapters may return direct media or a "
         "short-lived download URL; extracted text is returned by default."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "id": {
@@ -33,27 +40,19 @@ GET_FILE = types.FunctionDeclaration(
             },
         },
         "required": ["id"],
-    },
+    }),
 )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_file.py::execute_get_file
-# @reason submitted tool boolean parsing is exercised through file tool payload tests
 def _truthy(value):
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_file_tools_return_summary_and_content
-# @tests tests_unit/test_015_ai_tools.py::test_ai_get_file_skips_large_original_unless_requested
-# @tests tests_unit/test_015_ai_tools.py::test_ai_get_file_reports_unsupported_original_file
-# @matrix ai files : attachments content get-file large-file summary unsupported
-def execute_get_file(args, user):
+def execute_get_file(args: Mapping[str, object], user: User) -> Mapping[str, object] | tuple[Mapping[str, object], list[FilePart]]:
     file_id = args.get("id")
-    if not file_id:
+    if not isinstance(file_id, str) or not file_id:
         return {"error": "id is required"}
 
     entity = Entities.fetch_one(file_id, request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION))

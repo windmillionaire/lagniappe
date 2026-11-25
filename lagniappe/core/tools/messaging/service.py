@@ -1,5 +1,11 @@
 """Authorization and post-commit orchestration for direct messages."""
 
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+    from google.cloud.datastore import Entity as DatastoreRow, Key
+
 from ...definitions import MessageRevisionConflict
 from ...properties import message as message_values
 from ...properties import message_conversation as conversation_values
@@ -12,17 +18,13 @@ from ..notifications import service as notification_service
 from . import views
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @matrix messaging : compose-eligibility idempotency new-after-clear reply-permission
 def send_message(
-    actor,
-    recipient_identifier,
-    body,
-    operation_id,
-    conversation_identifier=None,
-):
+    actor: User,
+    recipient_identifier: str,
+    body: str,
+    operation_id: str,
+    conversation_identifier: str | None = None,
+) -> dict[str, object]:
     recipient = collaboration.resolve_user(recipient_identifier)
     if not recipient:
         raise PermissionError("Recipient is not eligible for messages.")
@@ -49,6 +51,8 @@ def send_message(
         operation_id,
         require_existing=not can_initiate,
     )
+    if conversation is None:
+        raise PermissionError("Conversation is unavailable.")
     if aggregate is not None:
         notification_service.publish_notification_aggregate(recipient, aggregate)
     if created:
@@ -65,11 +69,7 @@ def send_message(
     }
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @pair messaging:read-race
-def mark_read(user, conversation_identifier, expected_revision=None):
+def mark_read(user: User, conversation_identifier: str | Key, expected_revision: int | None = None) -> views.ConversationProjection:
     key = database_get.datastore_key(conversation_identifier)
     if not key:
         raise ValueError("Conversation key is invalid.")
@@ -79,7 +79,7 @@ def mark_read(user, conversation_identifier, expected_revision=None):
             user, key, expected_revision
         )
     except MessageRevisionConflict as error:
-        error.conversation = views.serialize_conversation(error.conversation, user)
+        error.conversation = views.serialize_conversation(cast("DatastoreRow", error.conversation), user)
         raise
     if aggregate is not None:
         notification_service.publish_notification_aggregate(user, aggregate)
@@ -95,11 +95,7 @@ def mark_read(user, conversation_identifier, expected_revision=None):
     return views.serialize_conversation(conversation, user, **peer_status)
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @pair messaging:per-copy-delete
-def hide_message(user, message_identifier):
+def hide_message(user: User, message_identifier: str | Key) -> bool:
     key = database_get.datastore_key(message_identifier)
     if not key:
         raise ValueError("Message key is invalid.")
@@ -110,11 +106,7 @@ def hide_message(user, message_identifier):
     return bool(conversation)
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @pair messaging:clear-horizon
-def clear_conversation(user, conversation_identifier):
+def clear_conversation(user: User, conversation_identifier: str | Key) -> views.ConversationProjection:
     key = database_get.datastore_key(conversation_identifier)
     if not key:
         raise ValueError("Conversation key is invalid.")

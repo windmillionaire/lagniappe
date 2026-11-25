@@ -1,5 +1,11 @@
 """Stable delivery identities and application links."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from google.cloud.datastore import Entity as DatastoreRow
+    from lagniappe.core.entities.entity import Entity
+
 from hashlib import sha256
 import os
 from urllib.parse import urlsplit, urlunsplit
@@ -10,17 +16,11 @@ from ....entities import Entities
 from ...database import notification_email as email_database
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @reason stable identities are exercised through idempotent capture
-def identity(*parts):
+def identity(*parts: object) -> str:
     return sha256("\0".join(str(part) for part in parts).encode()).hexdigest()
 
 
-# @testable true
-# @tests tests_unit/test_029b_notification_email_events.py::test_managed_local_test_origin_ignores_request_host_headers
-# @matrix agent-api testing web-headers : origin-validation
-def origin():
+def origin() -> str:
     managed_test_mode = os.environ.get("LAGNIAPPE_TEST_SESSION_MODE")
     if (
         CONFIG.testing
@@ -40,20 +40,14 @@ def origin():
     return configured.rstrip("/")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason absolute links are exercised through rendered delivery
-def absolute_url(path):
+def absolute_url(path: str | None) -> str:
     path = str(path or "/").strip()
     if path.startswith(("https://", "http://")):
         return path
     return f"{origin()}/{path.lstrip('/')}"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification
-# @reason target resolution is exercised through notification capture
-def target_path(target):
+def target_path(target: Entity | None) -> str:
     if isinstance(target, Entities.REPORT):
         return f"/tools/reports/{target.urlsafe_key}"
     if target is not None:
@@ -66,10 +60,7 @@ def target_path(target):
     return "/"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @reason stable SMTP identity is exercised through delivery
-def message_id(row):
+def message_id(row: DatastoreRow) -> str:
     domain = urlsplit(origin()).hostname or "localhost"
     version = (
         row.get("message_sequence")

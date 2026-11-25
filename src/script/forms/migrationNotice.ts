@@ -1,0 +1,116 @@
+import { STYLES } from "../generated/styles.mjs";
+import { Modal } from "../shared/modal.ts";
+import type { FormMigrationNotice } from "../types/forms.d.ts";
+
+type MigrationNoticeWidget = {
+	target?: HTMLElement | null;
+	view?:
+		| (NonNullable<ConstructorParameters<typeof Modal>[0]> & {
+				kind?: string | null;
+		  })
+		| null;
+	component?: { kind?: string | null } | null;
+	kind?: string | null;
+	revisionPreview?: boolean;
+	_migrationNotice?: { destroy(): void } | null;
+};
+
+export function installMigrationNotice(widget: MigrationNoticeWidget) {
+	widget._migrationNotice?.destroy();
+	const target = widget.target;
+	if (!target || widget.revisionPreview || target.dataset.completed === "true")
+		return;
+	const values: FormMigrationNotice[] = JSON.parse(
+		target.dataset.migrationNotice || "[]",
+	);
+	if (!values.length) return;
+	let trigger = target.querySelector<HTMLButtonElement>(
+		"[data-role='migration-changes']",
+	);
+	let banner: HTMLParagraphElement | null = null;
+	if (!trigger) {
+		banner = document.createElement("p");
+		banner.dataset.role = "migration-notice";
+		banner.className = STYLES.message;
+		banner.textContent = "This form was updated. ";
+		trigger = banner.appendChild(document.createElement("button"));
+		trigger.type = "button";
+		trigger.className = "font-semibold underline underline-offset-2";
+		trigger.textContent = "View changes";
+		target.prepend(banner);
+	}
+	const modal = new Modal(widget.view, trigger);
+	widget._migrationNotice = {
+		destroy: () => {
+			modal.destroy();
+			trigger.removeEventListener("click", click);
+			banner?.remove();
+		},
+	};
+	const click = async () => {
+		const root = document.createElement("div");
+		root.id = "modal";
+		root.className = STYLES.modal.wrapper;
+		root.dataset.kind =
+			widget.kind || widget.component?.kind || widget.view?.kind || "default";
+		const content = root.appendChild(document.createElement("section"));
+		content.id = "modal-content";
+		content.className = `${STYLES.modal.content} w-full sm:max-w-3xl`;
+		content.setAttribute("role", "dialog");
+		content.setAttribute("aria-modal", "true");
+		content.setAttribute("aria-label", "Form changes");
+		const header = content.appendChild(document.createElement("header"));
+		header.className = STYLES.modal.header;
+		const heading = header.appendChild(document.createElement("h2"));
+		heading.className = "text-lg font-bold text-base-dark";
+		heading.textContent = "Form changes";
+		const close = header.appendChild(document.createElement("button"));
+		close.type = "button";
+		close.setAttribute("lp-control", "close");
+		close.className = STYLES.button.close;
+		close.textContent = "Close";
+		const body = content.appendChild(document.createElement("div"));
+		body.className = "space-y-4 p-4 sm:p-6";
+		const intro = body.appendChild(document.createElement("p"));
+		intro.className = "text-sm text-base-medium";
+		intro.textContent =
+			"These values changed when the form was updated. The notice clears when this submission is next saved or completed.";
+		const fields = body.appendChild(document.createElement("div"));
+		fields.className = "space-y-4";
+		for (const value of values) {
+			const row = fields.appendChild(document.createElement("section"));
+			row.className = "rounded-md border border-base-light/50 bg-base-bg p-3";
+			const title = row.appendChild(document.createElement("h3"));
+			title.className = "mb-2 font-semibold text-base-dark";
+			title.textContent = value.label;
+			const cells = row.appendChild(document.createElement("div"));
+			cells.className = "grid gap-2 sm:grid-cols-2";
+			for (const key of ["before", "after"] as const) {
+				const cell = cells.appendChild(document.createElement("div"));
+				cell.dataset.role = `migration-${key}`;
+				cell.className =
+					"min-w-0 rounded-md border border-base-light/50 bg-white p-3";
+				const label = cell.appendChild(document.createElement("h4"));
+				label.className = "mb-2 text-xs font-semibold text-base-medium";
+				label.textContent = key === "before" ? "Before" : "After the update";
+				const content = cell.appendChild(document.createElement("p"));
+				content.className = "whitespace-pre-wrap break-words text-sm";
+				if (key === "after" && value.reason === "invalid") {
+					content.dataset.kind = "error";
+					content.className += " italic text-kind-default";
+					content.textContent = "Value not able to be converted";
+				} else if (key === "after" && value.reason === "deleted") {
+					content.dataset.kind = "error";
+					content.className += " italic text-kind-default";
+					content.textContent = "Deleted from form";
+				} else {
+					if (key === "after") label.textContent = "Converted value";
+					content.textContent = value[key];
+				}
+			}
+		}
+		await modal.attach(root, widget.component);
+		close.focus();
+	};
+	trigger.addEventListener("click", click);
+}

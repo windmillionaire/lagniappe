@@ -37,10 +37,6 @@ class _DocumentEntity(AssetMixin):
         self.mutation_intents.extend(intents)
 
 
-# @source lagniappe/core/properties/common_assets.py::Document.save
-# @source lagniappe/core/mutations/base.py::MutationPlanBuilder.consume_intents
-# @source lagniappe/core/entities/entity.py::Entity.add_mutation_intents
-# @matrix editor mutations : document durable-first cleanup named-versions
 @pytest.mark.parametrize("failure", [None, "commit", "cache"])
 def test_document_save_retires_only_superseded_blobs_after_commit(monkeypatch, failure):
     from lagniappe.core.tools.database import assets
@@ -106,8 +102,6 @@ def test_document_save_retires_only_superseded_blobs_after_commit(monkeypatch, f
         assert events[-2:] == ["commit", "cleanup"]
 
 
-# @source lagniappe/core/properties/common_assets.py::Document.save
-# @matrix editor : document isolated-checkpoint tombstones
 def test_document_checkpoint_blobs_are_isolated_and_empty_snapshots_survive(
     monkeypatch,
 ):
@@ -164,7 +158,6 @@ def test_document_checkpoint_blobs_are_isolated_and_empty_snapshots_survive(
     assert stored[winner_paths["document"]] == "<p>Winner</p>"
 
 
-# @matrix editor sync : document append idempotency offline-replay
 def test_append_preserves_existing_crdt_and_is_idempotent():
     baseline, _ = crdt.append_fragment(None, "<p>Existing</p>", "initial")
     offline = crdt.load_document(baseline)
@@ -188,7 +181,6 @@ def test_append_preserves_existing_crdt_and_is_idempotent():
     assert len(merged["default"].children) == 3
 
 
-# @matrix editor markdown : document append formatting
 def test_append_converts_supported_markdown_blocks():
     html = render_markdown(
         "# Heading\n\nA **bold** and *italic* [link](https://example.com).\n\n- one\n- two\n\n---\n\n- [x] done\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n```\ncode\n```\n"
@@ -211,8 +203,6 @@ def test_append_converts_supported_markdown_blocks():
     assert dict(root.children[4].children[0].attributes)["checked"] is True
 
 
-# @source lagniappe/core/tools/document_crdt.py::append_fragment
-# @matrix editor markdown : document append formatting
 @pytest.mark.parametrize("list_tag", ["ol", "ul"])
 @pytest.mark.parametrize("source", ["markdown", "saved_html"])
 def test_append_list_paragraphs_do_not_gain_empty_spacer_paragraphs(list_tag, source):
@@ -247,7 +237,6 @@ def test_append_list_paragraphs_do_not_gain_empty_spacer_paragraphs(list_tag, so
     assert str(items[1]) == "<listItem><paragraph>Next item</paragraph></listItem>"
 
 
-# @matrix editor sync : document append write-lock
 def test_document_write_lock_is_scoped_and_bounded(monkeypatch):
     calls = []
     monkeypatch.setattr(
@@ -267,7 +256,6 @@ def test_document_write_lock_is_scoped_and_bounded(monkeypatch):
     ]
 
 
-# @matrix editor sync : document append cache-recovery offline-replay
 def test_publish_checkpoint_preserves_live_updates(monkeypatch):
     redis = _DocumentRedis()
     monkeypatch.setattr(documents.cache, "_redis", redis)
@@ -298,7 +286,6 @@ def test_publish_checkpoint_preserves_live_updates(monkeypatch):
     )
 
 
-# @matrix editor sync : document append checkpoint conflict
 def test_append_requires_a_checkpointed_collaborative_baseline(monkeypatch):
     baseline, _ = crdt.append_fragment(None, "<p>Base</p>", "initial")
     doc = SimpleNamespace(
@@ -319,7 +306,6 @@ def test_append_requires_a_checkpointed_collaborative_baseline(monkeypatch):
         document_updates.checkpointed_document(page)
 
 
-# @matrix editor sync : document permissions fresh-read
 def test_fresh_document_rechecks_current_permissions(monkeypatch):
     actor = object()
     stale = SimpleNamespace(key="page", allowed=lambda *args, **kwargs: True)
@@ -344,7 +330,6 @@ def test_fresh_document_rechecks_current_permissions(monkeypatch):
         document_updates.fresh_document(stale, actor)
 
 
-# @matrix mutations sync : document append guarded-checkpoint durable-first
 def test_checkpoint_persists_before_publishing_and_guards_assets(monkeypatch):
     events = []
     page = SimpleNamespace(
@@ -384,7 +369,6 @@ def test_checkpoint_persists_before_publishing_and_guards_assets(monkeypatch):
     assert events == [("assets", {"html": "loser", "ydoc": "loser"})]
 
 
-# @matrix mutations sync : document checkpoint cas conflict
 def test_guarded_checkpoint_rejects_a_concurrent_asset_change(monkeypatch):
     writes = []
     transaction = SimpleNamespace(put=lambda row: writes.append(row))
@@ -411,7 +395,6 @@ def test_guarded_checkpoint_rejects_a_concurrent_asset_change(monkeypatch):
     assert writes == [{"assets": "loser"}]
 
 
-# @matrix agent-api email editor : document source-attribution
 @pytest.mark.parametrize(
     "origin,manifest,label",
     [
@@ -430,8 +413,6 @@ def test_source_quote_uses_trusted_origin(origin, manifest, label):
     )
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/actions/recovery.py::_inspect_action_applied
-# @pair ai-report:skipped-prefix
 def test_skipped_document_append_needs_no_receipt_on_retry(monkeypatch):
     from lagniappe.core.tools.ai.reporting.execution.actions import recovery
 
@@ -443,7 +424,6 @@ def test_skipped_document_append_needs_no_receipt_on_retry(monkeypatch):
     ) == recovery.ACTION_APPLIED
 
 
-# @matrix ai-report editor : document append retry
 @pytest.mark.parametrize("existing", [False, True])
 @pytest.mark.parametrize("action_type", ["append_page_document", "replace_page_document"])
 def test_report_append_retry_preserves_content(monkeypatch, existing, action_type):
@@ -573,7 +553,6 @@ def test_report_append_retry_preserves_content(monkeypatch, existing, action_typ
         assert len(histories) == int(existing or action_type == "replace_page_document")
 
 
-# @matrix editor sync : document replacement idempotency offline-replay
 @pytest.mark.parametrize("offline_edit", ["existing-paragraph", "new-paragraph"])
 def test_replacement_preserves_crdt_lineage_and_retry_receipts(offline_edit):
     from pycrdt import XmlElement, XmlText

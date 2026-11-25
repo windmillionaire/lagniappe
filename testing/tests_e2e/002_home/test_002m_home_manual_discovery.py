@@ -17,7 +17,6 @@ from testing.definitions import Users
 pytestmark = pytest.mark.e2e
 
 
-# @matrix public-directory : anonymous-access collapsible login manual metadata
 def test_public_directory_lists_manual_in_collapsed_group(get_user):
     assert CONFIG.PUBLIC_MANUAL is True
     anonymous = get_user(Users.ANONYMOUS)
@@ -51,7 +50,6 @@ def test_public_directory_lists_manual_in_collapsed_group(get_user):
 # @template manual/index.html::main
 # @template manual/index.html::mobile_nav
 # @template manual/index.html::nav_column
-# @matrix manual : ajax-section anonymous-access canonical-url direct-section metadata noindex page-load popstate section-navigation
 def test_public_manual_search_metadata_and_navigation(get_user):
     anonymous = get_user(Users.ANONYMOUS)
     base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
@@ -111,11 +109,6 @@ def test_public_manual_search_metadata_and_navigation(get_user):
     )
 
 
-# @matrix manual robots : disabled enabled fragment
-# @matrix manual sitemap : disabled enabled public-url
-# @matrix public-pages robots : disabled enabled
-# @matrix public-pages sitemap : disabled enabled redis-cache
-# @pair manual:search-discovery
 def test_public_manual_discovery_follows_live_setting(get_user):
     assert CONFIG.PUBLIC_MANUAL is True
     anonymous = get_user(Users.ANONYMOUS)

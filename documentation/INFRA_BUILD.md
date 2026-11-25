@@ -1,6 +1,6 @@
 # Frontend Build
 
-Rollup bundles authored JavaScript and CSS from `src/` into
+Rollup bundles authored TypeScript and CSS from `src/` into
 `lagniappe/web/static/`. The build also generates server-side style maps,
 service-worker metadata, and stable cache generations.
 
@@ -16,6 +16,7 @@ For styles, icons, and linting, read
 ```bash
 npm run dev
 npm run build
+npm run typecheck
 ```
 
 Development output is readable and tagged with mode `development`. Production
@@ -28,7 +29,9 @@ version replacements and Sentry releases use that same package version.
 
 `build/rollup.shared.mjs` owns the common login, monitoring, and main bundle
 construction: registry-derived inputs, output names, browser resolution,
-warning handling, chunk versioning, and artifact recording. It creates fresh
+type stripping for `.ts` and `.mts`, warning handling, chunk versioning, and
+artifact recording. Run `npm run typecheck` for compile-time diagnostics.
+The shared config creates fresh
 plugins for each standalone entry. Standalone login and monitoring bundles inline
 dynamic imports to preserve their single-file output when dependencies add lazy
 modules. `rollup.dev.config.mjs` and
@@ -83,12 +86,12 @@ apparently complete marker; the next managed build repairs it.
 
 | Entry point | Output | Responsibility |
 | --- | --- | --- |
-| `src/script/main.mjs` | `script.js` and chunks | Private application and interactive public pages. |
-| `src/script/public.mjs` | `chunks/views/public.js` | Minimal native-share behavior for anonymous public documents. |
-| `src/script/login.mjs` | `login.js` | Identity Platform REST client and login forms. |
-| `src/script/sentry.mjs` | `sentry.js` | Conditional local browser monitoring SDK. |
+| `src/script/main.ts` | `script.js` and chunks | Private application and interactive public pages. |
+| `src/script/public.ts` | `chunks/views/public.js` | Minimal native-share behavior for anonymous public documents. |
+| `src/script/login.ts` | `login.js` | Identity Platform REST client and login forms. |
+| `src/script/sentry.ts` | `sentry.js` | Conditional local browser monitoring SDK. |
 
-`src/script/viewRegistry.mjs` is the source of runtime view selection and
+`src/script/viewRegistry.ts` is the source of runtime view selection and
 stable named entries under `chunks/views/`. Rollup derives feature chunks from
 module boundaries. Editor, PDF, modal, combobox, offline, sync, notification,
 and similar code stay lazy until their owning surface requests them.
@@ -177,8 +180,8 @@ The custom plugins in `build/utility.mjs` enforce one artifact contract:
 
 - `versionChunkImports(buildId)` adds the build query to generated imports
   without renaming files.
-- `updateServiceWorker(buildId)` injects the browser protocol, dynamic precache
-  URLs, and build ID into `sw.template.mjs`, then writes `sw.js` atomically.
+- `updateServiceWorker(buildId)` compiles `sw.template.ts` with the browser
+  protocol, dynamic precache URLs, and build ID, then writes `sw.js` atomically.
 - `recordBuildArtifacts(...)` collects every Rollup output across all entry
   configurations. The build wrapper validates that inventory and publishes the
   completion marker last.

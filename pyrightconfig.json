@@ -1,0 +1,23 @@
+{
+  "pythonVersion": "3.14",
+  "venvPath": ".",
+  "venv": "venv",
+  "typeCheckingMode": "standard",
+  "include": [
+    "config",
+    "installer",
+    "lagniappe",
+    "runner",
+    "main.py",
+    "run.py"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "lagniappe/web/static",
+    "mcp/.venv",
+    "mcp/.uv-cache",
+    "node_modules",
+    "reports",
+    "venv"
+  ]
+}

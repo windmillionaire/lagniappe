@@ -136,13 +136,26 @@ building changed service inputs and activating them after App Engine; see
 Skip the commit if the canonical builds are already committed and the tree is
 clean.
 
+For a mechanical change recorded in `.git-blame-ignore-revs`, check whether
+each listed commit is already an ancestor of the release base before carrying
+its entry through a squash. For example, run
+`git merge-base --is-ancestor "$strip_sha" origin/main`. A successful result
+means Git can find that revision in the future main history. Keep branch-only
+entries on their integration branch. The release squash also contains behavior
+changes that must remain attributable in blame.
+
 ### 4. Run the offline gates
 
 ```bash
 npm run check
 venv/bin/python -m ruff check .
-venv/bin/python run.py traceability --check --fail-on warning --no-report --no-manifest
-venv/bin/python run.py traceability --changed origin/main --check --fail-on warning --no-report --no-manifest
+venv/bin/python -m basedpyright --warnings
+venv/bin/python -m runner.uv_bootstrap install --non-interactive
+venv/bin/python -c 'from runner.mcp_environment import prepare_environment; prepare_environment()'
+venv/bin/python -m basedpyright --warnings --project mcp/pyrightconfig.json
+venv/bin/python run.py template-contracts --check --no-report
+venv/bin/python run.py style-contracts --check --no-report --no-manifest
+venv/bin/python run.py mutation-contracts --check
 venv/bin/python run.py release-check --base origin/main
 git show --check --oneline HEAD -- . ':(exclude)lagniappe/web/static/**'
 ```
@@ -159,22 +172,31 @@ git push origin next/X.Y.Z
 The hosted lifecycle is tied to the exact committed source/build pair. Do not
 amend or replace that commit after creation.
 
+Before opening the PR, wait for **Resolve hosted release request** in the
+initial push run to finish and confirm that hosted execution was skipped.
+The resolver looks up open PRs when it runs. Opening the PR earlier can
+schedule the same hosted suite from both the push and the PR event.
+
 ### 6. Open the release pull request
 
 ```bash
 gh pr create --base main --head next/X.Y.Z --title "Release X.Y.Z"
-gh pr merge --auto --squash
-gh pr checks --watch
+gh pr checks next/X.Y.Z --watch
 ```
 
-The required **Source quality and traceability** workflow first reruns the
-offline quality, traceability, and release checks in an unprivileged job. Only
-a passing exact candidate can enter the protected environment and run hosted
-`all`. A manual diagnostic dispatch may bypass that preflight, but cannot
-publish release attestation. The automatic workflow may push one evidence-only
-child commit and then validate that child without rerunning the suites. Do not
-manually merge downloaded evidence into the release branch. Any later source
-change requires a new exact hosted lifecycle.
+Candidate creation runs the offline preflight before deployment. For a release
+PR, the protected job executes the complete hosted suite on that candidate
+and imports its results. The workflow can push one evidence-only child commit.
+The unprivileged quality job verifies the evidence, runs both type checks,
+Ruff, Biome and all three contract checks, and checks the release tree. The
+attestation job then posts **Source quality and traceability** on the exact
+release head. Manual diagnostic runs cannot publish this status. Leave evidence
+import to the workflow.
+
+The hosted result and the recorded test evidence must agree on the build ID.
+The importer and the final validation each verify it against the production
+artifacts of the exact candidate commit. A new source commit needs its own
+hosted run even when it reuses the same frontend build.
 
 ### 7. Tear down hosted resources
 
@@ -187,7 +209,16 @@ venv/bin/python run.py hosted-e2e teardown
 Keep a failed lifecycle available while diagnosing its logs. A failed result
 cannot produce the required green status.
 
-### 8. Publish the merged release
+For candidate validation alone, leave the green PR open with auto-merge disabled.
+
+### 8. Merge and publish the release
+
+Once the Owner explicitly authorizes merging the verified PR, enable squash
+auto-merge.
+
+```bash
+gh pr merge next/X.Y.Z --auto --squash
+```
 
 After GitHub squash-merges the pull request:
 

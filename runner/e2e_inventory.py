@@ -1,24 +1,51 @@
 """Discover named resources and group collected E2E stories without app imports."""
 
+from __future__ import annotations
+
 import ast
 import inspect
 import json
 import math
 import os
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from statistics import median
+from typing import TYPE_CHECKING, NotRequired, Protocol, TypedDict
 
 from runner.e2e_parallel import Batch
+
+if TYPE_CHECKING:
+    import pytest
+
+
+class CollectionSession(Protocol):
+    @property
+    def items(self) -> Sequence[pytest.Function]: ...
+
+
+type ScannedModule = tuple[
+    ast.Module, dict[str, ast.FunctionDef | ast.AsyncFunctionDef], dict[str, ast.expr]
+]
+
+
+class CollectedTest(TypedDict):
+    nodeid: str
+    fixtures: list[list[str]]
+    serial: bool
+    serial_phase: NotRequired[str | None]
+    group: NotRequired[str | None]
+
+
+class InventoriedTest(CollectedTest):
+    resources: list[str]
+    estimated_seconds: float
 
 
 ENUMS = frozenset({"Pages", "Tasks", "Projects", "Categories", "Forms", "Files",
                    "ModelTasks", "Users", "Groups"})
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_collection_preserves_group_and_serial_markers
-# @matrix testing : parallel-e2e
-def pytest_collection_finish(session):
+def pytest_collection_finish(session: CollectionSession) -> None:
     destination = os.environ.get("LAGNIAPPE_E2E_COLLECTION")
     if not destination:
         return
@@ -49,10 +76,14 @@ def pytest_collection_finish(session):
     Path(destination).write_text(json.dumps(records), encoding="utf-8")
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_inventory_follows_helpers_constants_and_fixtures
-# @matrix testing : parallel-e2e
-def discover_resources(root, path, name, fixtures=(), *, modules=None):
+def discover_resources(
+    root: Path,
+    path: str,
+    name: str,
+    fixtures: Sequence[Sequence[str]] = (),
+    *,
+    modules: dict[str, ScannedModule] | None = None,
+) -> frozenset[str]:
     """Follow test helpers/constants and fixtures; no transitive entity graph."""
     visited, resources = set(), set()
     modules = {} if modules is None else modules
@@ -106,17 +137,20 @@ def discover_resources(root, path, name, fixtures=(), *, modules=None):
     return frozenset(resources)
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_inventory_balances_cases_without_transitive_resource_groups
-# @tests tests_tooling/test_015_e2e_parallel.py::test_marked_groups_stay_on_one_worker_without_becoming_exclusive
-# @matrix testing : parallel-e2e
-def story_batches(root, records, *, workers=3, durations=None):
+def story_batches(
+    root: Path,
+    records: Sequence[CollectedTest],
+    *,
+    workers: int = 3,
+    durations: Mapping[str, float] | None = None,
+) -> tuple[list[Batch], list[InventoriedTest]]:
     """Place marked groups first, then balance cases; reserve resources per test."""
     if type(workers) is not int or workers < 1:
         raise ValueError("E2E workers must be a positive integer")
     durations = durations or {}
     fallback = median(durations.values()) if durations else 5.0
-    ordinary, serial, before, inventory = [], [], [], []
+    ordinary, serial, before = [], [], []
+    inventory: list[InventoriedTest] = []
     groups = {}
     modules = {}
     for record in records:
@@ -128,8 +162,8 @@ def story_batches(root, records, *, workers=3, durations=None):
         if record["serial"]:
             (before if record.get("serial_phase") == "before" else serial).append((nodeid, resources))
             continue
-        if record.get("group"):
-            groups.setdefault(record["group"], []).append((nodeid, estimate))
+        if group := record.get("group"):
+            groups.setdefault(group, []).append((nodeid, estimate))
         else:
             ordinary.append((nodeid, estimate))
     order = {record["nodeid"].removeprefix("testing/"): i for i, record in enumerate(records)}
@@ -160,10 +194,7 @@ def story_batches(root, records, *, workers=3, durations=None):
     return batches, inventory
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_duration_estimates_use_only_valid_passed_e2e_results
-# @matrix testing : parallel-e2e
-def duration_estimates(root):
+def duration_estimates(root: Path) -> dict[str, float]:
     """Historical timings guide placement only; they never supply run outcomes."""
     hints = os.environ.get("LAGNIAPPE_E2E_DURATIONS")
     if hints:

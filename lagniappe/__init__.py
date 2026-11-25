@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 import ipaddress
 import math
 import os
 import re
+import sys
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from config import Environment, constants, load_runtime_settings
@@ -12,14 +16,16 @@ from config.locations import (
 from config.storage import storage_bucket_names
 
 
+if TYPE_CHECKING:
+    from config import RuntimeSettings
+    from google.auth.credentials import Credentials
+
+
 GOOGLE_CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 IAM_CREDENTIALS_SIGNING_URL = "https://iamcredentials.googleapis.com/"
 
 
-# @testable false
-# @covered-by lagniappe/__init__.py::Config
-# @reason helper for environment-derived config flags
-def _env_flag(name, default=False):
+def _env_flag(name: str, default: bool = False) -> bool:
     """Return a boolean from a local debugging environment variable."""
     raw = os.environ.get(name)
     if raw is None:
@@ -27,9 +33,6 @@ def _env_flag(name, default=False):
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-# @testable false
-# @covered-by lagniappe/__init__.py::Config
-# @reason Sentry sampling normalization is exercised through runtime Config construction
 def _sample_rate(value, name):
     if isinstance(value, bool):
         raise RuntimeError(f"Invalid {name}: expected a number from 0.0 through 1.0")
@@ -44,20 +47,99 @@ def _sample_rate(value, name):
     return normalized
 
 
-# @testable true
-# @tests tests_unit/test_016_config.py::test_config_prefers_tracked_build_id_over_app_settings
-# @tests tests_unit/test_016_config.py::test_config_requires_hosted_build_id_to_match_built_source
-# @tests tests_unit/test_016_config.py::test_config_honors_ai_observability_setting
-# @tests tests_unit/test_016_config.py::test_config_honors_configured_source_url
-# @tests tests_unit/test_016_config.py::test_config_normalizes_and_validates_sentry_sample_rates
-# @tests tests_unit/test_016_config.py::test_config_owns_values_from_an_explicit_runtime_snapshot
-# @matrix config : ai-email build-id configuration constants error-reporting google-signin observability-setting optional-providers public-projection secrets site-policy source-link stale-settings validation
-# @pairs ai:observability error-reporting:sampling
-# @pair config:transactional-state
+def _normalize_login_notice(value: object, *, max_length: int = 500) -> str:
+    """Normalize an optional short login-page notice to bounded plain text."""
+    text = str(value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not text:
+        return ""
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    if len(text) > max_length:
+        text = text[:max_length].rstrip()
+    return text
+
+
 class Config:
     """Application configuration."""
 
-    def __init__(self, settings=None):
+    # Installed settings are assigned with setattr; these names describe the
+    # values available to callers without constructing provider clients or
+    # turning optional installation settings into class-level defaults.
+    ADMIN_EMAIL: str
+    ADMIN_NAME: str
+    AGENT_ACCESS_EMAIL: str
+    AGENT_ACCESS_NAME: str
+    AI_AUTO_EXECUTE: bool
+    AI_ENABLED: bool
+    AI_IMAGE_MODEL: str
+    AI_LOCATION: str
+    AI_MODEL: str
+    AI_UTILITY_MODEL: str
+    ANALYTICS: bool
+    APP_ENGINE_LOCATION: str
+    APP_NAME: str
+    APP_URL: str
+    AUTH_EMAIL_CONFIG: dict[str, object]
+    BASE_URL: str
+    CAPTURE_ERRORS: bool
+    CONFIG_KIND: str
+    CONFIG_SCHEMA_VERSION: int
+    DEMO_GUEST_EMAIL: str
+    DEPLOYER_EMAIL: str
+    DEPLOY_IDLE_TIMEOUT: str
+    DEPLOY_INSTANCE_CLASS: str
+    DEPLOY_MAX_INSTANCES: int | str
+    DEPLOY_MIN_IDLE_INSTANCES: int | str
+    DEPLOY_SCALING_TYPE: str
+    DEPLOY_WORKER_COUNT: int | str
+    EXPERIMENTS_DIAGNOSTICS: str
+    EXPERIMENTS_ENABLED: bool
+    EXPERIMENTS_EXECUTION_ENABLED: bool
+    EXPERIMENTS_PROJECT: str
+    EXPERIMENTS_SOURCE_ID: str
+    EXTERNAL_AI_ENABLED: bool
+    GIBBERISH: str
+    GOOGLE_CLOUD_PROJECT: str
+    GOOGLE_LOGIN_URI: str
+    GOOGLE_SIGNIN_ENABLED: bool
+    HISTORY_BUCKET: str
+    HOSTED_E2E: bool
+    HOSTED_E2E_BUILD_ID: str
+    HOSTED_E2E_CALLER_EMAIL: str
+    HOSTED_E2E_ROLE: str
+    HOSTED_E2E_SERVICE: str
+    HOSTED_E2E_SESSION_KEY: str
+    HOSTED_E2E_SOURCE: str
+    HOSTED_E2E_SOURCE_SNAPSHOT: str
+    HOSTED_E2E_VERSION: str
+    IDENTITY_PLATFORM_CONFIG: dict[str, str]
+    INSTALLER_EMAIL: str
+    INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL: str
+    LOGIN_DEMO_GUEST_KEY: str
+    LOGIN_NOTICE: str
+    MCP_NAME: str
+    MCP_RESOURCE: str
+    MCP_SERVICE_ACCOUNT: str
+    OCR_LOCATION: str
+    OCR_PROCESSOR: str
+    OCR_PROCESSOR_ID: str
+    PRIVATE_BUCKET: str
+    PUBLIC_BUCKET: str
+    PUBLIC_MANUAL: bool
+    PUBLIC_PAGE_INDEXING: bool
+    REDIS_HOST: str
+    REDIS_PASSWORD: str
+    REDIS_PORT: int
+    REDIS_TLS: bool
+    RESOURCE_REGION: str
+    RUNTIME_SERVICE_ACCOUNT_EMAIL: str
+    SECRET_KEY: str
+    SENTRY_DSN: str
+    TASK_QUEUE_NAME: str
+    VERSION: str
+
+    def __init__(self, settings: RuntimeSettings | None = None) -> None:
+        if sys.version_info[:2] != (3, 14):
+            raise RuntimeError("Lagniappe 2.5 requires Python 3.14.")
         if settings is None:
             settings = load_runtime_settings(
                 Environment(os.environ.get("FLASK_ENV", "production"))
@@ -73,7 +155,7 @@ class Config:
                 "Application settings contain unsupported keys: "
                 + ", ".join(unsupported)
             )
-        self.PREFIX = app_settings.get("PREFIX", "")
+        self.PREFIX = ""
         for key, value in app_settings.items():
             setattr(self, key, value)
         if (
@@ -120,7 +202,7 @@ class Config:
             )
         self.RUNTIME_SERVICE_ACCOUNT_EMAIL = runtime_email.casefold()
         self.INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL = internal_caller_email.casefold()
-        self._google_credentials = None
+        self._google_credentials: Credentials | None = None
         tracked_build_id = getattr(constants, "BUILD_ID", None) or self.VERSION
         hosted_build_id = (
             getattr(self, "HOSTED_E2E_BUILD_ID", None)
@@ -221,14 +303,22 @@ class Config:
             )
             or ""
         ).strip()
+        self.DEMO_GUEST_EMAIL = str(
+            getattr(self, "DEMO_GUEST_EMAIL", "") or ""
+        ).strip().casefold()
+        self.LOGIN_NOTICE = _normalize_login_notice(
+            getattr(self, "LOGIN_NOTICE", "")
+        )
         self.REDIS_CA_CERT = getattr(self, "REDIS_CA_CERT", None)
         self.LOGIN_USER_KEY = "_lagniappe_user_key"
         self.LOGIN_USER_PAGE_KEY = "_lagniappe_user_page_key"
         self.LOGIN_INVALIDATE_CACHE_KEY = "_lagniappe_invalidate_cache"
+        self.LOGIN_DEMO_GUEST_KEY = "_lagniappe_demo_guest"
         self.AUTH_SESSION_CACHE_KEYS = (
             self.LOGIN_USER_KEY,
             self.LOGIN_USER_PAGE_KEY,
             self.LOGIN_INVALIDATE_CACHE_KEY,
+            self.LOGIN_DEMO_GUEST_KEY,
             "restrictions",
             "belongs_to",
             "assign",
@@ -238,7 +328,7 @@ class Config:
 
         self._set_bucket_names()
 
-    def _set_bucket_names(self):
+    def _set_bucket_names(self) -> None:
         for bucket, bucket_name in storage_bucket_names(
             {
                 "GIBBERISH": self.GIBBERISH,
@@ -249,54 +339,40 @@ class Config:
             setattr(self, attr_name, bucket_name.removeprefix(self.PREFIX))
 
     @property
-    def capture_errors(self):
+    def capture_errors(self) -> bool:
         return self.ENV == Environment.PRODUCTION and self.CAPTURE_ERRORS
 
     @property
-    def testing(self):
+    def testing(self) -> bool:
         return self.ENV == Environment.TESTING
 
     @property
-    # @testable true
-    # @tests tests_unit/test_016_config.py::test_hosted_e2e_overrides_require_exact_runtime_identity
-    # @matrix hosted-e2e : configuration role
-    def hosted_e2e(self):
+    def hosted_e2e(self) -> bool:
         """Return whether this is a validated Google-hosted test process."""
         return self.testing and bool(getattr(self, "HOSTED_E2E", False))
 
     @property
-    # @testable true
-    # @tests tests_unit/test_016_config.py::test_hosted_e2e_server_rejects_wrong_app_engine_version
-    # @matrix hosted-e2e : configuration role
-    def hosted_e2e_server(self):
+    def hosted_e2e_server(self) -> bool:
         return self.hosted_e2e and getattr(self, "HOSTED_E2E_ROLE", None) == "server"
 
     @property
-    # @testable true
-    # @tests tests_unit/test_016_config.py::test_hosted_e2e_overrides_require_exact_runtime_identity
-    # @matrix hosted-e2e : configuration role
-    def hosted_e2e_runner(self):
+    def hosted_e2e_runner(self) -> bool:
         return self.hosted_e2e and getattr(self, "HOSTED_E2E_ROLE", None) == "runner"
 
     @property
-    def production(self):
+    def production(self) -> bool:
         return self.ENV == Environment.PRODUCTION
 
     @property
-    def development(self):
+    def development(self) -> bool:
         return self.ENV == Environment.DEVELOPMENT
 
     @property
-    def local(self):
+    def local(self) -> bool:
         return not self.production
 
-    # @testable true
-    # @tests tests_unit/test_016_config.py::test_google_credentials_are_shared_and_project_bound
-    # @tests tests_unit/test_016_config.py::test_local_google_credentials_impersonate_runtime_identity
-    # @matrix config : adc credential-cache project-identity
-    # @matrix development testing : adc credential-cache project-identity runtime-impersonation
     @property
-    def google_credentials(self):
+    def google_credentials(self) -> Credentials:
         """Return one project- and runtime-bound credential for Google clients."""
         if self._google_credentials is not None:
             return self._google_credentials
@@ -353,10 +429,7 @@ class Config:
         self._google_credentials = credentials
         return credentials
 
-    # @testable true
-    # @tests tests_unit/test_016_config.py::test_google_access_token_refreshes_adc_when_stale
-    # @matrix config : adc token-refresh
-    def google_access_token(self):
+    def google_access_token(self) -> str:
         """Return a fresh shared ADC token for direct Google REST operations."""
         from google.auth.transport.requests import Request
 

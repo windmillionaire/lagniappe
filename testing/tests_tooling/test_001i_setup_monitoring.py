@@ -94,7 +94,6 @@ def _policy(name="projects/demo-project/alertPolicies/memory", **values):
     }
 
 
-# @matrix monitoring setup : instance-class threshold
 @pytest.mark.parametrize(
     ("instance_class", "envelope_mib"),
     (
@@ -124,7 +123,6 @@ def test_memory_threshold_is_derived_from_each_supported_instance_class(
         assert threshold["envelope_mib"] == 768
 
 
-# @matrix monitoring setup : alert-policy documentation memory-pressure payload
 def test_memory_policy_payload_uses_per_instance_query_and_actionable_documentation():
     channels = ["projects/demo-project/notificationChannels/owner"]
     payload = monitoring.memory_policy_payload(SETTINGS, "demo-project", channels)
@@ -162,7 +160,6 @@ def test_memory_policy_payload_uses_per_instance_query_and_actionable_documentat
         assert expected in documentation
 
 
-# @matrix monitoring setup : idempotence notification-channel operator-preservation owner-reconciliation
 def test_reconcile_reuses_owner_channel_preserves_operator_channels_and_is_idempotent(
     monkeypatch,
 ):
@@ -221,7 +218,6 @@ def test_reconcile_reuses_owner_channel_preserves_operator_channels_and_is_idemp
     ]
 
 
-# @matrix monitoring setup : notification-channel operator-preservation owner-reconciliation
 def test_reconcile_creates_owner_channel_and_detaches_obsolete_managed_channels(
     monkeypatch,
 ):
@@ -260,8 +256,6 @@ def test_reconcile_creates_owner_channel_and_detaches_obsolete_managed_channels(
     assert all(call[0] != "DELETE" for call in session.calls)
 
 
-# @source installer/monitoring.py::reconcile_memory_alert
-# @matrix monitoring setup : alert-policy creation idempotence
 def test_reconcile_creates_exactly_one_policy_and_tolerates_provider_condition_names(
     monkeypatch,
 ):
@@ -296,7 +290,6 @@ def test_reconcile_creates_exactly_one_policy_and_tolerates_provider_condition_n
     assert [call[0] for call in session.calls].count("POST") == 1
 
 
-# @matrix monitoring setup : failure-isolation post-deploy retry-command
 def test_automatic_reconciliation_failure_is_nonfatal_and_prints_retry_command(
     monkeypatch,
     capsys,
@@ -323,7 +316,6 @@ def test_automatic_reconciliation_failure_is_nonfatal_and_prints_retry_command(
     assert "Retry with:\n  ./setup.sh monitoring" in output
 
 
-# @matrix doctor monitoring setup : drift read-only
 def test_inspection_reports_missing_and_drifted_managed_policy(monkeypatch):
     owner = _channel(
         "projects/demo-project/notificationChannels/operator-owner",

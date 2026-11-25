@@ -15,10 +15,10 @@ def test_page_layout_is_visible_in_server_template():
 
 
 def test_initial_replay_is_scheduled_after_view_readiness():
-    services = Path("src/script/views/base/services.mjs").read_text()
-    core = Path("src/script/views/base/core.mjs").read_text()
-    load_body = core.split("\tasync load(component, route) {", 1)[1].split(
-        "\n\t/**", 1
+    services = Path("src/script/views/base/services.ts").read_text()
+    core = Path("src/script/views/base/core.ts").read_text()
+    load_body = core.split("\tasync load(", 1)[1].split(
+        "\n\t_setLoadingTrigger(", 1
     )[0]
 
     assert "const start = view._publishedReady.then(() => view)" in services

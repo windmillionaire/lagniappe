@@ -1,15 +1,15 @@
 """Canonical settings export and recovery-file validation."""
 
-from collections.abc import Mapping
 import json
 import os
-from pathlib import Path
 import re
 import tempfile
+from collections.abc import Mapping, MutableMapping
+from pathlib import Path
 from urllib.parse import urlparse
 
-from config.ai_settings import AI_SETTING_KEYS
 from config.ai_email import AIEmailConfigurationError, normalize_ai_email_config
+from config.ai_settings import AI_PERSISTED_SETTING_KEYS
 from config.constants import (
     DEFAULT_DEPLOYMENT_SETTINGS,
     REDIS_CA_CERT_RELATIVE_PATH,
@@ -17,7 +17,6 @@ from config.constants import (
 )
 from config.public_pages import PUBLIC_PAGE_SETTING_KEYS
 from config.redis import redis_tls_enabled, validate_redis_ca_cert
-
 
 CONFIG_KIND = "lagniappe-settings"
 CONFIG_SCHEMA_VERSION = 3
@@ -37,18 +36,10 @@ _SECRET_KEY_MARKERS = (
 _PROJECT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
 
 
-# @testable false
-# @covered-by config/recovery.py::validate_recovery_document
-# @covered-by config/recovery.py::materialize_recovery_redis_ca
-# @reason recovery-specific validation type exercised through its public raisers
 class RecoveryConfigurationError(ValueError):
     """Raised when a recovery snapshot cannot be trusted or restored."""
 
 
-# @testable false
-# @covered-by config/recovery.py::validate_recovery_document
-# @covered-by config/recovery.py::redact_settings_for_display
-# @reason structured-value parser owned by public recovery validation and redaction
 def _mapping(value, name):
     if isinstance(value, Mapping):
         return dict(value)
@@ -64,18 +55,14 @@ def _mapping(value, name):
     raise RecoveryConfigurationError(f"{name} must be a mapping.")
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_recovery_snapshot_is_complete_flat_and_merges_live_settings
-# @matrix config : current-schema messaging-removal recovery-export
-# @pair public-pages:recovery-export
 def build_recovery_snapshot(
-    settings,
+    settings: Mapping[str, object],
     *,
-    deployment_settings=None,
-    ai_settings=None,
-    public_page_settings=None,
-    redis_ca_pem=None,
-):
+    deployment_settings: Mapping[str, object] | None = None,
+    ai_settings: Mapping[str, object] | None = None,
+    public_page_settings: Mapping[str, object] | None = None,
+    redis_ca_pem: str | None = None,
+) -> dict[str, object]:
     """Return a complete flat recovery snapshot without redacting persisted values."""
     snapshot = dict(settings)
     snapshot.pop("BUILD_ID", None)
@@ -126,7 +113,7 @@ def build_recovery_snapshot(
             {
                 key: value
                 for key, value in dict(ai_settings).items()
-                if key in AI_SETTING_KEYS
+                if key in AI_PERSISTED_SETTING_KEYS
             }
         )
     if public_page_settings:
@@ -155,26 +142,17 @@ def build_recovery_snapshot(
     return snapshot
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_recovery_display_redacts_nested_and_flat_secrets_without_mutation
-# @matrix config : recovery-display secrets
-def redact_settings_for_display(settings):
+def redact_settings_for_display(settings: Mapping[str, object]) -> dict[str, object]:
     """Return a redacted browser-display copy without mutating the source mapping."""
 
-    # @testable false
-    # @covered-by config/recovery.py::redact_settings_for_display
-    # @reason nested key classifier exercised through the public redaction helper
-    def secret_key(key):
+    def secret_key(key: object) -> bool:
         normalized = re.sub(r"[^A-Z0-9]+", "_", str(key).upper()).strip("_")
         compact = normalized.replace("_", "")
         return normalized == REDIS_CA_PEM or any(
             marker.replace("_", "") in compact for marker in _SECRET_KEY_MARKERS
         )
 
-    # @testable false
-    # @covered-by config/recovery.py::redact_settings_for_display
-    # @reason recursive implementation exercised through the public redaction helper
-    def redact(value, key=""):
+    def redact(value: object, key: object = "") -> object:
         if secret_key(key):
             return REDACTED_VALUE
         if isinstance(value, Mapping):
@@ -196,9 +174,6 @@ def redact_settings_for_display(settings):
     return {key: redact(value, key) for key, value in dict(settings).items()}
 
 
-# @testable false
-# @covered-by config/recovery.py::validate_recovery_document
-# @reason URL hostname extraction is exercised through recovery identity validation
 def _hostname(value, name):
     parsed = urlparse(str(value or ""))
     if parsed.scheme != "https" or not parsed.hostname:
@@ -206,9 +181,6 @@ def _hostname(value, name):
     return parsed.hostname.casefold()
 
 
-# @testable false
-# @covered-by config/recovery.py::validate_recovery_document
-# @reason project-qualified resource comparison is owned by recovery validation
 def _require_project_resource(value, name, project_id):
     if not value:
         return
@@ -232,22 +204,26 @@ def _require_project_resource(value, name, project_id):
         )
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_recovery_document_cross_checks_all_persisted_project_identities
-# @tests tests_tooling/test_003_config.py::test_recovery_rejects_current_configuration_identity_mismatch
-# @tests tests_tooling/test_003_config.py::test_recovery_requires_complete_current_configuration
-# @tests tests_tooling/test_003_config.py::test_recovery_validates_and_normalizes_auth_email_smtp
-# @tests tests_tooling/test_003_config.py::test_recovery_upgrades_schema_2_and_discards_legacy_messaging_config
-# @tests tests_tooling/test_003_config.py::test_recovery_accepts_and_redacts_optional_ai_email_config
-# @matrix config : site-policy ai-email authentication-email current-schema messaging-removal project-identity project-number recovery-validation required-settings schema-upgrade secrets
-def validate_recovery_document(settings):
+def validate_recovery_document(settings: Mapping[str, object]) -> dict[str, object]:
     """Validate and normalize a canonical recovery document before provider access."""
     from config.locations import (
         normalize_app_engine_location,
         normalize_resource_region,
     )
+    from config.secrets import (
+        SecretsBackendError,
+        normalize_secrets_config,
+        uses_secret_manager,
+    )
 
     recovered = dict(settings)
+    try:
+        secrets_config = normalize_secrets_config(recovered)
+    except SecretsBackendError as error:
+        raise RecoveryConfigurationError(str(error)) from error
+    secret_manager_backend = uses_secret_manager(secrets_config)
+    if secret_manager_backend:
+        recovered.update(secrets_config)
     if recovered.get("CONFIG_KIND") != CONFIG_KIND:
         raise RecoveryConfigurationError(
             f"CONFIG_KIND must be '{CONFIG_KIND}'."
@@ -297,14 +273,16 @@ def validate_recovery_document(settings):
         app_engine_location
     )
     recovered["RESOURCE_REGION"] = normalize_resource_region(resource_region)
-    for name in (
+    required_fields = [
         "APP_URL",
         "GOOGLE_LOGIN_URI",
-        "GIBBERISH",
         "APP_ENGINE_LOCATION",
         "RESOURCE_REGION",
         "OCR_LOCATION",
-    ):
+    ]
+    if not secret_manager_backend:
+        required_fields.append("GIBBERISH")
+    for name in required_fields:
         if recovered.get(name) in (None, ""):
             raise RecoveryConfigurationError(f"{name} is required for recovery.")
 
@@ -358,7 +336,8 @@ def validate_recovery_document(settings):
         )
     auth_email = _mapping(auth_email_value, "AUTH_EMAIL_CONFIG")
     try:
-        auth_email_port = int(auth_email.get("port"))
+        port = auth_email.get("port")
+        auth_email_port = int(port) if port is not None else 0
     except (TypeError, ValueError):
         auth_email_port = 0
     normalized_auth_email = {
@@ -379,7 +358,7 @@ def validate_recovery_document(settings):
         and 1 <= normalized_auth_email["port"] <= 65535
         and normalized_auth_email["security"] in {"starttls", "ssl"}
         and normalized_auth_email["username"]
-        and normalized_auth_email["password"]
+        and (secret_manager_backend or normalized_auth_email["password"])
         and re.fullmatch(
             r"[^@\s]+@[^@\s]+\.[^@\s]+",
             normalized_auth_email["senderEmail"],
@@ -390,6 +369,8 @@ def validate_recovery_document(settings):
             "AUTH_EMAIL_CONFIG must contain a complete encrypted SMTP "
             "configuration, verified sender address, and sender name."
         )
+    if secret_manager_backend and not normalized_auth_email["password"]:
+        normalized_auth_email.pop("password", None)
     recovered["AUTH_EMAIL_CONFIG"] = normalized_auth_email
 
     from config.experiments import normalize_experiments_config
@@ -410,14 +391,36 @@ def validate_recovery_document(settings):
 
     ai_email_value = recovered.get("AI_EMAIL_CONFIG")
     if ai_email_value not in (None, ""):
-        try:
-            recovered["AI_EMAIL_CONFIG"] = normalize_ai_email_config(
-                _mapping(ai_email_value, "AI_EMAIL_CONFIG")
-            )
-        except AIEmailConfigurationError as error:
-            raise RecoveryConfigurationError(
-                f"AI_EMAIL_CONFIG is invalid: {error}"
-            ) from error
+        ai_email_mapping = _mapping(ai_email_value, "AI_EMAIL_CONFIG")
+        if secret_manager_backend and ai_email_mapping.get("enabled"):
+            # Secret Resend keys live in Secret Manager rather than disk YAML.
+            resend_raw = ai_email_mapping.get("resend")
+            if isinstance(resend_raw, Mapping):
+                validation_copy = dict(ai_email_mapping)
+                validation_resend = dict(resend_raw)
+                for key in ("webhookSecret", "inboundApiKey", "sendingApiKey"):
+                    validation_resend.setdefault(key, f"secret-manager-managed-{key}")
+                validation_copy["resend"] = validation_resend
+                try:
+                    normalize_ai_email_config(validation_copy)
+                except AIEmailConfigurationError as error:
+                    raise RecoveryConfigurationError(
+                        f"AI_EMAIL_CONFIG is invalid: {error}"
+                    ) from error
+                recovered["AI_EMAIL_CONFIG"] = ai_email_mapping
+            else:
+                raise RecoveryConfigurationError(
+                    "AI_EMAIL_CONFIG is invalid: AI_EMAIL_CONFIG.resend must be a mapping."
+                )
+        else:
+            try:
+                recovered["AI_EMAIL_CONFIG"] = normalize_ai_email_config(
+                    ai_email_mapping
+                )
+            except AIEmailConfigurationError as error:
+                raise RecoveryConfigurationError(
+                    f"AI_EMAIL_CONFIG is invalid: {error}"
+                ) from error
 
     app_hostname = _hostname(recovered.get("APP_URL"), "APP_URL")
     if not (
@@ -448,10 +451,12 @@ def validate_recovery_document(settings):
         "OCR_PROCESSOR_ID",
         project_id,
     )
-    redis_values = {
-        name: recovered.get(name)
-        for name in ("REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD")
-    }
+    redis_required = (
+        ("REDIS_HOST", "REDIS_PORT")
+        if secret_manager_backend
+        else ("REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD")
+    )
+    redis_values = {name: recovered.get(name) for name in redis_required}
     if any(value not in (None, "") for value in redis_values.values()) and not all(
         value not in (None, "") for value in redis_values.values()
     ):
@@ -461,10 +466,9 @@ def validate_recovery_document(settings):
     return recovered
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_recovery_redis_ca_round_trips_through_one_file
-# @matrix config : recovery-export redis-tls
-def read_recovery_redis_ca(settings, *, app_dir=None):
+def read_recovery_redis_ca(
+    settings: Mapping[str, object], *, app_dir: str | Path | None = None
+) -> str | None:
     """Read the validated Redis CA PEM for inclusion in a recovery snapshot."""
     if not redis_tls_enabled(settings):
         return None
@@ -475,10 +479,9 @@ def read_recovery_redis_ca(settings, *, app_dir=None):
     return cert_path.read_text(encoding="utf-8")
 
 
-# @testable true
-# @tests tests_tooling/test_003_config.py::test_recovery_redis_ca_round_trips_through_one_file
-# @matrix config : certificate-validation recovery-restore redis-tls
-def materialize_recovery_redis_ca(settings, *, app_dir=None):
+def materialize_recovery_redis_ca(
+    settings: MutableMapping[str, object], *, app_dir: str | Path | None = None
+) -> Path | None:
     """Atomically restore the managed Redis CA file before endpoint validation."""
     recovered = settings
     if not redis_tls_enabled(recovered):

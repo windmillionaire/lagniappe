@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable
+from typing import Any
+from collections.abc import Iterable, Mapping
 
 from .portable import (
     TEXT_REFERENCE_PREFIX,
@@ -24,21 +25,27 @@ from .provider import DataLifecycleError
 from .validation import validate_archive
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_import_planner_is_source_independent_and_resolves_two_pass_references
-# @tests tests_tooling/test_008_data_lifecycle.py::test_history_and_messages_are_nested_and_replanned_under_their_owners
-# @matrix portable-json : import-planner natural-identity owner-scoped-children two-pass-resolution
 class ImportPlanner:
     """Prove a validated v1 bundle can be represented without mutating a target."""
 
     RECIPE = "lagniappe-target-key/v1"
 
-    def __init__(self, *, target_prefix="", target_namespace="", reserved_keys=None):
+    def __init__(
+        self,
+        *,
+        target_prefix: str = "",
+        target_namespace: str = "",
+        reserved_keys: Mapping[str, str] | None = None,
+    ) -> None:
         self.target_prefix = str(target_prefix)
         self.target_namespace = str(target_namespace)
         self.reserved_keys = dict(reserved_keys or {})
 
-    def plan(self, records: Iterable[dict[str, Any]], assets=()):
+    def plan(
+        self,
+        records: Iterable[dict[str, Any]],
+        assets: Iterable[dict[str, object]] = (),
+    ) -> dict[str, object]:
         records = list(records)
         identities: dict[PortableIdentity, str] = {}
         ordinary = []
@@ -103,15 +110,15 @@ class ImportPlanner:
             "identity_count": len(planned),
         }
 
-    def plan_bundle(self, path):
+    def plan_bundle(self, path: str | Path) -> dict[str, object]:
         """Read one standalone-validated directory or ZIP and prove representability."""
         validate_archive(path)
         path = Path(path)
         if path.is_dir():
-            def read(relative):
+            def read(relative: str, /) -> bytes:
                 return (path / PurePosixPath(relative)).read_bytes()
 
-            def close():
+            def close() -> None:
                 return None
         else:
             import zipfile

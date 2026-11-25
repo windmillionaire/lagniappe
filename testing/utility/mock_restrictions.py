@@ -11,7 +11,8 @@ Heuristics match common test fixture hashes (``cat*``, ``page*``, ``grp*``,
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Mapping
+from typing import Any
+from collections.abc import Iterable, Mapping
 from unittest.mock import patch
 
 __all__ = ["MockRestrictions"]

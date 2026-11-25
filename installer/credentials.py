@@ -34,9 +34,6 @@ GOOGLE_AUTH_PERMISSION_GUIDANCE = (
 )
 
 
-# @testable false
-# @covered-by installer/credentials.py::_adc_auth_transaction
-# @reason platform-specific Cloud SDK credential location owned by ADC rollback
 def _adc_credentials_path():
     override = str(os.environ.get("CLOUDSDK_CONFIG") or "").strip()
     if override:
@@ -48,37 +45,32 @@ def _adc_credentials_path():
     return Path.home() / ".config" / "gcloud" / "application_default_credentials.json"
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_authentication_is_kept_only_after_project_permission_confirmation
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_transaction_rolls_back_uncommitted_interruption
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_transaction_rejects_existing_credentials_and_keeps_committed_identity
-# @matrix setup : adc permissions transactional-state
 class _AdcCredentialTransaction:
     """Restore or remove ADC when setup cannot confirm the selected operator."""
 
-    def __init__(self, path=None):
+    def __init__(self, path: str | Path | None = None) -> None:
         self.path = Path(path or _adc_credentials_path())
         self.captured = False
         self.previous = None
         self.committed = False
         self.refresh_required = False
 
-    def capture(self):
+    def capture(self) -> None:
         if self.captured:
             return
         self.captured = True
         self.previous = self.path.read_bytes() if self.path.is_file() else None
 
-    def reject_current(self):
+    def reject_current(self) -> None:
         if not self.captured:
             self.captured = True
             self.previous = None
 
-    def commit(self):
+    def commit(self) -> None:
         self.committed = True
         self.previous = None
 
-    def rollback(self):
+    def rollback(self) -> None:
         if self.committed or not self.captured:
             return
         if self.previous is None:
@@ -107,11 +99,6 @@ class _AdcCredentialTransaction:
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_authentication_is_kept_only_after_project_permission_confirmation
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_transaction_rolls_back_uncommitted_interruption
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_transaction_rejects_existing_credentials_and_keeps_committed_identity
-# @matrix setup : adc permissions transactional-state
 @contextmanager
 def _adc_auth_transaction(path=None):
     transaction = _AdcCredentialTransaction(path)
@@ -121,9 +108,6 @@ def _adc_auth_transaction(path=None):
         transaction.rollback()
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_config_status_save_and_gcloud_login_helpers
-# @pair setup:gcloud-config
 def _adc_login_command(account, project_id, *, force=False):
     command = [GCLOUD_CLI, "auth", "application-default", "login"]
     if account and not force:
@@ -134,9 +118,6 @@ def _adc_login_command(account, project_id, *, force=False):
     return format_command(command)
 
 
-# @testable false
-# @covered-by installer/credentials.py::_set_adc_quota_project
-# @reason thin subprocess wrapper for interactive browser auth; parent owns fallback flow
 def _run_adc_login(account, project_id=None, *, transaction, force=False):
     from installer import GCLOUD_CLI
 
@@ -156,13 +137,11 @@ def _run_adc_login(account, project_id=None, *, transaction, force=False):
         return subprocess.run(command, check=False, timeout=GCLOUD_TIMEOUT)
 
 
-# @testable false
-# @covered-by installer/credentials.py::_adc_identity
-# @reason provider principal lookup owned by the ADC identity inspection
 def _get_current_account_email(credentials=None):
     """Resolve the ADC principal email from the credential's access token."""
     import google.auth
     from google.auth.transport.requests import Request
+    from google.auth.exceptions import RefreshError
     from installer.utils import install_if_missing
 
     scopes = ["https://googleapis.com/auth/userinfo.email", "openid"]
@@ -180,7 +159,7 @@ def _get_current_account_email(credentials=None):
     auth_request = Request()
     try:
         credentials.refresh(auth_request)
-    except google.auth.exceptions.RefreshError:
+    except RefreshError:
         return None
 
     if credentials.token:
@@ -195,9 +174,6 @@ def _get_current_account_email(credentials=None):
     return None
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_identity_reports_principal_project_and_quota
-# @matrix setup : adc gcloud-config
 def _adc_identity():
     """Return a secret-free structured view of Application Default Credentials."""
     from installer.utils import install_if_missing
@@ -233,11 +209,6 @@ def _adc_identity():
         }
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_new_project_forces_transactional_adc_refresh
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_refreshes_adc_login_after_quota_failure
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_exits_when_adc_login_refresh_fails
-# @matrix setup : adc gcloud-config new-project transactional-state
 def _set_adc_quota_project(target: SetupTarget, sp, *, transaction):
     from installer import FORMATTER
 
@@ -245,9 +216,6 @@ def _set_adc_quota_project(target: SetupTarget, sp, *, transaction):
     account, project_id = target.account, target.project_id
     adc_refreshed = False
 
-    # @testable false
-    # @covered-by installer/credentials.py::_set_adc_quota_project
-    # @reason local retry closure; quota-project behavior is owned by the parent
     def refresh_adc(reason, *, force=False):
         nonlocal adc_refreshed
         sp.write(f.warning(reason))
@@ -443,9 +411,6 @@ def _set_adc_quota_project(target: SetupTarget, sp, *, transaction):
     return identity
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_principal_mismatch_requires_explicit_reauthentication
-# @matrix setup : adc gcloud-config identity
 def _ensure_adc_principal(target: SetupTarget, *, transaction):
     """Authenticate ADC explicitly when it is not the selected CLI principal."""
     account, project_id = target.account, target.project_id

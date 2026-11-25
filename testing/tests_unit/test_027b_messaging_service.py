@@ -23,8 +23,6 @@ from testing.utility.messaging_fakes import MemoryDatastore, managed_user
 pytestmark = pytest.mark.unit
 
 
-# @matrix messaging : body-validation chronological-display clear-horizon compose-eligibility conversation-page deterministic-key history-page idempotency new-after-clear participant-privacy per-copy-delete read-race reply-permission unread-count
-# @matrix notifications : aggregate-count revision
 def test_message_transactions_are_idempotent_and_keep_exact_unread_counts(monkeypatch):
     store = MemoryDatastore()
     monkeypatch.setattr(messaging_database.DATA, "_datastore_client", store)
@@ -212,7 +210,6 @@ def test_message_transactions_are_idempotent_and_keep_exact_unread_counts(monkey
         message_values.normalize_body("x" * 1001)
 
 
-# @matrix messaging : deleted-peer history-retention orphan-purge
 def test_user_delete_preserves_or_purges_message_history_by_survivor(monkeypatch):
     deleted_user = managed_user("deleted", "Deleted User")
     survivor = managed_user("survivor", "Surviving User")

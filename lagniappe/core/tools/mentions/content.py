@@ -1,14 +1,23 @@
 """Checkpoint mention validation, saved-node extraction, and public text."""
 
-from bs4 import BeautifulSoup, NavigableString
+from typing import TypedDict
+
+from bs4 import BeautifulSoup
+from bs4.element import NavigableString
 
 from ...properties import mention
 
 
-# @testable true
-# @tests tests_unit/test_027c_mentions.py::test_mentions_validate_saved_occurrences_dedupe_and_sanitize
-# @pair mentions:payload-validation
-def validate_mentions_payload(value):
+class SavedMention(TypedDict):
+    recipient: str
+    display_name: str
+
+
+class MentionOccurrence(SavedMention):
+    occurrence_id: str
+
+
+def validate_mentions_payload(value: object) -> str | None:
     if value is None:
         return None
     if not isinstance(value, list) or len(value) > mention.MAX_MENTIONS_PER_CHECKPOINT:
@@ -25,17 +34,15 @@ def validate_mentions_payload(value):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/mentions/service.py::deliver_mentions
-# @reason saved checkpoint parsing is exercised through authorized delivery
-def saved_mentions(html):
+def saved_mentions(html: str | None) -> dict[str, SavedMention]:
     soup = BeautifulSoup(html or "", "html.parser")
-    saved = {}
+    saved: dict[str, SavedMention] = {}
     for node in soup.select('[data-type="lagniappe-mention"][data-mention-id]'):
         occurrence_id = node.get("data-mention-id")
         recipient = node.get("data-recipient")
         display_name = node.get("data-display-name")
-        if occurrence_id and recipient and display_name:
+        if (isinstance(occurrence_id, str) and occurrence_id and isinstance(recipient, str)
+                and recipient and isinstance(display_name, str) and display_name):
             saved[occurrence_id] = {
                 "recipient": recipient,
                 "display_name": display_name,
@@ -43,10 +50,7 @@ def saved_mentions(html):
     return saved
 
 
-# @testable true
-# @tests tests_unit/test_027c_mentions.py::test_mentions_validate_saved_occurrences_dedupe_and_sanitize
-# @pair mentions:public-sanitization
-def sanitize_mentions(html):
+def sanitize_mentions(html: str) -> str:
     """Render mention nodes as inert plain @Name text for public/export HTML."""
     if not html:
         return html

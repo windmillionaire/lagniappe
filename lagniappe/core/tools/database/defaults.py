@@ -1,6 +1,6 @@
 """Default schema and seed data for reserved user entities."""
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 import json
 
 
@@ -27,13 +27,13 @@ DEFAULT_USER_PAGE = {
     "name": "Users",
     "reserved": True,
     "type": "users",
-    "created": datetime.now(timezone.utc),
+    "created": datetime.now(UTC),
 }
 
 DEFAULT_USER_FORM = {
     "name": "User",
     "reserved": True,
     "type": "form",
-    "created": datetime.now(timezone.utc),
+    "created": datetime.now(UTC),
     "schema": json.dumps(DEFAULT_USER_SCHEMA),
 }

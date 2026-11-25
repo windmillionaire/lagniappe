@@ -1,5 +1,6 @@
 """Bounded action results, diagnostics, and created-entity bookkeeping."""
 
+from contextlib import suppress
 from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
 
@@ -7,9 +8,6 @@ from ....debug import ai_debug
 from .common import _safe_entity_relation, _stored_relation_key
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason result diagnostics are asserted through deterministic run results
 def _file_summary_result(file):
     summarize = getattr(getattr(file, "properties", None), "summarize", None)
     result = {
@@ -26,10 +24,6 @@ def _file_summary_result(file):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/tasks.py::_create_task
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
-# @reason task structure diagnostics are asserted through deterministic run results
 def _task_structure_result(task, project=None, model=None, form=None):
     result = {}
     project = project or _safe_entity_relation(task, "project")
@@ -44,9 +38,6 @@ def _task_structure_result(task, project=None, model=None, form=None):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason submission diagnostics are asserted through deterministic run results
 def _submission_result(entity, empty_reason=None):
     submission = getattr(entity, "submission", None)
     field_count = len(submission) if isinstance(submission, dict) else 0
@@ -59,9 +50,6 @@ def _submission_result(entity, empty_reason=None):
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
-# @reason telemetry is provider-facing; behavior is covered by runner result tests
 def _capture_missing_task_submission(action, data, report, page, project, model, form):
     ai_debug(
         "report_runner.create_task.missing_submission",
@@ -114,9 +102,6 @@ def _capture_missing_task_submission(action, data, report, page, project, model,
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/results.py::_capture_missing_task_submission
-# @reason compact diagnostic projection is exercised through runner telemetry
 def _diagnostic_entity(entity):
     if entity is None:
         return None
@@ -133,9 +118,6 @@ def _diagnostic_entity(entity):
     return details
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/results.py::_capture_missing_task_submission
-# @reason compact diagnostic projection is exercised through runner telemetry
 def _diagnostic_schema(form):
     schema = getattr(form, "schema", None) or []
     fields = []
@@ -153,9 +135,6 @@ def _diagnostic_schema(form):
     return fields
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/results.py::_capture_missing_task_submission
-# @reason compact diagnostic projection is exercised through runner telemetry
 def _diagnostic_file_refs(data):
     files = []
     if data.get("file"):
@@ -164,18 +143,12 @@ def _diagnostic_file_refs(data):
     return files
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason created-reference bookkeeping is verified through ordered runner tests
 def _remember_created(created, action, entity):
     for key in [action.get("id"), entity.key, entity.urlsafe_key]:
         if key:
             created[key] = entity
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason attachment target serialization is verified through report run outputs
 def _attachment_target_result(action, to_save):
     if action.get("type") != "attach_file":
         return None
@@ -184,16 +157,10 @@ def _attachment_target_result(action, to_save):
     return _entity_result(to_save[1])
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason attachment metadata is verified through grouped result tests
 def _action_attachment_results(action, to_save):
     return []
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason result serialization is exercised through report run outputs
 def _entity_result(entity, parent=None):
     result = {
         "id": entity.urlsafe_key,
@@ -221,16 +188,11 @@ def _entity_result(entity, parent=None):
                     },
                     level="warning",
                 )
-    try:
+    with suppress(Exception):
         result["url"] = entity.url
-    except Exception:
-        pass
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/results.py::_entity_result
-# @reason fallback naming is exercised through task-history report results
 def _entity_result_name(entity):
     try:
         name = entity.name

@@ -103,7 +103,12 @@ export const validateStartupBudgets = (bundle) => {
 			),
 		);
 		for (const forbidden of CORE_FORBIDDEN_MODULES) {
-			const match = [...modules].find((id) => id.includes(forbidden));
+			const match = [...modules].find((id) =>
+				id
+					.replaceAll("\\", "/")
+					.replace(/\.m?ts$/, ".mjs")
+					.includes(forbidden),
+			);
 			if (match)
 				failures.push(`Core view ${entry} statically includes ${match}`);
 		}

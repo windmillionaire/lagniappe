@@ -1,5 +1,14 @@
 """Shared detail collector used by proposal action display adapters."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ActionData
+
+
 REFERENCE_DETAIL_LABELS = frozenset(
     {
         "Category",
@@ -34,20 +43,21 @@ DETAIL_KINDS = {
 }
 
 
-# @testable true
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_decision_details
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_empty_submission_reason
-# @matrix ai-report : classification details feedback proposal submission-empty-reason
 class ProposalDetailCollector:
     """Resolve and collect display details without knowing action types."""
 
-    def __init__(self, action_labels, file_labels, entity_label):
+    def __init__(
+        self,
+        action_labels: Mapping[str, str],
+        file_labels: Mapping[object, str],
+        entity_label: Callable[[object], str | None],
+    ) -> None:
         self.action_labels = action_labels
         self.file_labels = file_labels
         self.entity_label = entity_label
         self.values = []
 
-    def add(self, label, value, *, preview=None):
+    def add(self, label: str, value: object, *, preview: str | None = None) -> None:
         if value:
             self.values.append(
                 {
@@ -59,15 +69,15 @@ class ProposalDetailCollector:
             if preview:
                 self.values[-1]["preview"] = preview
 
-    def reference(self, label, data, *roots):
+    def reference(self, label: str, data: ActionData, *roots: str) -> None:
         self.add_reference(label, self.first_value(data, *roots))
 
-    def add_reference(self, label, value):
+    def add_reference(self, label: str, value: object) -> None:
         resolved = self.resolve(value, label)
         if resolved:
             self.add(label, resolved)
 
-    def resolve(self, value, label=None):
+    def resolve(self, value: object, label: str | None = None) -> object:
         if isinstance(value, dict):
             if "_proposal_display_value" in value:
                 return value["_proposal_display_value"]
@@ -83,18 +93,16 @@ class ProposalDetailCollector:
             return None
         if isinstance(value, str) and value.startswith("$"):
             value = value[1:]
-        elif isinstance(value, str) and value.startswith("action:"):
+        elif isinstance(value, str) and value.startswith("action:") or isinstance(value, str) and value.startswith("file:"):
             value = value.split(":", 1)[1]
-        elif isinstance(value, str) and value.startswith("file:"):
-            value = value.split(":", 1)[1]
-        resolved = self.action_labels.get(value) or self.file_labels.get(value)
+        resolved = (self.action_labels.get(value) if isinstance(value, str) else None) or self.file_labels.get(value)
         if resolved:
             return resolved
         if label in REFERENCE_DETAIL_LABELS:
             return self.entity_label(value) or value
         return None
 
-    def submission(self, data, form_present=False):
+    def submission(self, data: ActionData, form_present: bool = False) -> None:
         if "submission" not in data and not form_present:
             return
         if data.get("submission_empty_reason"):
@@ -107,7 +115,7 @@ class ProposalDetailCollector:
         self.add("Submission", "created" if created else "missing")
 
     @staticmethod
-    def first_value(data, *roots):
+    def first_value(data: ActionData, *roots: str) -> object:
         for root in roots:
             display_keys = [f"{root}_name", f"{root}_display", f"{root}_label"]
             if root == "file":
@@ -123,10 +131,11 @@ class ProposalDetailCollector:
         return None
 
     @staticmethod
-    def file_values(data):
+    def file_values(data: ActionData) -> list[object]:
         values = [data[key] for key in ("file", "file_id", "file_ref") if data.get(key)]
         file_values = data.get("files") or data.get("file_refs") or []
         if isinstance(file_values, (str, dict)):
             file_values = [file_values]
-        values.extend(file_values)
+        if isinstance(file_values, list):
+            values.extend(file_values)
         return values

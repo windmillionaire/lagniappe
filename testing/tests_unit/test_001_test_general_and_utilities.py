@@ -1,6 +1,7 @@
 """Unit tests for general infrastructure and core utility functions."""
 
 from types import SimpleNamespace
+from typing import get_args, get_type_hints
 from uuid import UUID
 
 from flask import Flask, g
@@ -47,7 +48,6 @@ class _TraceSingleRelation(RelatedEntityMixin, DBProperty):
     _label = "Owner"
 
 
-# @matrix deferred-jobs error-handling : sentry terminal-delivery
 def test_error_capture_can_wait_for_sentry_delivery(monkeypatch):
     error = ValueError("terminal failure")
     captured = []
@@ -70,7 +70,6 @@ def test_error_capture_can_wait_for_sentry_delivery(monkeypatch):
     assert flushed == [2.0]
 
 
-# @matrix error-reporting : payload-bounds privacy redaction
 def test_error_context_sanitizer_redacts_nested_secrets_and_bounds_payloads():
     context = {
         "password": "top-level-secret",
@@ -117,7 +116,6 @@ def test_error_context_sanitizer_redacts_nested_secrets_and_bounds_payloads():
     assert sanitized["large_mapping"]["_truncated_items"] == 15
 
 
-# @matrix error-reporting : privacy redaction url-metadata
 def test_error_context_sanitizer_replaces_urls_with_bounded_metadata():
     context = {
         "URL": (
@@ -157,7 +155,6 @@ def test_error_context_sanitizer_replaces_urls_with_bounded_metadata():
     }
 
 
-# @matrix error-reporting : payload-bounds privacy request-context
 def test_request_info_uses_bounded_structural_allowlist():
     app = Flask("request-privacy-test")
 
@@ -222,7 +219,6 @@ def test_request_info_uses_bounded_structural_allowlist():
     assert info["body_metadata"]["content_type"] == "application/json"
 
 
-# @matrix error-reporting : payload-bounds privacy redaction request-context sentry-event
 def test_sentry_event_sanitizer_removes_sdk_request_payloads():
     event = {
         "request": {
@@ -302,7 +298,6 @@ def test_sentry_event_sanitizer_removes_sdk_request_payloads():
     assert sanitized["spans"][0]["data"]["http.response.status_code"] == 500
 
 
-# @matrix error-handling : privacy redaction request-context sentry
 def test_error_capture_sanitizes_context_without_duplicate_request(monkeypatch):
     class Scope:
         def __init__(self):
@@ -368,7 +363,6 @@ def test_error_capture_sanitizes_context_without_duplicate_request(monkeypatch):
     assert "inline-secret" not in scope.extras["detail"]
 
 
-# @pair entities:initialization
 def test_entities_initialized():
     """Verify Entities registry is initialized by unit-test conftest."""
     assert hasattr(Entities, "PROJECT")
@@ -379,7 +373,16 @@ def test_entities_initialized():
     assert not hasattr(Entities, "get")
 
 
-# @matrix mutations : batch dedupe delete
+def test_registry_types_match_runtime_classes_including_aliases():
+    from lagniappe.core.entities import EntityRegistry, types as registered
+
+    annotations = get_type_hints(EntityRegistry, localns={"registered": registered})
+    declared = {name: get_args(value)[0] for name, value in annotations.items()}
+    members = {name: member.value for name, member in registered.EntityType.__members__.items()}
+    assert declared == members
+    assert {name: getattr(Entities, name) for name in members} == declared
+
+
 def test_entities_delete_accepts_batch_and_dedupes(monkeypatch):
     class DB(dict):
         pass
@@ -456,7 +459,6 @@ def test_entities_delete_accepts_batch_and_dedupes(monkeypatch):
     assert outcome.complete is True
 
 
-# @matrix entities : cascade delete user-page
 def test_collect_entities_deletes_user_and_page_together(monkeypatch):
     user = Entities.USER(testing=True)
     user._key = "delete-user"
@@ -516,8 +518,6 @@ def test_collect_entities_deletes_user_and_page_together(monkeypatch):
     assert collector.survivors == []
 
 
-# @matrix entities pages users : category-fallback delete preserve-page search-cache user-unlink
-# @pair mutations:preserve-user-pages
 def test_collect_user_delete_can_preserve_page(monkeypatch):
     monkeypatch.setattr(delete_module.DeleteCollector, "user_notes", lambda *_: None)
     monkeypatch.setattr(delete_module.DeleteCollector, "user_messages", lambda *_: None)
@@ -610,7 +610,6 @@ def test_collect_user_delete_can_preserve_page(monkeypatch):
     )
 
 
-# @matrix entities tasks : cascade delete list-owner-fingerprint
 def test_collect_task_delete_updates_task_list_owners(monkeypatch):
     page = TestEntities.get("PAGE", {"name": "Task Page", "hash": "tskownerpg"})
     project = TestEntities.get(
@@ -656,7 +655,6 @@ def test_collect_task_delete_updates_task_list_owners(monkeypatch):
     )
 
 
-# @matrix entities forms : cascade delete forms list-owner-fingerprint
 def test_collect_form_delete_updates_form_users(monkeypatch):
     form = TestEntities.get("FORM", {"name": "Deleted Form", "hash": "formowner"})
     category = TestEntities.get(
@@ -689,7 +687,6 @@ def test_collect_form_delete_updates_form_users(monkeypatch):
     ]
 
 
-# @matrix testing users : current-user resolver
 def test_current_user_prefers_explicit_user():
     explicit = _TestUser(owner=False)
     CONFIG.TEST_CURRENT_USER = _TestUser(owner=True)
@@ -697,7 +694,6 @@ def test_current_user_prefers_explicit_user():
     assert user_context.current_context_user(explicit) is explicit
 
 
-# @matrix testing users : config-mutable current-user resolver
 def test_current_user_uses_config_test_user_without_request():
     configured = _TestUser(owner=False)
     CONFIG.TEST_CURRENT_USER = configured
@@ -705,7 +701,6 @@ def test_current_user_uses_config_test_user_without_request():
     assert user_context.current_context_user() is configured
 
 
-# @matrix testing users : current-user flask-request resolver
 def test_current_user_prefers_flask_user_over_config(monkeypatch):
     app = Flask(__name__)
     request_user = _TestUser(owner=False)
@@ -716,7 +711,6 @@ def test_current_user_prefers_flask_user_over_config(monkeypatch):
         assert user_context.current_context_user() is request_user
 
 
-# @matrix agent-api users : bearer-user current-user resolver
 def test_current_user_prefers_agent_api_user_over_flask_user(monkeypatch):
     app = Flask(__name__)
     bearer_user = _TestUser(owner=True)
@@ -729,7 +723,6 @@ def test_current_user_prefers_agent_api_user_over_flask_user(monkeypatch):
         assert user_context.current_context_user() is bearer_user
 
 
-# @matrix property : current-user propagation
 def test_property_defaults_to_config_test_user():
     configured = _TestUser(owner=False)
     CONFIG.TEST_CURRENT_USER = configured
@@ -740,7 +733,6 @@ def test_property_defaults_to_config_test_user():
     assert prop.user is configured
 
 
-# @matrix login : agent-access code-validation config
 def test_agent_access_config_and_user_helpers(monkeypatch):
     monkeypatch.setattr(CONFIG, "AGENT_ACCESS_ENABLED", False, raising=False)
     monkeypatch.setattr(CONFIG, "AGENT_ACCESS_CODE", "secret-code", raising=False)
@@ -772,7 +764,6 @@ def test_agent_access_config_and_user_helpers(monkeypatch):
     assert not agent_access.code_matches("wrong-code")
 
 
-# @matrix login : agent-access groups user user-page
 def test_agent_access_user_helper_creates_or_loads_user_with_groups(monkeypatch):
     monkeypatch.setattr(
         CONFIG, "AGENT_ACCESS_EMAIL", "Agent@Example.COM", raising=False
@@ -874,7 +865,6 @@ def test_agent_access_user_helper_creates_or_loads_user_with_groups(monkeypatch)
     ]
 
 
-# @matrix permissions testing : entity-allowed no-testing-shortcut
 def test_testing_entity_allowed_uses_real_permissions():
     entity = TestEntities.get(
         "CATEGORY",
@@ -886,7 +876,6 @@ def test_testing_entity_allowed_uses_real_permissions():
     assert entity.allowed(Action.VIEW, user=user) is False
 
 
-# @matrix entities : fetch no-extra-read typed-entity
 def test_entities_fetch_root_reuses_typed_entity_without_database_fetch(monkeypatch):
     entity = TestEntities.get(
         "CATEGORY",
@@ -901,7 +890,6 @@ def test_entities_fetch_root_reuses_typed_entity_without_database_fetch(monkeypa
     assert Entities.fetch_one(entity, request=Fetch.root()) is entity
 
 
-# @pair relations:attach-cache
 def test_related_attach_caches_attached_entity_map():
     page = TestEntities.get(
         "PAGE",
@@ -918,7 +906,6 @@ def test_related_attach_caches_attached_entity_map():
     assert page.properties.model.attached_entities == {category.key: category}
 
 
-# @matrix entities relations : attached-cache load no-extra-read
 def test_entities_fetch_reuses_cached_attached_relations(monkeypatch):
     page = TestEntities.get(
         "PAGE",
@@ -953,8 +940,6 @@ def test_entities_fetch_reuses_cached_attached_relations(monkeypatch):
     assert Entities.fetch(page, request=Fetch.direct()) == [page]
 
 
-# @matrix relations : attached-cache root-precedence
-# @pair entities:explicit-fetch-depth
 def test_entities_fetch_preserves_explicit_root_over_shallow_attached_copy(monkeypatch):
     authoritative_page = TestEntities.get(
         "PAGE",
@@ -995,7 +980,6 @@ def test_entities_fetch_preserves_explicit_root_over_shallow_attached_copy(monke
     assert task.page.model.name == "Loaded Model"
 
 
-# @pairs entities:explicit-fetch-depth permissions:registered-reason
 def test_fetch_requires_registered_reason_for_nested_depth():
     assert Fetch.root().depth is FetchDepth.ROOT
     assert Fetch.direct().depth is FetchDepth.DIRECT
@@ -1012,8 +996,6 @@ def test_fetch_requires_registered_reason_for_nested_depth():
         Fetch(FetchDepth.DIRECT, FetchReason.TASK_SAVE_REQUIREMENTS)
 
 
-# @matrix relations : direct nested root
-# @pair entities:explicit-fetch-depth
 @pytest.mark.parametrize(
     ("fetch", "expected_calls", "has_category", "has_form"),
     [
@@ -1077,8 +1059,6 @@ def test_entities_fetch_applies_total_depth_to_key_and_typed_entity(
         assert category.properties.form.is_set is False
 
 
-# @matrix relations : direct stale-key
-# @pair entities:explicit-fetch-depth
 def test_entities_fetch_attaches_survivors_from_fully_resolved_relation(monkeypatch):
     page = TestEntities.get(
         "PAGE",
@@ -1109,7 +1089,6 @@ def test_entities_fetch_attaches_survivors_from_fully_resolved_relation(monkeypa
     assert page.categories == [model, category]
 
 
-# @pairs entities:batch relations:root
 def test_entities_fetch_batches_unresolved_roots_once(monkeypatch):
     first = TestEntities.get(
         "CATEGORY",
@@ -1140,8 +1119,6 @@ def test_entities_fetch_batches_unresolved_roots_once(monkeypatch):
     assert calls == [[first.key, second.key]]
 
 
-# @matrix entities : batch explicit-fetch-depth
-# @matrix relations : direct nested root
 @pytest.mark.parametrize(
     "fetch",
     [
@@ -1196,7 +1173,6 @@ def test_entities_fetch_deduplicates_mixed_roots_and_skips_missing(
     assert calls == [[second.key, missing]]
 
 
-# @pairs entities:explicit-fetch-depth relations:root
 def test_entities_fetch_root_does_not_attach_cross_root_relations(monkeypatch):
     page = TestEntities.get(
         "PAGE",
@@ -1228,7 +1204,6 @@ def test_entities_fetch_root_does_not_attach_cross_root_relations(monkeypatch):
     assert page.properties.categories.is_set is False
 
 
-# @pairs entities:reference-details relations:direct
 def test_reference_details_does_not_derive_requirements_from_unloaded_relations():
     page = TestEntities.get(
         "PAGE",
@@ -1244,7 +1219,6 @@ def test_reference_details_does_not_derive_requirements_from_unloaded_relations(
     assert page.properties.model.is_set is False
 
 
-# @pairs entities:explicit-fetch-depth relations:direct
 def test_entities_fetch_reuses_attached_direct_relations(monkeypatch):
     page = TestEntities.get(
         "PAGE",
@@ -1268,7 +1242,6 @@ def test_entities_fetch_reuses_attached_direct_relations(monkeypatch):
     assert page.model is category
 
 
-# @pairs entities:explicit-fetch-depth relations:root
 def test_entities_fetch_one_returns_entity_or_none(monkeypatch):
     form = TestEntities.get(
         "FORM",
@@ -1289,7 +1262,6 @@ def test_entities_fetch_one_returns_entity_or_none(monkeypatch):
     assert Entities.fetch_one("missing-form", request=Fetch.root()) is None
 
 
-# @pair entities:load-tracing
 def test_record_entity_load_trace_uses_request_context(monkeypatch):
     app = Flask(__name__)
     monkeypatch.setattr(
@@ -1325,7 +1297,6 @@ def test_record_entity_load_trace_uses_request_context(monkeypatch):
         ]
 
 
-# @pair entities:load-tracing
 def test_record_entity_load_trace_skips_no_database_work(monkeypatch):
     app = Flask(__name__)
     monkeypatch.setattr(
@@ -1344,8 +1315,6 @@ def test_record_entity_load_trace_skips_no_database_work(monkeypatch):
         assert not hasattr(g, "entity_loads")
 
 
-# @matrix permissions : explicit-fetch-depth registered-reason
-# @pair entities:load-tracing
 def test_record_entity_load_trace_includes_fetch_scope(monkeypatch):
     app = Flask(__name__)
     monkeypatch.setattr(
@@ -1370,7 +1339,6 @@ def test_record_entity_load_trace_includes_fetch_scope(monkeypatch):
         assert g.entity_loads[0]["fetch_stage"] == "roots"
 
 
-# @pair entities:load-tracing
 def test_print_entity_load_trace_outputs_request_summary(monkeypatch, capsys):
     app = Flask(__name__)
     monkeypatch.setattr(
@@ -1435,7 +1403,6 @@ def test_print_entity_load_trace_outputs_request_summary(monkeypatch, capsys):
     ) in output
 
 
-# @matrix relations : diagnostics unloaded-fallback
 def test_related_list_value_reports_unloaded_relation_without_loading(monkeypatch):
     captured = []
     monkeypatch.setattr(
@@ -1480,7 +1447,6 @@ def test_related_list_value_reports_unloaded_relation_without_loading(monkeypatc
     )
 
 
-# @matrix relations : diagnostics unloaded-fallback
 def test_related_single_value_reports_unloaded_relation_without_loading(monkeypatch):
     captured = []
     monkeypatch.setattr(
@@ -1525,7 +1491,6 @@ def test_related_single_value_reports_unloaded_relation_without_loading(monkeypa
     assert context["request"]["path"] == "/tasks/demo"
 
 
-# @matrix relations : diagnostics strict-mode
 def test_related_value_strict_mode_raises_after_reporting(monkeypatch):
     captured = []
     monkeypatch.setattr(
@@ -1553,7 +1518,7 @@ def test_related_value_strict_mode_raises_after_reporting(monkeypatch):
     prop = _TraceSingleRelation(entity=entity)
 
     with pytest.raises(UnloadedRelationError, match="category.owner"):
-        prop.value
+        _ = prop.value
 
     assert len(captured) == 1
     error, context, level = captured[0]
@@ -1563,7 +1528,6 @@ def test_related_value_strict_mode_raises_after_reporting(monkeypatch):
     assert context["keys"] == ["form:form-1"]
 
 
-# @pair entities:load-tracing
 def test_print_entity_load_trace_prints_once_per_request(monkeypatch, capsys):
     app = Flask(__name__)
     monkeypatch.setattr(
@@ -1592,7 +1556,6 @@ def test_print_entity_load_trace_prints_once_per_request(monkeypatch, capsys):
     assert output.count("[entity-loads] GET /categories/demo") == 1
 
 
-# @pair utility:html-stripping
 def test_strip_tags():
     """Test html_tools.strip_tags removes HTML tags correctly."""
     assert html_tools.strip_tags("<p>Hello <b>World</b></p>") == "Hello World"
@@ -1615,7 +1578,6 @@ def test_strip_tags():
     assert html_tools.strip_tags(None, preserve_whitespace=True) is None
 
 
-# @pair utility:timing
 def test_timed_config_disabled(monkeypatch, capsys):
     monkeypatch.setattr(diagnostics, "CONFIG", SimpleNamespace(DEBUG_TRACING=False))
 
@@ -1627,7 +1589,6 @@ def test_timed_config_disabled(monkeypatch, capsys):
     assert capsys.readouterr().out == ""
 
 
-# @pair utility:timing
 def test_timed_config_enabled(monkeypatch, capsys):
     monkeypatch.setattr(diagnostics, "CONFIG", SimpleNamespace(DEBUG_TRACING=True))
 
@@ -1643,7 +1604,6 @@ def test_timed_config_enabled(monkeypatch, capsys):
     assert "ms" in output
 
 
-# @pair utility:timing
 def test_timed_parameterized_preserves_metadata(capsys):
     @diagnostics.timed(enabled=True, label="custom-timer")
     def named_function():
@@ -1662,7 +1622,6 @@ def _timed_profile_helper(value):
     return sum(i * i for i in range(value))
 
 
-# @pair utility:timing
 def test_timed_profiles_project_calls(capsys):
     @diagnostics.timed(enabled=True, profile=True, label="profiled", limit=20)
     def profiled():
@@ -1681,7 +1640,6 @@ def test_timed_profiles_project_calls(capsys):
     assert "_timed_profile_helper" in output
 
 
-# @pair utility:timing
 def test_timed_project_filter_excludes_local_dependency_paths():
     project_file = diagnostics.PROJECT_ROOT / "lagniappe" / "web" / "auth.py"
     dependency_file = (
@@ -1707,7 +1665,6 @@ def test_timed_project_filter_excludes_local_dependency_paths():
     )
 
 
-# @pair utility:timing
 def test_timed_profile_rows_use_total_calls(monkeypatch):
     project_file = diagnostics.PROJECT_ROOT / "lagniappe" / "demo.py"
     stats = {
@@ -1732,7 +1689,6 @@ def test_timed_profile_rows_use_total_calls(monkeypatch):
     ]
 
 
-# @pair utility:timing
 def test_timed_prints_when_wrapped_function_raises(capsys):
     @diagnostics.timed(enabled=True, label="explode")
     def explode():
@@ -1745,7 +1701,6 @@ def test_timed_prints_when_wrapped_function_raises(capsys):
     assert "[timing] explode:" in output
 
 
-# @pair utility:timing
 def test_timed_prints_request_label_without_entity_trace(monkeypatch, capsys):
     app = Flask(__name__)
     monkeypatch.setattr(diagnostics, "CONFIG", SimpleNamespace(DEBUG_TRACING=True))
@@ -1776,7 +1731,6 @@ def test_timed_prints_request_label_without_entity_trace(monkeypatch, capsys):
     assert "[entity-loads]" not in output
 
 
-# @pair utility:hashing
 def test_short_hash_and_uuid(monkeypatch):
     """Test hash and uuid utility functions."""
     assert identifiers.short_hash("test") == "9f86d081884c"
@@ -1789,7 +1743,6 @@ def test_short_hash_and_uuid(monkeypatch):
     assert identifiers.short_uuid() == "12345678"
 
 
-# @pair utility:task-sorting
 def test_sort_tasks():
     """Test ordering.sort_tasks sorts by due_date then modified."""
     from unittest.mock import MagicMock
@@ -1811,7 +1764,6 @@ def test_sort_tasks():
     assert sorted_tasks == [t1, t2, t4, t3]
 
 
-# @matrix database : filter validation
 def test_database_filter_requires_rejects_invalid_hashes_type():
     assert Filter().requires(Restriction.UNRESTRICTED).build() is None
 
@@ -1833,7 +1785,6 @@ def test_database_filter_requires_rejects_invalid_hashes_type():
         Filter().requires(None)
 
 
-# @matrix ai error-reporting files : expected-provider-failure pdf-page-limit privacy
 def test_sentry_filter_drops_only_expected_ai_document_page_limit():
     from lagniappe.core.exceptions.request import filter_sentry_event
 

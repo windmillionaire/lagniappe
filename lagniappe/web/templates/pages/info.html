@@ -59,6 +59,7 @@
           data-api-key-route="{{ url_for('users.api_key') }}"
         {% endif %}
         data-can-edit-notification-email="{{ (is_own_page and not page.user.is_public)|yesno }}"
+        data-can-edit-auto-execute="{{ (CONFIG.AI_ENABLED and is_own_page and not page.user.is_public and auto_execute_site_enabled())|yesno }}"
         data-can-edit-public-email="{{ (is_own_page and page.user.is_public)|yesno }}"
         data-is-public="{{ page.user.is_public|yesno }}"
         data-can-edit-owner-inbound="{{ (is_owner_viewer and is_own_page and is_owner_page)|yesno }}"
@@ -94,6 +95,27 @@
             </div>
           </div>
           {% if is_own_page and not page.user.is_public %}<div data-role="notification-email"></div>{% endif %}
+          {% if CONFIG.AI_ENABLED and is_own_page and not page.user.is_public and auto_execute_site_enabled() %}
+            <fieldset data-role="auto-execute-settings"
+                      data-kind="user"
+                      class="rounded-md border border-user-default p-3">
+              <legend class="{{ styles.label.default }} px-1">Automatic plan execution</legend>
+              <label class="{{ styles.checkbox.label }}">
+                <div class="{{ styles.checkbox.container }}">
+                  <input type="checkbox"
+                         name="allow_auto_execute"
+                         data-kind="user"
+                         {% if page.user.allow_auto_execute %}checked{% endif %}
+                         class="{{ styles.checkbox.default }}">
+                  {{ render_icon("check", (styles.checkbox.icon)) }}
+                </div>
+                <span>Run safe AI plans automatically by default (on-site, API, and MCP)</span>
+              </label>
+              <p class="mt-2 text-xs text-base-medium">
+                You can still turn this off on any request. Plans with form schema changes, review items, or flagged issues always pause for browser review.
+              </p>
+            </fieldset>
+          {% endif %}
           {% if CONFIG.AI_ENABLED and CONFIG.EXTERNAL_AI_ENABLED and is_own_page and not page.user.is_public %}
             <fieldset data-role="api-key-settings"
                       data-kind="user"
@@ -107,7 +129,7 @@
                   </p>
                 {% endif %}
                 <p class="text-sm text-base-medium">
-                  Use another AI client to Ask questions or prepare Create and Organize plans within your workspace permissions. API plans never run automatically.
+                  Use another AI client to Ask questions or prepare Create and Organize plans within your workspace permissions. API plans require browser review unless automatic plan execution is enabled for the site and your account.
                 </p>
                 <p data-role="api-key-status" class="text-sm font-semibold text-base-dark">
                   Loading API key status...

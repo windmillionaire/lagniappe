@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass, replace
 import re
-from typing import Any
+from typing import cast
 
 from mcp import Tool
 from mcp_types import ToolAnnotations
@@ -47,7 +48,7 @@ GET_FILE_PRIVATE_FIELDS = frozenset(
         "x-goog-signature",
     }
 )
-GET_FILE_SAFE_PROPERTIES: dict[str, dict[str, Any]] = {
+GET_FILE_SAFE_PROPERTIES: dict[str, dict[str, object]] = {
     "hash": {"type": "string"},
     "display_name": {"type": "string"},
     "filename": {"type": "string"},
@@ -140,6 +141,7 @@ SAFE_PLAN_SCHEMA = {
         "execution": {"type": ["object", "null"]},
         "original_brief": {"type": ["object", "null"]},
         "action_summary": ACTION_SUMMARY_SCHEMA,
+        "require_review": {"type": "boolean"},
     },
     "additionalProperties": False,
 }
@@ -232,7 +234,7 @@ SAFE_RECEIPT_SCHEMA = {
     "properties": {
         "action_summary": ACTION_SUMMARY_SCHEMA,
         "id": {"type": "string"},
-        "status": {"enum": ["ready", "complete"]},
+        "status": {"enum": ["ready", "running", "complete"]},
         "preview_url": {"type": "string"},
         "review_url": {"type": "string"},
         "contract_version": {
@@ -245,6 +247,24 @@ SAFE_RECEIPT_SCHEMA = {
                 {"type": "string", "minLength": 1},
                 {"type": "null"},
             ]
+        },
+        "operation": {
+            "type": "object",
+            "required": ["id", "status"],
+            "properties": {
+                "id": {"type": "string"},
+                "status": {"type": "string"},
+            },
+            "additionalProperties": False,
+        },
+        "execution": {
+            "type": "object",
+            "required": ["started"],
+            "properties": {
+                "started": {"type": "boolean"},
+                "reason": {"type": "string"},
+            },
+            "additionalProperties": False,
         },
     },
     "additionalProperties": False,
@@ -466,9 +486,7 @@ ENRICHED_UPLOAD_RESULT_SCHEMA = {
 }
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
-def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, Any]:
+def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, object]:
     return {
         "type": "object",
         "required": [],
@@ -478,6 +496,10 @@ def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, Any]:
             },
             "name": {"type": "string", "maxLength": 120},
             "revises_plan_id": {"type": ["string", "null"], "minLength": 1, "description": "Creator-owned stopped execution to correct. Omit or use null for an independent Plan. Read current workspace state; propose only additional changes."},
+            "require_review": {
+                "type": "boolean",
+                "description": "When true, lock this Plan to browser review only so external execution is rejected.",
+            },
             **(
                 {
                     "actions": {
@@ -493,23 +515,19 @@ def _plan_input_schema(*, selected_actions: bool = False) -> dict[str, Any]:
     }
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/catalog.py::lifecycle_tools
-def _plan_id_input() -> dict[str, Any]:
+def _plan_id_input(properties: dict[str, object]) -> dict[str, object]:
     return {
         "type": "object",
         "required": ["plan_id"],
         "properties": {
-            "plan_id": {"type": "string", "minLength": 1, "maxLength": 2048}
+            "plan_id": {"type": "string", "minLength": 1, "maxLength": 2048},
+            **properties,
         },
         "additionalProperties": False,
     }
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_get_file_schema_projects_every_transport_extension
-def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
+def get_file_output_schema(rest_schema: dict[str, object]) -> dict[str, object]:
     """Expose a scoped original download alongside bounded inline media."""
     result = validate_schema_document(rest_schema)
     rest_properties = result.setdefault("properties", {})
@@ -589,7 +607,7 @@ def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
     required[:] = [field for field in required if field in properties]
     if "delivery" not in required:
         required.append("delivery")
-    result.setdefault("allOf", []).append({
+    cast(list[object], result.setdefault("allOf", [])).append({
         "if": {"properties": {"delivery": {"properties": {"kind": {"const": "download"}}}}},
         "then": {
             "required": ["original_file"],
@@ -610,22 +628,17 @@ def get_file_output_schema(rest_schema: dict[str, Any]) -> dict[str, Any]:
     return validate_schema_document(result)
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_server_presents_matching_schemas_and_values_for_each_protocol
 @dataclass(frozen=True, slots=True)
 class ToolDefinition:
     name: str
     description: str
-    input_schema: dict[str, Any]
-    output_schema: dict[str, Any]
+    input_schema: dict[str, object]
+    output_schema: dict[str, object]
     kind: str
     annotations: ToolAnnotations
-    rest_output_schema: dict[str, Any] | None = None
-    result_paths: dict[str, Any] | None = None
+    rest_output_schema: dict[str, object] | None = None
+    result_paths: dict[str, object] | None = None
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/catalog.py::ToolDefinition
     def requires_result_wrapper(self, protocol_version: str) -> bool:
         # Select by the declared schema, including nullable/union roots, so
         # every successful value matches the same advertised result shape.
@@ -634,8 +647,6 @@ class ToolDefinition:
             and self.output_schema.get("type") != "object"
         )
 
-    # @testable false
-    # @covered-by mcp/src/lagniappe_mcp/catalog.py::ToolDefinition
     def as_mcp_tool(self, protocol_version: str = LATEST_MODERN_VERSION) -> Tool:
         wrapped = self.requires_result_wrapper(protocol_version)
         result_paths = (
@@ -653,7 +664,7 @@ class ToolDefinition:
                 else self.output_schema
             ),
             annotations=self.annotations,
-            meta=(
+            _meta=(
                 {"lagniappe/resultPaths": result_paths}
                 if result_paths is not None
                 else None
@@ -661,9 +672,7 @@ class ToolDefinition:
         )
 
 
-# @testable false
-# @covered-by mcp/src/lagniappe_mcp/catalog.py::ToolDefinition
-def _wrap_result_paths(value: Any) -> Any:
+def _wrap_result_paths(value: object) -> object:
     """Keep catalog JSONPath hints relative to the advertised MCP value."""
     if isinstance(value, dict):
         return {key: _wrap_result_paths(child) for key, child in value.items()}
@@ -699,9 +708,6 @@ SUBMIT_ANNOTATIONS = ToolAnnotations(
 )
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
 def lifecycle_tools() -> tuple[ToolDefinition, ...]:
     common_start = (
         "Each call creates a new report. Reuse the returned id as plan_id for "
@@ -754,8 +760,13 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ),
         ToolDefinition(
             "get_plan",
-            "Return current Plan state, current/original brief, round-trippable proposal, and bounded execution outcomes with currently viewable result entities. Before execution, revise the existing plan_id. After execution, start_plan with revises_plan_id creates a linked correction; never replay successful creations. Entity null means unavailable, not proof an action never ran.",
-            _plan_id_input(),
+            "Return current Plan state, current/original brief, and bounded execution outcomes with currently viewable result entities. Defaults to include_proposal=false for compact status polling; pass include_proposal=true to fetch the full round-trippable proposal body. Before execution, revise the existing plan_id. After execution, start_plan with revises_plan_id creates a linked correction; never replay successful creations. Entity null means unavailable, not proof an action never ran.",
+            _plan_id_input({
+                "include_proposal": {
+                    "type": "boolean",
+                    "description": "Include the full round-trippable proposal body (default false for compact polling).",
+                },
+            }),
             SAFE_PLAN_SCHEMA,
             "get_plan",
             READ_ANNOTATIONS,
@@ -763,14 +774,10 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
         ToolDefinition(
             "get_plan_contract",
             "Load exact schemas for selected allowed actions; actions=[] returns a saved-answer schema with no changes. Use view=schema for a follow-up after receiving the plan context: it omits repeated workflow/inventory guidance. full includes context and, without actions, all schemas. The default summary includes context without schemas. Reuse selected schemas; refresh context for changed state/permissions. Submission uses the API's current validation and permissions.",
-            {
-                **_plan_id_input(),
-                "properties": {
-                    **_plan_id_input()["properties"],
-                    "actions": ACTION_SELECTION_SCHEMA,
-                    "view": {"enum": ["full", "summary", "schema"]},
-                },
-            },
+            _plan_id_input({
+                "actions": ACTION_SELECTION_SCHEMA,
+                "view": {"enum": ["full", "summary", "schema"]},
+            }),
             {"type": "object", "anyOf": [SAFE_CONTRACT_SCHEMA, SAFE_SCHEMA_CONTRACT_SCHEMA]},
             "get_plan_contract",
             READ_ANNOTATIONS,
@@ -824,6 +831,10 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
                         "minLength": 1,
                         "maxLength": 65536,
                     },
+                    "require_review": {
+                        "type": "boolean",
+                        "description": "When true, lock this Plan to browser review only.",
+                    },
                 },
                 "additionalProperties": False,
             },
@@ -834,10 +845,7 @@ def lifecycle_tools() -> tuple[ToolDefinition, ...]:
     )
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-def catalog_tools(catalog: dict[str, Any]) -> tuple[ToolDefinition, ...]:
+def catalog_tools(catalog: Mapping[str, object]) -> tuple[ToolDefinition, ...]:
     """Validate and convert every REST read into one fixed-route MCP tool."""
     if json_size(catalog) > MAX_CATALOG_BYTES:
         raise TransportError(
@@ -989,19 +997,36 @@ def catalog_tools(catalog: dict[str, Any]) -> tuple[ToolDefinition, ...]:
     return tuple(sorted(result, key=lambda item: item.name))
 
 
-# @testable true
-# @pair mcp-adapter:product-contract
-# @tests tests_unit/test_033_mcp_adapter.py::test_adapter_executes_only_typed_lifecycle_and_catalog_routes
-def build_tool_registry(catalog: dict[str, Any], *, execute_plan: bool = False) -> dict[str, ToolDefinition]:
+def build_tool_registry(catalog: Mapping[str, object], *, execute_plan: bool = False) -> dict[str, ToolDefinition]:
     tools = (*lifecycle_tools(), *catalog_tools(catalog), *((execution_tool(),) if execute_plan else ()))
     if execute_plan:
-        tools = tuple(
-            replace(tool, description=tool.description.replace(
-                "Give preview_url for authenticated review, never claim a proposal was applied.",
-                "Use execute_plan with the returned fingerprint and a stable operation_id to apply it; poll get_plan for the outcome.",
-            )) if tool.name == "submit_plan" else tool
-            for tool in tools
-        )
+        updated_tools = []
+        for tool in tools:
+            if tool.name == "submit_plan":
+                submit_schema = deepcopy(tool.input_schema)
+                cast(dict[str, object], submit_schema["properties"]).update(
+                    {
+                        "execute": {
+                            "type": "boolean",
+                            "description": "When true, immediately start executing the submitted proposal (requires operation_id). Plans marked require_review or containing form schema changes, review items, or flagged issues still pause in ready state for browser review.",
+                        },
+                        "operation_id": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9._-]{1,128}$",
+                            "description": "Stable operation ID (required when execute is true).",
+                        },
+                    }
+                )
+                tool = replace(
+                    tool,
+                    description=tool.description.replace(
+                        "Give preview_url for authenticated review, never claim a proposal was applied.",
+                        "Pass execute=true with a stable operation_id to run safe proposals immediately, or call execute_plan with the returned fingerprint; poll get_plan for the outcome. Respect user requests for review by setting require_review=true.",
+                    ),
+                    input_schema=submit_schema,
+                )
+            updated_tools.append(tool)
+        tools = tuple(updated_tools)
     if len(tools) > MAX_TOOL_COUNT:
         raise TransportError(
             "catalog_too_large", "Published MCP catalog contains too many tools."
@@ -1017,13 +1042,10 @@ def build_tool_registry(catalog: dict[str, Any], *, execute_plan: bool = False) 
     return {tool.name: tool for tool in tools}
 
 
-# @testable true
-# @tests tests_unit/test_033_mcp_adapter.py::test_experiments_execution_is_advertised_only_when_authorized
-# @matrix mcp-adapter : product-contract
 def execution_tool() -> ToolDefinition:
     return ToolDefinition(
         "execute_plan",
-        "Execute an already submitted proposal on this experiments installation as its designated Administrator agent. Use the proposal_fingerprint returned by submit_plan and a stable operation_id. Retry an uncertain request with those same values; poll get_plan for outcomes and never recreate successful actions. Current permissions and the exact proposal are checked again. This applies app records, not shell commands or deployments.",
+        "Execute an already submitted proposal when automatic plan execution is enabled for this connection. Use the proposal_fingerprint returned by submit_plan and a stable operation_id. Retry an uncertain request with those same values; poll get_plan for outcomes and never recreate successful actions. Plans marked require_review or containing form schema changes, review items, or flagged issues still require browser review. Current permissions and the exact proposal are checked again. This applies app records, not shell commands or deployments.",
         {
             "type": "object",
             "required": ["plan_id", "proposal_fingerprint", "operation_id"],

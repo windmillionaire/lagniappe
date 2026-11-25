@@ -13,7 +13,6 @@ from testing.resources import Task
 pytestmark = pytest.mark.e2e
 
 
-# @matrix form-todo : add check default-persistence delete edit history-fill rename reset
 # @template pages/tasks.html::task_form
 def test_task_todo_list_editing_and_history_restore(get_admin, get_user):
     user = get_admin()

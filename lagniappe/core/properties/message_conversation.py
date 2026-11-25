@@ -1,5 +1,16 @@
 """Persisted direct-message conversation state and pure transitions."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast, overload
+
+if TYPE_CHECKING:
+    from datetime import datetime
+    from google.cloud.datastore import Entity as DatastoreEntity
+    from google.cloud.datastore import Key
+    from lagniappe.core.entities import types as models
+
+
 import hashlib
 
 from config.datastore import encode_urlsafe_key
@@ -7,46 +18,39 @@ from config.datastore import encode_urlsafe_key
 from .base_db import DBProperty
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/messaging/views.py::serialize_conversation
-# @reason key encoding is exercised through browser projections
-def encoded_identifier(value):
+def encoded_identifier(value: object) -> str | None:
     """Return the stable urlsafe identity for an entity or Datastore key."""
     key = getattr(value, "key", value)
     identifier = getattr(value, "urlsafe_key", None)
     if identifier:
         return str(identifier)
     if key is not None and hasattr(key, "to_legacy_urlsafe"):
-        return encode_urlsafe_key(key)
+        return encode_urlsafe_key(cast("Key", key))
     return str(key) if key is not None else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::send_message_record
-# @reason participant normalization is exercised through transactional state
-def participant_id(user):
+@overload
+def participant_id(user: models.User | Key | str) -> str: ...
+
+
+@overload
+def participant_id(user: None) -> None: ...
+
+
+def participant_id(user: models.User | Key | str | None) -> str | None:
     return encoded_identifier(user)
 
 
-# @testable true
-# @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @pair messaging:deterministic-key
-def conversation_identity(first, second):
+def conversation_identity(first: models.User | Key, second: models.User | Key) -> str:
     participants = sorted((participant_id(first), participant_id(second)))
     return hashlib.sha256("\0".join(participants).encode()).hexdigest()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::require_participant
-# @reason membership comparison is exercised through authorized reads and writes
-def participant(conversation, user):
+def participant(conversation: DatastoreEntity, user: models.User | Key) -> bool:
     return getattr(user, "key", user) in set(conversation.get("participants") or ())
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/messaging/views.py::serialize_conversation
-# @reason peer selection is exercised through conversation projection
-def peer_key(conversation, user):
+def peer_key(conversation: DatastoreEntity, user: models.User | Key) -> Key | None:
     user_key = getattr(user, "key", user)
     return next(
         (key for key in conversation.get("participants") or () if key != user_key),
@@ -54,10 +58,7 @@ def peer_key(conversation, user):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::send_message_record
-# @reason exact raw conversation construction is exercised through first send
-def initial_values(actor, recipient, now):
+def initial_values(actor: models.User, recipient: models.User, now: datetime) -> dict[str, object]:
     actor_id = participant_id(actor)
     recipient_id = participant_id(recipient)
     return {
@@ -82,10 +83,7 @@ def initial_values(actor, recipient, now):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::send_message_record
-# @reason the pure transition is exercised within the atomic send contract
-def apply_send(conversation, actor, recipient, now):
+def apply_send(conversation: DatastoreEntity, actor: models.User, recipient: models.User, now: datetime) -> int:
     """Advance one conversation after accepting a new message."""
     actor_id = participant_id(actor)
     recipient_id = participant_id(recipient)
@@ -110,10 +108,7 @@ def apply_send(conversation, actor, recipient, now):
     return sequence
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::mark_conversation_read
-# @reason the pure transition is exercised within the atomic read contract
-def apply_read(conversation, user, now):
+def apply_read(conversation: DatastoreEntity, user: models.User, now: datetime) -> int:
     """Clear a participant's unread cursor and return the prior unread count."""
     user_id = participant_id(user)
     unread = dict(conversation.get("unread_counts") or {})
@@ -130,10 +125,7 @@ def apply_read(conversation, user, now):
     return prior
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::hide_message_for_user
-# @reason the pure transition is exercised within the atomic hide contract
-def apply_hidden_message(conversation, message, user):
+def apply_hidden_message(conversation: DatastoreEntity, message: DatastoreEntity, user: models.User) -> bool:
     """Remove one still-unread hidden inbound message from conversation counts."""
     user_id = participant_id(user)
     unread = dict(conversation.get("unread_counts") or {})
@@ -150,10 +142,7 @@ def apply_hidden_message(conversation, message, user):
     return True
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/messaging.py::clear_message_conversation
-# @reason the pure transition is exercised within the atomic clear contract
-def apply_clear(conversation, user, now):
+def apply_clear(conversation: DatastoreEntity, user: models.User, now: datetime) -> int:
     """Advance one participant's clear horizon and return cleared unread count."""
     user_id = participant_id(user)
     unread = dict(conversation.get("unread_counts") or {})
@@ -171,45 +160,45 @@ def apply_clear(conversation, user, now):
     return prior
 
 
-class Participants(DBProperty):
+class Participants(DBProperty["list[Key]"]):
     _id = "participants"
 
 
-class VisibleTo(DBProperty):
+class VisibleTo(DBProperty["list[Key]"]):
     _id = "visible_to"
 
 
-class ParticipantNames(DBProperty):
+class ParticipantNames(DBProperty[dict[str, str]]):
     _id = "participant_names"
     json = True
 
 
-class LastActivity(DBProperty):
+class LastActivity(DBProperty["datetime"]):
     _id = "last_activity"
 
 
-class LastSender(DBProperty):
+class LastSender(DBProperty["Key"]):
     _id = "last_sender"
 
 
-class Sequence(DBProperty):
+class Sequence(DBProperty[int]):
     _id = "sequence"
 
 
-class Revision(DBProperty):
+class Revision(DBProperty[int]):
     _id = "revision"
 
 
-class UnreadCounts(DBProperty):
+class UnreadCounts(DBProperty[dict[str, int]]):
     _id = "unread_counts"
     json = True
 
 
-class ReadThrough(DBProperty):
+class ReadThrough(DBProperty[dict[str, int]]):
     _id = "read_through"
     json = True
 
 
-class ClearedThrough(DBProperty):
+class ClearedThrough(DBProperty[dict[str, int]]):
     _id = "cleared_through"
     json = True

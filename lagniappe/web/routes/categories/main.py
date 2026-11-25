@@ -1,3 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from werkzeug.datastructures import MultiDict
+    from lagniappe.core.entities.category import CategoryData
+    from lagniappe.core.entities import types as models
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.web.auth import EntityContext
+    from typing import Unpack
+
 from flask import request
 from flask_login import current_user
 
@@ -12,62 +25,55 @@ from lagniappe.core.definitions import (
     MutationIntent,
     Resource,
 )
-from lagniappe.web.auth import permission, require_ai_access
+from lagniappe.web.auth import authenticated_user, permission, require_ai_access
+from lagniappe.web.pagination import pagination_options
 from lagniappe.web import responses
 from lagniappe.core.tools.diagnostics import timed
 
 from . import categories
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_page_acl_user_sees_one_page_on_category_index_home_and_search
-# @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_create_scoped_to_one_category
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
-# @matrix categories : create-control first-batch index-filter permission-gates server-render
 @categories.route("/<key>", methods=["GET"])
 @timed(profile=True)
 @permission(Resource.CATEGORY, Action.RESTRICTED)
-def index(key, **kwargs):
+def index(
+    key: str, **kwargs: Unpack[EntityContext[models.Category]]
+) -> ResponseReturnValue:
     category = kwargs["entity"]
 
     filters.FilterCache(category).update()
 
-    category_index = category.index(**request.values)
+    category_index = category.index(**pagination_options())
     pages = category_index.pages
 
     return responses.index("categories", category_index, pages=pages)
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_page_acl_user_sees_one_page_on_category_index_home_and_search
-# @matrix categories : index-filter permission-gates
 @categories.route("/<key>/rows", methods=["GET"])
 @permission(Resource.CATEGORY, Action.RESTRICTED)
-def rows(key, **kwargs):
+def rows(
+    key: str, **kwargs: Unpack[EntityContext[models.Category]]
+) -> ResponseReturnValue:
     category = kwargs["entity"]
 
-    category_index = category.index(**request.values)
+    category_index = category.index(**pagination_options())
     pages = category_index.pages
 
     return responses.rows(pages, category_index)
 
 
-# @testable infrastructure
-# @covered-by lagniappe/web/responses.py::category_info
 @categories.route("/<key>/info/replace", methods=["GET"])
 @permission(Resource.CATEGORY, Action.VIEW)
-def info(key, **kwargs):
+def info(
+    key: str, **kwargs: Unpack[EntityContext[models.Category]]
+) -> ResponseReturnValue:
     return responses.category_info(kwargs["entity"])
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/categories/main.py::create
-# @covered-by lagniappe/web/routes/categories/main.py::update
-# @reason form parsing helper owned by category create/update routes
-def _category_data(form, category=None):
+def _category_data(form: MultiDict[str, str], category: models.Category | None = None) -> CategoryData:
     form_key = form.get("form")
     current_form = category.form if category else None
-    selected_form = SubmittedReferenceResolver(current_user, form_key).one(
+    selected_form = SubmittedReferenceResolver(authenticated_user(), form_key).one(
         form_key,
         expected=Entities.FORM,
         action=Action.VIEW,
@@ -86,13 +92,11 @@ def _category_data(form, category=None):
     }
 
 
-# @testable true
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
-# @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_viewer_opens_readonly_settings
-# @matrix categories : permission-gates update
 @categories.route("<key>/update", methods=["PUT"])
 @permission(Resource.CATEGORY, Action.EDIT)
-def update(key, **kwargs):
+def update(
+    key: str, **kwargs: Unpack[EntityContext[models.Category]]
+) -> ResponseReturnValue:
     category = kwargs["entity"]
 
     try:
@@ -104,10 +108,7 @@ def update(key, **kwargs):
     return responses.category_info(category)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/categories/main.py::create
-# @reason AI response shaping is exercised through the category create route
-def _generate_category(generated_data):
+def _generate_category(generated_data: ai_category.GeneratedCategory) -> CategoryData:
     if generated_data.get("form_schema"):
         create_form_data = {
             "name": generated_data.get("form_name"),
@@ -118,7 +119,7 @@ def _generate_category(generated_data):
     else:
         form = None
 
-    category_data = {
+    category_data: CategoryData = {
         "name": generated_data.get("category_name"),
         "description": generated_data.get("category_description"),
         "form": form,
@@ -127,22 +128,16 @@ def _generate_category(generated_data):
     return category_data
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_manual_mode
-# @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode
-# @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_with_form
-# @tests tests_e2e/002_home/test_002c_home_categories.py::test_retired_initial_prompt_request_cannot_create_category
-# @matrix categories : ai-create attach-form create-manual retired-preview no-create
 @categories.route("create", methods=["POST"])
 @permission(Resource.MODELS, Action.CREATE)
-def create():
+def create() -> ResponseReturnValue:
     generate = request.form.get("generate")
     if request.form.get("role") == "explain" or request.form.get("explain"):
         return responses.error("Initial Prompt is no longer available.")
 
     if generate:
         require_ai_access(AI.CREATE)
-        prompt = ai_category.category_creation_prompt(request.form.get("user_description"))
+        prompt = ai_category.category_creation_prompt(request.form.get("user_description") or "")
         try:
             results = ai_category.generate_category(prompt)
             generated_data = _generate_category(results)
@@ -151,12 +146,13 @@ def create():
 
         category = Entities.CATEGORY().create(generated_data)
         category.ai_generated = True
-        category.add_mutation_intents(
-            MutationIntent.standard(
-                category.form,
-                reason="generated-category-form",
+        if category.form is not None:
+            category.add_mutation_intents(
+                MutationIntent.standard(
+                    category.form,
+                    reason="generated-category-form",
+                )
             )
-        )
     else:
         try:
             category = Entities.CATEGORY().create(_category_data(request.form))
@@ -168,12 +164,9 @@ def create():
     return responses.new_category(category)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002c_home_categories.py::test_delete_category
-# @pair categories:delete
 @categories.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.MODELS, Action.DELETE)
-def delete(key, **kwargs):
+def delete(key: str, **kwargs: Unpack[EntityContext[Entity]]) -> ResponseReturnValue:
     category = kwargs["entity"]
     if not category:
         return responses.error("category not found")

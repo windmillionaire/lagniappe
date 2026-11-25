@@ -3,9 +3,6 @@ import { test } from "node:test";
 import esmock from "esmock";
 import { createBrowser } from "../utility/js/environment.mjs";
 
-/**
- * @matrix notifications : accessible-state badge cold-seed redis-projection response-header
- */
 test("test_notification_state_updates_badge_and_reports_cache_miss", async (t) => {
 	createBrowser(t, {
 		html: `
@@ -17,8 +14,8 @@ test("test_notification_state_updates_badge_and_reports_cache_miss", async (t) =
 	const captured = [];
 	const captureError = t.mock.fn((...args) => captured.push(args));
 	const { applyNotificationState, applyNotificationStateHeader } =
-		await esmock.strict("../../src/script/shared/notificationState.mjs", {
-			"../../src/script/shared/errors.mjs": { captureError },
+		await esmock.strict("../../src/script/shared/notificationState.ts", {
+			"../../src/script/shared/errors.ts": { captureError },
 		});
 	const events = [];
 	window.addEventListener("notification-state", (event) => events.push(event));

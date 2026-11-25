@@ -15,11 +15,6 @@ from testing.resources import Page, Report
 pytestmark = pytest.mark.e2e
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/actions/documents.py::_append_page_document
-# @source lagniappe/web/routes/home/sync.py::sync
-# @source lagniappe/core/mixins/assets.py::AssetMixin.copy_asset
-# @matrix ai-report editor sync : document append browser-review persistence source-attribution
-# @matrix asset-storage : copy metadata visibility
 # @template tools/report.html::proposal_action_item
 @pytest.mark.parametrize("action_type", ["append_page_document", "replace_page_document"])
 def test_reviewed_document_append_updates_open_editor(get_admin, get_user, action_type):

@@ -20,7 +20,6 @@ from runner.context import format_command
 pytestmark = pytest.mark.tooling
 
 
-# @matrix setup : portability terminal-wrapping
 @pytest.mark.parametrize("width", [12, 40, 60, 80, 100])
 def test_prose_layout(width, monkeypatch):
     text = "First paragraph.\n\n  1. Review the saved settings before deployment.\n  - Keep all words."
@@ -47,7 +46,6 @@ def test_prose_layout(width, monkeypatch):
     assert max(map(len, wrap_text("word " * 50).splitlines())) <= 100
 
 
-# @matrix setup : interactive-input terminal-wrapping
 @pytest.mark.parametrize("width", [12, 40, 60, 80, 100])
 def test_prompt_layout(width):
     message = "Deploy app now? [y/N]: "
@@ -82,7 +80,6 @@ def test_prompt_layout(width):
     assert format_prompt(result, width) == result
 
 
-# @matrix setup : operator-summary terminal-wrapping
 @pytest.mark.parametrize("width", [12, 40, 60, 80, 100])
 @pytest.mark.parametrize("windows", [False, True])
 def test_value_layout_preserves_copyable_values(width, windows):
@@ -112,11 +109,10 @@ def test_value_layout_preserves_copyable_values(width, windows):
     )
     assert all(len(line) <= width for line in prose.splitlines())
     assert (
-        prose.split() == "Status: Review the saved settings before continuing.".split()
+        prose.split() == ["Status:", "Review", "the", "saved", "settings", "before", "continuing."]
     )
 
 
-# @matrix setup : manual-dns provider-records terminal-wrapping
 @pytest.mark.parametrize("width", [12, 40, 80])
 def test_dns_values_remain_verbatim(width, monkeypatch, capsys):
     from installer import ai_email
@@ -152,7 +148,6 @@ def test_dns_values_remain_verbatim(width, monkeypatch, capsys):
     assert "10" in output
 
 
-# @matrix setup : operator-summary secret-redaction
 @pytest.mark.parametrize("width", [12, 40, 60, 80, 100])
 def test_install_summary_is_responsive(width):
     from installer.summary import install_summary_lines
@@ -200,7 +195,6 @@ def test_install_summary_is_responsive(width):
         )
 
 
-# @matrix setup : operator-summary terminal-wrapping
 @pytest.mark.parametrize("width", [12, 40, 80, 100])
 def test_instruction_values_preserve_styles_and_copyable_content(width, monkeypatch):
     from rich.text import Text
@@ -232,7 +226,6 @@ def test_instruction_values_preserve_styles_and_copyable_content(width, monkeypa
     assert "\x1b" not in plain
 
 
-# @matrix setup : spinner terminal-wrapping
 def test_progress_label_tracks_terminal_width(monkeypatch):
     monkeypatch.setenv("COLUMNS", "80")
     label = ProgressLabel("\x1b[32mDeploying App Engine indexes and application\x1b[0m")
@@ -246,7 +239,6 @@ def test_progress_label_tracks_terminal_width(monkeypatch):
     assert label.message == "Deploying App Engine indexes and application"
 
 
-# @matrix setup : portability spinner
 @pytest.mark.parametrize(
     "tty,legacy,encoding,term,columns,plain",
     [
@@ -270,7 +262,6 @@ def test_progress_modes(monkeypatch, tty, legacy, encoding, term, columns, plain
     assert plain_progress(None, stream) is True
 
 
-# @matrix setup : package-install spinner
 @pytest.mark.parametrize("tty,no_color", [(True, False), (True, True), (False, False)])
 def test_formatter_preserves_plain_and_colored_output(monkeypatch, tty, no_color):
     import installer
@@ -304,7 +295,6 @@ def test_formatter_preserves_plain_and_colored_output(monkeypatch, tty, no_color
     assert ("\x1b" in output.getvalue()) is (tty and not no_color)
 
 
-# @matrix setup : encoding operator-summary portability terminal-wrapping
 def test_semantic_output(monkeypatch):
     from rich.color import Color
     from rich.text import Text
@@ -355,7 +345,6 @@ def test_semantic_output(monkeypatch):
     assert stream.getvalue().endswith(literal + "\n")
 
 
-# @matrix setup : package-install spinner
 def test_progress_output_and_input(monkeypatch):
     from runner import presentation as ui
 
@@ -405,9 +394,11 @@ def test_progress_output_and_input(monkeypatch):
     transcript = unstyle(stream.getvalue())
     assert " ".join(transcript.split()).count("Configuration verified") == 1
     assert "Normal [literal] detail." in transcript
-    with pytest.raises(RuntimeError, match="provider failed"):
-        with ui.Progress("Failing operation"):
-            raise RuntimeError("provider failed")
+    with (
+        pytest.raises(RuntimeError, match="provider failed"),
+        ui.Progress("Failing operation"),
+    ):
+        raise RuntimeError("provider failed")
     assert ui.ACTIVE_PROGRESS == []
     assert "✓ Failing operation" not in unstyle(stream.getvalue())
     monkeypatch.setenv("COLUMNS", "80")
@@ -417,7 +408,6 @@ def test_progress_output_and_input(monkeypatch):
     assert "✓ Images unchanged" not in unstyle(stream.getvalue())
 
 
-# @matrix setup : spinner subprocess-output
 def test_visible_subprocess_output_pauses_progress(monkeypatch):
     import subprocess
     from runner import presentation as ui, process

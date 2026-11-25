@@ -1,5 +1,15 @@
 """Document-scoped recovery pins and retained Storage versions."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
+    from ..entities.user import User
+    from ..entities.page import Page
+    from ..entities.project import Project
+
+from typing import TypedDict
+
 import hashlib
 import re
 
@@ -12,21 +22,29 @@ from lagniappe.core.exceptions import ValidationError
 from .database import assets, utility
 
 
-# @testable infrastructure
+class BackupEntry(TypedDict):
+    key: str
+    name: str
+    backup: bool
+    created: str
+
+
+class BackupListing(TypedDict):
+    entries: list[BackupEntry]
+    cursor: str | None
+
+
 def _tokens():
     return URLSafeTimedSerializer(CONFIG.SECRET_KEY, salt="document-backup")
 
 
-# @testable true
-# @tests tests_unit/test_010c_document_versions.py::test_storage_backups_are_scoped_paginated_and_generation_bound
-# @matrix document-history : backups permissions pagination
-def list_backups(entity, cursor=None):
+def list_backups(entity: Entity, cursor: str | None = None) -> BackupListing:
     if cursor:
         try:
-            cursor = _tokens().loads(cursor, max_age=3600)
-            if cursor["owner"] != entity.urlsafe_key:
+            cursor_record = _tokens().loads(cursor, max_age=3600)
+            if cursor_record["owner"] != entity.urlsafe_key:
                 raise ValueError()
-            cursor = cursor["cursor"]
+            cursor = cursor_record["cursor"]
         except (BadSignature, KeyError, TypeError, ValueError) as error:
             raise ValidationError("Invalid or expired backup listing; reopen History.") from error
     iterator = assets.DATA.bucket("private").list_blobs(
@@ -34,7 +52,7 @@ def list_backups(entity, cursor=None):
         max_results=50, page_token=cursor,
     )
     page = next(iterator.pages, ())
-    entries = []
+    entries: list[BackupEntry] = []
     pattern = re.compile(rf"{re.escape(entity.hash)}_document(?:_[a-f0-9]{{32}})?\.html")
     for blob in page:
         if not pattern.fullmatch(blob.name) or not blob.time_deleted:
@@ -50,10 +68,7 @@ def list_backups(entity, cursor=None):
     }) if iterator.next_page_token else None}
 
 
-# @testable true
-# @tests tests_unit/test_010c_document_versions.py::test_storage_backups_are_scoped_paginated_and_generation_bound
-# @matrix document-history : backups permissions generation-pinned
-def read_backup(entity, token):
+def read_backup(entity: Entity, token: str) -> str | None:
     try:
         record = _tokens().loads(token, max_age=3600)
         pattern = rf"{re.escape(entity.hash)}_document(?:_[a-f0-9]{{32}})?\.html"
@@ -67,10 +82,9 @@ def read_backup(entity, token):
     return assets.get_text(record["path"], "private", generation=generation)
 
 
-# @testable true
-# @tests tests_unit/test_010c_document_versions.py::test_recovery_pin_retry_is_scoped_and_keeps_empty_versions
-# @matrix document-history : recovery idempotency empty-content
-def recovery_pin(entity, user, *, html, name, operation_id):
+def recovery_pin(
+    entity: Page | Project, user: User, *, html: str, name: str, operation_id: str
+) -> Entity:
     if not isinstance(operation_id, str) or not re.fullmatch(r"[a-f0-9]{64}", operation_id):
         raise ValidationError("Invalid recovery operation")
     if not isinstance(html, str):
@@ -82,5 +96,7 @@ def recovery_pin(entity, user, *, html, name, operation_id):
     if existing:
         return existing
     history = Entities.DOCUMENT_HISTORY.create(entity, name=name, html=html, key=key, allow_empty=True)
+    if history is None:
+        raise ValidationError("Document history creation did not produce a named version.")
     Entities.save(history)
     return history

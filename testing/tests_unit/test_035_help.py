@@ -30,7 +30,6 @@ def clear_topic_caches():
         function.cache_clear()
 
 
-# @pair help:canonical-source
 def test_topics_are_canonical_and_portable():
     corpus = reference.topics()
     assert 'form_creation' not in corpus
@@ -49,7 +48,6 @@ def test_topics_are_canonical_and_portable():
     assert reference.get_topic('create_form') is corpus['create_form']
 
 
-# @pair help:version
 def test_help_version_changes_with_source_without_rendering(monkeypatch):
     monkeypatch.setattr(reference, 'render_markdown', lambda *_a: pytest.fail('versioning must not render'))
     monkeypatch.setattr(reference, '_sources', lambda: (('one', b'first'),))
@@ -65,7 +63,6 @@ def test_help_version_changes_with_source_without_rendering(monkeypatch):
     assert reference.help_version() != original
 
 
-# @pair help:validation
 @pytest.mark.parametrize('source', [
     b'No metadata',
     b'---\ntitle: One\naliases: [two]\n---\nSummary.',
@@ -83,14 +80,12 @@ def test_invalid_topic_sources_fail_validation(monkeypatch, source):
         reference.topics()
 
 
-# @pair help:canonical-source
 @pytest.mark.parametrize('topic_id', ['form_creation', '../prompt', 'create_form.md', 'Create_Form', 'missing', None])
 def test_topic_lookup_rejects_aliases_and_paths(topic_id):
     with pytest.raises(KeyError):
         reference.get_topic(topic_id)
 
 
-# @pair help:rendering
 def test_topic_rendering_preserves_safety_and_links(monkeypatch):
     source = b'---\ntitle: One\n---\nA summary.\n\n## Details\n\n[More](/help/one) and [Installation](/manual/installation)\n\n<script>secret()</script>'
     monkeypatch.setattr(reference, '_sources', lambda: (('one', source),))
@@ -116,7 +111,6 @@ def test_topic_rendering_preserves_safety_and_links(monkeypatch):
     assert 'Details without a heading.' in details and 'One more paragraph.' in details
 
 
-# @pair help:context-permissions
 def test_context_is_separate_and_requires_authenticated_user(monkeypatch):
     monkeypatch.setattr(CONFIG, 'AI_EMAIL_PUBLIC', {'enabled': True, 'addresses': {'ai': 'ai@private.example'}})
     monkeypatch.setattr(CONFIG, 'AI_ENABLED', True)
@@ -177,8 +171,8 @@ class MemoryRedis:
         definition = [b'prefixes', [HELP_PREFIX.encode()] if self.upgraded else [b'page:']]
         attributes = [[b'attribute', b'help_version', b'type', b'TAG']] if self.upgraded else []
         if self.metadata_maps:
-            definition = dict(zip(definition[::2], definition[1::2]))
-            attributes = [dict(zip(row[::2], row[1::2])) for row in attributes]
+            definition = dict(zip(definition[::2], definition[1::2], strict=True))
+            attributes = [dict(zip(row[::2], row[1::2], strict=True)) for row in attributes]
         return {'indexing': 0, 'index_definition': definition, 'attributes': attributes}
 
     def dropindex(self, *, delete_documents=False):
@@ -218,7 +212,6 @@ def memory_cache(monkeypatch):
     return redis
 
 
-# @pair help:index-upgrade
 @pytest.mark.parametrize('metadata_maps', [False, True])
 def test_index_upgrade_preserves_hashes_and_is_serialized(memory_cache, metadata_maps):
     memory_cache.metadata_maps = metadata_maps
@@ -232,7 +225,6 @@ def test_index_upgrade_preserves_hashes_and_is_serialized(memory_cache, metadata
     assert memory_cache.events == before
 
 
-# @pair help:provider-failure
 def test_index_upgrade_does_not_hide_provider_failures(memory_cache):
     memory_cache.index_error = ResponseError('permission denied')
     with pytest.raises(ResponseError, match='permission denied'):
@@ -240,7 +232,6 @@ def test_index_upgrade_does_not_hide_provider_failures(memory_cache):
     assert not memory_cache.events
 
 
-# @matrix help : publication version
 def test_population_is_versioned_atomic_and_skips_warm_start(memory_cache, monkeypatch):
     version = help_cache.ensure_help()
     assert len(memory_cache.hashes) == len(reference.topics()) + 1
@@ -266,7 +257,6 @@ def test_population_is_versioned_atomic_and_skips_warm_start(memory_cache, monke
     assert 'nextversion' in help_cache.help_clause('nextversion')
 
 
-# @matrix help : publication cache-recovery
 def test_failed_population_is_retryable_and_cache_loss_repopulates(memory_cache):
     memory_cache.fail_write = True
     with pytest.raises(ConnectionError):
@@ -281,7 +271,6 @@ def test_failed_population_is_retryable_and_cache_loss_repopulates(memory_cache)
     assert len(memory_cache.hashes) == len(reference.topics())
 
 
-# @pair help:publication
 def test_population_rechecks_readiness_after_lock(memory_cache, monkeypatch):
     key = Keys.HELP_READY.value.format(reference.help_version())
     memory_cache.on_lock = lambda: memory_cache.values.update({key: 'ready'})
@@ -290,10 +279,6 @@ def test_population_rechecks_readiness_after_lock(memory_cache, monkeypatch):
     assert all(event[0] not in {'write', 'ready'} for event in memory_cache.events)
 
 
-# @source lagniappe/core/tools/cache/query.py::search
-# @source lagniappe/core/tools/cache/query.py::_current_search_results
-# @matrix search : permissions pagination stale-row
-# @pair cache:self-repair
 def test_help_search_unions_scope_before_pagination_and_keeps_its_details(monkeypatch):
     captured = []
     topic = reference.get_topic('create_form')
@@ -318,10 +303,6 @@ def test_help_search_unions_scope_before_pagination_and_keeps_its_details(monkey
     assert '@help_version' not in captured[-1]._query_string
 
 
-# @source lagniappe/core/tools/cache/query.py::candidate_search
-# @source lagniappe/core/tools/cache/query.py::exact_name_search
-# @source lagniappe/core/tools/cache/query.py::search
-# @pair search:permissions
 def test_entity_search_and_pickers_exclude_help_even_for_administrators(monkeypatch):
     captured = []
     monkeypatch.setattr(query.cache, 'search', lambda q: captured.append(q._query_string) or SimpleNamespace(docs=[], total=0))
@@ -340,7 +321,6 @@ def test_entity_search_and_pickers_exclude_help_even_for_administrators(monkeypa
     assert 'help' not in ALLOWED_SEARCH_KINDS
 
 
-# @pair help:ai-lookup
 def test_help_tool_is_bounded_source_backed_and_shared(monkeypatch):
     from lagniappe.core.tools.ai import functions
     from lagniappe.core.tools.ai.function_definitions import get_help
@@ -362,7 +342,6 @@ def test_help_tool_is_bounded_source_backed_and_shared(monkeypatch):
     assert 'get_help' in READ_ONLY_CONTEXT_TOOLS and 'get_help' in KNOWN_TOOL_NAMES
 
 
-# @matrix help : validation provider-failure
 def test_help_tool_rejects_invalid_requests_and_reports_search_failure(monkeypatch):
     from lagniappe.core.tools.ai.function_definitions import get_help
     for args in ({}, {'topic_id': 'form_creation'}, {'topic_id': 'tasks', 'query': 'tasks'}, {'query': []}, {'query': ' '}, {'query': 'x' * 501}, {'query': 'email', 'aliases': ['mail']}):

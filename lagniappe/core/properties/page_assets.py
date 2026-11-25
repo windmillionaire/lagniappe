@@ -1,3 +1,10 @@
+from typing import TYPE_CHECKING
+
+from ..definitions.asset import ImageAsset
+if TYPE_CHECKING:
+    from ..definitions.asset import AssetUpload as AssetUpload
+    from ..entities.page import Page as Page
+
 from ..definitions import FieldType, FilterOptions, Ordering
 
 from ..mixins import ColumnMixin, FilterMixin
@@ -5,10 +12,7 @@ from .base_asset import AssetProperty
 from .base_property import UNSET
 
 
-# @testable true
-# @tests tests_unit/test_008_page_properties.py::test_page_image_asset_lifecycle_and_projections
-# @matrix page : asset-lifecycle column filter-value image
-class Image(ColumnMixin, FilterMixin, AssetProperty):
+class Image(ColumnMixin, FilterMixin, AssetProperty["Page", ImageAsset, "AssetUpload | None"]):
     """Entity image. Stored as an image asset.
 
     Set:
@@ -23,12 +27,12 @@ class Image(ColumnMixin, FilterMixin, AssetProperty):
     # Property Attributes
     _id = "image"
     _icon = "image"
-    _kind = "page"
+    _kind: str | None = "page"
     _asset_type = "image"
     _label = "Image"
 
     # Entity Attributes
-    def delete(self):
+    def delete(self) -> None:
         self.entity.delete_asset(self.id)
         self.unset()
         self._asset = UNSET
@@ -39,11 +43,11 @@ class Image(ColumnMixin, FilterMixin, AssetProperty):
     _editable = False
 
     @property
-    def sort_value(self):
+    def sort_value(self) -> bool:
         return self.filter_value
 
     @property
-    def column_value(self):
+    def column_value(self) -> str | None:
         return self.value.url if self.value else None
 
     # Filter Attributes
@@ -53,9 +57,9 @@ class Image(ColumnMixin, FilterMixin, AssetProperty):
     _filter_key = "has_image"
 
     @property
-    def filter_value(self):
-        return True if self.value else False
+    def filter_value(self) -> bool:
+        return bool(self.value)
 
     @property
-    def filter_label(self):
+    def filter_label(self) -> str:
         return "Has Image"

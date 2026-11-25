@@ -1,6 +1,17 @@
 """Claim-through-terminal deferred-job execution."""
 
-from datetime import timedelta
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities import Identifier
+
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    # Dispatch, recovery, and execution are composed by the same service.
+    from .service import DeferredJobService
+
+from datetime import datetime, timedelta
 import uuid
 
 from lagniappe.core import exceptions
@@ -48,19 +59,10 @@ MISSING_INPUT_MESSAGE = (
 )
 
 
-# @testable infrastructure
 class DeferredJobRunner:
 
-    # @testable true
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_checkpoints_before_apply_and_resumes_without_prepare
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_classifies_wrapped_transient_errors_and_schedules_retry
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_waits_for_dependency_without_consuming_provider_retry
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_treats_deleted_active_job_as_cancellation
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_rechecks_ai_access_before_apply
-    # @matrix deferred-jobs : cancellation checkpoint reauthorization recovery retry
-    # @pair deferred-jobs:preparation-context
-    def run(self, job_key, *, now=None):
+    def run(self, job_key: Identifier, *, now: datetime | None = None) -> DeferredJobResult:
+        service = cast("DeferredJobService", self)
         now = _utc(now)
         lease_token = uuid.uuid4().hex
         claim = database_deferred_jobs.claim_deferred_job(
@@ -80,7 +82,7 @@ class DeferredJobRunner:
         job = Entities.fetch_one(job, request=Fetch.direct()) or job
         from lagniappe.core.tools.measurements import link_job
         link_job(job)
-        adapter = self.adapter(job.job_type)
+        adapter = service.adapter(job.job_type)
         if not claim.get("claimed"):
             if claim.get("reason") == "terminal":
                 if job.status in {
@@ -308,8 +310,6 @@ class DeferredJobRunner:
         finally:
             lease_guard.__exit__()
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
     def _complete(self, job, adapter, lease_token, result, *, context=None):
         result = _json_copy(result)
         _validate_payload(
@@ -342,8 +342,6 @@ class DeferredJobRunner:
         return DeferredJobResult(DeferredJobRunState.COMPLETE, job=job)
 
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
     def _claim_provider_retry(self, job, lease_token, context):
         parameters = dict(job.parameters or {})
         if parameters.get("_provider_retry_used"):
@@ -354,7 +352,6 @@ class DeferredJobRunner:
         context.parameters.update(parameters)
         return True
 
-    # @testable infrastructure
     def _context(self, job):
         return DeferredJobContext(
             job=job,
@@ -366,9 +363,8 @@ class DeferredJobRunner:
         )
 
 
-    # @testable infrastructure
     def _heartbeat(self, job, lease_token, phase=None):
-        values = {
+        values: dict[str, object] = {
             "lease_expires": _utc() + timedelta(seconds=DEFERRED_JOB_LEASE_SECONDS),
         }
         if phase:
@@ -376,8 +372,6 @@ class DeferredJobRunner:
         self._persist_claimed(job, lease_token, **values)
 
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
     def _persist_progress(self, job, lease_token, progress):
         self._persist_claimed(
             job,
@@ -387,8 +381,6 @@ class DeferredJobRunner:
         )
 
 
-    # @testable infrastructure
-    # @covered-by lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner.run
     def _checkpoint_stage(
         self,
         job,
@@ -405,7 +397,7 @@ class DeferredJobRunner:
             client=job.client or {},
             checkpoint=checkpoint,
         )
-        values = {
+        values: dict[str, object] = {
             "checkpoint": checkpoint,
             "status_revision": int(getattr(job, "status_revision", 0) or 0) + 1,
         }
@@ -417,10 +409,6 @@ class DeferredJobRunner:
         self._persist_claimed(job, lease_token, **values)
 
 
-    # @testable true
-    # @tests tests_unit/test_023h_deferred_job_control.py::test_blocking_work_renews_only_on_the_heartbeat_cadence
-    # @tests tests_unit/test_023h_deferred_job_control.py::test_claim_loss_stops_checks_and_prevents_heartbeat_renewal
-    # @matrix deferred-jobs : heartbeat lease-loss
     def _renew_claim(self, job, lease_token):
         """Renew without mutating shared entity caches from the guard thread."""
         now = _utc()
@@ -433,11 +421,6 @@ class DeferredJobRunner:
         )
 
 
-    # @testable true
-    # @tests tests_unit/test_023h_deferred_job_control.py::test_blocking_work_renews_only_on_the_heartbeat_cadence
-    # @tests tests_unit/test_023h_deferred_job_control.py::test_claim_loss_stops_checks_and_prevents_heartbeat_renewal
-    # @tests tests_unit/test_023h_deferred_job_control.py::test_activity_lookup_failure_is_an_infrastructure_error
-    # @matrix deferred-jobs : cancellation heartbeat lease-loss read-path
     def _claim_active(self, job, lease_token):
         """Read durable ownership at cancellation boundaries; never renew it."""
         try:
@@ -451,7 +434,6 @@ class DeferredJobRunner:
             ) from error
 
 
-    # @testable infrastructure
     def _persist_claimed(self, job, claim_token, **values):
         for name, value in values.items():
             setattr(job, name, value)
@@ -474,11 +456,9 @@ class DeferredJobRunner:
         )
 
 
-    # @testable true
-    # @tests tests_unit/test_023b_deferred_job_service.py::test_terminal_release_reuses_committed_scheduler_control
-    # @pairs cloud-scheduler:datastore-read-isolation deferred-jobs:terminal-delivery
     def _release(self, job, lease_token):
-        values = {
+        service = cast("DeferredJobService", self)
+        values: dict[str, object] = {
             "lease_token": None,
             "lease_expires": None,
             "next_attempt_at": None,
@@ -488,10 +468,9 @@ class DeferredJobRunner:
             values.update({"dispatch_state": "complete", "deadline_at": None})
         scheduler_control = self._persist_claimed(job, lease_token, **values)
         if terminal:
-            self._sync_reconciler(control=scheduler_control)
+            service._sync_reconciler(control=scheduler_control)
 
 
-    # @testable infrastructure
     def _expire_claim(self, job, lease_token, now):
         if job.status in TERMINAL_STATUSES:
             return
@@ -501,10 +480,8 @@ class DeferredJobRunner:
             return
 
 
-    # @testable true
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_increases_later_quota_backoff_without_adding_attempts
-    # @pair deferred-jobs:retry
     def _schedule_retry(self, job, adapter, context, lease_token, error, now):
+        service = cast("DeferredJobService", self)
         attempt = int(job.attempt or 0)
         delay = _retry_delay(error, _provider_retry_attempt(job))
         scheduled_at = max(_utc(), now)
@@ -526,7 +503,7 @@ class DeferredJobRunner:
             status_revision=int(getattr(job, "status_revision", 0) or 0) + 1,
         )
         try:
-            task_identity = self.dispatch(
+            task_identity = service.dispatch(
                 job,
                 attempt=attempt + 1,
                 delay_seconds=delay,
@@ -561,10 +538,6 @@ class DeferredJobRunner:
         )
 
 
-    # @testable true
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_waits_for_dependency_without_consuming_provider_retry
-    # @matrix deferred-jobs : dependency-wait provider-attempt-isolation retry backoff
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_schedules_report_dependency_checks_with_backoff
     def _schedule_dependency_wait(
         self,
         job,
@@ -574,6 +547,7 @@ class DeferredJobRunner:
         error,
         now,
     ):
+        service = cast("DeferredJobService", self)
         attempt = int(job.attempt or 0)
         scheduled_at = max(_utc(), now)
         parameters = dict(job.parameters or {})
@@ -599,7 +573,7 @@ class DeferredJobRunner:
             status_revision=int(getattr(job, "status_revision", 0) or 0) + 1,
         )
         try:
-            task_identity = self.dispatch(
+            task_identity = service.dispatch(
                 job,
                 attempt=attempt + 1,
                 delay_seconds=delay,
@@ -634,9 +608,6 @@ class DeferredJobRunner:
         )
 
 
-    # @testable true
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_fails_cleanly_when_dependency_failed
-    # @matrix deferred-jobs : dependency-failure no-duplicate-capture terminal
     def _fail(
         self,
         job,
@@ -712,10 +683,6 @@ class DeferredJobRunner:
         )
 
 
-    # @testable true
-    # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_completes_terminal_delivery_when_input_was_deleted
-    # @tests tests_unit/test_023c_deferred_job_runner.py::test_email_ingest_notification_is_created_only_for_failure
-    # @matrix deferred-jobs : failure-only-notification orphaned-input
     def _finish_terminal_delivery(
         self,
         job,
@@ -811,7 +778,6 @@ class DeferredJobRunner:
             self._save_terminal_fields(job, delivery=delivery)
 
 
-    # @testable infrastructure
     def _save_terminal_fields(self, job, **values):
         token = job.lease_token
         if not token:

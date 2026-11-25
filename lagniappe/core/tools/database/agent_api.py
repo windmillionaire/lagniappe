@@ -1,21 +1,30 @@
 """Transactional credentials and Plan-operation claims for the external API."""
 
-from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from __future__ import annotations
+
 import hashlib
 import json
 import re
+from collections.abc import Iterable, Mapping
+from copy import deepcopy
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from google.cloud.datastore import Entity as DatastoreEntity
+from google.cloud.datastore import Key
 
 from lagniappe.core.report_contracts import UPLOAD_BATCH_ID_PATTERN
 
-from .core import DATA
 from . import get as database_get
 from . import notifications as database_notifications
 from . import utility as database_utility
+from .core import DATA
 from .transactions import retry_aborted
 from .utility import create_named_key
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity as DomainEntity
+    from lagniappe.core.entities.user import User
 
 
 EXCLUDED_FIELDS = ("token_digest",)
@@ -35,24 +44,15 @@ _UPLOAD_BATCH_PATTERN = re.compile(UPLOAD_BATCH_ID_PATTERN)
 _PLAN_OPERATION_TOKEN_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::rotate_credential
-# @reason named key construction is exercised through transactional rotation
-def credential_key(identifier):
+def credential_key(identifier: str) -> Key:
     return create_named_key("agent_api_credential", identifier)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/agent_api.py::authenticate_credential
-# @reason raw lookup is owned by the authenticated credential boundary
-def get_credential(identifier):
+def get_credential(identifier: str) -> DatastoreEntity | None:
     return DATA.datastore.get(credential_key(identifier))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason stable claim-key construction is exercised through competing claims
-def plan_operation_claim_key(report_key):
+def plan_operation_claim_key(report_key: Key) -> Key:
     """Return the one serialized external-operation claim beneath a report."""
     return create_named_key(
         "agent_api_plan_operation_claim",
@@ -61,10 +61,7 @@ def plan_operation_claim_key(report_key):
     )
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_upload_file_identity_is_deterministic_per_batch_record
-# @matrix agent-api mcp-upload : deterministic-file-identity retry
-def upload_file_key(report_key, upload_batch_id, file_index):
+def upload_file_key(report_key: Key, upload_batch_id: str, file_index: int) -> Key:
     """Return a stable File key for one server-issued upload batch record."""
     report_identity = database_get.urlsafe_key(report_key)
     if (
@@ -78,14 +75,11 @@ def upload_file_key(report_key, upload_batch_id, file_index):
     ):
         raise ValueError("Invalid external upload file identity")
     digest = hashlib.sha256(
-        f"{report_identity}\0{upload_batch_id}\0{file_index}".encode("utf-8")
+        f"{report_identity}\0{upload_batch_id}\0{file_index}".encode()
     ).hexdigest()
     return create_named_key("file", f"agent-upload-{digest}")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason raw report JSON is validated through public claim outcomes
 def _json_field(row, name, expected_type, default):
     value = row.get(name)
     if value is None:
@@ -97,9 +91,6 @@ def _json_field(row, name, expected_type, default):
     return decoded if isinstance(decoded, expected_type) else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason canonical process-backed status is validated through public claim outcomes
 def _report_process(row):
     process = _json_field(row, "process", dict, {})
     if process is None:
@@ -108,9 +99,6 @@ def _report_process(row):
     return report_process if isinstance(report_process, dict) else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason canonical process-backed status is validated through public claim outcomes
 def _report_status(row):
     report_process = _report_process(row)
     if report_process is None:
@@ -118,9 +106,6 @@ def _report_status(row):
     return report_process.get("status")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason shared report-state validation is exercised through public claim outcomes
 def _report_operation_state(report, phase):
     """Return validated state used to decide one serialized Plan operation."""
     from lagniappe.core.entities.ai_report import REPORT_FORMAT_VERSION
@@ -180,9 +165,6 @@ def _report_operation_state(report, phase):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason durable phase transitions are exercised through competing operation claims
 def _completed_claim_transition(claim, state):
     """Whether a prior owner already committed its report-side transition."""
     phase = claim["phase"]
@@ -200,9 +182,6 @@ def _completed_claim_transition(claim, state):
     return False
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::claim_plan_operation
-# @reason claim validation is exercised through the public transaction
 def _valid_claim(row):
     if row is None:
         return None
@@ -228,18 +207,15 @@ def _valid_claim(row):
     }
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_plan_operation_claim_serializes_competing_workers
-# @matrix agent-api mcp-upload : claim concurrency lease transaction
 @retry_aborted
 def claim_plan_operation(
-    report_key,
+    report_key: Key,
     *,
-    phase,
-    operation_id,
-    claim_token,
-    now=None,
-):
+    phase: str,
+    operation_id: str,
+    claim_token: str,
+    now: datetime | None = None,
+) -> str:
     """Claim one report's create, finalize, or submit transition."""
     if (
         phase not in PLAN_OPERATION_PHASES
@@ -249,7 +225,7 @@ def claim_plan_operation(
         or not _PLAN_OPERATION_TOKEN_PATTERN.fullmatch(claim_token)
     ):
         raise ValueError("Invalid external Plan-operation claim")
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     if not isinstance(now, datetime) or now.tzinfo is None:
         raise ValueError("Plan-operation claim time must be timezone-aware")
 
@@ -305,25 +281,22 @@ def claim_plan_operation(
     return PLAN_OPERATION_CLAIMED
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_plan_operation_claim_serializes_competing_workers
-# @matrix agent-api mcp-upload : fencing lease renewal
 @retry_aborted
 def renew_plan_operation(
-    report_key,
+    report_key: Key,
     *,
-    phase,
-    operation_id,
-    claim_token,
-    now=None,
-):
+    phase: str,
+    operation_id: str,
+    claim_token: str,
+    now: datetime | None = None,
+) -> bool:
     """Renew only the owned Plan-operation claim; reject a replacement owner."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     key = plan_operation_claim_key(report_key)
     with DATA.datastore.transaction() as transaction:
         row = DATA.datastore.get(key, transaction=transaction)
         claim = _valid_claim(row)
-        if not claim or (
+        if row is None or not claim or (
             claim["phase"] != phase
             or claim["operation_id"] != operation_id
             or claim["claim_token"] != claim_token
@@ -334,23 +307,18 @@ def renew_plan_operation(
     return True
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_plan_operation_commit_rejects_a_replacement_owner
-# @tests tests_unit/test_032b_agent_plan_notifications.py::test_publication_notification_commits_with_plan_and_survives_replay
-# @matrix agent-api mcp-upload : atomic-checkpoint cas claim fencing transaction
-# @pairs agent-api:creator-bound agent-api:ready-state notifications:idempotency notifications:ordinary-count
 @retry_aborted
 def commit_plan_operation(
-    report_key,
+    report_key: Key,
     *,
-    phase,
-    operation_id,
-    claim_token,
-    expected_report,
-    writes,
-    notification_user=None,
-    now=None,
-):
+    phase: str,
+    operation_id: str,
+    claim_token: str,
+    expected_report: Mapping[str, object],
+    writes: Iterable[tuple[DomainEntity | DatastoreEntity, Iterable[str] | None]],
+    notification_user: User | None = None,
+    now: datetime | None = None,
+) -> str:
     """Commit prepared entity writes only while the exact claim is still owned.
 
     Reading the claim and report and writing every checkpoint in the same
@@ -367,7 +335,7 @@ def commit_plan_operation(
         or not isinstance(expected_report, dict)
     ):
         raise ValueError("Invalid external Plan-operation commit")
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     if not isinstance(now, datetime) or now.tzinfo is None:
         raise ValueError("Plan-operation commit time must be timezone-aware")
 
@@ -378,6 +346,7 @@ def commit_plan_operation(
         key = getattr(row, "key", None)
         if key is None:
             continue
+        row = database_utility.stored_row(entity)
         mask = None if property_mask is None else tuple(property_mask)
         prepared.append((entity, row, mask))
         if key == report_key:
@@ -421,14 +390,14 @@ def commit_plan_operation(
 
         row = DATA.datastore.get(key, transaction=transaction)
         claim = _valid_claim(row)
-        if not claim or (
+        if row is None or not claim or (
             claim["phase"] != phase
             or claim["operation_id"] != operation_id
             or claim["claim_token"] != claim_token
         ):
             return PLAN_OPERATION_LOST
 
-        if notification is not None:
+        if notification is not None and notification_user is not None:
             existing = DATA.datastore.get(notification.key, transaction=transaction)
             if existing is None:
                 database_notifications.mutate_notification_aggregate(
@@ -449,9 +418,6 @@ def commit_plan_operation(
     return PLAN_OPERATION_COMMITTED
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/agent_api.py::commit_plan_operation
-# @reason the fenced publication tests cover recipient, state, and durable replay identity
 def _prepare_publication_notification(report, user):
     """Prepare the first publication alert; its manifest marker outlives dismissal."""
     from lagniappe.core.entities.ai_report import REPORT_FORMAT_VERSION
@@ -479,19 +445,16 @@ def _prepare_publication_notification(report, user):
     }
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_idle_plan_mutation_fences_api_claims_and_stale_browser_snapshots
-# @matrix agent-api ai-report : browser-review cas claim fencing transaction
 @retry_aborted
 def commit_plan_mutation_if_idle(
-    report_key,
+    report_key: Key,
     *,
-    expected_report,
-    writes=(),
-    deletes=(),
-    now=None,
-    active_job=None,
-):
+    expected_report: Mapping[str, object],
+    writes: Iterable[tuple[DomainEntity | DatastoreEntity, Iterable[str] | None]] = (),
+    deletes: Iterable[DomainEntity | DatastoreEntity] = (),
+    now: datetime | None = None,
+    active_job: tuple[Key, str] | None = None,
+) -> str:
     """Commit one browser mutation only when no API operation owns the Plan.
 
     The claim key is deleted in the same transaction even when it is absent or
@@ -501,7 +464,7 @@ def commit_plan_mutation_if_idle(
     """
     if not isinstance(expected_report, dict):
         raise ValueError("Invalid idle Plan mutation snapshot")
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     if not isinstance(now, datetime) or now.tzinfo is None:
         raise ValueError("Idle Plan mutation time must be timezone-aware")
 
@@ -581,23 +544,20 @@ def commit_plan_mutation_if_idle(
     return PLAN_OPERATION_COMMITTED
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_plan_operation_claim_serializes_competing_workers
-# @matrix agent-api mcp-upload : claim cleanup ownership
 @retry_aborted
 def release_plan_operation(
-    report_key,
+    report_key: Key,
     *,
-    phase,
-    operation_id,
-    claim_token,
-):
+    phase: str,
+    operation_id: str,
+    claim_token: str,
+) -> bool:
     """Delete a Plan-operation claim only for its exact current owner."""
     key = plan_operation_claim_key(report_key)
     with DATA.datastore.transaction() as transaction:
         row = DATA.datastore.get(key, transaction=transaction)
         claim = _valid_claim(row)
-        if not claim or (
+        if row is None or not claim or (
             claim["phase"] != phase
             or claim["operation_id"] != operation_id
             or claim["claim_token"] != claim_token
@@ -607,19 +567,16 @@ def release_plan_operation(
     return True
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_credential_rotation_and_revocation_are_transactional
-# @matrix agent-api : credential persistence revoke rotate
 @retry_aborted
 def rotate_credential(
-    identifier,
-    user_key,
+    identifier: str,
+    user_key: Key,
     *,
-    token_digest,
-    display_prefix,
-    issued_at,
-    expires_at,
-):
+    token_digest: str,
+    display_prefix: str,
+    issued_at: datetime,
+    expires_at: datetime,
+) -> DatastoreEntity:
     """Replace the user's sole credential and return its public metadata."""
     key = credential_key(identifier)
     with DATA.datastore.transaction() as transaction:
@@ -642,11 +599,10 @@ def rotate_credential(
     return row
 
 
-# @testable true
-# @tests tests_unit/test_032_agent_api.py::test_credential_rotation_and_revocation_are_transactional
-# @matrix agent-api : credential persistence revoke rotate
 @retry_aborted
-def revoke_credential(identifier, user_key, *, revoked_at):
+def revoke_credential(
+    identifier: str, user_key: Key, *, revoked_at: datetime
+) -> DatastoreEntity | None:
     """Invalidate the user's credential without deleting its audit metadata."""
     key = credential_key(identifier)
     with DATA.datastore.transaction() as transaction:

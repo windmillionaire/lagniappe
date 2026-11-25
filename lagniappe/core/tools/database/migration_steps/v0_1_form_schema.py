@@ -1,22 +1,25 @@
 """Version 0.1 canonical form-schema migration."""
 
 import json
+from collections.abc import MutableMapping
 
 from config.form_schema import (
     SCHEMA_FORMAT_VERSION,
     SchemaValidationError,
+)
+from config.form_schema import (
     normalize_form_schema as canonicalize_schema,
 )
 
 from .base import MigrationDataError
 
 
-# @testable true
-# @tests tests_unit/test_018b_database_migrations.py::test_form_schema_transform_is_idempotent_and_preserves_history_membership
-# @tests tests_unit/test_018b_database_migrations.py::test_form_schema_transform_repairs_invalid_legacy_fields
-# @tests tests_unit/test_018b_database_migrations.py::test_form_schema_transform_rejects_unreadable_rows_without_mutation
-# @matrix form-schema : canonicalization copy-on-write history-snapshot idempotence legacy-repair malformed-data
-def canonicalize_form_schema_record(entity, *, snapshot=False, repairs=None):
+def canonicalize_form_schema_record(
+    entity: MutableMapping[str, object],
+    *,
+    snapshot: bool = False,
+    repairs: list[str] | None = None,
+) -> bool:
     """Canonicalize one raw form or form-history row, repairing legacy fields."""
 
     raw_schema = entity.get("schema")
@@ -32,16 +35,19 @@ def canonicalize_form_schema_record(entity, *, snapshot=False, repairs=None):
     else:
         raise MigrationDataError("schema must be a JSON list")
 
+    form_type = entity.get("form_type")
+    if form_type is not None and not isinstance(form_type, str):
+        raise MigrationDataError("form_type must be a string")
     try:
         canonical = canonicalize_schema(
             parsed,
-            form_type=entity.get("form_type"),
+            form_type=form_type,
             snapshot=snapshot,
         )
     except SchemaValidationError as error:
         canonical = canonicalize_schema(
             parsed,
-            form_type=entity.get("form_type"),
+            form_type=form_type,
             snapshot=snapshot,
             discard_invalid=True,
         )

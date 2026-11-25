@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections.abc import Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, TypedDict
+
+
+from datetime import datetime, UTC
 import hashlib
 import json
 import posixpath
@@ -14,23 +18,45 @@ from .provider import BACKUP_ROOT_PREFIX, DataLifecycleError
 from .staging import _namespaces, _physical_kinds, _query_pages
 
 
+if TYPE_CHECKING:
+    from google.cloud.datastore import Client
+    from google.cloud.storage import Bucket
+    from .provider import ProviderContext
+
+class Asset(TypedDict):
+    role: str
+    path: str
+    generation: str
+    owners: list[dict[str, str]]
+
+class CapturedAsset(Asset):
+    size: int
+    sha256: str
+    recovery_object: str
+    recovery_generation: str
+
+class Inventory(TypedDict):
+    snapshot_time: str
+    entity_count: int
+    entities: list[dict[str, str | None]]
+
+class CatalogDescriptor(TypedDict):
+    uri: str
+    sha256: str
+    bytes: bytes
+
+
 COPY_CHUNK_BYTES = 8 * 1024 * 1024
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/recovery_set.py::inventory_database
-# @reason timestamp canonicalization is exercised by exact inventory generation
 def _timestamp(value):
     if not isinstance(value, datetime):
         return None
     if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/recovery_set.py::inventory_database
-# @reason named scratch keys are canonicalized during public inventory generation
 def _canonical_key(key, source_database_id):
     if source_database_id == "(default)":
         return key
@@ -43,9 +69,6 @@ def _canonical_key(key, source_database_id):
     )
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/recovery_set.py::inventory_database
-# @reason reference canonicalization is part of the entity inventory digest
 def _key_reference(key, source_database_id="(default)"):
     key = _canonical_key(key, source_database_id)
     return PortableReference(
@@ -55,9 +78,6 @@ def _key_reference(key, source_database_id="(default)"):
     )
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/recovery_set.py::inventory_database
-# @reason canonical entity hashing is validated through deterministic inventories
 def _entity_digest(entity, source_database_id):
     codec = ValueCodec(
         reference_resolver=lambda key: _key_reference(key, source_database_id)
@@ -73,9 +93,6 @@ def _entity_digest(entity, source_database_id):
     return hashlib.sha256(canonical_json(payload)).hexdigest()
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/recovery_set.py::inventory_database
-# @reason descriptor extraction and validation are inventory responsibilities
 def _asset_definitions(entity, source_database_id):
     canonical_owner = encode_urlsafe_key(
         _canonical_key(entity.key, source_database_id)
@@ -131,23 +148,19 @@ def _asset_definitions(entity, source_database_id):
     return definitions
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_inventory_uses_one_read_time_and_requires_asset_generations
-# @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_inventory_includes_uploaded_file_asset_generations
-# @matrix data-lifecycle disaster-recovery file : asset-generation inventory point-in-time uploaded-file
 def inventory_database(
-    client,
+    client: Client,
     *,
-    snapshot_time,
-    page_size=250,
-    source_database_id="(default)",
-    point_in_time_read=True,
-):
+    snapshot_time: datetime,
+    page_size: int = 250,
+    source_database_id: str = "(default)",
+    point_in_time_read: bool = True,
+) -> tuple[Inventory, list[Asset]]:
     """Read every namespace/kind at one PITR timestamp."""
     if not isinstance(snapshot_time, datetime) or snapshot_time.tzinfo is None:
         raise DataLifecycleError("Recovery inventory requires a timezone-aware read time.")
-    entities = []
-    assets = {}
+    entities: list[dict[str, str | None]] = []
+    assets: dict[tuple[str, str, str], Asset] = {}
     read_time = snapshot_time if point_in_time_read else None
     for namespace in _namespaces(client, read_time=read_time):
         for kind in _physical_kinds(client, namespace, read_time=read_time):
@@ -197,21 +210,18 @@ def inventory_database(
                                 "generation": definition["generation"],
                                 "owners": [{"key": key, "name": definition["name"]}],
                             }
-    entities.sort(key=lambda item: item["key"])
+    entities.sort(key=lambda item: item["key"] or "")
     captured_assets = sorted(
         assets.values(),
         key=lambda item: (item["role"], item["path"], item["generation"]),
     )
     return {
-        "snapshot_time": _timestamp(snapshot_time),
+        "snapshot_time": snapshot_time.astimezone(UTC).isoformat().replace("+00:00", "Z"),
         "entity_count": len(entities),
         "entities": entities,
     }, captured_assets
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/recovery_set.py::capture_assets
-# @reason bounded generation-matched hashing is exercised by immutable asset capture
 def _blob_sha256(blob, size):
     digest = hashlib.sha256()
     offset = 0
@@ -230,19 +240,16 @@ def _blob_sha256(blob, size):
     return digest.hexdigest()
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_capture_recovery_assets_copies_exact_generation_create_only
-# @matrix data-lifecycle storage : asset-generation checksum immutable-copy
 def capture_assets(
-    context,
-    backup_id,
-    assets,
-    runtime_buckets,
+    context: ProviderContext,
+    backup_id: str,
+    assets: Sequence[Asset],
+    runtime_buckets: Mapping[str, Bucket],
     *,
-    progress=None,
-):
+    progress: Callable[[int, int], None] | None = None,
+) -> list[CapturedAsset]:
     """Copy exact referenced generations into the recovery-set prefix."""
-    captured = []
+    captured: list[CapturedAsset] = []
     total = len(assets)
     for current, asset in enumerate(assets, 1):
         if progress is not None:
@@ -308,17 +315,11 @@ def capture_assets(
     return captured
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason canonical catalog bytes are owned by immutable backup publication
-def catalog_bytes(payload):
+def catalog_bytes(payload: object) -> bytes:
     return canonical_json(payload)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/backup.py::create_backup
-# @reason catalog checksum descriptors are owned by immutable backup publication
-def catalog_descriptor(uri, payload):
+def catalog_descriptor(uri: str, payload: object) -> CatalogDescriptor:
     encoded = catalog_bytes(payload)
     return {
         "uri": uri,

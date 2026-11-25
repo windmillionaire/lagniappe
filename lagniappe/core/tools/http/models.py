@@ -12,10 +12,7 @@ _HTTP_METHOD = re.compile(r"^[A-Z][A-Z0-9!#$%&'*+.^_`|~-]*$")
 _TRANSIENT_RETRY_STATUSES = frozenset({408, 425, 429, 500, 502, 503, 504})
 
 
-# @testable true
-# @tests tests_unit/test_032_outbound_http.py::test_outbound_result_repr_and_diagnostic_never_expose_url_or_body
-# @matrix outbound-http : privacy typed-outcome
-class OutboundStatus(str, Enum):
+class OutboundStatus(str, Enum):  # noqa: UP042 -- preserve qualified enum string representations.
     """Privacy-safe outcomes shared by outbound HTTP callers."""
 
     OK = "ok"
@@ -26,9 +23,6 @@ class OutboundStatus(str, Enum):
     WRONG_TYPE = "wrong_type"
 
 
-# @testable true
-# @tests tests_unit/test_032_outbound_http.py::test_outbound_result_repr_and_diagnostic_never_expose_url_or_body
-# @matrix outbound-http : immutable privacy typed-outcome
 @dataclass(frozen=True)
 class OutboundResult:
     """Bounded response data without transport exception text.
@@ -51,9 +45,6 @@ class OutboundResult:
         return self.status is OutboundStatus.OK
 
 
-# @testable true
-# @tests tests_unit/test_032_outbound_http.py::test_user_policy_rejects_invalid_configuration
-# @matrix outbound-http : user-policy validation
 @dataclass(frozen=True)
 class UserFetchPolicy:
     """Limits for one class of user-directed GET request."""
@@ -85,9 +76,6 @@ class UserFetchPolicy:
             raise ValueError("Invalid user fetch policy")
 
 
-# @testable true
-# @tests tests_unit/test_032_outbound_http.py::test_trusted_policy_requires_explicit_retry_contract
-# @matrix outbound-http : retry trusted-policy validation
 @dataclass(frozen=True)
 class TrustedProviderPolicy:
     """Fixed-origin limits for a provider adapter."""
@@ -207,9 +195,6 @@ PLACES_DETAILS_POLICY = TrustedProviderPolicy(
 )
 
 
-# @testable true
-# @tests tests_unit/test_032_outbound_http.py::test_outbound_result_repr_and_diagnostic_never_expose_url_or_body
-# @matrix outbound-http : diagnostics privacy url-structure
 def outbound_diagnostic(result: OutboundResult) -> dict[str, object]:
     """Return a bounded diagnostic projection without URL values or content."""
     diagnostic: dict[str, object] = {

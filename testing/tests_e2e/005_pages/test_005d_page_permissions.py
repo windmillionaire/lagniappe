@@ -14,7 +14,6 @@ from testing.utility.network import manual_mutation_headers
 pytestmark = pytest.mark.e2e
 
 
-# @pair pages:permission-gates
 def test_page_is_forbidden_without_model_or_page_permission(
     get_admin, get_user, browser_failures
 ):
@@ -27,7 +26,6 @@ def test_page_is_forbidden_without_model_or_page_permission(
         expect(blocked.page).to_have_title("Error 403")
 
 
-# @matrix pages : load permission-gates readonly tabs
 # @template pages/info.html::info_form
 def test_page_viewer_reads_page_without_page_editing_affordances(get_admin, get_user):
     owner = get_admin()
@@ -38,8 +36,8 @@ def test_page_viewer_reads_page_without_page_editing_affordances(get_admin, get_
 
     tabs = Tabs(viewer)
     expect(tabs.info).to_be_visible()
-    expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).to_be_visible()
-    expect(viewer.locate(Tabs.DOCUMENT_TAB)).to_be_attached()
+    expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).not_to_be_attached()
+    expect(viewer.locate(Tabs.DOCUMENT_TAB)).not_to_be_attached()
     expect(tabs.tasks).to_be_visible()
 
     expect(viewer.locate(Page.CREATE_TASK_TOGGLE)).not_to_be_attached()
@@ -59,7 +57,6 @@ def test_page_viewer_reads_page_without_page_editing_affordances(get_admin, get_
     expect(info_form.locator("[data-role='autofill']")).not_to_be_attached()
 
 
-# @matrix pages : document-tab readonly
 # @template pages/page.html::main
 def test_page_viewer_can_read_document_content(get_admin, get_user):
     owner = get_admin()
@@ -78,7 +75,6 @@ def test_page_viewer_can_read_document_content(get_admin, get_user):
     expect(document).to_contain_text(marker)
 
 
-# @matrix files : async-load empty-state permission-gates readonly
 # @template pages/files.html::file_list
 def test_page_viewer_sees_empty_files_tab_without_upload_affordances(get_admin, get_user):
     owner = get_admin()
@@ -98,13 +94,12 @@ def test_page_viewer_sees_empty_files_tab_without_upload_affordances(get_admin, 
     expect(files.locator(Page.UPLOAD_FILE_FORM)).not_to_be_attached()
 
 
-# @matrix pages : permission-gates permissions-panel
 @pytest.mark.e2e_group("owner")
 def test_owner_can_open_page_permissions_panel(get_user):
     owner = get_user(Users.OWNER)
     owner.go(Pages.test_create_page)
 
-    Tabs(owner).info
+    _ = Tabs(owner).info
     permissions_toggle = owner.locate(Page.PAGE_PERMISSIONS_TOGGLE)
     expect(permissions_toggle).to_be_visible()
     permissions_toggle.click()
@@ -115,7 +110,6 @@ def test_owner_can_open_page_permissions_panel(get_user):
     expect(permissions.get_by_role("button", name="Save Restrictions")).to_be_visible()
 
 
-# @pair pages:submitted-reference
 def test_page_submission_rejects_hidden_internal_link_target(get_admin, get_user):
     """A forged internal-link ID must not bypass the picker's visibility filter."""
     owner = get_admin()

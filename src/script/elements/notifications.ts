@@ -1,0 +1,346 @@
+import { STYLES } from "../generated/styles.mjs";
+import { createIcon } from "../shared/icons.ts";
+import { ENDPOINTS, request } from "../shared/index.ts";
+import { renderNotificationBadge } from "../shared/notificationState.ts";
+import { withTransition } from "../shared/transitions.ts";
+import type { NotificationState } from "../types/api.d.ts";
+import type { ComboboxOptionElement } from "./combobox/combobox.ts";
+import { Dropdown, type DropdownItem } from "./combobox/dropdown.ts";
+import type { ComposerView } from "./messageComposer.ts";
+
+const CLEAR_ALL_KEY = "__clear_all_notifications__";
+
+interface NotificationOption extends DropdownItem {
+	key: string | null;
+	action?: string | null;
+	cursor?: string | null;
+}
+
+type NotificationView = ComposerView & { online?: boolean };
+
+function clickTarget(event: MouseEvent | null) {
+	const target = event?.target;
+	return target && "closest" in target && typeof target.closest === "function"
+		? (target as Pick<Element, "closest">)
+		: null;
+}
+
+export class Notifications {
+	declare view: NotificationView;
+	declare dropdown: Dropdown | null;
+	declare button: HTMLElement | null;
+	declare count: HTMLElement | null;
+	declare notifications: NotificationOption[];
+	declare loaded: boolean;
+	declare stale: boolean;
+	declare menuOpen: boolean;
+	declare state: NotificationState | null;
+	declare localMutation: boolean;
+
+	constructor(view: NotificationView) {
+		this.view = view;
+		this.dropdown = null;
+		this.button = document.querySelector("[data-role='notifications']");
+		this.count = document.querySelector("[data-role='notification-count']");
+		this.notifications = [];
+		this.loaded = false;
+		this.stale = false;
+		this.menuOpen = false;
+		this.state = null;
+		this.localMutation = false;
+
+		this._selectNotification = this._selectNotification.bind(this);
+		this._clearNotifications = this._clearNotifications.bind(this);
+		this._closeOnNotificationClick = this._closeOnNotificationClick.bind(this);
+		this._notificationState = this._notificationState.bind(this);
+	}
+
+	get visible() {
+		return this.button?.dataset.visible === "true";
+	}
+
+	set visible(value: boolean) {
+		if (!this.button) return;
+		const visible = Boolean(value);
+		this.button.dataset.visible = visible ? "true" : "false";
+		this.button.setAttribute("aria-hidden", visible ? "false" : "true");
+		this.button.tabIndex = visible ? 0 : -1;
+	}
+
+	init(notifications: NotificationOption[] = []) {
+		if (!this.button) return;
+
+		this.notifications = this.notifications.concat(notifications);
+		this.loaded = notifications.length > 0;
+		this.state = window.__NOTIFICATION_STATE__ || null;
+		this.dropdown = new Dropdown(this.button).init({
+			items: [],
+			loadOptions: async () => {
+				await this._ensureLoaded();
+				return this._dropdownItems();
+			},
+			onShow: () => {
+				this.menuOpen = true;
+			},
+			onHide: () => {
+				this.menuOpen = false;
+			},
+			placement: "bottom-end",
+			styles: {
+				panel: `${STYLES.dropdown.panel} mt-2 w-80 max-w-[calc(100vw-1rem)] sm:w-96`,
+			},
+		});
+		this._updateCount();
+		window.addEventListener("notification-state", this._notificationState);
+	}
+
+	async _notificationState(event: CustomEvent<NotificationState>) {
+		const next = event?.detail;
+		if (!next || next.miss) return;
+		const changed = Boolean(
+			this.state &&
+				(this.state.generation !== next.generation ||
+					this.state.revision !== next.revision),
+		);
+		this.state = { ...next };
+		if (changed && this.loaded && !this.localMutation) this.stale = true;
+		this._updateCount();
+		if (this.stale && this.menuOpen) await this.refresh();
+	}
+
+	async _ensureLoaded() {
+		if (this.loaded && !this.stale) return true;
+		return await this.refresh();
+	}
+
+	upsertNotification(html: string) {
+		if (!this.dropdown || !html) return;
+		if (!this.loaded) {
+			this.stale = true;
+			return;
+		}
+
+		const option = this._notificationOption(html);
+		const index = option.key
+			? this.notifications.findIndex((item) => item.key === option.key)
+			: -1;
+
+		if (index >= 0) {
+			this.notifications.splice(index, 1, option);
+		} else {
+			this.notifications.splice(0, 0, option);
+		}
+		this._updateDropdown();
+	}
+
+	async refresh() {
+		if (!this.dropdown) return false;
+		// A click during recovery belongs to the pending health cycle, not its
+		// previous offline snapshot. Do not require a second click to load.
+		if (!this.view.online) await window.__CONNECTIVITY_READY__;
+		if (!this.dropdown || !this.view.online) return false;
+
+		const response = await request.get(ENDPOINTS.notifications);
+		if (!response?.ok || !response.html) return false;
+
+		this.notifications = this._optionsFromHtml(response.html);
+		this.loaded = true;
+		this.stale = false;
+		this._updateDropdown();
+		return true;
+	}
+
+	_optionsFromHtml(html: ParentNode) {
+		return Array.from(
+			html.querySelectorAll<HTMLElement>("[role='option']"),
+		).map((option) => {
+			return this._notificationOption(option.outerHTML, option.dataset.key);
+		});
+	}
+
+	_notificationOption(
+		html: string,
+		key: string | null = null,
+	): NotificationOption {
+		const element = this._htmlOption(html);
+		return {
+			key: key || element?.dataset.key || null,
+			action: element?.dataset.action || null,
+			cursor: element?.dataset.cursor || null,
+			html: element?.outerHTML || html,
+			onClick: this._selectNotification,
+			closeOnClick: this._closeOnNotificationClick,
+		};
+	}
+
+	_dropdownItems() {
+		if (!this.notifications.length) return [];
+		const messageUser = this.notifications.find(
+			(item) => item.action === "message-user",
+		);
+		const messageAggregate = this.notifications.find(
+			(item) => item.action === "open-messages",
+		);
+		const leading = [messageUser, messageAggregate].filter(
+			(item) => item !== undefined,
+		);
+		const remaining = this.notifications.filter(
+			(item) => !leading.includes(item),
+		);
+		const hasOrdinary = this.notifications.some(
+			(item) => item.key && !item.key.startsWith("__"),
+		);
+		if (!hasOrdinary) return [...leading, ...remaining];
+		return [...leading, this._clearAllOption(), ...remaining];
+	}
+
+	_clearAllOption(): NotificationOption {
+		return {
+			key: CLEAR_ALL_KEY,
+			html: `
+				<button role="option"
+					type="button"
+					data-action="clear-notifications"
+					class="${STYLES.dropdown.option.action} border-y border-base-light !rounded-none bg-base-bg text-delete-default">
+					${createIcon("trash.inactive", STYLES.dropdown.icon).outerHTML}
+					<span>Clear all notifications</span>
+				</button>
+			`,
+			onClick: this._clearNotifications,
+			closeOnClick: false,
+		};
+	}
+
+	_htmlOption(html: string) {
+		const template = document.createElement("template");
+		template.innerHTML = String(html || "").trim();
+		return template.content.querySelector<HTMLElement>("[role='option']");
+	}
+
+	async _selectNotification(
+		option: ComboboxOptionElement,
+		event: MouseEvent | null,
+	) {
+		const target = clickTarget(event);
+		const action = option?.dataset?.action;
+		if (action === "message-user") {
+			event?.preventDefault();
+			const { ensureMessageComposer } = await import("./messageComposer.ts");
+			ensureMessageComposer(this.view).open();
+			return;
+		}
+		if (action === "load-notifications") {
+			event?.preventDefault();
+			await this._loadOlder(option.dataset.cursor);
+			return;
+		}
+		const deleteButton = target?.closest<HTMLElement>(
+			"[data-action='delete-notification']",
+		);
+		if (deleteButton) {
+			event?.preventDefault();
+			event?.stopPropagation();
+			await this._deleteNotification(deleteButton.dataset.key);
+			return;
+		}
+
+		const link =
+			target?.closest<HTMLAnchorElement>("a[href]") ||
+			option.querySelector<HTMLAnchorElement>("a[href]");
+		if (link) window.location.href = link.href;
+	}
+
+	_closeOnNotificationClick(
+		_option: ComboboxOptionElement,
+		event: MouseEvent | null,
+	) {
+		return !clickTarget(event)?.closest("[data-action='delete-notification']");
+	}
+
+	async _clearNotifications() {
+		if (
+			!this.notifications.some((item) => item.key && !item.key.startsWith("__"))
+		)
+			return;
+
+		this.localMutation = true;
+		const response = await request
+			.delete(ENDPOINTS.notifications)
+			.finally(() => {
+				this.localMutation = false;
+			});
+		if (!response?.ok) return;
+
+		await this.refresh();
+	}
+
+	async _loadOlder(cursor?: string) {
+		if (!cursor || !this.view.online) return;
+		const response = await request.get(ENDPOINTS.notifications, { cursor });
+		if (!response?.ok || !response.html) return;
+		const loaded = this._optionsFromHtml(response.html);
+		const older = loaded.filter(
+			(item) => item.key && !item.key.startsWith("__"),
+		);
+		const next = loaded.find((item) => item.action === "load-notifications");
+		const existing = this.notifications.filter(
+			(item) => item.action !== "load-notifications",
+		);
+		const keys = new Set(existing.map((item) => item.key));
+		for (const item of older) {
+			if (!keys.has(item.key)) existing.push(item);
+		}
+		if (next) existing.push(next);
+		this.notifications = existing;
+		this._updateDropdown();
+	}
+
+	async _deleteNotification(key?: string) {
+		if (!key) return;
+
+		this.localMutation = true;
+		const response = await request
+			.delete(ENDPOINTS.activity(key))
+			.finally(() => {
+				this.localMutation = false;
+			});
+		if (!response?.ok) return;
+
+		this.notifications = this.notifications.filter((item) => item.key !== key);
+		this.stale = false;
+		this._updateDropdown();
+	}
+
+	_updateDropdown() {
+		const { dropdown } = this;
+		if (!dropdown) return;
+
+		const items = this._dropdownItems();
+		this._updateCount();
+		if (!this.menuOpen) {
+			dropdown.items = items;
+			return;
+		}
+		void withTransition(() => dropdown.updateOptions(items), {
+			label: "notifications:update-open-menu",
+		});
+	}
+
+	_updateCount() {
+		const projected = Number(this.state?.count);
+		const count = Number.isInteger(projected)
+			? projected
+			: this.loaded
+				? this.notifications.filter(
+						(item) => item.key && !item.key.startsWith("__"),
+					).length
+				: 0;
+		renderNotificationBadge(count);
+	}
+
+	destroy() {
+		window.removeEventListener("notification-state", this._notificationState);
+		this.dropdown?.destroy?.();
+		this.dropdown = null;
+	}
+}

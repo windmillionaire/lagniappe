@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 from playwright.sync_api import expect
 
@@ -63,9 +62,9 @@ class UploadDefinition:
 
     file: TestFile
     upload_type: UploadType
-    display_name: Optional[str] = None
-    processing: Optional[ProcessingOptions] = None
-    method: Optional[UploadMethod] = None
-    filename: Optional[str] = None
-    rows: Optional[int] = None
-    columns: Optional[int] = None
+    display_name: str | None = None
+    processing: ProcessingOptions | None = None
+    method: UploadMethod | None = None
+    filename: str | None = None
+    rows: int | None = None
+    columns: int | None = None

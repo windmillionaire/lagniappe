@@ -13,7 +13,6 @@ def _find_page_module():
     return importlib.import_module("lagniappe.core.tools.files.find_page")
 
 
-# @matrix ingress link : page-match
 def test_find_page_exact_name_match(monkeypatch):
     find_page = _find_page_module()
     calls = []
@@ -33,7 +32,6 @@ def test_find_page_exact_name_match(monkeypatch):
     assert calls == [("Target Page", "page", Restriction.UNRESTRICTED, Restriction.BELONGS_TO_ALL)]
 
 
-# @matrix ingress link : no-match page-match
 def test_find_page_no_match_returns_error(monkeypatch):
     find_page = _find_page_module()
     monkeypatch.setattr(find_page.cache, "kind_search", lambda *args: [])
@@ -44,7 +42,6 @@ def test_find_page_no_match_returns_error(monkeypatch):
     assert all(text in result["errors"][0] for text in ("No page", "Related", "Missing Page"))
 
 
-# @matrix ingress link : fuzzy-match page-match weak-match
 def test_find_page_fuzzy_weak_match_returns_warning(monkeypatch):
     find_page = _find_page_module()
     monkeypatch.setattr(
@@ -65,7 +62,6 @@ def test_find_page_fuzzy_weak_match_returns_warning(monkeypatch):
     assert all(text in result["warnings"][0] for text in ("Weak match", "Name", "Target Page"))
 
 
-# @matrix ingress link : fuzzy-match no-match page-match
 def test_find_page_fuzzy_low_confidence_returns_error(monkeypatch):
     find_page = _find_page_module()
     monkeypatch.setattr(

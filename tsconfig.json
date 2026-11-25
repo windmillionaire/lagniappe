@@ -1,0 +1,18 @@
+{
+	"compilerOptions": {
+		"allowImportingTsExtensions": true,
+		"allowJs": true,
+		"checkJs": false,
+		"erasableSyntaxOnly": true,
+		"lib": ["ES2024", "DOM", "DOM.Iterable"],
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"noEmit": true,
+		"skipLibCheck": true,
+		"strict": true,
+		"target": "ES2024",
+		"types": []
+	},
+	"include": ["src/script/**/*.ts", "src/script/**/*.mts"],
+	"exclude": ["testing/"]
+}

@@ -55,7 +55,6 @@ def _submission_page(schema_name, name="Submission behavior"):
     return entity
 
 
-# @matrix submission : db-value empty-field
 @pytest.mark.unit
 def test_submission_db_value_omits_unset_number_field(get_test_entities, get_schema):
     """``SubmissionProperty.db_value`` drops keys whose ``db_value`` is ``None``."""
@@ -65,7 +64,6 @@ def test_submission_db_value_omits_unset_number_field(get_test_entities, get_sch
         assert entity.properties.submission.db_value == {"num_a": 1.0}
 
 
-# @matrix checkbox submission : missing-field projection unset
 @pytest.mark.unit
 def test_missing_stored_checkbox_is_unset_and_omitted(get_schema):
     entity = _submission_page("checkbox_only", "Missing checkbox")
@@ -81,7 +79,6 @@ def test_missing_stored_checkbox_is_unset_and_omitted(get_schema):
     assert entity.properties.submission.db_value == {}
 
 
-# @matrix checkbox submission : explicit-false form-submit
 @pytest.mark.unit
 def test_full_form_submit_missing_checkbox_persists_explicit_false(get_schema):
     entity = _submission_page("checkbox_only", "Unchecked checkbox")
@@ -97,7 +94,6 @@ def test_full_form_submit_missing_checkbox_persists_explicit_false(get_schema):
     assert field.db_value is False
 
 
-# @matrix checkbox submission : load-save stored-false
 @pytest.mark.unit
 def test_stored_explicit_checkbox_false_survives_load_save(get_schema):
     entity = _submission_page("checkbox_only", "Stored false checkbox")
@@ -113,7 +109,6 @@ def test_stored_explicit_checkbox_false_survives_load_save(get_schema):
     assert json.loads(entity.db["submission"]) == {"checkbox-ab12": False}
 
 
-# @matrix checkbox submission : normalization stored-null
 @pytest.mark.unit
 def test_stored_null_checkbox_normalizes_away_on_resave(get_schema):
     entity = _submission_page("checkbox_only", "Null checkbox")
@@ -130,7 +125,6 @@ def test_stored_null_checkbox_normalizes_away_on_resave(get_schema):
     assert "submission" not in entity.db
 
 
-# @matrix submission : blank-persistence empty-submission
 @pytest.mark.unit
 def test_empty_submission_pops_submission_db_key(get_schema):
     entity = _submission_page("text_input_only", "Empty submission")
@@ -142,7 +136,6 @@ def test_empty_submission_pops_submission_db_key(get_schema):
     assert "submission" not in entity.db
 
 
-# @matrix html-field submission : asset-isolation submit-boundary
 @pytest.mark.unit
 def test_html_field_is_ignored_by_form_submission(get_schema):
     entity = _submission_page("complex_types", "HTML field ignored")
@@ -159,7 +152,6 @@ def test_html_field_is_ignored_by_form_submission(get_schema):
     assert "html-instructqr" not in entity.assets
 
 
-# @matrix submission ai : autofill draft snapshot no-save
 @pytest.mark.unit
 def test_autofill_preview_validates_draft_without_saving_or_changing_cached_fields():
     entity = _submission_page("draft snapshot", "Saved title")
@@ -184,7 +176,6 @@ def test_autofill_preview_validates_draft_without_saving_or_changing_cached_fiel
     assert saved_field.db_value == "Saved answer"
 
 
-# @matrix cache : cache-deduplication default-fields
 @pytest.mark.unit
 def test_default_entity_fields_are_not_duplicated_in_submission_search_cache():
     entity = _submission_page("default field search", "Original page name")
@@ -215,7 +206,6 @@ def test_default_entity_fields_are_not_duplicated_in_submission_search_cache():
     assert entity.description == "Submitted page description"
 
 
-# @matrix filter-index : entity-metadata unset-values
 @pytest.mark.unit
 def test_unset_submission_fields_do_not_erase_entity_filter_metadata():
     entity = _submission_page("unset defaults", "Canonical page name")
@@ -231,7 +221,6 @@ def test_unset_submission_fields_do_not_erase_entity_filter_metadata():
     assert values["description"] == "Canonical page description"
 
 
-# @pair form-table:search-value
 @pytest.mark.unit
 def test_submission_search_value_merges_table_column_labels(
     get_test_entities, get_schema, test_submission_values
@@ -247,7 +236,6 @@ def test_submission_search_value_merges_table_column_labels(
         } == entity.test_spec["expected_search"]
 
 
-# @matrix form-table : multiple-rows search-value
 @pytest.mark.unit
 def test_table_search_keys_match_multiple_row_values():
     """Table search labels repeat per populated row value for snippet lookup."""
@@ -274,7 +262,6 @@ def test_table_search_keys_match_multiple_row_values():
     assert table.search_value == ["Row one", "A1", "Row two"]
 
 
-# @pair submission:search-value
 @pytest.mark.unit
 def test_submission_search_value_accepts_scalar_boolean_values():
     """``SubmissionProperty.search_value`` accepts scalar non-string values."""
@@ -282,7 +269,6 @@ def test_submission_search_value_accepts_scalar_boolean_values():
     assert submission.search_value == {"keys": ["Flag"], "values": [True]}
 
 
-# @pair submission:search-value
 @pytest.mark.unit
 def test_submission_search_value_omits_blank_search_fields():
     """Blank search fields do not leave key-only cache lists behind."""
@@ -290,8 +276,6 @@ def test_submission_search_value_omits_blank_search_fields():
     assert submission.search_value == {}
 
 
-# @matrix date-input email-input number-input time-input : form-submission validation
-# @matrix submission : form-submit preservation validation
 @pytest.mark.unit
 @pytest.mark.parametrize("entity_kind", ["PAGE", "TASK"])
 @pytest.mark.parametrize("input_type, valid, invalid", [
@@ -333,7 +317,6 @@ def test_invalid_typed_browser_submission_preserves_saved_answers(
     assert field.db_value == previous_value
 
 
-# @matrix date-input email-input number-input time-input : form-submission empty-value
 @pytest.mark.unit
 @pytest.mark.parametrize("input_type, valid", [
     ("email", "Ada+notes@example.com"),
@@ -357,7 +340,6 @@ def test_typed_browser_submission_accepts_valid_and_blank(input_type, valid, bla
     assert "submission" not in entity.db
 
 
-# @matrix number-input : form-submission zero
 @pytest.mark.unit
 def test_submission_number_form_accepts_zero(
     get_test_entities, get_schema, test_submission_values

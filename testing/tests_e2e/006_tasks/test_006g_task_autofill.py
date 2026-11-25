@@ -66,12 +66,7 @@ def _create_autofill_fixture(user):
     return page, task
 
 
-# @source lagniappe/web/deferred_autofill.py::form_state
-# @source lagniappe/web/deferred_autofill.py::form_fingerprint
-# @source lagniappe/web/routes/tools/main.py::cancel_generation
-# @source lagniappe/core/tools/deferred_jobs/autofill.py::start_autofill_job
 # @template pages/tasks.html::task_form
-# @matrix ai tasks : autofill cancellation current-answers reload attachment
 def test_autofill_start_snapshots_draft_and_stages_file_without_saving_them(get_admin, get_user):
     user = get_admin()
     page, task = _create_autofill_fixture(user)
@@ -121,10 +116,7 @@ def test_autofill_start_snapshots_draft_and_stages_file_without_saving_them(get_
     assert not stored.files
 
 
-# @source lagniappe/web/deferred_autofill.py::start_deferred_autofill
-# @source lagniappe/core/tools/deferred_jobs/autofill.py::autofill_job_spec
 # @template pages/tasks.html::task_form
-# @matrix ai tasks : autofill retry original-prompt staged-upload current-answers
 def test_cancelled_autofill_retry_reuses_prompt_and_file_with_current_draft(get_admin, get_user):
     user = get_admin()
     page, task = _create_autofill_fixture(user)
@@ -166,13 +158,7 @@ def test_cancelled_autofill_retry_reuses_prompt_and_file_with_current_draft(get_
     assert second.parameters["snapshot"]["prompt"]["submission"][FIELD_ID] == "Current retry draft"
 
 
-# @source lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.apply_proposal
-# @source lagniappe/web/routes/tools/main.py::refine_autofill
-# @source src/script/forms/revisions/modals.mjs::FormRevisionModal
-# @source lagniappe/web/deferred_autofill.py::form_state
 # @template pages/tasks.html::task_form
-# @matrix ai tasks : autofill conflicts review private-refinement
-# @pair forms:submission-choice
 def test_autofill_completion_reviews_open_draft_and_refinement_waits_for_save(get_admin, get_user, monkeypatch):
     from lagniappe.web import app as web_app
     from lagniappe.core.tools.deferred_jobs.adapters import autofill as adapter
@@ -231,10 +217,7 @@ def test_autofill_completion_reviews_open_draft_and_refinement_waits_for_save(ge
     expect(form.locator("[lp-edited-marker]")).to_have_attribute("data-visible", "false")
 
 
-# @source src/script/forms/revisions/modals.mjs::FormRevisionModal
-# @source src/script/widgets/base/formWidget.mjs::FormWidget.prepareLocalRevision
 # @template pages/tasks.html::task_form
-# @pair forms:autofill-review
 def test_autofill_collection_review_applies_to_open_form_without_saving(get_admin, get_user, monkeypatch):
     from lagniappe.web import app as web_app
     from lagniappe.core.tools.deferred_jobs.adapters import autofill as adapter
@@ -321,9 +304,6 @@ def test_autofill_collection_review_applies_to_open_form_without_saving(get_admi
     assert Entities.fetch_one(task.entity.key, request=Fetch.direct()).properties.submission.value == original
 
 
-# @source lagniappe/web/deferred_autofill.py::staged_upload_for_update
-# @source lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.apply_proposal
-# @matrix ai files tasks : autofill rejected-suggestion staged-upload-cleanup
 @pytest.mark.parametrize("accept", [False, True], ids=["reject", "failed-save-then-accept"])
 def test_rejecting_file_backed_suggestion_discards_staged_upload_on_update(get_admin, get_user, monkeypatch, browser_failures, accept):
     from lagniappe.web import app as web_app
@@ -401,12 +381,15 @@ def test_rejecting_file_backed_suggestion_discards_staged_upload_on_update(get_a
     assert repeated_update.value.ok, repeated_update.value.text()
 
 
-# @matrix ai : attached-files autofill completion-refresh deferred
-# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery
-# @matrix notifications tasks : autofill deferred
 # @template pages/tasks.html::task_form
-@pytest.mark.ai
-@pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+@pytest.mark.parametrize(
+    "live_ai_job_quota",
+    [
+        pytest.param(False, id="live", marks=pytest.mark.ai),
+        pytest.param(True, id="quota-fallback"),
+    ],
+    indirect=True,
+)
 def test_task_autofill_runs_deferred_with_page_file_context(get_admin, get_user, monkeypatch, results, live_ai_job_quota):
     user = get_admin()
     page, task = _create_autofill_fixture(user)
@@ -459,9 +442,11 @@ def test_task_autofill_runs_deferred_with_page_file_context(get_admin, get_user,
             "generate_autofilled_submission",
             lambda prompt, **kwargs: {FIELD_ID: EXPECTED_VALUE},
         )
-        with user.page.expect_response("**/tasks/*/replace"):
-            with web_app.test_request_context("/"):
-                result = DeferredJobs.run(job.urlsafe_key)
+        with (
+            user.page.expect_response("**/tasks/*/replace"),
+            web_app.test_request_context("/"),
+        ):
+            result = DeferredJobs.run(job.urlsafe_key)
         assert result.success is True
 
     expect(form.locator("[data-role='edited-message']")).to_contain_text("Autofill is complete")

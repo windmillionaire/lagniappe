@@ -7,7 +7,32 @@ class EntityBoundary {
 	async reconcilePollingSubscriptions() {}
 }
 
-/** @matrix users : index-mode-toggle pagination */
+test("test_base_list_flashes_every_new_row", async (t) => {
+	createBrowser(t, { html: "<ul></ul>" });
+	const { BaseList } = await import(
+		"../../src/script/elements/base/baseList.ts"
+	);
+	const target = document.querySelector("ul");
+	const flashed = [];
+	const list = new BaseList({
+		target,
+		component: {},
+		name: "List",
+		view: { addFlash: (row) => flashed.push(row.dataset.key) },
+	});
+	const html = new DOMParser().parseFromString(
+		'<ul><li data-key="first"></li><li data-key="second"></li></ul>',
+		"text/html",
+	);
+	list.created({ html });
+	list.postreconcile();
+	assert.deepEqual(
+		[...target.children].map((row) => row.dataset.key),
+		["first", "second"],
+	);
+	assert.deepEqual(flashed, ["first", "second"]);
+});
+
 test("test_user_mode_switch_loads_all_pages_and_preserves_current_mode_on_failure", async (t) => {
 	createBrowser(t, {
 		html: `<main data-user-mode="regular">
@@ -22,13 +47,13 @@ test("test_user_mode_switch_loads_all_pages_and_preserves_current_mode_on_failur
 	let failContinuation = true;
 	const requests = [];
 	const { default: Users } = await esmock.strict(
-		"../../src/script/views/user.mjs",
+		"../../src/script/views/user.ts",
 		{
-			"../../src/script/views/base/index.mjs": { default: class {} },
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/views/base/index.ts": { default: class {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (commit) => commit(),
 			},
-			"../../src/script/shared/request.mjs": {
+			"../../src/script/shared/request.ts": {
 				request: {
 					async get(route) {
 						requests.push(route);
@@ -90,17 +115,16 @@ test("test_user_mode_switch_loads_all_pages_and_preserves_current_mode_on_failur
 
 async function loadPage() {
 	return (
-		await esmock.strict("../../src/script/views/page.mjs", {
-			"../../src/script/shared/icons.mjs": { setIcon() {} },
-			"../../src/script/shared/transitions.mjs": {
+		await esmock.strict("../../src/script/views/page.ts", {
+			"../../src/script/shared/icons.ts": { setIcon() {} },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
-			"../../src/script/views/base/entity.mjs": { default: EntityBoundary },
+			"../../src/script/views/base/entity.ts": { default: EntityBoundary },
 		})
 	).default;
 }
 
-/** @matrix polling tasks : channel refresh */
 test("test_page_task_collection_watches_task_form_changes", async () => {
 	const Page = await loadPage();
 	const page = new Page();
@@ -145,7 +169,6 @@ test("test_page_task_collection_watches_task_form_changes", async () => {
 	assert.equal(unsubscriptions, 1);
 });
 
-/** @matrix polling startup : subscription-lifecycle deferred-services */
 test("test_page_task_subscription_survives_list_loading_before_polling_service", async (t) => {
 	createBrowser(t);
 	const Page = await loadPage();
@@ -162,13 +185,13 @@ test("test_page_task_subscription_survives_list_loading_before_polling_service",
 			}
 		}
 		const { ensurePollingCoordinator } = await esmock.p(
-			"../../src/script/views/base/services.mjs",
+			"../../src/script/views/base/services.ts",
 			{
-				"../../src/script/views/base/shell.mjs": {
+				"../../src/script/views/base/shell.ts": {
 					markPerformance() {},
 					whenIdle: async () => {},
 				},
-				"../../src/script/shared/polling.mjs": { PollingCoordinator },
+				"../../src/script/shared/polling.ts": { PollingCoordinator },
 			},
 		);
 		const page = new Page();
@@ -201,17 +224,15 @@ test("test_page_task_subscription_survives_list_loading_before_polling_service",
 	}
 });
 
-/** @matrix reconnect-refresh : manifest */
-/** @source src/script/widgets/tables/indexTable.mjs::IndexTable.refreshDescriptor */
 test("test_collection_manifests_include_hash_and_fingerprint", async () => {
 	class Base {}
 	const [{ IndexTable }, { PageTaskList }] = await Promise.all([
-		esmock.strict("../../src/script/widgets/tables/indexTable.mjs", {
-			"../../src/script/elements/base/baseTable.mjs": { BaseTable: Base },
+		esmock.strict("../../src/script/widgets/tables/indexTable.ts", {
+			"../../src/script/elements/base/baseTable.ts": { BaseTable: Base },
 		}),
-		esmock.strict("../../src/script/widgets/pageTaskList.mjs", {
-			"../../src/script/elements/base/baseList.mjs": { BaseList: Base },
-			"../../src/script/shared/transitions.mjs": {
+		esmock.strict("../../src/script/widgets/pageTaskList.ts", {
+			"../../src/script/elements/base/baseList.ts": { BaseList: Base },
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
 		}),
@@ -244,13 +265,12 @@ test("test_collection_manifests_include_hash_and_fingerprint", async () => {
 	}
 });
 
-/** @matrix form-index : created-row delete-target destination-refresh sorting */
 test("test_index_table_row_updates_rebuild_active_sort", async (t) => {
 	createBrowser(t);
 	class BaseTable {}
 	const { IndexTable } = await esmock.strict(
-		"../../src/script/widgets/tables/indexTable.mjs",
-		{ "../../src/script/elements/base/baseTable.mjs": { BaseTable } },
+		"../../src/script/widgets/tables/indexTable.ts",
+		{ "../../src/script/elements/base/baseTable.ts": { BaseTable } },
 	);
 	const row = (key, modified) => {
 		const element = document.createElement("tr");
@@ -311,8 +331,8 @@ async function deltaTable(t, html) {
 	createBrowser(t, { html: `<table><tbody>${html}</tbody></table>` });
 	class BaseTable {}
 	const { IndexTable } = await esmock.strict(
-		"../../src/script/widgets/tables/indexTable.mjs",
-		{ "../../src/script/elements/base/baseTable.mjs": { BaseTable } },
+		"../../src/script/widgets/tables/indexTable.ts",
+		{ "../../src/script/elements/base/baseTable.ts": { BaseTable } },
 	);
 	const target = document.querySelector("tbody");
 	const released = [];
@@ -320,7 +340,7 @@ async function deltaTable(t, html) {
 	const table = Object.create(IndexTable.prototype);
 	Object.assign(table, {
 		target,
-		view: { mobile: false, addFlash: (...rows) => flashed.push(...rows) },
+		view: { mobile: false, addFlash: (row) => flashed.push(row) },
 		component: {
 			widgets: {
 				TableEditor: {
@@ -333,9 +353,6 @@ async function deltaTable(t, html) {
 	return { table, target, released, flashed };
 }
 
-/**
- * @matrix table-controls : delta-order unchanged-rows focus hidden-rows sentinel-rows
- */
 test("test_index_delta_preserves_unchanged_rows_and_focus", async (t) => {
 	const { table, target, released } = await deltaTable(
 		t,
@@ -383,9 +400,21 @@ test("test_index_delta_preserves_unchanged_rows_and_focus", async (t) => {
 	);
 });
 
-/**
- * @matrix table-controls : delta-order insertion removal empty-row sorting quick-edit-teardown
- */
+test("test_index_delta_flashes_each_new_row", async (t) => {
+	const { table, flashed } = await deltaTable(t, "");
+	table.refreshDelta({
+		upsert: [
+			{ key: "a", html: '<tr lp-entity data-key="a"><td>Alpha</td></tr>' },
+			{ key: "b", html: '<tr lp-entity data-key="b"><td>Bravo</td></tr>' },
+		],
+		order: ["a", "b"],
+	});
+	assert.deepEqual(
+		flashed.map((row) => row.dataset.key),
+		["a", "b"],
+	);
+});
+
 test("test_index_delta_reorders_adds_removes_and_restores_sort", async (t) => {
 	const { table, target, released, flashed } = await deltaTable(
 		t,
@@ -457,10 +486,6 @@ test("test_index_delta_reorders_adds_removes_and_restores_sort", async (t) => {
 	);
 });
 
-/**
- * @matrix reconnect-refresh : batching cache-invalidation committed-delete delta-apply destination-invalidation fallback legacy-fallback manifest mounted-collection
- * @pair polling:reentrancy
- */
 test("test_core_refresh_batches_supported_widgets_and_falls_back_per_target", async (t) => {
 	createBrowser(t);
 	const events = [];
@@ -499,15 +524,15 @@ test("test_core_refresh_batches_supported_widgets_and_falls_back_per_target", as
 		},
 	};
 	const { reconcileChange, refreshCollectionComponents } = await esmock.strict(
-		"../../src/script/views/base/reconciliation.mjs",
+		"../../src/script/views/base/reconciliation.ts",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw error;
 				},
 			},
-			"../../src/script/shared/request.mjs": { request },
-			"../../src/script/shared/storage.mjs": {
+			"../../src/script/shared/request.ts": { request },
+			"../../src/script/shared/storage.ts": {
 				clearRecentSearchResults() {},
 			},
 		},

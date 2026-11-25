@@ -70,13 +70,13 @@ async function setupPolling(
 	}
 	const request = { post };
 	const { PollingCoordinator } = await esmock.strict(
-		"../../src/script/shared/polling.mjs",
+		"../../src/script/shared/polling.ts",
 		{
-			"../../src/script/shared/endpoints.mjs": {
+			"../../src/script/shared/endpoints.ts": {
 				ENDPOINTS: { poll: "/l/poll" },
 			},
-			"../../src/script/shared/errors.mjs": { captureError },
-			"../../src/script/shared/request.mjs": { request },
+			"../../src/script/shared/errors.ts": { captureError },
+			"../../src/script/shared/request.ts": { request },
 		},
 	);
 	return {
@@ -91,7 +91,6 @@ async function setupPolling(
 
 const view = () => ({ elt: {}, hidden: false, online: true });
 
-/** @matrix polling : acknowledgement batching cadence coalescing lifecycle terminal-operation-order */
 test("test_polling_coordinator_batches_due_subscriptions_and_applies_results", async (t) => {
 	const calls = [];
 	const handled = [];
@@ -224,7 +223,6 @@ test("test_polling_coordinator_batches_due_subscriptions_and_applies_results", a
 	assert.equal(coordinator.subscriptions.size, 0);
 });
 
-/** @pairs messaging:active-polling polling:cadence */
 test("test_polling_coordinator_temporarily_boosts_a_subscription", async (t) => {
 	let now = 1000;
 	const context = await setupPolling(t, {
@@ -260,8 +258,6 @@ test("test_polling_coordinator_temporarily_boosts_a_subscription", async (t) => 
 	);
 });
 
-/** @matrix polling : blur cadence visibility */
-/** @pair deferred-jobs:polling */
 test("test_polling_coordinator_limits_visible_blur_to_eligible_operations", async (t) => {
 	const calls = [];
 	const handled = [];
@@ -345,8 +341,6 @@ test("test_polling_coordinator_limits_visible_blur_to_eligible_operations", asyn
 	coordinator.destroy();
 });
 
-/** @matrix polling : foreground scheduled-initial */
-/** @pair notifications:cold-seed */
 test("test_polling_coordinator_schedules_modes_and_notification_seed", async (t) => {
 	const calls = [];
 	const context = await setupPolling(t, {
@@ -401,7 +395,6 @@ test("test_polling_coordinator_schedules_modes_and_notification_seed", async (t)
 	cold.destroy();
 });
 
-/** @matrix notifications : acknowledgement bounded-backoff cold-seed zero-subscriptions */
 test("test_polling_coordinator_retries_cold_seed_until_warm_acknowledgement", async (t) => {
 	let now = 1000;
 	const calls = [];
@@ -445,7 +438,6 @@ test("test_polling_coordinator_retries_cold_seed_until_warm_acknowledgement", as
 	coordinator.destroy();
 });
 
-/** @matrix polling : freshness reentrancy requested-cycle */
 test("test_polling_coordinator_enqueues_reentrant_followup_without_waiting", async (t) => {
 	const calls = [];
 	let handled = 0;
@@ -538,7 +530,6 @@ test("test_polling_coordinator_enqueues_reentrant_followup_without_waiting", asy
 	coordinator.destroy();
 });
 
-/** @matrix polling : batching diagnostics presence protocol revision validation */
 test("test_polling_coordinator_captures_and_isolates_contract_failures", async (t) => {
 	const calls = [];
 	const captured = [];
@@ -672,7 +663,6 @@ test("test_polling_coordinator_captures_and_isolates_contract_failures", async (
 	coordinator.destroy();
 });
 
-/** @pair polling:transport-error */
 test("test_polling_coordinator_treats_failed_transport_as_retryable", async (t) => {
 	let captured = 0;
 	const calls = [];

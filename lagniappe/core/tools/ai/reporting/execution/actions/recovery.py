@@ -2,9 +2,11 @@
 
 
 from lagniappe.core import exceptions
+from lagniappe.core.entities import Entities
 from lagniappe.core.definitions import Action
 from lagniappe.core.tools.database import get as database_get
 
+from ...contracts.actions import DELETE_TARGETS
 from .common import TASK_FORM_TYPE_ERROR
 from .results import (
     _entity_result,
@@ -21,26 +23,17 @@ ACTION_NOT_APPLIED = "not-applied"
 ACTION_DRIFTED = "drifted"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason recovery authorization is enforced through the public runner
 def _recovery_entity_allowed(entity, user):
     if entity is None:
         return False
     return bool(entity.allowed(Action.EDIT, user=user))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason stored reference comparison is exercised through move recovery
 def _stored_reference_key(entity, name):
     value = entity.db.get(name)
     return _urlsafe_key_value(value)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason key normalization is exercised through action state inspection
 def _urlsafe_key_value(value):
     if not value:
         return None
@@ -54,11 +47,6 @@ def _urlsafe_key_value(value):
     return getattr(value, "name", None) or str(value)
 
 
-# @testable true
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_reconciles_applying_create_when_output_already_exists
-# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion
-# @matrix ai-report : completed-prefix completed-task permissions post-commit-checkpoint recovery
-# @pair ai-report:skipped-prefix
 def _inspect_action_applied(action, report, user, record):
     action_type = action.get("type")
     if record.get("status") == "skipped" or action_type in {
@@ -103,12 +91,14 @@ def _inspect_action_applied(action, report, user, record):
         return ACTION_NOT_APPLIED
     if not expected:
         return ACTION_NOT_APPLIED
+    if action_type in DELETE_TARGETS:
+        return ACTION_APPLIED if entity is None else ACTION_NOT_APPLIED
     if entity is None and entity_id:
         return ACTION_DRIFTED
     if entity is not None and not _recovery_entity_allowed(entity, user):
         return ACTION_DRIFTED
 
-    if action_type in {"update_task", "update_page", "update_project", "update_model_task", "update_file"}:
+    if action_type in {"update_task", "update_page", "update_project", "update_category", "update_model_task", "update_file"}:
         from lagniappe.core.tools.entity_patches import _projection
         if entity is not None and _projection(entity) == expected.get("entity_update_after"):
             return ACTION_APPLIED
@@ -146,7 +136,7 @@ def _inspect_action_applied(action, report, user, record):
     if action_type in {"update_form_schema"}:
         return (
             ACTION_APPLIED
-            if _value_fingerprint(entity.schema or [])
+            if entity is not None and _value_fingerprint(entity.schema or [])
             == expected.get("schema_fingerprint")
             else ACTION_DRIFTED
         )
@@ -159,11 +149,14 @@ def _inspect_action_applied(action, report, user, record):
             else ACTION_DRIFTED
         )
     if action_type == "summarize_file":
+        if not isinstance(entity, Entities.FILE):
+            return ACTION_DRIFTED
+        terms = entity.properties.summarize.retrieval_terms or []
         return (
             ACTION_APPLIED
             if entity.summary == expected.get("summary")
             and entity.properties.summarize.complete is True
-            and list(entity.properties.summarize.retrieval_terms or [])
+            and isinstance(terms, (list, tuple)) and list(terms)
             == expected.get("retrieval_terms")
             and entity.properties.summarize.search is expected.get("search")
             else ACTION_DRIFTED
@@ -171,9 +164,6 @@ def _inspect_action_applied(action, report, user, record):
     return ACTION_APPLIED
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason recoverable action errors are asserted through full report execution
 def _is_recoverable_action_error(_action, error):
     if isinstance(error, exceptions.MutationConflict):
         return False  # A rejected atomic write must remain retryable.
@@ -186,18 +176,12 @@ def _is_recoverable_action_error(_action, error):
     )
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
-# @matrix ai-report : attachments partial-result
 def _record_required_file_placement_error(action_record, error):
     action_record["status"] = "failed"
     action_record["error"] = str(error)
     action_record["note"] = "This required file placement was not completed."
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/recovery.py::_record_recoverable_action_error
-# @reason recoverable action error notes are asserted through full report execution
 def _recoverable_action_error_note(action_record, message):
     if message == "Referenced report file was not found.":
         return "Skipped because a referenced report file was not found."
@@ -210,10 +194,6 @@ def _recoverable_action_error_note(action_record, message):
     return "Skipped because this action could not be completed."
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_invalid_completed_task_events_and_continues
-# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_task_that_references_page_form_and_continues
-# @matrix ai-report : completed-task continue mismatched-form recoverable
 def _record_recoverable_action_error(action_record, error):
     message = str(error)
     action_record["status"] = "skipped"

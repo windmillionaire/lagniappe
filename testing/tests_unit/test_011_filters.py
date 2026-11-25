@@ -16,7 +16,7 @@ reading ``Filter.conditions``.
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 import pytest
 
@@ -46,7 +46,6 @@ def _prepare_saved_filter(filter_entity, entity_map):
     filter_entity.definitions = definitions
 
 
-# @matrix filters : condition-definition validation
 @pytest.mark.unit
 def test_condition_requires_field_for_type_and_definition():
     condition = Condition()
@@ -58,7 +57,6 @@ def test_condition_requires_field_for_type_and_definition():
         condition._create_definition()
 
 
-# @pair filter:missing-entity
 @pytest.mark.unit
 def test_condition_create_skips_missing_entity_reference():
     definition = FilterDefinition(
@@ -73,7 +71,6 @@ def test_condition_create_skips_missing_entity_reference():
     assert Condition.create(definition, {}) is None
 
 
-# @matrix filter : conditions string
 @pytest.mark.unit
 def test_filter_conditions_string(get_test_entities):
     """String field: entity, field object, comparator, value from definition."""
@@ -102,7 +99,6 @@ def test_filter_conditions_string(get_test_entities):
             assert cond.value == expected["value"]
 
 
-# @matrix filter : boolean conditions
 @pytest.mark.unit
 def test_filter_conditions_boolean(get_test_entities):
     """Boolean field: comparator only; stored definition omits value."""
@@ -128,7 +124,6 @@ def test_filter_conditions_boolean(get_test_entities):
             assert cond.value is None
 
 
-# @matrix filter : conditions entity-valued
 @pytest.mark.unit
 def test_filter_conditions_entity_valued(get_test_entities):
     """Entity-valued list field: value hash(es) resolvable from ``related`` map."""
@@ -160,7 +155,6 @@ def test_filter_conditions_entity_valued(get_test_entities):
                 assert cond.entity_map[h] is entity_map[h]
 
 
-# @matrix filter : conditions mixed-types
 @pytest.mark.unit
 def test_filter_conditions_multiple_types(get_test_entities):
     """Mixed string, boolean, and entity-valued rows on one filter."""
@@ -194,7 +188,6 @@ def test_filter_conditions_multiple_types(get_test_entities):
                     assert h in cond.entity_map
 
 
-# @pair filters:scalar-list
 @pytest.mark.unit
 def test_filter_expression_list_contains_accepts_scalar_form_values():
     """List-style contains filters match scalar single-select form submissions."""
@@ -213,7 +206,6 @@ def test_filter_expression_list_contains_accepts_scalar_form_values():
     assert '@["filter-decision"] == "approved"' in expression
 
 
-# @matrix filters : escaping field-name jsonpath punctuation regex-literal
 @pytest.mark.unit
 @pytest.mark.parametrize("value", ["Dr. Maria Rivera", 'René [a+b] ("x") \\folder ^$.?*|{2}', "quote'\n\t\x00"])
 @pytest.mark.parametrize("comparator", [Comparator.EQUALS, Comparator.SUBSTRING])
@@ -239,7 +231,6 @@ def test_filter_expression_encodes_field_names_and_literal_regex_values(value, c
     assert bool(re.search(pattern, f"prefix {value} suffix")) == (comparator == Comparator.SUBSTRING)
 
 
-# @matrix filter : parent parent-hash
 @pytest.mark.unit
 def test_filter_parent_sets_parent_hash():
     filter_entity = FilterEntity(testing=True)
@@ -262,7 +253,6 @@ def test_filter_parent_sets_parent_hash():
     assert "parent_hash" not in filter_entity.db
 
 
-# @matrix filter : fingerprint parent
 @pytest.mark.unit
 def test_filter_fingerprint_uses_loaded_parent_fingerprint():
     filter_entity = FilterEntity(testing=True)
@@ -270,19 +260,18 @@ def test_filter_fingerprint_uses_loaded_parent_fingerprint():
         "PROJECT",
         {"name": "Fingerprint Parent", "hash": "parent_fingerprint"},
     )
-    filter_entity.modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    filter_entity.modified = datetime(2026, 1, 1, tzinfo=UTC)
     filter_entity.parent = parent
 
     before = filter_entity.fingerprint
     assert filter_entity.fingerprint == before
-    parent.modified = datetime(2026, 1, 2, tzinfo=timezone.utc)
+    parent.modified = datetime(2026, 1, 2, tzinfo=UTC)
     parent_changed = filter_entity.fingerprint
     assert parent_changed != before
-    filter_entity.modified = datetime(2026, 1, 3, tzinfo=timezone.utc)
+    filter_entity.modified = datetime(2026, 1, 3, tzinfo=UTC)
     assert filter_entity.fingerprint != parent_changed
 
 
-# @matrix filter permissions : related-entities saved-filters
 @pytest.mark.unit
 def test_filter_related_entities_allowed_checks_referenced_entities():
     filter_entity = FilterEntity(testing=True)
@@ -300,7 +289,6 @@ def test_filter_related_entities_allowed_checks_referenced_entities():
     assert not filter_entity.related_entities_allowed()
 
 
-# @matrix filter permissions : model-task related-entities restricted-access saved-filters
 @pytest.mark.unit
 def test_filter_related_entities_allowed_keeps_model_and_form_access_separate():
     viewer = UtilityTestUser(
@@ -334,7 +322,6 @@ def test_filter_related_entities_allowed_keeps_model_and_form_access_separate():
     assert not filter_entity.related_entities_allowed(viewer)
 
 
-# @matrix filter : category project related-forms table
 @pytest.mark.unit
 def test_filter_table_derives_parent_fields_and_related_forms(get_schema):
     primary_form = TestEntities.get(

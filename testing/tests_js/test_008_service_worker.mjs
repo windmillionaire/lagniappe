@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createServiceWorkerContext } from "../utility/js/service_worker.mjs";
 
-/** @matrix cache : no-store service-worker */
 test("test_no_store_304_discards_cached_response", async () => {
 	const {
 		cacheNames,
@@ -73,7 +72,6 @@ test("test_no_store_304_discards_cached_response", async () => {
 	}
 });
 
-/** @matrix cache csrf : network-only service-worker token */
 test("test_token_request_is_network_only_without_client_cache_directives", async () => {
 	const {
 		cacheNames,
@@ -130,7 +128,6 @@ test("test_token_request_is_network_only_without_client_cache_directives", async
 	}
 });
 
-/** @matrix cache : invalidation no-store service-worker acknowledgement */
 test("test_invalidation_response_waits_for_acknowledgement_and_is_not_stored", async () => {
 	const {
 		cacheNames,
@@ -200,7 +197,6 @@ test("test_invalidation_response_waits_for_acknowledgement_and_is_not_stored", a
 	}
 });
 
-/** @matrix cache : invalidation no-store service-worker browser-validators */
 test("test_previously_stored_invalidation_is_discarded_before_reuse", async () => {
 	const {
 		cacheNames,
@@ -255,7 +251,6 @@ test("test_previously_stored_invalidation_is_discarded_before_reuse", async () =
 	}
 });
 
-/** @matrix cache request : conditional-response dom-refresh service-worker */
 test("test_cached_304_marks_response_not_updated", async () => {
 	const {
 		cacheNames,
@@ -304,7 +299,6 @@ test("test_cached_304_marks_response_not_updated", async () => {
 	}
 });
 
-/** @matrix cache offline : ajax response-shape service-worker */
 test("test_application_get_failure_returns_503_instead_of_offline_html", async () => {
 	const {
 		cacheNames,
@@ -350,7 +344,6 @@ test("test_application_get_failure_returns_503_instead_of_offline_html", async (
 	}
 });
 
-/** @matrix cache offline : navigation response-shape service-worker */
 test("test_navigation_failure_uses_offline_document", async () => {
 	const {
 		cacheNames,
@@ -379,7 +372,6 @@ test("test_navigation_failure_uses_offline_document", async () => {
 	}
 });
 
-/** @matrix cache : activation ownership service-worker */
 test("test_activation_clears_only_application_owned_caches", async () => {
 	const {
 		cacheNames,
@@ -405,7 +397,6 @@ test("test_activation_clears_only_application_owned_caches", async () => {
 	}
 });
 
-/** @matrix cache : invalidation service-worker */
 test("test_304_response_with_invalidation_header_fetches_fresh_response", async () => {
 	const {
 		cacheNames,
@@ -491,7 +482,6 @@ test("test_304_response_with_invalidation_header_fetches_fresh_response", async 
 	}
 });
 
-/** @matrix cache : browser-validators service-worker */
 test("test_dynamic_fetch_preserves_browser_validators_without_stored_etag", async () => {
 	const {
 		cacheNames,
@@ -550,7 +540,6 @@ test("test_dynamic_fetch_preserves_browser_validators_without_stored_etag", asyn
 	}
 });
 
-/** @matrix cache : cached-response network-validation service-worker */
 test("test_cached_dynamic_get_waits_for_network_validation_before_using_cached_response", async () => {
 	const {
 		cacheNames,
@@ -613,7 +602,6 @@ test("test_cached_dynamic_get_waits_for_network_validation_before_using_cached_r
 	}
 });
 
-/** @matrix cache : invalidation service-worker */
 test("test_redirect_response_with_invalidation_header_clears_cache", async () => {
 	const {
 		cacheNames,
@@ -679,7 +667,6 @@ test("test_redirect_response_with_invalidation_header_clears_cache", async () =>
 	}
 });
 
-/** @matrix cache : invalidation service-worker */
 test("test_cache_invalidation_confirmation_posts_after_local_clear", async () => {
 	const {
 		cacheNames,
@@ -759,7 +746,6 @@ test("test_cache_invalidation_confirmation_posts_after_local_clear", async () =>
 	}
 });
 
-/** @matrix cache : acknowledgement concurrency invalidation retry service-worker */
 test("test_cache_acknowledgements_do_not_coalesce_different_revisions", async () => {
 	const {
 		cacheNames,
@@ -819,7 +805,6 @@ test("test_cache_acknowledgements_do_not_coalesce_different_revisions", async ()
 	}
 });
 
-/** @matrix cache : acknowledgement failure invalidation retry service-worker */
 test("test_cache_invalidation_requires_explicit_server_acknowledgement", async () => {
 	const {
 		cacheNames,
@@ -951,7 +936,6 @@ test("test_cache_invalidation_requires_explicit_server_acknowledgement", async (
 	}
 });
 
-/** @matrix cache : etag redirect-mode service-worker */
 test("test_conditional_fetch_preserves_original_request_redirect_mode", async () => {
 	const {
 		cacheNames,
@@ -1015,7 +999,6 @@ test("test_conditional_fetch_preserves_original_request_redirect_mode", async ()
 	}
 });
 
-/** @matrix cache : redirected-response service-worker */
 test("test_redirected_responses_are_discarded_and_not_cached", async () => {
 	const {
 		cacheNames,
@@ -1064,7 +1047,6 @@ test("test_redirected_responses_are_discarded_and_not_cached", async () => {
 	}
 });
 
-/** @matrix cache : no-store service-worker static-assets */
 test("test_no_store_static_response_is_not_cached", async () => {
 	const {
 		cacheNames,
@@ -1119,7 +1101,6 @@ test("test_no_store_static_response_is_not_cached", async () => {
 	}
 });
 
-/** @matrix cache : retry service-worker static-assets */
 test("test_static_asset_retries_transient_failures_and_caches_recovery", async () => {
 	const { context, fetchCalls, listeners, staticCache, clientMessages } =
 		createServiceWorkerContext();
@@ -1190,7 +1171,6 @@ test("test_static_asset_retries_transient_failures_and_caches_recovery", async (
 	}
 });
 
-/** @matrix cache : retry service-worker static-assets */
 test("test_static_asset_retry_budget_preserves_failure", async () => {
 	for (const status of [500, 502, 503, 504, "network", "upstream-html"]) {
 		const { context, staticCache, fetchCalls, clientMessages } =
@@ -1235,7 +1215,6 @@ test("test_static_asset_retry_budget_preserves_failure", async () => {
 	}
 });
 
-/** @matrix cache : retry service-worker static-assets */
 test("test_static_asset_does_not_retry_permanent_errors_or_mutations", async () => {
 	for (const [method, status, headers] of [
 		["GET", 400],
@@ -1265,7 +1244,6 @@ test("test_static_asset_does_not_retry_permanent_errors_or_mutations", async () 
 	}
 });
 
-/** @matrix cache : abort retry service-worker static-assets */
 test("test_static_asset_abort_stops_retries", async () => {
 	for (const abortDuringBackoff of [false, true]) {
 		const { context, fetchCalls, staticCache } = createServiceWorkerContext();
@@ -1300,7 +1278,6 @@ test("test_static_asset_abort_stops_retries", async () => {
 	}
 });
 
-/** @matrix cache : cache-hit service-worker static-assets */
 test("test_static_asset_cache_hit_avoids_network", async () => {
 	const { context, fetchCalls, staticCache } = createServiceWorkerContext();
 	const request = new Request("https://example.test/chunks/app.js?v=btest");
@@ -1315,7 +1292,6 @@ test("test_static_asset_cache_hit_avoids_network", async () => {
 	assert.equal(staticCache.puts, 0);
 });
 
-/** @matrix cache : precache service-worker static-assets retry no-store */
 test("test_precache_retries_transient_failures_and_preserves_cache_policy", async () => {
 	const { context, staticCache, vm } = createServiceWorkerContext();
 	const attempts = new Map();
@@ -1359,7 +1335,6 @@ test("test_precache_retries_transient_failures_and_preserves_cache_policy", asyn
 	);
 });
 
-/** @matrix cache : precache service-worker static-assets */
 test("test_precache_reuses_cached_assets_without_reusing_another_build", async () => {
 	const { context, staticCache, vm } = createServiceWorkerContext();
 	const requests = [];
@@ -1402,7 +1377,6 @@ test("test_precache_reuses_cached_assets_without_reusing_another_build", async (
 	);
 });
 
-/** @matrix cache : precache service-worker static-assets */
 test("test_precache_static_assets_warms_configured_urls_and_ignores_failures", async () => {
 	const {
 		cacheNames,
@@ -1488,7 +1462,6 @@ test("test_precache_static_assets_warms_configured_urls_and_ignores_failures", a
 	}
 });
 
-/** @matrix cache : etag query route-class service-worker sibling-invalidation */
 test("test_changed_validators_clear_only_same_path_query_siblings_for_configured_routes", async () => {
 	const {
 		cacheNames,
@@ -1558,7 +1531,6 @@ test("test_changed_validators_clear_only_same_path_query_siblings_for_configured
 	}
 });
 
-/** @matrix cache : batch eviction quota service-worker throttle */
 test("test_quota_eviction_is_throttled_and_bounded_to_oldest_entries", async () => {
 	const {
 		cacheNames,
@@ -1619,7 +1591,6 @@ test("test_quota_eviction_is_throttled_and_bounded_to_oldest_entries", async () 
 	}
 });
 
-/** @matrix cache : eviction failure quota service-worker unavailable */
 test("test_quota_eviction_tolerates_unavailable_and_failed_estimates", async () => {
 	const {
 		cacheNames,
@@ -1662,7 +1633,6 @@ test("test_quota_eviction_tolerates_unavailable_and_failed_estimates", async () 
 	}
 });
 
-/** @matrix cache offline : cache-miss fallback navigation service-worker */
 test("test_navigation_failure_without_cached_offline_document_returns_503", async () => {
 	const {
 		cacheNames,
@@ -1686,7 +1656,6 @@ test("test_navigation_failure_without_cached_offline_document_returns_503", asyn
 	}
 });
 
-/** @matrix offline request : mutation response-shape service-worker */
 test("test_mutation_failure_returns_json_503", async () => {
 	const {
 		cacheNames,
@@ -1723,7 +1692,6 @@ test("test_mutation_failure_returns_json_503", async () => {
 	}
 });
 
-/** @matrix browser-protocol connectivity : controller service-worker validation version */
 test("test_worker_accepts_only_versioned_valid_connectivity_messages", async () => {
 	const {
 		cacheNames,
@@ -1774,7 +1742,6 @@ test("test_worker_accepts_only_versioned_valid_connectivity_messages", async () 
 	}
 });
 
-/** @matrix request-errors service-worker : application-error-marker classification upstream-unavailable */
 test("test_worker_classifies_only_unmarked_upstream_html_failures", async () => {
 	const {
 		cacheNames,
@@ -1818,7 +1785,6 @@ test("test_worker_classifies_only_unmarked_upstream_html_failures", async () => 
 	}
 });
 
-/** @matrix browser-protocol request-errors service-worker : client-message privacy upstream-unavailable */
 test("test_upstream_failure_notifies_controlled_clients_with_bounded_state", async () => {
 	const {
 		cacheNames,
@@ -1873,7 +1839,6 @@ test("test_upstream_failure_notifies_controlled_clients_with_bounded_state", asy
 	}
 });
 
-/** @matrix cache request-errors service-worker : stale-cache upstream-unavailable */
 test("test_upstream_failure_uses_marked_stale_cache_without_caching_5xx", async () => {
 	const {
 		cacheNames,
@@ -1935,7 +1900,6 @@ test("test_upstream_failure_uses_marked_stale_cache_without_caching_5xx", async 
 	}
 });
 
-/** @matrix request-errors service-worker : branded-response retry upstream-unavailable */
 test("test_upstream_failure_without_cache_returns_branded_retryable_503", async () => {
 	const {
 		cacheNames,
@@ -1967,7 +1931,6 @@ test("test_upstream_failure_without_cache_returns_branded_retryable_503", async 
 	}
 });
 
-/** @matrix request-errors service-worker : branded-response mutation no-replay upstream-unavailable */
 test("test_mutation_upstream_failure_returns_uncertain_json_without_replay", async () => {
 	const {
 		cacheNames,

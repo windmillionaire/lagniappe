@@ -1,5 +1,7 @@
 """Strict wire contract for adaptive browser polling."""
 
+from typing import Literal, TypedDict, overload
+
 from dataclasses import dataclass
 
 from .projections import CHANNEL_REVISION_PATHS
@@ -19,50 +21,76 @@ POLL_TYPES = frozenset(
 POLL_CHANNELS = frozenset(CHANNEL_REVISION_PATHS)
 
 
-# @testable true
-# @tests tests_unit/test_026_polling_contract.py::test_poll_contract_accepts_each_descriptor_type
-# @tests tests_unit/test_026_polling_contract.py::test_poll_contract_reports_exact_invalid_field
-# @matrix polling : diagnostics protocol validation
 class PollContractError(ValueError):
     """A safe, field-addressed public polling contract failure."""
 
-    def __init__(self, path, reason):
+    def __init__(self, path: str, reason: str) -> None:
         self.path = path
         self.reason = reason
         super().__init__(f"{path}: {reason}")
 
 
-# @testable infrastructure
+class ChannelDescriptor(TypedDict):
+    id: str
+    type: Literal["channel"]
+    channel: str
+    revision: str | None
+
+
+class KeyDescriptor(TypedDict):
+    id: str
+    type: Literal["entity", "form-lock", "ingress"]
+    key: str
+    revision: str | None
+
+
+class OperationDescriptor(TypedDict):
+    id: str
+    type: Literal["operation"]
+    key: str
+    revision: int
+
+
+class DocumentDescriptor(TypedDict):
+    id: str
+    type: Literal["document"]
+    key: str
+    sync_id: str
+    generation: str | None
+    presence_digest: str | None
+    revision: int
+
+
+type PollDescriptor = ChannelDescriptor | KeyDescriptor | OperationDescriptor | DocumentDescriptor
+
+
+class ClientNotificationState(TypedDict):
+    generation: str | None
+    revision: int | None
+    seed: bool
+
+
 @dataclass(frozen=True)
 class PollRequest:
     """Canonical polling request consumed by the route executor."""
 
     version: int
     client_id: str
-    subscriptions: tuple
-    closed_documents: tuple
-    notification_state: dict | None
+    subscriptions: tuple[PollDescriptor, ...]
+    closed_documents: tuple[str, ...]
+    notification_state: ClientNotificationState | None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/contract.py::parse_poll_request
-# @reason field paths are exercised through parser diagnostics
 def _field(path, name):
     return f"{path}.{name}" if path else name
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/contract.py::parse_poll_request
-# @reason object shape checks are exercised through the public parser
 def _object(value, path):
     if not isinstance(value, dict):
         raise PollContractError(path, "type")
     return value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/contract.py::parse_poll_request
-# @reason exact field checks are exercised through the public parser
 def _fields(value, path, required, optional=()):
     allowed = frozenset((*required, *optional))
     for name in required:
@@ -73,10 +101,11 @@ def _fields(value, path, required, optional=()):
             raise PollContractError(_field(path, name), "unexpected")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/contract.py::parse_poll_request
-# @reason bounded string checks are exercised through the public parser
-def _string(value, path, *, maximum, nullable=False):
+@overload
+def _string(value: object, path: str, *, maximum: int, nullable: Literal[False] = False) -> str: ...
+@overload
+def _string(value: object, path: str, *, maximum: int, nullable: bool) -> str | None: ...
+def _string(value: object, path: str, *, maximum: int, nullable: bool = False) -> str | None:
     if nullable and value is None:
         return None
     if not isinstance(value, str):
@@ -88,10 +117,7 @@ def _string(value, path, *, maximum, nullable=False):
     return value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/contract.py::parse_poll_request
-# @reason integer cursor checks are exercised through the public parser
-def _revision_integer(value, path):
+def _revision_integer(value: object, path: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise PollContractError(path, "type")
     if value < 0:
@@ -101,20 +127,14 @@ def _revision_integer(value, path):
     return value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/contract.py::parse_poll_request
-# @reason document identifier checks are exercised through the public parser
-def _document_id(value, path):
+def _document_id(value: object, path: str) -> str:
     value = _string(value, path, maximum=MAX_POLL_KEY_LENGTH)
     if not value.endswith(":document"):
         raise PollContractError(path, "unsupported")
     return value
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/contract.py::parse_poll_request
-# @reason type-specific descriptor normalization is exercised through the public parser
-def _descriptor(raw, index, identifiers):
+def _descriptor(raw: object, index: int, identifiers: set[str]) -> PollDescriptor:
     path = f"subscriptions[{index}]"
     value = _object(raw, path)
     for name in ("id", "type", "revision"):
@@ -145,59 +165,44 @@ def _descriptor(raw, index, identifiers):
     revision_path = _field(path, "revision")
     if subscription_type in {"operation", "document"}:
         revision = _revision_integer(value["revision"], revision_path)
-    else:
-        revision = _string(
-            value["revision"],
-            revision_path,
-            maximum=MAX_POLL_CURSOR_LENGTH,
-            nullable=subscription_type != "form-lock",
-        )
-
-    normalized = {
-        "id": identifier,
-        "type": subscription_type,
-        "revision": revision,
-    }
-    if subscription_type == "channel":
-        channel = _string(value["channel"], _field(path, "channel"), maximum=64)
-        if channel not in POLL_CHANNELS:
-            raise PollContractError(_field(path, "channel"), "unsupported")
-        normalized["channel"] = channel
-    else:
-        normalized["key"] = _string(
-            value["key"],
-            _field(path, "key"),
-            maximum=MAX_POLL_KEY_LENGTH,
-        )
-
-    if subscription_type == "document":
-        normalized.update(
-            {
-                "sync_id": _document_id(
-                    value["sync_id"], _field(path, "sync_id")
-                ),
+        key = _string(value["key"], _field(path, "key"), maximum=MAX_POLL_KEY_LENGTH)
+        if subscription_type == "document":
+            normalized: PollDescriptor = {
+                "id": identifier,
+                "type": "document",
+                "key": key,
+                "revision": revision,
+                "sync_id": _document_id(value["sync_id"], _field(path, "sync_id")),
                 "generation": _string(
-                    value["generation"],
-                    _field(path, "generation"),
-                    maximum=MAX_POLL_STATE_TOKEN_LENGTH,
-                    nullable=True,
+                    value["generation"], _field(path, "generation"),
+                    maximum=MAX_POLL_STATE_TOKEN_LENGTH, nullable=True,
                 ),
                 "presence_digest": _string(
-                    value["presence_digest"],
-                    _field(path, "presence_digest"),
-                    maximum=MAX_POLL_STATE_TOKEN_LENGTH,
-                    nullable=True,
+                    value["presence_digest"], _field(path, "presence_digest"),
+                    maximum=MAX_POLL_STATE_TOKEN_LENGTH, nullable=True,
                 ),
             }
+        else:
+            normalized = {"id": identifier, "type": "operation", "key": key, "revision": revision}
+    else:
+        revision = _string(
+            value["revision"], revision_path, maximum=MAX_POLL_CURSOR_LENGTH,
+            nullable=subscription_type != "form-lock",
         )
+        if subscription_type == "channel":
+            channel = _string(value["channel"], _field(path, "channel"), maximum=64)
+            if channel not in POLL_CHANNELS:
+                raise PollContractError(_field(path, "channel"), "unsupported")
+            normalized = {"id": identifier, "type": "channel", "channel": channel, "revision": revision}
+        else:
+            assert subscription_type == "entity" or subscription_type == "ingress" or subscription_type == "form-lock"
+            key = _string(value["key"], _field(path, "key"), maximum=MAX_POLL_KEY_LENGTH)
+            normalized = {"id": identifier, "type": subscription_type, "key": key, "revision": revision}
     identifiers.add(identifier)
     return normalized
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/polling/contract.py::parse_poll_request
-# @reason notification cursor modes are exercised through the public parser
-def _notification_state(raw):
+def _notification_state(raw: object) -> ClientNotificationState:
     path = "notification_state"
     value = _object(raw, path)
     _fields(value, path, ("generation", "revision", "seed"))
@@ -222,13 +227,7 @@ def _notification_state(raw):
     return {"generation": generation, "revision": revision, "seed": seed}
 
 
-# @testable true
-# @tests tests_unit/test_026_polling_contract.py::test_poll_contract_accepts_each_descriptor_type
-# @tests tests_unit/test_026_polling_contract.py::test_poll_contract_reports_exact_invalid_field
-# @tests tests_unit/test_026_polling_contract.py::test_poll_contract_rejects_invalid_notification_and_close_state
-# @matrix notifications : duplicates notification-state presence validation
-# @matrix polling : bounds cursor-types descriptors diagnostics duplicates notification-state presence protocol strict-fields validation
-def parse_poll_request(payload):
+def parse_poll_request(payload: object) -> PollRequest:
     """Parse one exact version-1 request or raise a safe contract error."""
     value = _object(payload, "request")
     _fields(

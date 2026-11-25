@@ -5,7 +5,7 @@ Maps to:
 - Entity: lagniappe/core/entities/page.py
 - Routes: lagniappe/web/routes/pages/
 - Templates: lagniappe/web/templates/pages/
-- View: src/script/views/page.mjs
+- View: src/script/views/page.ts
 """
 
 from playwright.sync_api import expect

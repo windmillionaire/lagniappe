@@ -48,10 +48,7 @@ _SETUP_DEPENDENCIES = (
 )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_package_install_helpers
-# @pair setup:package-install
-def ensure_pip_is_available():
+def ensure_pip_is_available() -> None:
     """Checks if pip is available, tries to install it if not, and provides guidance."""
     try:
         # Try to run pip --version
@@ -126,7 +123,7 @@ def ensure_pip_is_available():
         )
         print(
             wrap_text(
-                (
+
                     "\nFor Windows (if the above fails or python is not in PATH):\n  - "
                     f"Search for '{ui.literal('Manage app execution aliases')}' in "
                     f"Windows settings.\n  - Ensure '{ui.literal('python.exe')}' and '"
@@ -137,7 +134,7 @@ def ensure_pip_is_available():
                     "Pythons):\n  - Use 'python3' or the specific Python executable "
                     "path.\n  - You might need to use 'sudo' if installing system-wide "
                     "(not recommended if using virtual environments):"
-                )
+
             ),
             file=sys.stderr,
         )
@@ -149,16 +146,10 @@ def ensure_pip_is_available():
         raise SetupError("Automatic pip installation failed.") from e
 
 
-# @testable false
-# @covered-by installer/package_install.py::_pinned_requirement
-# @reason package-name normalization is an internal part of setup pin lookup
 def _normalize_package_name(package_name):
     return re.sub(r"[-_.]+", "-", package_name.split("[", 1)[0]).lower()
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_dependency_transaction_validates_versions_and_pip_check
-# @matrix setup : dependency-pins package-install
 def _requirement_version(requirement):
     match = re.match(
         r"^([a-zA-Z0-9_.-]+)(?:\[[^\]]+\])?==([^;\s]+)",
@@ -169,9 +160,6 @@ def _requirement_version(requirement):
     return match.group(1), match.group(2)
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_package_install_helpers
-# @matrix setup : dependency-pins package-install
 def _pinned_requirement(package_name):
     normalized_name = _normalize_package_name(package_name)
 
@@ -192,9 +180,6 @@ def _pinned_requirement(package_name):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_dependency_transaction_validates_versions_and_pip_check
-# @matrix setup : dependency-pins package-install
 def _dependency_status(import_name, package_name, *, check_import=True):
     """Return whether a distribution matches its pin and optionally imports."""
     requirement = _pinned_requirement(package_name)
@@ -222,9 +207,6 @@ def _dependency_status(import_name, package_name, *, check_import=True):
     return requirement, True, installed_version
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_dependency_transaction_validates_versions_and_pip_check
-# @matrix setup : dependency-pins package-install
 def _run_pip_check():
     result = subprocess.run(
         [sys.executable, "-m", "pip", "check"],
@@ -240,11 +222,7 @@ def _run_pip_check():
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_dependency_transaction_validates_versions_and_pip_check
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_dependency_transaction_repairs_transitive_conflicts
-# @matrix setup : dependency-pins package-install
-def ensure_setup_dependencies():
+def ensure_setup_dependencies() -> bool:
     """Validate/install the default setup dependency set in one pip transaction."""
     pending = []
     for import_name, package_name, explanation in _SETUP_DEPENDENCIES:
@@ -274,7 +252,7 @@ def ensure_setup_dependencies():
                     "Setup needs to install or correct these Python dependencies:"
                 )
             )
-            for _import_name, package_name, explanation, requirement, detail in pending:
+            for _import_name, _package_name, explanation, requirement, detail in pending:
                 print(f"  {requirement} — {explanation} ({detail})")
             if compatibility_error:
                 print(
@@ -340,9 +318,6 @@ def ensure_setup_dependencies():
     return True
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_package_install_helpers
-# @matrix setup : dependency-pins package-install
 def _install(package_name, import_name):
     requirement = _pinned_requirement(package_name)
     result = subprocess.run(
@@ -363,10 +338,9 @@ def _install(package_name, import_name):
     _run_pip_check()
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_package_install_helpers
-# @pair setup:package-install
-def install_if_missing(import_name, explanation=None, package_name=None):
+def install_if_missing(
+    import_name: str, explanation: str | None = None, package_name: str | None = None
+) -> None:
     """Test import and install if missing.
 
     Uses stderr for all output and pauses active setup spinners so prompts
@@ -401,7 +375,7 @@ def install_if_missing(import_name, explanation=None, package_name=None):
                     print(ui.status(wrap_text("Aborting installer.")))
                     raise SetupCancelled(
                         f"Installation of {package_name} was cancelled."
-                    )
+                    ) from None
 
             print(ui.activity(f"Installing {package_name}"), file=sys.stderr)
             try:

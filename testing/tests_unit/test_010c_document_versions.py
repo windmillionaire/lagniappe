@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from types import SimpleNamespace
 
 import pytest
@@ -10,11 +10,10 @@ from testing.utility.test_entities import TestEntities
 pytestmark = pytest.mark.unit
 
 
-# @matrix document-history : backups permissions pagination generation-pinned
 def test_storage_backups_are_scoped_paginated_and_generation_bound(monkeypatch):
     entity = SimpleNamespace(hash="document-owner", urlsafe_key="page-key")
     other = SimpleNamespace(hash="other-owner", urlsafe_key="other-key")
-    now = datetime(2026, 9, 26, tzinfo=timezone.utc)
+    now = datetime(2026, 9, 26, tzinfo=UTC)
     calls = []
     def blob(name, deleted=True):
         return SimpleNamespace(name=name, generation=1234, time_deleted=now if deleted else None, time_created=now)
@@ -45,7 +44,6 @@ def test_storage_backups_are_scoped_paginated_and_generation_bound(monkeypatch):
     assert calls[-1]["page_token"] == "next-page"
 
 
-# @matrix document-history : recovery idempotency empty-content
 def test_recovery_pin_retry_is_scoped_and_keeps_empty_versions(monkeypatch):
     entity = SimpleNamespace(hash="page", key="page")
     user = SimpleNamespace(hash="user")
@@ -70,8 +68,6 @@ def test_recovery_pin_retry_is_scoped_and_keeps_empty_versions(monkeypatch):
         history.recovery_pin(entity, user, **{**options, "operation_id": "arbitrary-path"})
 
 
-# @source lagniappe/core/entities/history.py::DocumentHistory
-# @matrix document-history : validation current-content
 def test_empty_recovery_version_is_restorable_without_allowing_empty_manual_pins(monkeypatch):
     page = TestEntities.get("PAGE", {"name": "Empty document", "hash": "empty-recovery"})
     from lagniappe.core.entities import entity as entity_module

@@ -1,5 +1,14 @@
 """Task-oriented proposal display adapters."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.tools.ai.reporting.contracts.actions import ActionData, ReportAction
+    from lagniappe.core.tools.ai.reporting.display.details import ProposalDetailCollector
+
+
 from ..contracts import (
     InheritedProposalDetail,
     ProposalActionDisplay,
@@ -7,16 +16,20 @@ from ..contracts import (
 )
 
 
-# @testable infrastructure
-def model_task_details(details, data, action=None):
+def model_task_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("Project", data, "project")
     details.reference("Form", data, "form")
 
 
-# @testable true
-# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_completed_task_events
-# @matrix ai-report : completed-task proposal
-def task_details(details, data, action=None):
+def task_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("Task", data, "task")
     details.reference("Page", data, "page")
     details.reference("Project", data, "project")
@@ -32,8 +45,11 @@ def task_details(details, data, action=None):
         details.add_reference("File", file_ref)
 
 
-# @testable infrastructure
-def move_task_details(details, data, action=None):
+def move_task_details(
+    details: ProposalDetailCollector,
+    data: ActionData,
+    action: ReportAction | None = None,
+) -> None:
     details.reference("Task", data, "task")
     details.reference("Page", data, "to_page", "page")
 

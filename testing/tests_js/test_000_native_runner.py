@@ -82,3 +82,67 @@ def test_native_pytest_collection_selection_skips_and_last_failure(tmp_path):
     rerun = invoke("--lf")
     assert rerun.returncode == 1
     assert "1 failed" in rerun.stdout
+
+
+def test_native_batched_file_execution_preserves_isolation_and_error_attribution():
+    outcomes = native_js.run_file_cases(
+        FIXTURES / "cases.mjs",
+        [
+            "test_pass",
+            "test_write_global",
+            "test_clean_global",
+            "test_fail",
+            "test_caught_network",
+            "test_missing_result",
+            "test_unhandled_error",
+        ],
+    )
+    assert isinstance(outcomes["test_pass"], dict)
+    assert outcomes["test_pass"]["type"] == "test:pass"
+    assert isinstance(outcomes["test_write_global"], dict)
+    assert outcomes["test_write_global"]["type"] == "test:pass"
+    # Even though test_write_global mutates globalThis in the same file,
+    # isolated per-case fallback must keep test_clean_global passing.
+    assert isinstance(outcomes["test_clean_global"], dict)
+    assert outcomes["test_clean_global"]["type"] == "test:pass"
+
+    assert isinstance(outcomes["test_fail"], native_js.JavaScriptFailure)
+    assert "expected" in str(outcomes["test_fail"])
+    assert isinstance(outcomes["test_caught_network"], native_js.JavaScriptFailure)
+    assert "Unaccounted network" in str(outcomes["test_caught_network"])
+    assert isinstance(outcomes["test_missing_result"], native_js.JavaScriptFailure)
+    assert "matching results 0" in str(outcomes["test_missing_result"])
+    assert isinstance(outcomes["test_unhandled_error"], native_js.JavaScriptFailure)
+    assert "late exception" in str(outcomes["test_unhandled_error"])
+
+
+def test_native_pytest_parallel_multi_file_execution(tmp_path):
+    first = tmp_path / "test_first.mjs"
+    second = tmp_path / "test_second.mjs"
+    shutil.copyfile(FIXTURES / "cases.mjs", first)
+    shutil.copyfile(FIXTURES / "cases.mjs", second)
+    (tmp_path / "conftest.py").write_text(
+        "from testing.utility.native_js_pytest import collect_file as pytest_collect_file\n"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-c",
+            str(native_js.REPO_ROOT / "testing/pytest.ini"),
+            "-o",
+            f"cache_dir={tmp_path / 'cache'}",
+            "-k",
+            "test_pass or test_write_global or test_clean_global",
+            str(first),
+            str(second),
+        ],
+        cwd=native_js.REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "6 passed" in result.stdout

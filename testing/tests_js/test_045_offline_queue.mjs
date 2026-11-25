@@ -6,7 +6,7 @@ import { createBrowser, installIndexedDB } from "../utility/js/environment.mjs";
 async function setup(t, options = {}) {
 	const dom = createBrowser(t, { formData: "native", ...options });
 	installIndexedDB(t, dom.window);
-	const storage = await import("../../src/script/shared/offline.mjs");
+	const storage = await import("../../src/script/shared/offline.ts");
 	let respond = () => ({ ok: true });
 	let handle = () => {};
 	const sent = [];
@@ -20,9 +20,9 @@ async function setup(t, options = {}) {
 		return respond(route, data);
 	});
 	const { OfflineQueue } = await esmock.strict(
-		"../../src/script/shared/offlineQueue.mjs",
+		"../../src/script/shared/offlineQueue.ts",
 		{
-			"../../src/script/shared/request.mjs": {
+			"../../src/script/shared/request.ts": {
 				request: { post: send, put: send, delete: send },
 			},
 		},
@@ -88,7 +88,6 @@ async function remaining(env, queue, ids) {
 	assert.equal(queue._replaying, false);
 }
 
-/** @matrix offline : queue-preserved replay-order */
 test("test_offline_replay_blocks_later_records_after_the_oldest_record_fails", async (t) => {
 	const env = await setup(t);
 	for (const [response, expectedPhases] of [
@@ -110,7 +109,6 @@ test("test_offline_replay_blocks_later_records_after_the_oldest_record_fails", a
 	}
 });
 
-/** @matrix offline : conflict-durability late-widget */
 test("test_late_form_receives_persisted_conflict_after_replay", async (t) => {
 	const env = await setup(t);
 	env.view.components = {};
@@ -134,7 +132,6 @@ test("test_late_form_receives_persisted_conflict_after_replay", async (t) => {
 	await remaining(env, queue, ["first"]);
 });
 
-/** @matrix offline : queue-preserved replay-order retry-boundary */
 test("test_offline_replay_returns_the_completed_prefix_and_retries_the_oldest_record", async (t) => {
 	const env = await setup(t);
 	let secondFailed = false;
@@ -145,12 +142,29 @@ test("test_offline_replay_returns_the_completed_prefix_and_retries_the_oldest_re
 		}
 		return { ok: true };
 	});
-	const queue = await env.seed([record("first", 1), record("second", 2)]);
+	const queue = await env.seed([
+		{
+			id: "first",
+			route: "/first",
+			files: [
+				{
+					name: "attachment",
+					file: new File(["legacy attachment"], "original.txt"),
+					filename: "queued.txt",
+				},
+			],
+		},
+		record("second", 2),
+	]);
 	assert.equal(await queue.replay(), 1);
 	assert.deepEqual(
 		env.sent.map(({ id }) => id),
 		["first", "second"],
 	);
+	assert.equal(env.sent[0].data.get("offline"), "True");
+	const attachment = env.sent[0].data.get("attachment");
+	assert.equal(attachment.name, "queued.txt");
+	assert.equal(await attachment.text(), "legacy attachment");
 	assert.deepEqual(env.phases, ["replayed:first"]);
 	await remaining(env, queue, ["second"]);
 	assert.equal(await queue.replay(), 1);
@@ -162,7 +176,6 @@ test("test_offline_replay_returns_the_completed_prefix_and_retries_the_oldest_re
 	await remaining(env, queue, []);
 });
 
-/** @matrix offline : conflict-rebase replay-order */
 test("test_offline_replay_retries_rebased_record_before_later_record", async (t) => {
 	const env = await setup(t);
 	env.respond((route, data) =>
@@ -209,7 +222,6 @@ test("test_offline_replay_retries_rebased_record_before_later_record", async (t)
 	await remaining(env, queue, []);
 });
 
-/** @matrix offline : queue-preserved replay-order retry-boundary */
 test("test_offline_replay_releases_ownership_after_handler_errors", async (t) => {
 	const env = await setup(t);
 	env.respond(() => ({ ok: true, conflict: true }));
@@ -258,12 +270,6 @@ test("test_offline_replay_releases_ownership_after_handler_errors", async (t) =>
 	await remaining(env, replayedQueue, []);
 });
 
-/**
- * @matrix offline : queue-submit reload replay queue-preserved
- * @source src/script/shared/offline.mjs::setOfflineMutation
- * @source src/script/shared/offline.mjs::getOfflineMutations
- * @source src/script/shared/offline.mjs::deleteOfflineMutations
- */
 test("test_offline_queue_recovers_persisted_mutation_and_replaces_optimistic_dom", async (t) => {
 	const env = await setup(t, {
 		html: '<ul><li data-key="offline:client-1">Pending title</li></ul>',

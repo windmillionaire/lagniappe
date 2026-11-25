@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+    from lagniappe.core.entities.entity import Entity
+    from lagniappe.core.entities.file import File
+
+
 import hashlib
 
 from itsdangerous import BadData, URLSafeTimedSerializer
@@ -13,10 +21,6 @@ TASK_ATTACHMENT_CLAIM_MAX_AGE = 60 * 60
 TASK_ATTACHMENT_CLAIM_SALT = "lagniappe-task-attachment-v1"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/task_attachments.py::sign_task_attachment_claim
-# @covered-by lagniappe/core/tools/auth/task_attachments.py::valid_task_attachment_claim
-# @reason serializer configuration is exercised through signed claim operations
 def _serializer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(
         CONFIG.SECRET_KEY,
@@ -25,18 +29,11 @@ def _serializer() -> URLSafeTimedSerializer:
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/auth/task_attachments.py::sign_task_attachment_claim
-# @covered-by lagniappe/core/tools/auth/task_attachments.py::valid_task_attachment_claim
-# @reason entity identity normalization is exercised through signed claim operations
 def _key(entity):
     return getattr(entity, "urlsafe_key", None)
 
 
-# @testable true
-# @tests tests_unit/test_031_submitted_references.py::test_task_attachment_claim_is_actor_file_scope_bound_and_expiring
-# @matrix task-attachments : actor expiry file scope signed-claim
-def sign_task_attachment_claim(*, actor, file, scope) -> str:
+def sign_task_attachment_claim(*, actor: User, file: File, scope: Entity) -> str:
     """Sign permission to attach one new File within one authorized scope."""
     payload = {
         "v": 1,
@@ -50,16 +47,13 @@ def sign_task_attachment_claim(*, actor, file, scope) -> str:
     return _serializer().dumps(payload)
 
 
-# @testable true
-# @tests tests_unit/test_031_submitted_references.py::test_task_attachment_claim_is_actor_file_scope_bound_and_expiring
-# @matrix task-attachments : actor expiry file scope signed-claim tamper validation
 def valid_task_attachment_claim(
-    claim,
+    claim: str | None,
     *,
-    actor,
-    file,
-    scope,
-    max_age=TASK_ATTACHMENT_CLAIM_MAX_AGE,
+    actor: User,
+    file: File,
+    scope: Entity,
+    max_age: int = TASK_ATTACHMENT_CLAIM_MAX_AGE,
 ) -> bool:
     """Return whether a claim authorizes this exact attachment operation."""
     if not claim:

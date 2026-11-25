@@ -44,7 +44,7 @@ by `default` or when no active widget exists. `data-persistent="true"` keeps a
 component or widget rendered when inactive. `data-tab="true"` marks a child
 component as an Entity tab.
 
-A widget's `data-widget` must match `widgets/loader.mjs` or intentionally use
+A widget's `data-widget` must match `widgets/loader.ts` or intentionally use
 the no-op default widget. Put request and presentation configuration on the
 widget:
 

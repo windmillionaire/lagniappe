@@ -3,16 +3,17 @@
 Location field edge cases and Places helpers are in ``test_003d_submission_location.py``.
 """
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 
+from lagniappe.core.properties.form_select import Select
 from lagniappe.core.tools.http import OutboundResult, OutboundStatus
 
 pytestmark = pytest.mark.unit
 
 
-# @matrix radio : ai-value column filter-value fuzzy-match import
 def test_submission_radio(get_test_entities, get_schema, test_submission_values):
     """Test Radio field outputs."""
     for entity in get_test_entities():
@@ -20,7 +21,6 @@ def test_submission_radio(get_test_entities, get_schema, test_submission_values)
         test_submission_values(entity)
 
 
-# @matrix select : ai-value column filter-value import
 def test_submission_select_single(
     get_test_entities, get_schema, test_submission_values
 ):
@@ -30,7 +30,6 @@ def test_submission_select_single(
         test_submission_values(entity)
 
 
-# @matrix select : ai-value column filter-value fuzzy-match import multiple separator
 def test_submission_select_multiple(
     get_test_entities, get_schema, test_submission_values
 ):
@@ -40,7 +39,6 @@ def test_submission_select_multiple(
         test_submission_values(entity)
 
 
-# @matrix link : ai-value external filter-value import
 def test_submission_link_external(
     get_test_entities, get_schema, test_submission_values
 ):
@@ -54,7 +52,6 @@ def test_submission_link_external(
             test_submission_values(entity)
 
 
-# @matrix bookmark : ai-value filter-value
 def test_submission_bookmark(get_test_entities, get_schema, test_submission_values):
     """Test Bookmark field outputs with mocked metadata fetch."""
     with patch(
@@ -66,7 +63,6 @@ def test_submission_bookmark(get_test_entities, get_schema, test_submission_valu
             test_submission_values(entity)
 
 
-# @matrix bookmark : replace-fields side-effects
 def test_submission_bookmark_replace_flags_update_entity_fields(
     get_test_entities, get_schema, test_submission_values
 ):
@@ -96,7 +92,7 @@ def test_submission_bookmark_replace_flags_update_entity_fields(
         for entity in get_test_entities():
             saved_assets = []
 
-            def save_asset(content, name, asset_type, visibility="private"):
+            def save_asset(content, name, asset_type, visibility="private", *, saved_assets=saved_assets):
                 saved_assets.append((content, name, asset_type, visibility))
                 return True
 
@@ -128,7 +124,6 @@ def test_submission_bookmark_replace_flags_update_entity_fields(
             download_image.assert_called_once_with(metadata["image"])
 
 
-# @matrix location : ai-value column filter-value import
 def test_submission_location(get_test_entities, get_schema, test_submission_values):
     """Test Location field outputs with mocked place details."""
     # Use side_effect (not return_value) so each validation gets a fresh dict.
@@ -150,3 +145,23 @@ def test_submission_location(get_test_entities, get_schema, test_submission_valu
         for entity in get_test_entities():
             entity.form.schema = get_schema(entity.test_spec["form"]["schema"])
             test_submission_values(entity)
+
+
+def test_select_fuzzy_lookup_without_a_candidate_and_read_only_options(monkeypatch):
+    field = Select(
+        {"id": "category", "options": [{"value": "h", "label": "Home"}]},
+        entity=SimpleNamespace(entity_kind="page"),
+    )
+    field.fuzzy_match = True
+    monkeypatch.setattr(
+        "lagniappe.core.properties.form_select.process.extractOne",
+        lambda *_: None,
+    )
+    field.validate_import(values=["Unknown"])
+    assert field.value is None
+    assert len(field.warnings) == 1
+    assert "No match found" in field.warnings[0]
+    with pytest.raises(AttributeError):
+        field.choices = {}
+    with pytest.raises(AttributeError):
+        field.field_type = None

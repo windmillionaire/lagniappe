@@ -1,17 +1,31 @@
 import json
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from ..definitions import Ordering
-from ..mixins import AIMixin, FilterMixin, ColumnMixin, SearchMixin
+from ..mixins import AIMixin, ColumnMixin, FilterMixin, SearchMixin
+from .base_schema import FieldDefinition, SchemaProperty, SchemaSource
 from .base_submission import _is_blank_value
-from .base_schema import SchemaProperty
+from .form_inputs import TextInput
 from .form_links import Link
-from .row_submission import RowSubmission, TableColumnFields
+from .row_submission import (
+    ColumnField,
+    ImportSettings,
+    RowSubmission,
+    TableColumnFields,
+)
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
 
 
-# @testable true
-# @tests tests_unit/test_003e_tables.py::test_table_ai_rejects_malformed_rows_without_losing_values
-# @matrix form-table : ai-value validation
-def validate_ai_table(value, columns=None):
+class TableValue(TypedDict):
+    rows: list[dict[str, object]]
+
+
+def validate_ai_table(
+    value: object, columns: list[FieldDefinition] | None = None
+) -> None:
     """Check the table envelope and exact column keys before consuming AI values."""
     if value is None:
         return
@@ -25,17 +39,7 @@ def validate_ai_table(value, columns=None):
             raise ValueError(f"Table row {index} contains unknown column ids; use the exact ids from the form schema.")
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/form_table.py::Table.value
-# @covered-by lagniappe/core/properties/form_table.py::Table.fields
-# @covered-by lagniappe/core/properties/form_table.py::Table.links
-# @covered-by lagniappe/core/properties/form_table.py::Table.validate_import
-# @covered-by lagniappe/core/properties/form_table.py::Table.validate_row_submission
-# @covered-by lagniappe/core/properties/form_table.py::Table.ai_value
-# @covered-by lagniappe/core/properties/form_table.py::Table.filter_value
-# @covered-by lagniappe/core/properties/form_table.py::Table.search_value
-# @reason table behavior is owned by row construction and projection properties
-class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
+class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty[TableValue]):
     """Inline table field with column definitions and row submissions.
 
     Each column is a TableColumnField (TextInput, DateInput, etc.).
@@ -55,30 +59,27 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
 
     _icon = "table"
 
-    def __init__(self, *args, entity=None, **kwargs):
+    def __init__(
+        self, *args: SchemaSource, entity: Entity | None = None, **kwargs: object
+    ) -> None:
         super().__init__(*args, entity=entity, **kwargs)
-        self._fields = None
-        self._rows = None
-        self._search_fields = None
-        self._import_process = None
+        self._fields: dict[str, ColumnField] | None = None
+        self._rows: list[RowSubmission] | None = None
+        self._search_fields: list[TextInput] | None = None
+        self._import_process: ImportSettings | None = None
 
     # Property Attributes
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_form_single_row
-    # @tests tests_unit/test_003e_tables.py::test_table_form_empty
-    # @tests tests_unit/test_003e_tables.py::test_table_form_mixed_column_types
-    # @matrix form-table : db-value empty form-submission mixed-columns
     @property
-    def value(self):
+    def value(self) -> TableValue:
         if self.is_set:
-            return self._value
+            return cast(TableValue, self._value)
 
         self._value = {"rows": [r.db_value for r in self.rows]}
-        return self._value
+        return cast(TableValue, self._value)
 
     @value.setter
-    def value(self, value):
-        value = value or {}
+    def value(self, value: object) -> None:
+        value = cast(TableValue | list[dict[str, object]], value or {})
         rows = value if isinstance(value, list) else value.get("rows", [])
         self._rows = [RowSubmission(self, row) for row in rows]
         if self._rows:
@@ -87,22 +88,19 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
             self.unset()
 
     @property
-    def columns(self):
-        return self.get("columns", [])
+    def columns(self) -> list[FieldDefinition]:
+        return cast(list[FieldDefinition], self.get("columns", []))
 
     @property
-    def rows(self):
+    def rows(self) -> list[RowSubmission]:
         if self._rows is not None:
             return self._rows
 
         self._rows = []
         return self._rows
 
-    # @testable true
-    # @tests tests_unit/test_004_form_properties.py::test_form_table_fields
-    # @pair form-table:table-fields
     @property
-    def fields(self):
+    def fields(self) -> dict[str, ColumnField]:
         if self._fields is not None:
             return self._fields
 
@@ -111,11 +109,8 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
         self._fields = {f.id: f for f in fields if f is not None}
         return self._fields
 
-    # @testable true
-    # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_links_internal_top_level_and_table_row
-    # @matrix form-table : internal links row-submission
     @property
-    def links(self):
+    def links(self) -> list[Link]:
         return [
             f
             for r in self.rows
@@ -123,31 +118,21 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
             if isinstance(f, Link) and f.is_entity_valued
         ]
 
-    def reset(self):
+    def reset(self) -> None:
         super().reset()
         self._rows = None
 
-    def set_import_process(self, import_process):
+    def set_import_process(self, import_process: ImportSettings | None) -> None:
         self._import_process = import_process
 
     # Ingress Attributes
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_import_single_row
-    # @tests tests_unit/test_003e_tables.py::test_table_import_multiple_rows
-    # @tests tests_unit/test_003e_tables.py::test_table_import_mixed_column_types
-    # @tests tests_unit/test_003e_tables.py::test_table_import_row_length_mismatch
-    # @tests tests_unit/test_003e_tables.py::test_table_validate_import_row_length_mismatch_raises_value_error
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_exact_match
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_fuzzy_match_warning
-    # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_no_match_records_error
-    # @matrix form-table link submission : entity-resolution fuzzy-match import internal no-match validation weak-match
-    def validate_import(self, rows):
+    def validate_import(self, rows: object) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] -- preserve the existing keyword for this table validator.
         # rows should be a list of lists, each list containing the values for a single row
         # rows should be in the same order as the column fields
         self.reset()
         if not rows:
             return
-        for row in rows:
+        for row in cast(Iterable[list[object]], rows):
             if len(row) != len(self.fields):
                 raise ValueError("Row length does not match number of columns")
             row_submission = RowSubmission.validate_import(
@@ -164,19 +149,14 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
             self.unset()
 
     # AI Attributes
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_ai_multiple_rows
-    # @tests tests_unit/test_003e_tables.py::test_table_ai_rejects_malformed_rows_without_losing_values
-    # @matrix form-table : ai-value multiple-rows
-    # @pair form-table:validation
-    def validate_ai(self, ai_submission):
+    def validate_ai(self, ai_submission: object) -> None:  # pyright: ignore[reportIncompatibleMethodOverride] -- preserve the existing keyword for this table validator.
         validate_ai_table(ai_submission, self.columns)
         self.reset()
         if not ai_submission:
             return
         # ai_submission should be a dict with a "rows" key that contains a list of submission values for each row
         # each row should be a dict with the field ids as keys and the submission values as values
-        for row in ai_submission.get("rows", []):
+        for row in cast(TableValue, ai_submission).get("rows", []):
             row_submission = RowSubmission.validate_ai(self, row)
             for field in row_submission.fields.values():
                 self.errors.extend(field.errors)
@@ -187,14 +167,8 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
         else:
             self.unset()
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_ai_multiple_rows
-    # @tests tests_unit/test_003e_tables.py::test_table_import_multiple_rows
-    # @tests tests_unit/test_015_ai_tools.py::test_get_schema_preserves_collection_rows_and_typed_cells
-    # @matrix form-table : ai-value multiple-rows
-    # @pair form-table:typed-values
     @property
-    def ai_value(self):
+    def ai_value(self) -> TableValue | None:
         rows = []
         for row in self.rows:
             row_dict = {}
@@ -207,21 +181,13 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
             rows.append(row_dict)
         return {"rows": rows} if rows else None
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_row_submission_text_email_checkbox
-    # @tests tests_unit/test_003e_tables.py::test_table_row_submission_external_link_column
-    # @tests tests_unit/test_003e_tables.py::test_table_row_submission_internal_link_column
-    # @matrix form-table link : row-submission
-    def validate_row_submission(self, values):
+    def validate_row_submission(self, values: dict[str, object]) -> dict[str, object]:
         # values are sent from the frontend as a single row submission
         # they are returned and the form is submitted with a complete "rows" list
         new_row = RowSubmission.validate_submission(self, values)
         return {field_id: f.form_value for field_id, f in new_row.fields.items()}
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_validate_submission_invalid_json
-    # @matrix form-table : form-submission validation
-    def validate_submission(self, value):
+    def validate_submission(self, value: object) -> None:
         # values are sent from the frontend as a complete "rows" list from a json-formatted hidden input
         # the rows have already been validated, so we can just add them to the list
         value = json.loads(value) if isinstance(value, str) else value
@@ -231,37 +197,29 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
     _ordering = Ordering.EXISTS
 
     @property
-    def sort_value(self):
-        return True if self.value else False
+    def sort_value(self) -> bool:
+        return bool(self.value)
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_form_single_row
-    # @tests tests_unit/test_003e_tables.py::test_table_form_empty
-    # @tests tests_unit/test_003e_tables.py::test_table_form_mixed_column_types
-    # @matrix form-table : column empty mixed-columns
     @property
-    def column_value(self):
+    def column_value(self) -> dict[str, int] | None:
         num_rows = len(self.value.get("rows", []))
         if not num_rows:
             return None
         return {"num_rows": num_rows}
 
     # Filter Attributes
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_import_multiple_rows
-    # @matrix form-table : filter-value multiple-rows
     @property
-    def filter_value(self):
+    def filter_value(self) -> dict[str, list[object]]:
         # returns a dict with the field ids as keys and a list of filter values for each row
         filter_values = {
             field_id: [r.fields[field_id].filter_value for r in self.rows]
-            for field_id in self.fields.keys()
+            for field_id in self.fields
         }
         return {k: v for k, v in filter_values.items() if v}
 
     # Search Attributes
     @property
-    def search_fields(self):
+    def search_fields(self) -> list[TextInput]:
         if self._search_fields is not None:
             return self._search_fields
 
@@ -271,39 +229,31 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
         return self._search_fields
 
     @property
-    def search_key(self):
+    def search_key(self) -> list[str | None]:
         return [key for key, _value in self._search_pairs()]
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_form_mixed_column_types
-    # @tests tests_unit/test_004e_submission_behavior.py::test_submission_search_value_merges_table_column_labels
-    # @tests tests_unit/test_004e_submission_behavior.py::test_table_search_keys_match_multiple_row_values
-    # @matrix form-table : multiple-rows search-value
     @property
-    def search_value(self):
+    def search_value(self) -> list[object]:
         return [value for _key, value in self._search_pairs()]
 
-    def _search_pairs(self):
+    def _search_pairs(self) -> list[tuple[str | None, object]]:
         pairs = []
         for row in self.rows:
             for field in self.search_fields:
-                value = row.fields[field.id].search_value
+                cell = row.fields[field.id]
+                if not isinstance(cell, SearchMixin):
+                    continue
+                value = cell.search_value
                 if value is not None and value != "":
                     pairs.append((field.search_key, value))
         return pairs
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_form_empty
-    # @matrix form-table : empty form-submission
     @property
-    def form_value(self):
+    def form_value(self) -> TableValue | None:
         return {"rows": [r.form_value for r in self.rows]} if self.rows else None
 
-    # @testable true
-    # @tests tests_unit/test_003e_tables.py::test_table_form_single_row
-    # @pair form-table:db-value
     @property
-    def db_value(self):
+    def db_value(self) -> TableValue | None:
         rows = []
         for row in self.rows:
             row_value = {
@@ -316,8 +266,8 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
         return {"rows": rows} if rows else None
 
     @db_value.setter
-    def db_value(self, value):
-        value = value or {}
+    def db_value(self, value: object) -> None:
+        value = cast(TableValue | list[dict[str, object]], value or {})
         rows = value if isinstance(value, list) else value.get("rows", [])
         self._rows = [RowSubmission(self, row) for row in rows]
         if self._rows:

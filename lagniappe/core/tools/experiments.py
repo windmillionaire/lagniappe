@@ -10,32 +10,14 @@ from lagniappe.core.mutations import execute_mutation, plan_mutation
 from lagniappe.core.tools.database.core import DATA, KINDS
 
 
-# @testable true
-# @tests tests_unit/test_034_experiments.py::test_execution_requires_designated_admin_and_current_policy
-# @matrix experiments : execution-policy
-def can_execute(user, *, remote_mcp=False):
+def can_execute(user: object, *, remote_mcp: bool = False) -> bool:
     """Additional capability never substitutes for ordinary record permissions."""
-    return bool(
-        remote_mcp
-        and getattr(CONFIG, "EXPERIMENTS_ENABLED", False)
-        and getattr(CONFIG, "EXPERIMENTS_EXECUTION_ENABLED", False)
-        and getattr(CONFIG, "EXPERIMENTS_PROJECT", None) == CONFIG.GOOGLE_CLOUD_PROJECT
-        and CONFIG.AI_ENABLED
-        and CONFIG.EXTERNAL_AI_ENABLED
-        and getattr(CONFIG, "AGENT_ACCESS_ENABLED", False)
-        and user
-        and user.is_authenticated
-        and user.is_admin
-        and not user.is_public
-        and str(user.email or "").strip().casefold()
-        == str(CONFIG.AGENT_ACCESS_EMAIL).strip().casefold()
-    )
+    from lagniappe.core.tools.ai.auto_execute import experiments_execution_allowed
+
+    return experiments_execution_allowed(user, remote_mcp=remote_mcp, config=CONFIG)
 
 
-# @testable true
-# @tests tests_unit/test_034_experiments.py::test_bootstrap_is_guarded_idempotent_and_preserves_roles
-# @matrix experiments : bootstrap
-def bootstrap():
+def bootstrap() -> None:
     """Create both normal accounts once, preserving subsequent Owner decisions."""
     if not getattr(CONFIG, "EXPERIMENTS_ENABLED", False) or not CONFIG.production:
         return
@@ -65,6 +47,8 @@ def bootstrap():
             user = Entities.USER.create(
                 {"email": email, "name": name, "admin": role == "agent"}, key=key
             )
+            if user is None or user.key is None:
+                raise RuntimeError("Experiments bootstrap could not resolve the saved account.")
             # A login that already created this identity is reused, not promoted.
             if user.key == key:
                 try:

@@ -32,6 +32,7 @@
     "@tailwindcss/postcss": "^4.3.4",
     "chokidar-cli": "^3.0.0",
     "cssnano": "^9.9.0",
+    "esbuild": "0.28.1",
     "esmock": "^3.0.0",
     "fake-indexeddb": "^6.2.7",
     "js-yaml": "^5.5.0",
@@ -43,6 +44,7 @@
     "rollup-plugin-postcss": "^4.0.2",
     "rollup-plugin-visualizer": "^7.1.2",
     "tailwindcss": "^4.3.4",
+    "typescript": "6.0.3",
     "web-vitals": "6.2.3"
   },
   "engines": {
@@ -56,7 +58,9 @@
     "check": "biome check src/script src/style build testing/utility/js testing/tests_js/*.mjs",
     "dev": "node build/run-rollup.mjs development",
     "format": "biome format --write src/script src/style build testing/utility/js testing/tests_js/*.mjs",
-    "watch": "chokidar './src/**/*.{css,js,mjs,yaml}' 'lagniappe/web/templates/*.html' 'lagniappe/web/templates/**/*.html' -c 'node build/run-rollup.mjs development'"
+    "typecheck": "tsc --noEmit",
+    "watch": "chokidar './src/**/*.{css,js,mjs,ts,mts,yaml}' 'lagniappe/web/templates/*.html' 'lagniappe/web/templates/**/*.html' -c 'node build/run-rollup.mjs development'"
   },
-  "version": "2.4.2"
+  "type": "module",
+  "version": "2.5.0"
 }

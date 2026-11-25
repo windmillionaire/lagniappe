@@ -1,5 +1,19 @@
 """One discovery and proposal conversation for all report requests."""
 
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, NotRequired, TypedDict
+
+if TYPE_CHECKING:
+    from .reporting.contracts.actions import ReportProposal
+    from ...entities.ai_report import AIReport
+    from ...entities.user import User
+
+
+
+
+
+
+
 from copy import deepcopy
 
 from lagniappe.core import exceptions
@@ -22,6 +36,27 @@ from .reporting.contracts.permissions import (
 from .reporting.proposals.repair import complete_proposal_structure
 from .reporting.proposals.validation import validate_proposal
 
+
+class FileUsage(TypedDict):
+    file: str
+    usage: str
+
+
+
+class GeneratedReport(TypedDict):
+    proposal: ReportProposal
+    file_usage: list[FileUsage]
+    status: NotRequired[str]
+
+
+
+class ReportResponseSchema(TypedDict):
+    type: str
+    properties: dict[str, object]
+    additionalProperties: bool
+    required: list[str]
+
+
 REPORT_MAX_TOOL_ITERATIONS = 50
 REPORT_READ_TOOLS = (
     *READ_ONLY_CONTEXT_TOOLS,
@@ -31,10 +66,7 @@ REPORT_READ_TOOLS = (
 )
 
 
-# @testable true
-# @tests tests_unit/test_020b_ai_planner.py::test_report_prompt_uses_shared_tools_and_selected_schemas
-# @matrix ai-report : prompt permissions tools
-def report_response_schema():
+def report_response_schema() -> ReportResponseSchema:
     """Small discovery envelope; selected action schemas are retrieved as tools."""
     return {
         "type": "object",
@@ -51,10 +83,7 @@ def report_response_schema():
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/planner.py::report_response_schema
-# @reason shared native and external upload classification contract
-def file_usage_schema():
+def file_usage_schema() -> dict[str, object]:
     return {
         "type": "array",
         "items": {
@@ -69,12 +98,9 @@ def file_usage_schema():
     }
 
 
-# @testable true
-# @tests tests_unit/test_020b_ai_planner.py::test_file_usage_requires_exact_coverage_and_files_only_filing
-# @matrix ai-report : validation file-placement
 def validate_file_usage(
-    file_usage, file_refs, *, require_organization=False, read_only=False
-):
+    file_usage: object, file_refs: Iterable[str], *, require_organization: bool = False, read_only: bool = False
+) -> list[FileUsage]:
     """Validate every uploaded file without interpreting evidence as a filing request."""
     if not isinstance(file_usage, list):
         raise exceptions.AIException("file_usage must be an array.")
@@ -108,11 +134,7 @@ def validate_file_usage(
     return deepcopy(file_usage)
 
 
-# @testable true
-# @tests tests_unit/test_020b_ai_planner.py::test_report_prompt_uses_shared_tools_and_selected_schemas
-# @tests tests_unit/test_020b_ai_planner.py::test_native_and_external_plans_share_personal_page_guidance
-# @matrix ai-report : prompt permissions tools file-placement
-def report_prompt(report, user, feedback=None):
+def report_prompt(report: AIReport, user: User, feedback: str | None = None) -> Prompt:
     can_create = user.access(AI.CREATE)
     allowed = allowed_report_actions(user) if can_create else ()
     prompt = Prompt(
@@ -126,7 +148,7 @@ def report_prompt(report, user, feedback=None):
     prompt.set_max_tool_file_parts_per_turn(2)
     prompt.set_instructions_before_context()
     prompt.set_allowed_actions(allowed)
-    prompt.set_response_schema(report_response_schema())
+    prompt.set_response_schema(dict(report_response_schema()))
     prompt.add_output_contract(
         "JSON",
         "Return summary, optional answer_markdown, confidence, issues, actions, and file_usage. Return complete final values, not an intermediate plan.",
@@ -223,22 +245,15 @@ never silently discard a file.
         prompt.add_instructions(
             "Revise the entire response using the feedback. Preserve correct values and exact stored references. An answer can become a proposal and vice versa before execution."
         )
+    if not files and feedback is None and not report.db.get("correction"):
+        prompt.set_thinking_level("LOW")
     return prompt
 
 
-# @testable true
-# @tests tests_unit/test_020b_ai_planner.py::test_generate_report_validates_answers_actions_and_file_usage
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @matrix ai-report : generate validation file-placement
-# @matrix ai-report : ask live-provider usable-answer
-def generate_report(prompt):
+def generate_report(prompt: Prompt) -> GeneratedReport:
     """Validate final output in the same provider conversation, including repairs."""
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/ai/planner.py::generate_report
-    # @reason validation callback is exercised through report generation
-    def validate_response(response):
+    def validate_response(response: object) -> GeneratedReport:
         if not isinstance(response, dict):
             raise exceptions.AIException("Report response must be an object.")
         if set(response) - set(report_response_schema()["properties"]):

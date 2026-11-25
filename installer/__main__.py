@@ -7,22 +7,31 @@ import argparse
 import sys
 
 
-# @testable false
-# @covered-by installer/__main__.py::_parser
-# @reason keep argparse help plain across Python versions and nested commands
 class _SetupArgumentParser(argparse.ArgumentParser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.color = False
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_routes_every_mode_and_returns_status
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_rejects_multiple_or_dashed_commands
-# @matrix setup : argument-validation cli-routing
-def _parser():
+def _parser() -> argparse.ArgumentParser:
     parser = _SetupArgumentParser(description="Lagniappe setup")
     parser.add_argument("--experiments", action="store_true", help="Create a dedicated experiments installation with an Administrator agent")
+    parser.add_argument(
+        "--agent",
+        action="store_true",
+        help="Run non-interactive agent-assisted install using Secret Manager and the localhost browser vault",
+    )
+    parser.add_argument(
+        "--answers",
+        metavar="FILE",
+        help="Path to non-secret JSON/YAML answers file for --agent mode",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Emit structured JSON output for --agent mode",
+    )
     commands = parser.add_subparsers(
         dest="command",
         metavar="COMMAND",
@@ -61,6 +70,15 @@ def _parser():
     commands.add_parser(
         "security",
         help="Configure Redis transport security",
+    )
+    secrets_cmd = commands.add_parser(
+        "secrets",
+        help="Migrate runtime secrets to GCP Secret Manager",
+    )
+    secrets_actions = secrets_cmd.add_subparsers(dest="secrets_action", required=True)
+    secrets_actions.add_parser(
+        "migrate",
+        help="Move local_yaml runtime secrets into GCP Secret Manager and strip them from disk",
     )
     commands.add_parser(
         "jobs",
@@ -124,23 +142,14 @@ def _parser():
     return parser
 
 
-# @testable false
-# @covered-by installer/__main__.py::main
-# @reason small argument-to-operation mapping owned by the tested CLI boundary
 def _mode(args):
     return args.command or "install"
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_lifecycle_cli_routes_nested_commands_and_read_only_boundaries
-# @matrix data-lifecycle : cli-routing read-only
 def _local_only(args):
     return args.command == "archive" and args.archive_target == "validate"
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_lifecycle_cli_routes_nested_commands_and_read_only_boundaries
-# @matrix data-lifecycle : cli-routing read-only
 def _read_only(args):
     return (
         _local_only(args)
@@ -149,11 +158,7 @@ def _read_only(args):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_routes_every_mode_and_returns_status
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_treats_none_cancellation_as_failure
-# @matrix setup : cli-status failure-propagation
-def _status(result):
+def _status(result: object) -> int:
     """Normalize every setup entry point to an honest process status."""
     if result is True:
         return 0
@@ -168,15 +173,28 @@ def _status(result):
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_stale_gcloud_token_stops_with_setup_auth_instruction
-# @matrix setup : dependency-bootstrap focused-mode gcloud-token prerequisites safe-failure
 def _prepare_setup_dependencies(args):
     """Bootstrap focused modes before importing their dependency-backed handlers."""
     if _mode(args) == "install":
-        # The full installer owns this step so it can announce recovery and ask
-        # for consent before changing the project environment.
+        if getattr(args, "agent", False):
+            from contextlib import nullcontext, redirect_stdout
+            from installer.commands import check_gcloud_cli
+            from installer.package_install import (
+                ensure_pip_is_available,
+                ensure_setup_dependencies,
+            )
+
+            stream_guard = (
+                redirect_stdout(sys.stderr)
+                if getattr(args, "json_output", False)
+                else nullcontext()
+            )
+            with stream_guard:
+                ensure_pip_is_available()
+                check_gcloud_cli()
+                ensure_setup_dependencies()
+        # The full interactive installer owns this step so it can announce
+        # recovery and ask for consent before changing the project environment.
         return
 
     if _read_only(args):
@@ -225,10 +243,6 @@ def _prepare_setup_dependencies(args):
         raise SetupError(str(error)) from error
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_routes_every_mode_and_returns_status
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_provider_failures_are_nonzero
-# @matrix setup : cli-routing failure-propagation lazy-imports
 def _dispatch(args):
     command = args.command
     if command == "auth":
@@ -271,6 +285,10 @@ def _dispatch(args):
         from installer.security import configure_security
 
         return configure_security()
+    if command == "secrets":
+        from installer.secrets import configure_secrets_migrate
+
+        return configure_secrets_migrate()
     if command == "jobs":
         from installer.verify import prepare_existing_installation
 
@@ -356,21 +374,32 @@ def _dispatch(args):
         restore_backup(args.backup_id, dry_run=args.dry_run)
         return 0
 
+    if getattr(args, "agent", False):
+        from installer.agent_mode import run_agent_install
+
+        return run_agent_install(
+            answers_path=getattr(args, "answers", None),
+            json_output=bool(getattr(args, "json_output", False)),
+        )
+
     from installer.install import install
 
     return install(experiments=True) if getattr(args, "experiments", False) else install()
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_rejects_multiple_or_dashed_commands
-# @matrix setup : cli-routing operation-journal prerequisites
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
+    from installer import verify_python_version
+
+    verify_python_version()
     arguments = list(sys.argv[1:] if argv is None else argv)
     parser = _parser()
     args = parser.parse_args(arguments)
     if args.experiments and args.command:
         parser.error("--experiments is an installation option; later commands retain the saved setting")
+    if (args.answers or args.json_output) and not args.agent:
+        parser.error("--answers and --json require --agent")
+    if args.agent and args.command:
+        parser.error("--agent cannot be combined with a subcommand")
     if args.command == "archive":
         if args.archive_target == "validate":
             if not args.validation_path:
@@ -398,11 +427,7 @@ def main(argv=None):
         return _status(_dispatch(args))
 
 
-# @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_provider_failures_are_nonzero
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_treats_none_cancellation_as_failure
-# @matrix setup : cli-status failure-propagation unexpected-errors
-def cli(argv=None):
+def cli(argv: list[str] | None = None) -> int:
     from installer.errors import SetupCancelled, SetupError, SetupInterrupted
 
     try:

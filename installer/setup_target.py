@@ -23,8 +23,6 @@ GCLOUD_VALUE_ERROR = "error"
 PROJECT_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
 
 
-# @testable infrastructure
-# @covered-by installer/create_config.py::set_application_defaults
 @dataclass(frozen=True)
 class SetupTarget:
     """The confirmed non-secret target, independent of mutable settings."""
@@ -35,9 +33,6 @@ class SetupTarget:
     project_id: str
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_config_status_save_and_gcloud_login_helpers
-# @pair setup:gcloud-config
 def _gcloud_debug_value(command):
     """Return a structured gcloud value without promoting errors to values."""
     result = run_gcloud_command(command, check=False)
@@ -65,9 +60,6 @@ def _gcloud_debug_value(command):
     }
 
 
-# @testable false
-# @covered-by installer/setup_target.py::_gcloud_debug_value
-# @reason console rendering for structured gcloud diagnostic values
 def _display_gcloud_value(result):
     if result["state"] == GCLOUD_VALUE_SUCCESS:
         return result["value"]
@@ -76,9 +68,6 @@ def _display_gcloud_value(result):
     return f"(error: {result['error']})"
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_gcloud_account_selection_requires_an_explicit_authenticated_identity
-# @matrix setup : gcloud-config gcloud-token interactive-input
 def _get_gcloud_account(account):
     from runner.gcloud import check_account_authentication
 
@@ -142,9 +131,6 @@ def _get_gcloud_account(account):
     return account
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_prefers_requested_name_and_suffixes_collisions
-# @matrix setup : interactive-input project-id
 def _project_id_from_app_name(sanitized_app_name):
     base = re.sub(r"[^a-z0-9-]", "-", sanitized_app_name.lower()).strip("-")
     if not base or not base[0].isalpha():
@@ -152,17 +138,11 @@ def _project_id_from_app_name(sanitized_app_name):
     return re.sub(r"-+", "-", base)[:30].rstrip("-")
 
 
-# @testable false
-# @covered-by installer/setup_target.py::_get_gcloud_project
-# @reason collision fallback is exercised through interactive project selection
 def _randomized_project_id(sanitized_app_name):
     base = _project_id_from_app_name(sanitized_app_name)[:23].rstrip("-")
     return f"{base}-{secrets.token_hex(3)}"
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_validate_project_id_and_project_state_are_non_mutating
-# @pair setup:project-id
 def _project_state(project_id):
     result = run_gcloud_command(
         ["projects", "describe", project_id, "--format=json"],
@@ -203,9 +183,6 @@ def _project_state(project_id):
     }
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_prefers_requested_name_and_suffixes_collisions
-# @matrix setup : interactive-input project-id
 def _confirm_project_candidate(project_id, state, formatter):
     if state["state"] == "unavailable":
         print(
@@ -215,10 +192,7 @@ def _confirm_project_candidate(project_id, state, formatter):
         )
         return False
 
-    if state["state"] == "available":
-        action = "Use the existing"
-    else:
-        action = "Create a new"
+    action = "Use the existing" if state["state"] == "available" else "Create a new"
     answer = input(
         format_prompt(f"{action} project '{project_id}'? [y/N]: ")
     ).strip()
@@ -229,9 +203,6 @@ def _confirm_project_candidate(project_id, state, formatter):
     raise SetupCancelled("Installation cancelled during project selection.")
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_prefers_requested_name_and_suffixes_collisions
-# @matrix setup : interactive-input project-id
 def _get_gcloud_project(project_id, sanitized_app_name):
     from installer import FORMATTER
 
@@ -298,9 +269,6 @@ def _get_gcloud_project(project_id, sanitized_app_name):
             suggestion = _randomized_project_id(sanitized_app_name)
 
 
-# @testable false
-# @covered-by installer/setup_target.py::_list_owned_projects
-# @reason per-project policy parsing is exercised through delegated discovery
 def _has_direct_project_owner_binding(project_id, account):
     result = run_gcloud_command(
         [
@@ -333,10 +301,6 @@ def _has_direct_project_owner_binding(project_id, account):
     )
 
 
-# @testable false
-# @covered-by installer/setup_target.py::_list_owned_projects
-# @covered-by installer/setup_target.py::_select_existing_gcloud_project
-# @reason project discovery normalization is exercised through both picker modes
 def _list_active_projects(account):
     """Return normalized active projects visible to the selected account."""
     result = run_gcloud_command(
@@ -395,9 +359,6 @@ def _list_active_projects(account):
     return projects
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_project_picker_lists_only_direct_owner_projects
-# @matrix setup : delegated-install existing-project gcloud-config project-iam project-picker provider-discovery
 def _list_owned_projects(account):
     """Return active projects directly owned by the selected gcloud account."""
     projects = []
@@ -428,10 +389,6 @@ def _list_owned_projects(account):
     return projects
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_project_picker_lists_only_direct_owner_projects
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_initial_target_choice_uses_delegated_picker_or_ordinary_name_flow
-# @matrix setup : delegated-install existing-project interactive-input ordinary-install project-iam project-picker provider-discovery
 def _select_existing_gcloud_project(account, *, direct_owner_required=True):
     """Let the operator select an active project visible to their account."""
     if direct_owner_required:
@@ -484,9 +441,6 @@ def _select_existing_gcloud_project(account, *, direct_owner_required=True):
         )
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_initial_target_choice_uses_delegated_picker_or_ordinary_name_flow
-# @matrix setup : delegated-install interactive-input ordinary-install project-picker
 def _select_initial_target(account):
     """Choose the delegated picker or ordinary installation naming flow."""
     while True:
@@ -535,9 +489,6 @@ def _select_initial_target(account):
         print(ui.error(wrap_text("Enter Y to select an existing project, or N to create one.")))
 
 
-# @testable false
-# @covered-by installer/create_config.py::set_application_defaults
-# @reason deterministic name normalization exercised through config-file creation
 def _gcloud_configuration_name(name):
     normalized = re.sub(r"[^a-z0-9]", "-", name.lower())
     normalized = re.sub(r"-+", "-", normalized).strip("-")
@@ -550,10 +501,7 @@ def _gcloud_configuration_name(name):
     return normalized[:30].rstrip("-")
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_validate_project_id_and_project_state_are_non_mutating
-# @pair setup:project-id
-def validate_project_id(project_id):
+def validate_project_id(project_id: str) -> bool:
     """Validate the provider's project-ID syntax without mutating state."""
     if not PROJECT_ID_PATTERN.fullmatch(str(project_id or "")):
         print(
@@ -567,9 +515,6 @@ def validate_project_id(project_id):
     return True
 
 
-# @testable false
-# @covered-by installer/iam.py::require_operator_permissions
-# @reason setup preflight adapter owned by the IAM permission reporter
 def _require_operator_permissions(
     project_id,
     *,
@@ -587,9 +532,6 @@ def _require_operator_permissions(
     )
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_gcloud_project_client_uses_selected_cli_account_without_adc
-# @matrix setup : adc gcloud-token identity
 def _gcloud_project_client(account):
     """Create a Resource Manager client from the already-authenticated CLI login."""
     result = run_gcloud_command(
@@ -617,9 +559,6 @@ def _gcloud_project_client(account):
     return resourcemanager_v3.ProjectsClient(credentials=Credentials(token=token))
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_existing_project_checks_cli_installer_permissions_before_adc_authentication
-# @matrix setup : adc gcloud-token operator-permissions preflight
 def _preflight_operator_authority(account, project_id, *, client=None):
     """Verify the selected CLI installer before opening or changing ADC."""
     client = client or _gcloud_project_client(account)
@@ -640,9 +579,6 @@ def _preflight_operator_authority(account, project_id, *, client=None):
     return client
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_app_name_validation_rejects_control_characters_and_long_names
-# @matrix setup : app-name validation
 def _validate_app_name(value):
     value = str(value or "").strip()
     return bool(value) and len(value) <= 80 and all(
@@ -650,9 +586,6 @@ def _validate_app_name(value):
     )
 
 
-# @testable false
-# @covered-by installer/create_config.py::set_application_defaults
-# @reason decorated input accessor; retry behavior is owned by installer/utils.py::validate_input
 @validate_input(
     "Enter a name for your Lagniappe installation",
     validation_fn=_validate_app_name,
@@ -662,9 +595,6 @@ def _get_app_name(value):
     return value.strip()
 
 
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_cli_identity_snapshot_fails_closed_on_unset_or_error
-# @matrix setup : gcloud-config identity
 def _active_cli_identity():
     values = {
         "configuration": _gcloud_debug_value(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 import hashlib
 from io import BytesIO
 import json
@@ -42,22 +42,22 @@ LIFECYCLE_TOOLS = (
     "upload_local_files",
     "submit_plan",
 )
-# Reviewed v10, including optional installation metadata and the execution capability
-# on get_actor. Ordinary API credentials still cannot execute proposals.
+# Reviewed lifecycle input and output schemas for the ordinary API credential.
+# The adapter exposes execute_plan only for a credential with that capability.
 LIFECYCLE_SCHEMA_SHA256 = {'answer_question': ('99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa',
                      'f6adb29d9eb84fc5920b6c8a7bae19d4b4690f7a90003a4f076aaba06131e61d'),
  'get_actor': ('99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa',
                '67f1f90a7a55e2bf678291801655eb551ca5d979b914f39be9abe1ccc05daaeb'),
- 'start_plan': ('6b80b5bbc86766d1de25efec1b3d9db01071fe4418ddca24121e8498650cb1bf',
-                '9db8d984e62c2f4c56ca97010933b002920ed5d4639769cf70a8b7be53a32a56'),
- 'get_plan': ('79fdf3b7715ee289b81b9fcd675247783d2114e5b6882d555bfefa34681705c9',
-              '615df466a99cd13f48c1ff1911c487fccb8502ae3dcfb78a93aafb5844e1c060'),
+ 'start_plan': ('febc18d7d91a25de641e364d358574079883b24e81ad2b961c816667ac2115bb',
+                '6e5eb2f960a8280e34ebaf0e0b97664b53da8ec515be47d893e6a626cadc77bb'),
+ 'get_plan': ('6ddc49debd71ded568dc1b5928713313380901355a601ce131801d7a034fdc37',
+              '5cb97bd86379b6e8ce4c60cdb414dc7302379b6c369e83ec159ea3f652a3712c'),
  'get_plan_contract': ('337cb97fa06d416268081a87b7a7f90574031467337bbc6806554a989ca0dde3',
                        '512d8688602644cb4fb4136d272c3795c70e2381ca77e69f6e66467079496a9c'),
  'upload_local_files': ('716aba2ac6b72fd22813194dcf1ea9c0b492c95d02857d691d62d5309c8db259',
-                        '0f2d24c0f0dad18b882e7df3157963f6be9957b87fc6fc8649f5466cb37601e1'),
- 'submit_plan': ('e96a342d76b63829e1d3e608b14befaa396c987206ba713adf9505641e13be0d',
-                 '4ac050543b3e323571d61ee3e6f60b6041c2b5706ae9fdaf887f96874bae0670')}
+                        'a166f75959e09ae3dfc1fcaa417d0b1d3eb09c9d8ad7eb46082ac79d69639525'),
+ 'submit_plan': ('dd9ee98735d6b733ab37289d24e6bb18e7cbd584610223b99d6bfe983ee42ec9',
+                 '048a45182d3bc25d6ba808defe1f31fe0103ea11595a79d32a4a4d94ab0d30ae')}
 PLAN_KEYS = {
     "id",
     "status",
@@ -101,10 +101,6 @@ MCP_BOUNDARY_PNG = base64.b64decode(
 )
 
 
-# @pair mcp-adapter:product-contract
-# @pair agent-api:tool-dispatch
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter._project_file_result
-# @source lagniappe/web/routes/api/main.py::execute_tool
 def test_mcp_original_pdf_download_uses_existing_api_and_storage(
     get_admin, get_user,
     tmp_path,
@@ -157,7 +153,7 @@ def test_mcp_original_pdf_download_uses_existing_api_and_storage(
             past.setattr(
                 _signing,
                 "_NOW",
-                lambda _tz: datetime.now(timezone.utc) - timedelta(minutes=10),
+                lambda _tz: datetime.now(UTC) - timedelta(minutes=10),
             )
             expired = storage_assets.get_signed_url(
                 file.properties.file.value.path, expires_in=300
@@ -227,13 +223,6 @@ def _canonical_sha256(value) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-# @pair mcp-adapter:product-contract
-# @matrix agent-api : submission proposal-contract schema field-path proposal-validation references
-# @source lagniappe/core/tools/ai/external/contracts.py::plan_contract
-# @source lagniappe/core/tools/ai/external/validation.py::submission_validation_errors
-# @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @source lagniappe/core/tools/ai/external/plans.py::submit_plan_request
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter.execute
 def test_rest_and_mcp_share_submission_validation(get_admin, get_user, tmp_path, monkeypatch, setup_test_server):
     monkeypatch.delenv("LAGNIAPPE_HOSTED_E2E_TEST_COOKIE", raising=False)
     for cookie in setup_test_server.browser_cookies:
@@ -622,36 +611,6 @@ def _assert_catalog_matches_live_rest(tools: list[dict], catalog: dict) -> None:
     assert get_file["additionalProperties"] is False
 
 
-# @pairs agent-api:bearer-only agent-api:build-marker agent-api:contract
-# @pairs agent-api:create-revision agent-api:discovery agent-api:entitlement-independent
-# @pairs agent-api:origin-validation agent-api:plan-capability agent-api:plan-isolation
-# @pairs agent-api:plan-session agent-api:proposal-contract agent-api:request-recheck
-# @pairs agent-api:revoke agent-api:session-independent agent-api:submission
-# @pairs agent-api:tool-catalog agent-api:tool-dispatch agent-api:tool-selection
-# @pairs agent-api:uploads mcp-adapter:product-contract mcp-upload:safe-result
-# @pairs mcp-upload:upload-all
-# @pair user-settings:revoke
-# @matrix agent-api task-scheduling : periodic recurring scheduled structured-output validation
-# @source lagniappe/core/tools/ai/reporting/contracts/schema.py::external_task_schedule_response_schema
-# @source lagniappe/web/routes/api/main.py::authenticate_request
-# @source lagniappe/web/routes/api/main.py::annotate_response
-# @source lagniappe/web/routes/api/main.py::api_index
-# @source lagniappe/web/routes/api/main.py::openapi_document
-# @source lagniappe/web/routes/api/main.py::me
-# @source lagniappe/web/routes/api/main.py::tools
-# @source lagniappe/web/routes/api/main.py::create_plan
-# @source lagniappe/core/tools/ai/external/plans.py::load_plan
-# @source lagniappe/web/routes/api/main.py::get_plan
-# @source lagniappe/web/routes/api/main.py::get_plan_contract
-# @source lagniappe/core/tools/ai/external/uploads.py::create_upload_sessions
-# @source lagniappe/core/tools/ai/external/uploads.py::finalize_upload_batch
-# @source lagniappe/web/routes/api/main.py::execute_tool
-# @source lagniappe/core/tools/ai/external/plans.py::submit_plan_request
-# @source lagniappe/web/routes/users/api_key.py::api_key
-# @source lagniappe/core/tools/email/notifications/links.py::origin
-# @source mcp/src/lagniappe_mcp/adapter.py::LagniappeAdapter
-# @source mcp/src/lagniappe_mcp/files.py::upload_local_files
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
 # @styles modal.wrapper modal.content modal.header modal.actions button.close label.default
 # @template notifications.html::item
 def test_managed_mcp_adapter_exercises_the_real_api_boundary(
@@ -863,6 +822,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         assert actor["user"]["name"] == owner.name
         assert actor["capabilities"] == {
             "plans": True,
+            "execute_plan": False,
         }
         assert actor["credential"]["active"] is True
         assert _structured(workflow["answer_context"])["report_created"] is False
@@ -940,6 +900,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         create_get = _assert_safe_plan(
             workflow["create"]["get"], tool="create", status="ready"
         )
+        assert "proposal" not in create_get
         replacement_receipt = _assert_safe_receipt(
             workflow["create"]["replacement_receipt"], status="ready"
         )
@@ -1093,6 +1054,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         organize_get = _assert_safe_plan(
             workflow["organize"]["get"], tool="organize", status="ready"
         )
+        assert "proposal" not in organize_get
         assert organize_get["id"] == organize_start["id"] == organize_receipt["id"]
         assert organize_get["files"] == upload["upload_inventory"]
 
@@ -1132,7 +1094,7 @@ def test_managed_mcp_adapter_exercises_the_real_api_boundary(
         )
         assert review_response is not None and review_response.status == 200
         expect(owner.page.get_by_role("button", name="Execute")).to_be_visible()
-        assert "execute" not in {tool["name"] for tool in workflow["tools"]}
+        assert {"execute", "execute_plan"}.isdisjoint(tool["name"] for tool in workflow["tools"])
 
         hostile_setup = _request(
             "GET",

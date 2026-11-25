@@ -22,22 +22,22 @@ const buttons = {
 
 async function loadImportData({ request = {} } = {}) {
 	const { ImportData } = await esmock.strict(
-		"../../src/script/widgets/ingress.mjs",
+		"../../src/script/widgets/ingress.ts",
 		{
-			"../../src/script/elements/buttons.mjs": { buttons },
-			"../../src/script/elements/combobox/index.mjs": {
+			"../../src/script/elements/buttons.ts": { buttons },
+			"../../src/script/elements/combobox/index.ts": {
 				FacetsBox: class {},
 				SelectBox: class {},
 			},
-			"../../src/script/elements/primitives.mjs": { primitives: {} },
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/elements/primitives.ts": { primitives: {} },
+			"../../src/script/shared/index.ts": {
 				captureError(error) {
 					throw error;
 				},
 				Modal: class {},
 				request,
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: (callback) => callback(),
 			},
 		},
@@ -57,7 +57,6 @@ function ingressTarget(stage = "IMPORTING") {
 	return { progress, stageElement, target };
 }
 
-/** @matrix ingress ui-action : polling-recovery retryable-action single-flight stage-action */
 test("test_ingress_stage_action_failure_restores_button_and_polling_for_retry", async (t) => {
 	createBrowser(t);
 	const ImportData = await loadImportData();
@@ -121,7 +120,6 @@ test("test_ingress_stage_action_failure_restores_button_and_polling_for_retry", 
 	await retry;
 });
 
-/** @matrix ingress : next-action serialization stage-update */
 test("test_ingress_next_waits_for_pending_stage_update", async (t) => {
 	createBrowser(t);
 	let finishPatch;
@@ -168,7 +166,6 @@ test("test_ingress_next_waits_for_pending_stage_update", async (t) => {
 	assert.deepEqual(calls, ["patch:start", "patch:finish", "next:true"]);
 });
 
-/** @matrix ingress polling : active-widget catch-up subscription-lifecycle visibility */
 test("test_ingress_polling_tracks_widget_visibility", async (t) => {
 	createBrowser(t);
 	const ImportData = await loadImportData();

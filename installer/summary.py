@@ -1,5 +1,8 @@
 """Secret-safe setup summaries shared by install and diagnostics."""
 
+from collections.abc import Mapping
+
+
 from runner import presentation as ui
 from runner.presentation import output as print
 
@@ -9,9 +12,6 @@ from runner.context import setup_command
 from runner.console import cell_width, terminal_width, wrap_text
 
 
-# @testable false
-# @covered-by installer/summary.py::expected_resource_lines
-# @reason private parsing adapter is exercised through the public summary allowlist
 def _mapping(value):
     if isinstance(value, dict):
         return value
@@ -24,17 +24,11 @@ def _mapping(value):
     return {}
 
 
-# @testable false
-# @covered-by installer/summary.py::install_summary_lines
-# @reason private display adapter is exercised through the public summary allowlist
 def _value(value):
     value = str(value or "").strip()
     return value or "(not configured)"
 
 
-# @testable false
-# @covered-by installer/summary.py::install_summary_lines
-# @reason private boolean display adapter is exercised through the public summary allowlist
 def _enabled(value, *, default=False):
     if value is None:
         return default
@@ -43,16 +37,10 @@ def _enabled(value, *, default=False):
     return str(value).strip().casefold() in {"1", "true", "yes", "y", "enabled"}
 
 
-# @testable false
-# @covered-by installer/summary.py::install_summary_lines
-# @reason private aligned display adapter is exercised through the public summary allowlist
 def _install_line(label, value, *, verbatim=False, standalone=False):
     return label, _value(value), verbatim and bool(value), standalone
 
 
-# @testable false
-# @covered-by installer/summary.py::expected_resource_lines
-# @reason private safe-name derivation is exercised through the public summary allowlist
 def _bucket_names(settings):
     secret = settings.get("GIBBERISH")
     if not secret:
@@ -69,15 +57,12 @@ def _bucket_names(settings):
     return names
 
 
-# @testable true
-# @tests tests_tooling/test_001g_setup_release_readiness.py::test_expected_resource_summary_is_allowlisted
-# @matrix doctor setup : operator-summary provider-resources secret-redaction
 def expected_resource_lines(
-    settings,
+    settings: Mapping[str, object],
     *,
-    deploy=None,
-    gcloud_config=None,
-):
+    deploy: Mapping[str, object] | None = None,
+    gcloud_config: Mapping[str, object] | None = None,
+) -> list[str]:
     """Return the detailed allowlisted provider inventory used by doctor."""
     settings = settings or {}
     deploy = deploy or {}
@@ -138,19 +123,15 @@ def expected_resource_lines(
     return lines
 
 
-# @testable true
-# @tests tests_tooling/test_001g_setup_release_readiness.py::test_redacted_install_summary_is_allowlisted
-# @tests tests_tooling/test_001k_setup_console.py::test_install_summary_is_responsive
-# @matrix setup : operator-summary secret-redaction
 def install_summary_lines(
-    settings,
+    settings: Mapping[str, object],
     *,
-    deploy=None,
-    node=None,
-    gcloud_config=None,
-    deployed=False,
-    width=None,
-):
+    deploy: Mapping[str, object] | None = None,
+    node: Mapping[str, object] | None = None,
+    gcloud_config: Mapping[str, object] | None = None,
+    deployed: bool = False,
+    width: int | None = None,
+) -> list[str]:
     """Return a compact, decision-focused successful-install handoff."""
     settings = settings or {}
     node = node or {}
@@ -362,18 +343,15 @@ def install_summary_lines(
     return rendered
 
 
-# @testable false
-# @covered-by installer/summary.py::install_summary_lines
-# @reason console adapter delegates all output selection to the tested allowlist
 def print_install_summary(
-    settings,
+    settings: Mapping[str, object],
     *,
-    deploy=None,
-    node=None,
-    gcloud_config=None,
-    deployed=False,
-    width=None,
-):
+    deploy: Mapping[str, object] | None = None,
+    node: Mapping[str, object] | None = None,
+    gcloud_config: Mapping[str, object] | None = None,
+    deployed: bool = False,
+    width: int | None = None,
+) -> None:
     """Print the allowlisted final install summary."""
     print()
     for line in install_summary_lines(

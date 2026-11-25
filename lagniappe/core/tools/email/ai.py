@@ -1,7 +1,15 @@
 """Signed inbound-email boundary and handoff to saved AI report workflows."""
 
+from collections.abc import Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from config.ai_email import AIEmailConfig
+    from lagniappe.core.entities.ai_report import AIReport
+
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from email import policy
 from email.parser import Parser
 from html import escape
@@ -16,7 +24,7 @@ import uuid
 from bs4 import BeautifulSoup
 import requests
 from svix.webhooks import Webhook, WebhookVerificationError
-from werkzeug.datastructures import FileStorage
+from werkzeug.datastructures import FileStorage, Headers
 from werkzeug.utils import secure_filename
 
 from config.ai_email import AI_EMAIL_ALIAS, AI_EMAIL_LIMITS, normalize_email_address
@@ -45,6 +53,18 @@ _IGNORED_INLINE_CONTAINER_PATTERN = re.compile(
 )
 
 
+class AttachmentRecord(TypedDict):
+    id: str
+    filename: str
+    content_type: str
+    size: int
+
+
+class ReceivedEvent(TypedDict):
+    type: str
+    data: dict[str, object]
+
+
 class AIEmailWebhookError(ValueError):
     """Raised when a webhook cannot cross the signed request boundary."""
 
@@ -53,20 +73,16 @@ class AIEmailProviderError(RuntimeError):
     """Raised for a bounded provider operation that should be retried."""
 
 
-# @testable infrastructure
 class AIEmailRejection(ValueError):
     """A safe, correctable submission rejection for a known user."""
 
-    def __init__(self, code, message, *, silent=False):
+    def __init__(self, code: str, message: str, *, silent: bool = False) -> None:
         super().__init__(message)
         self.code = str(code)
         self.public_message = str(message)
         self.silent = bool(silent)
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_inbound_attachment_disposition_overrides_content_id
-# @pair ai-email:attachments
 @dataclass(frozen=True)
 class InboundAttachment:
     """Provider-neutral attachment metadata with no signed URL."""
@@ -79,21 +95,18 @@ class InboundAttachment:
     content_id: str | None = None
     include_inline: bool = False
 
-    # @testable true
-    # @tests tests_unit/test_028_ai_email.py::test_inbound_attachment_disposition_overrides_content_id
-    # @matrix ai-email : attachments content-disposition content-id inline
     @property
-    def inline(self):
+    def inline(self) -> bool:
         if self.content_disposition:
             return self.content_disposition == "inline"
         return bool(self.content_id)
 
     @property
-    def submitted(self):
+    def submitted(self) -> bool:
         """Return whether this part should enter the report attachment pipeline."""
         return not self.inline or self.include_inline
 
-    def job_record(self):
+    def job_record(self) -> AttachmentRecord:
         return {
             "id": self.id,
             "filename": self.filename,
@@ -101,7 +114,7 @@ class InboundAttachment:
             "size": self.size,
         }
 
-    def display_record(self):
+    def display_record(self) -> dict[str, str | int]:
         return {
             "filename": self.filename,
             "content_type": self.content_type,
@@ -118,7 +131,7 @@ class InboundMessage:
     recipients: tuple[str, ...]
     subject: str
     text_body: str
-    headers: dict
+    headers: dict[str, object]
     received_at: str
     attachments: tuple[InboundAttachment, ...]
 
@@ -129,12 +142,9 @@ class AIEmailSubmissionResult:
 
     state: str
     code: str | None = None
-    report: object | None = None
+    report: AIReport | None = None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::verify_svix_signature
-# @reason case-insensitive header lookup is exercised through signature verification
 def _header(headers, name):
     wanted = name.casefold()
     for key, value in (headers or {}).items():
@@ -143,9 +153,6 @@ def _header(headers, name):
     return ""
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::authentication_results_candidates
-# @reason multi-value header normalization is owned by authentication telemetry
 def _header_values(headers, name):
     if not isinstance(headers, dict):
         return []
@@ -161,19 +168,13 @@ def _header_values(headers, name):
     return values
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_accepts_raw_body_case_insensitive_headers_and_any_v1_signature
-# @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_rejects_changed_or_non_bytes_body
-# @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_rejects_missing_or_malformed_authentication_inputs
-# @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_rejects_replayed_or_future_events
-# @matrix ai-email webhook : event-id future headers invalid raw-body replay rotation secret signature timestamp
-def verify_svix_signature(raw_body, headers, webhook_secret):
+def verify_svix_signature(raw_body: bytes, headers: Mapping[str, str] | Headers, webhook_secret: str) -> str:
     """Verify a Resend/Svix signature against the untouched request bytes."""
     if not isinstance(raw_body, bytes):
         raise AIEmailWebhookError("Webhook body must be raw bytes.")
 
     try:
-        Webhook(webhook_secret).verify(raw_body, headers)
+        Webhook(webhook_secret).verify(raw_body, dict(headers.items()))
     except WebhookVerificationError as error:
         raise AIEmailWebhookError() from error
     except Exception as error:
@@ -187,10 +188,7 @@ def verify_svix_signature(raw_body, headers, webhook_secret):
     return event_id
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_parse_resend_event_rejects_malformed_shapes
-# @matrix ai-email webhook : event-shape json malformed webhook
-def parse_resend_event(raw_body):
+def parse_resend_event(raw_body: bytes) -> ReceivedEvent:
     """Decode one signed Resend event without retaining its raw payload."""
     try:
         payload = json.loads(raw_body.decode("utf-8"))
@@ -205,9 +203,6 @@ def parse_resend_event(raw_body):
     return {"type": event_type, "data": data}
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::authentication_results_candidates
-# @reason RFC comment removal is private authentication-header normalization
 def _strip_rfc_comments(value):
     output = []
     depth = 0
@@ -239,9 +234,6 @@ def _strip_rfc_comments(value):
     return "".join(output)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::authentication_results_candidates
-# @reason domain canonicalization is owned by aligned authentication parsing
 def _parameter_domain(value):
     raw = str(value or "").strip().strip("<>")
     if "@" in raw:
@@ -252,11 +244,7 @@ def _parameter_domain(value):
         return ""
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_authentication_results_candidates_require_aligned_dmarc_pass
-# @tests tests_unit/test_028_ai_email.py::test_authentication_results_candidates_handle_folding_comments_and_multiple_values
-# @matrix ai-email sender-auth : alignment authentication-results comments dmarc folding multiple-results sender-auth telemetry
-def authentication_results_candidates(headers, visible_from_domain):
+def authentication_results_candidates(headers: Mapping[str, object], visible_from_domain: str) -> tuple[str, ...]:
     """Return authserv IDs reporting aligned DMARC pass as optional telemetry."""
     expected_domain = _parameter_domain(visible_from_domain)
     if not expected_domain:
@@ -283,9 +271,6 @@ def authentication_results_candidates(headers, visible_from_domain):
     return tuple(candidates)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::ResendAIEmailClient
-# @reason provider identifier validation is exercised through the runtime adapter
 def _provider_id(value, label):
     identifier = str(value or "").strip()
     if not _PROVIDER_ID_PATTERN.fullmatch(identifier):
@@ -293,21 +278,17 @@ def _provider_id(value, label):
     return identifier
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_resend_runtime_client_retrieves_with_full_key_and_sends_with_scoped_key
-# @tests tests_unit/test_028_ai_email.py::test_resend_attachment_download_is_bounded_and_does_not_return_signed_url
-# @matrix ai-email attachments provider-adapter : attachments authorization bounded-stream idempotency outbound-email provider-adapter retrieval signed-url size
 class ResendAIEmailClient:
     """Small runtime Resend adapter for received messages, files, and feedback."""
 
     def __init__(
         self,
-        inbound_api_key,
-        sending_api_key,
+        inbound_api_key: str,
+        sending_api_key: str,
         *,
-        request=None,
-        download_request=None,
-    ):
+        request: Callable[..., requests.Response] | None = None,
+        download_request: Callable[..., requests.Response] | None = None,
+    ) -> None:
         self.inbound_api_key = inbound_api_key
         self.sending_api_key = sending_api_key
         self.request = request or requests.request
@@ -342,7 +323,7 @@ class ResendAIEmailClient:
             raise AIEmailProviderError("Resend API returned an invalid object.")
         return payload
 
-    def retrieve_received_email(self, email_id):
+    def retrieve_received_email(self, email_id: str) -> dict[str, object]:
         email_id = _provider_id(email_id, "received-email")
         return self._request(
             "GET",
@@ -350,7 +331,7 @@ class ResendAIEmailClient:
             self.inbound_api_key,
         )
 
-    def list_received_attachments(self, email_id):
+    def list_received_attachments(self, email_id: str) -> list[object]:
         email_id = _provider_id(email_id, "received-email")
         payload = self._request(
             "GET",
@@ -362,7 +343,7 @@ class ResendAIEmailClient:
             raise AIEmailProviderError("Resend returned an invalid attachment list.")
         return data
 
-    def retrieve_received_attachment(self, email_id, attachment_id):
+    def retrieve_received_attachment(self, email_id: str, attachment_id: str) -> dict[str, object]:
         email_id = _provider_id(email_id, "received-email")
         attachment_id = _provider_id(attachment_id, "attachment")
         return self._request(
@@ -374,13 +355,13 @@ class ResendAIEmailClient:
 
     def download_received_attachment(
         self,
-        email_id,
-        attachment,
+        email_id: str,
+        attachment: AttachmentRecord,
         *,
-        max_file_bytes,
-        max_total_bytes,
-        total_bytes=0,
-    ):
+        max_file_bytes: int,
+        max_total_bytes: int,
+        total_bytes: int = 0,
+    ) -> tuple[FileStorage, int]:
         """Return a bounded spooled upload without exposing the signed URL."""
         metadata = self.retrieve_received_attachment(email_id, attachment["id"])
         download_url = str(metadata.get("download_url") or "").strip()
@@ -395,58 +376,59 @@ class ResendAIEmailClient:
             )
         ):
             raise AIEmailProviderError("Resend returned an invalid attachment URL.")
-        spool = tempfile.SpooledTemporaryFile(max_size=SPOOL_MEMORY_BYTES, mode="w+b")
-        actual = 0
-        response = None
-        try:
+        with ExitStack() as cleanup:
+            spool = cleanup.enter_context(
+                tempfile.SpooledTemporaryFile(max_size=SPOOL_MEMORY_BYTES, mode="w+b")
+            )
+            actual = 0
+            response = None
             try:
-                response = self.download_request(
-                    download_url,
-                    stream=True,
-                    timeout=RESEND_TIMEOUT,
-                )
-            except (requests.ConnectionError, requests.Timeout) as error:
-                raise AIEmailProviderError(
-                    "Resend attachment download was unavailable."
-                ) from error
-            if not response.ok:
-                raise AIEmailProviderError(
-                    f"Resend attachment download returned HTTP {response.status_code}."
-                )
-            for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_BYTES):
-                if not chunk:
-                    continue
-                actual += len(chunk)
-                if actual > max_file_bytes or total_bytes + actual > max_total_bytes:
+                try:
+                    response = self.download_request(
+                        download_url,
+                        stream=True,
+                        timeout=RESEND_TIMEOUT,
+                    )
+                except (requests.ConnectionError, requests.Timeout) as error:
+                    raise AIEmailProviderError(
+                        "Resend attachment download was unavailable."
+                    ) from error
+                if not response.ok:
+                    raise AIEmailProviderError(
+                        f"Resend attachment download returned HTTP {response.status_code}."
+                    )
+                for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_BYTES):
+                    if not chunk:
+                        continue
+                    actual += len(chunk)
+                    if actual > max_file_bytes or total_bytes + actual > max_total_bytes:
+                        raise AIEmailRejection(
+                            "attachment_contract",
+                            "One or more attachments exceeded the AI email size limit.",
+                        )
+                    spool.write(chunk)
+                if actual <= 0:
                     raise AIEmailRejection(
                         "attachment_contract",
-                        "One or more attachments exceeded the AI email size limit.",
+                        "Empty attachments cannot be submitted by email.",
                     )
-                spool.write(chunk)
-            if actual <= 0:
-                raise AIEmailRejection(
-                    "attachment_contract",
-                    "Empty attachments cannot be submitted by email.",
+                spool.seek(0)
+                filename = secure_filename(attachment.get("filename") or "") or "attachment.bin"
+                upload = FileStorage(
+                    stream=spool,
+                    filename=filename,
+                    content_type=(
+                        attachment.get("content_type") or "application/octet-stream"
+                    ),
+                    content_length=actual,
                 )
-            spool.seek(0)
-            filename = secure_filename(attachment.get("filename") or "") or "attachment.bin"
-            upload = FileStorage(
-                stream=spool,
-                filename=filename,
-                content_type=(
-                    attachment.get("content_type") or "application/octet-stream"
-                ),
-                content_length=actual,
-            )
+            finally:
+                if response is not None and hasattr(response, "close"):
+                    response.close()
+            cleanup.pop_all()  # FileStorage owns the open stream on success.
             return upload, actual
-        except Exception:
-            spool.close()
-            raise
-        finally:
-            if response is not None and hasattr(response, "close"):
-                response.close()
 
-    def send_email(self, payload, *, idempotency_key):
+    def send_email(self, payload: Mapping[str, object], *, idempotency_key: str) -> dict[str, object]:
         return self._request(
             "POST",
             "/emails",
@@ -456,10 +438,7 @@ class ResendAIEmailClient:
         )
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_inbound_message_normalization_routes_alias_and_strips_reply_marker
-# @matrix ai-email : html-fallback reply-marker routing sender
-def parse_mailbox(value):
+def parse_mailbox(value: object) -> str:
     """Return one normalized mailbox while preserving exact local-part spelling."""
     if not isinstance(value, str) or any(ord(character) < 32 for character in value):
         raise AIEmailRejection("sender_unknown", "Sender address is invalid.", silent=True)
@@ -489,9 +468,6 @@ def parse_mailbox(value):
         ) from error
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::normalize_resend_message
-# @reason subject canonicalization is part of provider message normalization
 def _normalize_subject(value):
     text = str(value or "").replace("\r", " ").replace("\n", " ")
     text = "".join(
@@ -501,9 +477,6 @@ def _normalize_subject(value):
     return " ".join(text.split()).strip()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::normalize_message_body
-# @reason HTML fallback conversion is owned by message-body normalization
 def _html_to_text(value):
     soup = BeautifulSoup(str(value or ""), "html.parser")
     for tag in soup(["script", "style", "noscript"]):
@@ -511,10 +484,7 @@ def _html_to_text(value):
     return soup.get_text("\n")
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_inbound_message_normalization_routes_alias_and_strips_reply_marker
-# @matrix ai-email : html-fallback reply-marker
-def normalize_message_body(text, html=None):
+def normalize_message_body(text: object, html: object = None) -> str:
     """Normalize provider text without broad reply or quote heuristics."""
     source = text if isinstance(text, str) and text.strip() else _html_to_text(html)
     source = str(source or "").replace("\r\n", "\n").replace("\r", "\n")
@@ -531,16 +501,10 @@ def normalize_message_body(text, html=None):
     return re.sub(r"\n{4,}", "\n\n\n", normalized)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::_select_inline_attachments
-# @reason private canonicalization exercised by inline attachment selection
 def _attachment_reference_key(value):
     return secure_filename(str(value or "")).casefold()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::_select_inline_attachments
-# @reason private canonicalization exercised by inline attachment selection
 def _content_id_key(value):
     key = str(value or "").strip()
     if key[:4].casefold() == "cid:":
@@ -548,9 +512,6 @@ def _content_id_key(value):
     return key.strip("<> ").casefold()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::_select_inline_attachments
-# @reason private HTML classification exercised by inline attachment selection
 def _ignored_inline_image(image):
     for node in (image, *image.parents):
         if getattr(node, "name", None) == "blockquote":
@@ -569,9 +530,6 @@ def _ignored_inline_image(image):
     return False
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::_select_inline_attachments
-# @reason private HTML matching exercised by inline attachment selection
 def _matching_inline_images(attachment, html):
     raw_html = str(html or "")
     marker_index = raw_html.find(REPLY_MARKER)
@@ -597,9 +555,6 @@ def _matching_inline_images(attachment, html):
     return tuple(matches)
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_inline_attachment_selection_keeps_user_content_and_filters_signature_art
-# @matrix ai-email : attachments image-only inline quoted-content routing signature
 def _select_inline_attachments(attachments, body, html):
     """Select intentional inline content while filtering signature and reply art."""
     ordinary = tuple(item for item in attachments if not item.inline)
@@ -629,9 +584,6 @@ def _select_inline_attachments(attachments, body, html):
     return frozenset(selected)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::normalize_resend_message
-# @reason alias routing is exercised through provider message normalization
 def _validate_recipient(recipients, config):
     if not isinstance(recipients, (list, tuple)):
         raise AIEmailRejection("route_invalid", "AI email recipient is invalid.")
@@ -652,9 +604,6 @@ def _validate_recipient(recipients, config):
     return unique[0]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::normalize_resend_message
-# @reason attachment canonicalization is exercised through message normalization
 def _normalize_attachment(value):
     if not isinstance(value, dict):
         raise AIEmailRejection(
@@ -673,7 +622,7 @@ def _normalize_attachment(value):
     disposition = str(value.get("content_disposition") or "").casefold() or None
     content_id = str(value.get("content_id") or "").strip() or None
     try:
-        size = int(value.get("size"))
+        size = int(value.get("size", ""))
     except (TypeError, ValueError) as error:
         raise AIEmailRejection(
             "attachment_contract", "Attachment sizes could not be verified."
@@ -688,12 +637,7 @@ def _normalize_attachment(value):
     )
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_inbound_message_normalization_routes_alias_and_strips_reply_marker
-# @tests tests_unit/test_028_ai_email.py::test_inline_attachment_selection_keeps_user_content_and_filters_signature_art
-# @tests tests_unit/test_028_ai_email.py::test_email_policy_ignores_saved_alias_and_limit_overrides
-# @matrix ai-email normalization : aliases attachments exact-local html-fallback inline normalization reply-marker routing sender
-def normalize_resend_message(message, attachments, config):
+def normalize_resend_message(message: object, attachments: Sequence[object], config: AIEmailConfig) -> InboundMessage:
     """Validate a Resend response and return only provider-neutral fields."""
     if not isinstance(message, dict):
         raise AIEmailProviderError("Resend returned an invalid received email.")
@@ -731,9 +675,6 @@ def normalize_resend_message(message, attachments, config):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::_preflight_submission
-# @reason automated-message classification is owned by submission preflight
 def _automated_message(message):
     headers = message.headers
     auto_submitted = _header(headers, "auto-submitted").strip().casefold()
@@ -758,19 +699,10 @@ def _automated_message(message):
     return "multipart/report" in content_type or "message/delivery-status" in content_type
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::_preflight_submission
-# @reason instruction assembly is owned by the submission body contract
 def _instructions(subject, body):
     return f"Subject: {subject or '(no subject)'}\n\n{body}".rstrip()
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_submission_contract_keeps_create_and_organize_report_only
-# @tests tests_unit/test_028_ai_email.py::test_inline_attachment_selection_keeps_user_content_and_filters_signature_art
-# @tests tests_unit/test_028_ai_email.py::test_email_policy_ignores_saved_alias_and_limit_overrides
-# @matrix ai-email : access attachment-contract body-contract limits rate-limit
-# @pair ai-email:signature
 def _preflight_submission(message, user, config):
     from lagniappe.core.definitions import AI
     from lagniappe.core.tools.cache.rate_limit import check_limit
@@ -824,9 +756,6 @@ def _preflight_submission(message, user, config):
     return instructions, submitted
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_create_shared_address_email_report_preserves_routing_input
-# @pair ai-email:routing
 def _compact_report_name(message, attachments):
     source = message.subject or " ".join(message.text_body.split())
     if not source:
@@ -834,10 +763,7 @@ def _compact_report_name(message, attachments):
     return f"AI: {source[:80]}{'...' if len(source) > 80 else ''}"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::_feedback_payload
-# @reason report-link construction is exercised through outbound feedback
-def report_url(report, config=None):
+def report_url(report: AIReport, config: Mapping[str, object] | None = None) -> str:
     if config is None:
         from lagniappe import CONFIG
 
@@ -847,16 +773,10 @@ def report_url(report, config=None):
     return f"https://{domain}/tools/reports/{report.urlsafe_key}"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::_feedback_payload
-# @reason reply-address construction is exercised through outbound feedback
-def receiving_address(config):
+def receiving_address(config: AIEmailConfig) -> str:
     return f"{AI_EMAIL_ALIAS}@{config['domain']}"
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::process_resend_email
-# @reason stored-address normalization is owned by sender authorization
 def _stored_email(user):
     """Normalize a stored mailbox without turning legacy bad data into retries."""
     try:
@@ -865,9 +785,6 @@ def _stored_email(user):
         return ""
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_report_feedback_links_to_report_and_remains_available_after_disable
-# @matrix ai-email : acceptance disabled-completion idempotency reply-to terminal-link
 def _feedback_payload(config, user, kind, *, report=None, message=None):
     label = "AI"
     link = report_url(report) if report is not None else None
@@ -917,9 +834,6 @@ def _feedback_payload(config, user, kind, *, report=None, message=None):
     }
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::send_report_feedback
-# @reason feedback idempotency hashing is owned by the outbound feedback contract
 def _feedback_digest(value):
     from lagniappe import CONFIG
 
@@ -930,10 +844,7 @@ def _feedback_digest(value):
     ).hexdigest()
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_report_feedback_links_to_report_and_remains_available_after_disable
-# @matrix ai-email : disabled-completion idempotency reply-to terminal-link
-def send_report_feedback(report, kind, *, message=None, client=None):
+def send_report_feedback(report: AIReport, kind: str, *, message: str | None = None, client: ResendAIEmailClient | None = None) -> dict[str, object] | None:
     """Send one idempotent acceptance/result email for an email-origin report."""
     from lagniappe import CONFIG
 
@@ -962,9 +873,6 @@ def send_report_feedback(report, kind, *, message=None, client=None):
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/ai.py::process_resend_email
-# @reason rejection delivery is a private terminal branch of event processing
 def _send_rejection(config, user, rejection, digest, client):
     return client.send_email(
         _feedback_payload(
@@ -977,9 +885,6 @@ def _send_rejection(config, user, rejection, digest, client):
     )
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_create_shared_address_email_report_preserves_routing_input
-# @matrix ai-email : idempotency privacy report-handoff routing
 def _create_email_report(
     message, user, instructions, attachments, digest, config
 ):
@@ -1031,10 +936,7 @@ def _create_email_report(
     return report
 
 
-# @testable true
-# @tests tests_unit/test_028_ai_email.py::test_process_resend_email_hands_off_to_existing_report_pipeline
-# @matrix ai-email webhook : exact-match replay report-handoff sender user-policy
-def process_resend_email(event, event_id, config, digest_secret, *, client=None):
+def process_resend_email(event: ReceivedEvent, event_id: str, config: AIEmailConfig, digest_secret: str, *, client: ResendAIEmailClient | None = None) -> AIEmailSubmissionResult:
     """Retrieve, authorize, and durably hand one signed event to report ingestion."""
     from lagniappe.core.definitions import Fetch
     from lagniappe.core.entities import Entities
@@ -1045,11 +947,11 @@ def process_resend_email(event, event_id, config, digest_secret, *, client=None)
         return AIEmailSubmissionResult("ignored")
     digest = hmac.new(
         str(digest_secret).encode("utf-8"),
-        f"resend:{event_id}".encode("utf-8"),
+        f"resend:{event_id}".encode(),
         hashlib.sha256,
     ).hexdigest()
     lease_token = uuid.uuid4().hex
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     claim = email_database.claim_ai_email_event(digest, lease_token, now)
     if not claim.get("claimed"):
         return AIEmailSubmissionResult("duplicate", code=claim.get("reason"))
@@ -1107,7 +1009,7 @@ def process_resend_email(event, event_id, config, digest_secret, *, client=None)
         return AIEmailSubmissionResult(terminal_state, code=rejection.code)
     except Exception:
         email_database.release_ai_email_event(
-            digest, lease_token, datetime.now(timezone.utc)
+            digest, lease_token, datetime.now(UTC)
         )
         raise
     finally:
@@ -1116,7 +1018,7 @@ def process_resend_email(event, event_id, config, digest_secret, *, client=None)
                 digest,
                 lease_token,
                 terminal_state,
-                datetime.now(timezone.utc),
+                datetime.now(UTC),
             )
 
 

@@ -12,15 +12,11 @@ HOSTED_E2E_COOKIE_SALT = "lagniappe-hosted-e2e-session-v1"
 HOSTED_E2E_COOKIE_MAX_AGE = 2 * 60 * 60
 
 
-# @testable infrastructure
 class HostedE2EAuthenticationError(ValueError):
     """Raised when a hosted-E2E credential does not match the deployment."""
 
 
-# @testable true
-# @tests tests_unit/test_030_hosted_e2e.py::test_validate_google_claims_requires_exact_verified_identity
-# @matrix hosted-e2e : audience authentication identity issuer
-def validate_google_claims(claims, *, audience: str, caller_email: str) -> dict:
+def validate_google_claims(claims: object, *, audience: str, caller_email: str) -> dict[str, object]:
     """Validate the identity-bound claims returned by Google's token verifier."""
     if not isinstance(claims, dict):
         raise HostedE2EAuthenticationError("Google ID-token claims are invalid.")
@@ -36,10 +32,6 @@ def validate_google_claims(claims, *, audience: str, caller_email: str) -> dict:
     return claims
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/hosted_e2e/auth.py::sign_hosted_e2e_cookie
-# @covered-by lagniappe/core/tools/hosted_e2e/auth.py::load_hosted_e2e_cookie
-# @reason serializer construction is owned by the public signed-cookie contracts
 def _serializer(secret_key: str) -> URLSafeTimedSerializer:
     if len(str(secret_key or "")) < 32:
         raise HostedE2EAuthenticationError("Hosted E2E session key is invalid.")
@@ -50,9 +42,6 @@ def _serializer(secret_key: str) -> URLSafeTimedSerializer:
     )
 
 
-# @testable true
-# @tests tests_unit/test_030_hosted_e2e.py::test_hosted_e2e_cookie_is_signed_scoped_and_expiring
-# @matrix hosted-e2e : authentication cookie deployment-binding expiry
 def sign_hosted_e2e_cookie(
     secret_key: str,
     *,
@@ -70,9 +59,6 @@ def sign_hosted_e2e_cookie(
     )
 
 
-# @testable true
-# @tests tests_unit/test_030_hosted_e2e.py::test_hosted_e2e_cookie_is_signed_scoped_and_expiring
-# @matrix hosted-e2e : authentication cookie deployment-binding expiry
 def load_hosted_e2e_cookie(
     secret_key: str,
     value: str,

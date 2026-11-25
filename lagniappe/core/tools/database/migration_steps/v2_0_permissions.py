@@ -1,14 +1,12 @@
 """2.0.0 single-owner Files and materialized local restriction lists."""
 
+from .base import MigrationContext, MigrationResult
+
 from .base import MigrationDataError, _file_record_reference, _result, scan_kind
 from ..core import KINDS
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_file_migration_normalizes_history_and_preserves_conflicts
-# @matrix files migrations : single-owner history conflict idempotence
-# @pair database-migrations:actionable-links
-def migrate_file_ownership(context):
+def migrate_file_ownership(context: MigrationContext) -> MigrationResult:
     result = _result("FIL-001", "Single-owner Files")
     owners = {row.key: row for row in context.query_factory(KINDS.instances).fetch_iter()
               if row.get("type") in {"page", "task"}}
@@ -22,9 +20,6 @@ def migrate_file_ownership(context):
         for file_key in row.get("files") or []:
             references.setdefault(file_key, set()).add(owner_key)
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/migration_steps/v2_0_permissions.py::migrate_file_ownership
-    # @reason row adapter preserves conflicting legacy records for explicit repair
     def transform(row):
         # Singular links are authoritative after FIL-001. Historical snapshots
         # may still reference a File that has since moved to another owner.
@@ -73,17 +68,11 @@ def migrate_file_ownership(context):
     return result
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_restrictions_migration_only_persists_local_sources
-# @matrix permissions migrations : local-restrictions owner-only idempotence
-def migrate_local_restrictions(context):
+def migrate_local_restrictions(context: MigrationContext) -> MigrationResult:
     result = _result("RST-001", "Materialized local restrictions")
     groups = {row.key: row.get("hash") for row in context.query_factory(KINDS.users).fetch_iter()
               if row.get("type") in {"group", "public_group"}}
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/migration_steps/v2_0_permissions.py::migrate_local_restrictions
-    # @reason row adapter materializes local groups without following any Form relation
     def transform(row):
         stored = row.get("restricted_to") or []
         if stored in (["owner"], ["admin"]):

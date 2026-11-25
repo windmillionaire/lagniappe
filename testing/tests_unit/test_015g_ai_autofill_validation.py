@@ -1,7 +1,7 @@
 """Autofill uses exact schema IDs and validates before changing saved answers."""
 
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 import json
 from types import SimpleNamespace
 
@@ -43,8 +43,6 @@ def game(monkeypatch):
     return page, actor
 
 
-# @source lagniappe/core/tools/ai/autofill.py::autofill_prompt_data
-# @matrix ai : partial-submission shared-context
 @pytest.mark.unit
 def test_autofill_context_preserves_exact_ids_with_duplicate_labels(game):
     page, actor = game
@@ -65,10 +63,6 @@ def test_autofill_context_preserves_exact_ids_with_duplicate_labels(game):
     }
 
 
-# @source lagniappe/core/tools/ai/autofill.py::generate_autofilled_submission
-# @source lagniappe/core/tools/ai/autofill.py::validate_submission
-# @source lagniappe/core/tools/ai/core.py::GenAI._tool_loop
-# @matrix ai : validation repair
 @pytest.mark.unit
 @pytest.mark.parametrize("exhausted", [False, True])
 def test_autofill_repairs_invalid_ids_and_table_rows_before_acceptance(monkeypatch, game, exhausted):
@@ -115,11 +109,6 @@ def test_autofill_repairs_invalid_ids_and_table_rows_before_acceptance(monkeypat
     assert (summaries[-1]["validated_result_chars"] > 0) is not exhausted
 
 
-# @source lagniappe/core/tools/ai/autofill.py::validate_submission
-# @source lagniappe/core/properties/schema.py::SchemaFields.prepare_ai_field
-# @source lagniappe/core/mixins/submitter.py::SubmitterMixin.ai_submission
-# @matrix submission : ai validation preservation
-# @matrix ai : validation
 @pytest.mark.unit
 def test_autofill_proposes_corrections_and_legacy_apply_preserves_answers(monkeypatch, game):
     page, actor = game
@@ -136,13 +125,10 @@ def test_autofill_proposes_corrections_and_legacy_apply_preserves_answers(monkey
     page.ai_submission(validated, actor=actor, preserve_existing=True)
     assert {key: page.submission[key] for key in saved} == saved
     assert page.properties.submission.fields["input-release"].value == datetime(
-        2026, 9, 24, 7, tzinfo=timezone.utc
+        2026, 9, 24, 7, tzinfo=UTC
     )
 
 
-# @source lagniappe/core/mixins/submitter.py::SubmitterMixin.ai_submission
-# @source lagniappe/core/properties/schema.py::SchemaFields.prepare_ai_field
-# @matrix submission : ai validation preservation
 @pytest.mark.unit
 def test_ai_submission_rejects_later_invalid_field_without_partial_changes(game):
     page, actor = game
@@ -155,8 +141,6 @@ def test_ai_submission_rejects_later_invalid_field_without_partial_changes(game)
     assert not page.properties.submission.fields["input-publisher"].is_set
 
 
-# @source lagniappe/core/tools/ai/autofill.py::validate_submission
-# @matrix ai : validation
 @pytest.mark.unit
 @pytest.mark.parametrize("payload", [[], None, "answer", {"submission": {"input-publisher": "Annapurna"}}])
 def test_autofill_rejects_wrong_response_shape(game, payload):

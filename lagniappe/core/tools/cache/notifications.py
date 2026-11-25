@@ -1,11 +1,16 @@
 """Redis persistence for the per-user notification projection."""
 
+from collections.abc import Callable, Iterable, Mapping
 import uuid
+
+from typing import TYPE_CHECKING, cast
 
 from redis import WatchError
 
 from .core import cache
 from .notification_state import (
+    NotificationState,
+    PublicNotificationState,
     clear_recorded_notification_states as clear_recorded_notification_states,
     decode as _decode,
     group_mutations as _group_mutations,
@@ -21,14 +26,19 @@ from .notification_state import (
 
 
 NOTIFICATION_TTL_SECONDS = 30 * 60
+if TYPE_CHECKING:
+    from ...entities.user import User
+
+
 MAX_TRANSACTION_ATTEMPTS = 8
 
 
-# @testable true
-# @tests tests_unit/test_025_notification_state.py::test_warm_notification_state_is_redis_only_and_refreshes_ttl
-# @tests tests_unit/test_025_notification_state.py::test_expired_notification_state_gets_a_new_generation
-# @matrix notifications : cold-seed datastore-read-isolation expiry generation redis-projection ttl
-def peek_notification_state(user):
+def _aggregate_count(aggregate: Mapping[str, object], field: str) -> int:
+    # Datastore rows also contain keys, timestamps and unrelated metadata.
+    return int(cast(int | str, aggregate.get(field) or 0))
+
+
+def peek_notification_state(user: object) -> NotificationState | None:
     """Read warm notification state and slide its expiration without seeding."""
     state_key, epoch_key = _redis_keys(user)
     with cache.redis.pipeline() as pipe:
@@ -39,25 +49,20 @@ def peek_notification_state(user):
     return _project(values)
 
 
-# @testable infrastructure
 def _default_keys_loader(user):
     from lagniappe.core.tools.database import notifications as database_notifications
 
     return database_notifications.notification_keys(user)
 
 
-# @testable true
-# @tests tests_unit/test_025_notification_state.py::test_cold_seed_runs_one_keys_only_query_and_is_race_safe
-# @tests tests_unit/test_025_notification_state.py::test_notification_list_keys_repair_warm_projection
-# @matrix notifications : authoritative-repair cold-seed keys-only membership race-safety revision
 def seed_notification_state(
-    user,
-    notification_keys=None,
+    user: object,
+    notification_keys: Iterable[object] | None = None,
     *,
-    keys_loader=None,
-    aggregate_loader=None,
-    repair=False,
-):
+    keys_loader: Callable[[object], Iterable[object]] | None = None,
+    aggregate_loader: Callable[[object], Mapping[str, object] | None] | None = None,
+    repair: bool = False,
+) -> NotificationState:
     """Seed or repair notification membership under an epoch-guarded transaction."""
     state_key, epoch_key = _redis_keys(user)
     loader = keys_loader or _default_keys_loader
@@ -86,25 +91,25 @@ def seed_notification_state(
                     try:
                         from lagniappe.core.tools.database import notifications as database_notifications
 
-                        aggregate = database_notifications.get_notification_aggregate(user)
+                        aggregate = database_notifications.get_notification_aggregate(cast("User", user))
                         if aggregate is None:
                             aggregate = database_notifications.repair_notification_aggregate(
-                                user, ordinary_count=len(members)
+                                cast("User", user), ordinary_count=len(members)
                             )
                     except Exception:
                         aggregate = None
                 ordinary_count = (
-                    int(aggregate.get("ordinary_count") or 0)
+                    _aggregate_count(aggregate, "ordinary_count")
                     if aggregate is not None
                     else len(members)
                 )
                 unread_message_count = (
-                    int(aggregate.get("unread_message_count") or 0)
+                    _aggregate_count(aggregate, "unread_message_count")
                     if aggregate is not None
                     else 0
                 )
                 message_revision = (
-                    int(aggregate.get("message_revision") or 0)
+                    _aggregate_count(aggregate, "message_revision")
                     if aggregate is not None
                     else 0
                 )
@@ -113,7 +118,7 @@ def seed_notification_state(
                 generation = current["generation"] if current else str(uuid.uuid4())
                 revision = (
                     current["revision"] + 1
-                    if changed
+                    if current and changed
                     else epoch
                     if not current
                     else current["revision"]
@@ -152,8 +157,11 @@ def seed_notification_state(
     raise RuntimeError("Notification state changed too frequently.")
 
 
-# @testable infrastructure
-def repair_notification_state(user, notification_keys, aggregate=None):
+def repair_notification_state(
+    user: object,
+    notification_keys: Iterable[object],
+    aggregate: Mapping[str, object] | None = None,
+) -> NotificationState:
     """Repair projection membership from keys already fetched for the list."""
     return seed_notification_state(
         user,
@@ -163,11 +171,10 @@ def repair_notification_state(user, notification_keys, aggregate=None):
     )
 
 
-# @testable true
-# @tests tests_unit/test_025_notification_state.py::test_notification_mutations_are_idempotent_and_advance_once
-# @tests tests_unit/test_025_notification_state.py::test_absent_projection_mutation_updates_epoch_without_querying
-# @matrix notifications : cold-cache datastore-read-isolation idempotent-count mutation revision
-def update_notification_projection(*, upserts=(), deletes=(), aggregates=None):
+def update_notification_projection(
+    *, upserts: Iterable[object] = (), deletes: Iterable[object] = (),
+    aggregates: Mapping[str, Mapping[str, object]] | None = None,
+) -> dict[str, PublicNotificationState]:
     """Apply one logical committed mutation per affected user's projection."""
     results = {}
     for user, changes in _group_mutations(upserts, deletes).items():
@@ -181,7 +188,7 @@ def update_notification_projection(*, upserts=(), deletes=(), aggregates=None):
                     pipe.multi()
                     pipe.incr(epoch_key)
                     pipe.expire(epoch_key, NOTIFICATION_TTL_SECONDS)
-                    state = None
+                    state: NotificationState | None = None
                     if current:
                         members = set(current["members"])
                         members.difference_update(changes["deletes"])
@@ -189,17 +196,17 @@ def update_notification_projection(*, upserts=(), deletes=(), aggregates=None):
                         revision = current["revision"] + 1
                         aggregate = (aggregates or {}).get(user)
                         ordinary_count = (
-                            int(aggregate.get("ordinary_count") or 0)
+                            _aggregate_count(aggregate, "ordinary_count")
                             if aggregate is not None
                             else len(members)
                         )
                         unread_message_count = (
-                            int(aggregate.get("unread_message_count") or 0)
+                            _aggregate_count(aggregate, "unread_message_count")
                             if aggregate is not None
                             else current.get("unread_message_count", 0)
                         )
                         message_revision = (
-                            int(aggregate.get("message_revision") or 0)
+                            _aggregate_count(aggregate, "message_revision")
                             if aggregate is not None
                             else current.get("message_revision", 0)
                         )
@@ -237,10 +244,9 @@ def update_notification_projection(*, upserts=(), deletes=(), aggregates=None):
     return results
 
 
-# @testable true
-# @tests tests_unit/test_025_notification_state.py::test_durable_aggregate_publish_preserves_members_and_exact_combined_count
-# @matrix notifications : aggregate-count redis-projection revision
-def publish_notification_aggregate(user, aggregate):
+def publish_notification_aggregate(
+    user: object, aggregate: Mapping[str, object]
+) -> NotificationState:
     """Mirror canonical durable counts without reading notification history."""
     identifier = _user_id(user)
     state_key, epoch_key = _redis_keys(identifier)
@@ -255,12 +261,12 @@ def publish_notification_aggregate(user, aggregate):
                 generation = current.get("generation") if current else str(uuid.uuid4())
                 revision = max(
                     (current or {}).get("revision", 0) + 1,
-                    int(aggregate.get("aggregate_revision") or 0),
+                    _aggregate_count(aggregate, "aggregate_revision"),
                     epoch + 1,
                 )
-                ordinary_count = int(aggregate.get("ordinary_count") or 0)
-                unread_message_count = int(aggregate.get("unread_message_count") or 0)
-                message_revision = int(aggregate.get("message_revision") or 0)
+                ordinary_count = _aggregate_count(aggregate, "ordinary_count")
+                unread_message_count = _aggregate_count(aggregate, "unread_message_count")
+                message_revision = _aggregate_count(aggregate, "message_revision")
                 pipe.multi()
                 pipe.set(epoch_key, str(revision))
                 pipe.delete(state_key)
@@ -278,7 +284,7 @@ def publish_notification_aggregate(user, aggregate):
                 pipe.expire(state_key, NOTIFICATION_TTL_SECONDS)
                 pipe.expire(epoch_key, NOTIFICATION_TTL_SECONDS)
                 pipe.execute()
-                state = {
+                state: NotificationState = {
                     "generation": generation,
                     "revision": revision,
                     "message_revision": message_revision,

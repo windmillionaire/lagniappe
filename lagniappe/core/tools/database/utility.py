@@ -1,31 +1,71 @@
 """Entity creation, persistence, deletion, and site fingerprinting."""
 
-from enum import Enum
+from __future__ import annotations
+
 import uuid
+from collections.abc import Iterable, Mapping, Sequence
+from copy import copy
+from enum import Enum
+from typing import TYPE_CHECKING, cast
 
 from google.api_core.exceptions import ServiceUnavailable
 from google.cloud.datastore import Entity, Key
+from google.cloud.datastore.transaction import Transaction
 
 from lagniappe import CONFIG
+from lagniappe.core.definitions.default import DefaultEnum
 
 from .core import DATA, KINDS
 from .defaults import DEFAULT_USER_FORM, DEFAULT_USER_PAGE
 from .filter import Filter, Query
 from .transactions import retry_aborted
-from lagniappe.core.definitions.default import DefaultEnum
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.entity import Entity as DomainEntity
+    from lagniappe.core.entities.site import Site
+
+    from .get import Identifier
 
 PREFIX = CONFIG.PREFIX
 
 
-# @testable infrastructure
+def stored_row(entity: DomainEntity | Entity) -> Entity:
+    """Return the keyed row for persistence, including SDK-compatible row subclasses."""
+    row = getattr(entity, "db", entity)
+    if not isinstance(row, dict) or getattr(row, "key", None) is None:
+        raise ValueError("A persistent Datastore entity requires a key.")
+    return cast(Entity, row)
+
+
+def stored_key(row: Entity) -> Key:
+    """Queries return persisted entities, each with its Datastore key."""
+    key = row.key
+    if key is None:
+        raise ValueError("A queried Datastore entity has no key.")
+    return key
+
+
 class ExactEntityState(dict):
     """Guard a complete saved row, including absence of additional properties."""
 
 
-# @testable true
-# @tests tests_unit/test_018b_database_migrations.py::test_database_initialize_only_marks_new_content_stores_as_fresh
-# @matrix database-migrations setup : detection fresh-install reserved-seeding
-def initialize():
+class PageSubmissionState(ExactEntityState):
+    """A full Page form edit leaves the revision-bound notes hint to its reader."""
+
+    @staticmethod
+    def with_current_note_hint[Row: dict[str, object]](
+        row: Row, current: dict[str, object]
+    ) -> Row:
+        result = copy(row)
+        for name in ("has_notes", "notes_checked_revision"):
+            if name in current:
+                result[name] = current[name]
+            else:
+                result.pop(name, None)
+        return result
+
+
+def initialize() -> bool:
     """Initialize data services and seed default reserved models if absent."""
     DATA.initialize()
 
@@ -51,37 +91,33 @@ def initialize():
     return fresh_install
 
 
-# @testable infrastructure
-def create_entity(key):
+def create_entity(key: Key) -> Entity:
     """Create a new Datastore Entity with the given key."""
     return Entity(key)
 
 
-# @testable infrastructure
-def create_key(entity_kind, parent):
+def create_key(entity_kind: str, parent: Identifier) -> Key:
     """Allocate a new Datastore key for the given entity kind and optional parent."""
     return create_keys(entity_kind, parent, 1)[0]
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_create_keys_retains_kind_parent_and_numeric_ids
-# @matrix database : id-allocation batching parent
-def create_keys(entity_kind, parent, count):
+def create_keys(entity_kind: str, parent: Identifier, count: int) -> list[Key]:
     """Allocate a bounded group of numeric keys with one kind and parent."""
     if not 1 <= count <= 50:
         raise ValueError("Allocate between 1 and 50 keys at a time.")
     kind = KINDS[entity_kind].value
     if parent and isinstance(parent, Key):
         partial = DATA.datastore.key(kind, parent=parent)
-    elif parent and hasattr(parent, "key"):
-        partial = DATA.datastore.key(kind, parent=parent.key)
+    elif parent and (parent_key := getattr(parent, "key", None)):
+        partial = DATA.datastore.key(kind, parent=parent_key)
     else:
         partial = DATA.datastore.key(kind)
     return DATA.datastore.allocate_ids(partial, count)
 
 
-# @testable infrastructure
-def create_named_key(entity_kind, identifier, parent=None):
+def create_named_key(
+    entity_kind: str, identifier: int | str, parent: Identifier = None
+) -> Key:
     """Create a stable complete key for an idempotent internal record."""
     kind = KINDS[entity_kind].value
     parent_key = getattr(parent, "key", parent)
@@ -122,10 +158,7 @@ class Fingerprint(Enum, metaclass=DefaultEnum):
     DEFAULT = None
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_save_persists_user_and_users_fingerprint_record
-# @matrix caching users : save site-fingerprint
-def save(*entities):
+def save(*entities: DomainEntity | Site) -> None:
     """Persist entities to Datastore and update their site fingerprints."""
     to_save = {e.key: e.db for e in entities if getattr(e, "key", None)}
     to_update = update_site_fingerprints(*to_save.values())
@@ -133,9 +166,6 @@ def save(*entities):
     DATA.datastore.put_multi(list(to_save.values()) + to_update)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/database/utility.py::save_mutations
-# @reason neutral-mask selection is asserted through the public mutation writer
 def _advances_site_fingerprint(entity, mask):
     fields = set(mask or ())
     if entity.db.get("type") == "notification":
@@ -153,8 +183,6 @@ def _advances_site_fingerprint(entity, mask):
     )
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/tools/database/utility.py::save_mutations
 def _put_mutation(writer, entity, property_mask=None):
     """Queue one full or property-masked Datastore mutation."""
     writer.put(entity)
@@ -165,12 +193,8 @@ def _put_mutation(writer, entity, property_mask=None):
     mutation.property_mask.paths.extend(property_mask)
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_cache_acknowledgement_is_revision_checked_and_masked
-# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_cache_acknowledgement_preserves_newer_permissions
-# @matrix cache user : invalidation acknowledgement concurrency property-mask
 @retry_aborted
-def acknowledge_user_cache(key, revision):
+def acknowledge_user_cache(key: Key, revision: str | int) -> bool:
     """Clear only the invalidation that the browser actually observed."""
     with DATA.datastore.transaction() as transaction:
         current = DATA.datastore.get(key, transaction=transaction)
@@ -185,16 +209,12 @@ def acknowledge_user_cache(key, revision):
     return True
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_save_mutations_applies_property_masks_and_fingerprints
-# @tests tests_unit/test_018_database_utility.py::test_permission_source_save_invalidates_tasks_without_descendant_writes
-# @matrix permissions mutations : channel-invalidation no-descendant-writes
-# @tests tests_unit/test_018_database_utility.py::test_notification_save_and_delete_skip_site_fingerprints
-# @tests tests_unit/test_018_database_utility.py::test_form_archive_and_deletion_share_the_guarded_transaction
-# @matrix database mutations : document-checkpoint full-upsert property-mask site-fingerprint update
-# @matrix notifications : mutation site-fingerprint-isolation
-# @matrix forms mutations : archive atomic-delete concurrency
-def save_mutations(writes, *, guards=None, deletes=()):
+def save_mutations(
+    writes: Iterable[tuple[DomainEntity, Iterable[str] | None]],
+    *,
+    guards: Iterable[tuple[Key, Mapping[str, object] | None]] | None = None,
+    deletes: Iterable[DomainEntity] = (),
+) -> None:
     """Persist full and property-masked writes with their collection revisions.
 
     ``writes`` contains ``(typed_entity, property_mask)`` pairs. A ``None`` mask
@@ -248,30 +268,25 @@ def save_mutations(writes, *, guards=None, deletes=()):
             batch.delete(entity.key)
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_guarded_checkpoint_rejects_a_concurrent_asset_change
-# @tests tests_unit/test_004f_form_drafts.py::test_exact_publication_guard_rejects_new_properties_but_document_guard_is_subset
-# @tests tests_unit/test_018_database_utility.py::test_form_archive_and_deletion_share_the_guarded_transaction
-# @matrix mutations sync : document checkpoint cas conflict
-# @matrix forms mutations permissions : guarded-save concurrent-restrictions
-# @matrix forms mutations : archive atomic-delete concurrency
 @retry_aborted
 def _save_guarded_mutations(writes, fingerprints, guards, *, deletes=()):
     with DATA.datastore.transaction() as transaction:
-        check_mutation_guards(transaction, guards)
+        guarded_pages = check_mutation_guards(transaction, guards)
         for entity, mask in writes:
-            _put_mutation(transaction, entity.db, mask)
+            row = entity.db
+            if mask is None and (current := guarded_pages.get(row.key)) is not None:
+                row = PageSubmissionState.with_current_note_hint(row, current)
+            _put_mutation(transaction, row, mask)
         for fingerprint in fingerprints:
             transaction.put(fingerprint)
         for entity in deletes:
             transaction.delete(entity.key)
 
 
-# @testable true
-# @tests tests_unit/test_018c_mutation_guards.py::test_*
-# @matrix mutations : concurrency batched-reads
-def check_mutation_guards(transaction, guards):
-    """Batch distinct reads while enforcing every expectation in input order."""
+def check_mutation_guards(
+    transaction: Transaction, guards: Iterable[tuple[Key, Mapping[str, object] | None]]
+) -> dict[Key, Entity]:
+    """Check every precondition and return Page rows whose notes hints must survive full writes."""
     guards = tuple(guards)
     keys = list(dict.fromkeys(key for key, _expected in guards))
     current_rows = {}
@@ -286,8 +301,13 @@ def check_mutation_guards(transaction, guards):
         # resolving them. Only explicitly missing rows satisfy absence guards.
         if any(key not in current_rows for key in batch):
             raise ServiceUnavailable("Datastore did not resolve all mutation guards; retry.")
+    guarded_pages = {}
     for key, expected in guards:
         current = current_rows[key]
+        if isinstance(expected, PageSubmissionState) and current is not None:
+            # Compare all other properties, including additions and removals.
+            expected = PageSubmissionState.with_current_note_hint(expected, current)
+            guarded_pages[key] = current
         conflict = (
             current is not None if expected is None else
             current is None or (
@@ -298,12 +318,10 @@ def check_mutation_guards(transaction, guards):
         if conflict:
             from lagniappe.core.exceptions import MutationConflict
             raise MutationConflict("Saved state changed while saving; reload and retry.")
+    return guarded_pages
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_save_raw_persists_datastore_entities_without_typed_save_hooks
-# @matrix database migrations : raw-save site-fingerprint
-def save_raw(*entities):
+def save_raw(*entities: Entity) -> None:
     """Persist raw Datastore entities without running typed entity save hooks.
 
     Maintenance migrations use this path so malformed legacy properties do not
@@ -321,9 +339,7 @@ def save_raw(*entities):
     DATA.datastore.put_multi(list(to_save.values()) + to_update)
 
 
-# @testable false
-# @reason delete side effects are owned by E2E coverage against configured services
-def delete_entities(entities):
+def delete_entities(entities: Iterable[DomainEntity]) -> None:
     """Delete durable rows and update fingerprints in one Datastore batch."""
     to_delete = {e.key: e.db for e in entities if getattr(e, "key", None)}
     if not to_delete:
@@ -343,16 +359,12 @@ def delete_entities(entities):
             batch.delete(key)
 
 
-# @testable false
-# @covered-by lagniappe/core/mutations/executor.py::execute_post_commit
-# @reason blob cleanup is a post-commit provider effect covered by entity deletion
-def delete_blobs(private_paths, public_paths):
+def delete_blobs(
+    private_paths: Sequence[str], public_paths: Sequence[str]
+) -> list[str]:
     """Delete post-commit storage blobs and return provider error messages."""
     errors = []
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/utility.py::delete_blobs
-    # @reason provider callback only normalizes an error into the outcome
     def record_error(error):
         errors.append(str(error))
 
@@ -367,11 +379,8 @@ def delete_blobs(private_paths, public_paths):
     return errors
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_update_site_fingerprints_upserts_missing_users_fingerprint
-# @matrix caching users : invalidation site-fingerprint
-def update_site_fingerprints(*entities):
-    fingerprints = set(Fingerprint[e.get("type")].value for e in entities)
+def update_site_fingerprints(*entities: Mapping[str, object]) -> list[Entity]:
+    fingerprints = {Fingerprint[kind].value for entity in entities if isinstance(kind := entity.get("type"), str)}
     keys = [DATA.datastore.key("site", f) for f in fingerprints if f]
 
     missing = []
@@ -383,28 +392,19 @@ def update_site_fingerprints(*entities):
     return records
 
 
-# @testable true
-# @tests tests_unit/test_009g_restriction_reconciliation.py::test_reconciliation_completion_publishes_existing_collection_revisions
-# @matrix permissions cache : channel-invalidation reconciliation
-def advance_site_fingerprints(*kinds):
+def advance_site_fingerprints(*kinds: str) -> None:
     """Publish completed projection changes through the existing channels."""
     records = update_site_fingerprints(*({"type": kind} for kind in kinds))
     if records:
         DATA.datastore.put_multi(records)
 
 
-# @testable false
-# @reason site fingerprint creation is persistence-owned and covered by route/E2E workflows
-def site_fingerprint(path):
+def site_fingerprint(path: str) -> str | None:
     """Return the current fingerprint UUID for a URL path, creating one if needed."""
     return site_fingerprints((path,)).get(path)
 
 
-# @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
-# @tests tests_unit/test_018_database_utility.py::test_site_fingerprints_batch_reads_only_resolved_paths
-# @matrix polling : batching channel mounted-scope
-def site_fingerprint_keys(paths):
+def site_fingerprint_keys(paths: Iterable[str]) -> dict[str, Key]:
     """Resolve channel paths to their canonical durable revision keys."""
     paths = tuple(dict.fromkeys(path for path in paths if isinstance(path, str)))
     indexes = {}
@@ -425,11 +425,9 @@ def site_fingerprint_keys(paths):
     return {path: keys_by_index[index] for path, index in indexes.items()}
 
 
-# @testable true
-# @tests tests_unit/test_018_database_utility.py::test_site_fingerprints_batch_reads_only_resolved_paths
-# @tests tests_unit/test_018_database_utility.py::test_site_fingerprints_reuses_supplied_records
-# @matrix polling : batching channel mounted-scope
-def site_fingerprints(paths, *, records=None):
+def site_fingerprints(
+    paths: Iterable[str], *, records: Mapping[Key, Entity] | None = None
+) -> dict[str, str | None]:
     """Read channel revisions once, or reuse this request's durable root batch."""
     path_keys = site_fingerprint_keys(paths)
     keys = list(dict.fromkeys(path_keys.values()))
@@ -451,8 +449,7 @@ def site_fingerprints(paths, *, records=None):
     }
 
 
-# @testable infrastructure
-def cleanup_test_data():
+def cleanup_test_data() -> None:
     """Delete all test Datastore entities and Storage objects (testing only)."""
     if not CONFIG.testing:
         return

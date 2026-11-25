@@ -1,7 +1,7 @@
 """Trusted external guidance and schedule contracts without provider drift."""
 
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 import json
 from types import SimpleNamespace
 
@@ -19,9 +19,6 @@ from lagniappe.core.tools.ai.reporting.contracts import schema
 from lagniappe.core.tools.ai.reporting.schedules import validate_task_schedule
 
 
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
-# @matrix ai agent-api : guidelines tool-dispatch
 @pytest.mark.unit
 def test_schema_conversion_guidance_is_selected_by_trusted_invocation():
     actor = SimpleNamespace()
@@ -55,9 +52,6 @@ def test_schema_conversion_guidance_is_selected_by_trusted_invocation():
     assert '"conversions"' in json.dumps(public_schema)
 
 
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
-# @matrix ai agent-api : guidelines tool-dispatch
 @pytest.mark.unit
 @pytest.mark.parametrize("external", [False, True])
 def test_schema_guidance_filters_definitions_without_submission_rules(external):
@@ -104,8 +98,6 @@ def test_schema_guidance_filters_definitions_without_submission_rules(external):
     assert "data.conversions" not in text
 
 
-# @source lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
-# @matrix agent-api ai-report : external-schema proposal-contract structured-output
 @pytest.mark.unit
 def test_external_schema_patch_uses_standard_nullable_values():
     public = schema.external_report_proposal_response_schema(
@@ -137,7 +129,6 @@ def test_external_schema_patch_uses_standard_nullable_values():
     assert external_validation._schema_errors(proposal, public, public, "$.proposal")
 
 
-# @matrix ai agent-api : guidelines tool-dispatch
 @pytest.mark.unit
 def test_organize_guidance_is_shared_across_provider_and_external_dispatch():
     actor = SimpleNamespace()
@@ -211,7 +202,6 @@ def test_organize_guidance_is_shared_across_provider_and_external_dispatch():
     assert "exact schema field ids" in external_form["guidelines"]
 
 
-# @matrix ai guidelines : action-selection field-type-selection payload-size
 @pytest.mark.unit
 def test_submission_patch_guidance_is_shared_and_omits_autofill_workflow():
     args = {
@@ -237,9 +227,6 @@ def test_submission_patch_guidance_is_shared_and_omits_autofill_workflow():
     assert external["filters"] == {key: args[key] for key in ("actions", "field_types")}
 
 
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
-# @matrix ai agent-api : guidelines tool-dispatch
 @pytest.mark.unit
 @pytest.mark.parametrize("task", ["project", "task_form"])
 def test_task_form_guidance_preserves_negative_answers_for_both_workflows(task):
@@ -267,9 +254,6 @@ def test_task_form_guidance_preserves_negative_answers_for_both_workflows(task):
     assert "/submit" not in guidance
 
 
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
-# @matrix ai agent-api : guidelines tool-dispatch
 @pytest.mark.unit
 def test_external_duplicate_check_reuses_evidence_without_a_filename_search_ritual():
     actor = SimpleNamespace()
@@ -289,8 +273,6 @@ def test_external_duplicate_check_reuses_evidence_without_a_filename_search_ritu
     assert internal == external
 
 
-# @matrix ai agent-api : guidelines tool-dispatch provider-neutral-schema tool-catalog
-# @source lagniappe/core/tools/ai/functions.py::tool_catalog
 @pytest.mark.unit
 def test_search_dispatch_and_catalog_match_across_ai_entry_points(
     monkeypatch,
@@ -329,9 +311,6 @@ def test_search_dispatch_and_catalog_match_across_ai_entry_points(
     )
 
 
-# @matrix agent-api task-scheduling : periodic recurring scheduled structured-output validation
-# @source lagniappe/core/tools/ai/external/validation.py::submission_validation_errors
-# @matrix agent-api : schema field-path
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "schedule,valid",
@@ -494,8 +473,6 @@ def test_external_schedule_schema_matches_repeating_schedule_requirements(
             validate_task_schedule(schedule)
 
 
-# @source lagniappe/core/tools/ai/reporting/contracts/schema.py::external_report_proposal_response_schema
-# @matrix agent-api ai-report : external-schema proposal-contract structured-output
 @pytest.mark.unit
 def test_external_task_contract_explains_references_without_changing_provider_schema():
     provider = schema.report_proposal_response_schema(("create_task", "create_page"))
@@ -546,11 +523,6 @@ def test_external_task_contract_explains_references_without_changing_provider_sc
         )
 
 
-# @source lagniappe/core/tools/ai/external/contracts.py::plan_contract
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @source lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
-# @matrix agent-api ai-report : proposal-contract
-# @matrix ai agent-api : guidelines tool-dispatch
 @pytest.mark.unit
 def test_external_contract_reuses_known_guidance_and_exposes_canonical_scheduling(
     monkeypatch,
@@ -576,7 +548,7 @@ def test_external_contract_reuses_known_guidance_and_exposes_canonical_schedulin
     monkeypatch.setattr(
         external_contracts.dates,
         "user_today",
-        lambda user: datetime(2026, 9, 4, tzinfo=timezone.utc),
+        lambda user: datetime(2026, 9, 4, tzinfo=UTC),
     )
     for instructions in ("Create a task", "Organize existing records"):
         contract = external_api.plan_contract(

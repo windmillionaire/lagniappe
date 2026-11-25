@@ -1,10 +1,15 @@
 """Bounded outbound HTTP clients for user URLs and fixed providers."""
 
+from contextlib import suppress
 from dataclasses import dataclass
 from io import BytesIO
 from ipaddress import ip_address
 import re
 import socket
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from requests._types import JsonType, ParamsType
 import time
 import unicodedata
 from urllib.parse import urljoin, urlsplit, urlunsplit
@@ -37,9 +42,6 @@ _STREAM_CHUNK_BYTES = 64 * 1024
 _HTTP_METHOD = re.compile(r"^[A-Z][A-Z0-9!#$%&'*+.^_`|~-]*$")
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/http/client.py::fetch_user_content
-# @reason validated URL details are an internal connection-pinning contract
 @dataclass(frozen=True)
 class _ValidatedURL:
     url: str
@@ -67,9 +69,6 @@ class _ValidatedURL:
         return urlunsplit((self.scheme, netloc, self.path, self.query, ""))
 
 
-# @testable true
-# @tests tests_unit/test_032_outbound_http.py::test_pinned_adapter_connects_to_address_with_original_host_and_tls_identity
-# @matrix outbound-http : certificate-hostname dns-pinning host-header sni
 class _PinnedAddressAdapter(HTTPAdapter):
     """Requests adapter that verifies an IP connection as the original host."""
 
@@ -88,9 +87,6 @@ class _PinnedAddressAdapter(HTTPAdapter):
         super().init_poolmanager(connections, maxsize, block=block, **pool_kwargs)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/http/client.py::fetch_user_content
-# @reason URL parsing and canonicalization are exercised through user fetch outcomes
 def _validate_user_url(value: object, policy: UserFetchPolicy) -> _ValidatedURL:
     if not isinstance(value, str):
         raise ValueError("invalid URL")
@@ -138,7 +134,7 @@ def _validate_user_url(value: object, policy: UserFetchPolicy) -> _ValidatedURL:
         address = ip_address(host)
     except ValueError:
         if any(not _HOST_LABEL.fullmatch(label) for label in host.split(".")):
-            raise ValueError("invalid URL")
+            raise ValueError("invalid URL") from None
     else:
         host = address.compressed
 
@@ -165,9 +161,6 @@ def _validate_user_url(value: object, policy: UserFetchPolicy) -> _ValidatedURL:
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/http/client.py::fetch_user_content
-# @reason DNS classification is exercised through user fetch outcomes
 def _resolve_public_addresses(target: _ValidatedURL) -> tuple[str, ...]:
     try:
         records = socket.getaddrinfo(
@@ -184,7 +177,7 @@ def _resolve_public_addresses(target: _ValidatedURL) -> tuple[str, ...]:
     for record in records:
         try:
             raw_address = record[4][0]
-            if "%" in raw_address:
+            if not isinstance(raw_address, str) or "%" in raw_address:
                 raise ValueError("scoped resolved address")
             address = ip_address(raw_address)
         except (IndexError, ValueError) as error:
@@ -204,20 +197,12 @@ def _resolve_public_addresses(target: _ValidatedURL) -> tuple[str, ...]:
     return tuple(addresses)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/http/client.py::fetch_user_content
-# @covered-by lagniappe/core/tools/http/client.py::request_trusted_content
-# @reason media parsing is exercised through both outbound response boundaries
 def _media_type(headers) -> str | None:
     value = headers.get("Content-Type", "") if headers is not None else ""
     media_type = str(value).split(";", 1)[0].strip().casefold()
     return media_type or None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/http/client.py::fetch_user_content
-# @covered-by lagniappe/core/tools/http/client.py::request_trusted_content
-# @reason media matching is exercised through both outbound response boundaries
 def _accepted_media_type(media_type: str | None, accepted: frozenset[str]) -> bool:
     if not media_type:
         return False
@@ -235,10 +220,6 @@ def _accepted_media_type(media_type: str | None, accepted: frozenset[str]) -> bo
     return False
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/http/client.py::fetch_user_content
-# @covered-by lagniappe/core/tools/http/client.py::request_trusted_content
-# @reason declared-length handling is exercised through bounded response tests
 def _declared_size(headers) -> int | None:
     value = headers.get("Content-Length") if headers is not None else None
     if value is None:
@@ -250,10 +231,6 @@ def _declared_size(headers) -> int | None:
     return size if size >= 0 else None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/http/client.py::fetch_user_content
-# @covered-by lagniappe/core/tools/http/client.py::request_trusted_content
-# @reason streaming enforcement is exercised through bounded response tests
 def _stream_body(response, max_bytes: int, deadline_at: float) -> tuple[bytes, int]:
     chunks = []
     size = 0
@@ -273,9 +250,6 @@ def _stream_body(response, max_bytes: int, deadline_at: float) -> tuple[bytes, i
     return b"".join(chunks), size
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/http/client.py::fetch_user_content
-# @reason raster verification is exercised through image policy outcomes
 def _verified_raster_media_type(body: bytes) -> str | None:
     try:
         with Image.open(BytesIO(body)) as image:
@@ -286,10 +260,6 @@ def _verified_raster_media_type(body: bytes) -> str | None:
     return _RASTER_MEDIA_TYPES.get(detected_format)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/http/client.py::fetch_user_content
-# @covered-by lagniappe/core/tools/http/client.py::request_trusted_content
-# @reason result construction is owned by the two public clients
 def _result(
     status: OutboundStatus,
     *,
@@ -311,27 +281,16 @@ def _result(
     )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/http/client.py::fetch_user_content
-# @covered-by lagniappe/core/tools/http/client.py::request_trusted_content
-# @reason cleanup failure handling is exercised through public-client closure tests
 def _close_response_session(response, session) -> None:
     """Attempt both cleanup operations without leaking transport exceptions."""
     if response is not None:
-        try:
+        with suppress(Exception):
             response.close()
-        except Exception:
-            pass
     if session is not None:
-        try:
+        with suppress(Exception):
             session.close()
-        except Exception:
-            pass
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/http/client.py::fetch_user_content
-# @reason per-address session ownership is exercised through user fetch closure tests
 def _user_request(target, address, headers, timeout):
     session = requests.Session()
     session.trust_env = False
@@ -351,18 +310,6 @@ def _user_request(target, address, headers, timeout):
     return session, response
 
 
-# @testable true
-# @tests tests_unit/test_032_outbound_http.py::test_pinned_adapter_connects_to_address_with_original_host_and_tls_identity
-# @tests tests_unit/test_032_outbound_http.py::test_user_fetch_rejects_malformed_urls_before_resolution
-# @tests tests_unit/test_032_outbound_http.py::test_user_fetch_rejects_every_non_public_address_category
-# @tests tests_unit/test_032_outbound_http.py::test_user_fetch_rejects_mixed_dns_and_degrades_resolution_failure
-# @tests tests_unit/test_032_outbound_http.py::test_user_fetch_pins_redirects_bounds_and_closes_every_response
-# @tests tests_unit/test_032_outbound_http.py::test_user_fetch_redirect_and_address_attempt_limits
-# @tests tests_unit/test_032_outbound_http.py::test_user_fetch_validates_media_deadline_and_raster_content
-# @tests tests_unit/test_032_outbound_http.py::test_user_fetch_assigns_verified_raster_media_type
-# @tests tests_unit/test_032_outbound_http.py::test_profile_image_policy_is_https_only
-# @tests tests_e2e/004_projects/test_004e_document_forms.py::test_editor_preview_rejects_private_targets_without_disrupting_popover
-# @matrix outbound-http : address-failover bounds closure deadline dns-pinning https-only media privacy proxy-isolation raster redirects streaming url-validation
 def fetch_user_content(
     url: str,
     policy: UserFetchPolicy,
@@ -530,9 +477,6 @@ def fetch_user_content(
         )
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/http/client.py::request_trusted_content
-# @reason fixed provider URL construction is exercised through trusted-client tests
 def _trusted_url(policy: TrustedProviderPolicy, path: str) -> str:
     try:
         parsed = urlsplit(path)
@@ -558,19 +502,14 @@ def _trusted_url(policy: TrustedProviderPolicy, path: str) -> str:
     return f"{policy.scheme}://{host}/{path.lstrip('/')}"
 
 
-# @testable true
-# @tests tests_unit/test_032_outbound_http.py::test_trusted_client_enforces_fixed_host_bounds_deadline_and_closure
-# @tests tests_unit/test_032_outbound_http.py::test_trusted_client_media_acceptance_checks_every_pattern
-# @tests tests_unit/test_032_outbound_http.py::test_trusted_client_retries_only_explicit_method_and_status
-# @matrix outbound-http : bounds closure deadline fixed-host media privacy proxy-isolation redirects retry streaming trusted-provider
 def request_trusted_content(
     method: str,
     path: str,
     policy: TrustedProviderPolicy,
     *,
     headers: dict[str, str] | None = None,
-    params: dict[str, object] | None = None,
-    json_body: object = None,
+    params: ParamsType = None,
+    json_body: JsonType = None,
 ) -> OutboundResult:
     """Request bounded content from a policy-owned fixed provider origin."""
     method = str(method or "").upper()

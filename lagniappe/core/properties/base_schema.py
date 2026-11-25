@@ -1,11 +1,19 @@
+from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING, cast
+
 from .base_property import Property
 
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
+    from ..exceptions import ValidationError
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/schema.py::Schema.fields
-# @covered-by lagniappe/core/properties/form_inputs.py::TextInput
-# @covered-by lagniappe/core/properties/form_table.py::Table
-class SchemaProperty(dict, Property):
+type FieldDefinition = dict[str, object]
+type SchemaSource = Mapping[str, object] | Iterable[tuple[str, object]]
+
+
+class SchemaProperty[Value = object, Write = Value | None](
+    dict[str, object], Property[Value, "Entity", Write]
+):
     """Base class for form fields defined by a user-created schema.
 
     Initialized from a schema definition dict (the dict itself is the
@@ -20,48 +28,50 @@ class SchemaProperty(dict, Property):
         required (bool): Whether the field is required.
     """
 
-    def __init__(self, *args, entity=None, **kwargs):
+    def __init__(
+        self, *args: SchemaSource, entity: Entity | None = None, **kwargs: object
+    ) -> None:
         dict.__init__(self, *args)
-        self._id = self.get("id", None)
-        self._label = self.get("title", None)
-        Property.__init__(self, entity=entity, **kwargs)
-        self.warnings = []
-        self.errors = []
+        self._id = cast(str | None, self.get("id"))
+        self._label = cast(str | None, self.get("title"))
+        Property.__init__(cast(Property, self), entity=entity, **kwargs)
+        self.warnings: list[str] = []
+        self.errors: list[str | ValidationError] = []
 
     @property
-    def visibility(self):
-        return self.get("visibility", {})
+    def visibility(self) -> list[FieldDefinition] | FieldDefinition:
+        return cast(list[FieldDefinition] | FieldDefinition, self.get("visibility", {}))
 
     @property
-    def required(self):
-        return self.get("required", False)
+    def required(self) -> bool:
+        return cast(bool, self.get("required", False))
 
     @property
-    def multiple(self):
-        return getattr(self, "_multiple", self.get("multiple", False))
+    def multiple(self) -> bool:
+        return cast(bool, getattr(self, "_multiple", self.get("multiple", False)))
 
     @multiple.setter
-    def multiple(self, value):
+    def multiple(self, value: bool) -> None:
         self._multiple = value
 
     @property
-    def placeholder(self):
-        return self.get("placeholder", None)
+    def placeholder(self) -> str | None:
+        return cast(str | None, self.get("placeholder", None))
 
     @property
-    def schema(self):
+    def schema(self) -> FieldDefinition:
         return dict(self)
 
-    def reset(self):
+    def reset(self) -> None:
         self.unset()
         self.warnings = []
         self.errors = []
 
-    def validate_import(self, value):
-        self.value = value
+    def validate_import(self, value: object) -> None:
+        self.value = cast("Write", value)
 
-    def validate_ai(self, value):
-        self.value = value
+    def validate_ai(self, value: object) -> None:
+        self.value = cast("Write", value)
 
-    def validate_submission(self, value):
-        self.value = value
+    def validate_submission(self, value: object) -> None:
+        self.value = cast("Write", value)

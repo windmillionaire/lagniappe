@@ -1,16 +1,19 @@
 """Shared eligibility checks for managed-user collaboration features."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
+    from ..entities.user import User
+    from ..entities import Identifier
+    from .cache.details import SearchRecord
+
 from ..definitions import Action, Fetch, Restriction
 from ..entities import Entities
 from . import cache
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @matrix messaging : managed-user public-exclusion
-# @pair messaging:new-after-clear
-def managed_user(user):
+def managed_user(user: object) -> bool:
     return bool(
         user
         and getattr(user, "is_authenticated", False)
@@ -18,22 +21,15 @@ def managed_user(user):
     )
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_inbound_message_allows_reply_without_compose_permission
-# @matrix messaging : compose-eligibility owner-opt-in
-def can_initiate_messages(user):
+def can_initiate_messages(user: User | None) -> bool:
     """Return whether a managed user has any possible new-message recipient."""
     return bool(
-        managed_user(user)
+        user is not None and managed_user(user)
         and user.properties.restrictions.can_initiate_messages
     )
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
-# @pair messaging:recipient-resolution
-def resolve_user(identifier):
+def resolve_user(identifier: Identifier) -> User | None:
     """Resolve either a canonical User key or its personal Page selector key."""
     entity = Entities.fetch_one(identifier, request=Fetch.direct())
     if isinstance(entity, Entities.USER):
@@ -43,9 +39,6 @@ def resolve_user(identifier):
     return None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/collaboration.py::recipient_allowed
-# @reason restriction-set math is exercised through the final recipient predicate
 def _ordinary_restriction_allows(recipient, restrictions):
     if Restriction.is_unrestricted(restrictions):
         return True
@@ -55,15 +48,11 @@ def _ordinary_restriction_allows(recipient, restrictions):
     return bool(required & set(restrictions or ()))
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @matrix messaging : owner-opt-in permission self-exclusion
-# @matrix task-assignment : owner-opt-in permission self-assignment
-# @pair task-assignment:permission
-def recipient_allowed(actor, recipient, *, channel):
+def recipient_allowed(
+    actor: User | None, recipient: User | None, *, channel: str
+) -> bool:
     """Validate a recipient at the final mutation boundary."""
-    if not managed_user(actor) or not managed_user(recipient):
+    if actor is None or recipient is None or not managed_user(actor) or not managed_user(recipient):
         return False
     actor_key = getattr(actor, "key", None)
     recipient_key = getattr(recipient, "key", None)
@@ -90,10 +79,9 @@ def recipient_allowed(actor, recipient, *, channel):
     return _ordinary_restriction_allows(recipient, restrictions)
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
-# @matrix mentions : document-view permission
-def mention_recipient_allowed(actor, recipient, document):
+def mention_recipient_allowed(
+    actor: User | None, recipient: User | None, document: Entity | None
+) -> bool:
     return bool(
         recipient_allowed(actor, recipient, channel="mention")
         and document
@@ -101,20 +89,14 @@ def mention_recipient_allowed(actor, recipient, document):
     )
 
 
-# @testable true
-# @tests tests_unit/test_027d_collaboration.py::test_collaboration_search_excludes_self_owner_and_stale_rows
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
-# @matrix messaging : owner-search recipient-key self-exclusion
-# @matrix owner-projection : deduplication normalization
-# @pair mentions:recipient-search
 def collaboration_user_results(
-    results,
-    query,
-    permission,
-    actor,
+    results: list[SearchRecord],
+    query: str,
+    permission: str,
+    actor: User,
     *,
-    document_identifier=None,
-):
+    document_identifier: Identifier = None,
+) -> list[SearchRecord]:
     """Apply collaboration recipient invariants to user-search results."""
     if permission not in {"message", "mention", "assign"}:
         return results
@@ -140,7 +122,7 @@ def collaboration_user_results(
     }
     filtered = [result for result in filtered if result.get("id") in selectable]
     for result in filtered:
-        page = selectable.get(result.get("id"))
+        page = selectable.get(result.get("id") or "")
         if page and page.user:
             result.setdefault("details", {})["recipient_key"] = page.user.urlsafe_key
     toggle = (
@@ -155,6 +137,7 @@ def collaboration_user_results(
         and normalized_query
         and normalized_query in owner.get("normalized_name", "")
         and owner.get("key") != actor.urlsafe_key
+        and (owner_result := cache.owner_search_result(owner))
     ):
-        filtered.append(cache.owner_search_result(owner))
+        filtered.append(owner_result)
     return filtered

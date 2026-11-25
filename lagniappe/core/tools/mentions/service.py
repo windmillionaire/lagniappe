@@ -1,5 +1,13 @@
 """Authorized, idempotent document-mention delivery orchestration."""
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+    from lagniappe.core.entities.page import Page
+    from lagniappe.core.entities.project import Project
+    from collections.abc import Sequence
+
 from ...definitions import Fetch
 from ...entities import Entities
 from .. import collaboration
@@ -7,14 +15,10 @@ from lagniappe.core.tools.database import mentions as database_mentions
 from lagniappe.core.tools.database import notifications as database_notifications
 from ..email.notifications import capture as email_capture
 from ..notifications import service as notification_service
-from .content import saved_mentions
+from .content import MentionOccurrence, saved_mentions
 
 
-# @testable true
-# @tests tests_unit/test_027c_mentions.py::test_mentions_validate_saved_occurrences_dedupe_and_sanitize
-# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
-# @matrix mentions : document-view idempotency permission saved-occurrence
-def deliver_mentions(actor, document, html, occurrences):
+def deliver_mentions(actor: User, document: Page | Project, html: str | None, occurrences: Sequence[MentionOccurrence] | None) -> int:
     """Deliver still-present eligible occurrences after a saved checkpoint."""
     if (
         not occurrences

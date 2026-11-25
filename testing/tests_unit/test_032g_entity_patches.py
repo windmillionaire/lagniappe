@@ -1,6 +1,6 @@
 """Cohesive patches validate selected changes and preserve omitted fields."""
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from types import SimpleNamespace
 
 from google.cloud.datastore import Key, Entity as DatastoreEntity
@@ -39,13 +39,12 @@ def case():
     task.form = form
     task.description = "Long original description"
     task.submission = {"answer": "old answer", "kept": "preserve me"}
-    task.due_date = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    task.due_date = datetime(2026, 10, 1, tzinfo=UTC)
     task.db["history"] = True
     task.db["scheduled_uncomplete_token"] = "keep-token"
     return actor, task, form, page
 
 
-# @matrix entity-patch : preservation validation preparation permissions
 def test_task_patch_preserves_omitted_values_and_source():
     actor, task, form, page = case()
     original = deepcopy(task.db)
@@ -64,7 +63,6 @@ def test_task_patch_preserves_omitted_values_and_source():
     assert prepared.after["description"] == "Short"
 
 
-# @matrix entity-patch : preservation validation preparation permissions
 def test_reassignment_requires_complete_values_and_reviews_removals():
     actor, task, form, page = case()
     target = entity("FORM", "target-form")
@@ -82,9 +80,6 @@ def test_reassignment_requires_complete_values_and_reviews_removals():
     assert {item.key for item in prepared.forms} == {form.key, target.key}
 
 
-# @matrix entity-patch : preservation validation preparation permissions
-# @source lagniappe/core/properties/schema.py::SchemaFields.prepare_ai_field
-# @matrix ai-report submission : validation failure-isolation
 def test_patch_rejects_completed_locked_invalid_and_unauthorized_targets():
     actor, task, form, page = case()
     original = deepcopy(task.db)
@@ -105,7 +100,6 @@ def test_patch_rejects_completed_locked_invalid_and_unauthorized_targets():
         prepare_patch(task, {"name": None}, actor)
 
 
-# @matrix entity-patch : preservation validation preparation permissions
 def test_model_and_project_patches_preserve_defaults_and_validate_order():
     actor, task, form, page = case()
     project = entity("PROJECT", "project")
@@ -125,7 +119,6 @@ def test_model_and_project_patches_preserve_defaults_and_validate_order():
         prepare_patch(project, {"model_tasks": [first, first]}, actor)
 
 
-# @matrix entity-patch : preservation validation preparation permissions
 def test_page_patch_preserves_omitted_membership():
     actor, task, form, page = case()
     category = entity("CATEGORY", "category")
@@ -136,7 +129,6 @@ def test_page_patch_preserves_omitted_membership():
     assert page.db == original
 
 
-# @matrix entity-patch : preservation validation preparation permissions
 def test_patch_validates_classification_assignee_and_explicit_clears():
     actor, task, form, page = case()
     project, other = entity("PROJECT", "project"), entity("PROJECT", "other")
@@ -158,7 +150,6 @@ def test_patch_validates_classification_assignee_and_explicit_clears():
     assert task.form.key == form.key
 
 
-# @matrix entity-patch : preservation validation preparation permissions
 def test_page_form_registration_is_detached_and_pending_checklist_stays_unchecked():
     actor, task, form, page = case()
     category = entity("CATEGORY", "category")
@@ -173,7 +164,6 @@ def test_page_form_registration_is_detached_and_pending_checklist_stays_unchecke
     assert any(intent.reason == "page-category-form-registration" for intent in prepared.entity.mutation_intents)
 
 
-# @matrix entity-patch : preservation preparation
 def test_page_form_registration_preserves_unloaded_category_forms(monkeypatch):
     actor, _task, _form, page = case()
     category = entity("CATEGORY", "shallow-category")
@@ -199,7 +189,6 @@ def test_page_form_registration_preserves_unloaded_category_forms(monkeypatch):
     assert reads == [original.key]
 
 
-# @matrix entity-patch : preservation validation preparation permissions
 def test_patch_schedule_and_form_type_and_permission_validation():
     actor, task, form, page = case()
     with pytest.raises(ValidationError, match="permission"):
@@ -217,7 +206,6 @@ def test_patch_schedule_and_form_type_and_permission_validation():
     assert task.db["scheduled_uncomplete_token"] == "keep-token"
 
 
-# @matrix entity-patch : integration review dependencies stale-state
 def test_update_review_and_execution_share_exact_references(monkeypatch):
     actor, task, form, page = case()
     monkeypatch.setattr(Entities, "fetch_one", lambda reference, **kwargs: task if reference is task or reference == task.urlsafe_key else None)
@@ -240,7 +228,6 @@ def test_update_review_and_execution_share_exact_references(monkeypatch):
     assert task.description == "Long original description"
 
 
-# @matrix entity-patch : integration review dependencies stale-state
 def test_update_execution_overwrites_selected_values_but_rejects_unreviewed_proposal(monkeypatch):
     actor, task, form, page = case()
     monkeypatch.setattr(Entities, "fetch_one", lambda reference, **kwargs: task)
@@ -258,7 +245,125 @@ def test_update_execution_overwrites_selected_values_but_rejects_unreviewed_prop
         execute_update_action(action, None, actor, {})
 
 
-# @matrix entity-patch : integration review dependencies stale-state
+def test_patch_answers_accepts_unset_schema_field_and_reports_unknown_field_ids():
+    actor, task, form, _page = case()
+    # Add an optional schema field not present in task.db["submission"].
+    form.set_schema([
+        *form.schema,
+        {"id": "optional_reason", "type": "textarea", "title": "Reason"},
+    ])
+    task.db["submission"] = {"answer": "old answer"}
+    patched = prepare_patch(task, {"submission": {"optional_reason": "Added later"}}, actor)
+    assert patched.entity.submission == {"answer": "old answer", "optional_reason": "Added later"}
+
+    with pytest.raises(ValidationError, match=r"bad_field.*Valid fields:.*optional_reason"):
+        prepare_patch(task, {"submission": {"bad_field": "oops"}}, actor)
+
+
+def test_update_category_and_delete_actions_enforce_permissions_and_guards(monkeypatch):
+    from lagniappe.core.entities.category import UNCATEGORIZED_PAGES_NAME
+    from lagniappe.core.tools.ai.reporting.execution.actions.entities import _delete_entity
+    from lagniappe.core.tools.ai.reporting.execution.actions.recovery import (
+        ACTION_APPLIED,
+        ACTION_NOT_APPLIED,
+        _inspect_action_applied,
+    )
+
+    actor = _test_user("cat-admin")
+    category = entity("CATEGORY", "old-cat")
+    category.name = "Old Name"
+    category.description = "Old desc"
+    page_form = entity("FORM", "cat-page-form")
+    page_form.form_type = "page"
+    task_form = entity("FORM", "cat-task-form")
+    task_form.form_type = "task"
+
+    patched = prepare_patch(
+        category,
+        {"name": "New Name", "description": "New desc", "form": page_form},
+        actor,
+    )
+    assert patched.entity.name == "New Name"
+    assert patched.entity.description == "New desc"
+    assert patched.entity.form.key == page_form.key
+
+    with pytest.raises(ValidationError, match="page Form"):
+        prepare_patch(category, {"form": task_form}, actor)
+
+    uncat = entity("CATEGORY", "uncat")
+    uncat.name = UNCATEGORIZED_PAGES_NAME
+    with pytest.raises(ValidationError, match="Uncategorized Pages cannot be renamed"):
+        prepare_patch(uncat, {"name": "Renamed"}, actor)
+
+    # Delete actions flush batch, enforce reserved guards, and call Entities.delete.
+    deleted = []
+    flushed = []
+    monkeypatch.setattr(Entities, "delete", lambda item, **kwargs: deleted.append(item))
+    monkeypatch.setattr(Entities, "save", lambda *items: None)
+    batch = SimpleNamespace(indices=[0], commit=lambda: flushed.append(True))
+
+    created = {category.urlsafe_key: category, uncat.urlsafe_key: uncat}
+    _, writes, metadata = _delete_entity(
+        {"type": "delete_category", "data": {"entity": category.urlsafe_key}},
+        None,
+        actor,
+        created,
+        {"batch": batch},
+    )
+    assert writes == []
+    assert metadata["deleted"] is True
+    assert flushed == [True]
+    assert deleted == [category]
+
+    with pytest.raises(ValidationError, match="Uncategorized Pages cannot be deleted"):
+        _delete_entity(
+            {"type": "delete_category", "data": {"entity": uncat.urlsafe_key}},
+            None,
+            actor,
+            created,
+            {},
+        )
+
+    personal = entity("PAGE", "personal-page")
+    personal.properties.user._value = actor
+    with pytest.raises(ValidationError, match="personal pages cannot be deleted"):
+        _delete_entity(
+            {"type": "delete_page", "data": {"entity": personal.urlsafe_key}},
+            None,
+            actor,
+            {personal.urlsafe_key: personal},
+            {},
+        )
+
+    # Recovery treats missing entity as applied for delete_* and present as not-applied.
+    monkeypatch.setattr(
+        "lagniappe.core.tools.ai.reporting.execution.actions.recovery._fetch_report_entity",
+        lambda _ref: None,
+    )
+    assert (
+        _inspect_action_applied(
+            {"type": "delete_category"},
+            None,
+            actor,
+            {"expected": {"entity": category.urlsafe_key}},
+        )
+        == ACTION_APPLIED
+    )
+    monkeypatch.setattr(
+        "lagniappe.core.tools.ai.reporting.execution.actions.recovery._fetch_report_entity",
+        lambda _ref: category,
+    )
+    assert (
+        _inspect_action_applied(
+            {"type": "delete_category"},
+            None,
+            actor,
+            {"expected": {"entity": category.urlsafe_key}},
+        )
+        == ACTION_NOT_APPLIED
+    )
+
+
 def test_update_missing_dependencies_never_fall_back_to_entity_lookup(monkeypatch):
     actor, task, form, page = case()
     reads = []
@@ -276,7 +381,6 @@ def test_update_missing_dependencies_never_fall_back_to_entity_lookup(monkeypatc
     assert reads == []
 
 
-# @matrix entity-patch : integration review dependencies stale-state
 def test_proposal_prepares_new_forms_and_model_order(monkeypatch):
     from lagniappe.core.tools.ai.reporting.entity_updates import prepare_entity_updates
     actor, task, old_form, page = case()
@@ -300,7 +404,6 @@ def test_proposal_prepares_new_forms_and_model_order(monkeypatch):
     assert project.model_tasks == [first]
 
 
-# @matrix entity-patch : integration review dependencies
 def test_proposal_orders_models_on_a_new_project():
     from lagniappe.core.tools.ai.reporting.entity_updates import prepare_entity_updates
     proposal = {"actions": [
@@ -314,7 +417,6 @@ def test_proposal_orders_models_on_a_new_project():
     assert proposal["actions"][-1]["_entity_update"]["after"]["model_tasks"] == ["$second", "$first"]
 
 
-# @matrix ai-report : correction ownership supersession
 def test_correction_snapshot_and_approval_reject_changed_source(monkeypatch):
     from lagniappe.core.tools.ai.reporting.corrections import link_correction, approve_correction
     from lagniappe.core.entities.ai_report import REPORT_FORMAT_VERSION
@@ -345,10 +447,6 @@ def test_correction_snapshot_and_approval_reject_changed_source(monkeypatch):
     assert source._form_additional_guards[0][0] == source.key
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @source lagniappe/core/tools/ai/reporting/entity_updates.py::prepare_entity_updates
-# @matrix entity-patch : integration review dependencies stale-state
-# @matrix ai-report : execute idempotency skip-action validation
 @pytest.mark.parametrize("skip_form", [False, True])
 def test_form_creation_and_task_update_batch_preserves_dependencies_and_retry(monkeypatch, skip_form):
     from lagniappe.core.tools.ai.reporting.entity_updates import prepare_entity_updates
@@ -399,8 +497,6 @@ def test_form_creation_and_task_update_batch_preserves_dependencies_and_retry(mo
         assert sum(any(item.entity_kind == "form" for item in batch) for batch in writes) == count
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @matrix ai-report : validation unavailable
 @pytest.mark.parametrize("version", [None, 1])
 def test_obsolete_report_execution_stops_before_workspace_writes(monkeypatch, version):
     from lagniappe.core.tools.ai.reporting.execution.runner import run_report
@@ -415,10 +511,6 @@ def test_obsolete_report_execution_stops_before_workspace_writes(monkeypatch, ve
         run_report(report, actor)
 
 
-# @source lagniappe/core/tools/ai/reporting/entity_updates.py::prepare_entity_updates
-# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @matrix entity-patch : integration review dependencies stale-state
-# @matrix ai-report : execute idempotency preservation
 @pytest.mark.parametrize("new_models", [False, True])
 def test_promotion_eight_task_migration_preserves_identity_and_orders_models(monkeypatch, new_models):
     from lagniappe.core.tools.ai.reporting.entity_updates import prepare_entity_updates
@@ -483,7 +575,7 @@ def test_promotion_eight_task_migration_preserves_identity_and_orders_models(mon
             actions.append({"id": f"model{i}", "type": "update_model_task", "data": {"entity": models[i].urlsafe_key, "changes": {"name": label, "form": f"$form{i}"}}})
             model_refs.append(models[i].urlsafe_key)
     actions.append({"id": "order", "type": "update_project", "data": {"entity": project.urlsafe_key, "changes": {"name": "Promotion workflow", "description": "Reusable promotion process", "model_tasks": model_refs}}})
-    for index, (task, stage) in enumerate(zip(tasks, [0, 1, 1, 2, 2, 2, 3, 3])):
+    for index, (task, stage) in enumerate(zip(tasks, [0, 1, 1, 2, 2, 2, 3, 3], strict=True)):
         actions.append({"id": f"task{index}", "type": "update_task", "data": {"entity": task.urlsafe_key, "changes": {"model": model_refs[stage], "form": f"$form{stage}", "submission": {"notes": task.description, "steps": {"items": [{"text": "Follow up", "checked": False}]}}, "description": labels[stage]}}})
     report.proposal = {"summary": "Generalize Promotion", "confidence": 1, "actions": actions}
     prepare_entity_updates(report.proposal, actor)
@@ -504,8 +596,6 @@ def test_promotion_eight_task_migration_preserves_identity_and_orders_models(mon
         assert current.form.key == current.model.form.key
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/actions/entities.py::_move_task
-# @pair ai-report:moves
 def test_completed_task_movement_remains_a_distinct_supported_operation(monkeypatch):
     from lagniappe.core.tools.ai.reporting.execution.actions.entities import _move_task
     actor, task, form, page = case()
@@ -520,9 +610,6 @@ def test_completed_task_movement_remains_a_distinct_supported_operation(monkeypa
     assert receipt["previous"]["page"]["id"] == page.urlsafe_key
 
 
-# @source lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
-# @matrix ai : edit-view exact-answers shared-schema
-# @matrix entity-patch : preservation validation preparation permissions
 def test_edit_view_preserves_complete_descriptions_and_deduplicates_schema(monkeypatch):
     from lagniappe.core.tools.ai.function_definitions.get_entity import execute_get_entity, edit_entity
     actor, task, form, page = case()
@@ -545,8 +632,6 @@ def test_edit_view_preserves_complete_descriptions_and_deduplicates_schema(monke
     assert edit_entity(task, actor)["editable_fields"] == []
 
 
-# @source lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
-# @matrix ai : edit-view model-task attached-form
 @pytest.mark.parametrize("with_form", [False, True])
 def test_model_edit_view_only_reads_supported_properties(monkeypatch, with_form):
     from lagniappe.core.tools.ai.function_definitions.get_entity import execute_get_entity
@@ -572,8 +657,6 @@ def test_model_edit_view_only_reads_supported_properties(monkeypatch, with_form)
         assert "form" not in result
 
 
-# @source lagniappe/core/tools/entity_patches.py::prepare_patch
-# @matrix entity-patch : preservation validation preparation permissions
 @pytest.mark.parametrize("description", ["Corrected file description", None])
 def test_file_patch_preserves_original_and_checks_owner_permission(description):
     page = entity("PAGE", "file-page")
@@ -616,13 +699,6 @@ def test_file_patch_preserves_original_and_checks_owner_permission(description):
     assert file.db == original
 
 
-# @source lagniappe/core/tools/ai/function_definitions/get_entity.py::execute_get_entity
-# @source lagniappe/core/tools/ai/reporting/entity_updates.py::review_update_action
-# @source lagniappe/core/tools/ai/reporting/entity_updates.py::execute_update_action
-# @source lagniappe/core/tools/ai/reporting/execution/actions/recovery.py::_inspect_action_applied
-# @matrix ai : edit-view
-# @matrix entity-patch : integration review stale-state
-# @matrix ai-report : permissions recovery
 def test_file_edit_read_review_execution_and_recovery(monkeypatch):
     from lagniappe.core.tools.ai.function_definitions.get_entity import execute_get_entity
     from lagniappe.core.tools.ai.reporting.execution.actions.recovery import _inspect_action_applied, ACTION_APPLIED, ACTION_DRIFTED
@@ -660,12 +736,6 @@ def test_file_edit_read_review_execution_and_recovery(monkeypatch):
     assert _inspect_action_applied(action, report, actor, record) == ACTION_DRIFTED
 
 
-# @source lagniappe/core/tools/ai/external/validation.py::validate_external_proposal
-# @source lagniappe/core/tools/ai/reporting/entity_updates.py::prepare_entity_updates
-# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @matrix agent-api ai-report : file-placement file-summary permissions proposal-validation references
-# @matrix entity-patch : integration review
-# @matrix ai-report : execute idempotency preservation
 @pytest.mark.parametrize("with_upload", [False, True])
 def test_existing_file_metadata_plan_runs_with_or_without_new_uploads(monkeypatch, with_upload):
     from lagniappe.core.entities.ai_report import REPORT_FORMAT_VERSION
@@ -724,10 +794,6 @@ def test_existing_file_metadata_plan_runs_with_or_without_new_uploads(monkeypatc
     assert len(writes) == count
 
 
-# @source lagniappe/core/tools/ai/reporting/corrections.py::link_correction
-# @source lagniappe/core/tools/ai/reporting/corrections.py::approve_correction
-# @source lagniappe/core/tools/ai/report_history.py::delete_report_record
-# @matrix ai-report : correction ownership supersession delete file-cleanup guarded-delete
 @pytest.mark.parametrize("source_origin,correction_origin", [("api", "web"), ("web", "api")])
 def test_corrections_share_evidence_across_origins_and_fence_source_retries(monkeypatch, source_origin, correction_origin):
     from lagniappe.core.tools.ai.reporting.corrections import link_correction, save_correction, approve_correction
@@ -763,8 +829,6 @@ def test_corrections_share_evidence_across_origins_and_fence_source_retries(monk
     assert not _other_report_references(file, correction)
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/actions/recovery.py::_inspect_action_applied
-# @matrix ai-report : completed-prefix completed-task permissions recovery
 def test_update_recovery_accepts_later_completion_but_rejects_unrelated_drift(monkeypatch):
     from lagniappe.core.tools.ai.reporting.execution.actions.recovery import _inspect_action_applied, ACTION_APPLIED, ACTION_DRIFTED
     from lagniappe.core.tools.ai.reporting.execution.actions.completed_tasks import _task_state_fingerprint
@@ -772,7 +836,7 @@ def test_update_recovery_accepts_later_completion_but_rejects_unrelated_drift(mo
     from lagniappe.core.tools.entity_patches import _projection
     actor, task, form, page = case()
     before = _projection(task)
-    task.due_date = datetime(2026, 11, 1, tzinfo=timezone.utc)
+    task.due_date = datetime(2026, 11, 1, tzinfo=UTC)
     task.completed = True
     records = [
         {"id": "edit", "type": "update_task", "status": "complete", "entity": {"id": task.urlsafe_key}, "expected": {"entity": task.urlsafe_key, "entity_update_after": before}},
@@ -785,8 +849,6 @@ def test_update_recovery_accepts_later_completion_but_rejects_unrelated_drift(mo
     assert _inspect_action_applied({"type": "update_task"}, report, actor, records[0]) == ACTION_DRIFTED
 
 
-# @source lagniappe/core/tools/ai/reporting/corrections.py::link_correction
-# @pair ai-report:correction
 def test_correction_snapshot_excludes_nested_long_values_from_datastore_indexes():
     from google.cloud.datastore.helpers import entity_to_protobuf, entity_from_protobuf
     from lagniappe.core.tools.ai.reporting.corrections import link_correction

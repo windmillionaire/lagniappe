@@ -146,7 +146,7 @@ never use this memo.
 
 ## Browser surfaces
 
-`views/messages.mjs` owns the Messages page. `MessageComposer` is shared with
+`views/messages.ts` owns the Messages page. `MessageComposer` is shared with
 the Notification menu. Mention suggestions are owned by the editor. Badge and
 menu invalidation use the notification projection described in
 [BACKEND_CACHE.md](BACKEND_CACHE.md); browser polling and reconciliation are in

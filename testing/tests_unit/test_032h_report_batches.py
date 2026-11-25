@@ -91,7 +91,6 @@ def create(kind, name, **data):
     return {"id": name, "type": "create_" + kind, "data": {"name": name, **data}}
 
 
-# @matrix ai-report : id-allocation batching identity recovery
 def test_create_batch_reserves_one_key_per_output_and_reuses_receipts(monkeypatch):
     actions = []
     for i in range(10):
@@ -121,8 +120,6 @@ def test_create_batch_reserves_one_key_per_output_and_reuses_receipts(monkeypatc
     assert len(reservations) == 1
 
 
-# @source lagniappe/core/entities/project.py::Project.create
-# @matrix ai-report : id-allocation batching parent bounded
 def test_create_key_batches_are_bounded_and_keep_parent_groups_separate(monkeypatch):
     actions = [create("project", "first"), create("project", "second"),
                create("model_task", "first_model", project_action="first"),
@@ -147,7 +144,6 @@ def test_create_key_batches_are_bounded_and_keep_parent_groups_separate(monkeypa
     assert result["actions"][-1]["status"] == "skipped"
 
 
-# @matrix ai-report files : batching attachments recovery
 def test_report_inputs_isolate_attachment_changes_from_retries(monkeypatch):
     _patch_fake_keys(monkeypatch)
     page = TestEntities.get("PAGE", {"hash": "input-owner-page"})
@@ -177,8 +173,6 @@ def test_report_inputs_isolate_attachment_changes_from_retries(monkeypatch):
     assert retried.summary is None
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @matrix ai-report : batching identity dependencies atomicity recovery
 def test_dependent_creations_share_one_commit(monkeypatch):
     actions = [create("project", "project"), create("model_task", "model", project_action="project"),
                create("form", "form", form_type="task", schema=[{"id": "notes", "type": "textarea", "title": "Notes"}]),
@@ -210,7 +204,6 @@ def test_dependent_creations_share_one_commit(monkeypatch):
     assert len([items for items in state.commits if len(items) > 1]) == 1
 
 
-# @matrix ai-report : batching identity dependencies
 def test_updates_reuse_loaded_entities_and_merge_final_state(monkeypatch):
     project = TestEntities.get("PROJECT", {"name": "Original", "hash": "original-project", "description": "Keep"})
     project.description = "Keep"
@@ -233,9 +226,6 @@ def test_updates_reuse_loaded_entities_and_merge_final_state(monkeypatch):
     assert _comparison({"id": project.urlsafe_key, "name": ""}, workspace) == project.urlsafe_key
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/batch.py::ExecutionBatch
-# @source lagniappe/core/tools/ai/reporting/execution/batch.py::WorkingEntities
-# @matrix ai-report : batching identity dependencies atomicity
 def test_shared_category_form_patches_merge_without_full_owner_save(monkeypatch):
     def make(kind, name):
         row = StoredEntity(key=Key("models", name, project="test-project"))
@@ -265,8 +255,6 @@ def test_shared_category_form_patches_merge_without_full_owner_save(monkeypatch)
     assert set(write.entity.properties.forms.keys) == {form.key for form in forms}
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @matrix ai-report : batching atomicity recovery
 @pytest.mark.parametrize("failure", ["before", "after", "replaced"])
 def test_batch_failure_and_ambiguous_commit_do_not_duplicate_creations(monkeypatch, failure):
     state = setup_case(monkeypatch, [create("project", "first"), create("project", "second")])
@@ -290,8 +278,6 @@ def test_batch_failure_and_ambiguous_commit_do_not_duplicate_creations(monkeypat
     assert len([items for items in state.commits if len(items) > 1]) == 1
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @matrix ai-report : batching atomicity documents recovery
 def test_documents_upload_before_combined_commit_and_publish_after(monkeypatch):
     actions = [create("category", "category")]
     for i in range(10):
@@ -321,8 +307,6 @@ def test_documents_upload_before_combined_commit_and_publish_after(monkeypatch):
     assert len([items for items in state.commits if len(items) > 1]) == 1
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @matrix ai-report : batching atomicity recovery
 def test_batch_boundaries_resume_without_replaying_completed_work(monkeypatch):
     state = setup_case(monkeypatch, [create("project", "first"), create("project", "second"), create("project", "third")])
     monkeypatch.setattr(batches, "MAX_BATCH_ACTIONS", 2)
@@ -344,8 +328,6 @@ def test_batch_boundaries_resume_without_replaying_completed_work(monkeypatch):
     assert len([item for item in state.rows.values() if item.entity_kind == "project"]) == 3
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/batch.py::ExecutionBatch
-# @matrix ai-report : batching atomicity recovery
 def test_lost_intermediate_commit_resumes_from_saved_receipt(monkeypatch):
     from lagniappe.core.tools.deferred_jobs.errors import DeferredJobInfrastructureError
     state = setup_case(monkeypatch, [create("project", "first"), create("project", "second"), create("project", "third")])
@@ -360,8 +342,6 @@ def test_lost_intermediate_commit_resumes_from_saved_receipt(monkeypatch):
     assert sorted(item.name for item in state.rows.values() if item.entity_kind == "project") == ["first", "second", "third"]
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @matrix ai-report : batching documents recovery
 def test_document_publication_retries_without_reapplying_changes(monkeypatch):
     from lagniappe.core.tools.deferred_jobs.errors import DeferredJobInfrastructureError
     actions = [create("category", "category"), create("page", "page", category_action="category", document="<p>Keep</p>")]
@@ -385,8 +365,6 @@ def test_document_publication_retries_without_reapplying_changes(monkeypatch):
     assert len([items for items in state.commits if len(items) > 1]) == 1
 
 
-# @source lagniappe/core/tools/ai/reporting/execution/batch.py::ExecutionBatch
-# @matrix ai-report : batching atomicity documents recovery
 def test_concurrent_document_edit_rejects_uncommitted_batch(monkeypatch):
     baseline, _ = append_fragment(None, "<p>Original</p>", "baseline")
     pages = [TestEntities.get("PAGE", {"name": f"Existing {i}", "hash": f"existing-document-{i}"}) for i in range(2)]

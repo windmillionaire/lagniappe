@@ -4,18 +4,17 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import threading
 
 from runner.test_session import inspect_process_identity
 
 
-# @testable infrastructure
 def context():
     return json.loads(Path(os.environ["LAGNIAPPE_E2E_WORKER_CONTEXT"]).read_text(encoding="utf-8"))
 
 
-# @testable infrastructure
 def assert_owner(record):
     from lagniappe.core.tools.hosted_e2e.lease import e2e_lease_active
 
@@ -23,11 +22,6 @@ def assert_owner(record):
         raise RuntimeError("E2E worker coordinator or lease is no longer active")
 
 
-# @testable true
-# @tests tests_unit/test_030_hosted_e2e.py::test_worker_inherits_run_cookie_without_replaying_bootstrap
-# @tests tests_e2e/001_site/test_001h_parallel_pilot.py::test_worker_page_and_task
-# @matrix hosted-e2e : authentication cookie
-# @matrix testing : parallel-e2e
 @contextmanager
 def worker_runtime():
     from lagniappe import CONFIG
@@ -37,7 +31,7 @@ def worker_runtime():
     )
 
     record = context()
-    if not CONFIG.testing or CONFIG.PREFIX != "test-" or CONFIG.BASE_URL != record["base_url"]:
+    if not CONFIG.testing or CONFIG.PREFIX != "test-" or record["base_url"] != CONFIG.BASE_URL:
         raise RuntimeError("E2E worker environment does not match its coordinator")
     assert_owner(record)
     stopped = threading.Event()
@@ -75,21 +69,69 @@ def worker_runtime():
         watcher.join(timeout=2)
 
 
-# @testable true
-# @tests tests_tooling/test_015_e2e_parallel.py::test_worker_progress_counts_cases_without_double_counting_phases
-# @matrix testing : parallel-e2e
+_REDACT_PATTERNS = (
+    re.compile(r"https?://\S+", re.IGNORECASE),
+    re.compile(r"\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+", re.IGNORECASE),
+    re.compile(r"\b(?:lgn_|lgmo_|AIza|sk-|ghp_|gho_|ya29\.)[A-Za-z0-9._~-]{8,}"),
+)
+
+
+def _format_target_nodeid(nodeid: str) -> str:
+    cleaned = str(nodeid or "").strip()
+    if cleaned and not cleaned.startswith("testing/"):
+        return f"testing/{cleaned}"
+    return cleaned
+
+
+def _redacted_diagnostic(traceback_text: object, *, limit: int = 160) -> str:
+    if not isinstance(traceback_text, str) or not traceback_text.strip():
+        return ""
+    lines = [line.strip() for line in traceback_text.splitlines() if line.strip()]
+    chosen = next((line for line in reversed(lines) if line.startswith("E ")), "")
+    chosen = chosen[1:].strip() if chosen else (lines[-1] if lines else "")
+    for pattern in _REDACT_PATTERNS:
+        chosen = pattern.sub("[redacted]", chosen)
+    chosen = " ".join(chosen.split())
+    if len(chosen) > limit:
+        return chosen[: limit - 1].rstrip() + "…"
+    return chosen
+
+
+def _first_failure_fields(outcomes) -> dict[str, str]:
+    for failed_nodeid, row in outcomes.items():
+        if not isinstance(row, dict) or row.get("outcome") != "failed":
+            continue
+        target = _format_target_nodeid(failed_nodeid)
+        diagnostic = _redacted_diagnostic(row.get("traceback"))
+        if not diagnostic and row.get("failed_phase"):
+            diagnostic = f"failed during {row['failed_phase']}"
+        return {
+            "first_failed_nodeid": target,
+            "first_failed_diagnostic": diagnostic,
+            "first_failed_rerun": (
+                f"venv/bin/python run.py hosted-e2e execute --target {target}"
+            ),
+        }
+    return {}
+
+
 def write_progress(outcomes, nodeid):
     record = context()
     counts = {state: sum(row["outcome"] == state for row in outcomes.values())
               for state in ("passed", "failed", "skipped")}
+    payload = {
+        **counts,
+        "completed": sum(counts.values()),
+        "total": len(record["nodeids"]),
+        "last_nodeid": nodeid,
+        **_first_failure_fields(outcomes),
+    }
     path = Path(record["artifacts"]) / "progress.json"
     temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps({**counts, "completed": sum(counts.values()),
-                                     "total": len(record["nodeids"]), "last_nodeid": nodeid}), encoding="utf-8")
+    temporary.write_text(json.dumps(payload), encoding="utf-8")
     temporary.replace(path)
 
 
-# @testable infrastructure
 def write_results(session, outcomes, exitstatus):
     record = context()
     selected = [item.nodeid for item in session.items]

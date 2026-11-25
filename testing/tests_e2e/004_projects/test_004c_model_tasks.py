@@ -54,7 +54,6 @@ from testing.utility.network import expect_successful_response
 from testing.utility.polling import expect_poll_result
 
 
-# @pair model-tasks:info-form
 def test_click_model_opens_info(get_admin, get_user):
     user = get_admin()
     model_task = ModelTasks.test_create_model_task.get(user)
@@ -71,7 +70,6 @@ def test_click_model_opens_info(get_admin, get_user):
     expect(model_task.info_form).to_be_hidden()
 
 
-# @matrix model-tasks : name update
 def test_edit_model_task_name(get_admin, get_user):
     user = get_admin()
     model_task = ModelTasks.test_edit_model_task_name.get(user)
@@ -98,7 +96,6 @@ def test_edit_model_task_name(get_admin, get_user):
     expect(title).to_contain_text(new_name)
 
 
-# @matrix model-tasks : form-change update
 def test_change_model_task_form(get_admin, get_user):
     user = get_admin()
 
@@ -123,7 +120,6 @@ def test_change_model_task_form(get_admin, get_user):
     expect(form_button).to_contain_text(new_form.name)
 
 
-# @matrix model-tasks : form-clear update
 def test_delete_model_task_form(get_admin, get_user):
     user = get_admin()
     model_task = ModelTasks.test_delete_model_task_form.get(user)
@@ -170,8 +166,6 @@ def _click_status_filter(model_task, label):
     return results
 
 
-# @matrix model-tasks : completed status-filter
-# @pairs polling:task-index reconnect-refresh:task-index
 # @template tasks/index.html::view
 def test_completed_button(get_admin, get_user, browser_failures):
     user = get_admin()
@@ -212,14 +206,13 @@ def test_completed_button(get_admin, get_user, browser_failures):
         with expect_poll_result(
             user.page,
             subscription_id="view:channel:tasks",
+        ), expect_successful_response(
+            user.page,
+            method="GET",
+            path=status_path,
+            query={"completed": "true"},
         ):
-            with expect_successful_response(
-                user.page,
-                method="GET",
-                path=status_path,
-                query={"completed": "true"},
-            ):
-                user.offline = False
+            user.offline = False
     finally:
         if user.offline:
             user.offline = False
@@ -231,7 +224,6 @@ def test_completed_button(get_admin, get_user, browser_failures):
     ).not_to_be_visible()
 
 
-# @matrix model-tasks : in-progress status-filter
 def test_in_progress_button(get_admin, get_user):
     user = get_admin()
     model_task, completed_task, in_progress_task = _status_filter_context(user)
@@ -249,7 +241,6 @@ def test_in_progress_button(get_admin, get_user):
     ).not_to_be_visible()
 
 
-# @matrix model-tasks : status-filter nested-relations
 # @template tasks/index.html::view
 def test_status_filter_loads_task_page_form_permissions(get_admin):
     user = get_admin()
@@ -273,7 +264,6 @@ def test_status_filter_loads_task_page_form_permissions(get_admin):
         Entities.delete(page, form.entity)
 
 
-# @pair model-tasks:delete
 def test_delete_model_task(get_admin, get_user):
     user = get_admin()
     model_task = ModelTasks.test_delete_model_task.get(user)

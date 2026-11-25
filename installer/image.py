@@ -1,5 +1,9 @@
 """Best-effort restoration of site images with transactional local updates."""
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+
 from runner import presentation as ui
 from runner.presentation import output as print
 
@@ -12,26 +16,25 @@ import uuid
 from installer import FORMATTER
 from installer.utils import ensure_storage_dependency
 
+
+if TYPE_CHECKING:
+    from google.cloud import datastore, storage
+    from runner.presentation import Progress
+
 DATASTORE_TIMEOUT = 30
 IMAGE_DOWNLOAD_TIMEOUT = 60
 SITE_IMAGE_SUFFIXES = (".png", ".ico", ".jpg", ".jpeg", ".webp")
 SITE_IMAGE_METADATA_KEYS = frozenset({"version", "asset_generations"})
 
 
-# @testable false
-# @covered-by installer/image.py::get_images
-# @reason thin Datastore client adapter owned by image metadata discovery
-def get_datastore_client():
+def get_datastore_client() -> datastore.Client:
     from google.cloud import datastore
     from config import SETTINGS
 
     return datastore.Client(project=SETTINGS.APP.get("GOOGLE_CLOUD_PROJECT"))
 
 
-# @testable false
-# @covered-by installer/image.py::save_images
-# @reason thin managed-public-bucket adapter owned by transactional image restore
-def get_storage_bucket():
+def get_storage_bucket() -> storage.Bucket:
     ensure_storage_dependency()
 
     from google.cloud import storage
@@ -42,10 +45,7 @@ def get_storage_bucket():
     return storage.Client().bucket(bucket_name)
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_image_restore_uses_loaded_metadata_and_timeouts
-# @pair setup:image-restore
-def get_images():
+def get_images() -> datastore.Entity | None:
     f = FORMATTER.initialize()
 
     try:
@@ -58,9 +58,6 @@ def get_images():
         return None
 
 
-# @testable false
-# @covered-by installer/image.py::save_images
-# @reason path validation branch exercised through transactional image restore
 def _validated_image_key(key):
     value = str(key)
     path = PurePosixPath(value)
@@ -75,9 +72,6 @@ def _validated_image_key(key):
     return path
 
 
-# @testable false
-# @covered-by installer/image.py::save_images
-# @reason metadata filtering and legacy path fallback are exercised through image restore
 def _site_image_entries(images_dict, sp, formatter):
     """Return safe local names and their corresponding remote blob paths."""
     entries = []
@@ -114,9 +108,6 @@ def _site_image_entries(images_dict, sp, formatter):
     return entries
 
 
-# @testable false
-# @covered-by installer/image.py::save_images
-# @reason directory swap and rollback are owned by transactional image restore
 def _swap_image_tree(staging, images_dir):
     backup = images_dir.parent / (
         f".{images_dir.name}.backup-{uuid.uuid4().hex}"
@@ -135,11 +126,7 @@ def _swap_image_tree(staging, images_dir):
             shutil.rmtree(backup)
 
 
-# @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_image_restore_uses_loaded_metadata_and_timeouts
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_image_restore_skips_invalid_entries_and_keeps_successful_downloads
-# @matrix setup : image-restore path-validation transactional-state partial-failure
-def save_images(sp, images_dict=None):
+def save_images(sp: Progress, images_dict: dict[str, object] | None = None) -> bool:
     """Restore each available remote image without replacing good live files."""
     from installer import FORMATTER
     from config import Directory

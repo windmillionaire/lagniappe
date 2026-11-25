@@ -9,7 +9,7 @@ import pickle
 import re
 from typing import Any
 
-from google.cloud.datastore import Key
+from google.cloud.datastore import Client, Key
 from config.datastore import encode_urlsafe_key
 
 from .portable import (
@@ -44,9 +44,6 @@ QUIET_OMITTED_TYPES = {"notification"}
 HASH_PATTERN = re.compile(r"\A[a-z0-9]{6,128}\Z")
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::stage_database
-# @reason provider pagination adapter is exercised by the bounded staging contract
 def _query_pages(query, *, page_size=SCAN_PAGE_SIZE, read_time=None):
     cursor = None
     while True:
@@ -68,9 +65,6 @@ def _query_pages(query, *, page_size=SCAN_PAGE_SIZE, read_time=None):
             return
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::stage_database
-# @reason namespace discovery is exercised through multi-namespace staging
 def _namespaces(client, *, read_time=None) -> list[str]:
     values = {""}
     query = client.query(kind="__namespace__")
@@ -83,9 +77,6 @@ def _namespaces(client, *, read_time=None) -> list[str]:
     return sorted(values)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::stage_database
-# @reason physical-kind discovery is exercised through excluded-kind warnings
 def _physical_kinds(client, namespace: str, *, read_time=None) -> list[str]:
     values = set()
     query = client.query(kind="__kind__", namespace=namespace or None)
@@ -97,16 +88,10 @@ def _physical_kinds(client, namespace: str, *, read_time=None) -> list[str]:
     return sorted(values)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::stage_database
-# @reason source-key serialization is private staging state only
 def _urlsafe(key) -> str:
     return encode_urlsafe_key(key)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::portable_records
-# @reason source-key normalization is exercised by recursive key replacement
 def _source_key(key, project_id: str, database_id: str):
     return Key(
         *key.flat_path,
@@ -116,9 +101,6 @@ def _source_key(key, project_id: str, database_id: str):
     )
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::stage_database
-# @reason partition-free IDs are exercised by nested-history and messaging staging
 def _partitionless_id(key) -> str:
     """Return a deterministic opaque ID without project or database partition data."""
     parts = []
@@ -136,9 +118,6 @@ def _partitionless_id(key) -> str:
     return f"key-{hashlib.sha256(payload).hexdigest()}"
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::stage_database
-# @reason user natural identities are exercised through portable staging references
 def _user_id(entity) -> str:
     """Return a key-independent portable identity for one unique user email."""
     email = str(entity.get("email") or "").strip().casefold()
@@ -147,9 +126,6 @@ def _user_id(entity) -> str:
     return f"user-email-{hashlib.sha256(email.encode('utf-8')).hexdigest()}"
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::portable_records
-# @reason typed child-key tails are exercised through owner-scoped portable records
 def _child_key(key) -> dict[str, Any]:
     identifier = key.id_or_name
     if isinstance(identifier, int) and not isinstance(identifier, bool):
@@ -159,13 +135,10 @@ def _child_key(key) -> dict[str, Any]:
     raise DataLifecycleError("Portable child has an incomplete Datastore key.")
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::portable_records
-# @reason natural conversation IDs are exercised through owner-scoped portable records
 def _normalize_conversation_ids(state: ArchiveState) -> None:
     """Derive conversation IDs from portable participant identities, not source keys."""
     rows = list(
-        state.connection.execute(
+        state.database.execute(
             "SELECT source_key, portable_id, raw FROM entities "
             "WHERE status='included' AND semantic_type='message_conversation'"
         )
@@ -174,7 +147,7 @@ def _normalize_conversation_ids(state: ArchiveState) -> None:
         entity = pickle.loads(row["raw"])
         participants = []
         for participant in entity.get("participants") or []:
-            mapped = state.connection.execute(
+            mapped = state.database.execute(
                 "SELECT namespace, semantic_type, portable_id, availability FROM key_map "
                 "WHERE encoding=?",
                 (_urlsafe(participant),),
@@ -190,22 +163,19 @@ def _normalize_conversation_ids(state: ArchiveState) -> None:
             raise DataLifecycleError("Conversation requires exactly two portable participants.")
         participants.sort(key=canonical_json)
         portable_id = f"conversation-{hashlib.sha256(canonical_json(participants)).hexdigest()}"
-        state.connection.execute(
+        state.database.execute(
             "UPDATE entities SET portable_id=? WHERE source_key=?",
             (portable_id, row["source_key"]),
         )
-        state.connection.execute(
+        state.database.execute(
             "UPDATE key_map SET portable_id=? "
             "WHERE semantic_type='message_conversation' AND portable_id=?",
             (portable_id, row["portable_id"]),
         )
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_staging_selects_durable_types_and_builds_typed_identity_map
-# @matrix portable-json : bounded-scan entity-selection portable-identity
 def stage_database(
-    client,
+    client: Client,
     state: ArchiveState,
     *,
     source_project: str,
@@ -324,28 +294,25 @@ def stage_database(
     for key, count in sorted(counts.items()):
         if key.startswith(("unknown-kind:", "excluded-type:", "missing-hash:", "invalid-hash:")):
             warning_id = hashlib.sha256(key.encode()).hexdigest()[:12]
-            state.connection.execute(
+            state.database.execute(
                 "INSERT OR REPLACE INTO warnings(id, code, details) VALUES(?, ?, ?)",
                 (warning_id, key.split(":", 1)[0], json.dumps({"category": key, "count": count}, sort_keys=True)),
             )
-    state.connection.commit()
+    state.database.commit()
     state.set_metadata("scan_counts", dict(sorted(counts.items())))
     return dict(counts)
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::portable_records
-# @reason staged key-map lookup is exercised through portable record conversion
 class _Resolver:
-    def __init__(self, state: ArchiveState):
+    def __init__(self, state: ArchiveState) -> None:
         self.state = state
         self.known = {}
-        for row in state.connection.execute(
+        for row in state.database.execute(
             "SELECT encoding, namespace, semantic_type, portable_id, availability FROM key_map"
         ):
             self.known[row["encoding"]] = row
 
-    def key(self, key) -> PortableReference | MissingReference:
+    def key(self, key: Key) -> PortableReference | MissingReference:
         return self.encoding(_urlsafe(key))
 
     def encoding(self, value: str) -> PortableReference | MissingReference:
@@ -375,7 +342,7 @@ class _Resolver:
         return missing
 
     def _warn_missing(self, missing, availability):
-        self.state.connection.execute(
+        self.state.database.execute(
             "INSERT OR IGNORE INTO warnings(id, code, details) VALUES(?, ?, ?)",
             (
                 missing.warning_id,
@@ -391,7 +358,9 @@ class _Resolver:
             ),
         )
 
-    def string(self, value: str, _path):
+    def string(
+        self, value: str, _path: tuple[str | int, ...]
+    ) -> str | PortableReference | MissingReference:
         if value in self.known:
             return self.encoding(value)
         if value[:1] in {"{", "["}:
@@ -437,9 +406,6 @@ class _Resolver:
         return value
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::portable_records
-# @reason structural ancestor conversion is part of portable record assembly
 def _ancestor_references(key, resolver):
     ancestors = []
     parent = key.parent
@@ -455,9 +421,6 @@ def _ancestor_references(key, resolver):
     return ancestors
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/staging.py::portable_records
-# @reason asset tag normalization is part of portable record assembly
 def _asset_tags(state, owner, raw_assets):
     if not raw_assets:
         return {}
@@ -477,7 +440,7 @@ def _asset_tags(state, owner, raw_assets):
         role = str(definition.get("visibility") or "private")
         if role not in {"private", "public", "history"}:
             raise DataLifecycleError(f"Asset bucket role is invalid for {owner}:{name}")
-        state.connection.execute(
+        state.database.execute(
             "INSERT OR IGNORE INTO assets(logical_id, state, owner, "
             "logical_name, asset_type, required, source_role, source_path, generation, media_type, size) "
             "VALUES(?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -504,11 +467,6 @@ def _asset_tags(state, owner, raw_assets):
     return result
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_staging_selects_durable_types_and_builds_typed_identity_map
-# @tests tests_tooling/test_008_data_lifecycle.py::test_staging_replaces_source_and_scratch_keys_recursively
-# @tests tests_tooling/test_008_data_lifecycle.py::test_history_and_messages_are_nested_and_replanned_under_their_owners
-# @matrix portable-json : entity-envelope key-replacement natural-identity owner-scoped-children typed-references
 def portable_records(state: ArchiveState) -> list[dict[str, Any]]:
     """Build top-level records with durable child rows nested under their owners."""
     if state.connection is None:
@@ -517,7 +475,7 @@ def portable_records(state: ArchiveState) -> list[dict[str, Any]]:
     codec = ValueCodec(reference_resolver=resolver.key, string_normalizer=resolver.string)
     records = []
     by_identity = {}
-    rows = list(state.connection.execute(
+    rows = list(state.database.execute(
         "SELECT * FROM entities WHERE status='included' "
         "ORDER BY semantic_type, namespace, portable_id"
     ))
@@ -602,7 +560,7 @@ def portable_records(state: ArchiveState) -> list[dict[str, Any]]:
     for record in records:
         for children in (record.get("children") or {}).values():
             children.sort(key=lambda child: canonical_json(child["key"]))
-    state.connection.commit()
+    state.database.commit()
     return sorted(
         records,
         key=lambda record: (
@@ -613,9 +571,6 @@ def portable_records(state: ArchiveState) -> list[dict[str, Any]]:
     )
 
 
-# @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_staging_replaces_source_and_scratch_keys_recursively
-# @pair portable-json:key-replacement
 def normalize_text(state: ArchiveState, value: str) -> str:
     """Replace every known source/scratch key token in one textual payload."""
     return str(_Resolver(state).string(str(value), ("text",)))

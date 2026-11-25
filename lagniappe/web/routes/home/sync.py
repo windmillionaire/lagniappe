@@ -1,5 +1,12 @@
 """Apply revisioned collaborative-document updates."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import request
 from flask_login import current_user
 
@@ -15,26 +22,18 @@ from lagniappe.core.tools.document_updates import (
 from lagniappe.core.tools.mentions import service as mentions
 from lagniappe.core.tools.polling.forms import validate_sync_payload
 from lagniappe.web import responses
-from lagniappe.web.auth import logged_in
+from lagniappe.web.auth import authenticated_user, logged_in
 
 from . import internal
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/sync.py::sync
-# @reason durable document fallback normalization is exercised through sync persistence
 def _document_seed(entity):
     return document_seed(entity)
 
 
-# @testable true
-# @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
-# @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
-# @tests tests_e2e/008_users/test_008e_public_users.py::test_public_user_edits_document_without_ai_or_image_tools
-# @matrix sync : checkpoint delta document offline-replay persistence revision
 @internal.route("/sync", methods=["POST"])
 @logged_in
-def sync():
+def sync() -> ResponseReturnValue:
     """Append Yjs deltas and persist only current-generation checkpoints."""
     payload = request.get_json(silent=True) or {}
     error = validate_sync_payload(payload)
@@ -60,15 +59,12 @@ def sync():
     acknowledgements = []
     for update in updates:
         with documents.document_write_lock(update["sync_id"]):
-            entity = fresh_document(entities[update["key"]], current_user)
+            entity = fresh_document(entities[update["key"]], authenticated_user())
             acknowledgements.append(_sync_document(update, entity))
 
     return responses.json_response({"updates": acknowledgements})
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/sync.py::sync
-# @reason one locked checkpoint operation in the authenticated sync route
 def _sync_document(update, entity):
     seed = _document_seed(entity)
     documents.current_document_state(update["sync_id"], seed=seed)
@@ -89,7 +85,7 @@ def _sync_document(update, entity):
         acknowledgement = {
             "generation": update.get("generation"),
             "revision": int(update.get("revision") or 0),
-            "fingerprint": seed["fingerprint"],
+            "fingerprint": seed.get("fingerprint"),
             "checkpoint_accepted": False,
         }
 
@@ -109,7 +105,7 @@ def _sync_document(update, entity):
             seed=_document_seed(entity),
         )
         mentions.deliver_mentions(
-            current_user,
+            authenticated_user(),
             entity,
             update.get("html") or "",
             update.get("mentions") or [],

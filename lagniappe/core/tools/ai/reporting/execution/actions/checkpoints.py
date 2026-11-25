@@ -1,6 +1,6 @@
 """Action identities, completion decisions, and committed result receipts."""
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import get as database_get
@@ -35,13 +35,6 @@ from .completed_tasks import (
 )
 
 
-# @testable true
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_resumes_after_completed_create_without_duplicate
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_reconciles_applying_create_when_output_already_exists
-# @tests tests_unit/test_032h_report_batches.py::test_create_batch_reserves_one_key_per_output_and_reuses_receipts
-# @tests tests_unit/test_032h_report_batches.py::test_create_key_batches_are_bounded_and_keep_parent_groups_separate
-# @matrix ai-report : create idempotency post-commit-checkpoint recovery
-# @matrix ai-report : id-allocation batching parent bounded
 def _allocate_action_output_key(action, created, context):
     spec = _creation_key_spec(action, created, context)
     if spec is None:
@@ -73,13 +66,10 @@ def _allocate_action_output_key(action, created, context):
     if not group:
         return database_utility.create_key(*spec)
     keys = database_utility.create_keys(kind, parent, len(group))
-    prepared.update(zip(group, keys))
+    prepared.update(zip(group, keys, strict=True))
     return prepared[identity]
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/checkpoints.py::_allocate_action_output_key
-# @reason eligible output kinds and resolved parents are exercised through Plan creation
 def _creation_key_spec(action, created, context):
     action_type = action.get("type")
     if not action_type.startswith("create_"):
@@ -124,9 +114,6 @@ def _creation_key_spec(action, created, context):
     return kind, parent
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason construction uses the same identity that is persisted with the action receipt
 def _prepared_output_key(context):
     context = context or {}
     record = context.get("action_record") or {}
@@ -134,9 +121,6 @@ def _prepared_output_key(context):
             or database_get.datastore_key(record.get("output_key")))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason action checkpoints are asserted through public forward recovery behavior
 def _capture_action_before(action, report, user, created, context=None):
     action_type = action.get("type")
     data = _data(action)
@@ -153,16 +137,12 @@ def _capture_action_before(action, report, user, created, context=None):
     return {}
 
 
-# @testable true
-# @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_resumes_after_completed_create_without_duplicate
-# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_preserves_reused_completion
-# @matrix ai-report : completed-task idempotency recovery
 def _prepare_action_checkpoint(action, report, user, created, context, record):
     if action.get("type") in {"append_page_document", "replace_page_document"}:
         prepare_document_append(action, report, user, created, record)
         return
     if action.get("type") == "create_page" and _data(action).get("document"):
-        record["document_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        record["document_at"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     # Only completion preparation needs a prior completion to decide whether
     # to create history. Ordinary writes commit their receipt with the batch;
     # they no longer need a second copy of the reviewed proposal/before-state.
@@ -208,9 +188,6 @@ def _prepare_action_checkpoint(action, report, user, created, context, record):
     return record
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason key assignment is asserted through duplicate-free create recovery
 def _assign_preallocated_key(entity, record, context):
     if entity is None or not record.get("output_key"):
         return entity
@@ -225,9 +202,6 @@ def _assign_preallocated_key(entity, record, context):
     return entity
 
 
-# @testable true
-# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
-# @matrix ai-report : attachments result
 def _record_action_result(record, action, entity, to_save, metadata, created, context):
     metadata = _default_action_metadata(action, entity, metadata)
     if (
@@ -295,9 +269,6 @@ def _record_action_result(record, action, entity, to_save, metadata, created, co
         record.setdefault("note", action.get("reason"))
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
-# @reason result metadata is asserted through deterministic run results
 def _default_action_metadata(action, entity, metadata):
     metadata = dict(metadata or {})
     action_type = action.get("type") or ""

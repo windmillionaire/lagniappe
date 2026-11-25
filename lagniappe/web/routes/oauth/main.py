@@ -1,5 +1,12 @@
 """Browser-consent and public-client OAuth boundary for remote MCP."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from urllib.parse import urlencode
 
 from flask import (
@@ -12,8 +19,18 @@ from flask import (
     url_for,
 )
 from flask_login import current_user
+from lagniappe.web.auth import authenticated_user
 
-from config.remote_mcp import CLIENT_ID, CODEX_CLIENT_ID, PENDING_SECONDS, mcp_issuer
+from config.remote_mcp import (
+    ANTIGRAVITY_CLIENT_ID,
+    CLAUDE_CLIENT_ID,
+    CLAUDE_CODE_CLIENT_ID,
+    CLIENT_ID,
+    CODEX_CLIENT_ID,
+    PENDING_SECONDS,
+    PI_CLIENT_ID,
+    mcp_issuer,
+)
 from lagniappe import CONFIG
 from lagniappe.core.tools.auth import remote_mcp as auth
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
@@ -22,12 +39,19 @@ from . import oauth, oauth_metadata
 
 
 _PENDING_COOKIE = "__Secure-lagniappe-mcp-pending"
+_CLIENT_LABELS = (
+    (CLIENT_ID, "ChatGPT"),
+    (CODEX_CLIENT_ID, "Codex"),
+    (ANTIGRAVITY_CLIENT_ID, "Antigravity"),
+    (CLAUDE_CLIENT_ID, "Claude"),
+    (CLAUDE_CODE_CLIENT_ID, "Claude Code"),
+    (PI_CLIENT_ID, "Pi"),
+)
+_CLIENT_NAME_BY_ID = dict(_CLIENT_LABELS)
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/oauth/main.py::authorize
 @oauth.before_request
-def guard():
+def guard() -> ResponseReturnValue | None:
     g.NO_CACHE = True
     request.max_content_length = 16 * 1024
     if (
@@ -49,10 +73,8 @@ def guard():
         return response
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/oauth/main.py::authorize
 @oauth.errorhandler(auth.OAuthError)
-def oauth_error(error):
+def oauth_error(error: auth.OAuthError) -> ResponseReturnValue:
     # Codes come from our closed vocabulary; no provider exception or form value.
     auth.log_outcome(error.code)
     if request.endpoint in {"oauth.token", "oauth.revoke"}:
@@ -60,19 +82,14 @@ def oauth_error(error):
     return render_template("oauth/connection.html", error=True), error.status
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/oauth/main.py::token
 def _parameters(values):
     if len(values) > 16 or any(len(values.getlist(key)) != 1 for key in values):
         raise auth.OAuthError("invalid_request")
     return values.to_dict()
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_metadata_login_consent_and_csrf
-# @matrix mcp-oauth : discovery site-policy
 @oauth_metadata.route("/oauth-authorization-server")
-def metadata():
+def metadata() -> ResponseReturnValue:
     g.NO_CACHE = True
     if (
         not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED
@@ -94,16 +111,8 @@ def metadata():
     )
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_browser_consent_names_client_and_revokes_only_its_connection
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_metadata_login_consent_and_csrf
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_consent_rejects_replaced_request_and_changed_account
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_pending_survives_google_callback_session_replacement
-# @matrix mcp-oauth : consent csrf login redirect loopback client-isolation
-# @pair mcp-oauth:consent-binding
-# @pair mcp-oauth:login-continuation
 @oauth.route("/authorize", methods=["GET", "POST"])
-def authorize():
+def authorize() -> ResponseReturnValue:
     if request.method == "GET" and request.args:
         pending = auth.begin_authorization(_parameters(request.args))
         # Remove OAuth parameters from the address bar before login or consent.
@@ -121,11 +130,15 @@ def authorize():
         )
         return response
     pending = request.cookies.get(_PENDING_COOKIE)
+    if not pending:
+        raise auth.OAuthError("invalid_request")
     pending_request = auth.pending_authorization(pending)
+    if pending_request is None:
+        raise auth.OAuthError("invalid_request")
     if not current_user.is_authenticated:
         return redirect(url_for("users.login", next=url_for("oauth.authorize")))
     user = current_user._get_current_object()
-    if not auth.eligible_user(user):
+    if user is None or not auth.eligible_user(user):
         raise auth.OAuthError("access_denied", 403)
     if request.method == "POST":
         form = _parameters(request.form)
@@ -147,17 +160,18 @@ def authorize():
             samesite="Lax",
         )
         return response
+    client_id = pending_request["client_id"]
+    if not isinstance(client_id, str):
+        raise auth.OAuthError("invalid_request")
     return render_template(
         "oauth/connection.html",
         consent=True,
         pending=pending,
         resource=CONFIG.MCP_RESOURCE,
-        client_name="Codex" if pending_request["client_id"] == CODEX_CLIENT_ID else "ChatGPT",
+        client_name=_CLIENT_NAME_BY_ID.get(client_id, "ChatGPT"),
     )
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/oauth/main.py::token
 def _public_client_form():
     if request.mimetype != "application/x-www-form-urlencoded" or request.query_string:
         raise auth.OAuthError("invalid_request")
@@ -170,11 +184,8 @@ def _public_client_form():
     return parameters
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_token_api_envelope_and_browser_revocation
-# @matrix mcp-oauth : token csrf-exemption
 @oauth.route("/token", methods=["POST"])
-def token():
+def token() -> ResponseReturnValue:
     result = auth.exchange_token(_public_client_form())
     auth.log_outcome("token_issued")
     response = jsonify(result)
@@ -182,33 +193,25 @@ def token():
     return response
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_token_api_envelope_and_browser_revocation
-# @matrix mcp-oauth : revocation csrf-exemption
 @oauth.route("/revoke", methods=["POST"])
-def revoke():
+def revoke() -> ResponseReturnValue:
     parameters = _public_client_form()
-    auth.revoke_token(parameters.get("token"), parameters.get("client_id"))
+    auth.revoke_token(parameters.get("token", ""), parameters.get("client_id", ""))
     return "", 200
 
 
-# @testable true
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_browser_consent_names_client_and_revokes_only_its_connection
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_oauth_token_api_envelope_and_browser_revocation
-# @matrix mcp-oauth : revocation csrf browser-settings client-isolation
 @oauth.route("/connection", methods=["GET", "POST"])
-def connection():
+def connection() -> ResponseReturnValue:
     if not current_user.is_authenticated:
         return redirect(url_for("users.login", next=url_for("oauth.connection")))
-    user = current_user._get_current_object()
+    user = authenticated_user()
     if request.method == "POST":
         parameters = _parameters(request.form)
         auth.connection_status(
             user, client_id=parameters.get("client_id", CLIENT_ID), revoke=True
         )
-    clients = [(CLIENT_ID, "ChatGPT"), (CODEX_CLIENT_ID, "Codex")]
     connections = [
         {"client_id": client_id, "name": name, **auth.connection_status(user, client_id=client_id)}
-        for client_id, name in clients
+        for client_id, name in _CLIENT_LABELS
     ]
     return render_template("oauth/connection.html", connections=connections)

@@ -1,5 +1,15 @@
 """Deferred-job request identity, authorization, and bounded payload values."""
 
+from __future__ import annotations
+
+from typing import Protocol, TYPE_CHECKING, runtime_checkable
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities import types as models
+    from collections.abc import Mapping
+    from lagniappe.core.definitions.deferred_jobs import DeferredJobSpec
+
+
 import hashlib
 import json
 import uuid
@@ -11,59 +21,51 @@ from ..mixins import RelatedEntityMixin
 from .base_db import DBProperty
 
 
-class Actor(RelatedEntityMixin, DBProperty):
+type _Actor = models.User
+type _Notification = models.Notification
+
+
+class Actor(RelatedEntityMixin[_Actor], DBProperty[_Actor]):
     _id = "actor"
     _kind = "user"
 
 
-class Notification(RelatedEntityMixin, DBProperty):
+class Notification(RelatedEntityMixin[_Notification], DBProperty[_Notification]):
     _id = "notification"
     _kind = "notification"
 
 
-class JSONValue(DBProperty):
+class JSONValue(DBProperty[dict[str, object]]):
     """JSON-backed request value that preserves an explicitly empty container."""
 
     json = True
     _blank_values = (None,)
 
 
-class JobType(DBProperty):
+class JobType(DBProperty[str]):
     _id = "job_type"
 
 
-class Version(DBProperty):
+class Version(DBProperty[int]):
     _id = "job_version"
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_request_properties_own_identity_and_payload_validation
-# @pair deferred-jobs:request-identity
-class IdempotencyKey(DBProperty):
+class IdempotencyKey(DBProperty[str]):
     _id = "idempotency_key"
 
     @staticmethod
-    # @testable true
-    # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_request_properties_own_identity_and_payload_validation
-    # @pair deferred-jobs:request-identity
-    def generate(spec):
+    def generate(spec: DeferredJobSpec) -> str:
         source = ":".join(
             (spec.job_type.value, spec.actor.urlsafe_key, uuid.uuid4().hex)
         )
         return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_request_fingerprint_tracks_the_complete_client_contract
-# @matrix deferred-jobs : client-contract operation-fingerprint routing-identity
-class RequestFingerprint(DBProperty):
+class RequestFingerprint(DBProperty[str]):
     _id = "request_fingerprint"
 
-    # @testable true
-    # @tests tests_unit/test_023a_deferred_job_properties.py::test_request_fingerprint_tracks_the_complete_client_contract
-    # @matrix deferred-jobs : client-contract operation-fingerprint routing-identity
     @staticmethod
-    def create(*, job_type, actor, authorization, inputs, parameters, client):
+    def create(*, job_type: str, actor: str, authorization: Mapping[str, object], inputs: Mapping[str, object], parameters: Mapping[str, object], client: Mapping[str, object] | None) -> str:
         """Hash the complete immutable deferred-operation request contract."""
         payload = json.dumps(
             {
@@ -81,11 +83,11 @@ class RequestFingerprint(DBProperty):
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-class StartCompleted(DBProperty):
+class StartCompleted(DBProperty[bool]):
     _id = "start_completed"
 
 
-class TelemetryId(DBProperty):
+class TelemetryId(DBProperty[str]):
     _id = "telemetry_id"
 
 
@@ -93,21 +95,24 @@ class Authorization(JSONValue):
     _id = "authorization"
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_request_properties_own_identity_and_payload_validation
-# @pair deferred-jobs:input-serialization
+@runtime_checkable
+class _EntityReference(Protocol):
+    @property
+    def entity_kind(self) -> str: ...
+
+    @property
+    def urlsafe_key(self) -> str: ...
+
+
 class Inputs(JSONValue):
     _id = "inputs"
 
     @staticmethod
-    # @testable true
-    # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_request_properties_own_identity_and_payload_validation
-    # @pair deferred-jobs:input-serialization
-    def serialize(inputs):
+    def serialize(inputs: Mapping[str, object] | None) -> dict[str, dict[str, str] | None]:
         """Reduce typed entity inputs to the stable persisted reference shape."""
         result = {}
         for name, value in (inputs or {}).items():
-            if hasattr(value, "urlsafe_key"):
+            if isinstance(value, _EntityReference):
                 result[name] = {
                     "kind": value.entity_kind,
                     "id": value.urlsafe_key,
@@ -131,10 +136,7 @@ class Client(JSONValue):
     _id = "client"
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_request_properties_own_identity_and_payload_validation
-# @pair deferred-jobs:payload-limit
-def validate_payload(**sections):
+def validate_payload(**sections: object) -> int:
     """Validate the complete envelope before its JSON values are persisted."""
     size = len(
         json.dumps(sections, sort_keys=True, separators=(",", ":"), default=str)

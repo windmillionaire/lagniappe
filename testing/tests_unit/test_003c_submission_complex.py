@@ -45,7 +45,6 @@ def _signature(entity):
     )
 
 
-# @matrix status : ai-value column computed condition-matching
 @pytest.mark.unit
 def test_submission_status(get_test_entities, get_schema, test_submission_values):
     """Test Status field - computed from other fields' values."""
@@ -54,7 +53,6 @@ def test_submission_status(get_test_entities, get_schema, test_submission_values
         test_submission_values(entity)
 
 
-# @matrix signature : asset-lifecycle db-value
 @pytest.mark.unit
 def test_signature_field_asset_lifecycle_saves_and_clears_image():
     entity = _FakeEntity()
@@ -82,7 +80,6 @@ def test_signature_field_asset_lifecycle_saves_and_clears_image():
     assert entity.deleted == ["signature-signop"]
 
 
-# @matrix signature : ai-value column filter-value form-value sort
 @pytest.mark.unit
 def test_signature_field_projections_reflect_asset_presence():
     empty = _signature(_FakeEntity())

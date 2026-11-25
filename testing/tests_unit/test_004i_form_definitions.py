@@ -1,7 +1,7 @@
 """Immutable completion definitions, compatibility checks and history reads."""
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 from unittest.mock import patch
 import json
@@ -26,7 +26,6 @@ def _record(*, completed=True, generation=0, kind="task_history"):
     )
 
 
-# @matrix submission task-completion : schema-version missing-schema
 @pytest.mark.unit
 def test_completed_definition_uses_recorded_version_and_reports_missing_schema():
     record = _record()
@@ -48,7 +47,6 @@ def test_completed_definition_uses_recorded_version_and_reports_missing_schema()
         resolve.assert_not_called()
 
 
-# @matrix submission task-completion : live-metadata
 @pytest.mark.unit
 def test_active_definition_uses_latest_metadata():
     record = _record(completed=False, kind="task")
@@ -59,7 +57,6 @@ def test_active_definition_uses_latest_metadata():
         resolve.assert_not_called()
 
 
-# @matrix task-completion : deleted-form generation missing-schema raw-values
 @pytest.mark.unit
 @pytest.mark.parametrize("generation", [0, 2])
 @pytest.mark.parametrize("available", [True, False])
@@ -95,7 +92,6 @@ def test_completed_task_resolves_saved_generation_after_form_deletion(generation
     assert record.properties.submission.value == values
 
 
-# @matrix task-completion : deleted-form active-form
 @pytest.mark.unit
 @pytest.mark.parametrize("kind", ["task", "page"])
 def test_active_submission_does_not_restore_deleted_form(kind):
@@ -108,7 +104,6 @@ def test_active_submission_does_not_restore_deleted_form(kind):
         resolve.assert_not_called()
 
 
-# @matrix task-completion : deleted-form empty-submission
 @pytest.mark.unit
 def test_completed_task_without_an_attached_form_stays_empty():
     record = _record(kind="task")
@@ -122,11 +117,9 @@ def test_completed_task_without_an_attached_form_stays_empty():
         resolve.assert_not_called()
 
 
-# @source lagniappe/core/tools/forms/definitions.py::history_groups
-# @matrix tasks task-completion : history ordering schema-version
 @pytest.mark.unit
 def test_history_orders_same_day_completions_by_archive_time():
-    day = datetime(2026, 9, 12, tzinfo=timezone.utc)
+    day = datetime(2026, 9, 12, tzinfo=UTC)
     records = [_record(generation=generation) for generation in (0, 1, 0, 2)]
     for index, record in enumerate(records):
         record.completed_on = day
@@ -157,7 +150,6 @@ def _task():
     return task
 
 
-# @matrix task-completion : generation original-view no-extra-read
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "completed,task_generation,form_generation,original_generation,original,current,expected",
@@ -203,7 +195,6 @@ def test_original_answers_are_available_only_after_completed_values_change(
             read_original.assert_not_called()
 
 
-# @matrix task-completion : immutable-submission
 @pytest.mark.unit
 def test_completed_mutations_are_rejected_before_changing_values():
     task = _task()
@@ -224,7 +215,6 @@ def test_completed_mutations_are_rejected_before_changing_values():
     assert dict(task.db) == before
 
 
-# @matrix task-completion submission : history-fill identity incompatible-value
 @pytest.mark.unit
 def test_history_transfer_preserves_identity_and_rejects_incompatible_values():
     source = [{"id": "choice", "type": "select", "title": "Old", "options": [{"value": "a", "label": "Old A"}]}]
@@ -261,7 +251,6 @@ def test_history_transfer_preserves_identity_and_rejects_incompatible_values():
             definitions.history_values_for(live, historical, "note")
 
 
-# @matrix task-completion submission : history-fill identity incompatible-value
 @pytest.mark.unit
 def test_history_fill_converts_one_field_without_changing_history():
     live = _task()
@@ -298,7 +287,6 @@ def test_history_fill_converts_one_field_without_changing_history():
         assert historical.properties.submission.value["items"]["rows"][0]["count"] == "12"
 
 
-# @matrix tasks task-completion : history schema-version ordering
 @pytest.mark.unit
 @pytest.mark.parametrize("last_form_key", ["form-key", "other-form-key"])
 def test_history_groups_share_generation_tables_and_preserve_row_order(last_form_key):
@@ -325,7 +313,6 @@ def test_history_groups_share_generation_tables_and_preserve_row_order(last_form
     assert [record.generation for record in records] == [0, 0, 2, 0]
 
 
-# @matrix task-completion html-field : schema-version owned-image missing-content
 @pytest.mark.unit
 def test_history_html_uses_authorized_record_asset_urls():
     record = _record()
@@ -347,7 +334,6 @@ def test_history_html_uses_authorized_record_asset_urls():
         assert "unavailable" in definitions.rendered_html_fields(record, only_field_id="intro")["intro"]
 
 
-# @matrix html-field : authoritative-content
 @pytest.mark.unit
 @pytest.mark.parametrize("kind", ["task", "task_history"])
 def test_html_field_selection_reads_only_requested_content(kind):
@@ -379,12 +365,6 @@ def test_html_field_selection_reads_only_requested_content(kind):
     assert reads == ["intro", "other"], "Full original/history responses still need all sections"
 
 
-# @source lagniappe/core/entities/task.py::Task.complete
-# @source lagniappe/core/entities/task.py::Task.uncomplete
-# @source lagniappe/core/entities/history.py::TaskHistory.create
-# @source lagniappe/core/properties/form_submission.py::FormSubmission.fields
-# @matrix task-completion : schema-version history
-# @pair submission:fields
 @pytest.mark.unit
 def test_completion_without_answers_pins_definition_and_reopen_archives_original():
     task = _task()
@@ -413,10 +393,6 @@ def test_completion_without_answers_pins_definition_and_reopen_archives_original
     assert task.submission == {}
 
 
-# @source lagniappe/core/entities/task.py::Task.uncomplete
-# @source lagniappe/core/entities/task.py::Task.create_history_entry
-# @source lagniappe/core/entities/history.py::TaskHistory.create
-# @matrix task-completion : history schema-version asset-copy uncomplete
 @pytest.mark.unit
 @pytest.mark.parametrize("submission_source", [None, "original", "modified"])
 def test_uncomplete_archives_selected_raw_answers_and_their_generation(submission_source):
@@ -468,8 +444,6 @@ def test_uncomplete_archives_selected_raw_answers_and_their_generation(submissio
     assert task.generation == 2
 
 
-# @source lagniappe/core/entities/task.py::Task.uncomplete
-# @matrix task-completion mutations : immutable-submission concurrency
 @pytest.mark.unit
 @pytest.mark.parametrize("changed_field,new_value", [
     ("submission", '{"note":"Newer conversion"}'),
@@ -499,8 +473,6 @@ def test_modified_uncomplete_rejects_stale_current_answers_before_archiving(chan
     assert dict(task.db) == before
 
 
-# @source lagniappe/core/entities/task.py::Task.uncomplete
-# @matrix task-completion : immutable-submission uncomplete
 @pytest.mark.unit
 @pytest.mark.parametrize("submission_source", [None, "unexpected", ""])
 def test_uncomplete_rejects_invalid_submission_selection_before_mutation(submission_source):
@@ -515,7 +487,6 @@ def test_uncomplete_rejects_invalid_submission_selection_before_mutation(submiss
     assert not task.new_history_created
 
 
-# @matrix task-completion mutations : immutable-submission concurrency
 @pytest.mark.unit
 def test_completion_write_rejects_raw_changes_and_stages_original_guards():
     task = _task()
@@ -536,12 +507,13 @@ def test_completion_write_rejects_raw_changes_and_stages_original_guards():
     task.db["completed_submission"] = persisted["completed_submission"].replace("Original", "Changed")
     with pytest.raises(ValidationError, match="cannot be changed"):
         definitions.validate_completion_write(task, persisted)
-    with patch.object(definitions.database_get, "entity", return_value=persisted):
-        with pytest.raises(ValidationError, match="cannot be changed"):
-            task.uncomplete()
+    with (
+        patch.object(definitions.database_get, "entity", return_value=persisted),
+        pytest.raises(ValidationError, match="cannot be changed"),
+    ):
+        task.uncomplete()
 
 
-# @matrix task-completion submission : schema-version incompatible-value preservation
 @pytest.mark.unit
 def test_completion_rejects_unrepresented_values_without_rewriting_answers():
     task = _task()
@@ -561,7 +533,6 @@ def test_completion_rejects_unrepresented_values_without_rewriting_answers():
     assert "completed_submission" not in task.db
 
 
-# @matrix submission : ai unknown-fields preservation
 @pytest.mark.unit
 def test_generated_answers_reject_unknown_fields_before_resetting_values():
     task = _task()
@@ -572,8 +543,6 @@ def test_generated_answers_reject_unknown_fields_before_resetting_values():
     assert task.properties.submission.fields["note"].value == "Preserved answer"
 
 
-# @source lagniappe/core/entities/task.py::Task
-# @matrix task-completion mutations : hydration no-extra-read
 @pytest.mark.unit
 def test_task_construction_does_not_hydrate_or_copy_whole_rows():
     from google.cloud import datastore
@@ -595,10 +564,6 @@ def test_task_construction_does_not_hydrate_or_copy_whole_rows():
             assert "_completion_identity" not in lazy.__dict__
 
 
-# @source lagniappe/core/tools/forms/definitions.py::preload_definitions
-# @source lagniappe/core/properties/form_submission.py::FormSubmission.value
-# @matrix submission task-completion : schema-version
-# @matrix task-completion : current-definition no-extra-read
 @pytest.mark.unit
 def test_completed_envelope_uses_matching_current_definition_without_history_read():
     task = _task()
@@ -636,8 +601,6 @@ def test_completed_envelope_uses_matching_current_definition_without_history_rea
     assert task.submission == {"note": "Current answer"}
 
 
-# @source lagniappe/core/entities/task.py::Task.uncomplete
-# @matrix task-completion mutations : immutable-submission concurrency
 @pytest.mark.unit
 def test_envelope_write_guard_rejects_raw_mutation_and_stale_active_overwrite():
     task = _task()
@@ -662,8 +625,6 @@ def test_envelope_write_guard_rejects_raw_mutation_and_stale_active_overwrite():
         definitions.validate_completion_write(task, concurrent)
 
 
-# @source lagniappe/core/tools/forms/definitions.py::original_completion
-# @matrix submission task-completion : schema-version missing-schema raw-values
 @pytest.mark.unit
 def test_legacy_original_completion_uses_generation_zero_and_preserves_missing_answers():
     task = _task()

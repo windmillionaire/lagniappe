@@ -1,2 +1,2 @@
-import"../connectivity.js?v=beda3bd6";import{S as o,m as t,b as f}from"../foundation.js?v=beda3bd6";import"../upstreamUnavailable.js?v=beda3bd6";export{o as default,t as markPerformance,f as whenIdle};
+import"../connectivity.js?v=baa4a64d";import{S as o,l as i,m as l,b as s}from"../foundation.js?v=baa4a64d";import"../upstreamUnavailable.js?v=baa4a64d";export{o as default,i as loadViewService,l as markPerformance,s as whenIdle};
 /*! Third-party licenses: /third-party-licenses.txt */

@@ -1,5 +1,11 @@
 """Function declaration and handler for on-demand AI guideline bundles."""
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities.user import User
+
 from google.genai import types
 
 from lagniappe.core.tools.ai.debug import ai_debug
@@ -72,7 +78,8 @@ unless the user requests a separate field. Prefer useful repeatable data over
 generic filler. Mark a field required only when its answer is necessary.
 """
 ACTION_GUIDELINES = {
-    **{name: 'Use data.entity and data.changes with exact references. Omitted fields are unchanged. Patch selected answers with changes.submission keyed by exact field IDs. Reassigning a Form requires a complete target submission, including empty values. Pair answer migration and description cleanup in one action. Use $action_id to refer to an earlier created Form or model task. Only active tasks can be restructured. Model defaults affect future tasks only. Project model_tasks must include every model exactly once. Example data: {"entity":"hash:012345abcdef","changes":{"submission":{"textarea-notes":"Updated notes"}}}.' for name in ("update_task", "update_page", "update_project", "update_model_task")},
+    **{name: 'Use data.entity and data.changes with exact references. Omitted fields are unchanged. Patch selected answers with changes.submission keyed by exact field IDs. Reassigning a Form requires a complete target submission, including empty values. Pair answer migration and description cleanup in one action. Use $action_id to refer to an earlier created Form or model task. Only active tasks can be restructured. Model defaults affect future tasks only. Project model_tasks must include every model exactly once. Example data: {"entity":"hash:012345abcdef","changes":{"submission":{"textarea-notes":"Updated notes"}}}.' for name in ("update_task", "update_page", "update_project", "update_category", "update_model_task")},
+    **{name: 'Permanently delete one exact existing record via data.entity (hash reference). Never target user personal pages or Uncategorized Pages. Plans containing deletes pause for browser confirmation on ordinary user accounts.' for name in ("delete_page", "delete_task", "delete_category", "delete_project", "delete_model_task", "delete_file")},
     "replace_page_document": "Replace one editable Page document only when explicitly requested. Read the existing document first; supply the complete replacement in document_markdown. The server pins the previous version, adds trusted source/time attribution, and applies a normal collaborative edit. Unsaved collaborative edits stop execution for retry. Concurrent/offline edits follow normal CRDT rules.",
     "append_page_document": "Add only the requested text in document_markdown to one editable Page (page or page_action). Starts a missing document; never replaces existing text. The server adds trusted source/time attribution. Read existing content first. Unsaved collaborative edits or an uninitialized older document stop execution for a safe retry. Inline edits belong in the editor.",
     "complete_task": "Check off one exact existing Task via data.task at the current execution time. No name-based matching, replacement submission, or historical completed_on override. For a source-dated completed occurrence, use create_task with completed=true, completed_on, and the exact task reference when reusing a Task. Preserve existing fields and attachments; normal required-field and recurring-task rules apply at browser execution. Put update_task first and list its action id in depends_on when completing with details. An already-completed Task is a no-op.",
@@ -213,7 +220,7 @@ GET_GUIDELINES = types.FunctionDeclaration(
         "summaries, or action data. Request one bundle per call. Independent bundles "
         "may be requested in parallel when the client supports it."
     ),
-    parameters={
+    parameters=types.Schema.model_validate({
         "type": "object",
         "properties": {
             "task": {
@@ -244,36 +251,20 @@ GET_GUIDELINES = types.FunctionDeclaration(
             },
         },
         "required": ["task"],
-    },
+    }),
 )
 
 
-# @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_get_guidelines_returns_named_bundle
-# @tests tests_unit/test_015_ai_tools.py::test_get_guidelines_filters_actions_and_schema_field_types
-# @tests tests_unit/test_032d_external_guidance.py::test_submission_patch_guidance_is_shared_and_omits_autofill_workflow
-# @matrix ai : guidelines tool-dispatch
-# @matrix ai guidelines : action-selection field-type-selection payload-size
-def execute_get_guidelines(args, _user):
+def execute_get_guidelines(args: Mapping[str, object], _user: User) -> Mapping[str, object]:
     """Return guidelines for the built-in provider's current workflow stage."""
     return _guidelines_result(args, external=False)
 
 
-# @testable true
-# @tests tests_unit/test_032d_external_guidance.py::test_organize_guidance_is_shared_across_provider_and_external_dispatch
-# @tests tests_unit/test_032d_external_guidance.py::test_submission_patch_guidance_is_shared_and_omits_autofill_workflow
-# @matrix ai agent-api : guidelines tool-dispatch
-# @matrix ai guidelines : action-selection field-type-selection payload-size
-# @matrix ai-report submission : preservation validation
-def execute_external_get_guidelines(args, _user):
+def execute_external_get_guidelines(args: Mapping[str, object], _user: User) -> Mapping[str, object]:
     """Compose external authoring guidance from trusted API dispatch context."""
     return _guidelines_result(args, external=True)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
-# @reason shared bundle filtering is observed through both trusted entry points
 def _guidelines_result(args, *, external):
     task = args.get("task")
     ai_debug("tool.get_guidelines.request", task=task)
@@ -326,17 +317,17 @@ def _guidelines_result(args, *, external):
             section = _schema_type_guidance(field_types)
         sections.append(section)
     if task == "report_actions":
+        assert actions
         sections.extend((
             _selected_action_guidance(actions),
             "### Output Boundary\n\nUse the action fields and final JSON "
             "shape defined by the current report response schema.",
         ))
 
-    if task == "report_actions" and "create_task" in actions:
-        sections.append(REPORT_TASK_SCHEDULING_GUIDELINES)
-
-    if task == "report_actions" and "summarize_file" in actions:
-        sections.append(SUMMARY_GENERATION_GUIDELINES)
+        if "create_task" in actions:
+            sections.append(REPORT_TASK_SCHEDULING_GUIDELINES)
+        if "summarize_file" in actions:
+            sections.append(SUMMARY_GENERATION_GUIDELINES)
 
     guidelines = "\n\n".join(section.strip() for section in sections)
     ai_debug(
@@ -358,7 +349,7 @@ def _guidelines_result(args, *, external):
             "the proposal. Read tools never execute the proposal."
         )
     content = f"{instructions}\n\n{guidelines}"
-    result = {
+    result: dict[str, object] = {
         "task": task,
         "description": bundle["description"],
         "guidelines": content,
@@ -376,13 +367,12 @@ def _guidelines_result(args, *, external):
             external_report_proposal_response_schema(allowed_actions=actions, include_submission_fields=True, require_file_summary_terms=True)
             if external else report_proposal_response_schema(actions, include_submission_fields=True)
         )
-        result["action_schema"] = {**schema["properties"]["actions"]["items"], **({"$defs": schema["$defs"]} if "$defs" in schema else {})}
+        items = schema["properties"]["actions"]["items"]
+        assert isinstance(items, dict)
+        result["action_schema"] = {**items, **({"$defs": schema["$defs"]} if "$defs" in schema else {})}
     return result
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @reason option validation and stable deduplication are observed through filtered guidance
 def _selected_values(value, allowed, field):
     if value is None:
         return None, None
@@ -399,19 +389,12 @@ def _selected_values(value, allowed, field):
     return normalized, None
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @reason field-type section routing is asserted through filtered public guidance
 def _schema_type_guidance(field_types):
     from ..guidelines.field_types import schema_type_guidance
 
     return schema_type_guidance(field_types)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_external_get_guidelines
-# @reason schema-only guidance and field filtering are asserted through both tool entry points
 def _schema_definition_guidance(field_types, *, page_form=False):
     selected = SCHEMA_FIELD_TYPES if field_types is None else field_types
     sections = [
@@ -431,9 +414,6 @@ def _schema_definition_guidance(field_types, *, page_form=False):
     return "\n\n".join(sections)
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/function_definitions/get_guidelines.py::execute_get_guidelines
-# @reason selected action text is asserted through filtered public guidance
 def _selected_action_guidance(actions):
     lines = [
         "### Selected Action Planning",

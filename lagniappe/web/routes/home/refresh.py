@@ -1,7 +1,13 @@
 """Batched collection refresh with cached-fingerprint comparisons."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+
 from flask import get_template_attribute, request
-from flask_login import current_user
 
 from lagniappe.core import exceptions
 from lagniappe.core.tools.polling.refresh import (
@@ -12,7 +18,7 @@ from lagniappe.core.tools.polling.refresh import (
     resolve_refresh_delta,
 )
 from lagniappe.web import responses
-from lagniappe.web.auth import logged_in
+from lagniappe.web.auth import authenticated_user, logged_in
 
 from . import internal
 
@@ -20,17 +26,11 @@ from . import internal
 MAX_REFRESH_TARGETS = 32
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/refresh.py::refresh
-# @reason per-target fallback envelopes are owned by the public refresh route
 def _fallback(target):
     target_id = target.get("id") if isinstance(target, dict) else None
     return {"id": target_id, "fallback": True}
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/refresh.py::refresh
-# @reason target-specific template rendering is exercised through the refresh route
 def _render_upserts(collection, entities):
     if collection.kind == "page-tasks":
         render = get_template_attribute("pages/tasks.html", "task")
@@ -55,9 +55,6 @@ def _render_upserts(collection, entities):
     ]
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/refresh.py::refresh
-# @reason empty-state rendering is exercised through the refresh route
 def _render_empty(collection, order):
     if order:
         return None
@@ -73,13 +70,10 @@ def _render_empty(collection, order):
     return render(collection.parent).strip()
 
 
-# @testable false
-# @covered-by lagniappe/web/routes/home/refresh.py::refresh
-# @reason target orchestration is owned by the public batched route
 def _refresh_target(view, target, refresh_view):
-    collection = load_refresh_collection(view, target, current_user, refresh_view)
+    collection = load_refresh_collection(view, target, authenticated_user(), refresh_view)
     delta = resolve_refresh_delta(
-        collection, target.get("rows"), current_user,
+        collection, target.get("rows"), authenticated_user(),
         reauthorize=refresh_view.reauthorize,
     )
     return {
@@ -92,17 +86,9 @@ def _refresh_target(view, target, refresh_view):
     }
 
 
-# @testable true
-# @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
-# @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_reconnect_refreshes_external_page
-# @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
-# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
-# @matrix reconnect-refresh : batched-request category-index component-identity fallback page-tasks root-fingerprint
-# @pairs category-index:refresh permissions:authorization
 @internal.route("/refresh", methods=["POST"])
 @logged_in
-def refresh():
+def refresh() -> ResponseReturnValue:
     """Return permission-checked row deltas for supported mounted collections."""
     payload = request.get_json(silent=True) or {}
     view = payload.get("view")
@@ -115,7 +101,7 @@ def refresh():
         return responses.error("Invalid refresh targets.")
 
     try:
-        refresh_view = load_refresh_view(view, current_user)
+        refresh_view = load_refresh_view(view, authenticated_user())
     except RefreshFallback:
         return responses.json_response(
             {"targets": [_fallback(target) for target in targets]}

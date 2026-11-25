@@ -10,8 +10,8 @@ Related Files:
         - lagniappe/web/routes/files/ingress.py: Ingress upload and progress routes
         - lagniappe/web/templates/home/ingress.html: Import component template
         - lagniappe/web/templates/delete/ingress.html: Delete confirmation modal
-        - src/script/widgets/ingressUpload.mjs: Import upload widget
-        - src/script/elements/upload.mjs: Shared upload element
+        - src/script/widgets/ingressUpload.ts: Import upload widget
+        - src/script/elements/upload.ts: Shared upload element
 
     Core:
         - lagniappe/core/properties/file_ingress.py: File ingress processing
@@ -43,7 +43,6 @@ from testing.elements import Buttons, Modal
 from testing.resources import File
 
 
-# @pair ingress:upload-form
 @pytest.mark.e2e
 def test_open_import_form(get_admin, get_user):
     """
@@ -60,7 +59,6 @@ def test_open_import_form(get_admin, get_user):
     expect(form).to_be_visible()
 
 
-# @matrix ingress : delete file-input upload-counts
 @pytest.mark.e2e
 def test_import_csv_via_file_input(get_admin, get_user):
     """
@@ -91,7 +89,6 @@ def test_import_csv_via_file_input(get_admin, get_user):
         expect(file_item).not_to_be_visible()
 
 
-# @matrix ingress : delete drag-drop upload-counts
 @pytest.mark.e2e
 def test_import_csv_via_drag_drop(get_admin, get_user):
     """

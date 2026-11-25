@@ -6,15 +6,21 @@ LAGNIAPPE_VENV_PYTHON="$LAGNIAPPE_REPOSITORY_ROOT/venv/bin/python"
 cd -- "$LAGNIAPPE_REPOSITORY_ROOT"
 
 supported_python() {
-    "$1" -E -c 'import sys; raise SystemExit(sys.version_info < (3, 12))' \
+    "$1" -E -c 'import sys; raise SystemExit(sys.version_info[:2] != (3, 14))' \
         >/dev/null 2>&1
 }
+
+if [ -x "$LAGNIAPPE_VENV_PYTHON" ] && ! supported_python "$LAGNIAPPE_VENV_PYTHON"; then
+    printf '%s\n' "This checkout's venv must use Python 3.14." \
+        "Rename the existing venv directory, then rerun ./setup.sh to create it with Python 3.14."
+    exit 1
+fi
 
 if [ ! -x "$LAGNIAPPE_VENV_PYTHON" ]; then
     printf '%s\n' "Preparing Lagniappe's isolated Python environment..."
     LAGNIAPPE_BOOTSTRAP_PYTHON=""
 
-    for LAGNIAPPE_PYTHON_CANDIDATE in python3 python; do
+    for LAGNIAPPE_PYTHON_CANDIDATE in python3.14 python3 python; do
         if command -v "$LAGNIAPPE_PYTHON_CANDIDATE" >/dev/null 2>&1 \
             && supported_python "$LAGNIAPPE_PYTHON_CANDIDATE"; then
             LAGNIAPPE_BOOTSTRAP_PYTHON=$LAGNIAPPE_PYTHON_CANDIDATE
@@ -37,9 +43,8 @@ if [ ! -x "$LAGNIAPPE_VENV_PYTHON" ]; then
     if [ -z "$LAGNIAPPE_BOOTSTRAP_PYTHON" ]; then
         printf '%s\n' \
             "" \
-            "[X] Lagniappe needs Python 3.12 or newer" \
-            "Install a current Google Cloud CLI with bundled Python, or install" \
-            "Python 3.12 or newer, reopen this terminal, and run ./setup.sh again."
+            "[X] Lagniappe needs Python 3.14." \
+            "Install Python 3.14, reopen this terminal, and run ./setup.sh again."
         exit 1
     fi
 

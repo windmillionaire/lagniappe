@@ -1,13 +1,15 @@
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Self
+
+if TYPE_CHECKING:
+    from ..entities.entity import Entity
+    from ..entities.site import Site
+
 from ..mixins import ColumnMixin
-from .base_property import Property
+from .base_property import Property, build_field
 
 
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/index.py::TaskTable
-# @covered-by lagniappe/core/properties/index.py::FormTable
-# @covered-by lagniappe/core/properties/index.py::UserTable
-# @covered-by lagniappe/core/properties/category.py::CategoryTable
-class Columns(Property):
+class Columns[Owner: Entity | Site = "Entity"](Property["Columns", Owner, "Columns | None"]):
     """Table column configuration for an entity's list view.
 
     Builds a dict of ColumnMixin fields from ``column_fields`` and
@@ -22,32 +24,35 @@ class Columns(Property):
 
     _id = "table"
     _embedded = False
+    column_fields: list[type[ColumnMixin]]
+    _fields: dict[str, ColumnMixin] | None
+    _columns: list[dict[str, object]] | None
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args: object, entity: Owner | None = None, **kwargs: object) -> None:
+        super().__init__(*args, entity=entity, **kwargs)
         self._fields = None
         self._columns = None
 
     @property
-    def value(self):
+    def value(self) -> Self:  # pyright: ignore[reportIncompatibleMethodOverride] -- The table is a read-only computed field.
         return self
 
     @property
-    def embedded(self):
+    def embedded(self) -> bool:
         return self._embedded
 
     @embedded.setter
-    def embedded(self, value):
+    def embedded(self, value: bool) -> None:
         self._embedded = value
 
     @property
-    def fields(self):
-        if getattr(self, "_fields", None):
-            return self._fields
+    def fields(self) -> dict[str, ColumnMixin]:
+        if cached := getattr(self, "_fields", None):
+            return cached
 
         fields = {}
         for f in self.column_fields:
-            field = f(entity=self.entity)
+            field = build_field(f, self.entity)
             fields[field.id] = field
 
         if not all(isinstance(f, ColumnMixin) for f in fields.values()):
@@ -56,7 +61,7 @@ class Columns(Property):
         self._fields = fields
         return fields
 
-    def update_fields(self, fields):
+    def update_fields(self, fields: Mapping[str, object]) -> None:
         new_fields = {
             f_id: f
             for f_id, f in fields.items()
@@ -68,20 +73,20 @@ class Columns(Property):
         self._columns = None
 
     @property
-    def selected(self):
+    def selected(self) -> list[str]:
         return [f.id for f in self.fields.values() if f.selected]
 
     @property
-    def columns(self):
-        if getattr(self, "_columns", None):
-            return self._columns
+    def columns(self) -> list[dict[str, object]]:
+        if cached := getattr(self, "_columns", None):
+            return cached
 
         self._columns = [
             {
                 "field": f.id,
                 "title": f.label,
                 "icon": f.icon,
-                "ordering": f.ordering.value if getattr(f, "ordering", None) else None,
+                "ordering": ordering.value if (ordering := getattr(f, "ordering", None)) else None,
                 "selected": getattr(f, "selected", False),
                 "link": getattr(f, "link", True),
                 "parent": getattr(f, "parent", True),
@@ -92,5 +97,5 @@ class Columns(Property):
         return self._columns
 
     @property
-    def preload(self):
+    def preload(self) -> dict[str, object]:
         return {"columns": self.columns, "selected": self.selected}

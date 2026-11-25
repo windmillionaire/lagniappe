@@ -27,7 +27,6 @@ def document_save_response(text):
     return predicate
 
 
-# @matrix sync : checkpoint collaboration delta document persistence revision
 def test_two_users_see_document_edits_without_reload(
     get_admin, get_user,
     browser_failures,
@@ -66,7 +65,6 @@ def test_two_users_see_document_edits_without_reload(
     expect(project.editor.text_entry).to_contain_text(text)
 
 
-# @matrix sync : document lifecycle presence
 def test_document_presence_appears_and_clears(get_admin, get_user, browser_failures):
     owner = get_admin()
     collaborator = get_user(Users.admin, creator=owner)
@@ -101,7 +99,7 @@ def test_document_presence_appears_and_clears(get_admin, get_user, browser_failu
             f'"closed_documents":["{document_sync_id}"]'
         ),
     ):
-        Tabs(owner).info
+        _ = Tabs(owner).info
 
     with expect_poll_result(
         collaborator.page,

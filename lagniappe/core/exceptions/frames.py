@@ -1,10 +1,26 @@
 """Traceback frame extraction with entity deduplication for error reports."""
 
+from collections.abc import Iterable
+from types import TracebackType
+from typing import TypedDict
+
 from .constants import FILTER_KEYS, JINJA_GLOBALS_FILTER, SKIP_TYPES
 from .utility import safe_repr
 
 
-def extract_local_variables(tb, max_frames=10):
+class FrameInfo(TypedDict):
+    filename: str
+    lineno: int
+    function: str
+    locals: dict[str, str]
+
+
+
+
+
+def extract_local_variables(
+    tb: TracebackType | None, max_frames: int = 10
+) -> list[FrameInfo]:
     """Extract local variables from traceback frames.
 
     Entity deduplication: The 'entity' passed from auth decorator is often present
@@ -102,7 +118,7 @@ def extract_local_variables(tb, max_frames=10):
         if frame["auth_entity"]:
             var_name, entity_obj = frame["auth_entity"]
 
-            if i == first_entity_idx or i == last_entity_idx:
+            if i in (first_entity_idx, last_entity_idx):
                 # Show full entity in first and last frames
                 if first_entity_idx == last_entity_idx:
                     label = ""
@@ -127,7 +143,7 @@ def extract_local_variables(tb, max_frames=10):
     return frames_info
 
 
-def extract_entity_from_frames(frames_info):
+def extract_entity_from_frames(frames_info: Iterable[FrameInfo]) -> str | None:
     """Look for 'entity' in frame locals and extract its formatted representation.
 
     Returns the entity from the first frame that has full entity data (not a reference).

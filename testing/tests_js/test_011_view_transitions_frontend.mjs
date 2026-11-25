@@ -8,9 +8,9 @@ async function setupTransitions(t, { skipped = () => false } = {}) {
 	const capturedErrors = [];
 	const captureError = t.mock.fn((...args) => capturedErrors.push(args));
 	const { withTransition } = await esmock.strict(
-		"../../src/script/shared/transitions.mjs",
+		"../../src/script/shared/transitions.ts",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError,
 				isSkippedViewTransitionError: skipped,
 			},
@@ -47,7 +47,6 @@ function createPendingAnimation(callback) {
 	};
 }
 
-/** @matrix view-transition : error-reporting nested-callback */
 test("test_nested_transition_joins_active_transition_without_error_report", async (t) => {
 	const { capturedErrors, withTransition } = await setupTransitions(t);
 	const events = [];
@@ -73,7 +72,6 @@ test("test_nested_transition_joins_active_transition_without_error_report", asyn
 	finishTransition();
 });
 
-/** @matrix view-transition : animation-lifecycle queueing update-completion */
 test("test_transition_resolves_after_update_without_waiting_for_animation", async (t) => {
 	const { withTransition } = await setupTransitions(t);
 	const events = [];
@@ -95,7 +93,6 @@ test("test_transition_resolves_after_update_without_waiting_for_animation", asyn
 	finishTransition();
 });
 
-/** @matrix view-transition : coalescing exact-once */
 test("test_same_turn_commits_share_one_transition_and_run_once", async (t) => {
 	const { withTransition } = await setupTransitions(t);
 	const events = [];
@@ -119,7 +116,6 @@ test("test_same_turn_commits_share_one_transition_and_run_once", async (t) => {
 	finishTransition();
 });
 
-/** @matrix view-transition : exact-once ready-rejection */
 test("test_ready_rejection_does_not_replay_commit", async (t) => {
 	const skipped = new Error("Transition was skipped");
 	const { capturedErrors, withTransition } = await setupTransitions(t, {

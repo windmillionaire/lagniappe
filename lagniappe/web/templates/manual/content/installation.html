@@ -11,6 +11,40 @@
       explains each choice and opens the right provider pages along the way.
       The steps below cover what to have ready before you begin.
     {% endcall %}
+    <details data-role="ai-assisted-install"
+             data-kind="page"
+             class="mt-4 rounded-lg border border-base-light/50 bg-white shadow-sm">
+      <summary class="cursor-pointer px-5 py-4 text-base-dark marker:text-kind-default">
+        <span class="ml-1 text-lg font-semibold">Install with a local AI assistant (no terminal required)</span>
+        <span class="ml-5 block text-sm font-normal leading-relaxed text-base-medium">
+          Use Claude, Codex, Antigravity, or another local coding assistant with
+          <code>./setup.sh --agent</code> and the localhost browser Secret Vault
+          so passwords and API keys never enter chat history.
+        </span>
+      </summary>
+      <div class="border-t border-base-light/40 px-5 py-5 space-y-3 text-sm text-base-medium">
+        <p>
+          Open a fresh conversation in a local desktop or IDE assistant with
+          command execution and paste the prompt below. The assistant asks only
+          non-secret questions in chat and opens a one-shot
+          <code>127.0.0.1</code> browser vault whenever credentials are needed,
+          writing them straight into Google Cloud Secret Manager
+          (<code>lagniappe-runtime-secrets</code>).
+        </p>
+        {% set repo_url = CONFIG.SOURCE_URL.rstrip("/") if CONFIG.SOURCE_URL else "https://github.com/windmillionaire/lagniappe" %}
+        {{ code("Help me install and deploy Lagniappe to my own Google Cloud project. Clone " ~ repo_url ~ " into a local folder, read documentation/INSTALL_WITH_AI.md, and follow the Assistant Playbook to walk me through the install. Never ask me to paste passwords or API keys in chat.") }}
+        <p>
+          For the full reference (including <code>answers.json</code> fields,
+          resuming an interrupted run, and migrating an older install to Secret
+          Manager), see
+          {% if CONFIG.SOURCE_URL %}
+            {{ link(CONFIG.SOURCE_URL.rstrip("/") ~ "/blob/main/documentation/INSTALL_WITH_AI.md", "INSTALL_WITH_AI.md") }}
+          {% else %}
+            <code>documentation/INSTALL_WITH_AI.md</code>
+          {% endif %}.
+        </p>
+      </div>
+    </details>
   {% endcall %}
   {{ heading("Services Used") }}
   {% call card() %}
@@ -34,8 +68,7 @@
         <strong>Vertex AI</strong> for optional AI features.
       </li>
       <li>
-        <strong>Google Identity Platform</strong> for sign-in and adaptive
-        polling for live updates.
+        <strong>Google Identity Platform</strong> for sign-in.
       </li>
       <li>
         <strong>Google Places</strong> for address autocomplete and verified
@@ -115,7 +148,7 @@
       </li>
       <li>
         <strong>Cloudflare, optional:</strong> an account and temporary API
-        token if you want automatic custom-domain setup
+        token if you want automatic custom-domain setup.
       </li>
     </ul>
     {{ subheading("Install Git and Google Cloud CLI") }}
@@ -163,14 +196,11 @@
             class="text-base-medium text-sm space-y-3 list-decimal ml-5 mt-3">
           <li>Check whether the installed Python version is ready for Lagniappe:</li>
         </ol>
-        {{ code("python3") }}
+        {{ code("python3.14 --version") }}
         <p class="text-base-medium text-sm mt-2">
-          Python displays its version and then a <code>&gt;&gt;&gt;</code> prompt.
-          Type <code>exit()</code> and press Enter to return to the normal
-          Terminal prompt. If the displayed version is 3.12 or newer,
-          continue. If it is 3.11 or older, or the command is not found,
+          If the command displays Python 3.14.x, continue. If it is unavailable,
           download and run
-          {{ link("https://www.python.org/downloads/macos/", "Python.org's current macOS installer") }},
+          {{ link("https://www.python.org/downloads/macos/", "the latest Python 3.14.x macOS installer") }},
           then close and reopen Terminal and run the check again.
         </p>
         <ol start="3"
@@ -203,7 +233,7 @@
       Google Cloud CLI remain normal system tools.
     {% endcall %}
     {% call callout("note", False) %}
-      Lagniappe needs Python 3.12 or newer. The macOS steps above check Python
+      Lagniappe requires Python 3.14. The macOS steps above check Python
       before installing Google Cloud CLI. On Windows, setup can offer to
       install a supported standalone Python with WinGet if one is not already
       available.
@@ -820,9 +850,12 @@
     <p class="text-base-medium mb-3">
       Setup writes your installation settings to
       <code>config/files/lagniappe_settings.yaml</code> inside your Lagniappe
-      checkout. This file contains secrets and provider configuration, so keep
-      it private and do not commit it to a public repository. Git ignores it,
-      but you should still keep a secure backup.
+      checkout. By default this file contains secrets and provider
+      configuration, so keep it private and do not commit it to a public
+      repository. Git ignores it, but you should still keep a secure backup.
+      You can also move runtime secrets into Google Cloud Secret Manager with
+      <code>./setup.sh secrets migrate</code> so local YAML holds only
+      non-secret configuration.
     </p>
     <p class="text-base-medium">
       Alongside a fresh copy of the Lagniappe source code, this is the one

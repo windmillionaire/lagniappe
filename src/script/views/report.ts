@@ -1,0 +1,431 @@
+import type { FormController } from "../forms/controller.ts";
+import { createIcon, setIcon } from "../shared/icons.ts";
+import { request } from "../shared/request.ts";
+import { withTransition } from "../shared/transitions.ts";
+import type { DeferredOperationStatus } from "../types/api.d.ts";
+import Core from "./base/core.ts";
+
+const REPORT_FORM_SELECTOR =
+	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='revise-report-form']";
+
+interface ReportExecution {
+	notification?: string;
+	deferred?: boolean;
+	operation?: string;
+}
+
+export default class Report extends Core {
+	declare RunReportForm?: FormController;
+	declare ReviseReportForm?: FormController;
+	declare _runningReport?: boolean;
+	declare _revisingReport?: boolean;
+	declare _reportFormsReady?: boolean;
+	declare _reportReloadScheduled?: boolean;
+	declare _reportFormsPromise?: Promise<this | null> | null;
+	declare _reportFormBootstrap?: ((event: SubmitEvent) => void) | null;
+
+	async init() {
+		await super.init();
+		this._receiveDeferredOperation = this._receiveDeferredOperation.bind(this);
+		window.addEventListener(
+			"deferred-operation",
+			this._receiveDeferredOperation,
+		);
+		const hasForms = this.elt.querySelector(REPORT_FORM_SELECTOR);
+		if (hasForms) {
+			this._installReportFormBootstrap();
+			try {
+				await this.ensureReportForms();
+			} catch (error) {
+				this.reportStartupError(error, hasForms, "report-forms");
+			}
+		}
+		return this;
+	}
+
+	ensureReportForms(): Promise<this | null> {
+		if (this._reportFormsReady) return Promise.resolve(this);
+		if (this._reportFormsPromise) return this._reportFormsPromise;
+
+		const pending = import("../forms/controller.ts")
+			.then(async ({ FormController }) => {
+				if (this._destroyed) return null;
+				await Promise.all([
+					this._initRunReportForm(FormController),
+					this._initReviseReportForm(FormController),
+				]);
+				if (this._destroyed) return null;
+				this._reportFormsReady = true;
+				this._removeReportFormBootstrap();
+				return this;
+			})
+			.catch((error) => {
+				if (this._reportFormsPromise === pending) {
+					this._reportFormsPromise = null;
+				}
+				throw error;
+			});
+		this._reportFormsPromise = pending;
+		return pending;
+	}
+
+	_installReportFormBootstrap() {
+		if (this._reportFormBootstrap) return;
+		this._reportFormBootstrap = (event) => {
+			const form = event.target as HTMLFormElement | null;
+			if (!form?.matches?.(REPORT_FORM_SELECTOR) || this._reportFormsReady)
+				return;
+			event.preventDefault();
+			event.stopImmediatePropagation?.();
+			const submitter = event.submitter as HTMLElement | null;
+			void this.runColdAction(
+				form,
+				() => this.ensureReportForms(),
+				() => {
+					if (!this._destroyed && form.isConnected) {
+						form.requestSubmit(submitter || undefined);
+					}
+				},
+				submitter || form,
+			);
+		};
+		this.elt.addEventListener?.("submit", this._reportFormBootstrap, true);
+	}
+
+	_removeReportFormBootstrap() {
+		if (!this._reportFormBootstrap) return;
+		this.elt.removeEventListener?.("submit", this._reportFormBootstrap, true);
+		this._reportFormBootstrap = null;
+	}
+
+	async _initRunReportForm(Controller: typeof FormController) {
+		const target = this.elt.querySelector<HTMLFormElement>(
+			"[data-role='run-report-form'], [data-role='retry-report-form']",
+		);
+		if (!target) return;
+		const retrying = target.dataset.role === "retry-report-form";
+
+		this.RunReportForm = new Controller({
+			target,
+			view: this,
+			messages: {
+				submit: retrying ? "Retry Proposal" : "Execute Proposal",
+				submitting: retrying ? "Starting Retry" : "Starting Execution",
+				submitted: retrying ? "Retry Started" : "Execution Started",
+			},
+			icon: "run.active",
+		});
+		await this.RunReportForm.init();
+		target.addEventListener("submit", this._runReport.bind(this));
+	}
+
+	async _initReviseReportForm(Controller: typeof FormController) {
+		const target = this.elt.querySelector<HTMLFormElement>(
+			"[data-role='revise-report-form']",
+		);
+		if (!target) return;
+
+		this.ReviseReportForm = new Controller({
+			target,
+			view: this,
+			messages: {
+				submit: target.dataset.submit || "Revise Plan",
+				submitting: target.dataset.submitting || "Revising Plan",
+				submitted: target.dataset.submitted || "Revision Started",
+			},
+			icon: target.dataset.icon || "generate",
+		});
+		await this.ReviseReportForm.init();
+		target.addEventListener("submit", this._reviseReport.bind(this));
+	}
+
+	_click(event?: MouseEvent) {
+		const target = event?.target as Element | null | undefined;
+		const skipButton = target?.closest?.<HTMLButtonElement>(
+			"[data-role='skip-action']",
+		);
+		if (event && skipButton && this.elt.contains(skipButton)) {
+			event.preventDefault();
+			event.stopPropagation();
+			this._toggleActionSkip(skipButton);
+			return;
+		}
+
+		const expandButton = target?.closest?.<HTMLButtonElement>("[lp-expand]");
+		if (event && expandButton && this.elt.contains(expandButton)) {
+			event.preventDefault();
+			event.stopPropagation();
+			this._toggleAccordion(expandButton);
+			return;
+		}
+
+		super._click(event);
+	}
+
+	async _runReport(event: SubmitEvent) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (this._runningReport) return;
+
+		const form = event.currentTarget as HTMLFormElement | null;
+		if (!form) return;
+		this._runningReport = true;
+		const data = new FormData(form);
+		data.append("operation-id", this.operationId());
+		this.RunReportForm?.submitting();
+
+		const response = await request.post<ReportExecution>(form.action, data);
+		this._runningReport = false;
+		if (!response?.ok) {
+			this.RunReportForm?.showError(
+				response?.error || "This report could not be run.",
+			);
+			if (response?.reload) {
+				if (this.RunReportForm?.submitButton) {
+					this.RunReportForm.submitButton.disabled = true;
+				}
+				window.setTimeout(() => window.location.reload(), 1000);
+			}
+			return;
+		}
+
+		if (response.notification) {
+			const notifications = await this.ensureNotifications();
+			notifications?.upsertNotification?.(response.notification);
+		}
+		this.RunReportForm?.success();
+		if (response.deferred) {
+			const operations = await this.ensureDeferredOperations();
+			if (response.operation)
+				operations?.track(response.operation, { node: this.elt });
+			this._showDeferredReportStatus("running", "Saving report changes...");
+			return;
+		}
+		window.setTimeout(() => window.location.reload(), 250);
+	}
+
+	async _reviseReport(event: SubmitEvent) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (this._revisingReport) return;
+
+		const form = event.currentTarget as HTMLFormElement | null;
+		if (!form) return;
+		this._revisingReport = true;
+		const data = new FormData(form);
+		data.append("operation-id", this.operationId());
+		this.ReviseReportForm?.submitting();
+
+		const response = await request.post<ReportExecution>(form.action, data);
+		this._revisingReport = false;
+		if (!response?.ok) {
+			this.ReviseReportForm?.showError(
+				response?.error || "This report could not be revised.",
+			);
+			return;
+		}
+
+		if (response.notification) {
+			const notifications = await this.ensureNotifications();
+			notifications?.upsertNotification?.(response.notification);
+		}
+		this.ReviseReportForm?.success();
+		if (response.deferred) {
+			const operations = await this.ensureDeferredOperations();
+			if (response.operation)
+				operations?.track(response.operation, { node: this.elt });
+			this._showDeferredReportStatus("revising", "Revising report...");
+			return;
+		}
+		window.setTimeout(() => window.location.reload(), 250);
+	}
+
+	_showDeferredReportStatus(
+		statusValue: "running" | "revising",
+		message: string,
+	) {
+		const section = this.elt.querySelector("#layout section");
+		if (!section) return;
+		void withTransition(
+			() => {
+				this.elt.dataset.pending = "true";
+				this.elt.dataset.status = statusValue;
+
+				let status = section.querySelector<HTMLElement>(
+					"[data-role='report-status']",
+				);
+				if (!status) {
+					status = document.createElement("div");
+					status.dataset.role = "report-status";
+					status.className = "flex flex-col gap-2";
+
+					const heading = document.createElement("h2");
+					heading.className = "text-base font-semibold text-base-dark";
+					heading.textContent = "Status";
+
+					const note = document.createElement("p");
+					note.dataset.role = "report-status-note";
+					note.className = "flex items-center gap-1.5 text-base-dark";
+					status.append(heading, note);
+					section.prepend(status);
+				}
+
+				const note =
+					status.querySelector<HTMLElement>(
+						"[data-role='report-status-note']",
+					) || status;
+				if (note !== status) {
+					note.className = "flex items-center gap-1.5 text-base-dark";
+				}
+				const spinner = createIcon("spinner", "icon-sm shrink-0");
+				spinner.setAttribute("aria-hidden", "true");
+				const text = document.createElement("span");
+				text.textContent = message;
+				note.replaceChildren(spinner, text);
+				let progress = status.querySelector<HTMLElement>(
+					"[data-role='deferred-progress']",
+				);
+				if (!progress) {
+					progress = document.createElement("p");
+					progress.dataset.role = "deferred-progress";
+					progress.className = "text-sm text-base-medium";
+					const phase = document.createElement("span");
+					phase.dataset.role = "deferred-phase";
+					phase.textContent = "Waiting to start";
+					const separator = document.createElement("span");
+					separator.setAttribute("aria-hidden", "true");
+					separator.textContent = " · ";
+					const elapsed = document.createElement("span");
+					elapsed.dataset.role = "deferred-elapsed";
+					elapsed.textContent = "just now";
+					progress.append(phase, separator, elapsed);
+					status.append(progress);
+				}
+			},
+			{ label: "report:show-deferred-status" },
+		);
+	}
+
+	_receiveDeferredOperation(event: CustomEvent<DeferredOperationStatus>) {
+		const status = event.detail;
+		if (!status?.terminal || status.key !== this.elt.dataset.operation) return;
+		this._reloadReport();
+	}
+
+	_reloadReport(delay = 0) {
+		if (this._reportReloadScheduled) return;
+		this._reportReloadScheduled = true;
+		window.setTimeout(() => window.location.reload(), delay);
+	}
+
+	destroy() {
+		this._removeReportFormBootstrap();
+		window.removeEventListener(
+			"deferred-operation",
+			this._receiveDeferredOperation,
+		);
+		this.RunReportForm?.destroy?.();
+		this.ReviseReportForm?.destroy?.();
+		super.destroy();
+	}
+
+	async _toggleActionSkip(button: HTMLButtonElement) {
+		const route = button.dataset.route;
+		if (button.disabled || !route) return;
+
+		button.disabled = true;
+		const actionIndexes = (
+			button.closest<HTMLElement>("[data-action-indexes]")?.dataset
+				.actionIndexes || ""
+		)
+			.split(",")
+			.map((value) => Number(value))
+			.filter(Boolean);
+		const includeDependencies =
+			button.closest<HTMLElement>("[data-skip-dependencies]")?.dataset
+				.skipDependencies !== "false";
+		const response = await request.post<{ skipped: number[] }>(route, {
+			action_indexes: actionIndexes,
+			include_dependencies: includeDependencies,
+		});
+		button.disabled = false;
+		if (!response?.ok) return;
+
+		const skipped = new Set(response.skipped || []);
+		await withTransition(
+			() => {
+				this.elt
+					.querySelectorAll<HTMLElement>("[data-action-index]")
+					.forEach((item) => {
+						this._setActionSkipped(
+							item,
+							skipped.has(Number(item.dataset.actionIndex)),
+						);
+					});
+				this.elt
+					.querySelectorAll<HTMLElement>("[data-schema-action-index]")
+					.forEach((impact) => {
+						const isSkipped = skipped.has(
+							Number(impact.dataset.schemaActionIndex),
+						);
+						const skippedMessage = impact.querySelector<HTMLElement>(
+							"[data-role='schema-impact-skipped']",
+						);
+						const details = impact.querySelector<HTMLElement>(
+							"[data-role='schema-impact-details']",
+						);
+						if (skippedMessage)
+							skippedMessage.dataset.visible = isSkipped ? "true" : "false";
+						if (details) details.dataset.visible = isSkipped ? "false" : "true";
+					});
+			},
+			{ label: "report:toggle-skipped-actions" },
+		);
+	}
+
+	_setActionSkipped(item: HTMLElement, skipped: boolean) {
+		item.dataset.skipped = skipped ? "true" : "false";
+		const label = item.querySelector<HTMLElement>(
+			"[data-role='skipped-label']",
+		);
+		if (label) label.dataset.visible = item.dataset.skipped;
+
+		const button = item.querySelector<HTMLButtonElement>(
+			"[data-role='skip-action']",
+		);
+		if (!button) return;
+		button.title = skipped ? "Restore action" : "Skip action";
+		const kind = skipped ? button.dataset.restoreKind : button.dataset.skipKind;
+		if (kind) button.dataset.kind = kind;
+		button.setAttribute(
+			"aria-label",
+			`${button.title} ${item.dataset.actionIndex}`,
+		);
+		const icon = button.querySelector<HTMLElement>("[data-icon]");
+		if (icon) {
+			setIcon(
+				icon,
+				skipped ? button.dataset.restoreIcon : button.dataset.skipIcon,
+			);
+		}
+	}
+
+	async _toggleAccordion(button: HTMLButtonElement) {
+		const accordion = button.closest<HTMLElement>("[data-role='accordion']");
+		const panel = accordion?.querySelector<HTMLElement>(
+			"[data-role='accordion-panel']",
+		);
+		if (!accordion || !panel) return;
+
+		await withTransition(
+			() => {
+				const open = accordion.dataset.open !== "true";
+				accordion.dataset.open = open ? "true" : "false";
+				button.dataset.open = accordion.dataset.open;
+				button.setAttribute("aria-expanded", open ? "true" : "false");
+				panel.dataset.visible = accordion.dataset.open;
+			},
+			{ label: "report:toggle-accordion" },
+		);
+	}
+}

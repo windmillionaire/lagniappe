@@ -48,8 +48,6 @@ def _open_visibility_panel(user, category):
     return panel
 
 
-# @matrix categories : first-batch server-render
-# @pairs pages:cursor-pagination table-controls:cursor-continuation
 # @template categories/index.html::view
 # @template table.html::table
 def test_category_index_renders_first_batch_before_cursor_continuation(
@@ -91,27 +89,26 @@ def test_category_index_renders_first_batch_before_cursor_continuation(
             user,
             status=503,
             path=continuation_path,
+        ), scoped_browser_route(
+            user.page.context,
+            continuation_route,
+            reject_continuation,
         ):
-            with scoped_browser_route(
-                user.page.context,
-                continuation_route,
-                reject_continuation,
+            with user.page.expect_response(
+                lambda response: is_continuation_request(response.request)
+                and response.status == 503
             ):
-                with user.page.expect_response(
-                    lambda response: is_continuation_request(response.request)
-                    and response.status == 503
-                ):
-                    response = user.navigate(category.url)
-                assert response.ok
-                expect(user.locate("[lp-view]")).to_have_attribute(
-                    "initialized", ""
-                )
-                body = user.locate(category.TABLE_BODY)
-                rows = body.locator("tr[lp-entity]")
+                response = user.navigate(category.url)
+            assert response.ok
+            expect(user.locate("[lp-view]")).to_have_attribute(
+                "initialized", ""
+            )
+            body = user.locate(category.TABLE_BODY)
+            rows = body.locator("tr[lp-entity]")
 
-                expect(rows).to_have_count(25)
-                expect(rows.first).to_be_visible()
-                expect(body).not_to_have_attribute("loaded", "")
+            expect(rows).to_have_count(25)
+            expect(rows.first).to_be_visible()
+            expect(body).not_to_have_attribute("loaded", "")
 
         response = user.navigate(category.url)
         assert response.ok
@@ -125,7 +122,6 @@ def test_category_index_renders_first_batch_before_cursor_continuation(
         Entities.delete(*created)
 
 
-# @matrix pages : category-index create
 def test_create_page_from_category_index(get_admin, get_user):
     user = get_admin()
     category = Categories.test_empty_category.get(user)
@@ -141,8 +137,6 @@ def test_create_page_from_category_index(get_admin, get_user):
     expect(Table(user).get_row(page.name)).to_be_visible()
 
 
-# @matrix reconnect-refresh : category-index component-identity
-# @pair category-index:refresh
 # @template table.html::row
 def test_category_index_reconnect_refreshes_external_page(get_admin, get_user, browser_failures):
     user = get_admin()
@@ -165,9 +159,6 @@ def test_category_index_reconnect_refreshes_external_page(get_admin, get_user, b
         Entities.delete(external_page)
 
 
-# @source lagniappe/web/routes/pages/main.py::create
-# @source src/script/widgets/pageInfo.mjs::CreatePage
-# @matrix pages : category-index create required-name row-navigation
 # @template categories/tools.html::create_page
 # @template table.html::row
 def test_page_creation_requires_name_and_rows_do_not_follow_attached_form(get_admin, get_user, browser_failures):
@@ -219,10 +210,15 @@ def test_page_creation_requires_name_and_rows_do_not_follow_attached_form(get_ad
             Entities.delete(legacy)
 
 
-# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
-# @matrix polling : operation owner progress timing
 # @template categories/tools.html::create_page
-@pytest.mark.parametrize("live_ai_job_quota", [False, True], indirect=True, ids=["live", "quota-fallback"])
+@pytest.mark.parametrize(
+    "live_ai_job_quota",
+    [
+        pytest.param(False, id="live", marks=pytest.mark.ai),
+        pytest.param(True, id="quota-fallback"),
+    ],
+    indirect=True,
+)
 def test_create_page_autofill_is_deferred(get_admin, get_user, monkeypatch, results, live_ai_job_quota):
     user = get_admin()
     category = Categories.test_basic_inputs_submission.get(user)
@@ -280,9 +276,11 @@ def test_create_page_autofill_is_deferred(get_admin, get_user, monkeypatch, resu
             lambda prompt, *, entity, user, schema: prompts.append(prompt)
             or {"input-textab12": expected_text},
         )
-        with user.page.expect_response("**/pages/*/info/replace"):
-            with web_app.test_request_context("/"):
-                result = DeferredJobs.run(job.urlsafe_key)
+        with (
+            user.page.expect_response("**/pages/*/info/replace"),
+            web_app.test_request_context("/"),
+        ):
+            result = DeferredJobs.run(job.urlsafe_key)
         assert result.success is True
         preview = prompts[0].preview()
         assert page_name in preview
@@ -302,8 +300,6 @@ def test_create_page_autofill_is_deferred(get_admin, get_user, monkeypatch, resu
     saved = Entities.fetch_one(page_key, request=Fetch.direct())
     assert saved.properties.submission.value["input-textab12"] == expected_text
 
-# @matrix categories : info-form update
-# @matrix web-headers : acknowledgement entity-revision local-save
 # @template categories/index.html::view_header
 def test_update_category_info_from_tools(get_admin, get_user):
     user = get_admin()
@@ -349,7 +345,6 @@ def test_update_category_info_from_tools(get_admin, get_user):
         Entities.save(restored)
 
 
-# @matrix pages : category-index create related-forms
 def test_create_page_related_form_badge_selects_form(get_admin, get_user):
     user = get_admin()
     page = Pages.test_category_filter_related_form_registration_page.get(user)
@@ -389,7 +384,6 @@ def test_create_page_related_form_badge_selects_form(get_admin, get_user):
     Table(user).new_row(created_name)
 
 
-# @matrix category-index : editable-cell quick-edit
 def test_category_index_quick_edit_updates_text_cell(get_admin, get_user):
     user = get_admin()
     page = Pages.test_basic_input_submission.get(user)
@@ -424,7 +418,6 @@ def test_category_index_quick_edit_updates_text_cell(get_admin, get_user):
     expect(row.locator("td[data-column='name']")).to_contain_text(updated_name)
 
 
-# @matrix category-index : checkbox-cell quick-edit
 def test_category_index_quick_edit_renders_checkbox_cells(get_admin, get_user):
     user = get_admin()
     page = Pages.test_category_filter_match_page.get(user)
@@ -471,7 +464,6 @@ def test_category_index_quick_edit_renders_checkbox_cells(get_admin, get_user):
         expect(checkbox).to_be_checked()
 
 
-# @matrix form-table table-controls : form-table-column table-cell-expand
 # @template cell.html::table_cell
 # @template controls.html::expand
 def test_category_index_expands_table_submission_cell(get_admin, get_user):

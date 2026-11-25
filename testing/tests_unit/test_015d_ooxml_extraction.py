@@ -131,7 +131,6 @@ def _set_policy(monkeypatch, **changes):
     return policy
 
 
-# @matrix files : compatibility docx ooxml xlsx
 def test_ooxml_happy_paths_preserve_docx_and_xlsx_order():
     docx = _docx_bytes(
         """
@@ -168,7 +167,6 @@ def test_ooxml_happy_paths_preserve_docx_and_xlsx_order():
     assert extract_ooxml_text(docx, filename="notes.txt") is None
 
 
-# @matrix files : ooxml partial-result
 def test_ooxml_output_budget_returns_typed_partial_result():
     exact = _docx_bytes("<w:p><w:r><w:t>12345</w:t></w:r></w:p>")
     over = _docx_bytes(
@@ -193,7 +191,6 @@ def test_ooxml_output_budget_returns_typed_partial_result():
             )
 
 
-# @matrix files : ooxml output-budget partial-result
 def test_ooxml_output_limit_does_not_parse_later_worksheets():
     content = _xlsx_bytes(
         [
@@ -207,7 +204,6 @@ def test_ooxml_output_limit_does_not_parse_later_worksheets():
     assert result == OOXMLExtractionResult("abcde", OOXMLTruncationReason.OUTPUT)
 
 
-# @matrix files : archive-safety bounded-resources ooxml
 @pytest.mark.parametrize(
     "members",
     [
@@ -226,7 +222,6 @@ def test_ooxml_rejects_unsafe_archive_members_before_parsing(members):
         extract_ooxml(_zip_bytes(members), filename="unsafe.docx")
 
 
-# @matrix files : archive-safety central-directory ooxml
 def test_ooxml_rejects_central_directory_count_mismatch(monkeypatch):
     content = bytearray(_docx_bytes("<w:p><w:r><w:t>text</w:t></w:r></w:p>"))
     end_offset = content.rfind(ooxml.EOCD_SIGNATURE)
@@ -241,7 +236,6 @@ def test_ooxml_rejects_central_directory_count_mismatch(monkeypatch):
         extract_ooxml(_docx_bytes(""), filename="members.docx")
 
 
-# @matrix files : archive-safety expansion ooxml
 def test_ooxml_rejects_unsupported_compression_and_expansion(monkeypatch):
     unsupported = _zip_bytes(
         [("word/document.xml", f'<w:document xmlns:w="{ooxml.W_NS}"/>')],
@@ -258,7 +252,6 @@ def test_ooxml_rejects_unsupported_compression_and_expansion(monkeypatch):
         )
 
 
-# @matrix files : bounded-resources ooxml xml-safety
 @pytest.mark.parametrize(
     "body",
     [
@@ -273,7 +266,6 @@ def test_ooxml_rejects_forbidden_or_malformed_xml(body):
         extract_ooxml(_zip_bytes([("word/document.xml", body)]), filename="xml.docx")
 
 
-# @matrix files : ooxml xml-safety
 def test_ooxml_rejects_excessive_xml_depth(monkeypatch):
     _set_policy(monkeypatch, xml_depth=4)
     with pytest.raises(OOXMLExtractionError):
@@ -283,7 +275,6 @@ def test_ooxml_rejects_excessive_xml_depth(monkeypatch):
         )
 
 
-# @matrix files : ooxml partial-result
 def test_ooxml_returns_partial_text_for_xml_work_limits(monkeypatch):
     _set_policy(monkeypatch, xml_elements=5)
     element_limited = extract_ooxml(
@@ -308,7 +299,6 @@ def test_ooxml_returns_partial_text_for_xml_work_limits(monkeypatch):
     )
 
 
-# @matrix files : deadline ooxml partial-result
 def test_ooxml_returns_partial_text_when_deadline_expires(monkeypatch):
     _set_policy(monkeypatch, seconds=1.0)
     calls = 0
@@ -327,7 +317,6 @@ def test_ooxml_returns_partial_text_when_deadline_expires(monkeypatch):
     assert result == OOXMLExtractionResult("kept", OOXMLTruncationReason.DEADLINE)
 
 
-# @matrix files : ooxml partial-result policy
 def test_ooxml_returns_partial_text_for_worksheet_work_limits(monkeypatch):
     two_rows = _worksheet(_inline_row(1, "first", reference="A1") + _inline_row(2, "second", reference="A2"))
 
@@ -352,7 +341,6 @@ def test_ooxml_returns_partial_text_for_worksheet_work_limits(monkeypatch):
     assert sheet_limited == OOXMLExtractionResult("first", OOXMLTruncationReason.SHEETS)
 
 
-# @matrix files : ooxml relationships xlsx
 @pytest.mark.parametrize(
     ("target", "relationship_type", "target_mode"),
     [
@@ -374,7 +362,6 @@ def test_ooxml_rejects_unsafe_worksheet_relationships(
         extract_ooxml(content, filename="relationship.xlsx")
 
 
-# @matrix files : fallback ooxml xlsx
 def test_ooxml_fallback_worksheets_use_natural_order():
     content = _zip_bytes(
         [
@@ -388,7 +375,6 @@ def test_ooxml_fallback_worksheets_use_natural_order():
     assert result.text == "two\nten"
 
 
-# @matrix files : cell-reference ooxml xlsx
 @pytest.mark.parametrize("reference", ["XFE1", "ZZZZZZZZZZZZ1", "A1048577"])
 def test_ooxml_rejects_out_of_domain_cell_references(reference):
     content = _xlsx_bytes(
@@ -398,7 +384,6 @@ def test_ooxml_rejects_out_of_domain_cell_references(reference):
         extract_ooxml(content, filename="coordinates.xlsx")
 
 
-# @matrix files : cell-reference ooxml sparse-row xlsx
 def test_ooxml_accepts_xfd_without_unbounded_padding():
     rows = """
         <row r="1">
@@ -413,7 +398,6 @@ def test_ooxml_accepts_xfd_without_unbounded_padding():
     assert result.text.count("\t") == 16_383
 
 
-# @matrix files : ooxml shared-strings xlsx
 def test_ooxml_bounds_shared_string_storage_and_fanout(monkeypatch):
     shared_sheet = _worksheet(
         '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>0</v></c></row>'
@@ -434,7 +418,6 @@ def test_ooxml_bounds_shared_string_storage_and_fanout(monkeypatch):
         extract_ooxml(repeated, filename="characters.xlsx")
 
 
-# @matrix files : compressed-limit input-stream ooxml
 def test_ooxml_bounds_input_streams_and_preserves_seekable_ownership(monkeypatch):
     content = _docx_bytes("<w:p><w:r><w:t>streamed</w:t></w:r></w:p>")
 
@@ -470,7 +453,6 @@ def test_ooxml_bounds_input_streams_and_preserves_seekable_ownership(monkeypatch
         extract_ooxml(content, filename="large.docx")
 
 
-# @matrix files : archive-safety ooxml streamed-member
 def test_ooxml_stream_reader_rejects_bytes_beyond_member_declaration():
     xml = (
         f'<w:document xmlns:w="{ooxml.W_NS}"><w:body/>'
@@ -491,7 +473,6 @@ def test_ooxml_stream_reader_rejects_bytes_beyond_member_declaration():
         )
 
 
-# @matrix files : ooxml policy
 def test_ooxml_production_policy_defaults_are_fixed():
     policy = ooxml.OOXML_POLICY
 

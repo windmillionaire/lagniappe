@@ -1,0 +1,829 @@
+import { buttons } from "../../elements/buttons.ts";
+import { STYLES } from "../../generated/styles.mjs";
+import { Modal } from "../../shared/modal.ts";
+import { request } from "../../shared/request.ts";
+import { areEqual } from "../../shared/utilities.ts";
+import type { RequestResult } from "../../types/api.d.ts";
+import type {
+	FormFieldSchema,
+	FormReviewOperation,
+	FormRevisionResponse,
+	FormRevisionReviewOptions,
+	FormRevisionSource,
+	FormSchema,
+	FormSubmission,
+} from "../../types/forms.d.ts";
+import type { FormWidget } from "../../widgets/base/formWidget.ts";
+import { compatibleField } from "../representation.ts";
+import { renderReviewBar } from "../reviewBar.ts";
+import { loadRevisionPreview } from "./preview.ts";
+import type {
+	EditReconciler,
+	FormRevisionState,
+	RevisionMarker,
+} from "./reconciler.ts";
+
+interface ReviewSource {
+	id: FormRevisionSource;
+	label: string;
+	schema?: FormSchema | null;
+	submission: FormSubmission;
+	fields?: string[];
+	baseline?: FormSubmission | null;
+}
+
+interface ReviewChoice {
+	source: FormRevisionSource;
+	label: string;
+	compatible: boolean;
+	value: HTMLElement;
+}
+
+interface ReviewDifference {
+	id: string;
+	label: string;
+	choices: ReviewChoice[];
+}
+
+interface ReviewElement {
+	elt?: HTMLElement | null;
+	hasSubmission?: boolean;
+}
+
+type AutofillRefineResponse = Omit<
+	RequestResult<{
+		message: string;
+		operation: string;
+		revision: number;
+		scope: string;
+		blocks_edit: boolean;
+	}>,
+	"status"
+> & { status?: number | FormReviewOperation | null };
+
+export class FormRevisionModal extends Modal {
+	declare reconciler: EditReconciler;
+	declare marker: RevisionMarker;
+	declare widget: FormWidget;
+	declare state: FormRevisionState;
+	declare blockedAction: FormRevisionReviewOptions["blockedAction"];
+	declare selections: Map<string, FormRevisionSource>;
+	declare sources: [ReviewSource, ReviewSource, ...ReviewSource[]];
+	declare openReview: ReturnType<FormRevisionModal["_reviewSnapshot"]>;
+	declare openSnapshot: string;
+
+	constructor(
+		reconciler: EditReconciler,
+		marker: RevisionMarker,
+		widget: FormWidget,
+		state: FormRevisionState,
+		{ blockedAction = null }: FormRevisionReviewOptions = {},
+	) {
+		super(
+			reconciler.view,
+			marker.querySelector<HTMLButtonElement>("[data-role='edited-reset']"),
+		);
+		this.reconciler = reconciler;
+		this.marker = marker;
+		this.widget = widget;
+		this.state = state;
+		this.blockedAction = blockedAction;
+		this.selections = new Map();
+		this.openReview = this._reviewSnapshot();
+		this.openSnapshot = widget.revisionSnapshot();
+	}
+
+	_reviewSnapshot() {
+		const response = this.state.response;
+		if (!response) return null;
+		const review = response.form_state ?? {};
+		return structuredClone({
+			schema: response.schema,
+			submission: response.submission,
+			revision: review.revision,
+			reviews: review.reviews,
+			queued: this.state.record?.id,
+		});
+	}
+
+	async _isCurrent() {
+		await Promise.all([this.state.probePromise, this.state.conflictPromise]);
+		return (
+			areEqual(this.openReview, this._reviewSnapshot()) &&
+			this.widget.revisionSnapshot() === this.openSnapshot
+		);
+	}
+
+	_schemaSummary() {
+		const before = new Map(
+			(this.state.record?.renderer_schema ?? this.widget.schema ?? []).map(
+				(field) => [field?.id, field],
+			),
+		);
+		const after = new Map(
+			(this.state.response?.schema ?? []).map((field) => [field?.id, field]),
+		);
+		const added = [...after.keys()].filter((id) => id && !before.has(id));
+		const removed = [...before.keys()].filter((id) => id && !after.has(id));
+		const changed = [...after.keys()].filter(
+			(id) => id && before.has(id) && !areEqual(before.get(id), after.get(id)),
+		);
+		const parts = [];
+		if (added.length) parts.push(`${added.length} added`);
+		if (removed.length) parts.push(`${removed.length} removed`);
+		if (changed.length) parts.push(`${changed.length} changed`);
+		return parts.length ? `Schema update: ${parts.join(", ")}.` : null;
+	}
+
+	_value(element?: ReviewElement) {
+		const rendered = element?.elt?.cloneNode(true) as HTMLElement | undefined;
+		if (!rendered || element?.hasSubmission === false) {
+			const empty = document.createElement("p");
+			empty.className = "text-sm italic text-base-medium";
+			empty.textContent = "Empty";
+			return empty;
+		}
+
+		const label = rendered.matches?.("[data-role='label']")
+			? rendered
+			: rendered.querySelector?.("[data-role='label']");
+		label?.remove();
+		rendered.removeAttribute?.("id");
+		rendered.querySelectorAll?.("[id]").forEach((node) => {
+			node.removeAttribute("id");
+		});
+		rendered.querySelectorAll?.("button").forEach((button) => {
+			button.remove();
+		});
+		for (const node of [
+			rendered,
+			...rendered.querySelectorAll<HTMLElement>("[data-visible]"),
+		]) {
+			node.dataset.visible = "true";
+		}
+		return rendered;
+	}
+
+	async _differences(
+		localResponse: FormRevisionResponse,
+	): Promise<ReviewDifference[]> {
+		const response = this.state.response;
+		if (!response) return [];
+		const localSnapshot = this.state.record
+			? (this.state.record.renderer_submission ?? {})
+			: (this.widget.captureFormState().renderer_submission ?? {});
+		const localSubmission = {
+			...localResponse.submission,
+			...localSnapshot,
+		};
+		const state = response.form_state ?? {};
+		this.sources = [
+			{
+				id: "local",
+				label: this.state.record ? "Queued value" : "Value in this tab",
+				schema: this.state.record?.renderer_schema ?? this.widget.schema,
+				submission: localSubmission,
+			},
+			{
+				id: "server",
+				label: "Latest saved value",
+				schema: response.schema,
+				submission: response.submission ?? {},
+			},
+			...(state.reviews ?? []).map(
+				(review): ReviewSource => ({
+					id: `ai:${review.operation}`,
+					label: review.private ? "Revised suggestion" : "Autofill suggestion",
+					...review,
+				}),
+			),
+		];
+		const previews = await Promise.all(
+			this.sources.map((source) =>
+				loadRevisionPreview(
+					this.widget,
+					{
+						...response,
+						schema: source.schema,
+						submission: source.submission,
+					},
+					{ readonly: true },
+				),
+			),
+		);
+		try {
+			const rendered = previews.map((preview) => {
+				if (!preview) throw new Error("Could not render form review values");
+				return new Map(
+					Array.from(preview.form?.renderer?.elements?.values?.() ?? []).map(
+						(element) => [element.schema?.id, element],
+					),
+				);
+			});
+			const fields = [
+				...new Map(
+					this.sources
+						.flatMap((source) => source.schema ?? [])
+						.map((field) => [field.id, field]),
+				).values(),
+			];
+			const reviews = state.reviews ?? [];
+			const savedChangedSinceLaunch = (field: FormFieldSchema) =>
+				reviews.some(
+					(review) =>
+						review.saved_baseline &&
+						!this._sameValue(
+							this.sources[1].submission[field.id],
+							review.saved_baseline[field.id],
+							field,
+						),
+				);
+			return fields
+				.filter((field) => {
+					if (!field?.id) return false;
+					const suggestedChange = reviews.some(
+						(review) =>
+							review.fields?.includes(field.id) &&
+							!this._sameValue(
+								review.baseline?.[field.id],
+								review.submission?.[field.id],
+								field,
+							),
+					);
+					if (suggestedChange) return true;
+					if (reviews.length && !this.state.record) {
+						// An existing local draft is context, not a new AI or remote value.
+						const localField = this.sources[0].schema?.find(
+							(item) => item.id === field.id,
+						);
+						const savedField = this.sources[1].schema?.find(
+							(item) => item.id === field.id,
+						);
+						return (
+							savedChangedSinceLaunch(field) ||
+							!compatibleField(localField, savedField)
+						);
+					}
+					return this.sources.some(
+						(source) =>
+							(!source.fields || source.fields.includes(field.id)) &&
+							source.schema?.some((item) => item.id === field.id) &&
+							(!this._sameValue(
+								source.submission[field.id],
+								this.sources[1].submission[field.id],
+								field,
+							) ||
+								!compatibleField(
+									source.schema.find((item) => item.id === field.id),
+									this.sources[1].schema?.find((item) => item.id === field.id),
+								)),
+					);
+				})
+				.map((field) => ({
+					id: field.id,
+					label: field.title || field.label || "Untitled field",
+					choices: this.sources
+						.flatMap((source, index) => {
+							if (source.fields && !source.fields.includes(field.id)) return [];
+							if (
+								source.id === "server" &&
+								((reviews.length &&
+									!this.state.record &&
+									!savedChangedSinceLaunch(field) &&
+									compatibleField(
+										this.sources[0].schema?.find(
+											(item) => item.id === field.id,
+										),
+										source.schema?.find((item) => item.id === field.id),
+									)) ||
+									(this._sameValue(
+										source.submission[field.id],
+										this.sources[0].submission[field.id],
+										field,
+									) &&
+										compatibleField(
+											this.sources[0].schema?.find(
+												(item) => item.id === field.id,
+											),
+											source.schema?.find((item) => item.id === field.id),
+										)) ||
+									(!savedChangedSinceLaunch(field) &&
+										this.sources.some(
+											(candidate) =>
+												candidate.id.startsWith("ai:") &&
+												candidate.fields?.includes(field.id) &&
+												this._sameValue(
+													source.submission[field.id],
+													candidate.submission[field.id],
+													field,
+												) &&
+												compatibleField(
+													candidate.schema?.find(
+														(item) => item.id === field.id,
+													),
+													source.schema?.find((item) => item.id === field.id),
+												),
+										)))
+							)
+								return [];
+							const definition = source.schema?.find(
+								(item) => item.id === field.id,
+							);
+							if (!definition) return [];
+							if (
+								source.id.startsWith("ai:") &&
+								savedChangedSinceLaunch(field) &&
+								this._sameValue(
+									source.submission[field.id],
+									this.sources[1].submission[field.id],
+									field,
+								) &&
+								compatibleField(
+									definition,
+									this.sources[1].schema?.find((item) => item.id === field.id),
+								)
+							)
+								return [];
+							if (
+								source.id.startsWith("ai:") &&
+								this._sameValue(
+									source.baseline?.[field.id],
+									source.submission[field.id],
+									field,
+								) &&
+								this._sameValue(
+									source.submission[field.id],
+									this.sources[0].submission[field.id],
+									field,
+								) &&
+								compatibleField(
+									definition,
+									this.sources[0].schema?.find((item) => item.id === field.id),
+								)
+							)
+								return [];
+							return [
+								{
+									source: source.id,
+									label: source.label,
+									compatible:
+										source.id === "server" ||
+										compatibleField(
+											definition,
+											this.sources[1].schema?.find(
+												(item) => item.id === field.id,
+											),
+										),
+									value: this._value(rendered[index].get(field.id)),
+								},
+							];
+						})
+						.sort((left, right) => {
+							const rank = (source: FormRevisionSource) => {
+								if (source === "local") return 0;
+								if (source.startsWith("ai:")) return 1;
+								if (source === "server") return 2;
+								return 3;
+							};
+							return rank(left.source) - rank(right.source);
+						}),
+				}));
+		} finally {
+			previews.forEach((preview) => {
+				preview?.destroy?.();
+			});
+		}
+	}
+
+	_sameValue(
+		left: unknown,
+		right: unknown,
+		field: FormFieldSchema | null = null,
+	) {
+		const comparable = (value: unknown) => {
+			if (
+				value == null ||
+				value === "" ||
+				(Array.isArray(value) && !value.length)
+			)
+				return null;
+			if (
+				typeof value === "object" &&
+				Object.keys(value).length === 1 &&
+				(("rows" in value && Array.isArray(value.rows) && !value.rows.length) ||
+					("items" in value &&
+						Array.isArray(value.items) &&
+						!value.items.length))
+			)
+				return null;
+			if (
+				field?.type === "input" &&
+				field.input === "number" &&
+				(typeof value === "string" || typeof value === "number") &&
+				Number.isFinite(Number(value))
+			)
+				return Number(value);
+			return value;
+		};
+		return areEqual(comparable(left), comparable(right));
+	}
+
+	_choice(
+		field: ReviewDifference,
+		{ source, label, compatible, value }: ReviewChoice,
+	) {
+		const button = document.createElement(compatible ? "button" : "div");
+		if (compatible) {
+			button.setAttribute("type", "button");
+			button.setAttribute("role", "radio");
+			button.setAttribute(
+				"aria-checked",
+				(source === this.selections.get(field.id)).toString(),
+			);
+		} else button.dataset.role = "incompatible-value";
+		button.setAttribute("aria-label", `${label} for ${field.label}`);
+		button.dataset.revisionSource = source;
+		button.className =
+			"min-w-0 rounded-md border border-base-light/50 bg-white p-3 text-left transition-colors hover:bg-base-bg aria-checked:bg-kind-bg aria-checked:outline-2 aria-checked:outline-kind-default";
+
+		const heading = button.appendChild(document.createElement("span"));
+		heading.className = "mb-2 block text-xs font-semibold text-base-medium";
+		heading.textContent = label;
+		button.appendChild(value);
+		if (!compatible) {
+			const explanation = button.appendChild(document.createElement("p"));
+			explanation.className = "mt-2 text-xs text-base-medium";
+			explanation.textContent =
+				"This field changed type or was removed. Keep this earlier value for reference and re-enter it in the updated form if needed.";
+			return button;
+		}
+
+		button.addEventListener("click", () => {
+			const group = button.closest("[role='radiogroup']");
+			group?.querySelectorAll("[role='radio']").forEach((choice) => {
+				choice.setAttribute("aria-checked", (choice === button).toString());
+			});
+			this.selections.set(field.id, source);
+		});
+		return button;
+	}
+
+	async init() {
+		const response = this.state.response;
+		if (!response) return false;
+		const local = this.state.record
+			? this.widget.buildLocalRevision(response, this.state.record)
+			: this.widget.buildLocalRevision(response);
+		const differences = await this._differences(local.response);
+		if (!differences.length && !this.state.response?.form_state) return false;
+		const noNewAutofillValues =
+			!differences.length &&
+			!this.blockedAction &&
+			!this.state.record &&
+			!!this.state.response?.form_state?.reviews?.length;
+		const saved = this.sources[1];
+		// An AI value can depend on a different saved field, so a post-launch
+		// context edit makes every proposal opt-in, not only the edited field.
+		const savedContextChanged =
+			this.state.response?.form_state?.reviews?.some((review) => {
+				const savedBaseline = review.saved_baseline;
+				if (!savedBaseline) return false;
+				const fields = new Map(
+					[...(review.schema ?? []), ...(saved.schema ?? [])]
+						.filter((field) => field?.id)
+						.map((field) => [field.id, field]),
+				);
+				return [...fields.values()].some(
+					(field) =>
+						!this._sameValue(
+							saved.submission[field.id],
+							savedBaseline[field.id],
+							field,
+						),
+				);
+			}) ?? false;
+		for (const field of differences) {
+			const localChoice = field.choices.find(
+				(choice) => choice.source === "local" && choice.compatible,
+			);
+			const serverChoice = field.choices.find(
+				(choice) => choice.source === "server" && choice.compatible,
+			);
+			const aiChoice = field.choices.findLast(
+				(choice) => choice.compatible && choice.source.startsWith("ai:"),
+			);
+			const baseline = this.widget._baselineSubmission;
+			const changedLocally =
+				this.state.record ||
+				(baseline &&
+					!this._sameValue(
+						this.sources[0].submission[field.id] ?? null,
+						baseline[field.id] ?? null,
+					));
+			let defaultSource =
+				aiChoice?.source ?? serverChoice?.source ?? localChoice?.source;
+			if (savedContextChanged)
+				defaultSource =
+					serverChoice?.source ??
+					(localChoice?.compatible ? "local" : defaultSource);
+			if (localChoice?.compatible && changedLocally) defaultSource = "local";
+			if (defaultSource) this.selections.set(field.id, defaultSource);
+		}
+
+		const modal = document.createElement("div");
+		modal.id = "modal";
+		modal.className = STYLES.modal.wrapper;
+		modal.dataset.kind =
+			this.widget.kind ||
+			this.widget.component?.kind ||
+			this.reconciler.view.kind ||
+			"default";
+		const content = modal.appendChild(document.createElement("div"));
+		content.id = "modal-content";
+		content.className = `${STYLES.modal.content} w-full sm:max-w-3xl`;
+
+		const header = content.appendChild(document.createElement("header"));
+		header.className = STYLES.modal.header;
+		const title = header.appendChild(document.createElement("h2"));
+		title.className = "text-lg font-bold text-base-dark";
+		title.textContent =
+			this.blockedAction === "autofill"
+				? "Review changes before autofill"
+				: noNewAutofillValues
+					? "Autofill is complete"
+					: "Choose form values";
+		const close = header.appendChild(document.createElement("button"));
+		close.type = "button";
+		close.setAttribute("lp-control", "close");
+		close.className = STYLES.button.close;
+		close.textContent = "Close";
+
+		const body = content.appendChild(document.createElement("div"));
+		body.className = "space-y-4 p-4 sm:p-6";
+		const intro = body.appendChild(document.createElement("p"));
+		intro.className = "text-sm text-base-medium";
+		intro.textContent =
+			this.blockedAction === "autofill"
+				? "Autofill did not start because the saved form changed. Choose which values to keep, then select Use selected values and start Autofill again. Use Update first if you want to save your choices."
+				: noNewAutofillValues
+					? "No new form values were suggested. Keep your current values or revise the result below. Use Update afterward to acknowledge this review."
+					: "Choose the values to keep. This updates your open form only; use Update afterward to save. Earlier values whose field type changed are shown for reference.";
+		if (
+			differences.some((field) =>
+				field.choices.some((choice) => !choice.compatible),
+			)
+		)
+			intro.textContent +=
+				" Applying these choices drops incompatible draft values from the updated form. Copy any earlier values you need before continuing.";
+		const schemaSummary = this._schemaSummary();
+		if (schemaSummary) {
+			const schema = body.appendChild(document.createElement("p"));
+			schema.className = STYLES.message;
+			schema.textContent = schemaSummary;
+		}
+		const fields = body.appendChild(document.createElement("div"));
+		fields.className = "space-y-4";
+		for (const field of differences) {
+			const row = fields.appendChild(document.createElement("section"));
+			row.className = "rounded-md border border-base-light/50 bg-base-bg p-3";
+			const label = row.appendChild(document.createElement("h3"));
+			label.className = "mb-2 font-semibold text-base-dark";
+			label.textContent = field.label;
+			const choices = row.appendChild(document.createElement("div"));
+			if (field.choices.some((choice) => choice.compatible))
+				choices.setAttribute("role", "radiogroup");
+			choices.setAttribute("aria-label", field.label);
+			choices.className = "grid gap-2 sm:grid-cols-2";
+			choices.append(
+				...field.choices.map((choice) => this._choice(field, choice)),
+			);
+		}
+		if (!differences.length && !noNewAutofillValues) {
+			const noChanges = fields.appendChild(document.createElement("p"));
+			noChanges.textContent =
+				"The available values already match. You can revise them with a prompt below.";
+		}
+		this._refinement(body);
+		const actions = body.appendChild(document.createElement("div"));
+		actions.className = "flex w-full";
+		const updateAction = buttons.active({
+			type: "button",
+			text: noNewAutofillValues ? "Keep current values" : "Use selected values",
+			processingText: "Applying values…",
+		});
+		const update = actions.appendChild(updateAction.element);
+
+		update.addEventListener("click", async () => {
+			updateAction.activate();
+			try {
+				if (!(await this._isCurrent())) {
+					intro.textContent =
+						"The form changed while this review was open. Close and reopen Review to compare the latest values.";
+					return;
+				}
+				await this.reconciler.resolveRevision(this.marker, {
+					localResponse: local.response,
+					selections: Object.fromEntries(this.selections),
+					selectedSubmission: this._selectedSubmission(),
+				});
+				await this.remove();
+			} finally {
+				updateAction.deactivate();
+			}
+		});
+
+		await super.attach(modal, this.widget.component);
+		update.focus();
+		return true;
+	}
+
+	_selectedSubmission() {
+		const response = this.state.response;
+		if (!response) return {};
+		const review = response.form_state ?? {};
+		const preserveTabDraft = !this.state.record && review.reviews?.length;
+		const submission = structuredClone(
+			preserveTabDraft
+				? this.sources[0].submission
+				: (response.submission ?? {}),
+		);
+		for (const [id, sourceId] of this.selections) {
+			const source = this.sources.find(
+				(candidate) => candidate.id === sourceId,
+			);
+			if (
+				!source ||
+				!compatibleField(
+					source.schema?.find((field) => field.id === id),
+					response.schema?.find((field) => field.id === id),
+				)
+			)
+				continue;
+			if (Object.hasOwn(source.submission, id))
+				submission[id] = structuredClone(source.submission[id]);
+			else delete submission[id];
+		}
+		const currentIds = new Set(
+			(response.schema ?? []).map((field) => field.id),
+		);
+		return Object.fromEntries(
+			Object.entries(submission).filter(([id]) => currentIds.has(id)),
+		);
+	}
+
+	_refinement(body: HTMLElement) {
+		const review = this.state.response?.form_state;
+		const url = review?.refine_url;
+		if (!url || this.state.record || !review.reviews?.length) return;
+		const section = body.appendChild(document.createElement("section"));
+		section.className = "space-y-2";
+		const label = section.appendChild(document.createElement("label"));
+		label.className = "block text-sm font-semibold";
+		label.append("Revise these values");
+		const prompt = label.appendChild(document.createElement("textarea"));
+		prompt.setAttribute("aria-label", "Revise these values with AI");
+		prompt.className =
+			"mt-2 block w-full rounded-md border border-base-light p-2 text-sm";
+		prompt.placeholder = "Describe what to add, correct, or reorganize…";
+		const reviseAction = buttons.active({
+			type: "button",
+			icon: "generate",
+			text: "Revise suggestions",
+			processingText: "Revising suggestions…",
+			style: `${STYLES.button.submit} review-revise-action`,
+		});
+		const button = section.appendChild(reviseAction.element);
+		button.setAttribute("aria-label", "Revise suggestions with AI");
+		const message = section.appendChild(document.createElement("p"));
+		message.setAttribute("role", "status");
+		message.className = "text-sm text-base-medium";
+		message.textContent =
+			"Suggestions stay private to you until you save the form. No file is required.";
+		button.addEventListener("click", async () => {
+			if (!prompt.value.trim()) return;
+			if (!(await this._isCurrent())) {
+				message.textContent =
+					"The form changed. Close and reopen Review before revising.";
+				return;
+			}
+			reviseAction.activate();
+			try {
+				const operationId = this.widget.view?.operationId?.();
+				if (!operationId)
+					throw new Error("Could not identify the review operation");
+				const data = new FormData();
+				data.set("autofill-description", prompt.value);
+				data.set(
+					"form-revision",
+					String(this.state.response?.form_state?.revision),
+				);
+				data.set("operation-id", operationId);
+				data.set("submission", JSON.stringify(this._selectedSubmission()));
+				const response: AutofillRefineResponse | undefined = await request.post(
+					url,
+					data,
+				);
+				if (!response?.ok) {
+					message.textContent =
+						response?.message ||
+						response?.error ||
+						"The form changed or suggestions could not be started. Your choices were kept.";
+					return;
+				}
+				const status =
+					typeof response.status === "object" ? response.status : undefined;
+				this.widget.lockDeferredOperation({ ...response, status });
+				renderReviewBar(this.widget, status);
+				const manager = await this.widget.view?.ensureDeferredOperations?.();
+				if (response.operation)
+					manager?.track(response.operation, {
+						node: this.widget.target,
+						status,
+						revision: response.revision,
+					});
+				await this.remove();
+			} catch {
+				message.textContent =
+					"Suggestions could not be started. Your choices were kept; please try again.";
+			} finally {
+				reviseAction.deactivate();
+			}
+		});
+	}
+}
+
+export class WholeFormRevisionModal extends Modal {
+	declare reconciler: EditReconciler;
+	declare marker: RevisionMarker;
+	declare widget: FormWidget;
+
+	constructor(
+		reconciler: EditReconciler,
+		marker: RevisionMarker,
+		widget: FormWidget,
+	) {
+		super(
+			reconciler.view,
+			marker.querySelector<HTMLButtonElement>("[data-role='edited-reset']"),
+		);
+		this.reconciler = reconciler;
+		this.marker = marker;
+		this.widget = widget;
+	}
+
+	async init() {
+		const modal = document.createElement("div");
+		modal.id = "modal";
+		modal.className = STYLES.modal.wrapper;
+		modal.dataset.kind =
+			this.widget.kind ||
+			this.widget.component?.kind ||
+			this.reconciler.view.kind ||
+			"default";
+		const content = modal.appendChild(document.createElement("div"));
+		content.id = "modal-content";
+		content.className = `${STYLES.modal.content} w-full sm:max-w-lg`;
+
+		const header = content.appendChild(document.createElement("header"));
+		header.className = STYLES.modal.header;
+		const title = header.appendChild(document.createElement("h2"));
+		title.className = "text-lg font-bold text-base-dark";
+		title.textContent = "Choose form version";
+		const close = header.appendChild(document.createElement("button"));
+		close.type = "button";
+		close.setAttribute("lp-control", "close");
+		close.className = STYLES.button.close;
+		close.textContent = "Close";
+
+		const body = content.appendChild(document.createElement("div"));
+		body.className = "space-y-4 p-4 sm:p-6";
+		const copy = body.appendChild(document.createElement("p"));
+		copy.className = "text-sm text-base-medium";
+		copy.textContent =
+			"This form cannot be compared field by field. Use the saved version or retry the complete queued version.";
+
+		const actions = body.appendChild(document.createElement("div"));
+		actions.className =
+			"flex flex-col-reverse gap-2 sm:flex-row sm:justify-end";
+		const retry = actions.appendChild(document.createElement("button"));
+		retry.type = "button";
+		retry.className = STYLES.button.cancel;
+		retry.textContent = "Retry queued version";
+		const saved = actions.appendChild(document.createElement("button"));
+		saved.type = "button";
+		saved.className = STYLES.button.submit;
+		saved.textContent = "Use saved version";
+
+		retry.addEventListener("click", async () => {
+			await this.reconciler.resolveRevision(this.marker, "local");
+			await this.remove();
+		});
+		saved.addEventListener("click", async () => {
+			await this.reconciler.resolveRevision(this.marker, "server");
+			await this.remove();
+		});
+
+		await super.attach(modal, this.widget.component);
+		saved.focus();
+	}
+}

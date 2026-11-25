@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Union
 from lagniappe.core.definitions import General, Levels
 
 from . import Pages, Categories, Projects, Groups
@@ -8,7 +7,7 @@ from . import Pages, Categories, Projects, Groups
 @dataclass
 class PermissionDefinition:
     definition: list[
-        tuple[Union[Pages, Categories, Projects, Groups, General], Levels]
+        tuple[Pages | Categories | Projects | Groups | General, Levels]
     ] = field(default_factory=list)
     permissions: dict = field(default_factory=dict)
     initialized: bool = False

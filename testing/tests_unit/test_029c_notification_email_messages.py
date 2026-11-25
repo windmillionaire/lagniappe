@@ -1,6 +1,6 @@
 """Direct-message notification-email quiet-window contracts."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 from google.cloud.datastore import Entity as DatastoreEntity
 import pytest
@@ -20,9 +20,8 @@ from testing.utility.notification_email_fakes import (
 pytestmark = pytest.mark.unit
 
 
-# @matrix notification-email : clear-suppression hide-suppression latest-only message quiet-window read-suppression reply-suppression
 def test_immediate_messages_wait_for_conversation_quiet(monkeypatch):
-    now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 8, 15, 12, tzinfo=UTC)
     store = MemoryDatastore()
     monkeypatch.setattr(email_database.DATA, "_datastore_client", store)
     monkeypatch.setattr(email_presentation.CONFIG, "APP_NAME", "Test Lagniappe")

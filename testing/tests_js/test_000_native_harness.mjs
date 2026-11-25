@@ -39,7 +39,7 @@ test("test_indexeddb_commits_binary_payloads_and_aborts_changes", async (t) => {
 	createBrowser(t, { formData: "native" });
 	const factory = installIndexedDB(t);
 	assert.equal(window.indexedDB, factory);
-	const storage = await import("../../src/script/shared/offline.mjs");
+	const storage = await import("../../src/script/shared/offline.ts");
 	const file = new File(["payload"], "upload.txt", { type: "text/plain" });
 	await storage.setOfflineMutation({
 		id: "kept",
@@ -106,7 +106,7 @@ test("test_request_parses_server_html_through_mocked_fetch", async (t) => {
 			});
 		}
 	});
-	const { request } = await import("../../src/script/shared/request.mjs");
+	const { request } = await import("../../src/script/shared/request.ts");
 	const response = await request.get("/example");
 	assert.equal(response.ok, true);
 	assert.equal(response.html.querySelector("p").textContent, "Saved");
@@ -127,7 +127,7 @@ test("test_unmocked_queue_graph_imports_with_browser_environment", async (t) => 
 	createBrowser(t);
 	installIndexedDB(t);
 	const { OfflineQueue } = await import(
-		"../../src/script/shared/offlineQueue.mjs"
+		"../../src/script/shared/offlineQueue.ts"
 	);
 	const queue = new OfflineQueue({ online: false, components: {} });
 	await queue.init();
@@ -135,7 +135,6 @@ test("test_unmocked_queue_graph_imports_with_browser_environment", async (t) => 
 	assert.equal(await queue.replay(), 0);
 });
 
-/** @pair style-build:runtime-parity */
 test("test_registry_generation_is_idempotent_and_repairs_missing_outputs", async () => {
 	const { generateStyleModules, STYLE_PIPELINE } = await import(
 		"../../build/utility.mjs"
@@ -168,7 +167,7 @@ test("test_registry_generation_is_idempotent_and_repairs_missing_outputs", async
 
 test("test_generated_styles_and_icons_render_a_real_button", async (t) => {
 	createBrowser(t);
-	const { buttons } = await import("../../src/script/elements/buttons.mjs");
+	const { buttons } = await import("../../src/script/elements/buttons.ts");
 	const { STYLES } = await import("../../src/script/generated/styles.mjs");
 	const button = buttons.default({ text: "Create page", icon: "page" });
 	assert.equal(button.className, STYLES.button.submit);

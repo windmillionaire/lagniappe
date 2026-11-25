@@ -80,10 +80,9 @@ async function waitForRequests(tx, count) {
 	throw new Error(`Expected ${count} requests, received ${tx.requests.length}`);
 }
 
-/** @matrix offline sync : connection-lifecycle multi-delete readonly-result transaction-commit */
 test("test_indexeddb_operations_resolve_only_after_transaction_commit", async (t) => {
 	const { db, state } = createIndexedDB(t);
-	const offline = await import("../../src/script/shared/offline.mjs");
+	const offline = await import("../../src/script/shared/offline.ts");
 	let writeSettled = false;
 	const write = offline.setOfflineMutation({ id: "mutation-1" }).then(() => {
 		writeSettled = true;
@@ -132,11 +131,10 @@ test("test_indexeddb_operations_resolve_only_after_transaction_commit", async (t
 	assert.equal(deleteSettled, true);
 });
 
-/** @matrix offline sync : connection-lifecycle error-ownership transaction-abort */
 test("test_indexeddb_abort_and_errors_reject_once_and_close_the_database", async (t) => {
 	{
 		const { state } = createIndexedDB(t);
-		const offline = await import("../../src/script/shared/offline.mjs");
+		const offline = await import("../../src/script/shared/offline.ts");
 		const aborted = new Error("commit aborted");
 		const pending = offline.setOfflineMutation({ id: "mutation-1" });
 		const tx = await waitForTransaction(state);
@@ -156,7 +154,7 @@ test("test_indexeddb_abort_and_errors_reject_once_and_close_the_database", async
 	}
 	{
 		const { state } = createIndexedDB(t);
-		const offline = await import("../../src/script/shared/offline.mjs");
+		const offline = await import("../../src/script/shared/offline.ts");
 		const requestError = new Error("request failed");
 		const pending = offline.setOfflineMutation({ id: "mutation-2" });
 		const tx = await waitForTransaction(state);
@@ -177,7 +175,7 @@ test("test_indexeddb_abort_and_errors_reject_once_and_close_the_database", async
 	}
 	{
 		const { db, state } = createIndexedDB(t);
-		const offline = await import("../../src/script/shared/offline.mjs");
+		const offline = await import("../../src/script/shared/offline.ts");
 		const pending = offline.getOfflineMutations();
 		await waitForTransaction(state);
 		db.onclose?.();
@@ -190,11 +188,10 @@ test("test_indexeddb_abort_and_errors_reject_once_and_close_the_database", async
 	}
 });
 
-/** @matrix offline sync : error-ownership executor-error transaction-abort */
 test("test_indexeddb_executor_failures_abort_and_preserve_the_original_error", async (t) => {
 	for (const operation of ["set", "get"]) {
 		const { state } = createIndexedDB(t);
-		const offline = await import("../../src/script/shared/offline.mjs");
+		const offline = await import("../../src/script/shared/offline.ts");
 		const original = new Error(`${operation} executor`);
 		state.executorError = original;
 		const pending =
@@ -228,7 +225,7 @@ async function setupEditor(t) {
 		put: (...args) => put(...args),
 	};
 	const { IndependentDocument } = await esmock.strict(
-		"../../src/script/elements/editor/independent.mjs",
+		"../../src/script/elements/editor/independent.ts",
 		{
 			"../../src/script/generated/styles.mjs": {
 				STYLES: {
@@ -237,18 +234,18 @@ async function setupEditor(t) {
 					message: "message",
 				},
 			},
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError(error) {
 					throw new Error(`Unexpected capture: ${error.message}`);
 				},
 			},
-			"../../src/script/shared/request.mjs": { request },
-			"../../src/script/elements/editor/editor.mjs": {
+			"../../src/script/shared/request.ts": { request },
+			"../../src/script/elements/editor/editor.ts": {
 				independentEditor() {
 					throw new Error("Editor factory was not stubbed");
 				},
 			},
-			"../../src/script/elements/editor/toolbar.mjs": { Toolbar: class {} },
+			"../../src/script/elements/editor/toolbar.ts": { Toolbar: class {} },
 		},
 	);
 	const statusElement = () => {
@@ -298,33 +295,32 @@ async function setupEditor(t) {
 }
 
 async function loadToolbar() {
-	return await esmock.strict("../../src/script/elements/editor/toolbar.mjs", {
+	return await esmock.strict("../../src/script/elements/editor/toolbar.ts", {
 		"../../src/script/generated/styles.mjs": { STYLES: {} },
-		"../../src/script/shared/transitions.mjs": {
+		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
-		"../../src/script/shared/utilities.mjs": {
+		"../../src/script/shared/utilities.ts": {
 			debounce: (callback) => Object.assign(callback, { cancel() {} }),
 		},
-		"../../src/script/elements/editor/config.mjs": {
+		"../../src/script/elements/editor/config.ts": {
 			TOOLBAR_MENUS: {},
 			TOOLBAR_TOOLS: [],
 		},
-		"../../src/script/elements/editor/dropdowns.mjs": {
+		"../../src/script/elements/editor/dropdowns.ts": {
 			toolbarDropdown() {},
 		},
-		"../../src/script/elements/editor/options/markdownPaste.mjs": {
+		"../../src/script/elements/editor/options/markdownPaste.ts": {
 			MarkdownPastePrompt: class {},
 		},
-		"../../src/script/elements/editor/options/registry.mjs": {
+		"../../src/script/elements/editor/options/registry.ts": {
 			FORM_REGISTRY: {},
 			OPTION_REGISTRY: {},
 		},
-		"../../src/script/elements/editor/users.mjs": { UserManager: class {} },
+		"../../src/script/elements/editor/users.ts": { UserManager: class {} },
 	});
 }
 
-/** @matrix editor html-field : listener-teardown builder-save */
 test("test_editor_teardown_releases_toolbar_before_editor_view", async (t) => {
 	const env = await setupEditor(t);
 	const { document: owner } = env.makeDocument();
@@ -370,7 +366,6 @@ test("test_editor_teardown_releases_toolbar_before_editor_view", async (t) => {
 	assert.equal(cancellations, 2);
 });
 
-/** @matrix editor html-field : authoritative-content error-reporting initial-load retry */
 test("test_independent_editor_failed_load_stays_inert_and_retries", async (t) => {
 	const env = await setupEditor(t);
 	const owner = new env.IndependentDocument({
@@ -413,7 +408,6 @@ test("test_independent_editor_failed_load_stays_inert_and_retries", async (t) =>
 	);
 });
 
-/** @matrix editor html-field : error-reporting retry server-acknowledgement */
 test("test_independent_editor_failed_save_stays_dirty_and_retries", async (t) => {
 	const env = await setupEditor(t);
 	const { document: owner, setCurrent } = env.makeDocument();
@@ -439,7 +433,6 @@ test("test_independent_editor_failed_save_stays_dirty_and_retries", async (t) =>
 	);
 });
 
-/** @matrix editor html-field : concurrent-edit keepalive serialized-save server-acknowledgement */
 test("test_independent_editor_serializes_inflight_edits_and_acknowledges_in_order", async (t) => {
 	const env = await setupEditor(t);
 	const { document: owner, setCurrent } = env.makeDocument();
@@ -476,7 +469,6 @@ test("test_independent_editor_serializes_inflight_edits_and_acknowledges_in_orde
 	assert.equal(env.requests.put.at(-1)[2].keepalive, false);
 });
 
-/** @matrix editor html-field : intentional-clear server-acknowledgement */
 test("test_independent_editor_saves_intentional_clear", async (t) => {
 	const env = await setupEditor(t);
 	const { document: owner, setCurrent } = env.makeDocument();
@@ -499,13 +491,13 @@ function emptyClass() {
 }
 
 async function loadBuilder(connectivity) {
-	return await esmock.strict("../../src/script/views/builder/builder.mjs", {
-		"../../src/script/elements/combobox/search.mjs": {
+	return await esmock.strict("../../src/script/views/builder/builder.ts", {
+		"../../src/script/elements/combobox/search.ts": {
 			SearchBox: emptyClass(),
 		},
-		"../../src/script/elements/entityMenu.mjs": { EntityMenu: emptyClass() },
-		"../../src/script/shared/directUpload.mjs": { directUpload() {} },
-		"../../src/script/shared/index.mjs": {
+		"../../src/script/elements/entityMenu.ts": { EntityMenu: emptyClass() },
+		"../../src/script/shared/directUpload.ts": { directUpload() {} },
+		"../../src/script/shared/index.ts": {
 			captureError() {},
 			connectivity,
 			DeleteModal: emptyClass(),
@@ -514,44 +506,43 @@ async function loadBuilder(connectivity) {
 			OfflineModal: emptyClass(),
 			request: {},
 		},
-		"../../src/script/shared/transitions.mjs": {
+		"../../src/script/shared/transitions.ts": {
 			withTransition: (callback) => callback(),
 		},
-		"../../src/script/views/builder/changeStatus.mjs": {
+		"../../src/script/views/builder/changeStatus.ts": {
 			FormChangeStatus: emptyClass(),
 		},
-		"../../src/script/views/builder/conditions/loader.mjs": {
+		"../../src/script/views/builder/conditions/loader.ts": {
 			loadCondition: async () => null,
 		},
-		"../../src/script/views/builder/draft.mjs": { BuilderDraft: emptyClass() },
-		"../../src/script/views/builder/migrations.mjs": {
+		"../../src/script/views/builder/draft.ts": { BuilderDraft: emptyClass() },
+		"../../src/script/views/builder/migrations.ts": {
 			fieldKind: () => null,
 			needsMigration: () => false,
 			repairConditions() {},
 		},
-		"../../src/script/views/builder/panels/components.mjs": {
+		"../../src/script/views/builder/panels/components.ts": {
 			ComponentsPanel: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/condition.mjs": {
+		"../../src/script/views/builder/panels/condition.ts": {
 			ConditionPanel: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/elementSettings.mjs": {
+		"../../src/script/views/builder/panels/elementSettings.ts": {
 			ElementSettings: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/formSettings.mjs": {
+		"../../src/script/views/builder/panels/formSettings.ts": {
 			FormSettings: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/header.mjs": {
+		"../../src/script/views/builder/panels/header.ts": {
 			Header: emptyClass(),
 		},
-		"../../src/script/views/builder/panels/model.mjs": {
+		"../../src/script/views/builder/panels/model.ts": {
 			ModelElement: {},
 			ModelPanel: emptyClass(),
 		},
 	});
 }
 
-/** @matrix editor html-field : teardown */
 test("test_builder_owns_independent_editor_lifecycle_flushes", async (t) => {
 	createBrowser(t);
 	const connectivity = { online: true };

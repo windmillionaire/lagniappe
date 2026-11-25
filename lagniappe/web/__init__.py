@@ -7,18 +7,29 @@ the X-Lagniappe-Invalidate-Cache header that triggers service worker
 cache clearing.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask import Response
+    from flask.typing import ResponseReturnValue
+    from lagniappe import Config
+
 from datetime import timedelta
 import json
+import os
 import re
 from urllib.parse import urlsplit
 
-from flask import Flask, g, request, session
+from flask import Flask, abort, g, jsonify, request, session
 from flask_wtf.csrf import CSRFProtect
 
 from lagniappe import CONFIG
 from lagniappe.core.exceptions.request import filter_sentry_event, sanitize_sentry_event
 from lagniappe.core.tools import cache
 
+from . import auth
 from .start import initialize_app
 
 
@@ -41,11 +52,7 @@ if CONFIG.capture_errors:
     SENTRY_LOADED = True
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_flask_security_configuration_and_session_cookie_attributes
-# @matrix login session : cookie-hardening lifetime
-# @pair web-headers:security
-def configure_flask_security(flask_app, runtime_config=CONFIG):
+def configure_flask_security(flask_app: Flask, runtime_config: Config = CONFIG) -> None:
     """Apply the stable Flask session, cookie, and runtime-mode contract."""
     flask_app.config.update(
         USE_SESSION_FOR_NEXT=True,
@@ -73,7 +80,10 @@ initialize_measurements(app, CONFIG)
 
 csrf = CSRFProtect()
 csrf.init_app(app)
-initialize_app(app, csrf)
+_initialize_services = not (
+    CONFIG.testing and os.environ.get("LAGNIAPPE_OFFLINE_WEB_TEST") == "1"
+)
+initialize_app(app, csrf, initialize_services=_initialize_services)
 
 GOOGLE_IDENTITY_BASE = "https://accounts.google.com/gsi/"
 GOOGLE_IDENTITY_SCRIPT = f"{GOOGLE_IDENTITY_BASE}client"
@@ -113,9 +123,6 @@ CSP = "; ".join(
 )
 
 
-# @testable false
-# @covered-by lagniappe/web/__init__.py::add_lagniappe_headers
-# @reason local predicate for the response-header hook
 def _client_cache_invalidation_requested():
     invalidate = bool(session.get(CONFIG.LOGIN_INVALIDATE_CACHE_KEY))
     if invalidate and not session.get("_user_id"):
@@ -123,20 +130,52 @@ def _client_cache_invalidation_requested():
     return invalidate
 
 
-# @testable infrastructure
+DEMO_GUEST_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+DEMO_GUEST_ALLOWED_WRITE_ENDPOINTS = frozenset(
+    {
+        "users.logout",
+        "internal.update_session",
+        "internal.validate_user",
+        "internal.poll",
+        "internal.refresh",
+    }
+)
+
+
 @app.before_request
-def clear_request_notification_state():
+def clear_request_notification_state() -> None:
     """Start every request without a stale post-commit projection result."""
     cache.clear_recorded_notification_states()
     cache.clear_request_owner_projection()
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/email/notifications/presence.py::record_site_activity
-# @reason Flask response-hook wiring delegates to the tested coarse activity service
+@app.before_request
+def enforce_demo_guest_read_only() -> ResponseReturnValue | None:
+    """Block mutating HTTP requests while signed in as the read-only demo guest."""
+    if request.method in DEMO_GUEST_SAFE_METHODS:
+        return None
+    if not auth.is_demo_guest_session():
+        return None
+    if request.endpoint in DEMO_GUEST_ALLOWED_WRITE_ENDPOINTS:
+        return None
+
+    message = "Demo accounts are read-only."
+    wants_json = (
+        request.headers.get("X-Lagniappe-Request") == "true"
+        or request.is_json
+        or request.accept_mimetypes["application/json"]
+        > request.accept_mimetypes["text/html"]
+    )
+    if wants_json:
+        return jsonify({"success": False, "error": message}), 403
+    abort(403, message)
+
+
 @app.after_request
-def record_authenticated_site_activity(response):
+def record_authenticated_site_activity(response: Response) -> Response:
     """Keep a coarse Redis activity hint without adding browser requests."""
+    if auth.is_demo_guest_session():
+        return response
     user_key = session.get(CONFIG.LOGIN_USER_KEY) if session.get("_user_id") else None
     if user_key and request.endpoint != "static":
         from lagniappe.core.tools.email.notifications import presence
@@ -145,20 +184,8 @@ def record_authenticated_site_activity(response):
     return response
 
 
-# @testable true
-# @tests tests_e2e/001_site/test_001c_web_security_wiring.py::test_common_security_headers
-# @tests tests_e2e/001_site/test_001b_login.py::test_google_signin_uses_response_specific_style_nonces
-# @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
-# @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
-# @tests tests_e2e/013_agent_api/test_013d_remote_mcp_oauth.py::test_codex_native_consent_reaches_loopback_and_shows_submit_progress
-# @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
-# @tests tests_e2e/009_search/test_009c_search_authorization.py::test_invalidation_is_not_replayed_by_browser_http_cache
-# @matrix web-headers : conditional-request entity-revision etag missing-fingerprint security
-# @matrix cache : invalidation no-store
-# @pair login:logout
-# @matrix mcp-oauth : loopback browser-callback
 @app.after_request
-def add_lagniappe_headers(response):
+def add_lagniappe_headers(response: Response) -> Response:
     """Add security headers, ETag fingerprinting, and cache invalidation flag."""
     headers = {
         "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
@@ -187,7 +214,10 @@ def add_lagniappe_headers(response):
         if CONFIG.AI_ENABLED and CONFIG.EXTERNAL_AI_ENABLED and CONFIG.MCP_RESOURCE:
             # Browsers enforce form-action on the POST's redirect chain,
             # including the native client's ephemeral loopback listener.
-            destinations = "https://chatgpt.com http://127.0.0.1:*/callback"
+            destinations = (
+                "https://chatgpt.com https://antigravity.google https://claude.ai "
+                "http://127.0.0.1:*/callback http://localhost:*/callback"
+            )
             headers["Content-Security-Policy"] = CSP.replace(
                 "form-action 'self'", "form-action 'self' " + destinations
             )
@@ -217,7 +247,7 @@ def add_lagniappe_headers(response):
         # Cache Storage deletion cannot clear the browser's separate HTTP cache.
         # This transient command must never become reusable response metadata.
         headers["Cache-Control"] = "no-store"
-        headers["X-Lagniappe-Invalidate-Cache"] = True
+        headers["X-Lagniappe-Invalidate-Cache"] = "True"
         headers["X-Lagniappe-Cache-Revision"] = str(cache_revision)
 
     if getattr(CONFIG, "DEBUG_TRACING", False):

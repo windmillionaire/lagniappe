@@ -1,6 +1,14 @@
 """Deferred-job lifecycle state and privacy-bounded projections."""
 
-from datetime import datetime, timezone
+from __future__ import annotations
+
+from typing import NotRequired, TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from lagniappe.core.entities import types as models
+
+
+from datetime import datetime, UTC
 
 from lagniappe.core.definitions import (
     DEFERRED_JOB_HEARTBEAT_SECONDS,
@@ -11,6 +19,52 @@ from lagniappe.core.definitions import (
 
 from .deferred_job_request import JSONValue
 from .base_db import DBProperty
+
+
+class JobStatus(TypedDict):
+    key: str
+    type: str | None
+    status: str | None
+    phase: str
+    phase_label: str
+    attempt: int
+    remaining_seconds: int | None
+    last_progress_at: str | None
+    retry_reason: str | None
+    elapsed_seconds: int
+    phase_elapsed_seconds: int
+    updated_at: str | None
+    next_attempt_at: str | None
+    revision: int
+    terminal: bool
+    stale: bool
+    recovering: bool
+    source_widget: str | None
+    destination: str | None
+    entity_key: str | None
+    can_cancel: NotRequired[bool]
+    target_key: NotRequired[str | None]
+    operation_id: NotRequired[str | None]
+    snapshot_revision: NotRequired[str | None]
+    error: NotRequired[str]
+
+
+class AdminJobStatus(JobStatus):
+    actor: str
+    dispatch_state: str | None
+    job_version: int
+    start_completed: bool
+    created_at: str | None
+    telemetry_id: str | None
+    input_refs: dict[str, dict[str, str]]
+    progress: dict[str, object]
+    checkpoint_state: dict[str, object]
+    delivery_state: dict[str, bool]
+    last_error: dict[str, object] | None
+    modified_at: str | None
+    dispatched_at: str | None
+    deadline_at: str | None
+    lease_expires_at: str | None
 
 
 TERMINAL_STATUSES = frozenset(
@@ -47,11 +101,11 @@ PHASE_LABELS = {
 }
 
 
-class Status(DBProperty):
+class Status(DBProperty[str]):
     _id = "status"
 
 
-class StatusRevision(DBProperty):
+class StatusRevision(DBProperty[int]):
     _id = "status_revision"
 
 
@@ -75,37 +129,24 @@ class Delivery(JSONValue):
     _id = "delivery"
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lifecycle_normalizes_timestamps_and_elapsed_time
-# @pair deferred-jobs:timestamp-normalization
-def datetime_value(value):
+def datetime_value(value: object) -> datetime | None:
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     if isinstance(value, str):
         try:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             return None
-        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
     return None
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lifecycle_normalizes_timestamps_and_elapsed_time
-# @pair deferred-jobs:elapsed-time
-def elapsed_seconds(start, now):
+def elapsed_seconds(start: object, now: datetime) -> int:
     start = datetime_value(start)
     return max(int((now - start).total_seconds()), 0) if start else 0
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_status_projection_is_bounded_and_marks_stale_work
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_dependency_status_distinguishes_form_waits_from_recovery
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_terminal_job_elapsed_time_stays_fixed_after_completion
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_active_job_elapsed_time_advances_with_the_clock
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_terminal_job_elapsed_time_uses_stored_fallbacks
-# @matrix deferred-jobs : privacy progress stale-state status timing dependency-wait recovery
-def status_projection(job, *, now):
+def status_projection(job: models.DeferredJob, *, now: datetime) -> JobStatus:
     progress = dict(getattr(job, "progress", None) or {})
     client = dict(getattr(job, "client", None) or {})
     phase = progress.get("phase") or getattr(job, "status", None) or "queued"
@@ -138,7 +179,7 @@ def status_projection(job, *, now):
     if dependency_wait and getattr(job, "job_type", None) == DeferredJobType.REPORT_EXECUTION.value:
         phase_label = "Waiting for form update"
     next_attempt = datetime_value(getattr(job, "next_attempt_at", None))
-    result = {
+    result: JobStatus = {
         "key": job.urlsafe_key,
         "type": getattr(job, "job_type", None),
         "status": getattr(job, "status", None),
@@ -189,75 +230,68 @@ def status_projection(job, *, now):
     return result
 
 
-# @testable true
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_admin_projection_exposes_diagnostics_without_payload_content
-# @tests tests_unit/test_023a_deferred_job_properties.py::test_terminal_job_elapsed_time_stays_fixed_after_completion
-# @matrix deferred-jobs : diagnostics privacy timing
-def admin_projection(job, *, now):
+def admin_projection(job: models.DeferredJob, *, now: datetime) -> AdminJobStatus:
     """Extend owner-visible status with bounded operational diagnostics."""
     projection = status_projection(job, now=now)
     actor = getattr(job, "actor", None)
     inputs = getattr(job, "inputs", None) or {}
     input_refs = {
-        str(name): {"kind": value.get("kind"), "id": value.get("id")}
+        str(name): {"kind": kind, "id": identifier}
         for name, value in inputs.items()
-        if isinstance(value, dict) and value.get("kind") and value.get("id")
+        if isinstance(value, dict)
+        and isinstance(kind := value.get("kind"), str) and kind
+        and isinstance(identifier := value.get("id"), str) and identifier
     }
     progress = getattr(job, "progress", None) or {}
     checkpoint = getattr(job, "checkpoint", None) or {}
     delivery = getattr(job, "delivery", None) or {}
     error = getattr(job, "error", None) or {}
 
-    timestamps = {}
-    for output_name, attribute_name in (
-        ("modified_at", "modified"),
-        ("dispatched_at", "dispatched_at"),
-        ("deadline_at", "deadline_at"),
-        ("lease_expires_at", "lease_expires"),
-    ):
-        value = datetime_value(getattr(job, attribute_name, None))
-        timestamps[output_name] = value.isoformat() if value else None
+    def timestamp(attribute: str) -> str | None:
+        value = datetime_value(getattr(job, attribute, None))
+        return value.isoformat() if value else None
 
     created = datetime_value(getattr(job, "created", None))
-    projection.update(
-        {
-            "actor": (
-                getattr(actor, "name", None)
-                or getattr(actor, "email", None)
-                or "Unknown user"
-            ),
-            "operation_id": getattr(job, "idempotency_key", None),
-            "dispatch_state": getattr(job, "dispatch_state", None),
-            "job_version": int(getattr(job, "job_version", 0) or 0),
-            "start_completed": bool(getattr(job, "start_completed", False)),
-            "created_at": created.isoformat() if created else None,
-            "telemetry_id": getattr(job, "telemetry_id", None),
-            "input_refs": input_refs,
-            "progress": {
-                key: progress[key]
-                for key in ("phase", "updated_at", "delay_seconds")
-                if progress.get(key) is not None
-            },
-            "checkpoint_state": {
-                key: checkpoint[key]
-                for key in ("schema_version", "stage", "phase")
-                if checkpoint.get(key) is not None
-            },
-            "delivery_state": {
-                key: bool(delivery[key])
-                for key in ("failure", "cleanup", "notification", "input_missing")
-                if key in delivery
-            },
-            "last_error": (
-                {
-                    key: error[key]
-                    for key in ("type", "retryable", "attempt")
-                    if error.get(key) is not None
-                }
-                if isinstance(error, dict) and error
-                else None
-            ),
-            **timestamps,
-        }
-    )
-    return projection
+    return {
+        **projection,
+        "actor": (
+            getattr(actor, "name", None)
+            or getattr(actor, "email", None)
+            or "Unknown user"
+        ),
+        "operation_id": getattr(job, "idempotency_key", None),
+        "dispatch_state": getattr(job, "dispatch_state", None),
+        "job_version": int(getattr(job, "job_version", 0) or 0),
+        "start_completed": bool(getattr(job, "start_completed", False)),
+        "created_at": created.isoformat() if created else None,
+        "telemetry_id": getattr(job, "telemetry_id", None),
+        "input_refs": input_refs,
+        "progress": {
+            key: progress[key]
+            for key in ("phase", "updated_at", "delay_seconds")
+            if progress.get(key) is not None
+        },
+        "checkpoint_state": {
+            key: checkpoint[key]
+            for key in ("schema_version", "stage", "phase")
+            if checkpoint.get(key) is not None
+        },
+        "delivery_state": {
+            key: bool(delivery[key])
+            for key in ("failure", "cleanup", "notification", "input_missing")
+            if key in delivery
+        },
+        "last_error": (
+            {
+                key: error[key]
+                for key in ("type", "retryable", "attempt")
+                if error.get(key) is not None
+            }
+            if isinstance(error, dict) and error
+            else None
+        ),
+        "modified_at": timestamp("modified"),
+        "dispatched_at": timestamp("dispatched_at"),
+        "deadline_at": timestamp("deadline_at"),
+        "lease_expires_at": timestamp("lease_expires"),
+    }

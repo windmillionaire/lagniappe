@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import json
-from pathlib import Path, PurePosixPath
 import re
 import subprocess
+from collections.abc import Sequence
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
 
 from runner.context import GIT_CLI
 
@@ -20,8 +21,6 @@ BUILD_ID_RE = re.compile(r"^b[0-9a-f]{7}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
-# @testable infrastructure
-# @covered-by runner/frontend_build.py::inspect_frontend_build
 @dataclass(frozen=True)
 class FrontendBuildValidation:
     """Validated metadata and the current generated-output fingerprint."""
@@ -30,18 +29,16 @@ class FrontendBuildValidation:
     output_fingerprint: str
 
 
-# @testable infrastructure
-# @covered-by runner/frontend_build.py::inspect_frontend_build
 class FilesystemFrontendBuildReader:
     """Read frontend publication inputs and outputs from one checkout."""
 
-    def __init__(self, root):
+    def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
 
-    def read_bytes(self, relative_path):
+    def read_bytes(self, relative_path: str) -> bytes:
         return (self.root / relative_path).read_bytes()
 
-    def list_files(self, relative_roots):
+    def list_files(self, relative_roots: Sequence[str]) -> list[str]:
         paths = set()
         for relative_root in relative_roots:
             root = self.root / relative_root
@@ -55,12 +52,17 @@ class FilesystemFrontendBuildReader:
         return sorted(paths)
 
 
-# @testable infrastructure
-# @covered-by runner/frontend_build.py::inspect_frontend_build
 class GitFrontendBuildReader:
     """Read frontend publication inputs and outputs from an index or commit."""
 
-    def __init__(self, repo_root, *, revision=None, index=False, git_cli=None):
+    def __init__(
+        self,
+        repo_root: str | Path,
+        *,
+        revision: str | None = None,
+        index: bool = False,
+        git_cli: str | None = None,
+    ) -> None:
         if bool(revision) == bool(index):
             raise ValueError("Choose exactly one Git frontend build source.")
         self.repo_root = Path(repo_root)
@@ -76,7 +78,7 @@ class GitFrontendBuildReader:
             check=False,
         )
 
-    def read_bytes(self, relative_path):
+    def read_bytes(self, relative_path: str) -> bytes:
         object_name = (
             f":{relative_path}" if self.index else f"{self.revision}:{relative_path}"
         )
@@ -85,7 +87,7 @@ class GitFrontendBuildReader:
             raise FileNotFoundError(relative_path)
         return result.stdout
 
-    def list_files(self, relative_roots):
+    def list_files(self, relative_roots: Sequence[str]) -> list[str]:
         if self.index:
             arguments = ["ls-files", "--cached", "-z", "--", *relative_roots]
         else:
@@ -216,16 +218,12 @@ def _source_digest(reader, contract, issues):
     return digest.hexdigest()
 
 
-# @testable true
-# @tests tests_tooling/test_005a_frontend_build.py::test_frontend_build_validator_checks_recursive_artifacts_and_source_identity
-# @tests tests_tooling/test_005a_frontend_build.py::test_frontend_build_validator_rejects_unsafe_and_incoherent_metadata
-# @matrix frontend-build : artifact-integrity build-identity build-metadata path-safety source-integrity
 def inspect_frontend_build(
-    reader,
+    reader: FilesystemFrontendBuildReader | GitFrontendBuildReader,
     *,
-    expected_mode=None,
-    expected_version=None,
-):
+    expected_mode: str | None = None,
+    expected_version: str | None = None,
+) -> tuple[FrontendBuildValidation | None, list[str]]:
     """Return a validated build and a complete list of publication issues."""
     issues = []
     metadata, metadata_content = _read_json(
@@ -367,11 +365,14 @@ def inspect_frontend_build(
         issues,
         "Frontend service worker",
     )
-    if service_worker is not None and isinstance(build_id, str):
-        if build_id.encode() not in service_worker:
-            issues.append(
-                "Frontend service worker does not contain the current build ID."
-            )
+    if (
+        service_worker is not None
+        and isinstance(build_id, str)
+        and build_id.encode() not in service_worker
+    ):
+        issues.append(
+            "Frontend service worker does not contain the current build ID."
+        )
 
     validation = None
     if not issues:
@@ -382,24 +383,19 @@ def inspect_frontend_build(
     return validation, issues
 
 
-# @testable true
-# @tests tests_tooling/test_005a_frontend_build.py::test_verify_frontend_build_reports_actionable_failure
-# @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
-# @matrix deploy frontend-build : safe-failure validation
-# @pair deploy:build
 def verify_frontend_build(
     *,
-    app_dir,
-    expected_mode=None,
-    expected_version=None,
-):
+    app_dir: str | Path,
+    expected_mode: str | None = None,
+    expected_version: str | None = None,
+) -> FrontendBuildValidation:
     """Require a coherent completed build from the filesystem."""
     validation, issues = inspect_frontend_build(
         FilesystemFrontendBuildReader(app_dir),
         expected_mode=expected_mode,
         expected_version=expected_version,
     )
-    if issues:
+    if issues or validation is None:
         detail = "\n".join(f"  - {issue}" for issue in issues)
         raise RuntimeError(
             "Frontend build is incomplete or stale. Rerun the appropriate "

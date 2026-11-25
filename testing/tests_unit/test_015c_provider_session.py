@@ -1,6 +1,6 @@
 """Cancellable provider calls use one loop and the current conversation."""
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -28,7 +28,6 @@ def provider_config(monkeypatch):
     ))
 
 
-# @matrix ai : cancellation deadline retry-ownership
 def test_blocked_request_is_cancelled_and_closed(monkeypatch):
     events = []
     active = [True]
@@ -59,10 +58,6 @@ def test_blocked_request_is_cancelled_and_closed(monkeypatch):
     assert events == ["cancelled", "closed", "sync_closed"]
 
 
-# @source lagniappe/core/tools/ai/provider_session.py::ProviderSession
-# @source lagniappe/core/tools/deferred_jobs/control.py::DeferredExecutionControl
-# @matrix ai : cancellation deadline
-# @matrix deferred-jobs : cancellation deadline heartbeat
 @pytest.mark.parametrize(
     "stop, expected_error",
     [
@@ -72,7 +67,7 @@ def test_blocked_request_is_cancelled_and_closed(monkeypatch):
     ],
 )
 def test_execution_control_stops_blocked_provider_at_next_check(monkeypatch, stop, expected_error):
-    now = [datetime(2026, 9, 19, tzinfo=timezone.utc)]
+    now = [datetime(2026, 9, 19, tzinfo=UTC)]
     monkeypatch.setattr(control_module, "_utc", lambda: now[0])
     owned = [True]
     activity_reads = Mock(side_effect=lambda: owned[0])
@@ -123,7 +118,6 @@ def test_execution_control_stops_blocked_provider_at_next_check(monkeypatch, sto
     assert events == ["cancelled", "closed", "sync_closed"]
 
 
-# @matrix ai : cancellation deadline retry-ownership service-tier
 @pytest.mark.parametrize("service_tier", [None, "priority", "flex"])
 def test_transient_retry_preserves_request_and_uses_one_budget(monkeypatch, service_tier):
     calls = []
@@ -172,7 +166,6 @@ def test_transient_retry_preserves_request_and_uses_one_budget(monkeypatch, serv
     assert config.model_dump() == original_config
 
 
-# @matrix ai : deadline retry-ownership
 def test_transient_error_does_not_retry_with_too_little_time(monkeypatch):
     calls = []
     claim_retry = Mock(return_value=True)

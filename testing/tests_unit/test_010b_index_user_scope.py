@@ -33,7 +33,6 @@ def _viewer(suffix, permissions):
     )
 
 
-# @matrix task-index : explicit-user permissions
 @pytest.mark.unit
 @pytest.mark.parametrize("viewer_suffix", ["a", "b"])
 @pytest.mark.parametrize("undated", [False, True])
@@ -81,7 +80,6 @@ def test_task_index_visibility_uses_explicit_viewer(
     assert queries[0]["assigned_to"] is viewer.page
 
 
-# @matrix pages : explicit-user permissions
 @pytest.mark.unit
 @pytest.mark.parametrize("viewer_suffix", ["a", "b"])
 def test_page_index_visibility_uses_explicit_viewer(
@@ -114,7 +112,6 @@ def test_page_index_visibility_uses_explicit_viewer(
     assert listing.cursor == "next-page"
 
 
-# @matrix forms : explicit-user permissions
 @pytest.mark.unit
 @pytest.mark.parametrize("viewer_suffix", ["a", "b"])
 def test_form_index_visibility_uses_explicit_viewer(
@@ -151,7 +148,6 @@ def test_form_index_visibility_uses_explicit_viewer(
     ] == [f"form-{viewer_suffix}"]
 
 
-# @matrix forms : explicit-user related-entities
 @pytest.mark.unit
 @pytest.mark.parametrize("viewer_suffix", ["a", "b"])
 def test_form_index_related_models_use_explicit_viewer(
@@ -169,7 +165,7 @@ def test_form_index_related_models_use_explicit_viewer(
     ]
     models = [
         TestEntities.get("MODEL_TASK", {"hash": f"model-{suffix}"}, project=project)
-        for suffix, project in zip(("a", "b"), projects)
+        for suffix, project in zip(("a", "b"), projects, strict=True)
     ]
     for category in categories:
         category.forms = [form]
@@ -206,7 +202,6 @@ def test_form_index_related_models_use_explicit_viewer(
     assert [project.hash for project in form.projects] == [f"proj-{viewer_suffix}"]
 
 
-# @matrix user-index : explicit-user groups permissions
 @pytest.mark.unit
 @pytest.mark.parametrize("viewer_suffix", ["a", "b"])
 def test_user_index_groups_use_explicit_viewer(

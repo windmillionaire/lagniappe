@@ -39,7 +39,6 @@ def test_material_icons_are_direct_children_of_icon_only_controls():
     assert layout_classes == set()
 
 
-# @pair icons:subset-request
 def test_material_symbol_subset_request_uses_unique_sorted_registry_glyphs(tmp_path):
     from runner import icons
 
@@ -66,7 +65,6 @@ def test_material_symbol_subset_request_uses_unique_sorted_registry_glyphs(tmp_p
     assert query["family"] == [icons.FONT_FAMILY_QUERY]
 
 
-# @pair icons:subset-update
 def test_update_icons_writes_official_subset_metadata_and_rebuilds(
     tmp_path, monkeypatch
 ):
@@ -152,9 +150,6 @@ def icon_refresh(tmp_path, monkeypatch):
     return icons, paths, downloads
 
 
-# @source runner/icons.py::subset_request
-# @source runner/icons.py::update_icons
-# @pairs icons:subset-request icons:subset-update
 @pytest.mark.parametrize("rebuild", [False, True])
 @pytest.mark.parametrize(
     "registry",
@@ -183,10 +178,6 @@ def test_icon_refresh_rejects_invalid_registry_before_io(icon_refresh, registry,
     assert set(paths["icons_path"].parent.iterdir()) == set(paths.values())
 
 
-# @source runner/icons.py::_font_url
-# @source runner/icons.py::_write_subset
-# @source runner/icons.py::update_icons
-# @pair icons:subset-update
 @pytest.mark.parametrize("failure", ["css-download", "css-url", "font-download", "font-format"])
 def test_icon_refresh_preserves_files_on_download_or_format_failure(
     icon_refresh, monkeypatch, failure
@@ -213,9 +204,6 @@ def test_icon_refresh_preserves_files_on_download_or_format_failure(
     assert set(paths["icons_path"].parent.iterdir()) == set(paths.values())
 
 
-# @source runner/icons.py::_write_subset
-# @source runner/icons.py::update_icons
-# @pair icons:subset-update
 @pytest.mark.parametrize("existing", [False, True])
 @pytest.mark.parametrize("failure", ["stage-metadata", "publish-font", "publish-metadata"])
 def test_icon_refresh_restores_pair_on_publication_failure(
@@ -252,8 +240,6 @@ def test_icon_refresh_restores_pair_on_publication_failure(
     assert {path: path.read_bytes() for path in root.iterdir()} == before
 
 
-# @source runner/icons.py::_write_subset
-# @pair icons:subset-update
 def test_icon_refresh_retains_recovery_files_if_restoration_fails(icon_refresh, monkeypatch):
     icons, paths, _ = icon_refresh
     replace = Path.replace
@@ -275,8 +261,6 @@ def test_icon_refresh_retains_recovery_files_if_restoration_fails(icon_refresh, 
     assert paths["metadata_path"].read_bytes() == b"previous-metadata"
 
 
-# @source runner/icons.py::update_icons
-# @pair icons:subset-update
 def test_icon_refresh_keeps_published_pair_when_rebuild_fails(icon_refresh, monkeypatch, capsys):
     icons, paths, _ = icon_refresh
 

@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { renderServiceWorker } from "../../../build/serviceWorker.mjs";
 
 function requestUrl(request) {
 	return typeof request === "string" ? request : request.url;
@@ -113,13 +113,7 @@ export function createServiceWorkerContext() {
 	};
 
 	vm.createContext(context);
-	const browserProtocol = JSON.parse(
-		readFileSync("config/browser_protocol.json", "utf8"),
-	);
-	const workerSource = readFileSync(
-		"src/script/sw.template.mjs",
-		"utf8",
-	).replace("/* __BROWSER_PROTOCOL__ */ null", JSON.stringify(browserProtocol));
+	const workerSource = renderServiceWorker("development", []);
 	vm.runInContext(workerSource, context);
 	vm.runInContext(
 		`realCheckForCacheInvalidation = checkForCacheInvalidation;

@@ -1,7 +1,6 @@
-# @testable infrastructure
-# @covered-by lagniappe/core/properties/common_entity.py::Name
-# @covered-by lagniappe/core/properties/common_entity.py::Kind.details_value
-class DetailsMixin:
+from .field_host import FieldHost
+
+class DetailsMixin(FieldHost):
     """Adds API detail output. Collected by Entity.details.
 
     Provides:
@@ -10,9 +9,9 @@ class DetailsMixin:
     """
 
     @property
-    def details_value(self):
+    def details_value(self) -> object:
         return self.value
 
     @property
-    def details_key(self):
+    def details_key(self) -> str:
         return self.id

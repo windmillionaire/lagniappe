@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import esmock from "esmock";
-import { QueryLifecycle } from "../../src/script/shared/queryLifecycle.mjs";
-import { BuilderDraft } from "../../src/script/views/builder/draft.mjs";
+import { QueryLifecycle } from "../../src/script/shared/queryLifecycle.ts";
+import { BuilderDraft } from "../../src/script/views/builder/draft.ts";
 import { createBrowser } from "../utility/js/environment.mjs";
 
 function deferred() {
@@ -13,7 +13,6 @@ function deferred() {
 	return { promise, resolve };
 }
 
-/** @matrix async-query : cancellation ordering repeated-key */
 test("test_query_lifecycle_publishes_only_the_current_request", async () => {
 	const lifecycle = new QueryLifecycle();
 	const published = [];
@@ -77,7 +76,6 @@ test("test_query_lifecycle_publishes_only_the_current_request", async () => {
 	assert.deepEqual(published, ["new-B", "repeated-new-A"]);
 });
 
-/** @matrix async-query : error-propagation teardown */
 test("test_query_lifecycle_invalidates_repeated_keys_and_destroyed_owners", async () => {
 	let rejectLoader;
 	const lifecycle = new QueryLifecycle();
@@ -106,7 +104,6 @@ test("test_query_lifecycle_invalidates_repeated_keys_and_destroyed_owners", asyn
 	);
 });
 
-/** @pair async-query:error-propagation */
 test("test_query_lifecycle_propagates_current_loader_errors", async () => {
 	const lifecycle = new QueryLifecycle();
 	const expected = new Error("loader failed");
@@ -122,7 +119,6 @@ test("test_query_lifecycle_propagates_current_loader_errors", async () => {
 	);
 });
 
-/** @matrix async-query combobox : debounce dismissal stale-publication teardown */
 test("test_remote_combobox_invalidates_before_debounce_and_on_destroy", async () => {
 	class ElementBoundary {
 		constructor() {
@@ -181,16 +177,16 @@ test("test_remote_combobox_invalidates_before_debounce_and_on_destroy", async ()
 		return delayed;
 	};
 	const { RemoteQueryCombobox } = await esmock.strict(
-		"../../src/script/elements/combobox/remote.mjs",
+		"../../src/script/elements/combobox/remote.ts",
 		{
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError: (error) => {
 					throw error;
 				},
 			},
-			"../../src/script/shared/queryLifecycle.mjs": { QueryLifecycle },
-			"../../src/script/shared/utilities.mjs": { debounce },
-			"../../src/script/elements/combobox/combobox.mjs": { Combobox },
+			"../../src/script/shared/queryLifecycle.ts": { QueryLifecycle },
+			"../../src/script/shared/utilities.ts": { debounce },
+			"../../src/script/elements/combobox/combobox.ts": { Combobox },
 		},
 	);
 	let inputs = 0;
@@ -237,7 +233,6 @@ test("test_remote_combobox_invalidates_before_debounce_and_on_destroy", async ()
 	assert.equal(publications, 0);
 });
 
-/** @matrix search : recent-results stale-publication threshold */
 test("test_search_threshold_settles_stale_work_and_restores_recent_results", async () => {
 	const calls = [];
 	class RemoteQueryCombobox {
@@ -262,17 +257,17 @@ test("test_search_threshold_settles_stale_work_and_restores_recent_results", asy
 		}
 	}
 	const { SearchBox } = await esmock.strict(
-		"../../src/script/elements/combobox/search.mjs",
+		"../../src/script/elements/combobox/search.ts",
 		{
 			"../../src/script/generated/styles.mjs": {
 				STYLES: { dropdown: { panel: "panel" } },
 			},
-			"../../src/script/shared/endpoints.mjs": {
+			"../../src/script/shared/endpoints.ts": {
 				ENDPOINTS: { search: { bar: "/l/search-bar", page: "/l/search-page" } },
 			},
-			"../../src/script/shared/request.mjs": { request: {} },
-			"../../src/script/elements/combobox/remote.mjs": { RemoteQueryCombobox },
-			"../../src/script/elements/combobox/results.mjs": { Results },
+			"../../src/script/shared/request.ts": { request: {} },
+			"../../src/script/elements/combobox/remote.ts": { RemoteQueryCombobox },
+			"../../src/script/elements/combobox/results.ts": { Results },
 		},
 	);
 	const box = new SearchBox({ value: "" });
@@ -289,7 +284,6 @@ test("test_search_threshold_settles_stale_work_and_restores_recent_results", asy
 	]);
 });
 
-/** @matrix modal : exact-owner late-publication listener-teardown reuse */
 test("test_modal_owns_exact_node_and_rejects_late_attachment", async (t) => {
 	createBrowser(t);
 	const listeners = new Map();
@@ -305,7 +299,7 @@ test("test_modal_owns_exact_node_and_rejects_late_attachment", async (t) => {
 	});
 	let resolveLoad;
 	const { Modal, OfflineModal } = await esmock.strict(
-		"../../src/script/shared/modal.mjs",
+		"../../src/script/shared/modal.ts",
 		{
 			"../../src/script/generated/styles.mjs": {
 				STYLES: {
@@ -313,15 +307,15 @@ test("test_modal_owns_exact_node_and_rejects_late_attachment", async (t) => {
 					button: { close: "" },
 				},
 			},
-			"../../src/script/shared/endpoints.mjs": {
+			"../../src/script/shared/endpoints.ts": {
 				ENDPOINTS: { delete: () => "", help: () => "" },
 			},
-			"../../src/script/shared/errors.mjs": {
+			"../../src/script/shared/errors.ts": {
 				captureError: (error) => {
 					throw error;
 				},
 			},
-			"../../src/script/shared/request.mjs": {
+			"../../src/script/shared/request.ts": {
 				request: {
 					get: () =>
 						new Promise((resolve) => {
@@ -329,7 +323,7 @@ test("test_modal_owns_exact_node_and_rejects_late_attachment", async (t) => {
 						}),
 				},
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => {
 					callback();
 					return true;
@@ -378,7 +372,6 @@ test("test_modal_owns_exact_node_and_rejects_late_attachment", async (t) => {
 	assert.equal(pending.modal, null);
 });
 
-/** @matrix forms : builder-lifecycle late-publication listener-teardown */
 test("test_builder_destroys_owned_search_modal_and_panels_during_startup", async (t) => {
 	createBrowser(t, {
 		html: `
@@ -460,12 +453,12 @@ test("test_builder_destroys_owned_search_modal_and_panels_during_startup", async
 		remove(type, callback, options);
 	});
 	const { default: FormBuilder } = await esmock.strict(
-		"../../src/script/views/builder/builder.mjs",
+		"../../src/script/views/builder/builder.ts",
 		{
-			"../../src/script/elements/combobox/search.mjs": { SearchBox },
-			"../../src/script/elements/entityMenu.mjs": { EntityMenu },
-			"../../src/script/shared/directUpload.mjs": { directUpload: {} },
-			"../../src/script/shared/index.mjs": {
+			"../../src/script/elements/combobox/search.ts": { SearchBox },
+			"../../src/script/elements/entityMenu.ts": { EntityMenu },
+			"../../src/script/shared/directUpload.ts": { directUpload: {} },
+			"../../src/script/shared/index.ts": {
 				captureError: (error) => {
 					throw error;
 				},
@@ -476,33 +469,33 @@ test("test_builder_destroys_owned_search_modal_and_panels_during_startup", async
 				OfflineModal,
 				request: {},
 			},
-			"../../src/script/shared/transitions.mjs": {
+			"../../src/script/shared/transitions.ts": {
 				withTransition: async (callback) => callback(),
 			},
-			"../../src/script/views/builder/changeStatus.mjs": {
+			"../../src/script/views/builder/changeStatus.ts": {
 				FormChangeStatus: class {},
 			},
-			"../../src/script/views/builder/conditions/loader.mjs": {
+			"../../src/script/views/builder/conditions/loader.ts": {
 				loadCondition: async () => null,
 			},
-			"../../src/script/views/builder/draft.mjs": { BuilderDraft },
-			"../../src/script/views/builder/migrations.mjs": {
+			"../../src/script/views/builder/draft.ts": { BuilderDraft },
+			"../../src/script/views/builder/migrations.ts": {
 				fieldKind: () => "",
 				needsMigration: () => false,
 				repairConditions: () => {},
 			},
-			"../../src/script/views/builder/panels/components.mjs": {
+			"../../src/script/views/builder/panels/components.ts": {
 				ComponentsPanel,
 			},
-			"../../src/script/views/builder/panels/condition.mjs": { ConditionPanel },
-			"../../src/script/views/builder/panels/elementSettings.mjs": {
+			"../../src/script/views/builder/panels/condition.ts": { ConditionPanel },
+			"../../src/script/views/builder/panels/elementSettings.ts": {
 				ElementSettings,
 			},
-			"../../src/script/views/builder/panels/formSettings.mjs": {
+			"../../src/script/views/builder/panels/formSettings.ts": {
 				FormSettings,
 			},
-			"../../src/script/views/builder/panels/header.mjs": { Header },
-			"../../src/script/views/builder/panels/model.mjs": {
+			"../../src/script/views/builder/panels/header.ts": { Header },
+			"../../src/script/views/builder/panels/model.ts": {
 				ModelElement: {},
 				ModelPanel,
 			},

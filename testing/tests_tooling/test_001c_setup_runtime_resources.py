@@ -37,7 +37,6 @@ from testing.utility.setup_fakes import (
 pytestmark = pytest.mark.tooling
 
 
-# @matrix setup : classification errors exit-status provider-errors retry timeout
 def test_setup_error_classification_and_retry_contract():
     class StatusError(RuntimeError):
         def __init__(self, status):
@@ -218,7 +217,6 @@ def test_deferred_jobs_cli_verifies_installation_before_provisioning(monkeypatch
     assert events == ["verify", "provision"]
 
 
-# @matrix setup : authentication-email cli deploy gmail replacement smtp
 def test_email_cli_replaces_gmail_without_custom_domain(monkeypatch):
     import config
     import installer as setup_pkg
@@ -257,7 +255,6 @@ def test_email_cli_replaces_gmail_without_custom_domain(monkeypatch):
     assert events == ["verify", ("gmail", True), ("deploy", False)]
 
 
-# @matrix setup : authentication-email cli custom-domain deploy smtp
 def test_email_cli_configures_and_optionally_deploys(monkeypatch):
     import config
     import installer as setup_pkg
@@ -292,7 +289,6 @@ def test_email_cli_configures_and_optionally_deploys(monkeypatch):
     assert events == ["verify", "configure", ("deploy", False)]
 
 
-# @matrix setup : cli deploy redis-tls
 def test_security_cli_configures_and_optionally_deploys_redis_tls(monkeypatch):
     import config
     import installer as setup_pkg
@@ -335,7 +331,7 @@ def test_security_cli_configures_and_optionally_deploys_redis_tls(monkeypatch):
 def _install_cloud_module(monkeypatch, name, module):
     google = sys.modules.get("google") or types.ModuleType("google")
     cloud = sys.modules.get("google.cloud") or types.ModuleType("google.cloud")
-    setattr(google, "cloud", cloud)
+    google.cloud = cloud
     setattr(cloud, name, module)
     monkeypatch.setitem(sys.modules, "google", google)
     monkeypatch.setitem(sys.modules, "google.cloud", cloud)
@@ -373,7 +369,6 @@ def isolated_config_package(monkeypatch):
     )
 
 
-# @matrix setup : development prerequisites
 def test_development_setup_requires_existing_installation(monkeypatch, capsys):
     from installer import development
 
@@ -391,7 +386,6 @@ def test_development_setup_requires_existing_installation(monkeypatch, capsys):
     assert "DEV_YAML, APP_SETTINGS_YAML" in output
 
 
-# @matrix setup : development frontend-build idempotence package-install
 def test_development_setup_is_additive_and_idempotent(monkeypatch):
     from installer import development
 
@@ -464,7 +458,6 @@ def test_development_setup_is_additive_and_idempotent(monkeypatch):
     ]
 
 
-# @matrix setup : development portability windows
 def test_development_setup_directs_native_windows_to_wsl(monkeypatch, capsys):
     from installer import development
 
@@ -477,7 +470,6 @@ def test_development_setup_directs_native_windows_to_wsl(monkeypatch, capsys):
     assert "installation, recovery, update, and deployment only" in output
 
 
-# @matrix setup : development node-version
 def test_development_setup_validates_node_range():
     from installer.development import (
         APP_ROOT,
@@ -505,7 +497,6 @@ def test_development_setup_validates_node_range():
     assert node_version_supported(pinned)
 
 
-# @matrix setup : privacy-consent rerun sentry-destination
 def test_error_monitoring_supports_maintainer_or_operator_sentry(monkeypatch, capsys):
     import config
     from installer import optional
@@ -558,7 +549,6 @@ def test_error_monitoring_supports_maintainer_or_operator_sentry(monkeypatch, ca
     assert len(settings._saves) == saves_before
 
 
-# @matrix setup : default-disabled privacy-consent sentry-destination
 def test_disabled_error_monitoring_offers_to_enable(monkeypatch, capsys):
     import config
     from installer import optional
@@ -592,7 +582,6 @@ def test_disabled_error_monitoring_offers_to_enable(monkeypatch, capsys):
     assert "Error monitoring and crash reporting" in capsys.readouterr().out
 
 
-# @matrix ai-observability setup : privacy-consent rerun settings-save
 def test_ai_observability_is_an_explicit_preserved_setup_choice(
     monkeypatch,
     capsys,
@@ -654,7 +643,6 @@ def test_ai_observability_is_an_explicit_preserved_setup_choice(
     ]
 
 
-# @matrix setup : google-oauth optional rerun settings-save
 def test_google_signin_is_an_explicit_preserved_setup_choice(monkeypatch, capsys):
     import config
     from installer import admin
@@ -681,7 +669,6 @@ def test_google_signin_is_an_explicit_preserved_setup_choice(monkeypatch, capsys
     assert "Google sign-in is disabled" in capsys.readouterr().out
 
 
-# @matrix ai-observability setup : ai-cache privacy-consent settings-save
 def test_ai_setup_mode_configures_observability(monkeypatch):
     import config
     from installer import ai
@@ -700,7 +687,6 @@ def test_ai_setup_mode_configures_observability(monkeypatch):
     assert len(settings._saves) == 2
 
 
-# @matrix setup : credential-parsing redis validation
 @pytest.mark.parametrize(
     ("command", "expected"),
     [
@@ -748,7 +734,6 @@ def test_redis_cli_command_parser_extracts_connection_details(command, expected)
     assert redis_setup._is_redis_cli_command(command)
 
 
-# @matrix setup : credential-parsing redis validation
 @pytest.mark.parametrize(
     "command",
     [
@@ -767,7 +752,6 @@ def test_redis_cli_command_parser_rejects_invalid_commands(command):
     assert not redis_setup._is_redis_cli_command(command)
 
 
-# @matrix setup : cancellation credential-parsing interactive-input redis
 def test_redis_cli_command_uses_visible_standard_input(monkeypatch, capsys):
     import installer as setup_pkg
     from installer import redis as redis_setup
@@ -792,7 +776,6 @@ def test_redis_cli_command_uses_visible_standard_input(monkeypatch, capsys):
     assert "begin with 'redis-cli' or 'redis:'" in output
 
 
-# @matrix setup : browser operator-guidance plan-selection provider-region redis redis-tls
 def test_redis_cloud_instructions_open_console_and_locate_credentials(
     monkeypatch,
     capsys,
@@ -829,7 +812,6 @@ def test_redis_cloud_instructions_open_console_and_locate_credentials(
     assert "Keep the database details page open" in output
 
 
-# @matrix setup : interactive-input operator-guidance redis
 def test_redis_eviction_policy_instructions_require_confirmation(
     monkeypatch,
     capsys,
@@ -860,7 +842,6 @@ def test_redis_eviction_policy_instructions_require_confirmation(
     ]
 
 
-# @matrix setup : failure-isolation redis retry rollback settings-save
 def test_setup_redis_clears_failed_credentials_and_retries(
     monkeypatch,
     capsys,
@@ -948,7 +929,6 @@ def test_setup_redis_clears_failed_credentials_and_retries(
     assert "failed Redis connection details were cleared" in output
 
 
-# @matrix setup : development privacy sentry-destination
 def test_development_monitoring_rejects_maintainer_sentry(monkeypatch, capsys):
     import config
     from installer import optional
@@ -967,11 +947,11 @@ def test_development_monitoring_rejects_maintainer_sentry(monkeypatch, capsys):
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
 
     assert optional.configure_development_error_monitoring()
-    assert settings.APP == {
+    assert {
         "CAPTURE_ERRORS": "True",
         "SENTRY_DSN": operator_dsn,
         "SENTRY_JS_DSN": operator_dsn,
-    }
+    } == settings.APP
     assert "That is the maintainer DSN" in capsys.readouterr().out
 
     settings.APP.update({"CAPTURE_ERRORS": "True", "SENTRY_DSN": constants.SENTRY_DSN})
@@ -981,7 +961,6 @@ def test_development_monitoring_rejects_maintainer_sentry(monkeypatch, capsys):
     assert settings.APP == {"CAPTURE_ERRORS": "False"}
 
 
-# @matrix setup : redis-connection redis-tls
 def test_redis_connection_uses_shared_tls_settings_and_exits_on_failure(
     monkeypatch, tmp_path
 ):
@@ -1079,7 +1058,6 @@ def test_redis_connection_uses_shared_tls_settings_and_exits_on_failure(
     assert len(closed_clients) == 3
 
 
-# @matrix setup : certificate-validation failure-isolation redis-tls settings-save
 def test_redis_tls_enablement_uses_managed_ca(monkeypatch, tmp_path):
     import config
     from config import redis as redis_config
@@ -1130,7 +1108,6 @@ def test_redis_tls_enablement_uses_managed_ca(monkeypatch, tmp_path):
     assert len(settings._saves) == 1
 
 
-# @matrix setup : certificate-validation missing-file operator-guidance redis-tls
 def test_redis_tls_enablement_requires_managed_ca(monkeypatch, tmp_path, capsys):
     import config
     import installer as setup_pkg
@@ -1168,7 +1145,6 @@ def test_redis_tls_enablement_requires_managed_ca(monkeypatch, tmp_path, capsys)
     assert "config/files/redis_ca.pem" in output
 
 
-# @matrix setup : failure-isolation redis-tls rollback settings-save
 def test_redis_tls_disablement_is_transactional(monkeypatch, tmp_path):
     import config
     from installer import redis as redis_setup
@@ -1209,7 +1185,6 @@ def test_redis_tls_disablement_is_transactional(monkeypatch, tmp_path):
     assert len(settings._saves) == 1
 
 
-# @matrix setup : deploy gcp-domain https managed-certificate provider-status retry success
 @pytest.mark.parametrize("announce_ready", [True, False])
 def test_managed_certificate_waits_for_provider_then_reports_active(
     monkeypatch,
@@ -1290,7 +1265,6 @@ def test_managed_certificate_waits_for_provider_then_reports_active(
     assert "Retrying in 3 seconds" not in output
 
 
-# @matrix setup : managed-certificate retry timeout
 def test_managed_certificate_default_polling_backs_off_without_extending_timeout():
     from installer.domain import gcp as domain_gcp
 
@@ -1299,7 +1273,6 @@ def test_managed_certificate_default_polling_backs_off_without_extending_timeout
     assert sum(domain_gcp.MANAGED_CERTIFICATE_POLL_DELAYS) == 600
 
 
-# @matrix setup : gcp-domain managed-certificate operator-guidance provider-failure
 def test_managed_certificate_reports_permanent_provider_failure(monkeypatch):
     from installer.domain import gcp as domain_gcp
 
@@ -1345,7 +1318,6 @@ def test_managed_certificate_reports_permanent_provider_failure(monkeypatch):
     assert "DNS records and CAA" in raised.value.repair_action
 
 
-# @matrix setup : gcp-domain incomplete-deployment managed-certificate timeout
 def test_managed_certificate_timeout_keeps_deployment_incomplete(monkeypatch):
     from installer.domain import gcp as domain_gcp
 
@@ -1394,7 +1366,6 @@ def test_managed_certificate_timeout_keeps_deployment_incomplete(monkeypatch):
     assert "rerun setup" in raised.value.repair_action
 
 
-# @matrix setup : account-project gcp-domain managed-certificate missing-resource
 def test_managed_certificate_reports_missing_domain_mapping(monkeypatch):
     from installer.domain import gcp as domain_gcp
 
@@ -1419,7 +1390,6 @@ def test_managed_certificate_reports_missing_domain_mapping(monkeypatch):
     assert "project project-1" in raised.value.repair_action
 
 
-# @matrix setup : gcp-domain managed-certificate missing-resource reconciliation
 def test_empty_mapping_list_creates_managed_mapping(monkeypatch):
     from installer.domain import gcp as domain_gcp
 
@@ -1480,7 +1450,6 @@ def test_empty_mapping_list_creates_managed_mapping(monkeypatch):
     assert not sp.messages
 
 
-# @matrix setup : gcp-domain idempotence managed-certificate reconciliation
 def test_existing_domain_mapping_enables_managed_tls(monkeypatch):
     from installer.domain import gcp as domain_gcp
 
@@ -1542,7 +1511,6 @@ def test_existing_domain_mapping_enables_managed_tls(monkeypatch):
     assert not sp.messages
 
 
-# @matrix setup : ai-cache gcp-domain idempotence provider-records
 def test_gcp_domain_mapping_and_ai_cache_commands(monkeypatch):
     from installer import ai
     from installer.domain import gcp as domain_gcp
@@ -1650,7 +1618,6 @@ def test_gcp_domain_mapping_and_ai_cache_commands(monkeypatch):
     ]
 
 
-# @matrix setup : account-identity custom-domain interactive-input ownership
 def test_domain_ownership_instructions_name_selected_gcloud_account(
     monkeypatch,
     capsys,
@@ -1685,7 +1652,6 @@ def test_domain_ownership_instructions_name_selected_gcloud_account(
     ]
 
 
-# @matrix setup : cloudflare-api interactive-input least-privilege
 def test_cloudflare_token_prompt_explains_dashboard_steps_and_scope(
     monkeypatch,
     capsys,
@@ -1727,7 +1693,6 @@ def test_cloudflare_token_prompt_explains_dashboard_steps_and_scope(
         cloudflare.get_cloudflare_api_token()
 
 
-# @matrix setup : cloudflare-dns custom-domain disabled-provider dns-only idempotence provider-records
 def test_custom_domain_uses_provider_records_and_dns_only_cloudflare(monkeypatch):
     import installer as setup_package
     from installer import custom_domain
@@ -1824,7 +1789,6 @@ def test_custom_domain_uses_provider_records_and_dns_only_cloudflare(monkeypatch
     assert identity_urls == ["https://no-google.example.com"]
 
 
-# @matrix setup : custom-domain idempotence manual-dns provider-records
 def test_custom_domain_supports_manual_dns(monkeypatch, capsys):
     import installer as setup_package
     from installer import custom_domain
@@ -1899,7 +1863,6 @@ def test_custom_domain_supports_manual_dns(monkeypatch, capsys):
     assert identity_urls == []
 
 
-# @matrix setup : branch git-upgrade local-change-report
 def test_upgrade_repository_preserves_report_before_branch_reset(
     monkeypatch,
     tmp_path,
@@ -1959,7 +1922,6 @@ def test_upgrade_repository_preserves_report_before_branch_reset(
     assert len(spinner.oks) == 1
 
 
-# @matrix setup : branch failure-propagation git-upgrade
 def test_upgrade_repository_handles_clean_status_and_status_failure(monkeypatch):
     import installer as setup_pkg
     from installer import upgrade
@@ -1995,7 +1957,6 @@ def test_upgrade_repository_handles_clean_status_and_status_failure(monkeypatch)
     assert any("Git status failed" in message for message in failure_spinner.messages)
 
 
-# @matrix setup : branch git-upgrade version-validation
 def test_upgrade_target_fetches_and_reads_exact_remote_version(monkeypatch, tmp_path):
     import installer as setup_pkg
     from installer import upgrade
@@ -2047,7 +2008,6 @@ def test_upgrade_target_fetches_and_reads_exact_remote_version(monkeypatch, tmp_
     assert len(spinner.oks) == 1
 
 
-# @matrix setup : branch failure-propagation git-upgrade version-validation
 @pytest.mark.parametrize(
     ("resolved", "package", "expected_message"),
     [
@@ -2095,8 +2055,6 @@ def test_upgrade_target_rejects_missing_ref_and_invalid_version(
     assert any(expected_message in message for message in spinner.messages)
 
 
-# @matrix setup : branch config-files git-upgrade post-deploy
-# @pairs migrations:major-version setup:major-version
 def test_upgrade_replaces_source_then_applies_update(monkeypatch):
     import installer as setup_pkg
     from installer import upgrade
@@ -2169,7 +2127,6 @@ def test_upgrade_replaces_source_then_applies_update(monkeypatch):
     ]
 
 
-# @matrix migrations setup : major-version unknown-source version-validation
 def test_upgrade_maintenance_notice_version_policy():
     from installer.upgrade_notice import (
         parse_release_version,
@@ -2185,7 +2142,6 @@ def test_upgrade_maintenance_notice_version_policy():
         post_upgrade_maintenance_required("1.0.0", "next")
 
 
-# @matrix migrations setup : legacy-upgrade major-version
 def test_legacy_upgrade_deploy_notice_uses_active_operation(monkeypatch):
     from installer import state
     from installer.upgrade_notice import legacy_upgrade_deploy_notice_required
@@ -2208,7 +2164,6 @@ def test_legacy_upgrade_deploy_notice_uses_active_operation(monkeypatch):
     assert not legacy_upgrade_deploy_notice_required(settings)
 
 
-# @matrix setup : dependency-bootstrap git-upgrade
 def test_upgrade_refreshes_setup_dependencies_from_replaced_checkout(monkeypatch):
     import installer as setup_pkg
     from installer import upgrade
@@ -2240,8 +2195,6 @@ def test_upgrade_refreshes_setup_dependencies_from_replaced_checkout(monkeypatch
     ]
 
 
-# @matrix setup : config-files deferred-jobs post-deploy provider-apis public-page-settings storage-buckets
-# @pairs migrations:major-version setup:major-version
 def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
     import installer as setup_pkg
     from installer import upgrade
@@ -2373,7 +2326,7 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
     for answer in ("n", "N", ""):
         events.clear()
         capsys.readouterr()
-        monkeypatch.setattr("builtins.input", lambda prompt: answer)
+        monkeypatch.setattr("builtins.input", lambda prompt, *, answer=answer: answer)
         assert upgrade.update() == 0
         output = capsys.readouterr().out
         assert output.rstrip().endswith("Deploy when ready:\n  ./setup.sh update")
@@ -2383,7 +2336,6 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch, capsys):
         assert "scheduler-repair-warning" not in events
 
 
-# @matrix deferred-jobs setup : failure-isolation post-deploy recovery
 @pytest.mark.parametrize(
     "failure",
     [RuntimeError("scheduler unavailable"), SystemExit(1)],
@@ -2406,7 +2358,6 @@ def test_post_deploy_deferred_job_recovery_failure_is_nonfatal(capsys, failure):
     assert "Retry with:\n  ./setup.sh jobs" in output
 
 
-# @pair setup:image-restore
 def test_image_restore_uses_loaded_metadata_and_timeouts(monkeypatch, tmp_path):
     from installer import image
 
@@ -2508,7 +2459,6 @@ def test_image_restore_uses_loaded_metadata_and_timeouts(monkeypatch, tmp_path):
     assert any("continuing without it" in message for message in failed_sp.messages)
 
 
-# @matrix setup : image-restore path-validation transactional-state partial-failure
 def test_image_restore_skips_invalid_entries_and_keeps_successful_downloads(
     monkeypatch,
     tmp_path,
@@ -2557,7 +2507,6 @@ def test_image_restore_skips_invalid_entries_and_keeps_successful_downloads(
     assert not (images_dir / "second.png").exists()
 
 
-# @matrix setup : image-restore site-image
 def test_upgrade_restore_images_installs_storage_before_restore_spinner(monkeypatch):
     from installer import upgrade
 
@@ -2614,7 +2563,6 @@ def test_upgrade_restore_images_installs_storage_before_restore_spinner(monkeypa
     assert settings.APP["SITE_IMAGE_VERSION"] == 11
 
 
-# @matrix setup : image-restore site-image partial-failure
 def test_upgrade_restore_images_continues_when_no_remote_image_is_available(
     monkeypatch,
 ):
@@ -2644,8 +2592,6 @@ def test_upgrade_restore_images_continues_when_no_remote_image_is_available(
     assert "Custom images unchanged" in spinner.messages
 
 
-# @source config/deployment.py::normalize_deployment_settings
-# @matrix config : app-yaml deployment-settings memory-pressure
 def test_default_deployment_uses_three_memory_safe_workers():
     from config.deployment import normalize_deployment_settings
 
@@ -2654,7 +2600,6 @@ def test_default_deployment_uses_three_memory_safe_workers():
     assert normalize_deployment_settings({})["DEPLOY_WORKER_COUNT"] == "3"
 
 
-# @matrix config user-settings : app-yaml deployment-settings validation
 def test_deployment_settings_normalize_validation(monkeypatch):
     real_import = builtins.__import__
 
@@ -2770,7 +2715,6 @@ def test_deployment_settings_normalize_validation(monkeypatch):
         )
 
 
-# @matrix config : app-yaml deployment-settings
 def test_deployment_settings_apply_automatic_scaling_preserves_unowned_app_config(
     monkeypatch,
 ):
@@ -2846,7 +2790,6 @@ def test_deployment_settings_apply_automatic_scaling_preserves_unowned_app_confi
     assert app_yaml["default_expiration"] == "31536000s"
 
 
-# @matrix config : app-yaml deployment-settings
 def test_deployment_settings_apply_basic_scaling_preserves_unowned_app_config(
     monkeypatch,
 ):
@@ -2917,7 +2860,6 @@ def test_deployment_settings_apply_basic_scaling_preserves_unowned_app_config(
     assert "inbound_services" not in app_yaml
 
 
-# @matrix config : ai-settings app-yaml
 def test_ai_settings_apply_preserves_unowned_app_config(monkeypatch):
     constants = types.SimpleNamespace(
         DEFAULT_AI_MODEL="gemini-3.5-flash",
@@ -2961,7 +2903,6 @@ def test_ai_settings_apply_preserves_unowned_app_config(monkeypatch):
     }
 
 
-# @matrix config : app-yaml public-page-indexing
 def test_public_page_settings_apply_preserves_unowned_app_config(monkeypatch):
     constants = types.SimpleNamespace(DEFAULT_PUBLIC_PAGE_INDEXING=False)
     _install_config_package(monkeypatch, constants)
@@ -2980,7 +2921,6 @@ def test_public_page_settings_apply_preserves_unowned_app_config(monkeypatch):
     }
 
 
-# @matrix setup : app-yaml datastore deployment-settings
 def test_upgrade_restore_deployment_settings_applies_saved_app_config(monkeypatch):
     from installer import upgrade
 
@@ -3062,7 +3002,6 @@ def test_upgrade_restore_deployment_settings_applies_saved_app_config(monkeypatc
     assert "basic_scaling" not in settings.DEPLOY
 
 
-# @matrix setup : app-yaml deployment-settings
 def test_upgrade_restore_deployment_settings_continues_when_unavailable(monkeypatch):
     import config
     from installer import upgrade
@@ -3086,7 +3025,6 @@ def test_upgrade_restore_deployment_settings_continues_when_unavailable(monkeypa
     assert settings.DEPLOY == {"entrypoint": "existing"}
 
 
-# @matrix setup : ai-settings app-yaml datastore
 def test_upgrade_restore_ai_settings_applies_saved_app_config(monkeypatch):
     from installer import upgrade
 
@@ -3161,7 +3099,6 @@ def test_upgrade_restore_ai_settings_applies_saved_app_config(monkeypatch):
     }
 
 
-# @matrix setup : ai-settings app-yaml
 def test_upgrade_restore_ai_settings_continues_when_unavailable(monkeypatch):
     import config
     from installer import upgrade
@@ -3185,7 +3122,6 @@ def test_upgrade_restore_ai_settings_continues_when_unavailable(monkeypatch):
     assert settings.APP == {"AI_MODEL": "existing"}
 
 
-# @matrix setup : app-yaml datastore public-page-indexing
 def test_upgrade_restore_public_page_settings_applies_saved_app_config(monkeypatch):
     from installer import upgrade
     import installer.public_pages as public_pages_module
@@ -3217,7 +3153,6 @@ def test_upgrade_restore_public_page_settings_applies_saved_app_config(monkeypat
     assert settings.APP["APP_NAME"] == "Lagniappe"
 
 
-# @matrix setup : app-yaml public-page-indexing
 def test_upgrade_restore_public_page_settings_continues_when_unavailable(monkeypatch):
     import config
     from installer import upgrade
@@ -3240,8 +3175,6 @@ def test_upgrade_restore_public_page_settings_continues_when_unavailable(monkeyp
     assert settings.APP == {"PUBLIC_PAGE_INDEXING": False}
 
 
-# @matrix setup : dependency-pins package-install
-# @source installer/package_install.py::_pinned_requirement
 def test_setup_third_party_imports_are_bootstrapped_or_jit_guarded():
     from installer import package_install
 
@@ -3274,7 +3207,7 @@ def test_setup_third_party_imports_are_bootstrapped_or_jit_guarded():
             for child in ast.iter_child_nodes(parent)
         }
 
-        def scope(node):
+        def scope(node, *, parents=parents):
             current = node
             while current is not None and not isinstance(
                 current, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef)
@@ -3355,7 +3288,6 @@ def test_setup_third_party_imports_are_bootstrapped_or_jit_guarded():
     assert violations == []
 
 
-# @matrix setup : dependency-pins package-install
 def test_setup_package_install_helpers(monkeypatch):
     from installer import package_install
 
@@ -3491,7 +3423,6 @@ def test_setup_package_install_helpers(monkeypatch):
         )
 
 
-# @matrix setup : dependency-pins package-install
 def test_setup_dependency_transaction_validates_versions_and_pip_check(monkeypatch):
     from installer import package_install
 
@@ -3601,7 +3532,6 @@ def test_setup_dependency_transaction_validates_versions_and_pip_check(monkeypat
         package_install._run_pip_check()
 
 
-# @matrix setup : dependency-pins package-install
 def test_setup_dependency_transaction_repairs_transitive_conflicts(monkeypatch):
     from installer import package_install
 
@@ -3655,7 +3585,6 @@ def test_setup_dependency_transaction_repairs_transitive_conflicts(monkeypatch):
     assert check_calls == [True, True]
 
 
-# @matrix setup : package-install portability spinner terminal-wrapping
 def test_setup_formatter_tracks_active_spinners(monkeypatch):
     import installer as setup_pkg
     from installer import package_install
@@ -3688,12 +3617,12 @@ def test_setup_formatter_tracks_active_spinners(monkeypatch):
     formatter = setup_pkg.Formatter().initialize()
     formatter.initialize()
     with formatter.progress(text="Configuring service account") as active_spinner:
-        assert package_install._ACTIVE_SPINNERS == [active_spinner]
+        assert [active_spinner] == package_install._ACTIVE_SPINNERS
         active_spinner.ok("Service account configured")
     assert package_install._ACTIVE_SPINNERS == []
     output.tty = False
     with formatter.progress(text="Checking permissions") as progress:
-        assert package_install._ACTIVE_SPINNERS == [progress]
+        assert [progress] == package_install._ACTIVE_SPINNERS
         progress.fail("Permission check failed")
     assert package_install._ACTIVE_SPINNERS == []
     wrapped = setup_pkg.wrap_text(
@@ -3721,7 +3650,6 @@ def test_setup_formatter_tracks_active_spinners(monkeypatch):
     ]
 
 
-# @matrix setup : package-install spinner
 def test_install_if_missing_pauses_active_spinner_for_prompt(monkeypatch):
     from installer import package_install
 
@@ -3761,7 +3689,7 @@ def test_install_if_missing_pauses_active_spinner_for_prompt(monkeypatch):
             "Google IAM Admin API",
             package_name="google-cloud-iam",
         )
-        assert package_install._ACTIVE_SPINNERS == [spinner]
+        assert [spinner] == package_install._ACTIVE_SPINNERS
     finally:
         package_install._ACTIVE_SPINNERS.clear()
     assert events == [
@@ -3771,7 +3699,6 @@ def test_install_if_missing_pauses_active_spinner_for_prompt(monkeypatch):
     ]
 
 
-# @matrix setup : gcloud-command preflight provider-apis timeout
 def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
     import installer as setup_pkg
     from installer import gcloud
@@ -3900,7 +3827,6 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
     ]
 
 
-# @matrix setup : browser error-guidance google-service-terms identity interactive-input provider-apis
 def test_enable_gcloud_apis_guides_maps_terms_then_retries_activation(
     monkeypatch,
     capsys,
@@ -4023,7 +3949,6 @@ def test_enable_gcloud_apis_guides_maps_terms_then_retries_activation(
     ]
 
 
-# @matrix setup : deploy failure gcloud-command post-deploy progress timeout
 def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     # Load the real summary dependency before replacing config with a small fake.
     importlib.import_module("installer.mcp")
@@ -4180,7 +4105,6 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     assert "MCP server is ready" not in capsys.readouterr().out
 
 
-# @pairs migrations:deploy setup:legacy-upgrade setup:major-version
 def test_legacy_upgrade_warning_can_cancel_before_provider_deploy(
     monkeypatch,
     capsys,
@@ -4231,7 +4155,6 @@ def test_legacy_upgrade_warning_can_cancel_before_provider_deploy(
     assert "  4. Select Refresh Cache." in output
 
 
-# @matrix deferred-jobs setup : cloud-scheduler iam oidc recovery runtime-isolation
 def test_setup_deferred_job_reconciler_contract(monkeypatch):
     import installer as setup_pkg
     from installer import gcloud
@@ -4368,7 +4291,6 @@ def test_setup_deferred_job_reconciler_contract(monkeypatch):
     assert not any(command[:1] == ["firestore"] for command, _check in commands)
 
 
-# @matrix disaster-recovery setup : idempotent native-backups pitr retention runtime-isolation
 def test_setup_data_protection_contract(monkeypatch):
     from installer import gcloud
 
@@ -4461,7 +4383,6 @@ def test_setup_data_protection_contract(monkeypatch):
     )
 
 
-# @matrix setup : admin ai-model ai-observability identity-platform oauth optional privacy-consent redis redis-tls settings-save
 def test_setup_settings_mutation_flows(monkeypatch, capsys):
     constants = _load_config_constants()
     settings = _fake_settings(
@@ -4623,7 +4544,6 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     assert len(settings._saves) == 2
 
 
-# @matrix setup : admin disabled-provider oauth optional settings-save
 def test_disabled_google_signin_skips_oauth_setup(monkeypatch, capsys):
     constants = _load_config_constants()
     settings = _fake_settings(
@@ -4657,7 +4577,6 @@ def test_disabled_google_signin_skips_oauth_setup(monkeypatch, capsys):
     assert "Skipping Google OAuth" in capsys.readouterr().out
 
 
-# @matrix setup : browser oauth provider-apis
 def test_oauth_instructions_open_current_project_clients_page(
     monkeypatch,
     capsys,
@@ -4716,7 +4635,6 @@ def test_oauth_instructions_open_current_project_clients_page(
     assert str(admin.OAUTH_CLIENT_FILE) in output
 
 
-# @matrix setup : credential-file oauth retention rotation secrets
 def test_oauth_credential_retention_message(tmp_path, capsys):
     from installer import admin
 
@@ -4732,7 +4650,6 @@ def test_oauth_credential_retention_message(tmp_path, capsys):
     assert "./setup.sh oauth" in output
 
 
-# @matrix setup : client-type oauth provider-apis redirect-uri validation
 def test_oauth_web_client_probe_accepts_exact_callback():
     from installer import admin
 
@@ -4760,7 +4677,6 @@ def test_oauth_web_client_probe_accepts_exact_callback():
     assert calls[0][1]["timeout"] == admin.OAUTH_CLIENT_PROBE_TIMEOUT
 
 
-# @matrix setup : client-type failure-isolation oauth redirect-uri validation
 def test_oauth_web_client_probe_rejects_redirect_mismatch():
     from installer import admin
 
@@ -4792,7 +4708,6 @@ def test_oauth_web_client_probe_rejects_redirect_mismatch():
     assert "google_oauth_credentials.json" in failure.value.repair_action
 
 
-# @matrix setup : client-type credential-file javascript-origin oauth project-isolation redirect-uri secrets validation
 def test_oauth_credentials_file_requires_web_project_and_exact_urls(tmp_path):
     from installer import admin
 
@@ -4843,7 +4758,6 @@ def test_oauth_credentials_file_requires_web_project_and_exact_urls(tmp_path):
             )
 
 
-# @matrix setup : credential-file interactive-retry oauth propagation secrets
 def test_oauth_credentials_file_retry_reloads_or_waits_for_propagation(
     monkeypatch,
     tmp_path,
@@ -4940,7 +4854,6 @@ def test_oauth_credentials_file_retry_reloads_or_waits_for_propagation(
     assert "Google may still be applying" in output
 
 
-# @matrix setup : client-type failure-isolation identity-platform oauth redirect-uri
 def test_admin_oauth_rejection_precedes_provider_update(monkeypatch):
     constants = _load_config_constants()
     settings = _fake_settings(
@@ -4978,7 +4891,6 @@ def test_admin_oauth_rejection_precedes_provider_update(monkeypatch):
     assert settings._saves == []
 
 
-# @matrix setup : client-type identity-platform interactive-retry oauth settings-save
 def test_existing_admin_oauth_can_replace_rejected_saved_client(monkeypatch):
     constants = _load_config_constants()
     settings = _fake_settings(
@@ -5025,7 +4937,6 @@ def test_existing_admin_oauth_can_replace_rejected_saved_client(monkeypatch):
     assert settings._saves == [True, True]
 
 
-# @matrix setup : cli client-type deploy identity-platform oauth redirect-uri settings-save
 def test_oauth_cli_replaces_settings_and_deploys(monkeypatch):
     import config
     import installer as setup_package
@@ -5088,7 +4999,6 @@ def test_oauth_cli_replaces_settings_and_deploys(monkeypatch):
     ]
 
 
-# @matrix iam setup : identity
 def test_iam_principal_member_classifies_google_identities():
     from installer import iam
 
@@ -5099,7 +5009,6 @@ def test_iam_principal_member_classifies_google_identities():
     )
 
 
-# @matrix iam setup : conditions etag idempotence unrelated-members
 def test_iam_reconciliation_is_idempotent_and_preserves_conditions_and_etag():
     from google.api_core.iam import Policy
     from installer import iam
@@ -5229,7 +5138,6 @@ def test_iam_reconciliation_is_idempotent_and_preserves_conditions_and_etag():
     )
 
 
-# @matrix iam setup : deployer failure-reporting installer preflight
 def test_operator_permission_preflight_reports_missing_boundaries(monkeypatch):
     from installer import iam
 
@@ -5307,7 +5215,6 @@ def test_operator_permission_preflight_reports_missing_boundaries(monkeypatch):
     assert "active installer/deployer account" in message
 
 
-# @matrix setup : delegated-install owner preflight project-iam
 def test_permanent_owner_preflight_requires_direct_project_owner_binding(
     monkeypatch,
 ):
@@ -5354,7 +5261,6 @@ def test_permanent_owner_preflight_requires_direct_project_owner_binding(
     assert "direct roles/owner binding" in str(error.value)
 
 
-# @matrix iam setup storage : bucket-scope failure-reporting installer preflight
 def test_installer_bucket_permission_preflight_uses_bucket_resource(monkeypatch):
     from installer import iam
 
@@ -5384,7 +5290,6 @@ def test_installer_bucket_permission_preflight_uses_bucket_resource(monkeypatch)
     assert "active installer account" in message
 
 
-# @matrix iam setup : idempotence operator-preservation
 def test_runtime_project_policy_preserves_unmanaged_bindings_and_is_idempotent(monkeypatch):
     from google.cloud import resourcemanager_v3
     from google.iam.v1 import policy_pb2
@@ -5480,7 +5385,6 @@ def test_runtime_role_plan_limits_administration_to_owned_scheduler_lifecycle():
     ]
 
 
-# @matrix iam setup storage : bucket-location bucket-scope idempotence provisioning storage-class
 def test_setup_storage_provisioning_is_bucket_scoped_and_idempotent(monkeypatch):
     import installer as setup_pkg
     from config.storage import recovery_bucket_name, storage_bucket_names
@@ -5682,7 +5586,6 @@ def test_setup_storage_provisioning_is_bucket_scoped_and_idempotent(monkeypatch)
             assert bucket.patches == 1
 
 
-# @matrix setup : app-engine immutable-location keyless-config oidc provider-state
 def test_setup_app_engine_persists_provider_location_hostname_and_oidc_subject(
     monkeypatch,
 ):
@@ -5727,7 +5630,6 @@ def test_setup_app_engine_persists_provider_location_hostname_and_oidc_subject(
     assert len(settings._saves) == 2
 
 
-# @matrix setup : provider-convergence service-account
 def test_service_account_waits_for_newly_enabled_iam(monkeypatch, capsys):
     import installer as setup_pkg
 
@@ -5816,7 +5718,6 @@ def test_service_account_waits_for_newly_enabled_iam(monkeypatch, capsys):
     assert spinner.oks == []
 
 
-# @matrix setup : app-engine cloud-tasks ocr service-account
 def test_setup_gcloud_resource_client_contracts(monkeypatch):
     import installer as setup_pkg
 
@@ -6104,7 +6005,7 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
 
     gcloud.create_ocr_processor()
 
-    assert settings.APP == {
+    assert {
         "APP_NAME": "Lagniappe",
         "RUNTIME_SERVICE_ACCOUNT_EMAIL": runtime_email,
         "APP_ENGINE_LOCATION": "us-central",
@@ -6114,7 +6015,7 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
         "TASK_QUEUE_NAME": "lagniappe-tasks",
         "OCR_PROCESSOR_ID": "projects/project-1/locations/us/processors/processor-1",
         "OCR_PROCESSOR": "lagniappe-document-processor",
-    }
+    } == settings.APP
     assert ocr_requests == [
         ("options", "us-documentai.googleapis.com"),
         ("list", "projects/project-1/locations/us"),
@@ -6126,7 +6027,6 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
     ]
 
 
-# @matrix setup : app-engine failure-isolation interactive-input timeout
 def test_app_engine_creation_prompt_and_bounded_failures(monkeypatch, capsys):
     import installer as setup_pkg
 
@@ -6204,7 +6104,6 @@ def test_app_engine_creation_prompt_and_bounded_failures(monkeypatch, capsys):
     )
 
 
-# @matrix iam : conditions empty-bindings member-removal policy-inspection unrelated-members
 def test_handoff_policy_helpers_remove_only_the_target_member():
     from installer import iam
 
@@ -6276,7 +6175,6 @@ def _handoff_policy(*bindings):
     )
 
 
-# @matrix handoff : active-account adc gcloud installer operator owner preconditions
 def test_handoff_operator_preparation_accepts_installer_or_owner(monkeypatch, capsys):
     import config
     from installer import handoff as handoff_module
@@ -6324,7 +6222,6 @@ def test_handoff_operator_preparation_accepts_installer_or_owner(monkeypatch, ca
     assert len(activations) == 2
 
 
-# @matrix handoff : all-bindings bucket cleanup deploy final-mutation idempotence installer-removal ordering owner-add owner-lockout preview project-role resumable service-account settings unrelated-members verification
 def test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent(
     monkeypatch, capsys
 ):
@@ -6499,7 +6396,6 @@ def test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_i
     assert "deploy the change before deleting the mailbox" in cleanup
 
 
-# @matrix handoff : confirmation default-no no-mutation owner-lockout preconditions
 def test_delegated_handoff_rejects_owner_lockout_and_default_no_confirmation(
     monkeypatch,
 ):
@@ -6575,7 +6471,6 @@ def test_delegated_handoff_rejects_owner_lockout_and_default_no_confirmation(
     assert events == []
 
 
-# @matrix setup : image-restore site-image storage-bucket
 # def test_setup_image_client_and_site_image_restore_helpers(monkeypatch):
 #     import installer as setup_pkg
 #     from installer import image

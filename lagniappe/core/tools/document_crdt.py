@@ -4,35 +4,52 @@ import base64
 import hashlib
 import json
 import secrets
+from collections.abc import Buffer
+from typing import NotRequired, TypedDict, cast
 
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import BeautifulSoup
+from bs4.element import NavigableString
 from pycrdt import Doc, Map, XmlElement, XmlFragment, XmlText
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_append_preserves_existing_crdt_and_is_idempotent
-# @matrix editor sync : document append idempotency offline-replay
-def load_document(snapshot=None):
+class DocumentReceipt(TypedDict):
+    state: str
+    signature: NotRequired[dict[str, str | None]]
+
+
+type Document = Doc[XmlFragment | Map]
+
+
+def report_receipts(doc: Document) -> Map[DocumentReceipt]:
+    """The report root is a Map in every initialized collaborative document."""
+    return cast(Map[DocumentReceipt], doc["lagniappeReports"])
+
+
+def _replacements(doc: Document) -> Map[dict[str, str]]:
+    return cast(Map[dict[str, str]], doc["lagniappeReplacements"])
+
+
+def _fragment(doc: Document) -> XmlFragment:
+    return cast(XmlFragment, doc["default"])
+
+
+def load_document(snapshot: object = None) -> Document:
     doc = Doc(
         {"default": XmlFragment(), "lagniappeReports": Map(), "lagniappeReplacements": Map()},
         client_id=secrets.randbits(32),
     )
     if snapshot:
+        if not isinstance(snapshot, (str, Buffer)):
+            raise TypeError("Expected an encoded document snapshot")
         doc.apply_update(base64.b64decode(snapshot, validate=True))
     return doc
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_append_preserves_existing_crdt_and_is_idempotent
-# @matrix editor sync : document append idempotency offline-replay
-def encode_document(doc):
+def encode_document(doc: Document) -> str:
     return base64.b64encode(doc.get_update()).decode("ascii")
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_append_preserves_existing_crdt_and_is_idempotent
-# @matrix editor sync : document append idempotency offline-replay
-def merge_documents(*snapshots):
+def merge_documents(*snapshots: str | bytes | None) -> str:
     doc = load_document()
     for snapshot in snapshots:
         if snapshot:
@@ -40,40 +57,32 @@ def merge_documents(*snapshots):
     return encode_document(doc)
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_report_append_retry_preserves_content
-# @matrix ai-report editor : document append retry
-def document_structure(snapshot):
-    # @testable false
-    # @covered-by lagniappe/core/tools/document_crdt.py::document_structure
-    # @reason canonical recursive XML projection
+def document_structure(snapshot: str | bytes | None) -> str:
     def project(node):
         if isinstance(node, XmlText):
             return ["text", node.diff()]
         return [
             getattr(node, "tag", "fragment"),
-            dict(node.attributes) if isinstance(node, XmlElement) else {},
+            dict(node.attributes.__iter__()) if isinstance(node, XmlElement) else {},
             [project(child) for child in node.children],
         ]
 
     return json.dumps(
-        project(load_document(snapshot)["default"]),
+        project(_fragment(load_document(snapshot))),
         sort_keys=True,
         separators=(",", ":"),
     )
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_append_requires_a_checkpointed_collaborative_baseline
-# @matrix editor sync : document append checkpoint conflict
-def document_state(snapshot):
+def document_state(
+    snapshot: str | bytes | None,
+) -> tuple[
+    list[tuple[int, int]], str, dict[str, DocumentReceipt], dict[str, dict[str, str]]
+]:
     """Compare IDs/clocks and content, not nondeterministic binary map ordering."""
     doc = load_document(snapshot)
     values = iter(doc.get_state())
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/document_crdt.py::document_state
-    # @reason Yjs state-vector unsigned varint decoding
     def integer():
         value = shift = 0
         for byte in values:
@@ -84,12 +93,9 @@ def document_state(snapshot):
         raise ValueError("Invalid document state vector")
 
     vector = sorted((integer(), integer()) for _ in range(integer()))
-    return vector, document_structure(snapshot), dict(doc["lagniappeReports"]), dict(doc["lagniappeReplacements"])
+    return vector, document_structure(snapshot), dict(report_receipts(doc).items()), dict(_replacements(doc).items())
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/document_crdt.py::append_fragment
-# @reason converter is restricted to the shared sanitized Markdown renderer's output
 def _append_nodes(parent, nodes, marks=None):
     marks = marks or {}
     text = None
@@ -182,7 +188,9 @@ def _append_nodes(parent, nodes, marks=None):
             }
         if kind is None:
             raise ValueError(f"Unsupported report document element: {tag}")
-        element = XmlElement(kind, attributes=attributes)
+        # pycrdt annotates attributes as strings, but its Yjs binding also
+        # persists the numeric heading level and list start used by the editor.
+        element = XmlElement(kind, attributes=cast(dict[str, str], attributes))
         parent.children.append(element)
         if tag == "pre":
             element.children.append(XmlText(node.get_text()))
@@ -229,20 +237,17 @@ def _append_nodes(parent, nodes, marks=None):
             _append_nodes(element, node.contents, marks)
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_append_preserves_existing_crdt_and_is_idempotent
-# @tests tests_unit/test_010b_document_append.py::test_append_converts_supported_markdown_blocks
-# @matrix editor sync : document append idempotency offline-replay browser-interop
-# @matrix editor markdown : document append formatting
-def append_fragment(snapshot, html, operation_id, *, html_after=None):
+def append_fragment(
+    snapshot: str | None, html: str, operation_id: str, *, html_after: str | None = None
+) -> tuple[str | None, DocumentReceipt]:
     """Return a new snapshot and a durable retry receipt; never reset old IDs."""
     doc = load_document(snapshot)
-    receipts = doc["lagniappeReports"]
+    receipts = report_receipts(doc)
     if operation_id in receipts:
         return snapshot, receipts[operation_id]
-    root = doc["default"]
+    root = _fragment(doc)
     _append_nodes(root, BeautifulSoup(html, "html.parser").contents)
-    receipt = {"state": "applied"}
+    receipt: DocumentReceipt = {"state": "applied"}
     if html_after is not None:
         receipt["signature"] = {
             "html": hashlib.md5(html_after.strip().encode()).hexdigest()
@@ -256,24 +261,28 @@ def append_fragment(snapshot, html, operation_id, *, html_after=None):
     return encode_document(doc), receipt
 
 
-# @testable true
-# @tests tests_unit/test_010b_document_append.py::test_replacement_preserves_crdt_lineage_and_retry_receipts
-# @matrix editor sync : document replacement idempotency offline-replay
-def replace_fragment(snapshot, html, operation_id, *, previous_version, name):
+def replace_fragment(
+    snapshot: str | None,
+    html: str,
+    operation_id: str,
+    *,
+    previous_version: str,
+    name: str,
+) -> tuple[str | None, DocumentReceipt]:
     """Replace visible nodes as one edit, retaining tombstones and all receipts."""
     doc = load_document(snapshot)
-    if operation_id in doc["lagniappeReports"]:
-        return snapshot, doc["lagniappeReports"][operation_id]
+    if operation_id in report_receipts(doc):
+        return snapshot, report_receipts(doc)[operation_id]
     with doc.transaction():
-        root = doc["default"]
+        root = _fragment(doc)
         del root.children[:]
         _append_nodes(root, BeautifulSoup(html, "html.parser").contents)
-        doc["lagniappeReplacements"][operation_id] = {
+        _replacements(doc)[operation_id] = {
             "key": previous_version, "name": name,
         }
-        receipt = {"state": "applied", "signature": {
+        receipt: DocumentReceipt = {"state": "applied", "signature": {
             "html": hashlib.md5(html.strip().encode()).hexdigest() if html.strip() else None,
             "structure": hashlib.sha256(document_structure(encode_document(doc)).encode()).hexdigest(),
         }}
-        doc["lagniappeReports"][operation_id] = receipt
+        report_receipts(doc)[operation_id] = receipt
     return encode_document(doc), receipt

@@ -1,7 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseReturnValue
+    from lagniappe.core.entities.note import NoteCreation
+
 from flask import abort, request, g, make_response
 
 from flask_login import current_user
 from lagniappe.core.definitions import Action, Fetch, Resource
+from lagniappe.core.properties.home import ToolsList
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.properties.notification_aggregate import counts as aggregate_counts
@@ -14,84 +23,63 @@ from lagniappe.core.tools.polling.projections import (
     render_operation_statuses,
 )
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
-from lagniappe.web.auth import home_permission, logged_in
+from lagniappe.web.auth import authenticated_user, home_permission, logged_in
 from lagniappe.web import responses
 
 from . import home, internal
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002a_home.py::test_home_mobile_dashboard_smoke
-# @matrix home : layout load mobile
 @home.route("/")
 @home_permission(anonymous_endpoint="home.public_directory")
-def home_page():
-    home = Entities.HOME(user=current_user._get_current_object())
+def home_page() -> ResponseReturnValue:
+    home = Entities.HOME(user=authenticated_user())
     return responses.home_page(home)
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002a_home.py::test_tasks_prefetch
-# @tests tests_e2e/002_home/test_002a_home.py::test_model_lists_load_on_toggle
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
-# @tests tests_e2e/002_home/test_002j_home_tools.py::test_saved_report_controls_do_not_require_provider_access
-# @matrix home : category-list lazy-load prefetch project-list task-count task-list
-# @pair ai-report:provider-independent-history
 @internal.route("/get/<kind>")
 @home_permission()
-def get(kind):
+def get(kind: str) -> ResponseReturnValue:
     if kind == "tools" and getattr(current_user, "is_public", False):
         abort(403)
-    home = Entities.HOME(user=current_user._get_current_object())
+    home = Entities.HOME(user=authenticated_user())
     section = home.section(kind, cursor=request.args.get("cursor"))
-    if kind == "tools":
-        render_operation_statuses(section.list, current_user)
+    if isinstance(section, ToolsList):
+        render_operation_statuses(section.list, authenticated_user())
 
     response = make_response(responses.home_section(section))
     channel = {
         "notes": "home-notes",
         "tools": "tool-reports",
     }.get(kind, kind)
-    revision = channel_revisions((channel,), current_user)[channel]
+    revision = channel_revisions((channel,), authenticated_user())[channel]
     response.headers["X-Lagniappe-Poll-Channel"] = channel
     response.headers["X-Lagniappe-Poll-Revision"] = revision
     return response
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_notes_exclude_notifications
-# @matrix activity : cached-response load notes-exclusion notes-only
-# @matrix notes : cached-response load notes-only
 @internal.route("/activity")
 @home_permission()
-def activity():
-    home = Entities.HOME(user=current_user._get_current_object())
+def activity() -> ResponseReturnValue:
+    home = Entities.HOME(user=authenticated_user())
     return responses.activity(home.section("notes"))
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_renders_target_and_preserves_pending_state
-# @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
-# @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_assigned_to
-# @matrix notifications offline : dropdown-refresh target-link
-# @matrix notifications : pending target
-# @pair notifications:assignee-target
 @internal.route("/notifications")
 @logged_in
-def notifications():
+def notifications() -> ResponseReturnValue:
     page = database_notifications.notifications_page(
-        current_user,
+        authenticated_user(),
         start_cursor=request.args.get("cursor"),
         limit=25,
     )
     notification_keys = [row.key for row in page]
     aggregate = database_notifications.repair_notification_aggregate(
-        current_user,
+        authenticated_user(),
     )
 
     try:
         state = cache.seed_notification_state(
-            current_user,
+            authenticated_user(),
             notification_keys=notification_keys,
             aggregate_loader=lambda _user: aggregate,
             repair=True,
@@ -113,33 +101,24 @@ def notifications():
         notifications,
         aggregate=aggregate_counts(aggregate),
         cursor=page.next_cursor,
-        can_message=collaboration.can_initiate_messages(current_user),
+        can_message=collaboration.can_initiate_messages(authenticated_user()),
     )
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_deletes_and_clears
-# @matrix notifications : clear-all ownership
 @internal.route("/notifications", methods=["DELETE"])
 @logged_in
-def clear_notifications():
-    notification_keys = database_notifications.notification_keys(current_user)
-    notification_service.clear_ordinary_notifications(current_user, notification_keys)
-    aggregate = database_notifications.get_notification_aggregate(current_user)
-    notification_service.publish_notification_aggregate(current_user, aggregate)
+def clear_notifications() -> ResponseReturnValue:
+    notification_keys = database_notifications.notification_keys(authenticated_user())
+    notification_service.clear_ordinary_notifications(authenticated_user(), notification_keys)
+    aggregate = database_notifications.get_notification_aggregate(authenticated_user())
+    notification_service.publish_notification_aggregate(authenticated_user(), aggregate)
 
     return responses.ok()
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_note_shared_visibility_is_owner_only
-# @matrix activity : body create owner-only-shared parent photo scope visibility
-# @matrix notes : body create owner-only-shared parent photo private-default scope visibility
-# @pair permissions:owner-only-shared
 @internal.route("/activity/notes", methods=["POST"])
 @logged_in
-def create_note():
+def create_note() -> ResponseReturnValue:
     body = (request.form.get("body") or "").strip()
     photo = request.files.get("note-file")
     has_photo = bool(photo and getattr(photo, "filename", None))
@@ -152,9 +131,10 @@ def create_note():
     if visibility == "everyone" and not Resource.SITE.allowed(Action.EDIT):
         abort(403)
 
-    note_data = {
-        "parent": current_user,
-        "user": current_user,
+    actor = authenticated_user()
+    note_data: NoteCreation = {
+        "parent": actor,
+        "user": actor,
         "body": body,
         "photo": photo if has_photo else None,
         "visibility": visibility,
@@ -167,21 +147,16 @@ def create_note():
     return responses.new_note(new_note, surface="home")
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_delete_activity_item_from_home
-# @matrix activity notes notifications : delete ownership
 @internal.route("/activity/<key>", methods=["DELETE"])
 @logged_in
-def delete_activity(key):
+def delete_activity(key: str) -> ResponseReturnValue:
     activity = Entities.fetch_one(key, request=Fetch.direct())
-    if not activity or activity.kind not in ("note", "notification"):
+    if not isinstance(activity, (Entities.NOTE, Entities.NOTIFICATION)):
         return responses.not_found("Activity item not found")
 
     if activity.kind == "note" and not activity.allowed(
         Action.DELETE, user=current_user
-    ):
-        abort(403)
-    elif (
+    ) or (
         activity.kind == "notification"
         and activity.properties.parent.key != current_user.key
     ):
@@ -190,25 +165,20 @@ def delete_activity(key):
     if activity.kind == "notification":
         if activity.notification_type != "ordinary":
             abort(403)
-        notification_service.delete_ordinary_notification(current_user, activity.key)
-        aggregate = database_notifications.get_notification_aggregate(current_user)
-        notification_service.publish_notification_aggregate(current_user, aggregate)
+        if activity.key is None:
+            return responses.not_found("Activity item not found")
+        notification_service.delete_ordinary_notification(authenticated_user(), activity.key)
+        aggregate = database_notifications.get_notification_aggregate(authenticated_user())
+        notification_service.publish_notification_aggregate(authenticated_user(), aggregate)
     else:
         Entities.delete(activity)
 
     return responses.ok()
 
 
-# @testable true
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_category
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_file
-# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_route_rejects_inaccessible_and_missing_targets
-# @matrix starred : add-authorization category file missing-target no-mutation page project unavailable-removal
 @internal.route("/toggle-star/<key>", methods=["PATCH"])
 @logged_in
-def toggle_star(key):
+def toggle_star(key: str) -> ResponseReturnValue:
     """Toggle starred status for an entity.
 
     Removing a stored key mutates only the authenticated user's own starred
