@@ -86,6 +86,10 @@ export default class Entity extends Core {
 		);
 	}
 
+	_initialTabWidget(_tabId: string) {
+		return "default";
+	}
+
 	_tabElement(tabId: string | null) {
 		if (!tabId) return null;
 		return (
@@ -247,7 +251,7 @@ export default class Entity extends Core {
 				"Entity layout requires an active tab and layout container",
 			);
 
-		await activeTab.activate("default");
+		await activeTab.activate(this._initialTabWidget(activeTabId));
 		await activeTab.prepareRender?.(true);
 		return { activeTab, activeTabId, layout, secondary, tabs };
 	}

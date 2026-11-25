@@ -182,6 +182,7 @@ const STYLES = {
     "card": {
       "item": "flex flex-row items-start justify-between gap-2 px-3 py-2 text-base font-semibold hover:bg-kind-bg group/item",
       "directory": "flex flex-row items-center gap-2 px-3 py-2 text-base font-semibold hover:bg-kind-bg group/item",
+      "directoryAction": "flex w-full cursor-pointer flex-row items-center gap-2 text-left",
       "list": "bg-white rounded-md outline-2 outline-kind-default",
       "actions": "flex flex-row items-center gap-1"
     },

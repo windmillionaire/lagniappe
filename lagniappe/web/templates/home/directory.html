@@ -48,5 +48,23 @@
            data-role="title">Admin</a>
       </li>
     {% endif %}
+    <li lp-link
+        data-kind="user"
+        class="{{ styles.home.card.directory }} border-t border-base-light/50">
+      {{ render_icon("settings.page", (styles.icon.default)) }}
+      <a href='{{ url_for("pages.view", key=current_user.page.urlsafe_key, tab="user-settings") }}'
+         class="{{ styles.link.title }}"
+         data-role="title">Account Settings</a>
+    </li>
+    <li data-kind="user" class="{{ styles.home.card.directory }}">
+      <button type="button"
+              data-action="logout"
+              data-route="{{ url_for('users.logout') }}"
+              data-role="sign-out"
+              class="{{ styles.home.card.directoryAction }} {{ styles.link.title }}">
+        {{ render_icon("logout", (styles.icon.default)) }}
+        <span>Sign out</span>
+      </button>
+    </li>
   </ul>
 {% endmacro %}

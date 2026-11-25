@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as ShellView, E as ENDPOINTS, r as request, w as withTransition } from '../foundation.js?v=bbf4a50a';
-import '../upstreamUnavailable.js?v=bbf4a50a';
-import '../connectivity.js?v=bbf4a50a';
+import { S as ShellView, E as ENDPOINTS, r as request, w as withTransition } from '../foundation.js?v=b74a2211';
+import '../upstreamUnavailable.js?v=b74a2211';
+import '../connectivity.js?v=b74a2211';
 
 class Manual extends ShellView {
   async init() {
@@ -63,7 +63,7 @@ class Manual extends ShellView {
     }
     const mobileNavButton = this.elt.querySelector("#manual-nav-button");
     if (!mobileNavButton) return null;
-    this._mobileDropdownPromise = import('../combobox.js?v=bbf4a50a').then(function (n) { return n.e; }).then(({ Dropdown }) => {
+    this._mobileDropdownPromise = import('../combobox.js?v=b74a2211').then(function (n) { return n.e; }).then(({ Dropdown }) => {
       if (this._destroyed || !this.mobile) return null;
       const menu = {
         items: Array.from(this.sections.values()).map((section) => ({

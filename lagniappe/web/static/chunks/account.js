@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request } from './foundation.js?v=bbf4a50a';
+import { r as request } from './foundation.js?v=b74a2211';
 
 const LOGOUT_BUTTON_SELECTOR = "[data-action='logout'][data-route]";
 let initialized = false;

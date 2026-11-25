@@ -126,13 +126,50 @@ def test_directory_links_present(get_admin):
     directory = home.directory
     list_root = directory.list
 
-    for link in ["Active Tasks", "Forms", "Users", "Admin"]:
+    for link in ["Active Tasks", "Forms", "Users", "Admin", "Account Settings"]:
         link_element = list_root.locator(f"a:has-text('{link}')")
         expect(link_element).to_be_visible()
+    expect(list_root.get_by_role("button", name="Sign out")).to_be_visible()
     expect(user.locate(home.MANUAL_BUTTON)).to_be_visible()
 
     user.locate(home.DIRECTORY_LIST_TOGGLE).click()
     expect(list_root).not_to_be_visible()
+
+
+# @template home/directory.html::list
+@pytest.mark.e2e
+def test_directory_account_settings_and_sign_out(get_admin, get_user):
+    """Account Settings opens User Info directly, and Sign out ends the session."""
+    from testing.definitions.user_definitions import UserDefinition
+
+    owner = get_admin()
+    suffix = uuid4().hex
+    user = get_user(
+        UserDefinition(
+            name=f"Directory Account {suffix[:8]}",
+            email=f"directory-account-{suffix}@example.test",
+        ),
+        creator=owner,
+    )
+    home = user.go(SitePages.HOME)
+    directory = home.directory.list
+
+    account_settings = directory.get_by_role("link", name="Account Settings")
+    expect(account_settings).to_be_visible()
+    with user.page.expect_navigation():
+        account_settings.click()
+
+    user_settings_form = user.locate("form[data-widget='UserSettings']")
+    expect(user_settings_form).to_be_visible()
+    expect(user_settings_form).to_have_attribute("initialized", "")
+    assert "tab=" not in user.page.url
+
+    home = user.go(SitePages.HOME)
+    sign_out = home.directory.list.get_by_role("button", name="Sign out")
+    expect(sign_out).to_be_visible()
+    with user.page.expect_navigation():
+        sign_out.click()
+    assert "/users/login" in user.page.url
 
 
 # @template manual/content/overview.html::open_source

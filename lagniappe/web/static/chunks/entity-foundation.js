@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { C as Core, N as NavElement } from './core-foundation.js?v=bbf4a50a';
-import { d as debounce, w as withTransition } from './foundation.js?v=bbf4a50a';
+import { C as Core, N as NavElement } from './core-foundation.js?v=b74a2211';
+import { d as debounce, w as withTransition } from './foundation.js?v=b74a2211';
 
 class Entity extends Core {
   constructor(node) {
@@ -28,6 +28,9 @@ class Entity extends Core {
   }
   _initialTabId() {
     return this.querySlug(this.queryParam("tab")) || localStorage.getItem(`${this.hash}-active`);
+  }
+  _initialTabWidget(_tabId) {
+    return "default";
   }
   _tabElement(tabId) {
     if (!tabId) return null;
@@ -158,7 +161,7 @@ class Entity extends Core {
       throw new Error(
         "Entity layout requires an active tab and layout container"
       );
-    await activeTab.activate("default");
+    await activeTab.activate(this._initialTabWidget(activeTabId));
     await activeTab.prepareRender?.(true);
     return { activeTab, activeTabId, layout, secondary, tabs };
   }

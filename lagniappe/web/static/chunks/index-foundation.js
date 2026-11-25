@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from './foundation.js?v=bbf4a50a';
-import { C as Core } from './core-foundation.js?v=bbf4a50a';
+import { w as withTransition } from './foundation.js?v=b74a2211';
+import { C as Core } from './core-foundation.js?v=b74a2211';
 
 class TableVisibilityState {
   constructor({
@@ -280,8 +280,8 @@ class EntityIndex extends Core {
     );
     if (!trigger) return;
     this._dropdownPromise = Promise.all([
-      import('./combobox.js?v=bbf4a50a').then(function (n) { return n.e; }),
-      import('./ui-resources.js?v=bbf4a50a').then(function (n) { return n.a; })
+      import('./combobox.js?v=b74a2211').then(function (n) { return n.e; }),
+      import('./ui-resources.js?v=b74a2211').then(function (n) { return n.a; })
     ]).then(([{ Dropdown }, { STYLES }]) => {
       if (this._destroyed || !this.mobile) return null;
       const items = [];
@@ -360,7 +360,7 @@ class EntityIndex extends Core {
     if (this._destroyed || token !== this._tableLoadingToken || !tbody.isConnected || tbody.hasAttribute("loaded") || tbody.querySelector("tr[lp-entity]") || tbody.querySelector("tr[data-role='loading']")) {
       return;
     }
-    const { STYLES } = await import('./ui-resources.js?v=bbf4a50a').then(function (n) { return n.a; });
+    const { STYLES } = await import('./ui-resources.js?v=b74a2211').then(function (n) { return n.a; });
     if (this._destroyed || token !== this._tableLoadingToken || !tbody.isConnected || tbody.hasAttribute("loaded") || tbody.querySelector("tr[lp-entity]") || tbody.querySelector("tr[data-role='loading']")) {
       return;
     }

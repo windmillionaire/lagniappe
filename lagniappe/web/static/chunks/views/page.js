@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { s as setIcon } from '../ui-resources.js?v=bbf4a50a';
-import { w as withTransition } from '../foundation.js?v=bbf4a50a';
-import { E as Entity } from '../entity-foundation.js?v=bbf4a50a';
-import '../upstreamUnavailable.js?v=bbf4a50a';
-import '../connectivity.js?v=bbf4a50a';
-import '../core-foundation.js?v=bbf4a50a';
+import { s as setIcon } from '../ui-resources.js?v=b74a2211';
+import { w as withTransition } from '../foundation.js?v=b74a2211';
+import { E as Entity } from '../entity-foundation.js?v=b74a2211';
+import '../upstreamUnavailable.js?v=b74a2211';
+import '../connectivity.js?v=b74a2211';
+import '../core-foundation.js?v=b74a2211';
 
 class Page extends Entity {
   async reconcilePollingSubscriptions() {
@@ -47,8 +47,13 @@ class Page extends Entity {
     if (taskId) {
       localStorage.setItem(`${this.hash}-active`, "tasks");
       this.postRender = this._focusTask.bind(this, taskId);
+    } else if (this._requestedUserSettings()) {
+      this._pendingTabWidget = { tabId: "info", widget: "UserSettings" };
     }
     await super.init();
+    if (this._requestedUserSettings()) {
+      this._replaceInitialTabUrl();
+    }
     const photo = this.elt.querySelector("#photo");
     if (photo) {
       const component = this.getComponent(photo);
@@ -63,9 +68,29 @@ class Page extends Entity {
     if (!available) return null;
     return this.elt.querySelector("#photo");
   }
+  _requestedUserSettings() {
+    const raw = new URLSearchParams(window.location.search).get("tab")?.trim();
+    const requested = typeof this.querySlug === "function" ? this.querySlug(raw) : raw?.toLowerCase();
+    return (requested === "user-settings" || requested === "settings") && Boolean(this.elt.querySelector("form[data-widget='UserSettings']"));
+  }
   _initialTabId() {
+    if (this._pendingTabWidget) return this._pendingTabWidget.tabId;
     const tabId = super._initialTabId();
     return tabId === "photo" && (!this.mobile || !this.secondaryCard) ? "info" : tabId;
+  }
+  _initialTabWidget(tabId) {
+    if (this._pendingTabWidget?.tabId === tabId) {
+      const { widget } = this._pendingTabWidget;
+      this._pendingTabWidget = null;
+      return widget;
+    }
+    return super._initialTabWidget(tabId);
+  }
+  _replaceInitialTabUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("tab");
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState(null, "", next);
   }
   _tabChange(event) {
     super._tabChange(event);

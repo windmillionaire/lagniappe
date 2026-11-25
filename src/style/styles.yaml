@@ -604,6 +604,10 @@ home:
       classes: flex flex-row items-center gap-2 px-3 py-2 text-base font-semibold hover:bg-kind-bg group/item
       intent: directory presentation within home card
       surfaces: [server]
+    directoryAction:
+      classes: flex w-full cursor-pointer flex-row items-center gap-2 text-left
+      intent: full-row button layout for non-link actions inside the Home directory card
+      surfaces: [server]
     list:
       classes: bg-white rounded-md outline-2 outline-kind-default
       intent: list presentation within home card

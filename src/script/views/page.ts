@@ -15,6 +15,7 @@ export default class Page extends Entity {
 	declare photoActiveTab?: string;
 	declare photoBusy?: boolean;
 	declare _taskChannelUnsubscribe?: (() => void) | null;
+	declare _pendingTabWidget?: { tabId: string; widget: string } | null;
 
 	async reconcilePollingSubscriptions() {
 		await super.reconcilePollingSubscriptions();
@@ -61,9 +62,15 @@ export default class Page extends Entity {
 		if (taskId) {
 			localStorage.setItem(`${this.hash}-active`, "tasks");
 			this.postRender = this._focusTask.bind(this, taskId);
+		} else if (this._requestedUserSettings()) {
+			this._pendingTabWidget = { tabId: "info", widget: "UserSettings" };
 		}
 
 		await super.init();
+
+		if (this._requestedUserSettings()) {
+			this._replaceInitialTabUrl();
+		}
 
 		const photo = this.elt.querySelector<HTMLElement>("#photo");
 		if (photo) {
@@ -84,11 +91,40 @@ export default class Page extends Entity {
 		return this.elt.querySelector<HTMLElement>("#photo");
 	}
 
+	_requestedUserSettings() {
+		const raw = new URLSearchParams(window.location.search).get("tab")?.trim();
+		const requested =
+			typeof this.querySlug === "function"
+				? this.querySlug(raw)
+				: raw?.toLowerCase();
+		return (
+			(requested === "user-settings" || requested === "settings") &&
+			Boolean(this.elt.querySelector("form[data-widget='UserSettings']"))
+		);
+	}
+
 	_initialTabId() {
+		if (this._pendingTabWidget) return this._pendingTabWidget.tabId;
 		const tabId = super._initialTabId();
 		return tabId === "photo" && (!this.mobile || !this.secondaryCard)
 			? "info"
 			: tabId;
+	}
+
+	_initialTabWidget(tabId: string) {
+		if (this._pendingTabWidget?.tabId === tabId) {
+			const { widget } = this._pendingTabWidget;
+			this._pendingTabWidget = null;
+			return widget;
+		}
+		return super._initialTabWidget(tabId);
+	}
+
+	_replaceInitialTabUrl() {
+		const url = new URL(window.location.href);
+		url.searchParams.delete("tab");
+		const next = `${url.pathname}${url.search}${url.hash}`;
+		window.history.replaceState(null, "", next);
 	}
 
 	_tabChange(event: SubcomponentEvent) {
