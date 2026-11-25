@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { h as handleUpstreamResponse } from './upstreamUnavailable.js?v=be84e1e9';
-import { c as connectivity } from './connectivity.js?v=be84e1e9';
+import { h as handleUpstreamResponse } from './upstreamUnavailable.js?v=b6c361d7';
+import { c as connectivity } from './connectivity.js?v=b6c361d7';
 
 const getErrorDetails = (error) => error && (typeof error === "object" || typeof error === "function") ? error : void 0;
 const getElementContext = (element) => {
@@ -430,157 +430,108 @@ const uint8ArrayToBase64 = (bytes) => {
 };
 
 const ENDPOINTS = {
-  CollaborativeDocument: (settings) => {
-    return {
-      sendUpdates: `/assets/${settings.key}/document/update`,
-      saveDocument: `/assets/${settings.key}/document/save`,
-      addImage: `/assets/${settings.key}/document/image`,
-      generateText: `/assets/${settings.key}/document/generate`,
-      removeUser: `/assets/${settings.key}/document/remove-user`,
-      getContent: `/assets/${settings.key}/document/state`,
-      history: `/assets/${settings.key}/document/history`
-    };
-  },
-  Filters: (settings) => {
-    return {
-      condition: `/filters/${settings.key}/condition`,
-      options: `/filters/${settings.key}/options`,
-      save: `/filters/${settings.key}/save`,
-      test: `/filters/${settings.key}/test`,
-      get: `/filters/${settings.key}/get`
-    };
-  },
-  FileInfo: (settings) => {
-    return {
-      html: `/files/${settings.key}/html`
-    };
-  },
-  PagePhoto: (settings) => {
-    return {
-      upload: `/assets/${settings.key}/add-page-image`,
-      generate: `/assets/${settings.key}/generate-page-image`,
-      remove: `/assets/${settings.key}/remove-page-image`
-    };
-  },
-  SiteAiModels: () => {
-    return {
-      setAiSettings: "/l/set-ai-settings"
-    };
-  },
-  SiteAdministrators: () => {
-    return {
-      promote: "/l/site-administrators",
-      demote: (key) => `/l/site-administrators/${key}`
-    };
-  },
-  SiteDeployment: () => {
-    return {
-      setDeploymentSettings: "/l/set-deployment-settings"
-    };
-  },
-  SiteImage: () => {
-    return {
-      setSiteImage: "/l/set-site-image"
-    };
-  },
-  SiteMaintenance: () => {
-    return {
-      siteConfiguration: "/l/site-configuration",
-      siteUpdate: "/l/site-update",
-      rebuildCache: "/l/rebuild-cache"
-    };
-  },
-  SiteSettings: () => {
-    return {
-      siteSettings: "/l/site-settings"
-    };
-  },
-  HomeTaskList: () => {
-    return {
-      completeTask: (key) => {
-        return `/tasks/${key}/complete`;
-      },
-      changeDueDate: (key) => {
-        return `/tasks/${key}/change-due-date`;
-      }
-    };
-  },
-  TaskForm: (settings) => {
-    return {
-      latestHistorySubmission: `/tasks/${settings.key}/history/latest-submission`
-    };
-  },
-  TaskUpload: (settings) => {
-    return {
-      upload: `/tasks/${settings.key}/upload-file`,
-      remove: (fileKey) => `/tasks/${settings.key}/files/${fileKey}`
-    };
-  },
-  ImportData: () => {
-    return {
-      get: (key) => `/files/ingress?key=${key}`,
-      setStage: (key) => `/files/ingress/${key}/stage`,
-      update: (key) => `/files/ingress/${key}/update`,
-      next: (key) => `/files/ingress/${key}/next`,
-      import: (key) => `/files/ingress/${key}/import`,
-      stop: (key) => `/files/ingress/${key}/stop`,
-      deleteImported: (key) => `/files/ingress/${key}/delete-imported`,
-      getPageForm: (key) => `/files/ingress/${key}/get-page-form`
-    };
-  },
+  CollaborativeDocument: ({ key }) => ({
+    addImage: `/assets/${key}/document/image`,
+    generateText: `/assets/${key}/document/generate`,
+    getContent: `/assets/${key}/document/state`,
+    history: `/assets/${key}/document/history`
+  }),
+  Filters: ({ key }) => ({
+    condition: `/filters/${key}/condition`,
+    options: `/filters/${key}/options`,
+    save: `/filters/${key}/save`,
+    test: `/filters/${key}/test`,
+    get: `/filters/${key}/get`
+  }),
+  FileInfo: ({ key }) => ({
+    html: `/files/${key}/html`
+  }),
+  PagePhoto: ({ key }) => ({
+    upload: `/assets/${key}/add-page-image`,
+    generate: `/assets/${key}/generate-page-image`,
+    remove: `/assets/${key}/remove-page-image`
+  }),
+  SiteAiModels: () => ({
+    setAiSettings: `/l/set-ai-settings`
+  }),
+  SiteAdministrators: () => ({
+    promote: `/l/site-administrators`,
+    demote: (key) => `/l/site-administrators/${key}`
+  }),
+  SiteDeployment: () => ({
+    setDeploymentSettings: `/l/set-deployment-settings`
+  }),
+  SiteImage: () => ({
+    setSiteImage: `/l/set-site-image`
+  }),
+  SiteMaintenance: () => ({
+    siteConfiguration: `/l/site-configuration`,
+    siteUpdate: `/l/site-update`,
+    rebuildCache: `/l/rebuild-cache`
+  }),
+  SiteSettings: () => ({
+    siteSettings: `/l/site-settings`
+  }),
+  HomeTaskList: () => ({
+    completeTask: (key) => `/tasks/${key}/complete`,
+    changeDueDate: (key) => `/tasks/${key}/change-due-date`
+  }),
+  TaskForm: ({ key }) => ({
+    latestHistorySubmission: `/tasks/${key}/history/latest-submission`
+  }),
+  TaskUpload: (settings) => ({
+    upload: `/tasks/${settings.key}/upload-file`,
+    remove: (fileKey) => `/tasks/${settings.key}/files/${fileKey}`
+  }),
+  ImportData: () => ({
+    get: (key) => `/files/ingress?key=${key}`,
+    setStage: (key) => `/files/ingress/${key}/stage`,
+    update: (key) => `/files/ingress/${key}/update`,
+    next: (key) => `/files/ingress/${key}/next`,
+    import: (key) => `/files/ingress/${key}/import`,
+    stop: (key) => `/files/ingress/${key}/stop`,
+    deleteImported: (key) => `/files/ingress/${key}/delete-imported`,
+    getPageForm: (key) => `/files/ingress/${key}/get-page-form`
+  }),
   search: {
-    bar: "/l/search-bar",
-    page: "/l/search-page"
+    bar: `/l/search-bar`,
+    page: `/l/search-page`
   },
-  linkPreview: "/l/preview",
-  markdown: "/l/markdown",
-  location: "/l/search-location",
-  facet: (index) => {
-    return `/l/search-index/${index}`;
-  },
-  html: (key, field) => {
-    return {
-      save: `/assets/${key}/form-html/${field}`,
-      addImage: `/assets/${key}/document/image?field=${field}`,
-      generateText: `/assets/${key}/document/generate?field=${field}`,
-      getContent: `/assets/${key}/html/${field}`
-    };
-  },
+  linkPreview: `/l/preview`,
+  markdown: `/l/markdown`,
+  location: `/l/search-location`,
+  facet: (index) => `/l/search-index/${index}`,
+  html: (key, field) => ({
+    save: `/assets/${key}/form-html/${field}`,
+    addImage: `/assets/${key}/document/image?field=${field}`,
+    generateText: `/assets/${key}/document/generate?field=${field}`,
+    getContent: `/assets/${key}/html/${field}`
+  }),
   renderer: {
     validateRow: (key, table_id) => `/forms/${key}/validate-row/${table_id}`,
     expandTableCell: (key, table_id) => `/forms/${key}/expand-table-cell/${table_id}`,
     getSchema: (key) => `/forms/${key}/schema`
   },
   manual: {
-    section: (key) => {
-      return `/manual/section/${key}`;
-    }
-  },
-  collaboration: {
-    start: `/collaboration/start`,
-    stop: `/collaboration/stop`
+    section: (key) => `/manual/section/${key}`
   },
   delete: (key) => `/l/delete/${key}`,
-  toggleStar: (key) => {
-    return `/l/toggle-star/${key}`;
-  },
+  toggleStar: (key) => `/l/toggle-star/${key}`,
   activity: (key) => `/l/activity/${key}`,
-  poll: "/l/poll",
-  notifications: "/l/notifications",
+  poll: `/l/poll`,
+  notifications: `/l/notifications`,
   messages: {
-    conversations: "/l/messages/conversations",
+    conversations: `/l/messages/conversations`,
     history: (key) => `/l/messages/conversations/${key}`,
-    send: "/l/messages",
+    send: `/l/messages`,
     read: (key) => `/l/messages/conversations/${key}/read`,
     remove: (key) => `/l/messages/${key}`,
     clearModal: (key) => `/l/messages/conversations/${key}/delete`
   },
-  help: (key) => {
-    return `/reference/section/${key}`;
-  },
-  createSchema: "/forms/create-schema",
+  help: (key) => `/reference/section/${key}`,
+  createSchema: `/forms/create-schema`,
   restrictions: (key) => `/forms/${key}/restrictions`,
-  sync: "/l/sync"
+  sync: `/l/sync`
 };
 
 const PARSER = new DOMParser();
@@ -1079,7 +1030,7 @@ class ShellView {
       "_pollingPromise",
       "PollingCoordinator",
       async () => {
-        const { PollingCoordinator } = await import('./polling.js?v=be84e1e9');
+        const { PollingCoordinator } = await import('./polling.js?v=b6c361d7');
         return this._destroyed ? null : new PollingCoordinator(this).init();
       }
     );
@@ -1088,7 +1039,7 @@ class ShellView {
     return loadViewService(this, "_searchPromise", "SearchBox", async () => {
       const search = document.querySelector("[lp-search]");
       if (!search) return null;
-      const { SearchBox } = await import('./combobox.js?v=be84e1e9').then(function (n) { return n.d; });
+      const { SearchBox } = await import('./combobox.js?v=b6c361d7').then(function (n) { return n.d; });
       if (this._destroyed) return null;
       const box = new SearchBox(search);
       await box.init();
@@ -1103,7 +1054,7 @@ class ShellView {
       async () => {
         if (!document.querySelector("[data-role='notifications']")) return null;
         await this.ensurePollingCoordinator();
-        const { Notifications } = await import('./notifications.js?v=be84e1e9');
+        const { Notifications } = await import('./notifications.js?v=b6c361d7');
         if (this._destroyed) return null;
         const notifications = new Notifications(this);
         notifications.init();

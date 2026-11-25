@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FormController } from './forms.js?v=be84e1e9';
-import { r as request, E as ENDPOINTS, w as withTransition } from './foundation.js?v=be84e1e9';
-import { p as primitives, b as buttons } from './ui-controls.js?v=be84e1e9';
-import { C as COLOR_MENU, F as FONT_MENU, I as IMAGE_GROUPS, T as ToolbarButton, r as runToolCommand, g as getMarkRange, n as normalizeLinkAttributes } from './document.js?v=be84e1e9';
-import { S as STYLES } from './ui-resources.js?v=be84e1e9';
-import { a as RemoteQueryCombobox, R as Results } from './combobox.js?v=be84e1e9';
-import { Modal } from './modal.js?v=be84e1e9';
-import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './uploads.js?v=be84e1e9';
+import { F as FormController } from './forms.js?v=b6c361d7';
+import { r as request, E as ENDPOINTS, w as withTransition } from './foundation.js?v=b6c361d7';
+import { p as primitives, b as buttons } from './ui-controls.js?v=b6c361d7';
+import { C as COLOR_MENU, F as FONT_MENU, I as IMAGE_GROUPS, T as ToolbarButton, r as runToolCommand, g as getMarkRange, n as normalizeLinkAttributes } from './document.js?v=b6c361d7';
+import { S as STYLES } from './ui-resources.js?v=b6c361d7';
+import { a as RemoteQueryCombobox, R as Results } from './combobox.js?v=b6c361d7';
+import { Modal } from './modal.js?v=b6c361d7';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './uploads.js?v=b6c361d7';
 
 class PinVersion {
   constructor(toolbar) {

@@ -89,7 +89,7 @@ Modules:
 |---|---|
 | `analytics.ts` | `analytics.tag()` and `analytics.view()` -- fire-and-forget page-load, login, and public-view tracking using metadata from the current page. |
 | `connectivity.ts` | `ConnectivityState` and the shared `connectivity` instance -- explicit browser-link, server-reachability, visibility, and service-worker-controller state. |
-| `endpoints.ts` | API route definitions, organized by widget name. Widget-specific endpoints are functions keyed by widget name (e.g. `ENDPOINTS.Filters(settings)`); global endpoints are static properties. |
+| `endpoints.ts` | Public import for browser URLs generated from Flask. Widgets use helpers such as `ENDPOINTS.Filters(settings)`. The [frontend build guide](INFRA_BUILD.md#browser-endpoints) covers adding and refreshing bindings. |
 | `polling.ts` | `PollingCoordinator` -- one adaptive, visibility-aware scheduler with periodic/foreground and immediate/scheduled subscription modes for entity, channel, document, operation, form-lock, and ingress state. Subscription-owned visible-blur eligibility lets rendered deferred operations retain their normal cadence for at most ten minutes without waking other work. Notification state piggybacks on any poll and uses one personal-state-only request after a cold `/l/ping` miss. |
 | `notificationState.ts` | Parses `X-Lagniappe-Notification-State`, stores the latest generation/revision/count before the lazy menu loads, updates the badge, and publishes state changes to menu/coordinator consumers. |
 | `deferredOperations.ts` | `DeferredOperationManager` -- owner-authorized operation subscriptions and revision-aware terminal destination reconciliation. |

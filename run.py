@@ -727,6 +727,29 @@ def _read_optional_git_text(
         return None
 
 
+def _browser_endpoint_release_issues(repo_root: Path) -> list[str]:
+    """Compare the staged browser bindings with the staged Flask application."""
+    # Flask registers blueprints and decorators on import. Run the generator
+    # in an isolated copy of the index so unstaged edits cannot affect either side.
+    with tempfile.TemporaryDirectory(prefix="lagniappe-release-endpoints-") as snapshot:
+        _run_release_git(
+            repo_root,
+            [
+                "checkout-index", "--all", "--ignore-skip-worktree-bits",
+                f"--prefix={Path(snapshot).as_posix()}/",
+            ],
+        )
+        result = subprocess.run(
+            [sys.executable, "-EB", "-m", "runner.browser_endpoints", "--check"],
+            cwd=snapshot,
+            capture_output=True,
+            text=True,
+        )
+    if result.returncode:
+        return [f"Browser endpoints: {result.stderr.strip() or result.stdout.strip()}"]
+    return []
+
+
 def _migration_catalog_metadata(content: str) -> dict[str, dict]:
     """Extract immutable migration metadata without importing application code."""
     tree = ast.parse(content)
@@ -974,6 +997,7 @@ def release_readiness_issues(
         expected_version=version,
     )
     issues.extend(f"Frontend build: {issue}" for issue in frontend_issues)
+    issues.extend(_browser_endpoint_release_issues(repo_root))
 
     release_note = None
     if version:
@@ -1044,7 +1068,7 @@ def run_release_check_command(
     parser = argparse.ArgumentParser(
         prog="run.py release-check",
         description=(
-            "Check version metadata, release notes, local-file boundaries, "
+            "Check version metadata, release notes, browser endpoints, local-file boundaries, "
             "and the maintainer-generated delivery build."
         ),
     )

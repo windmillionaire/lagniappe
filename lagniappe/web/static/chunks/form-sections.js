@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from './foundation.js?v=be84e1e9';
-import { B as BaseUpload, u as uploadElement, U as UploadMenu, T as TaskUpload } from './uploads.js?v=be84e1e9';
-import { p as primitives, b as buttons, f as formatting } from './ui-controls.js?v=be84e1e9';
-import { S as STYLES, s as setIcon, i as iconDefinition } from './ui-resources.js?v=be84e1e9';
-import { i as isFacetOption, a as FacetsBox } from './forms.js?v=be84e1e9';
+import { w as withTransition } from './foundation.js?v=b6c361d7';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu, T as TaskUpload } from './uploads.js?v=b6c361d7';
+import { p as primitives, b as buttons, f as formatting } from './ui-controls.js?v=b6c361d7';
+import { S as STYLES, s as setIcon, i as iconDefinition } from './ui-resources.js?v=b6c361d7';
+import { i as isFacetOption, a as FacetsBox } from './forms.js?v=b6c361d7';
 
 const AUTOFILL_DROPZONE_TEXT = "Click or drop to add a related image or a pdf";
 class AutofillUpload extends BaseUpload {

@@ -1,0 +1,107 @@
+// Generated from the registered Flask routes. Regenerate with venv/bin/python -m runner.browser_endpoints.
+type KeyedSettings = { key: string };
+
+export const ENDPOINTS = {
+	CollaborativeDocument: ({ key }: KeyedSettings) => ({
+		addImage: `{{ path("assets.add_document_image", key="key") }}`,
+		generateText: `{{ path("assets.generate_text", key="key") }}`,
+		getContent: `{{ path("assets.get_document_state", key="key") }}`,
+		history: `{{ path("assets.list_document_history", key="key") }}`,
+	}),
+	Filters: ({ key }: KeyedSettings) => ({
+		condition: `{{ path("filters.condition", key="key") }}`,
+		options: `{{ path("filters.options", key="key") }}`,
+		save: `{{ path("filters.save", key="key") }}`,
+		test: `{{ path("filters.test", key="key") }}`,
+		get: `{{ path("filters.get", key="key") }}`,
+	}),
+	FileInfo: ({ key }: KeyedSettings) => ({
+		html: `{{ path("files.get_html", key="key") }}`,
+	}),
+	PagePhoto: ({ key }: KeyedSettings) => ({
+		upload: `{{ path("assets.add_page_image", key="key") }}`,
+		generate: `{{ path("assets.generate_page_image", key="key") }}`,
+		remove: `{{ path("assets.remove_page_image", key="key") }}`,
+	}),
+	SiteAiModels: () => ({
+		setAiSettings: `{{ path("internal.set_ai_settings") }}`,
+	}),
+	SiteAdministrators: () => ({
+		promote: `{{ path("internal.promote_site_administrator") }}`,
+		demote: (key: string) => `{{ path("internal.demote_site_administrator", key="key") }}`,
+	}),
+	SiteDeployment: () => ({
+		setDeploymentSettings: `{{ path("internal.set_deployment_settings") }}`,
+	}),
+	SiteImage: () => ({
+		setSiteImage: `{{ path("internal.set_site_image") }}`,
+	}),
+	SiteMaintenance: () => ({
+		siteConfiguration: `{{ path("internal.site_configuration") }}`,
+		siteUpdate: `{{ path("internal.site_update") }}`,
+		rebuildCache: `{{ path("internal.rebuild_cache") }}`,
+	}),
+	SiteSettings: () => ({
+		siteSettings: `{{ path("internal.site_settings") }}`,
+	}),
+	HomeTaskList: () => ({
+		completeTask: (key: string) => `{{ path("tasks.complete", key="key") }}`,
+		changeDueDate: (key: string) => `{{ path("tasks.change_due_date", key="key") }}`,
+	}),
+	TaskForm: ({ key }: KeyedSettings) => ({
+		latestHistorySubmission: `{{ path("tasks.latest_history_submission", key="key") }}`,
+	}),
+	TaskUpload: (settings: KeyedSettings) => ({
+		upload: `{{ path("tasks.upload_file", key="settings.key") }}`,
+		remove: (fileKey: string) => `{{ path("tasks.delete_file", key="settings.key", file_key="fileKey") }}`,
+	}),
+	ImportData: () => ({
+		get: (key: string) => `{{ path("files.ingress") }}?key=${key}`,
+		setStage: (key: string) => `{{ path("files.ingress_stage", key="key") }}`,
+		update: (key: string) => `{{ path("files.ingress_update", key="key") }}`,
+		next: (key: string) => `{{ path("files.ingress_next", key="key") }}`,
+		import: (key: string) => `{{ path("files.ingress_import", key="key") }}`,
+		stop: (key: string) => `{{ path("files.ingress_stop", key="key") }}`,
+		deleteImported: (key: string) => `{{ path("files.ingress_delete_imported", key="key") }}`,
+		getPageForm: (key: string) => `{{ path("files.ingress_get_page_form", key="key") }}`,
+	}),
+	search: {
+		bar: `{{ path("internal.search_bar") }}`,
+		page: `{{ path("internal.search_page") }}`,
+	},
+	linkPreview: `{{ path("internal.preview") }}`,
+	markdown: `{{ path("internal.markdown") }}`,
+	location: `{{ path("internal.location_search") }}`,
+	facet: (index: string) => `{{ path("internal.index", kind="index") }}`,
+	html: (key: string, field: string) => ({
+		save: `{{ path("assets.form_html", key="key", field_id="field") }}`,
+		addImage: `{{ path("assets.add_document_image", key="key") }}?field=${field}`,
+		generateText: `{{ path("assets.generate_text", key="key") }}?field=${field}`,
+		getContent: `{{ path("assets.html_field", key="key", field_id="field") }}`,
+	}),
+	renderer: {
+		validateRow: (key: string, table_id: string) => `{{ path("forms.validate_row", key="key", table_id="table_id") }}`,
+		expandTableCell: (key: string, table_id: string) => `{{ path("forms.expand_table_cell", key="key", table_id="table_id") }}`,
+		getSchema: (key: string) => `{{ path("forms.schema", key="key") }}`,
+	},
+	manual: {
+		section: (key: string) => `{{ path("manual.content", section="key") }}`,
+	},
+	delete: (key: string) => `{{ path("internal.delete", key="key") }}`,
+	toggleStar: (key: string) => `{{ path("internal.toggle_star", key="key") }}`,
+	activity: (key: string) => `{{ path("internal.delete_activity", key="key") }}`,
+	poll: `{{ path("internal.poll") }}`,
+	notifications: `{{ path("internal.notifications", "internal.clear_notifications") }}`,
+	messages: {
+		conversations: `{{ path("message_internal.conversations") }}`,
+		history: (key: string) => `{{ path("message_internal.history", key="key") }}`,
+		send: `{{ path("message_internal.send") }}`,
+		read: (key: string) => `{{ path("message_internal.read", key="key") }}`,
+		remove: (key: string) => `{{ path("message_internal.hide_message", key="key") }}`,
+		clearModal: (key: string) => `{{ path("message_internal.clear_modal", key="key") }}`,
+	},
+	help: (key: string) => `{{ path("reference.section", section="key") }}`,
+	createSchema: `{{ path("forms.create_schema") }}`,
+	restrictions: (key: string) => `{{ path("forms.restrictions", key="key") }}`,
+	sync: `{{ path("internal.sync") }}`,
+};

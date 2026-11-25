@@ -2,6 +2,8 @@
 CONFIG_KIND: lagniappe-settings
 CONFIG_SCHEMA_VERSION: 3
 GOOGLE_CLOUD_PROJECT: project-1
+APP_NAME: Offline test application
+SECRET_KEY: offline-test-fixture-only
 VERSION: "1.0"
 GIBBERISH: bucket-seed
 RUNTIME_SERVICE_ACCOUNT_EMAIL: runtime@project-1.iam.gserviceaccount.com
