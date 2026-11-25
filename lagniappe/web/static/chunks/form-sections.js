@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from './foundation.js?v=b6c361d7';
-import { B as BaseUpload, u as uploadElement, U as UploadMenu, T as TaskUpload } from './uploads.js?v=b6c361d7';
-import { p as primitives, b as buttons, f as formatting } from './ui-controls.js?v=b6c361d7';
-import { S as STYLES, s as setIcon, i as iconDefinition } from './ui-resources.js?v=b6c361d7';
-import { i as isFacetOption, a as FacetsBox } from './forms.js?v=b6c361d7';
+import { w as withTransition } from './foundation.js?v=b8e0e957';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu, T as TaskUpload } from './uploads.js?v=b8e0e957';
+import { p as primitives, b as buttons, f as formatting } from './ui-controls.js?v=b8e0e957';
+import { S as STYLES, s as setIcon, i as iconDefinition } from './ui-resources.js?v=b8e0e957';
+import { i as isFacetOption, a as FacetsBox } from './forms.js?v=b8e0e957';
 
 const AUTOFILL_DROPZONE_TEXT = "Click or drop to add a related image or a pdf";
 class AutofillUpload extends BaseUpload {
@@ -437,13 +437,14 @@ class DueDate {
   }
   createOptionGroups() {
     this.container = primitives.div({
-      style: STYLES.section,
+      style: `${STYLES.section} mt-2`,
       data: {
         visible: this.open ? "true" : "false",
         role: "date-form"
       }
     });
-    this.button.after(this.container);
+    const anchor = this.button.closest("[data-role='section-toggle-row']") ?? this.button;
+    anchor.after(this.container);
     const choices = this.container.appendChild(
       primitives.div({
         style: "flex flex-col gap-3 pt-3"

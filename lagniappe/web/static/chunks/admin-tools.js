@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { b as buttons } from './ui-controls.js?v=b6c361d7';
-import { r as request, w as withTransition, a as clearRecentSearchResults } from './foundation.js?v=b6c361d7';
-import { S as SelectBox, a as FacetsBox } from './forms.js?v=b6c361d7';
-import './connectivity.js?v=b6c361d7';
-import { Modal } from './modal.js?v=b6c361d7';
-import { u as uploadElement, B as BaseUpload, U as UploadMenu } from './uploads.js?v=b6c361d7';
-import { s as setIcon, S as STYLES } from './ui-resources.js?v=b6c361d7';
+import { b as buttons } from './ui-controls.js?v=b8e0e957';
+import { r as request, w as withTransition, a as clearRecentSearchResults } from './foundation.js?v=b8e0e957';
+import { S as SelectBox, a as FacetsBox } from './forms.js?v=b8e0e957';
+import './connectivity.js?v=b8e0e957';
+import { Modal } from './modal.js?v=b8e0e957';
+import { u as uploadElement, B as BaseUpload, U as UploadMenu } from './uploads.js?v=b8e0e957';
+import { s as setIcon, S as STYLES } from './ui-resources.js?v=b8e0e957';
 
 class SiteSetting {
   constructor(attributes) {

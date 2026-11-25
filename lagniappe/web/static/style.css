@@ -490,8 +490,14 @@
   .-mb-2 {
     margin-bottom: calc(var(--spacing) * -2);
   }
+  .-mb-3 {
+    margin-bottom: calc(var(--spacing) * -3);
+  }
   .mb-1 {
     margin-bottom: var(--spacing);
+  }
+  .mb-1\.5 {
+    margin-bottom: calc(var(--spacing) * 1.5);
   }
   .mb-2 {
     margin-bottom: calc(var(--spacing) * 2);
@@ -1953,6 +1959,9 @@
   .opacity-30 {
     opacity: 30%;
   }
+  .opacity-45 {
+    opacity: 45%;
+  }
   .opacity-50 {
     opacity: 50%;
   }
@@ -1967,6 +1976,10 @@
   }
   .shadow {
     --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .shadow-2xs {
+    --tw-shadow: 0 1px var(--tw-shadow-color, rgb(0 0 0 / 0.05));
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
   .shadow-lg {
@@ -2169,6 +2182,9 @@
     :is(:where(.group\/link):hover .group-hover\/link\:text-kind-default) {
       color: var(--kind-default);
     }
+    :is(:where(.group\/read):hover .group-hover\/read\:opacity-100) {
+      opacity: 100%;
+    }
   }
   :is(:where(.group\/toggle)[aria-expanded="true"] .group-aria-expanded\/toggle\:rotate-180) {
     rotate: 180deg;
@@ -2328,6 +2344,9 @@
     .hover\:border-form-dark:hover {
       border-color: var(--color-form-dark);
     }
+    .hover\:border-kind-default:hover {
+      border-color: var(--kind-default);
+    }
     .hover\:bg-base-bg:hover {
       background-color: var(--color-base-bg);
     }
@@ -2381,6 +2400,14 @@
         background-color: color-mix(in oklab, var(--color-white) 70%, transparent);
       }
     }
+    .hover\:bg-white\/80:hover {
+      background-color: color-mix(in srgb, #fff 80%, transparent);
+    }
+    @supports (color: color-mix(in lab, red, red)) {
+      .hover\:bg-white\/80:hover {
+        background-color: color-mix(in oklab, var(--color-white) 80%, transparent);
+      }
+    }
     .hover\:text-base-dark:hover {
       color: var(--color-base-dark);
     }
@@ -2401,6 +2428,9 @@
     }
     .hover\:underline:hover {
       text-decoration-line: underline;
+    }
+    .hover\:opacity-100:hover {
+      opacity: 100%;
     }
     .hover\:outline-kind-default:hover {
       outline-color: var(--kind-default);
@@ -2465,11 +2495,11 @@
   .focus-visible\:border-form-dark:focus-visible {
     border-color: var(--color-form-dark);
   }
+  .focus-visible\:border-kind-default:focus-visible {
+    border-color: var(--kind-default);
+  }
   .focus-visible\:bg-delete-bg:focus-visible {
     background-color: var(--color-delete-bg);
-  }
-  .focus-visible\:bg-kind-bg:focus-visible {
-    background-color: var(--kind-bg);
   }
   .focus-visible\:bg-kind-dark:focus-visible {
     background-color: var(--kind-dark);
@@ -2485,6 +2515,9 @@
   }
   .focus-visible\:underline:focus-visible {
     text-decoration-line: underline;
+  }
+  .focus-visible\:opacity-100:focus-visible {
+    opacity: 100%;
   }
   .focus-visible\:outline-kind-default:focus-visible {
     outline-color: var(--kind-default);
@@ -3079,7 +3112,12 @@ button[type="submit"] .icon[data-icon="generate"] {
   --icon-offset-y: -1.5px;
 }
 .task-action-icon-context .icon[data-icon="project"] {
-  --icon-offset-y: 1px;
+  --icon-offset-y: -0.5px;
+}
+.select-heading .icon {
+  --icon-box-size: var(--icon-sm-box-size);
+  --icon-size: var(--icon-sm-glyph-size);
+  --icon-offset-y: -1px;
 }
 .select-button .icon[data-icon="form"] {
   --icon-offset-y: 1px;
@@ -4453,7 +4491,7 @@ input[role="combobox"][data-panel="closed"]::placeholder {
   outline-width: 2px;
   outline-color: var(--kind-default);
 }
-[data-readonly="false"] label:has([data-role="history-fill"]:is(:hover, :focus-visible)) :where(.form-input:not(:disabled)) {
+[data-readonly="false"] label:has(:is([data-role="history-fill"], [data-role="clear"]):is(:hover, :focus-visible ) ) :where(.form-input:not(:disabled)) {
   outline: 0.5px solid var(--color-base-light);
 }
 button[lp-select][data-readonly="true"], button[lp-select]:disabled {
@@ -4470,6 +4508,11 @@ button[lp-select][data-readonly="true"], button[lp-select]:disabled {
   @supports (color: color-mix(in lab, red, red)) {
     outline-color: color-mix(in oklch, var(--kind-light) 50%, transparent);
   }
+}
+.form-read-row:hover .submission-outline, .form-read-row:has([data-role="edit"]:focus-visible) .submission-outline {
+  background-color: white;
+  outline-color: var(--kind-default);
+  outline-width: 2px;
 }
 .form-link-label {
   line-height: 1.5rem;

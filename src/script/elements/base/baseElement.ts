@@ -201,8 +201,10 @@ export class BaseElement {
 		setIcon(
 			button.appendChild(document.createElement("span")),
 			"historyFill",
-			"icon-sm",
+			"icon-xs",
 		);
+		const labelSpan = button.appendChild(document.createElement("span"));
+		labelSpan.textContent = "Use last";
 
 		button.addEventListener("click", async (event) => {
 			event.preventDefault();
@@ -216,6 +218,7 @@ export class BaseElement {
 				"value" in this ? (this.value ?? this.submission) : this.submission;
 			const before = JSON.stringify(readValue());
 			button.disabled = true;
+			labelSpan.textContent = "Loading...";
 			try {
 				const restored: unknown = await value();
 				if (
@@ -226,6 +229,7 @@ export class BaseElement {
 					this.fillFromHistory(restored);
 			} finally {
 				button.disabled = false;
+				if (button.isConnected) labelSpan.textContent = "Use last";
 			}
 		});
 
@@ -284,44 +288,50 @@ export class BaseElement {
 		}
 		if (read) {
 			read.dataset.role = "read";
-			elt.appendChild(read);
-			if (!this.readonly) {
+			if (!this.readonly && this.hasSubmission) {
+				read.classList.add("cursor-pointer", "transition-colors");
+				const readRow = document.createElement("div");
+				readRow.dataset.role = "read-row";
+				readRow.className = STYLES.form.readRow;
+
 				const button = document.createElement("button");
 				button.type = "button";
 				button.dataset.role = "edit";
 				button.ariaLabel = `Edit ${this.label}`;
 				button.title = `Edit ${this.label}`;
-				button.className = `group-data-[mode=edit]/element:hidden ${STYLES.form.icon}`;
+				button.className = STYLES.form.readEdit;
 				setIcon(
 					button.appendChild(document.createElement("span")),
 					"edit",
 					"icon-sm",
 				);
-				label?.append(button);
+
+				readRow.append(read, button);
+				elt.appendChild(readRow);
 			} else {
-				elt.classList.add("flex", "flex-col", "gap-1");
+				elt.appendChild(read);
+				if (this.readonly) {
+					elt.classList.add("flex", "flex-col", "gap-1");
+				}
 			}
 		}
 
-		if (
-			label &&
-			"clear" in this &&
-			this.clear &&
-			this.mode === "read" &&
-			!this.readonly
-		) {
+		if (label && "clear" in this && this.clear && !this.readonly) {
 			const clearButton = label.appendChild(document.createElement("button"));
 			clearButton.type = "button";
 			clearButton.dataset.role = "clear";
-			clearButton.dataset.kind = "delete";
+			clearButton.dataset.kind = "default";
 			clearButton.ariaLabel = `Clear ${this.label}`;
 			clearButton.title = `Clear ${this.label}`;
+			clearButton.hidden = !this.hasSubmission;
 			clearButton.className = `group-data-[mode=read]/element:hidden ${STYLES.form.icon}`;
 			setIcon(
 				clearButton.appendChild(document.createElement("span")),
-				"clear",
-				"icon-sm",
+				"x",
+				"icon-xs",
 			);
+			const clearText = clearButton.appendChild(document.createElement("span"));
+			clearText.textContent = "Clear";
 		}
 
 		elt._lp_element = this;

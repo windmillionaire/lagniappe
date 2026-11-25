@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { b as FormWidget, I as InputElement, T as TextareaElement, S as SelectBox } from './forms.js?v=b6c361d7';
-import { s as sections, S as SectionToggle } from './form-sections.js?v=b6c361d7';
-import { r as request, c as captureError, w as withTransition } from './foundation.js?v=b6c361d7';
-import './connectivity.js?v=b6c361d7';
-import { S as STYLES, c as createIcon } from './ui-resources.js?v=b6c361d7';
-import { p as primitives } from './ui-controls.js?v=b6c361d7';
-import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './uploads.js?v=b6c361d7';
+import { b as FormWidget, I as InputElement, T as TextareaElement, S as SelectBox } from './forms.js?v=b8e0e957';
+import { s as sections, S as SectionToggle } from './form-sections.js?v=b8e0e957';
+import { r as request, c as captureError, w as withTransition } from './foundation.js?v=b8e0e957';
+import './connectivity.js?v=b8e0e957';
+import { S as STYLES, c as createIcon } from './ui-resources.js?v=b8e0e957';
+import { p as primitives } from './ui-controls.js?v=b8e0e957';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './uploads.js?v=b8e0e957';
 
 class CreateNote extends FormWidget {
   constructor(attributes) {
@@ -106,6 +106,7 @@ class PageForm extends FormWidget {
   constructor(attributes) {
     super(attributes);
     this.formSelect = null;
+    this.categorySelect = null;
   }
   get submitGroup() {
     return this.target.querySelector("[data-role='submit-group']");
@@ -224,6 +225,8 @@ class PageForm extends FormWidget {
     this.destroyables.push(control);
     if (target.matches('[data-action="select-form"]')) {
       this.formSelect = control;
+    } else if (target.matches('[data-role="categories"]')) {
+      this.categorySelect = control;
     }
     return control.elt;
   }
@@ -357,6 +360,39 @@ class CreatePage extends PageForm {
     await super.init();
     const name = this.target.querySelector("input[name='name']");
     if (name) name.required = true;
+  }
+  async prepareSubmit(options) {
+    if (!await super.prepareSubmit(options)) return false;
+    const select = this.categorySelect?.select;
+    if (!select || select.multiple) return true;
+    const typed = select.element?.value?.trim() || "";
+    if (!typed) {
+      this.form?.hideError();
+      return true;
+    }
+    const normalized = typed.toLowerCase();
+    const findExactMatch = () => Array.from(
+      select.panel?.querySelectorAll(
+        "[role='option'][data-id]"
+      ) ?? []
+    ).find(
+      (option) => (option.dataset.name || option.textContent || "").trim().toLowerCase() === normalized
+    ) ?? null;
+    let exactMatch = findExactMatch();
+    if (!exactMatch) {
+      await select._search(typed);
+      exactMatch = findExactMatch();
+    }
+    if (exactMatch) {
+      select.selectOption(exactMatch);
+      this.form?.hideError();
+      return true;
+    }
+    const message = select.creatable === "true" ? `Select a matching category, choose "Create ${typed}" from the list, or clear the Category field to save under Uncategorized Pages.` : "Select a category from the list, or clear the Category field to save under Uncategorized Pages.";
+    this.form?.showError(message);
+    select.element?.focus();
+    select.showPanel();
+    return false;
   }
   get html() {
     return [

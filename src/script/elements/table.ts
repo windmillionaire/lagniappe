@@ -420,14 +420,21 @@ export class TableElement extends BaseElement {
 
 		if (!this.renderer.readonly) {
 			this._createButton = document.createElement("button");
+			this._createButton.type = "button";
 			this._createButton.dataset.role = "create";
+			this._createButton.ariaLabel = `Add row to ${this.schema.title || "table"}`;
+			this._createButton.title = "Add row";
 			this._createButton.className = `group-data-[mode=read]/element:hidden ${STYLES.form.icon}`;
 			this._createButton.dataset.kind = "add";
 			setIcon(
 				this._createButton.appendChild(document.createElement("span")),
 				"addRow",
-				"icon-sm",
+				"icon-xs",
 			);
+			const text = this._createButton.appendChild(
+				document.createElement("span"),
+			);
+			text.textContent = "Add row";
 			label.appendChild(this._createButton);
 		}
 

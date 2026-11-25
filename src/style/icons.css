@@ -128,7 +128,14 @@ button[type="submit"] .icon[data-icon="generate"] {
 
 /* @style task.actionIconContext */
 .task-action-icon-context .icon[data-icon="project"] {
-	--icon-offset-y: 1px;
+	--icon-offset-y: -0.5px;
+}
+
+/* @style select.heading */
+.select-heading .icon {
+	--icon-box-size: var(--icon-sm-box-size);
+	--icon-size: var(--icon-sm-glyph-size);
+	--icon-offset-y: -1px;
 }
 
 /* @style select.button */

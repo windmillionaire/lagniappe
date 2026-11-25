@@ -138,7 +138,10 @@ const STYLES = {
       "title": "text-lg font-semibold text-kind-default flex flex-row items-center gap-2",
       "controls": "flex flex-row items-center gap-1"
     },
-    "icon": "text-kind-default hover:text-kind-dark focus-visible:text-kind-dark focus-visible:bg-kind-bg focus-visible:outline-none ml-1 inline-grid place-items-center rounded-full",
+    "icon": "ml-1.5 inline-flex h-6 items-center gap-1 rounded-full border border-base-light bg-white px-2 text-xs font-medium text-kind-default shadow-2xs transition-colors hover:border-kind-default hover:text-kind-dark focus-visible:border-kind-default focus-visible:text-kind-dark focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+    "readRow": "form-read-row group/read group-data-[mode=edit]/element:hidden inline-flex max-w-full flex-row items-center gap-1.5",
+    "readEdit": "inline-grid size-7 shrink-0 place-items-center rounded-md text-kind-default opacity-45 transition-opacity hover:bg-white/80 hover:opacity-100 group-hover/read:opacity-100 focus-visible:bg-white focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-kind-default cursor-pointer",
+    "editAll": "inline-flex h-7 items-center gap-1 rounded-md border border-base-light bg-white px-2.5 text-xs font-semibold text-kind-default shadow-2xs transition-colors hover:border-kind-default hover:text-kind-dark focus-visible:border-kind-default focus-visible:text-kind-dark focus-visible:outline-2 focus-visible:outline-kind-default cursor-pointer",
     "linkLabel": "form-link-label",
     "restriction": "flex flex-row items-center gap-2 px-3 py-2 justify-between",
     "table": {
@@ -412,7 +415,7 @@ const STYLES = {
     "default": "form-input col-start-1 row-start-1 h-10 w-full appearance-none rounded-md py-1.25 pr-8 pl-3 sm:text-sm placeholder:text-base-medium",
     "icon": "select-icon pointer-events-none col-start-1 row-start-1 mr-2.5 self-center justify-self-end z-25 text-base-medium",
     "button": "select-button group/toggle flex h-10 min-w-0 w-full flex-1 flex-row items-center gap-2 rounded-md bg-white px-3 text-left font-semibold focus-visible:outline-kind-default hover:outline-kind-default hover:outline-2 focus-visible:outline-2 disabled:pointer-events-none disabled:hover:outline-0 disabled:focus-visible:outline-0",
-    "heading": "flex items-center gap-1.5 sm:text-sm font-semibold text-base-dark mb-1",
+    "heading": "select-heading flex items-center gap-1.5 sm:text-sm font-semibold leading-none text-base-dark mb-1.5",
     "label": "min-w-0 flex-1 truncate text-left",
     "row": "flex w-full items-center gap-2",
     "expandIndicator": "ml-auto shrink-0 text-base-medium transition-transform duration-150 group-aria-expanded/toggle:rotate-180",

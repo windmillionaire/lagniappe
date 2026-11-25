@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES, c as createIcon, s as setIcon } from './ui-resources.js?v=b6c361d7';
-import { E as ENDPOINTS, r as request, w as withTransition } from './foundation.js?v=b6c361d7';
-import './connectivity.js?v=b6c361d7';
-import { p as primitives, b as buttons } from './ui-controls.js?v=b6c361d7';
-import { F as FormController } from './forms.js?v=b6c361d7';
-import { d as directUpload } from './directUpload.js?v=b6c361d7';
-import { D as Dropdown } from './combobox.js?v=b6c361d7';
+import { S as STYLES, c as createIcon, s as setIcon } from './ui-resources.js?v=b8e0e957';
+import { E as ENDPOINTS, r as request, w as withTransition } from './foundation.js?v=b8e0e957';
+import './connectivity.js?v=b8e0e957';
+import { p as primitives, b as buttons } from './ui-controls.js?v=b8e0e957';
+import { F as FormController } from './forms.js?v=b8e0e957';
+import { d as directUpload } from './directUpload.js?v=b8e0e957';
+import { D as Dropdown } from './combobox.js?v=b8e0e957';
 
 const DEFAULT_DROPZONE_TEXT = "Drop file here, click to upload, or tap to choose camera/files";
 const visibility = () => {
@@ -968,7 +968,7 @@ class TaskUpload extends BaseUpload {
     });
     this.widget = widget;
     this.target = document.createElement("div");
-    this.target.className = "w-full flex flex-col gap-2 group/upload";
+    this.target.className = "mt-2 w-full flex flex-col gap-2 group/upload";
     this.target.dataset.visible = "false";
     this.button.insertAdjacentElement("afterend", this.target);
     const preload = JSON.parse(button.dataset.preload || "{}");
@@ -1165,14 +1165,22 @@ class TaskUpload extends BaseUpload {
       );
     });
   }
+  get open() {
+    return this.target.dataset.visible === "true";
+  }
   toggleVisibility() {
-    this.target.dataset.visible = this.target.dataset.visible === "true" ? "false" : "true";
+    this.target.dataset.visible = this.open ? "false" : "true";
+    this.toggle?.display();
   }
   reset() {
     super.reset();
   }
   clear() {
-    this.reset();
+    if (this.open) {
+      this.target.dataset.visible = "false";
+    } else {
+      this.reset();
+    }
     this.toggle?.display();
   }
   showError(message) {

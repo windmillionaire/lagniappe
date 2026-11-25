@@ -1,8 +1,12 @@
-import type { ComboboxOption } from "../elements/combobox/combobox.ts";
+import type {
+	ComboboxOption,
+	ComboboxOptionElement,
+} from "../elements/combobox/combobox.ts";
 import { InputElement } from "../elements/input.ts";
 import { sections } from "../elements/sections.ts";
 import { SectionToggle } from "../elements/sectionToggle.ts";
 import { TextareaElement } from "../elements/textarea.ts";
+import type { FormSubmitOptions } from "../forms/controller.ts";
 import { captureError, request } from "../shared/index.ts";
 import { withTransition } from "../shared/transitions.ts";
 import type { FormRevisionFields } from "../types/forms";
@@ -26,11 +30,13 @@ type FormSelection = CustomEvent<{
 
 export class PageForm extends FormWidget {
 	declare formSelect: ReturnType<typeof SectionToggle.facet> | null;
+	declare categorySelect: ReturnType<typeof SectionToggle.facet> | null;
 	declare view?: FormWidget["view"] & Partial<Pick<Page, "_syncPhotoControls">>;
 
 	constructor(attributes: FormWidgetSettings) {
 		super(attributes);
 		this.formSelect = null;
+		this.categorySelect = null;
 	}
 
 	get submitGroup() {
@@ -177,6 +183,8 @@ export class PageForm extends FormWidget {
 		this.destroyables.push(control);
 		if (target.matches('[data-action="select-form"]')) {
 			this.formSelect = control;
+		} else if (target.matches('[data-role="categories"]')) {
+			this.categorySelect = control;
 		}
 		return control.elt;
 	}
@@ -338,6 +346,53 @@ export class CreatePage extends PageForm {
 		const name =
 			this.target.querySelector<HTMLInputElement>("input[name='name']");
 		if (name) name.required = true;
+	}
+
+	async prepareSubmit(options?: FormSubmitOptions) {
+		if (!(await super.prepareSubmit(options))) return false;
+
+		const select = this.categorySelect?.select;
+		if (!select || select.multiple) return true;
+
+		const typed = select.element?.value?.trim() || "";
+		if (!typed) {
+			this.form?.hideError();
+			return true;
+		}
+
+		const normalized = typed.toLowerCase();
+		const findExactMatch = () =>
+			Array.from(
+				select.panel?.querySelectorAll<ComboboxOptionElement>(
+					"[role='option'][data-id]",
+				) ?? [],
+			).find(
+				(option) =>
+					(option.dataset.name || option.textContent || "")
+						.trim()
+						.toLowerCase() === normalized,
+			) ?? null;
+
+		let exactMatch = findExactMatch();
+		if (!exactMatch) {
+			await select._search(typed);
+			exactMatch = findExactMatch();
+		}
+
+		if (exactMatch) {
+			select.selectOption(exactMatch);
+			this.form?.hideError();
+			return true;
+		}
+
+		const message =
+			select.creatable === "true"
+				? `Select a matching category, choose "Create ${typed}" from the list, or clear the Category field to save under Uncategorized Pages.`
+				: "Select a category from the list, or clear the Category field to save under Uncategorized Pages.";
+		this.form?.showError(message);
+		select.element?.focus();
+		select.showPanel();
+		return false;
 	}
 
 	get html() {

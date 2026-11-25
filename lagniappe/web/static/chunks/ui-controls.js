@@ -1,6 +1,15 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES, s as setIcon, c as createIcon, i as iconDefinition } from './ui-resources.js?v=b6c361d7';
+import { S as STYLES, s as setIcon, c as createIcon, i as iconDefinition } from './ui-resources.js?v=b8e0e957';
 
+let controlIdCounter = 0;
+const linkLabelToControl = (labelElt, control) => {
+  if (labelElt.tagName !== "LABEL") return;
+  if (!control.id) {
+    controlIdCounter += 1;
+    control.id = `lp-control-${controlIdCounter}`;
+  }
+  labelElt.setAttribute("for", control.id);
+};
 const setAttributes = (elt, attributes) => {
   if (attributes.name) elt.name = attributes.name;
   if (attributes.id) elt.id = attributes.id;
@@ -27,7 +36,7 @@ function label(attributes) {
   const labelElt = document.createElement(tag);
   labelElt.className = `${styles.label ?? STYLES.form.elementLabel}`;
   const container = labelElt.appendChild(div({ role }));
-  container.className = styles.container ?? "flex flex-row items-center gap-1";
+  container.className = styles.container ?? "flex flex-row flex-wrap items-center gap-1";
   if (icon2) {
     const iconElt = container.appendChild(document.createElement("span"));
     setIcon(iconElt, icon2, styles.icon ?? STYLES.icon.default);
@@ -66,6 +75,7 @@ function input(attributes) {
     const container = label(attributes);
     container.appendChild(elt);
     container.classList.add("flex-col");
+    linkLabelToControl(container, elt);
     return container;
   }
   return elt;
@@ -81,6 +91,7 @@ function textarea(attributes) {
     const container = label(attributes);
     container.appendChild(elt);
     container.classList.add("flex-col");
+    linkLabelToControl(container, elt);
     return container;
   }
   return elt;
@@ -164,6 +175,7 @@ const select = (attributes) => {
     const labelElt = label(attributes);
     labelElt.appendChild(container);
     labelElt.classList.add("flex-col");
+    linkLabelToControl(labelElt, elt);
     return labelElt;
   }
   return container;

@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request, E as ENDPOINTS, w as withTransition } from './foundation.js?v=b6c361d7';
-import { S as STYLES, s as setIcon } from './ui-resources.js?v=b6c361d7';
-import { p as primitives } from './ui-controls.js?v=b6c361d7';
-import { T as TableElement } from './form-complex.js?v=b6c361d7';
+import { r as request, E as ENDPOINTS, w as withTransition } from './foundation.js?v=b8e0e957';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=b8e0e957';
+import { p as primitives } from './ui-controls.js?v=b8e0e957';
+import { T as TableElement } from './form-complex.js?v=b8e0e957';
 
 function isEmbeddedColumn(value) {
   return Boolean(

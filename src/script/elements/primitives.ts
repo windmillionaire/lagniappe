@@ -75,6 +75,20 @@ type PrimitiveControl = (
 	| HTMLButtonElement
 ) & { readOnly?: boolean; required?: boolean };
 
+let controlIdCounter = 0;
+
+const linkLabelToControl = (
+	labelElt: HTMLElement,
+	control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
+) => {
+	if (labelElt.tagName !== "LABEL") return;
+	if (!control.id) {
+		controlIdCounter += 1;
+		control.id = `lp-control-${controlIdCounter}`;
+	}
+	labelElt.setAttribute("for", control.id);
+};
+
 const setAttributes = (
 	elt: PrimitiveControl,
 	attributes: ControlAttributes,
@@ -117,7 +131,8 @@ export function label(
 	labelElt.className = `${styles.label ?? STYLES.form.elementLabel}`;
 
 	const container = labelElt.appendChild(div({ role }));
-	container.className = styles.container ?? "flex flex-row items-center gap-1";
+	container.className =
+		styles.container ?? "flex flex-row flex-wrap items-center gap-1";
 
 	if (icon) {
 		const iconElt = container.appendChild(document.createElement("span"));
@@ -168,6 +183,7 @@ export function input(attributes: InputAttributes) {
 		const container = label(attributes);
 		container.appendChild(elt);
 		container.classList.add("flex-col");
+		linkLabelToControl(container, elt);
 		return container;
 	}
 
@@ -191,6 +207,7 @@ export function textarea(attributes: TextareaAttributes) {
 		const container = label(attributes);
 		container.appendChild(elt);
 		container.classList.add("flex-col");
+		linkLabelToControl(container, elt);
 		return container;
 	}
 
@@ -296,6 +313,7 @@ const select = (attributes: SelectAttributes) => {
 		const labelElt = label(attributes);
 		labelElt.appendChild(container);
 		labelElt.classList.add("flex-col");
+		linkLabelToControl(labelElt, elt);
 		return labelElt;
 	}
 

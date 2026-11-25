@@ -10,7 +10,9 @@ import {
 	renderReviewBar,
 } from "../../forms/reviewBar.ts";
 import type { EditWatcher } from "../../forms/revisions/watcher.ts";
+import { STYLES } from "../../generated/styles.mjs";
 import type { DeferredOperationManager } from "../../shared/deferredOperations.ts";
+import { setIcon } from "../../shared/icons.ts";
 import type { Modal } from "../../shared/modal.ts";
 import type { OfflineQueue } from "../../shared/offlineQueue.ts";
 import { withTransition } from "../../shared/transitions.ts";
@@ -226,6 +228,7 @@ export class FormWidget {
 		this._deferredOperation = this.target?.dataset?.operation || null;
 
 		this._click = this._click.bind(this);
+		this._syncFieldClearEvent = this._syncFieldClearEvent.bind(this);
 	}
 
 	get deferredLocked() {
@@ -675,6 +678,10 @@ export class FormWidget {
 			this.target.append(generation);
 		}
 		this.target.addEventListener("click", this._click);
+		this.target.addEventListener("input", this._syncFieldClearEvent);
+		this.target.addEventListener("change", this._syncFieldClearEvent);
+		this.target.addEventListener("updated", this._syncFieldClearEvent);
+		this._syncEditAllButton();
 		const hasDeferredOperation =
 			this.target.matches?.("[data-operation]") ||
 			this.target.querySelector?.("[data-operation]");
@@ -687,30 +694,184 @@ export class FormWidget {
 		this.target.setAttribute("initialized", "");
 	}
 
+	_editableReadFields() {
+		if (this.readonly || this.revisionPreview || !this.target) return [];
+		return Array.from(
+			this.target.querySelectorAll<FormFieldTarget>(
+				".form-element[data-mode='read']",
+			),
+		).filter((element) => Boolean(element.querySelector("[data-role='read']")));
+	}
+
+	_syncEditAllButton() {
+		if (!this.target) return;
+		const existingBar = this.target.querySelector<HTMLElement>(
+			":scope > [data-role='edit-all-bar']",
+		);
+		const readFields = this._editableReadFields();
+		if (readFields.length < 2) {
+			existingBar?.remove();
+			return;
+		}
+		if (existingBar) {
+			existingBar.hidden = false;
+			return;
+		}
+
+		const firstField = this.target.querySelector<HTMLElement>(".form-element");
+		if (!firstField) return;
+
+		const bar = document.createElement("div");
+		bar.dataset.role = "edit-all-bar";
+		bar.className = "flex items-center justify-end -mb-3";
+
+		const button = document.createElement("button");
+		button.type = "button";
+		button.dataset.role = "edit-all";
+		button.ariaLabel = "Edit all fields";
+		button.title = "Edit all fields";
+		button.className = STYLES.form.editAll;
+		setIcon(
+			button.appendChild(document.createElement("span")),
+			"edit",
+			"icon-xs",
+		);
+		const text = button.appendChild(document.createElement("span"));
+		text.textContent = "Edit all";
+		bar.appendChild(button);
+
+		if (firstField.parentElement === this.target) {
+			this.target.insertBefore(bar, firstField);
+		} else {
+			firstField.before(bar);
+		}
+	}
+
+	_hasFieldValue(element: FormFieldTarget) {
+		const field =
+			element._lp_element ?? this.form?.renderer?.elements.get(element.id);
+		if (field && "value" in field) {
+			const val = (field as { value?: unknown }).value;
+			if (Array.isArray(val)) return val.length > 0;
+			if (val && typeof val === "object") return Object.keys(val).length > 0;
+			return val !== null && val !== undefined && val !== "";
+		}
+		if (
+			element.querySelector(
+				"input[type='radio']:checked, input[type='checkbox']:checked",
+			)
+		) {
+			return true;
+		}
+		const textInput = element.querySelector<
+			HTMLInputElement | HTMLTextAreaElement
+		>("input:not([type='radio']):not([type='checkbox']), textarea");
+		if (textInput) return textInput.value !== "";
+		const select = element.querySelector<HTMLSelectElement>("select");
+		if (select) return select.selectedOptions.length > 0 && select.value !== "";
+		return false;
+	}
+
+	_syncFieldClear(element: FormFieldTarget | null) {
+		if (!element) return;
+		const clearButton = element.querySelector<HTMLButtonElement>(
+			"[data-role='label'] [data-role='clear']",
+		);
+		if (!clearButton) return;
+		clearButton.hidden = !this._hasFieldValue(element);
+	}
+
+	_syncFieldClearEvent(e: Event) {
+		if (this.readonly) return;
+		const target = e.target as Element | null;
+		const element = target?.closest<FormFieldTarget>(".form-element") ?? null;
+		this._syncFieldClear(element);
+		if (e.type === "change") this._syncEditAllButton();
+	}
+
+	_focusFieldControl(element: FormFieldTarget) {
+		const field =
+			element._lp_element ?? this.form?.renderer?.elements.get(element.id);
+		if (field && "focus" in field && typeof field.focus === "function") {
+			field.focus();
+			return;
+		}
+		const control = element.querySelector<HTMLElement>(
+			"input:not([type='hidden']):not(:disabled), textarea:not(:disabled), select:not(:disabled)",
+		);
+		control?.focus();
+	}
+
+	_enterFieldEdit(element: FormFieldTarget, { focus = true } = {}) {
+		void withTransition(
+			() => {
+				element.dataset.mode = "edit";
+				this._syncFieldClear(element);
+				this._syncEditAllButton();
+				if (focus) this._focusFieldControl(element);
+			},
+			{ label: "form:edit-field" },
+		);
+	}
+
 	_click(e: MouseEvent) {
 		if (this.readonly) return;
 
 		const target = e.target as Element | null;
 		if (!target?.closest) return;
+
+		const editAll = target.closest<HTMLElement>("[data-role='edit-all']");
+		if (editAll && this.target.contains(editAll)) {
+			e.preventDefault();
+			e.stopPropagation();
+			const readFields = this._editableReadFields();
+			if (readFields.length === 0) return;
+			void withTransition(
+				() => {
+					for (const field of readFields) {
+						field.dataset.mode = "edit";
+						this._syncFieldClear(field);
+					}
+					this._syncEditAllButton();
+					this._focusFieldControl(readFields[0]);
+				},
+				{ label: "form:edit-all-fields" },
+			);
+			return;
+		}
+
 		const element = target.closest<FormFieldTarget>(".form-element");
 		const role = target.closest<HTMLElement>("[data-role]")?.dataset.role;
-		if (role !== "edit" && role !== "clear") return;
 
-		e.preventDefault();
-		e.stopPropagation();
 		if (!element) return;
 
 		if (role === "edit") {
-			void withTransition(
-				() => {
-					element.dataset.mode = "edit";
-				},
-				{ label: "form:edit-field" },
-			);
-		} else if (role === "clear") {
+			e.preventDefault();
+			e.stopPropagation();
+			this._enterFieldEdit(element);
+			return;
+		}
+
+		if (role === "clear") {
+			e.preventDefault();
+			e.stopPropagation();
 			const field =
 				element._lp_element ?? this.form?.renderer?.elements.get(element.id);
 			field?.clear?.();
+			this._syncFieldClear(element);
+			return;
+		}
+
+		if (element.dataset.mode === "read") {
+			if (target.closest("a, button, input, textarea, select, summary")) return;
+			if (
+				target.closest("[data-role='read']") ||
+				target.closest("[data-role='label']")
+			) {
+				e.preventDefault();
+				e.stopPropagation();
+				this._enterFieldEdit(element);
+			}
 		}
 	}
 

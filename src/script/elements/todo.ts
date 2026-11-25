@@ -18,6 +18,7 @@ interface TodoButton {
 	role: string;
 	icon: string;
 	label: string;
+	text?: string | null;
 	kind?: string | null;
 	header?: boolean;
 }
@@ -146,7 +147,14 @@ export class TodoElement extends BaseElement {
 		});
 	}
 
-	_button({ role, icon, label, kind = null, header = false }: TodoButton) {
+	_button({
+		role,
+		icon,
+		label,
+		text = null,
+		kind = null,
+		header = false,
+	}: TodoButton) {
 		const button = document.createElement("button");
 		button.type = "button";
 		button.dataset.role = role;
@@ -159,8 +167,12 @@ export class TodoElement extends BaseElement {
 		setIcon(
 			button.appendChild(document.createElement("span")),
 			icon,
-			"icon-sm",
+			header ? "icon-xs" : "icon-sm",
 		);
+		if (header && text) {
+			const span = button.appendChild(document.createElement("span"));
+			span.textContent = text;
+		}
 		return button;
 	}
 
@@ -289,6 +301,7 @@ export class TodoElement extends BaseElement {
 						role: "todo-done",
 						icon: "success",
 						label: `Done editing ${this.label}`,
+						text: "Done",
 						kind: "success",
 						header: true,
 					}),
@@ -303,6 +316,7 @@ export class TodoElement extends BaseElement {
 						label: this.hasSubmission
 							? `Edit ${this.label}`
 							: `Add to ${this.label}`,
+						text: this.hasSubmission ? "Edit" : "Add",
 						kind: this.hasSubmission ? null : "add",
 						header: true,
 					}),

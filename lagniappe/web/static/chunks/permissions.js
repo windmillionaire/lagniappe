@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { a as FacetsBox } from './forms.js?v=b6c361d7';
-import { w as withTransition } from './foundation.js?v=b6c361d7';
+import { a as FacetsBox } from './forms.js?v=b8e0e957';
+import { w as withTransition } from './foundation.js?v=b8e0e957';
 
 class PermissionSections {
   constructor(root, { readonly = false, onChange = () => {

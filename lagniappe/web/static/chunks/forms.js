@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as createIcon, S as STYLES, s as setIcon } from './ui-resources.js?v=b6c361d7';
-import { p as primitives, f as formatting } from './ui-controls.js?v=b6c361d7';
-import { c as captureError, g as generateElementId, w as withTransition, s as showBriefly, E as ENDPOINTS, r as request, f as areEqual } from './foundation.js?v=b6c361d7';
-import { Modal } from './modal.js?v=b6c361d7';
-import { R as Results, a as RemoteQueryCombobox, C as Combobox } from './combobox.js?v=b6c361d7';
-import './connectivity.js?v=b6c361d7';
+import { c as createIcon, S as STYLES, s as setIcon } from './ui-resources.js?v=b8e0e957';
+import { p as primitives, f as formatting } from './ui-controls.js?v=b8e0e957';
+import { c as captureError, g as generateElementId, w as withTransition, s as showBriefly, E as ENDPOINTS, r as request, f as areEqual } from './foundation.js?v=b8e0e957';
+import { Modal } from './modal.js?v=b8e0e957';
+import { R as Results, a as RemoteQueryCombobox, C as Combobox } from './combobox.js?v=b8e0e957';
+import './connectivity.js?v=b8e0e957';
 
 function currentReviewOperation(widget, incoming) {
   const current = widget.reviewState?.operation;
@@ -115,7 +115,7 @@ function installReviewBar(widget) {
         if (!operation?.can_cancel) return;
         const data = new FormData();
         data.set("operation-id", String(operation.operation_id));
-        const { request } = await import('./foundation.js?v=b6c361d7').then(function (n) { return n.p; });
+        const { request } = await import('./foundation.js?v=b8e0e957').then(function (n) { return n.p; });
         const response = await request.post(
           `/tools/operations/${encodeURIComponent(operation.key)}/cancel`,
           data
@@ -170,8 +170,8 @@ function installReviewBar(widget) {
 }
 
 const CONTROLS = {
-  "permission-sections": () => import('./permissions.js?v=b6c361d7').then(function (n) { return n.p; }),
-  "access-restrictions": () => import('./permissions.js?v=b6c361d7').then(function (n) { return n.a; })
+  "permission-sections": () => import('./permissions.js?v=b8e0e957').then(function (n) { return n.p; }),
+  "access-restrictions": () => import('./permissions.js?v=b8e0e957').then(function (n) { return n.a; })
 };
 const isFormControl = (name) => name !== void 0 && Object.hasOwn(CONTROLS, name);
 async function initFormControls(form) {
@@ -226,15 +226,15 @@ async function getFormElement(renderer, schema, submission) {
       return new HtmlElement(renderer, schema, submission);
     }
     case "signature": {
-      const { SignatureElement } = await import('./form-complex.js?v=b6c361d7').then(function (n) { return n.s; });
+      const { SignatureElement } = await import('./form-complex.js?v=b8e0e957').then(function (n) { return n.s; });
       return new SignatureElement(renderer, schema, submission);
     }
     case "table": {
-      const { TableElement } = await import('./form-complex.js?v=b6c361d7').then(function (n) { return n.t; });
+      const { TableElement } = await import('./form-complex.js?v=b8e0e957').then(function (n) { return n.t; });
       return new TableElement(renderer, schema, submission);
     }
     case "todo": {
-      const { TodoElement } = await import('./form-complex.js?v=b6c361d7').then(function (n) { return n.a; });
+      const { TodoElement } = await import('./form-complex.js?v=b8e0e957').then(function (n) { return n.a; });
       return new TodoElement(renderer, schema, submission);
     }
     case "link": {
@@ -246,7 +246,7 @@ async function getFormElement(renderer, schema, submission) {
       return new BookmarkElement(renderer, schema, submission);
     }
     case "location": {
-      const { LocationElement } = await import('./location.js?v=b6c361d7');
+      const { LocationElement } = await import('./location.js?v=b8e0e957');
       return new LocationElement(renderer, schema, submission);
     }
     case "status": {
@@ -1354,8 +1354,10 @@ class BaseElement {
     setIcon(
       button.appendChild(document.createElement("span")),
       "historyFill",
-      "icon-sm"
+      "icon-xs"
     );
+    const labelSpan = button.appendChild(document.createElement("span"));
+    labelSpan.textContent = "Use last";
     button.addEventListener("click", async (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -1367,12 +1369,14 @@ class BaseElement {
       const readValue = () => "value" in this ? this.value ?? this.submission : this.submission;
       const before = JSON.stringify(readValue());
       button.disabled = true;
+      labelSpan.textContent = "Loading...";
       try {
         const restored = await value();
         if (button.isConnected && this.canHistoryFill && JSON.stringify(readValue()) === before)
           this.fillFromHistory(restored);
       } finally {
         button.disabled = false;
+        if (button.isConnected) labelSpan.textContent = "Use last";
       }
     });
     return button;
@@ -1416,37 +1420,47 @@ class BaseElement {
     }
     if (read) {
       read.dataset.role = "read";
-      elt.appendChild(read);
-      if (!this.readonly) {
+      if (!this.readonly && this.hasSubmission) {
+        read.classList.add("cursor-pointer", "transition-colors");
+        const readRow = document.createElement("div");
+        readRow.dataset.role = "read-row";
+        readRow.className = STYLES.form.readRow;
         const button = document.createElement("button");
         button.type = "button";
         button.dataset.role = "edit";
         button.ariaLabel = `Edit ${this.label}`;
         button.title = `Edit ${this.label}`;
-        button.className = `group-data-[mode=edit]/element:hidden ${STYLES.form.icon}`;
+        button.className = STYLES.form.readEdit;
         setIcon(
           button.appendChild(document.createElement("span")),
           "edit",
           "icon-sm"
         );
-        label?.append(button);
+        readRow.append(read, button);
+        elt.appendChild(readRow);
       } else {
-        elt.classList.add("flex", "flex-col", "gap-1");
+        elt.appendChild(read);
+        if (this.readonly) {
+          elt.classList.add("flex", "flex-col", "gap-1");
+        }
       }
     }
-    if (label && "clear" in this && this.clear && this.mode === "read" && !this.readonly) {
+    if (label && "clear" in this && this.clear && !this.readonly) {
       const clearButton = label.appendChild(document.createElement("button"));
       clearButton.type = "button";
       clearButton.dataset.role = "clear";
-      clearButton.dataset.kind = "delete";
+      clearButton.dataset.kind = "default";
       clearButton.ariaLabel = `Clear ${this.label}`;
       clearButton.title = `Clear ${this.label}`;
+      clearButton.hidden = !this.hasSubmission;
       clearButton.className = `group-data-[mode=read]/element:hidden ${STYLES.form.icon}`;
       setIcon(
         clearButton.appendChild(document.createElement("span")),
-        "clear",
-        "icon-sm"
+        "x",
+        "icon-xs"
       );
+      const clearText = clearButton.appendChild(document.createElement("span"));
+      clearText.textContent = "Clear";
     }
     elt._lp_element = this;
     return elt;
@@ -1750,6 +1764,7 @@ class FormWidget {
     this._reviewBar = null;
     this._deferredOperation = this.target?.dataset?.operation || null;
     this._click = this._click.bind(this);
+    this._syncFieldClearEvent = this._syncFieldClearEvent.bind(this);
   }
   get deferredLocked() {
     return Boolean(
@@ -2112,6 +2127,10 @@ class FormWidget {
       this.target.append(generation);
     }
     this.target.addEventListener("click", this._click);
+    this.target.addEventListener("input", this._syncFieldClearEvent);
+    this.target.addEventListener("change", this._syncFieldClearEvent);
+    this.target.addEventListener("updated", this._syncFieldClearEvent);
+    this._syncEditAllButton();
     const hasDeferredOperation = this.target.matches?.("[data-operation]") || this.target.querySelector?.("[data-operation]");
     if (hasDeferredOperation) {
       const manager = await this.view?.ensureDeferredOperations?.();
@@ -2121,26 +2140,156 @@ class FormWidget {
     this.loaded = this.target.hasAttribute("loaded");
     this.target.setAttribute("initialized", "");
   }
+  _editableReadFields() {
+    if (this.readonly || this.revisionPreview || !this.target) return [];
+    return Array.from(
+      this.target.querySelectorAll(
+        ".form-element[data-mode='read']"
+      )
+    ).filter((element) => Boolean(element.querySelector("[data-role='read']")));
+  }
+  _syncEditAllButton() {
+    if (!this.target) return;
+    const existingBar = this.target.querySelector(
+      ":scope > [data-role='edit-all-bar']"
+    );
+    const readFields = this._editableReadFields();
+    if (readFields.length < 2) {
+      existingBar?.remove();
+      return;
+    }
+    if (existingBar) {
+      existingBar.hidden = false;
+      return;
+    }
+    const firstField = this.target.querySelector(".form-element");
+    if (!firstField) return;
+    const bar = document.createElement("div");
+    bar.dataset.role = "edit-all-bar";
+    bar.className = "flex items-center justify-end -mb-3";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.role = "edit-all";
+    button.ariaLabel = "Edit all fields";
+    button.title = "Edit all fields";
+    button.className = STYLES.form.editAll;
+    setIcon(
+      button.appendChild(document.createElement("span")),
+      "edit",
+      "icon-xs"
+    );
+    const text = button.appendChild(document.createElement("span"));
+    text.textContent = "Edit all";
+    bar.appendChild(button);
+    if (firstField.parentElement === this.target) {
+      this.target.insertBefore(bar, firstField);
+    } else {
+      firstField.before(bar);
+    }
+  }
+  _hasFieldValue(element) {
+    const field = element._lp_element ?? this.form?.renderer?.elements.get(element.id);
+    if (field && "value" in field) {
+      const val = field.value;
+      if (Array.isArray(val)) return val.length > 0;
+      if (val && typeof val === "object") return Object.keys(val).length > 0;
+      return val !== null && val !== void 0 && val !== "";
+    }
+    if (element.querySelector(
+      "input[type='radio']:checked, input[type='checkbox']:checked"
+    )) {
+      return true;
+    }
+    const textInput = element.querySelector("input:not([type='radio']):not([type='checkbox']), textarea");
+    if (textInput) return textInput.value !== "";
+    const select = element.querySelector("select");
+    if (select) return select.selectedOptions.length > 0 && select.value !== "";
+    return false;
+  }
+  _syncFieldClear(element) {
+    if (!element) return;
+    const clearButton = element.querySelector(
+      "[data-role='label'] [data-role='clear']"
+    );
+    if (!clearButton) return;
+    clearButton.hidden = !this._hasFieldValue(element);
+  }
+  _syncFieldClearEvent(e) {
+    if (this.readonly) return;
+    const target = e.target;
+    const element = target?.closest(".form-element") ?? null;
+    this._syncFieldClear(element);
+    if (e.type === "change") this._syncEditAllButton();
+  }
+  _focusFieldControl(element) {
+    const field = element._lp_element ?? this.form?.renderer?.elements.get(element.id);
+    if (field && "focus" in field && typeof field.focus === "function") {
+      field.focus();
+      return;
+    }
+    const control = element.querySelector(
+      "input:not([type='hidden']):not(:disabled), textarea:not(:disabled), select:not(:disabled)"
+    );
+    control?.focus();
+  }
+  _enterFieldEdit(element, { focus = true } = {}) {
+    void withTransition(
+      () => {
+        element.dataset.mode = "edit";
+        this._syncFieldClear(element);
+        this._syncEditAllButton();
+        if (focus) this._focusFieldControl(element);
+      },
+      { label: "form:edit-field" }
+    );
+  }
   _click(e) {
     if (this.readonly) return;
     const target = e.target;
     if (!target?.closest) return;
-    const element = target.closest(".form-element");
-    const role = target.closest("[data-role]")?.dataset.role;
-    if (role !== "edit" && role !== "clear") return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (!element) return;
-    if (role === "edit") {
+    const editAll = target.closest("[data-role='edit-all']");
+    if (editAll && this.target.contains(editAll)) {
+      e.preventDefault();
+      e.stopPropagation();
+      const readFields = this._editableReadFields();
+      if (readFields.length === 0) return;
       void withTransition(
         () => {
-          element.dataset.mode = "edit";
+          for (const field of readFields) {
+            field.dataset.mode = "edit";
+            this._syncFieldClear(field);
+          }
+          this._syncEditAllButton();
+          this._focusFieldControl(readFields[0]);
         },
-        { label: "form:edit-field" }
+        { label: "form:edit-all-fields" }
       );
-    } else if (role === "clear") {
+      return;
+    }
+    const element = target.closest(".form-element");
+    const role = target.closest("[data-role]")?.dataset.role;
+    if (!element) return;
+    if (role === "edit") {
+      e.preventDefault();
+      e.stopPropagation();
+      this._enterFieldEdit(element);
+      return;
+    }
+    if (role === "clear") {
+      e.preventDefault();
+      e.stopPropagation();
       const field = element._lp_element ?? this.form?.renderer?.elements.get(element.id);
       field?.clear?.();
+      this._syncFieldClear(element);
+      return;
+    }
+    if (element.dataset.mode === "read") {
+      if (target.closest("a, button, input, textarea, select, summary")) return;
+      if (target.closest("[data-role='read']") || target.closest("[data-role='label']")) {
+        e.preventDefault();
+        e.stopPropagation();
+        this._enterFieldEdit(element);
+      }
     }
   }
   get header() {

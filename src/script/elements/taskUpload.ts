@@ -72,7 +72,7 @@ export class TaskUpload extends BaseUpload {
 
 		this.widget = widget;
 		this.target = document.createElement("div");
-		this.target.className = "w-full flex flex-col gap-2 group/upload";
+		this.target.className = "mt-2 w-full flex flex-col gap-2 group/upload";
 		this.target.dataset.visible = "false";
 		this.button.insertAdjacentElement("afterend", this.target);
 
@@ -310,9 +310,13 @@ export class TaskUpload extends BaseUpload {
 		});
 	}
 
+	get open() {
+		return this.target.dataset.visible === "true";
+	}
+
 	toggleVisibility() {
-		this.target.dataset.visible =
-			this.target.dataset.visible === "true" ? "false" : "true";
+		this.target.dataset.visible = this.open ? "false" : "true";
+		this.toggle?.display();
 	}
 
 	reset() {
@@ -320,7 +324,11 @@ export class TaskUpload extends BaseUpload {
 	}
 
 	clear() {
-		this.reset();
+		if (this.open) {
+			this.target.dataset.visible = "false";
+		} else {
+			this.reset();
+		}
 		this.toggle?.display();
 	}
 

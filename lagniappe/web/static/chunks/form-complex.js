@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES, s as setIcon } from './ui-resources.js?v=b6c361d7';
-import { E as ENDPOINTS, f as areEqual, w as withTransition, r as request, c as captureError, d as debounce } from './foundation.js?v=b6c361d7';
-import { B as BaseElement, L as LinkElement, I as InputElement, C as CheckboxElement, g as getFormElement } from './forms.js?v=b6c361d7';
-import { p as primitives } from './ui-controls.js?v=b6c361d7';
-import './connectivity.js?v=b6c361d7';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=b8e0e957';
+import { E as ENDPOINTS, f as areEqual, w as withTransition, r as request, c as captureError, d as debounce } from './foundation.js?v=b8e0e957';
+import { B as BaseElement, L as LinkElement, I as InputElement, C as CheckboxElement, g as getFormElement } from './forms.js?v=b8e0e957';
+import { p as primitives } from './ui-controls.js?v=b8e0e957';
+import './connectivity.js?v=b8e0e957';
 
 const COMPACT_COLUMN_TYPES = /* @__PURE__ */ new Set(["checkbox"]);
 const TABLE_CELL_ELEMENTS = {
@@ -320,14 +320,21 @@ class TableElement extends BaseElement {
     );
     if (!this.renderer.readonly) {
       this._createButton = document.createElement("button");
+      this._createButton.type = "button";
       this._createButton.dataset.role = "create";
+      this._createButton.ariaLabel = `Add row to ${this.schema.title || "table"}`;
+      this._createButton.title = "Add row";
       this._createButton.className = `group-data-[mode=read]/element:hidden ${STYLES.form.icon}`;
       this._createButton.dataset.kind = "add";
       setIcon(
         this._createButton.appendChild(document.createElement("span")),
         "addRow",
-        "icon-sm"
+        "icon-xs"
       );
+      const text = this._createButton.appendChild(
+        document.createElement("span")
+      );
+      text.textContent = "Add row";
       label.appendChild(this._createButton);
     }
     this._table = this.table();
@@ -1011,7 +1018,14 @@ class TodoElement extends BaseElement {
       if (select) input.select();
     });
   }
-  _button({ role, icon, label, kind = null, header = false }) {
+  _button({
+    role,
+    icon,
+    label,
+    text = null,
+    kind = null,
+    header = false
+  }) {
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.role = role;
@@ -1022,8 +1036,12 @@ class TodoElement extends BaseElement {
     setIcon(
       button.appendChild(document.createElement("span")),
       icon,
-      "icon-sm"
+      header ? "icon-xs" : "icon-sm"
     );
+    if (header && text) {
+      const span = button.appendChild(document.createElement("span"));
+      span.textContent = text;
+    }
     return button;
   }
   _checkbox(item, index, { disabled = false } = {}) {
@@ -1136,6 +1154,7 @@ class TodoElement extends BaseElement {
             role: "todo-done",
             icon: "success",
             label: `Done editing ${this.label}`,
+            text: "Done",
             kind: "success",
             header: true
           })
@@ -1148,6 +1167,7 @@ class TodoElement extends BaseElement {
             role: "todo-edit",
             icon: this.hasSubmission ? "edit" : "addRow",
             label: this.hasSubmission ? `Edit ${this.label}` : `Add to ${this.label}`,
+            text: this.hasSubmission ? "Edit" : "Add",
             kind: this.hasSubmission ? null : "add",
             header: true
           })

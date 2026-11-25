@@ -354,14 +354,16 @@ export class DueDate {
 
 	createOptionGroups() {
 		this.container = primitives.div({
-			style: STYLES.section,
+			style: `${STYLES.section} mt-2`,
 			data: {
 				visible: this.open ? "true" : "false",
 				role: "date-form",
 			},
 		});
 
-		this.button.after(this.container);
+		const anchor =
+			this.button.closest("[data-role='section-toggle-row']") ?? this.button;
+		anchor.after(this.container);
 
 		const choices = this.container.appendChild(
 			primitives.div({
