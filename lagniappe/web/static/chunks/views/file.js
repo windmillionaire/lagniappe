@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as Entity } from '../entity-foundation.js?v=be84e1e9';
-import '../core-foundation.js?v=be84e1e9';
-import '../connectivity.js?v=be84e1e9';
-import '../foundation.js?v=be84e1e9';
-import '../upstreamUnavailable.js?v=be84e1e9';
+import { E as Entity } from '../entity-foundation.js?v=b6c361d7';
+import '../core-foundation.js?v=b6c361d7';
+import '../connectivity.js?v=b6c361d7';
+import '../foundation.js?v=b6c361d7';
+import '../upstreamUnavailable.js?v=b6c361d7';
 
 class File extends Entity {
   constructor(node) {

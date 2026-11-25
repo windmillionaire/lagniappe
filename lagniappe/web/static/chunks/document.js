@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES, s as setIcon } from './ui-resources.js?v=be84e1e9';
-import { r as request, E as ENDPOINTS, Q as QueryLifecycle, d as debounce, c as captureError, g as generateElementId, h as base64ToUint8Array, u as uint8ArrayToBase64, w as withTransition, i as waitForAttribute } from './foundation.js?v=be84e1e9';
-import { b as autoUpdate, c as computePosition, o as offset, s as shift$1, f as flip, D as Dropdown } from './combobox.js?v=be84e1e9';
-import { b as buttons } from './ui-controls.js?v=be84e1e9';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=b6c361d7';
+import { r as request, E as ENDPOINTS, Q as QueryLifecycle, d as debounce, c as captureError, g as generateElementId, h as base64ToUint8Array, u as uint8ArrayToBase64, w as withTransition, i as waitForAttribute } from './foundation.js?v=b6c361d7';
+import { b as autoUpdate, c as computePosition, o as offset, s as shift$1, f as flip, D as Dropdown } from './combobox.js?v=b6c361d7';
+import { b as buttons } from './ui-controls.js?v=b6c361d7';
 
 /**
  * Utility module to work with key-value stores.
@@ -49337,7 +49337,7 @@ const OPTION_REGISTRY = {
   deleteTable: () => Promise.resolve().then(function () { return menuItems; }),
   undo: () => Promise.resolve().then(function () { return toolbarButtons; }),
   redo: () => Promise.resolve().then(function () { return toolbarButtons; }),
-  documentHistory: () => import('./documentHistory.js?v=be84e1e9'),
+  documentHistory: () => import('./documentHistory.js?v=b6c361d7'),
   setFontFamily: () => Promise.resolve().then(function () { return menuItems; }),
   setColor: () => Promise.resolve().then(function () { return menuItems; }),
   toggleUnderline: () => Promise.resolve().then(function () { return menuItems; }),
@@ -49358,14 +49358,14 @@ const OPTION_REGISTRY = {
   setTextAlign: () => Promise.resolve().then(function () { return menuItems; })
 };
 const FORM_REGISTRY = {
-  pinVersion: () => import('./editor-dialogs.js?v=be84e1e9').then(function (n) { return n.p; }),
-  setColor: () => import('./editor-dialogs.js?v=be84e1e9').then(function (n) { return n.s; }),
-  setFontFamily: () => import('./editor-dialogs.js?v=be84e1e9').then(function (n) { return n.a; }),
-  setImage: () => import('./editor-dialogs.js?v=be84e1e9').then(function (n) { return n.b; }),
-  addLink: () => import('./editor-dialogs.js?v=be84e1e9').then(function (n) { return n.c; }),
-  addImage: () => import('./editor-dialogs.js?v=be84e1e9').then(function (n) { return n.d; }),
-  addYouTube: () => import('./editor-dialogs.js?v=be84e1e9').then(function (n) { return n.e; }),
-  generateText: () => import('./editor-dialogs.js?v=be84e1e9').then(function (n) { return n.g; })
+  pinVersion: () => import('./editor-dialogs.js?v=b6c361d7').then(function (n) { return n.p; }),
+  setColor: () => import('./editor-dialogs.js?v=b6c361d7').then(function (n) { return n.s; }),
+  setFontFamily: () => import('./editor-dialogs.js?v=b6c361d7').then(function (n) { return n.a; }),
+  setImage: () => import('./editor-dialogs.js?v=b6c361d7').then(function (n) { return n.b; }),
+  addLink: () => import('./editor-dialogs.js?v=b6c361d7').then(function (n) { return n.c; }),
+  addImage: () => import('./editor-dialogs.js?v=b6c361d7').then(function (n) { return n.d; }),
+  addYouTube: () => import('./editor-dialogs.js?v=b6c361d7').then(function (n) { return n.e; }),
+  generateText: () => import('./editor-dialogs.js?v=b6c361d7').then(function (n) { return n.g; })
 };
 
 const DEFAULT_USER_COLOR = "rgba(22, 163, 74, 0.6)";

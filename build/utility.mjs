@@ -32,6 +32,7 @@ const rawStylesYaml = yaml.load(
 const constantsPath = "./config/constants.py";
 const BOOT_CONNECTIVITY_MODULE = "shared/connectivity.mjs";
 const INTERACTION_FOUNDATION_MODULES = new Set([
+	"generated/endpoints.mjs",
 	"shared/storage.mjs",
 	"shared/queryLifecycle.mjs",
 	"shared/endpoints.mjs",

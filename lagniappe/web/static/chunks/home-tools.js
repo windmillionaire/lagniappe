@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { BaseList, listHtml } from './baseList.js?v=be84e1e9';
-import { e as localStore, w as withTransition, r as request } from './foundation.js?v=be84e1e9';
-import { S as STYLES, s as setIcon } from './ui-resources.js?v=be84e1e9';
-import './connectivity.js?v=be84e1e9';
-import { D as Dropdown } from './combobox.js?v=be84e1e9';
+import { BaseList, listHtml } from './baseList.js?v=b6c361d7';
+import { e as localStore, w as withTransition, r as request } from './foundation.js?v=b6c361d7';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=b6c361d7';
+import './connectivity.js?v=b6c361d7';
+import { D as Dropdown } from './combobox.js?v=b6c361d7';
 
 const REPORT_FILTERS = ["active", "executed", "answers"];
 function isReportFilter(value) {
@@ -236,7 +236,7 @@ class ToolReportList extends BaseList {
     if (!content || !description || !confirm || !confirmLabel) return;
     this._openingDelete = true;
     try {
-      const { Modal } = await import('./modal.js?v=be84e1e9');
+      const { Modal } = await import('./modal.js?v=b6c361d7');
       if (this._destroyed) return;
       this._deleteModal?.destroy();
       const modal = new Modal(this.view, trigger);
@@ -272,7 +272,7 @@ class ToolReportList extends BaseList {
     error.hidden = true;
     this._renderFilters();
     try {
-      const { request } = await import('./foundation.js?v=be84e1e9').then(function (n) { return n.p; });
+      const { request } = await import('./foundation.js?v=b6c361d7').then(function (n) { return n.p; });
       const response = await request.delete(route, {
         keys
       });

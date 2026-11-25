@@ -40,6 +40,27 @@ explicit, including CSS transforms, minification, source maps, startup budgets,
 Sentry uploads, and visualizer options. Publication still runs through
 `build/run-rollup.mjs` and `build/publication.mjs`.
 
+## Browser endpoints
+
+Flask's registered routes supply the paths in `src/script/generated/endpoints.ts`.
+The template in `build/browser-endpoints.ts.jinja` maps the existing browser
+helper names and arguments to Flask endpoint names. Bind path arguments by
+their Flask names. The template adds client-side query strings to those paths.
+Application modules import `ENDPOINTS` from `src/script/shared/endpoints.ts`.
+
+Regenerate the module before building the frontend after a bound route or the
+template changes.
+
+```bash
+venv/bin/python -m runner.browser_endpoints
+npm run build
+```
+
+The generator loads the Flask URL map with the offline test fixture. Node
+builds consume the committed TypeScript output. Use
+`venv/bin/python -m runner.browser_endpoints --check` to check the working
+tree. `run.py release-check` checks the Flask routes and output in the Git index.
+
 ## Output
 
 ```text

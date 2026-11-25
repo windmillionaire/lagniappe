@@ -2767,6 +2767,9 @@ def _release_check_repository(tmp_path: Path) -> Path:
                 encoding="utf-8"
             )
         ),
+        "runner/browser_endpoints.py": (
+            Path(run.__file__).parent / "runner/browser_endpoints.py"
+        ).read_text(encoding="utf-8"),
         "runner/pytest_routing.py": (
             (Path(run.__file__).parent / "runner" / "pytest_routing.py").read_text(
                 encoding="utf-8"
@@ -2793,6 +2796,21 @@ def _release_check_repository(tmp_path: Path) -> Path:
             ")\n"
         ),
         "src/script/example.mjs": "export const value = 1;\n",
+        "lagniappe/__init__.py": "",
+        "lagniappe/web/__init__.py": (
+            "from flask import Blueprint, Flask\n"
+            "items = Blueprint('items', __name__)\n"
+            "@items.get('/<item>')\n"
+            "def detail(item): return item\n"
+            "app = Flask(__name__)\n"
+            "app.register_blueprint(items, url_prefix='/items')\n"
+        ),
+        "build/browser-endpoints.ts.jinja": (
+            'export const detail = (key: string) => `{{ path("items.detail", item="key") }}`;\n'
+        ),
+        "src/script/generated/endpoints.ts": (
+            'export const detail = (key: string) => `/items/${key}`;\n'
+        ),
         "lagniappe/web/static/script.js": "built-main\n",
         "lagniappe/web/static/sw.js": 'const BUILD_ID = "base1234";\n',
         "lagniappe/web/start/styles/icons.py": "ICONS = {}\n",
@@ -2914,6 +2932,19 @@ def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
     )
     assert result.returncode == 0
     assert "Release check passed against main" in result.stdout
+
+
+def test_release_check_rejects_staged_route_drift_despite_unstaged_fix(tmp_path, capsys):
+    repo = _release_check_repository(tmp_path)
+    _write_release_candidate(repo)
+    app = repo / "lagniappe/web/__init__.py"
+    original = app.read_text()
+    app.write_text(original.replace("url_prefix='/items'", "url_prefix='/records'"))
+    _git(repo, "add", "lagniappe/web/__init__.py")
+    app.write_text(original)
+
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
+    assert "src/script/generated/endpoints.ts is stale" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("change", ["runner", "documentation", "backend"])

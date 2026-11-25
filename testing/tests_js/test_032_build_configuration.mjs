@@ -265,6 +265,7 @@ test("test_templates_preload_registered_view_and_interaction_foundations", () =>
 test("test_interaction_preloads_have_stable_manual_chunks", () => {
 	const root = "/checkout/src/script/";
 	for (const module of [
+		"generated/endpoints.ts",
 		"shared/endpoints.ts",
 		"shared/errors.ts",
 		"shared/notificationState.ts",

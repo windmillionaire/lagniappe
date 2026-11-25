@@ -5,7 +5,9 @@ import json
 from pathlib import Path
 
 import pytest
+from werkzeug.routing import Map, Rule
 
+from runner.browser_endpoints import render_endpoints
 from runner.frontend_build import (
     FilesystemFrontendBuildReader,
     inspect_frontend_build,
@@ -16,6 +18,27 @@ from runner.frontend_build import (
 pytestmark = pytest.mark.tooling
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_browser_endpoints_bind_arguments_by_name_and_keep_client_query():
+    routes = Map([Rule("/assets/<field>/<key>", endpoint="assets.field")])
+    template = '`{{ path("assets.field", key="settings.key", field="fieldId") }}?page=${page}`'
+
+    assert render_endpoints(routes, template) == '`/assets/${fieldId}/${settings.key}?page=${page}`'
+
+
+def test_browser_endpoints_detect_removed_routes_and_shared_path_drift():
+    routes = Map([
+        Rule("/notices", endpoint="read"),
+        Rule("/notices/clear", endpoint="clear"),
+        Rule("/items/<key>", endpoint="detail"),
+    ])
+    with pytest.raises(ValueError, match="no longer share a URL"):
+        render_endpoints(routes, '{{ path("read", "clear") }}')
+    with pytest.raises(ValueError, match="No registered Flask endpoint"):
+        render_endpoints(routes, '{{ path("removed") }}')
+    with pytest.raises(ValueError, match="expected one route with parameters"):
+        render_endpoints(routes, '{{ path("detail", old_key="key") }}')
 
 
 def _sha256(content):
