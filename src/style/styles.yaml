@@ -59,6 +59,12 @@ builder:
       classes: h-8 flex flex-row justify-between items-center text-base-dark gap-4 mb-6 text-lg font-bold
       intent: model presentation within builder header
       surfaces: [server]
+    controls:
+      classes: builder-header-controls flex shrink-0 flex-row items-center gap-2.5
+      intent: right-aligned undo, preview, and save controls in the form builder header
+      surfaces: [server]
+      hooks: [builder-header-controls]
+      css: [src/style/buttons.css]
     side:
       classes: h-8 flex flex-row justify-between items-center text-base-dark gap-4 mb-6 text-lg font-bold
       intent: side presentation within builder header
@@ -67,6 +73,12 @@ builder:
         - diagnostic: duplicate-style-value
           target: builder.header.model
           reason: side and model headings are distinct layout roles that may diverge
+  save:
+    classes: builder-save-button inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md text-sm font-semibold transition-colors duration-100 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2
+    intent: labeled Saved, Save, and Saving form builder persistence control sized to fit inside the header row
+    surfaces: [server]
+    hooks: [builder-save-button]
+    css: [src/style/buttons.css, src/style/icons.css]
   panels:
     model:
       classes: "group/model mb-4 flex min-h-75 flex-col gap-4 rounded-lg p-4 outline-2 outline-form-default outline-dashed"
@@ -85,6 +97,12 @@ builder:
     intent: name presentation within builder
     surfaces: [server]
   switch:
+    label:
+      classes: builder-preview-label inline-flex shrink-0 cursor-pointer items-center gap-2 text-sm font-semibold text-base-default select-none
+      intent: clickable Preview label paired with the form builder preview switch
+      surfaces: [server]
+      hooks: [builder-preview-label]
+      css: [src/style/buttons.css]
     container:
       classes: "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-form-light bg-form-bg transition-colors ease-in-out focus:outline-none hover:border-form-dark focus-visible:border-form-dark focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-form-dark data-[active=true]:border-form-default data-[active=true]:bg-form-default"
       intent: container presentation within builder switch
@@ -303,8 +321,8 @@ editor:
       intent: section presentation within editor toolbar
       surfaces: [frontend]
     saveStatus:
-      classes: editor-save-status ml-auto inline-flex h-8 shrink-0 items-center gap-1 px-1.5 text-xs font-medium text-base-medium whitespace-nowrap
-      intent: subtle live autosave status indicator at the trailing end of the document toolbar
+      classes: editor-save-status inline-flex h-8 shrink-0 items-center gap-1 px-1 text-xs font-medium text-base-medium whitespace-nowrap
+      intent: subtle live autosave status indicator adjacent to the document toolbar controls
       surfaces: [frontend]
       hooks: [editor-save-status]
       css: [src/style/editor.css, src/style/icons.css]
@@ -1551,7 +1569,7 @@ toggle:
     hooks: [action-icon-button]
     css: [src/style/buttons.css]
   tabAction:
-    classes: tab-subtoggle group/toggle inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-kind-default transition-colors duration-100 hover:bg-black/5 hover:text-kind-dark focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-kind-default cursor-pointer
+    classes: tab-subtoggle group/toggle inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-sm font-medium text-kind-default transition-colors duration-100 hover:bg-black/5 hover:text-kind-dark focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-kind-default sm:pr-2 cursor-pointer
     intent: borderless tab-scoped action button paired beside the tab title with a vertical divider
     surfaces: [server]
     hooks: [tab-subtoggle]

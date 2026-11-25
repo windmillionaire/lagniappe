@@ -15,7 +15,7 @@
 {% set can_restrict_form = Resource.SITE.allowed(Action.PERMISSIONS) %}
 
 {% macro save() %}
-  <button class="{{ styles.nav.button }}"
+  <button class="{{ styles.builder.save }}"
           data-saved="true"
           data-role="save-form"
           data-kind="saved"
@@ -23,9 +23,14 @@
           aria-disabled="true"
           aria-label="All changes saved"
           title="All changes saved">
-    {{ render_icon("builder.saved", "icon-2xl text-kind-default", "saved") }}
-    {{ render_icon("builder.unsaved", "icon-2xl text-kind-default", "unsaved") }}
-    {{ render_icon("spinner", "icon-2xl text-kind-default") }}
+    <span class="builder-save-icon" aria-hidden="true">
+      {{ render_icon("builder.saved", "", "saved") }}
+      {{ render_icon("builder.unsaved", "", "unsaved") }}
+      {{ render_icon("spinner", "") }}
+    </span>
+    <span class="builder-save-label" data-state="saved">Saved</span>
+    <span class="builder-save-label" data-state="unsaved">Save</span>
+    <span class="builder-save-label" data-state="saving">Saving…</span>
   </button>
 {% endmacro %}
 
@@ -90,21 +95,36 @@
         {% endif %}
       </div>
     </h2>
-    <div class="flex flex-row items-center gap-2">
-      <div data-role="draft-history" data-visible="true" class="flex flex-row items-center gap-2">
-        <button type="button" class="{{ styles.nav.button }} disabled:opacity-50" data-role="undo-draft" aria-label="Undo draft change" title="Undo draft change" disabled>{{ render_icon("undo") }}</button>
-        <button type="button" class="{{ styles.nav.button }} disabled:opacity-50" data-role="redo-draft" aria-label="Redo draft change" title="Redo draft change" disabled>{{ render_icon("redo") }}</button>
+    <div class="{{ styles.builder.header.controls }}">
+      <div data-role="draft-history"
+           data-visible="true"
+           class="flex flex-row items-center gap-1.5">
+        <button type="button"
+                class="{{ styles.nav.button }} disabled:opacity-50"
+                data-role="undo-draft"
+                aria-label="Undo draft change"
+                title="Undo draft change"
+                disabled>{{ render_icon("undo") }}</button>
+        <button type="button"
+                class="{{ styles.nav.button }} disabled:opacity-50"
+                data-role="redo-draft"
+                aria-label="Redo draft change"
+                title="Redo draft change"
+                disabled>{{ render_icon("redo") }}</button>
       </div>
-      <button id="preview-toggle"
-              class="{{ styles.builder.switch.container }} group/toggle"
-              role="switch"
-              type="button"
-              aria-checked="false"
-              data-active="false"
-              aria-label="Preview form"
-              title="Preview form">
-        <span aria-hidden="true" class="{{ styles.builder.switch.toggle }}"></span>
-      </button>
+      <label for="preview-toggle" class="{{ styles.builder.switch.label }}">
+        <span>Preview</span>
+        <button id="preview-toggle"
+                class="{{ styles.builder.switch.container }} group/toggle"
+                role="switch"
+                type="button"
+                aria-checked="false"
+                data-active="false"
+                aria-label="Preview form"
+                title="Preview form">
+          <span aria-hidden="true" class="{{ styles.builder.switch.toggle }}"></span>
+        </button>
+      </label>
       {% if can_edit_form %}{{ save() }}{% endif %}
     </div>
   </div>

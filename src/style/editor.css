@@ -40,7 +40,8 @@
 }
 
 /* @style editor.container */
-.html-content:not([aria-busy="true"]) > .ProseMirror[contenteditable="true"] {
+.html-content:not([aria-busy="true"]):not([inert])
+	> .ProseMirror[contenteditable="true"] {
 	&:has(> p:only-child:empty)::before,
 	&:has(> p:only-child > br.ProseMirror-trailingBreak:only-child)::before {
 		content: "Start writing…";

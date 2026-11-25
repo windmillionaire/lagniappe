@@ -1,6 +1,7 @@
 import Sortable, { type SortableEvent } from "sortablejs";
 import { primitives } from "../../../elements/primitives.ts";
 import { STYLES } from "../../../generated/styles.mjs";
+import { setIcon } from "../../../shared/icons.ts";
 import type { FieldType, FormFieldSchema } from "../../../types/forms.d.ts";
 import type FormBuilder from "../builder.ts";
 import { CONFIG } from "../config.ts";
@@ -229,6 +230,37 @@ const input = (schema: FormFieldSchema) => {
 	return element;
 };
 
+const _selectPreview = ({
+	label,
+	icon,
+	selectIcon,
+	placeholder,
+}: {
+	label?: string | false | null;
+	icon?: string | null;
+	selectIcon: string;
+	placeholder?: string | null;
+}) => {
+	const wrapper = document.createElement("div");
+	wrapper.className = STYLES.select.wrapper;
+
+	const field = wrapper.appendChild(document.createElement("input"));
+	field.type = "text";
+	field.disabled = true;
+	field.readOnly = true;
+	field.tabIndex = -1;
+	field.className = `${STYLES.select.default} font-normal pointer-events-none select-none`;
+	if (placeholder) field.placeholder = placeholder;
+
+	const trailing = wrapper.appendChild(document.createElement("span"));
+	setIcon(trailing, selectIcon, STYLES.select.icon);
+
+	const labelElt = primitives.label({ label, icon });
+	labelElt.appendChild(wrapper);
+	labelElt.classList.add("flex-col");
+	return labelElt;
+};
+
 const link = (schema: FormFieldSchema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -241,11 +273,10 @@ const link = (schema: FormFieldSchema) => {
 			tag: "h3",
 		});
 	} else {
-		linkElt = primitives.select({
+		linkElt = _selectPreview({
 			label: display.title,
 			icon: display.location,
 			selectIcon: "search",
-			disabled: true,
 		});
 	}
 
@@ -289,12 +320,10 @@ const select = (schema: FormFieldSchema) => {
 	const display = _presentation(schema);
 	element.classList.add("flex", "flex-col", "gap-1");
 
-	const select = primitives.select({
+	const select = _selectPreview({
 		label: display.title,
 		icon: "select",
 		selectIcon: "dropdown",
-		name: schema.id,
-		disabled: true,
 		placeholder: schema.placeholder || "select an option...",
 	});
 

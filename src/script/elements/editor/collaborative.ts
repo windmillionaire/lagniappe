@@ -143,7 +143,7 @@ export class CollaborativeDocument {
 		// moves the toolbar or changes the document panel's height.
 		this.target.classList.add("relative");
 		this.loadingStatus.className =
-			"absolute inset-x-0 px-6 py-2 text-sm text-base-light";
+			"pointer-events-none absolute inset-x-0 px-4 pt-6 font-serif leading-[1.7] text-base-medium italic opacity-65 sm:px-6 sm:pt-8";
 		this.loadingStatus.setAttribute("role", "status");
 		this.loadingStatus.hidden = true;
 		this.target.insertBefore(this.loadingStatus, this.container);
@@ -328,6 +328,8 @@ export class CollaborativeDocument {
 		if (this.updateQueue.length === 0) {
 			this._dirty = false;
 			this.setSaveState("saved");
+		} else {
+			this.setSaveState("dirty");
 		}
 	}
 

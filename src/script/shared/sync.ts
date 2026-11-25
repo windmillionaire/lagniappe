@@ -516,17 +516,21 @@ export class SyncManager {
 	) {
 		const batch = updates ?? this._collect(save, { touchSyncIds });
 		if (!batch.length) return null;
+		const isContentSave = (update: SyncUpdate) =>
+			Boolean(update.save && update.ydoc);
 		if (!this.view.online) {
 			for (const update of batch) {
 				await updateSyncRecord(update);
-				if (update.save) {
+				if (isContentSave(update)) {
 					this.widgets[update.sync_id]?.setSaveState?.("offline");
 				}
 			}
 			return null;
 		}
+		const savingIds = new Set<string>();
 		for (const update of batch) {
-			if (update.save) {
+			if (isContentSave(update)) {
+				savingIds.add(update.sync_id);
 				this.widgets[update.sync_id]?.setSaveState?.("saving");
 			}
 		}
@@ -543,7 +547,8 @@ export class SyncManager {
 				await updateSyncRecord(update);
 				this._checkpointRetries.add(update.sync_id);
 				this._checkpointPollFirst.delete(update.sync_id);
-				if (update.save) {
+				if (isContentSave(update)) {
+					savingIds.delete(update.sync_id);
 					this.widgets[update.sync_id]?.setSaveState?.("error");
 				}
 			}
@@ -567,6 +572,7 @@ export class SyncManager {
 			}
 			if (acknowledgement.checkpoint_persisted) {
 				if (update?.save && update.ydoc) {
+					savingIds.delete(acknowledgement.sync_id);
 					const widget = this.widgets[acknowledgement.sync_id];
 					await widget?.readCache?.accept({
 						mode: "snapshot",
@@ -592,8 +598,14 @@ export class SyncManager {
 				this._checkpointRetries.add(acknowledgement.sync_id);
 				this._checkpointPollFirst.add(acknowledgement.sync_id);
 				await updateSyncRecord(update);
-				this.widgets[acknowledgement.sync_id]?.setSaveState?.("error");
+				if (isContentSave(update)) {
+					savingIds.delete(acknowledgement.sync_id);
+					this.widgets[acknowledgement.sync_id]?.setSaveState?.("error");
+				}
 			}
+		}
+		for (const syncId of savingIds) {
+			this.widgets[syncId]?.setSaveState?.(!response ? "error" : "dirty");
 		}
 		return response;
 	}

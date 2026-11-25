@@ -133,18 +133,101 @@
 	grid-area: 1 / 1;
 }
 
-/* @style nav.button */
-[data-role="save-form"] > .icon {
-	visibility: hidden;
+/* @style builder.header.controls */
+.builder-header-controls {
+	& > [data-role="draft-history"][data-visible="true"] + .builder-preview-label,
+	& > .builder-save-button {
+		position: relative;
+		margin-left: 0.375rem;
+		&::before {
+			content: "";
+			position: absolute;
+			left: -0.5rem;
+			top: 50%;
+			transform: translateY(-50%);
+			width: 1px;
+			height: 1rem;
+			background-color: color-mix(
+				in oklch,
+				var(--color-base-medium) 40%,
+				transparent
+			);
+			pointer-events: none;
+		}
+	}
 }
 
-/* @style nav.button */
-[data-role="save-form"][aria-busy="true"] > [data-icon="spinner"],
-[data-role="save-form"][data-saved="true"]:not([aria-busy="true"])
-	> [data-icon="builder.saved"],
-[data-role="save-form"][data-saved="false"]:not([aria-busy="true"])
-	> [data-icon="builder.unsaved"] {
-	visibility: visible;
+/* @style builder.switch.label */
+.builder-preview-label {
+	& > span {
+		line-height: 1;
+		transform: translateY(1px);
+	}
+	&:has(#preview-toggle[data-active="true"]) > span {
+		color: var(--color-form-default);
+	}
+}
+
+/* @style builder.save */
+.builder-save-button {
+	& > .builder-save-icon {
+		display: inline-grid;
+		place-items: center;
+		& > .icon {
+			grid-area: 1 / 1;
+			visibility: hidden;
+		}
+	}
+	& > .builder-save-label {
+		display: none;
+		line-height: 1;
+		transform: translateY(1px);
+	}
+	&[data-saved="true"]:not([aria-busy="true"]) {
+		color: var(--color-project-default);
+		cursor: default;
+		padding-inline: 0.375rem;
+		& > .builder-save-icon > [data-icon="builder.saved"] {
+			visibility: visible;
+		}
+		& > .builder-save-label[data-state="saved"] {
+			display: inline;
+		}
+	}
+	&[data-saved="false"]:not([aria-busy="true"]) {
+		background-color: var(--color-form-default);
+		color: white;
+		cursor: pointer;
+		padding-inline: 0.625rem;
+		box-shadow: var(--shadow-xs);
+		&:hover,
+		&:focus-visible {
+			background-color: var(--color-form-dark);
+			outline-color: var(--color-form-dark);
+		}
+		&[aria-disabled="true"] {
+			opacity: 0.5;
+			cursor: default;
+		}
+		& > .builder-save-icon > [data-icon="builder.unsaved"] {
+			visibility: visible;
+		}
+		& > .builder-save-label[data-state="unsaved"] {
+			display: inline;
+		}
+	}
+	&[aria-busy="true"] {
+		background-color: var(--color-base-bg);
+		color: var(--color-base-medium);
+		cursor: wait;
+		padding-inline: 0.625rem;
+		& > .builder-save-icon > [data-icon="spinner"] {
+			visibility: visible;
+		}
+		& > .builder-save-label[data-state="saving"] {
+			display: inline;
+		}
+	}
 }
 
 /* @style task.home.snooze */

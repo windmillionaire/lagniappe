@@ -17,8 +17,10 @@ const STYLES = {
     "component": "text-md flex cursor-move flex-row items-center gap-3 rounded-md bg-form-bg px-3 py-1.5 font-semibold text-base-dark shadow-sm outline-2 outline-form-default hover:bg-form-light hover:outline-form-dark",
     "header": {
       "model": "h-8 flex flex-row justify-between items-center text-base-dark gap-4 mb-6 text-lg font-bold",
+      "controls": "builder-header-controls flex shrink-0 flex-row items-center gap-2.5",
       "side": "h-8 flex flex-row justify-between items-center text-base-dark gap-4 mb-6 text-lg font-bold"
     },
+    "save": "builder-save-button inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md text-sm font-semibold transition-colors duration-100 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2",
     "panels": {
       "model": "group/model mb-4 flex min-h-75 flex-col gap-4 rounded-lg p-4 outline-2 outline-form-default outline-dashed",
       "default": "mb-4 flex flex-col gap-4 rounded-lg p-4 outline-2 outline-form-default",
@@ -26,6 +28,7 @@ const STYLES = {
     },
     "name": "border-b border-dashed focus:outline-none ml-2 w-auto max-w-xs bg-transparent border-base-medium focus:border-form-default",
     "switch": {
+      "label": "builder-preview-label inline-flex shrink-0 cursor-pointer items-center gap-2 text-sm font-semibold text-base-default select-none",
       "container": "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-form-light bg-form-bg transition-colors ease-in-out focus:outline-none hover:border-form-dark focus-visible:border-form-dark focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-form-dark data-[active=true]:border-form-default data-[active=true]:bg-form-default",
       "toggle": "pointer-events-none h-5 w-5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out grid place-items-center group-data-[active=true]/toggle:translate-x-5"
     },
@@ -94,7 +97,7 @@ const STYLES = {
       },
       "divider": "mx-1 hidden h-6 w-px bg-base-light/50 md:block md:first:hidden md:last:hidden",
       "section": "flex flex-row flex-wrap items-center gap-2",
-      "saveStatus": "editor-save-status ml-auto inline-flex h-8 shrink-0 items-center gap-1 px-1.5 text-xs font-medium text-base-medium whitespace-nowrap",
+      "saveStatus": "editor-save-status inline-flex h-8 shrink-0 items-center gap-1 px-1 text-xs font-medium text-base-medium whitespace-nowrap",
       "tool": "grid size-8 place-items-center rounded-md bg-white outline outline-base-light/50 shadow-sm",
       "menu": "flex min-h-8 w-fit flex-row items-center gap-1 rounded-md bg-white outline outline-base-light/50 px-2 py-1 text-center text-base font-semibold shadow-sm",
       "optionHeader": "text-lg font-bold pt-2 text-kind-default pb-1",
@@ -479,7 +482,7 @@ const STYLES = {
   "textarea": "form-input block w-full rounded-md px-3 py-2 text-base font-normal placeholder:text-base-medium sm:text-sm",
   "toggle": {
     "container": "group/toggle action-icon-button transition-colors duration-100 group-data-[visible=true]/form:shadow-sm group-data-[visible=true]/form:bg-white hover:bg-white shrink-0",
-    "tabAction": "tab-subtoggle group/toggle inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-kind-default transition-colors duration-100 hover:bg-black/5 hover:text-kind-dark focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-kind-default cursor-pointer",
+    "tabAction": "tab-subtoggle group/toggle inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-sm font-medium text-kind-default transition-colors duration-100 hover:bg-black/5 hover:text-kind-dark focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-kind-default sm:pr-2 cursor-pointer",
     "plain": "group/toggle action-icon-button transition-colors duration-100 hover:bg-white",
     "icon": {
       "documentSettings": "page-document-settings-icon",

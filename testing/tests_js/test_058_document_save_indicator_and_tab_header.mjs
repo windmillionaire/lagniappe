@@ -172,3 +172,110 @@ test("test_collaborative_document_schedules_idle_save_and_updates_save_state", a
 		doc.destroy();
 	}
 });
+
+test("test_sync_manager_parent_touch_on_blur_does_not_stick_in_saving_state", async (t) => {
+	createBrowser(t, { url: "https://lagniappe.test/pages/page-1" });
+	const esmock = (await import("esmock")).default;
+
+	const states = [];
+	const widget = {
+		syncId: "page-1:document",
+		key: "page-1",
+		initialized: true,
+		visible: true,
+		saveData: null,
+		syncData: null,
+		setSaveState(state) {
+			states.push(state);
+		},
+	};
+	const view = {
+		online: true,
+		hidden: false,
+		connectivityGeneration: 0,
+		components: {
+			document: { active: widget, visible: true, widgets: { doc: widget } },
+		},
+		PollingCoordinator: {
+			clientId: "client-1",
+			get: () => null,
+			update() {},
+			closeDocuments: async () => {},
+		},
+	};
+
+	const { SyncManager } = await esmock.strict(
+		"../../src/script/shared/sync.ts",
+		{
+			"../../src/script/shared/request.ts": {
+				request: {
+					post: async () => ({
+						ok: true,
+						updates: [
+							{
+								sync_id: "page-1:document",
+								checkpoint_persisted: false,
+								entity_touched: true,
+							},
+						],
+					}),
+				},
+			},
+			"../../src/script/shared/offline.ts": {
+				deleteSyncRecord: async () => {},
+				deleteSyncRecords: async () => {},
+				getAllOfflineRecords: async () => ({ sync: [] }),
+				getSyncRecord: async () => null,
+				updateSyncRecord: async () => {},
+			},
+		},
+	);
+
+	const manager = new SyncManager(view);
+	manager._pendingParentTouches.add("page-1:document");
+	await manager.sendUpdates(true, null, {
+		keepalive: true,
+		touchSyncIds: ["page-1:document"],
+	});
+
+	assert.deepEqual(
+		states,
+		[],
+		"Parent-touch-only blur flushes must not transition the indicator to Saving…",
+	);
+	assert.equal(manager._pendingParentTouches.has("page-1:document"), false);
+});
+
+test("test_builder_select_model_avoids_native_select_arrow", async (t) => {
+	createBrowser(t, { url: "https://lagniappe.test/forms/1" });
+
+	const { ModelElement } = await import(
+		"../../src/script/views/builder/panels/model.ts"
+	);
+
+	const selectModel = ModelElement.select({
+		id: "queen-seen",
+		type: "select",
+		title: "Queen Seen",
+		placeholder: "select an option...",
+	});
+	assert.equal(
+		selectModel.querySelector("select"),
+		null,
+		"Builder edit-mode select preview should not render a native <select>",
+	);
+	const input = selectModel.querySelector("input[disabled]");
+	assert.ok(input);
+	assert.equal(input.placeholder, "select an option...");
+	assert.ok(selectModel.querySelector("[data-icon='dropdown']"));
+
+	const internalLink = ModelElement.link({
+		id: "linked-page",
+		type: "link",
+		title: "Linked Page",
+		location: "page",
+	});
+	assert.equal(internalLink.querySelector("select"), null);
+	assert.ok(internalLink.querySelector("input[disabled]"));
+	assert.ok(internalLink.querySelector("[data-icon='search']"));
+});
