@@ -2,13 +2,14 @@
 {% set view_entry = "results" %}
 {% from 'search/results.html' import search_results %}
 
-{% macro facet_button(facet) %}
+{% macro facet_button(facet, count=0) %}
   <button type="button"
           data-role="attribute"
           data-kind="{{ facet.kind }}"
           data-selected="false"
+          data-empty="{{ 'true' if count == 0 else 'false' }}"
           aria-pressed="false"
-          class="{{ styles.attributes.button }} group cursor-pointer group-data-[has-selection=true]/facets:data-[selected=false]:opacity-50 group-data-[has-selection=true]/facets:data-[selected=false]:hover:opacity-100">
+          class="{{ styles.attributes.button }} group cursor-pointer">
     <span data-role="attribute-icons" class="{{ styles.attributes.iconStack }}">
       <span data-role="icon"
             class="{{ styles.attributes.icon }}"
@@ -20,37 +21,34 @@
             data-kind="delete">
         {{ render_icon("attribute.remove") }}
       </span>
-      <span data-role="add"
-            class="{{ styles.attributes.icon }}"
-            data-kind="{{ facet.kind }}">
-        {{ render_icon("filter.active") }}
-      </span>
     </span>
     <span data-role="text" class="font-semibold">{{ facet.title }}</span>
+    <span data-role="count" class="{{ styles.search.facetCount }}">{{ count }}</span>
   </button>
 {% endmacro %}
 
 {% macro main() %}
   <div lp-view data-kind="results" class="{{ styles.layout.contentView }}">
     <div class="flex flex-col gap-4 py-4 sm:py-6 lg:py-8">
-      <div class="flex flex-row items-center gap-2">
-        <span class="text-base-medium">Query:</span>
-        <span class="text-base-dark font-semibold">{{ query }}</span>
+      <div data-role="search-summary"
+           class="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 text-base">
+        <span class="font-semibold text-base-dark">{{ pagination.total }} {{ 'result' if pagination.total == 1 else 'results' }}</span>
+        <span class="text-base-medium">for</span>
+        <span class="font-semibold text-base-dark">“{{ query }}”</span>
       </div>
       <div class="{{ styles.attributes.container }} group/facets cursor-default"
            data-role="facets"
            data-has-selection="false">
-        {% for facet in facets %}{{ facet_button(facet.value) }}{% endfor %}
         <button type="button"
                 data-role="reset"
-                aria-label="Clear filters"
-                title="Clear filters"
-                class="{{ styles.attributes.button }} cursor-pointer group-data-[has-selection=false]/facets:hidden"
-                data-kind="delete">
-          <span data-role="remove" class="{{ styles.attributes.icon }}">
-            {{ render_icon("filter.inactive") }}
-          </span>
+                data-selected="true"
+                aria-pressed="true"
+                title="Show all results"
+                class="{{ styles.search.allFacet }}">
+          <span data-role="text">All</span>
+          <span data-role="count" class="{{ styles.search.facetCount }}">{{ unfiltered_total }}</span>
         </button>
+        {% for facet in facets %}{{ facet_button(facet.value, facet_counts.get(facet.value.kind, 0)) }}{% endfor %}
       </div>
       {{ search_results(results, pagination, query) }}
     </div>

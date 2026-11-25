@@ -180,6 +180,17 @@ nav:has(> [data-role="actions"]) > [data-role="actions"] {
 	gap: 0.25rem;
 }
 
+/* @style nav.search.input */
+.nav-search-input::-webkit-search-cancel-button {
+	-webkit-appearance: none;
+	appearance: none;
+}
+
+/* @style nav.search.clear */
+.nav-search-clear[data-visible="false"] {
+	display: none;
+}
+
 /* @style task.buttons */
 [data-widget="PageTaskList"] {
 	&

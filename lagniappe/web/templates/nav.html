@@ -120,6 +120,7 @@
       </a>
       {%- if not public -%}
         <div class="flex items-center justify-end gap-4">
+          {% set active_search_query = query if query is defined and query else '' %}
           <form class="w-48 sm:w-64"
                 action="{{ url_for('internal.search_page') }}"
                 method="get"
@@ -129,6 +130,7 @@
               <input type="search"
                      name="q"
                      required
+                     value="{{ active_search_query }}"
                      class="{{ styles.nav.search.input }}"
                      placeholder="Search..."
                      autocomplete="off"
@@ -136,6 +138,14 @@
                      enterkeyhint="search"
                      data-1p-ignore
                      aria-label="Search">
+              <button type="button"
+                      data-role="search-clear"
+                      data-visible="{{ 'true' if active_search_query else 'false' }}"
+                      aria-label="Clear search"
+                      title="Clear search"
+                      class="{{ styles.nav.search.clear }}">
+                {{ render_icon("close", "icon-xs") }}
+              </button>
             </div>
           </form>
           <div data-role="offline"

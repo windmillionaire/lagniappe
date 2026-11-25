@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, cast
 import redis
 from redis import Redis, ResponseError
 from redis.client import Pipeline
+from redis.commands.search.aggregation import AggregateRequest, AggregateResult
 from redis.commands.search.field import NumericField, TagField, TextField
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
@@ -167,6 +168,21 @@ class Cache:
                     "index": self.INDEX,
                     "error": str(e),
                     **_query_context(query),
+                },
+            )
+            raise e
+
+    def aggregate(self, query: AggregateRequest) -> AggregateResult:
+        """Execute a RediSearch aggregation query against the primary index."""
+        try:
+            return cast(AggregateResult, self.redis.ft(self.INDEX).aggregate(query))
+        except ResponseError as e:
+            capture(
+                e,
+                context={
+                    "method": "aggregate",
+                    "index": self.INDEX,
+                    "error": str(e),
                 },
             )
             raise e

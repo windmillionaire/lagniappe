@@ -61,13 +61,24 @@ export default class Results extends ShellView {
 	}
 
 	updateSelectionState() {
-		if (!this.facetsContainer) return;
-		this.facetsContainer.dataset.hasSelection = (
-			this.selected.size > 0
-		).toString();
+		const hasSelection = this.selected.size > 0;
+		if (this.facetsContainer) {
+			this.facetsContainer.dataset.hasSelection = hasSelection.toString();
+		}
+		if (this.reset) {
+			const allSelected = !hasSelection;
+			this.reset.dataset.selected = allSelected.toString();
+			this.reset.setAttribute("aria-pressed", allSelected.toString());
+		}
 	}
 
 	updateResults(html: Document) {
+		const summary = html.querySelector("[data-role='search-summary']");
+		if (summary) {
+			document
+				.querySelector("[data-role='search-summary']")
+				?.replaceWith(summary);
+		}
 		const replacement = html.querySelector("[data-role='results']");
 		if (!replacement) return;
 		document.querySelector("[data-role='results']")?.replaceWith(replacement);
@@ -104,6 +115,7 @@ export default class Results extends ShellView {
 	async handleResetClick(e: Event) {
 		e.preventDefault();
 		e.stopPropagation();
+		if (this.selected.size === 0) return;
 
 		this.selected.clear();
 

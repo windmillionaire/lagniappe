@@ -8,6 +8,8 @@ from .details import SearchRecord
 import re
 
 from markupsafe import Markup, escape
+from redis.commands.search import reducers
+from redis.commands.search.aggregation import AggregateRequest
 from redis.commands.search.query import Query
 
 from lagniappe import CONFIG
@@ -369,20 +371,18 @@ def kind_search(
     return _current_search_results(formatted_results)[0]
 
 
-def search(
+def _build_search_query_string(
     user_query: str,
     required: QueryHashes,
     belongs_to: GroupScope,
     kinds: Collection[str] | None = None,
-    page: int = 1,
-    limit: int = 10,
     *,
     include_help: bool = False,
-) -> tuple[list[SearchRecord], int]:
-    """Run a full-text search with highlighting, snippets, and pagination."""
+) -> str | None:
+    """Build the permission-scoped RediSearch query string for full-text search."""
     allow_help = include_help and (not kinds or "help" in kinds)
     if Restriction.is_denied(required) and not allow_help:
-        return [], 0
+        return None
 
     term_list = _build_term_list(user_query, expanded=True)
 
@@ -399,30 +399,94 @@ def search(
     if allow_help:
         scopes.append(help_clause(ensure_help()))
     if not scopes:
-        return [], 0
+        return None
     # Visibility clauses select records; their differing shapes must not boost
     # entities over help with the same text and a higher document weight.
     term_list.append("(" + " | ".join(scopes) + ") => { $weight: 0; }")
+    return " ".join(filter(None, term_list)) or "*"
 
-    if term_list:
-        redis_query = (
-            Query(" ".join(filter(None, term_list)) or "*")
-            .dialect(SEARCH_QUERY_DIALECT)
-            .highlight(
-                fields=["desc", "doc", "values"],
-                tags=[HIGHLIGHT_OPEN, HIGHLIGHT_CLOSE],
-            )
-            .summarize(fields=["desc", "doc"], num_frags=1, context_len=25)
-            .paging(offset=(page - 1) * limit, num=limit)
-        )
-        results = cache.search(redis_query)
-        formatted_results = [
-            _format_result(doc, snippets=True) for doc in results.docs
-        ]
-        formatted_results, stale_count = _current_search_results(formatted_results)
-        return formatted_results, max(0, results.total - stale_count)
-    else:
+
+def search(
+    user_query: str,
+    required: QueryHashes,
+    belongs_to: GroupScope,
+    kinds: Collection[str] | None = None,
+    page: int = 1,
+    limit: int = 10,
+    *,
+    include_help: bool = False,
+) -> tuple[list[SearchRecord], int]:
+    """Run a full-text search with highlighting, snippets, and pagination."""
+    query_string = _build_search_query_string(
+        user_query,
+        required,
+        belongs_to,
+        kinds=kinds,
+        include_help=include_help,
+    )
+    if not query_string:
         return [], 0
+
+    redis_query = (
+        Query(query_string)
+        .dialect(SEARCH_QUERY_DIALECT)
+        .highlight(
+            fields=["desc", "doc", "values"],
+            tags=[HIGHLIGHT_OPEN, HIGHLIGHT_CLOSE],
+        )
+        .summarize(fields=["desc", "doc"], num_frags=1, context_len=25)
+        .paging(offset=(page - 1) * limit, num=limit)
+    )
+    results = cache.search(redis_query)
+    formatted_results = [
+        _format_result(doc, snippets=True) for doc in results.docs
+    ]
+    formatted_results, stale_count = _current_search_results(formatted_results)
+    return formatted_results, max(0, results.total - stale_count)
+
+
+def search_facet_counts(
+    user_query: str,
+    required: QueryHashes,
+    belongs_to: GroupScope,
+    *,
+    include_help: bool = False,
+) -> dict[str, int]:
+    """Return per-facet result counts across all visible kinds for a query."""
+    query_string = _build_search_query_string(
+        user_query,
+        required,
+        belongs_to,
+        kinds=None,
+        include_help=include_help,
+    )
+    if not query_string:
+        return {}
+
+    agg_request = (
+        AggregateRequest(query_string)
+        .dialect(SEARCH_QUERY_DIALECT)
+        .group_by(["@kind"], reducers.count().alias("count"))
+    )
+    result = cache.aggregate(agg_request)
+    counts: dict[str, int] = {}
+    for row in getattr(result, "rows", ()) or ():
+        mapping: dict[str, str] = {}
+        for idx in range(0, len(row) - 1, 2):
+            raw_key = row[idx]
+            raw_val = row[idx + 1]
+            key = raw_key.decode("utf-8") if isinstance(raw_key, bytes) else str(raw_key)
+            val = raw_val.decode("utf-8") if isinstance(raw_val, bytes) else str(raw_val)
+            mapping[key] = val
+        raw_kind = mapping.get("kind")
+        if not raw_kind:
+            continue
+        facet_kind = "task" if raw_kind == "model" else raw_kind
+        try:
+            counts[facet_kind] = counts.get(facet_kind, 0) + int(mapping.get("count", 0))
+        except ValueError:
+            continue
+    return counts
 
 
 def exact_name_search(

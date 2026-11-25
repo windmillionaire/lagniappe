@@ -242,10 +242,26 @@ def search_page() -> ResponseReturnValue:
     q = request.values.get("q", "")
 
     page = int(request.args.get("page", 0))
-    results, total = _search_page_results(q, page, request.values.getlist("kind"))
+    kinds = request.values.getlist("kind")
+    results, total = _search_page_results(q, page, kinds)
     pagination = _search_page_pagination(page, results, total)
+    facet_counts = cache.search_facet_counts(
+        q,
+        current_user.properties.restrictions.search,
+        current_user.properties.restrictions.belongs_to,
+        include_help=True,
+    )
+    unfiltered_total = sum(facet_counts.values()) if kinds else total
+    if not kinds and total < sum(facet_counts.values()):
+        unfiltered_total = total
 
-    return responses.search_page(q, results, pagination)
+    return responses.search_page(
+        q,
+        results,
+        pagination,
+        facet_counts=facet_counts,
+        unfiltered_total=unfiltered_total,
+    )
 
 
 def _search_page_results(q, page, kinds):

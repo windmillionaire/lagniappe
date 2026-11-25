@@ -517,3 +517,48 @@ def test_search_special_characters(get_admin, get_user):
     _go_to_search_page(user, f"{token}: Pipe|Slash/Colon")
 
     expect(_result_titles(user).filter(has_text=name)).to_be_visible()
+
+
+# @template nav.html::navbar
+# @template search/search.html::main
+def test_search_retains_query_with_clear_button_and_facet_counts(get_admin, get_user):
+    user = get_admin()
+    token = _unique("ux-counts").replace("-", "")
+    _create_project(f"{token} alpha project")
+    _create_category(f"{token} beta category")
+
+    _go_to_search_page(user, token)
+
+    search_input = user.locate(SEARCH_INPUT)
+    clear_button = user.locate("[lp-search] [data-role='search-clear']")
+    expect(search_input).to_have_value(token)
+    expect(clear_button).to_be_visible()
+
+    summary = user.locate("[data-role='search-summary']")
+    expect(summary).to_contain_text(f"2 results for “{token}”")
+
+    all_chip = user.locate("[data-role='reset']")
+    expect(all_chip).to_be_visible()
+    expect(all_chip).to_have_attribute("data-selected", "true")
+    expect(all_chip.locator("[data-role='count']")).to_have_text("2")
+
+    project_facet = user.locate(f"{SEARCH_FACET}[data-kind='project']")
+    expect(project_facet).to_have_attribute("data-empty", "false")
+    expect(project_facet.locator("[data-role='count']")).to_have_text("1")
+    expect(project_facet.locator("[data-icon='project']")).to_be_visible()
+
+    file_facet = user.locate(f"{SEARCH_FACET}[data-kind='file']")
+    expect(file_facet).to_have_attribute("data-empty", "true")
+    expect(file_facet.locator("[data-role='count']")).to_have_text("0")
+
+    project_facet.click()
+    expect(all_chip).to_have_attribute("data-selected", "false")
+    expect(summary).to_contain_text(f"1 result for “{token}”")
+
+    all_chip.click()
+    expect(all_chip).to_have_attribute("data-selected", "true")
+    expect(summary).to_contain_text(f"2 results for “{token}”")
+
+    clear_button.click()
+    expect(search_input).to_have_value("")
+    expect(clear_button).to_be_hidden()

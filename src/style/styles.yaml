@@ -1282,9 +1282,17 @@ nav:
       hooks: [nav-search-icon]
       css: [src/style/icons.css]
     input:
-      classes: sm:text-sm rounded-md pl-8 pr-2 h-8 w-48 sm:w-64 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
+      classes: nav-search-input sm:text-sm rounded-md pl-8 pr-7 h-8 w-48 sm:w-64 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
       intent: input presentation within nav search
       surfaces: [server]
+      hooks: [nav-search-input]
+      css: [src/style/navigation.css]
+    clear:
+      classes: nav-search-clear absolute right-1 z-10 inline-grid size-6 cursor-pointer place-items-center rounded-sm text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-page-default
+      intent: inline clear button inside the navbar search input
+      surfaces: [server]
+      hooks: [nav-search-clear]
+      css: [src/style/navigation.css]
 
 radio:
   default:
@@ -1317,6 +1325,16 @@ section:
   surfaces: [frontend]
 
 search:
+  allFacet:
+    classes: search-all-facet font-semibold px-3 py-2 flex items-center rounded-md gap-1.5 border text-base-dark bg-white border-base-light/50 cursor-pointer
+    intent: All results reset chip in the search facet bar
+    surfaces: [server]
+    hooks: [search-all-facet]
+    css: [src/style/attributes.css]
+  facetCount:
+    classes: rounded-full bg-base-bg px-1.5 py-0.5 text-xs font-semibold tabular-nums text-base-medium
+    intent: compact match count badge inside a search facet chip
+    surfaces: [server]
   pagination:
     footer:
       classes: flex flex-row items-center gap-3 border-t border-base-light/50 py-3

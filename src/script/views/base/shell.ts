@@ -276,6 +276,26 @@ export default class ShellView {
 			if (!hasClosest(target)) return;
 			const search = target.closest("[lp-search]");
 			if (search && !this.SearchBox) {
+				const clearBtn = target.closest<HTMLButtonElement>(
+					"[data-role='search-clear']",
+				);
+				if (clearBtn && event.type === "click") {
+					event.preventDefault();
+					const input =
+						search.querySelector<HTMLInputElement>("input[name='q']");
+					if (input) {
+						input.value = "";
+						input.focus();
+					}
+					clearBtn.dataset.visible = "false";
+					this.runColdAction(
+						search,
+						() => this.ensureSearchBox(),
+						(box) => box?.clearSearch(),
+						search,
+					);
+					return;
+				}
 				this.runColdAction(
 					search,
 					() => this.ensureSearchBox(),

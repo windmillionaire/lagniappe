@@ -103,10 +103,11 @@ test("test_search_results_facets_sync_aria_pressed_on_toggle_and_reset", async (
 		url: "https://lagniappe.test/l/search?q=hive&kind=page",
 		html: `
 			<div lp-view data-kind="results">
+				<div data-role="search-summary">4 results for “hive”</div>
 				<div data-role="facets" data-has-selection="false">
+					<button type="button" data-role="reset" data-selected="true" aria-pressed="true" aria-label="Clear filters" title="Show all results">All <span>10</span></button>
 					<button type="button" data-role="attribute" data-kind="page" data-selected="false" aria-pressed="false">Pages</button>
 					<button type="button" data-role="attribute" data-kind="task" data-selected="false" aria-pressed="false">Tasks</button>
-					<button type="button" data-role="reset" aria-label="Clear filters" title="Clear filters"></button>
 				</div>
 				<div data-role="results"></div>
 			</div>
@@ -126,11 +127,14 @@ test("test_search_results_facets_sync_aria_pressed_on_toggle_and_reset", async (
 		{
 			"../../src/script/shared/request.ts": {
 				request: {
-					async get() {
+					async get(url) {
+						const summary = url.includes("kind=")
+							? "9 results for “hive”"
+							: "10 results for “hive”";
 						return {
 							ok: true,
 							html: new DOMParser().parseFromString(
-								'<div data-role="results"></div>',
+								`<div data-role="search-summary">${summary}</div><div data-role="results"></div>`,
 								"text/html",
 							),
 						};
@@ -157,13 +161,25 @@ test("test_search_results_facets_sync_aria_pressed_on_toggle_and_reset", async (
 
 	assert.equal(pageBtn.getAttribute("aria-pressed"), "true");
 	assert.equal(taskBtn.getAttribute("aria-pressed"), "false");
+	assert.equal(resetBtn.dataset.selected, "false");
+	assert.equal(resetBtn.getAttribute("aria-pressed"), "false");
 
 	await view.handleFacetClick(new MouseEvent("click"), taskBtn);
 	assert.equal(taskBtn.getAttribute("aria-pressed"), "true");
 	assert.equal(taskBtn.dataset.selected, "true");
+	assert.equal(
+		document.querySelector("[data-role='search-summary']").textContent,
+		"9 results for “hive”",
+	);
 
 	await view.handleResetClick(new MouseEvent("click"));
 	assert.equal(pageBtn.getAttribute("aria-pressed"), "false");
 	assert.equal(taskBtn.getAttribute("aria-pressed"), "false");
+	assert.equal(resetBtn.dataset.selected, "true");
+	assert.equal(resetBtn.getAttribute("aria-pressed"), "true");
+	assert.equal(
+		document.querySelector("[data-role='search-summary']").textContent,
+		"10 results for “hive”",
+	);
 	assert.equal(resetBtn.getAttribute("aria-label"), "Clear filters");
 });

@@ -4,9 +4,10 @@
    data-just-selected suppresses hover effects until mouseout
    ========================================================================== */
 
-/* @style attributes.button attributes.form */
+/* @style attributes.button attributes.form search.allFacet */
 [data-role="attribute"],
-[data-role="related-form"] {
+[data-role="related-form"],
+.search-all-facet {
 	& > [data-role="text"] {
 		align-items: center;
 		display: inline-flex;
@@ -18,12 +19,16 @@
 [data-role="attribute"] {
 	&
 		> [data-role="attribute-icons"]
-		> :is([data-role="icon"], [data-role="remove"], [data-role="add"]) {
+		> :is([data-role="icon"], [data-role="remove"]) {
 		display: grid;
 		grid-area: 1 / 1;
 		line-height: 1;
 		place-items: center;
 		visibility: hidden;
+	}
+
+	& > [data-role="attribute-icons"] > [data-role="icon"] {
+		visibility: visible;
 	}
 
 	&:hover,
@@ -34,10 +39,16 @@
 		outline-offset: 2px;
 	}
 
-	/* Selected: show icon, hide on interaction and show remove */
-	&[data-selected="true"] > [data-role="attribute-icons"] > [data-role="icon"] {
-		visibility: visible;
+	&[data-selected="true"] {
+		background-color: var(--kind-bg);
+		border-color: var(--kind-default);
+		color: var(--kind-dark);
+		& > [data-role="count"] {
+			background-color: white;
+			color: var(--kind-dark);
+		}
 	}
+
 	&[data-selected="true"]:not([data-just-selected="true"]):is(
 			:hover,
 			:focus-visible
@@ -50,18 +61,44 @@
 			visibility: visible;
 		}
 		& > [data-role="text"] {
-			opacity: 0.5;
+			opacity: 0.65;
 		}
 	}
 
-	/* Unselected: show add */
-	&[data-selected="false"] > [data-role="attribute-icons"] > [data-role="add"] {
-		visibility: visible;
+	&[data-selected="false"][data-empty="true"] {
+		opacity: 0.45;
+		&:is(:hover, :focus-visible) {
+			opacity: 0.85;
+		}
 	}
+}
 
-	/* Text opacity: faded when unselected+idle or selected+interacting */
-	&[data-selected="false"]:not(:hover, :focus-visible) > [data-role="text"] {
-		opacity: 0.5;
+/* @style attributes.button */
+[data-role="facets"][data-has-selection="true"]
+	> [data-role="attribute"][data-selected="false"] {
+	opacity: 0.65;
+	&[data-empty="true"] {
+		opacity: 0.35;
+	}
+	&:is(:hover, :focus-visible) {
+		opacity: 1;
+	}
+}
+
+/* @style search.allFacet */
+.search-all-facet {
+	&:hover,
+	&:focus-visible {
+		outline: 2px solid var(--color-base-default);
+		outline-offset: 2px;
+	}
+	&[data-selected="true"] {
+		background-color: var(--color-base-bg);
+		border-color: var(--color-base-default);
+		& > [data-role="count"] {
+			background-color: white;
+			color: var(--color-base-dark);
+		}
 	}
 }
 

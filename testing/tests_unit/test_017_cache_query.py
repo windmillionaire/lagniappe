@@ -1301,3 +1301,46 @@ def test_existing_filter_parents_execute_before_pipeline_closes(monkeypatch, pro
         "page-two": ["JSON:parent:all-v2"],
     }
     assert cache.get_existing_parents([]) == {}
+
+
+@pytest.mark.unit
+def test_search_facet_counts_aggregates_kinds_and_folds_models_into_tasks(monkeypatch):
+    from lagniappe.core.definitions import Restriction
+
+    captured = []
+
+    def fake_aggregate(request):
+        captured.append(request.build_args())
+        return SimpleNamespace(
+            rows=[
+                [b"kind", b"page", b"count", b"4"],
+                [b"kind", b"task", b"count", b"10"],
+                [b"kind", b"model", b"count", b"5"],
+                [b"kind", b"help", b"count", b"2"],
+            ]
+        )
+
+    monkeypatch.setattr(query.cache, "aggregate", fake_aggregate)
+    monkeypatch.setattr(query, "ensure_help", lambda: "v1")
+
+    counts = query.search_facet_counts(
+        "Hive",
+        Restriction.UNRESTRICTED,
+        Restriction.BELONGS_TO_ALL,
+        include_help=True,
+    )
+
+    assert counts == {"page": 4, "task": 15, "help": 2}
+    assert len(captured) == 1
+    assert "GROUPBY" in captured[0]
+    assert "@kind" in captured[0]
+
+    assert (
+        query.search_facet_counts(
+            "Hive",
+            [],
+            Restriction.BELONGS_TO_NONE,
+            include_help=False,
+        )
+        == {}
+    )

@@ -963,14 +963,26 @@ def search_results(
 
 
 def search_page(
-    q: str, results: Sequence[Mapping[str, object]], pagination: Mapping[str, object]
+    q: str,
+    results: Sequence[Mapping[str, object]],
+    pagination: Mapping[str, object],
+    *,
+    facet_counts: Mapping[str, int] | None = None,
+    unfiltered_total: int | None = None,
 ) -> tuple[str, int]:
+    total = (
+        unfiltered_total
+        if unfiltered_total is not None
+        else int(cast(int, pagination.get("total", 0)))
+    )
     return render_template(
         "search/search.html",
         query=q,
         results=results,
         pagination=pagination,
         facets=SearchFacets,
+        facet_counts=facet_counts or {},
+        unfiltered_total=total,
     ), 200
 
 

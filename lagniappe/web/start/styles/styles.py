@@ -390,7 +390,8 @@ STYLES = {
 		"user": "size-8 flex rounded-full items-center justify-center",
 		"search": {
 			"icon": "nav-search-icon pointer-events-none text-slate-400 absolute left-1.5 mr-1 z-10",
-			"input": "sm:text-sm rounded-md pl-8 pr-2 h-8 w-48 sm:w-64 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+			"input": "nav-search-input sm:text-sm rounded-md pl-8 pr-7 h-8 w-48 sm:w-64 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+			"clear": "nav-search-clear absolute right-1 z-10 inline-grid size-6 cursor-pointer place-items-center rounded-sm text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-page-default"
 		}
 	},
 	"radio": {
@@ -404,6 +405,8 @@ STYLES = {
 	},
 	"section": "outline outline-base-light rounded-md px-4 pb-4 bg-white w-full",
 	"search": {
+		"allFacet": "search-all-facet font-semibold px-3 py-2 flex items-center rounded-md gap-1.5 border text-base-dark bg-white border-base-light/50 cursor-pointer",
+		"facetCount": "rounded-full bg-base-bg px-1.5 py-0.5 text-xs font-semibold tabular-nums text-base-medium",
 		"pagination": {
 			"footer": "flex flex-row items-center gap-3 border-t border-base-light/50 py-3",
 			"summary": "text-xs text-base-medium sm:text-base",
