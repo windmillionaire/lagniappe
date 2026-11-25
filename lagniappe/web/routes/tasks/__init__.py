@@ -2,8 +2,6 @@ from flask import Blueprint
 
 tasks = Blueprint("tasks", __name__)
 
-from . import (
-    main,
-)
+from . import attachments, main
 
 __all__ = ["tasks"]
