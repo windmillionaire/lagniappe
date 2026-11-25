@@ -71,6 +71,7 @@ async function setupPolling(
 	const request = { post };
 	const { PollingCoordinator } = await esmock.strict(
 		"../../src/script/shared/polling.ts",
+		{},
 		{
 			"../../src/script/shared/endpoints.ts": {
 				ENDPOINTS: { poll: "/l/poll" },

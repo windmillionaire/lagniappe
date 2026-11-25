@@ -1,2 +1,2 @@
-import"../foundation.js?v=baa4a64d";import{E as a}from"../index-foundation.js?v=baa4a64d";import"../core-foundation.js?v=baa4a64d";import"../upstreamUnavailable.js?v=baa4a64d";import"../connectivity.js?v=baa4a64d";export{a as default};
+import"../foundation.js?v=b9ad6d22";import{E as a}from"../index-foundation.js?v=b9ad6d22";import"../core-foundation.js?v=b9ad6d22";import"../upstreamUnavailable.js?v=b9ad6d22";import"../connectivity.js?v=b9ad6d22";export{a as default};
 /*! Third-party licenses: /third-party-licenses.txt */
