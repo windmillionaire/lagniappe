@@ -1,351 +1,39 @@
-"""REST transport for provider-free external agent plans."""
+"""Discovery, plan and tool endpoints for external planning agents."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from flask import Response
     from flask.typing import ResponseReturnValue
 
-from functools import wraps
 import json
 import logging
 import re
 import time
-import uuid
 
-from flask import g, jsonify, make_response, request, url_for
-from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
+from flask import g, make_response, request, url_for
 
-from config.remote_mcp import mcp_issuer
 from lagniappe import CONFIG
-from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.definitions.asset import FileAsset
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import summarize_actions
 from lagniappe.core.tools.ai import external_api
 from lagniappe.core.tools.ai.external import definitions
-from lagniappe.core.tools.ai.external_operations import ExternalPlanError
 from lagniappe.core.tools.ai.external.openapi import build_openapi_document
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai.references import hash_reference, normalize_hash_references
-from lagniappe.core.tools.auth import agent_api as agent_auth
-from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
+from lagniappe.core.tools.cache.rate_limit import client_ip
 from lagniappe.core.tools.database import assets as storage_assets
-from lagniappe.core.tools.email.notifications.links import absolute_url
 
 from . import api, api_family
+from .http import APIProblem, api_absolute_url, api_route, json_body, rate_limit
 
-
-_DOMAIN_ERROR_STATUSES = {
-    "file_too_large": 422,
-    "files_too_large": 422,
-    "invalid_content_type": 422,
-    "invalid_file": 422,
-    "invalid_file_size": 422,
-    "invalid_files": 422,
-    "invalid_upload_batch_id": 422,
-    "invalid_upload_state": 409,
-    "not_found": 404,
-    "plan_not_draft": 409,
-    "plan_not_found": 404,
-    "plan_operation_in_progress": 409,
-    "plan_operation_lost": 409,
-    "plan_state_conflict": 409,
-    "plan_unavailable": 410,
-    "too_many_files": 422,
-    "unsupported_field": 422,
-    "upload_batch_mismatch": 409,
-    "uploads_pending": 409,
-    "validation_failed": 422,
-}
 
 LOGGER = logging.getLogger(__name__)
-REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,80}$")
-MAX_JSON_BODY_BYTES = external_api.MAX_PROPOSAL_BYTES + 64 * 1024
-GENERAL_RATE_LIMIT = (60, 60)
 PLAN_START_RATE_LIMIT = (100, 60 * 60)
 PLAN_TOOL_RATE_WINDOW = 31 * 24 * 60 * 60
-
-
-def _api_origin():
-    """Use the configured site origin, or the authenticated remote OAuth issuer."""
-    if getattr(g, "remote_mcp_authenticated", False):
-        return mcp_issuer(vars(CONFIG))
-    if CONFIG.hosted_e2e:
-        return CONFIG.BASE_URL.rstrip("/")
-    return absolute_url("/").rstrip("/")
-
-
-def _api_absolute_url(path):
-    """Build an API-advertised URL from the selected configured origin."""
-    return f"{_api_origin()}/{str(path or '/').lstrip('/')}"
-
-
-class APIProblem(Exception):
-    """Expected client-facing API failure."""
-
-    def __init__(
-        self,
-        code: str,
-        message: str,
-        status: int,
-        *,
-        details: object = None,
-        retry_after: int | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.status = status
-        self.details = details
-        self.retry_after = retry_after
-
-
-def _request_id():
-    supplied = str(request.headers.get("X-Request-ID") or "").strip()
-    if REQUEST_ID_PATTERN.fullmatch(supplied):
-        return supplied
-    return uuid.uuid4().hex
-
-
-def _error(code, message, status, *, details=None, retry_after=None):
-    payload = {
-        "error": {
-            "code": code,
-            "message": message,
-        },
-        "request_id": getattr(g, "agent_api_request_id", _request_id()),
-    }
-    if details is not None:
-        payload["error"]["details"] = details
-    response = make_response(jsonify(payload), status)
-    if retry_after is not None:
-        response.headers["Retry-After"] = str(max(int(retry_after), 1))
-    if status == 401:
-        response.headers["WWW-Authenticate"] = 'Bearer realm="Lagniappe API"'
-    return response
-
-
-def _rate_limit(scope, identifier, limit, window_seconds):
-    try:
-        state = check_limit(scope, identifier, limit, window_seconds)
-    except Exception as error:
-        exceptions.capture(
-            error,
-            context={
-                "agent_api": {
-                    "request_id": g.agent_api_request_id,
-                    "phase": "rate_limit",
-                    "scope": scope,
-                }
-            },
-        )
-        raise APIProblem(
-            "service_unavailable",
-            "API rate limiting is temporarily unavailable.",
-            503,
-            retry_after=30,
-        ) from error
-    if not state["allowed"]:
-        raise APIProblem(
-            "rate_limited",
-            "Too many API requests.",
-            429,
-            retry_after=state["retry_after"],
-        )
-    return state
-
-
-@api.before_request
-def authenticate_request() -> ResponseReturnValue | None:
-    """Authenticate only a bearer token; browser sessions are never a fallback."""
-    g.NO_CACHE = True
-    g.agent_api_request_id = _request_id()
-    if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED:
-        return _error("external_ai_disabled", "External AI access is disabled.", 403)
-    # ``Content-Length`` is not guaranteed (for example with chunked transfer).
-    # Werkzeug's limited request stream enforces this cap while JSON is read as
-    # well as rejecting an oversized declared length up front.
-    request.max_content_length = MAX_JSON_BODY_BYTES
-    if request.content_length and request.content_length > MAX_JSON_BODY_BYTES:
-        return _error("request_too_large", "Request body is too large.", 413)
-
-    authorization = str(request.headers.get("Authorization") or "")
-    scheme, separator, token = authorization.partition(" ")
-    if not separator or scheme.casefold() != "bearer" or not token.strip():
-        return _error("unauthorized", "A bearer API key is required.", 401)
-    try:
-        from config.remote_mcp import USER_TOKEN_HEADER
-        from lagniappe.core.tools.auth import remote_mcp as remote_auth
-
-        if USER_TOKEN_HEADER in request.headers:
-            try:
-                _rate_limit(
-                    "remote-mcp-envelope", client_ip(request), *GENERAL_RATE_LIMIT
-                )
-                actor, credential = remote_auth.authenticate_envelope(
-                    token.strip(), request.headers[USER_TOKEN_HEADER]
-                )
-                g.remote_mcp_authenticated = True
-            except remote_auth.OAuthError:
-                return _error(
-                    "unauthorized",
-                    "The remote MCP connection is invalid or expired.",
-                    401,
-                )
-            except APIProblem as problem:
-                return _error(
-                    problem.code,
-                    problem.message,
-                    problem.status,
-                    retry_after=problem.retry_after,
-                )
-        else:
-            actor, credential = agent_auth.authenticate_credential(token.strip())
-    except agent_auth.AgentAPICredentialError:
-        return _error("unauthorized", "The API key is invalid or expired.", 401)
-
-    if actor is None:
-        return _error("invalid_token", "Invalid bearer credential.", 401)
-    if getattr(actor, "is_public", False):
-        return _error(
-            "forbidden",
-            "This user cannot use external agent plans.",
-            403,
-        )
-    g.agent_api_user = actor
-    g.agent_api_credential = credential
-    try:
-        _rate_limit(
-            "agent-api-general",
-            f"{actor.urlsafe_key}:{client_ip(request)}",
-            *GENERAL_RATE_LIMIT,
-        )
-    except APIProblem as problem:
-        return _error(
-            problem.code,
-            problem.message,
-            problem.status,
-            retry_after=problem.retry_after,
-        )
-    return None
-
-
-api_family.before_request(authenticate_request)
-
-
-@api.after_request
-def annotate_response(response: Response) -> Response:
-    response.headers["X-Request-ID"] = getattr(
-        g,
-        "agent_api_request_id",
-        "",
-    )
-    response.headers["Cache-Control"] = "no-store"
-    response.headers["X-Lagniappe-Build-ID"] = CONFIG.BUILD_ID
-    return response
-
-
-api_family.after_request(annotate_response)
-
-
-def handle_api_http_error(error: HTTPException) -> Response:
-    """Render routing-level API failures with the normal JSON envelope."""
-    g.NO_CACHE = True
-    if not getattr(g, "agent_api_request_id", None):
-        g.agent_api_request_id = _request_id()
-    if not CONFIG.AI_ENABLED or not CONFIG.EXTERNAL_AI_ENABLED:
-        return _error("external_ai_disabled", "External AI access is disabled.", 403)
-
-    status = (error.code or 500) if isinstance(error, HTTPException) else 500
-    code, message = {
-        404: ("not_found", "API resource not found."),
-        405: ("method_not_allowed", "Method not allowed for this API resource."),
-    }.get(status, ("request_failed", "The API request could not be completed."))
-    response = _error(code, message, status)
-    if status == 405 and isinstance(error, HTTPException):
-        allow = error.get_response().headers.get("Allow")
-        if allow:
-            response.headers["Allow"] = allow
-    return annotate_response(response)
-
-
-@api.errorhandler(APIProblem)
-def handle_api_problem(problem: APIProblem) -> ResponseReturnValue:
-    return _error(
-        problem.code,
-        problem.message,
-        problem.status,
-        details=problem.details,
-        retry_after=problem.retry_after,
-    )
-
-
-@api.errorhandler(Exception)
-def handle_unexpected_error(error: Exception) -> Response:
-    if isinstance(error, HTTPException):
-        return _error(
-            "request_failed",
-            error.description or "Request failed.",
-            error.code or 500,
-        )
-    exceptions.capture(
-        error,
-        context={
-            "agent_api": {
-                "request_id": getattr(g, "agent_api_request_id", None),
-                "path": request.path,
-            }
-        },
-    )
-    return _error(
-        "internal_error",
-        "The API request could not be completed.",
-        500,
-    )
-
-
-def _route(handler):
-    """Qualify record links and translate expected domain failures."""
-
-    @wraps(handler)
-    def wrapped(*args, **kwargs):
-        try:
-            return external_api.absolute_entity_links(
-                handler(*args, **kwargs), origin=_api_origin()
-            )
-        except ExternalPlanError as error:
-            raise APIProblem(
-                error.reason, str(error), _DOMAIN_ERROR_STATUSES[error.reason],
-                details=error.details,
-            ) from error
-        except APIProblem:
-            raise
-        except (exceptions.AIException, exceptions.ValidationError) as error:
-            raise APIProblem("validation_failed", str(error), 422) from error
-        except (storage_assets.DirectUploadError, ValueError, TypeError) as error:
-            raise APIProblem("invalid_request", str(error), 422) from error
-
-    return wrapped
-
-
-def _json_body():
-    try:
-        data = request.get_json(silent=True)
-    except RequestEntityTooLarge as error:
-        raise APIProblem(
-            "request_too_large", "Request body is too large.", 413
-        ) from error
-    if not isinstance(data, dict):
-        raise APIProblem(
-            "invalid_json",
-            "Request body must be a JSON object.",
-            400,
-        )
-    return data
 
 
 def _json_safe(value):
@@ -378,31 +66,31 @@ def _plan_payload(report, *, include_proposal=True):
         "uploads_pending": bool(report.upload_manifest),
         "upload_batch_id": external_api.current_upload_batch_id(report),
         "contract_version": external_api.CONTRACT_VERSION,
-        "contract_url": _api_absolute_url(
+        "contract_url": api_absolute_url(
             url_for(
                 "agent_api.get_plan_contract",
                 plan_id=report.urlsafe_key,
             )
         ),
-        "submit_url": _api_absolute_url(
+        "submit_url": api_absolute_url(
             url_for(
                 "agent_api.submit_plan",
                 plan_id=report.urlsafe_key,
             )
         ),
-        "status_url": _api_absolute_url(
+        "status_url": api_absolute_url(
             url_for(
                 "agent_api.get_plan",
                 plan_id=report.urlsafe_key,
             )
         ),
-        "preview_url": _api_absolute_url(
+        "preview_url": api_absolute_url(
             url_for(
                 "tools.api_plan_preview",
                 plan_hash=report.hash,
             )
         ),
-        "review_url": _api_absolute_url(
+        "review_url": api_absolute_url(
             url_for(
                 "tools.report",
                 key=report.urlsafe_key,
@@ -469,13 +157,13 @@ def _discovery_payload():
     return {
         "name": "Lagniappe External Agent API",
         "version": "v1",
-        "base_url": _api_absolute_url(url_for("agent_api.api_index")).rstrip("/"),
-        "openapi_url": _api_absolute_url(url_for("agent_api.openapi_document")),
-        "actor_url": _api_absolute_url(url_for("agent_api.me")),
-        "tools_url": _api_absolute_url(url_for("agent_api.tools")),
-        "plans_url": _api_absolute_url(url_for("agent_api.create_plan")),
-        "answer_context_url": _api_absolute_url(url_for("agent_api.answer_context")),
-        "client_skill_url": _api_absolute_url(url_for("agent_api.client_skill")),
+        "base_url": api_absolute_url(url_for("agent_api.api_index")).rstrip("/"),
+        "openapi_url": api_absolute_url(url_for("agent_api.openapi_document")),
+        "actor_url": api_absolute_url(url_for("agent_api.me")),
+        "tools_url": api_absolute_url(url_for("agent_api.tools")),
+        "plans_url": api_absolute_url(url_for("agent_api.create_plan")),
+        "answer_context_url": api_absolute_url(url_for("agent_api.answer_context")),
+        "client_skill_url": api_absolute_url(url_for("agent_api.client_skill")),
         "authentication": "Authorization: Bearer <user API key>",
         "instructions": (
             "Read openapi_url before using or guessing resource paths, then call "
@@ -485,7 +173,7 @@ def _discovery_payload():
 
 
 @api_family.get("/", strict_slashes=False)
-@_route
+@api_route
 def api_family_index() -> ResponseReturnValue:
     """Identify the current version without duplicating its contract."""
     current = _discovery_payload()
@@ -497,19 +185,19 @@ def api_family_index() -> ResponseReturnValue:
 
 
 @api.get("/", strict_slashes=False)
-@_route
+@api_route
 def api_index() -> ResponseReturnValue:
     """Point an authenticated client directly to API discovery resources."""
     return _discovery_payload()
 
 
 @api.get("/client-skill.md")
-@_route
+@api_route
 def client_skill() -> ResponseReturnValue:
     """Return a copyable, discovery-first client skill without API schemas."""
     response = make_response(
         external_api.client_skill_markdown(
-            _api_absolute_url(url_for("agent_api.api_index")).rstrip("/")
+            api_absolute_url(url_for("agent_api.api_index")).rstrip("/")
         )
     )
     response.headers["Content-Type"] = "text/markdown; charset=utf-8"
@@ -518,16 +206,16 @@ def client_skill() -> ResponseReturnValue:
 
 
 @api.get("/openapi.json")
-@_route
+@api_route
 def openapi_document() -> ResponseReturnValue:
     """Return the authenticated external-agent contract."""
     return build_openapi_document(
-        app_name=CONFIG.APP_NAME, server_url=_api_absolute_url("/"),
+        app_name=CONFIG.APP_NAME, server_url=api_absolute_url("/"),
     )
 
 
 @api.get("/me")
-@_route
+@api_route
 def me() -> ResponseReturnValue:
     actor = g.agent_api_user
     return {
@@ -551,7 +239,7 @@ def me() -> ResponseReturnValue:
 
 
 @api.get("/tools")
-@_route
+@api_route
 def tools() -> ResponseReturnValue:
     selected = []
     for value in request.args.getlist("names"):
@@ -593,21 +281,21 @@ def tools() -> ResponseReturnValue:
 
 
 @api.get("/answer-context")
-@_route
+@api_route
 def answer_context() -> ResponseReturnValue:
     return external_api.answer_context(g.agent_api_user)
 
 
 @api.post("/plans")
-@_route
+@api_route
 def create_plan() -> ResponseReturnValue:
     actor = g.agent_api_user
-    _rate_limit(
+    rate_limit(
         "agent-api-plan-start",
         f"{actor.urlsafe_key}:{client_ip(request)}",
         *PLAN_START_RATE_LIMIT,
     )
-    data = _json_body()
+    data = json_body()
     envelope = definitions.create_plan_request_schema()
     unsupported_fields = sorted(set(data) - set(envelope["properties"]))
     if unsupported_fields:
@@ -658,7 +346,7 @@ def create_plan() -> ResponseReturnValue:
 
 
 @api.get("/plans/<plan_id>")
-@_route
+@api_route
 def get_plan(plan_id: str) -> ResponseReturnValue:
     raw_include = request.args.get("include_proposal")
     if raw_include is None:
@@ -692,7 +380,7 @@ def _experiments_execution_allowed():
 
 
 @api.post("/plans/<plan_id>/execute")
-@_route
+@api_route
 def execute_plan(plan_id: str) -> ResponseReturnValue:
     if not _execution_allowed():
         raise APIProblem(
@@ -700,7 +388,7 @@ def execute_plan(plan_id: str) -> ResponseReturnValue:
             "Automatic plan execution is not enabled for this connection.",
             403,
         )
-    data = _json_body()
+    data = json_body()
     if (
         set(data) != {"proposal_fingerprint", "operation_id"}
         or not isinstance(data.get("proposal_fingerprint"), str)
@@ -734,7 +422,7 @@ def execute_plan(plan_id: str) -> ResponseReturnValue:
 
 
 @api.get("/plans/<plan_id>/contract")
-@_route
+@api_route
 def get_plan_contract(plan_id: str) -> ResponseReturnValue:
     report = _load_plan(plan_id)
     actions = [
@@ -746,7 +434,7 @@ def get_plan_contract(plan_id: str) -> ResponseReturnValue:
     contract = external_api.plan_contract(
         report,
         g.agent_api_user,
-        submit_url=_api_absolute_url(
+        submit_url=api_absolute_url(
             url_for(
                 "agent_api.submit_plan",
                 plan_id=report.urlsafe_key,
@@ -771,22 +459,22 @@ def get_plan_contract(plan_id: str) -> ResponseReturnValue:
 
 
 @api.post("/plans/<plan_id>/uploads")
-@_route
+@api_route
 def create_uploads(plan_id: str) -> ResponseReturnValue:
     report = _load_plan(plan_id)
     external_api.require_uploads_available(report)
-    data = _json_body()
+    data = json_body()
     return external_api.create_upload_sessions(
         report, g.agent_api_user, data, request_id=g.agent_api_request_id,
     ), 201
 
 
 @api.post("/plans/<plan_id>/uploads/finalize")
-@_route
+@api_route
 def finalize_uploads(plan_id: str) -> ResponseReturnValue:
     report = _load_plan(plan_id)
     external_api.require_draft(report)
-    data = _json_body()
+    data = json_body()
     finalized = external_api.finalize_upload_batch(
         report, g.agent_api_user, data, request_id=g.agent_api_request_id,
     )
@@ -845,7 +533,7 @@ def _original_file_download(tool_name, arguments, result):
 
 @api.post("/tools/<tool_name>", defaults={"plan_id": None})
 @api.post("/plans/<plan_id>/tools/<tool_name>")
-@_route
+@api_route
 def execute_tool(plan_id: str, tool_name: str) -> ResponseReturnValue:
     report = _load_plan(plan_id) if plan_id is not None else None
     if report is not None:
@@ -853,7 +541,7 @@ def execute_tool(plan_id: str, tool_name: str) -> ResponseReturnValue:
     if tool_name not in ai_functions.TOOL_DEFINITIONS:
         raise APIProblem("tool_not_found", "Tool not found.", 404)
     rate_state = (
-        _rate_limit(
+        rate_limit(
             "agent-api-plan-tools",
             report.urlsafe_key,
             external_api.MAX_PLAN_TOOL_CALLS,
@@ -862,7 +550,7 @@ def execute_tool(plan_id: str, tool_name: str) -> ResponseReturnValue:
         if report is not None
         else {"count": 0}
     )
-    data = _json_body()
+    data = json_body()
     unsupported = sorted(set(data) - {"arguments"})
     if unsupported:
         raise APIProblem(
@@ -934,11 +622,11 @@ def execute_tool(plan_id: str, tool_name: str) -> ResponseReturnValue:
 
 
 @api.post("/plans/<plan_id>/submit")
-@_route
+@api_route
 def submit_plan(plan_id: str) -> ResponseReturnValue:
     report = _load_plan(plan_id)
     external_api.require_submission_available(report)
-    data = _json_body()
+    data = json_body()
     submitted = external_api.submit_plan_request(
         report, g.agent_api_user, data, request_id=g.agent_api_request_id,
     )

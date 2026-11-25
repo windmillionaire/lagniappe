@@ -748,9 +748,12 @@ authoritative state after acquiring a claim, recheck eligibility, and commit wit
 the exact claim token and expected report revision. Definite checkpoint rejection
 and ambiguous transaction failure retain distinct cleanup behavior.
 
-The REST module owns authentication, rate limits, body parsing, domain-to-HTTP
-error translation and response/URL construction. MCP remains a separate package
-that calls REST; it does not import application validators.
+In `lagniappe/web/routes/api/`, `http.py` authenticates requests to `/api`
+and `/api/v1`, enforces rate limits and JSON body limits, sets response headers,
+and translates errors into HTTP responses. The app-wide handler also uses it
+for API routing errors. `main.py` defines the discovery, plan, and tool endpoints
+and builds their response payloads. The separate MCP adapter calls these REST
+endpoints.
 
 The server's schema collector is intentionally a bounded subset, not a general
 JSON Schema engine: local references, discriminator-selected actions,
