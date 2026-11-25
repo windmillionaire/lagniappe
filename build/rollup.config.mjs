@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import replace from "@rollup/plugin-replace";
 import { sentryRollupPlugin } from "@sentry/rollup-plugin";
 import tailwindcss from "@tailwindcss/postcss";
@@ -25,7 +26,13 @@ const reportsDir = "./reports";
 mkdirSync(reportsDir, { recursive: true });
 const uploadedSourceMaps = "./lagniappe/web/static/**/*.map";
 const settings = yaml.load(
-	readFileSync("./config/files/lagniappe_settings.yaml", "utf8"),
+	readFileSync(
+		resolve(
+			process.env.LAGNIAPPE_CONFIG_ROOT || ".",
+			"config/files/lagniappe_settings.yaml",
+		),
+		"utf8",
+	),
 );
 const packageMetadata = JSON.parse(readFileSync("./package.json", "utf8"));
 const sentry = resolveSentryBuild(settings, packageMetadata);

@@ -61,6 +61,19 @@ builds consume the committed TypeScript output. Use
 `venv/bin/python -m runner.browser_endpoints --check` to check the working
 tree. `run.py release-check` checks the Flask routes and output in the Git index.
 
+## Polling and external API schemas
+
+Run `venv/bin/python -m runner.wire_contracts` after changing a polling model or
+an external Plan contract. It writes the TypeScript types and validation fields
+in `src/script/generated/poll.ts` from the server's polling contract and payload
+models. It also writes `mcp/src/lagniappe_mcp/wire_schemas.json` from the Flask
+OpenAPI for the actor, answer context, Plan, files, submission receipt and
+lifecycle request and response schemas.
+The standalone MCP package reads these schemas and selects its public fields.
+
+Run the same command with `--check` to verify the working tree. The release
+check runs both generators against the staged sources and outputs.
+
 ## Output
 
 ```text

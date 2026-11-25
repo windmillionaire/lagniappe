@@ -1,0 +1,883 @@
+{
+  "Actor": {
+    "type": "object",
+    "required": [
+      "user",
+      "credential",
+      "capabilities"
+    ],
+    "properties": {
+      "user": {
+        "type": "object",
+        "required": [
+          "name",
+          "hash",
+          "timezone",
+          "personal_page"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "hash": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "personal_page": {
+            "type": "object",
+            "required": [
+              "kind",
+              "hash",
+              "name",
+              "url",
+              "can_view",
+              "can_edit"
+            ],
+            "properties": {
+              "kind": {
+                "const": "page"
+              },
+              "hash": {
+                "type": "string"
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "url": {
+                "type": "string"
+              },
+              "can_view": {
+                "type": "boolean"
+              },
+              "can_edit": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "credential": {
+        "type": "object",
+        "required": [
+          "active",
+          "display_prefix",
+          "issued_at",
+          "expires_at",
+          "generation"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "display_prefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "issued_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "capabilities": {
+        "type": "object",
+        "required": [
+          "plans"
+        ],
+        "properties": {
+          "plans": {
+            "type": "boolean"
+          },
+          "execute_plan": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "installation": {
+        "type": "object",
+        "required": [
+          "project",
+          "experiments",
+          "source_id"
+        ],
+        "properties": {
+          "project": {
+            "type": "string"
+          },
+          "experiments": {
+            "type": "boolean"
+          },
+          "source_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "additionalProperties": false
+  },
+  "AnswerContext": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "current_date",
+      "timezone",
+      "personal_page",
+      "report_created",
+      "workflow_rules"
+    ],
+    "properties": {
+      "current_date": {
+        "type": "string"
+      },
+      "timezone": {
+        "type": "string"
+      },
+      "personal_page": {
+        "type": "object"
+      },
+      "report_created": {
+        "const": false
+      },
+      "workflow_rules": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "PlanFile": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "ref",
+      "name",
+      "filename",
+      "mimetype",
+      "size"
+    ],
+    "properties": {
+      "ref": {
+        "type": "string",
+        "pattern": "^hash:[A-Za-z0-9_-]{12}$"
+      },
+      "name": {
+        "type": "string"
+      },
+      "filename": {
+        "type": "string"
+      },
+      "mimetype": {
+        "type": "string"
+      },
+      "size": {
+        "type": "integer",
+        "minimum": 0
+      }
+    }
+  },
+  "Plan": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "id",
+      "status",
+      "name",
+      "instructions",
+      "files",
+      "uploads_pending",
+      "upload_batch_id",
+      "contract_version",
+      "contract_url",
+      "submit_url",
+      "status_url",
+      "preview_url",
+      "review_url"
+    ],
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "ready",
+          "running",
+          "complete",
+          "failed",
+          "undoing",
+          "undo_failed"
+        ]
+      },
+      "name": {
+        "type": "string"
+      },
+      "instructions": {
+        "type": "string"
+      },
+      "output_kind": {
+        "enum": [
+          "answer",
+          "proposal",
+          null
+        ]
+      },
+      "file_usage": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string"
+            },
+            "usage": {
+              "type": "string",
+              "enum": [
+                "evidence",
+                "organize"
+              ]
+            }
+          },
+          "required": [
+            "file",
+            "usage"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "files": {
+        "type": "array",
+        "maxItems": 20,
+        "items": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "ref",
+            "name",
+            "filename",
+            "mimetype",
+            "size"
+          ],
+          "properties": {
+            "ref": {
+              "type": "string",
+              "pattern": "^hash:[A-Za-z0-9_-]{12}$"
+            },
+            "name": {
+              "type": "string"
+            },
+            "filename": {
+              "type": "string"
+            },
+            "mimetype": {
+              "type": "string"
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      },
+      "uploads_pending": {
+        "type": "boolean"
+      },
+      "correction": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "superseded_by": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "require_review": {
+        "type": "boolean"
+      },
+      "upload_batch_id": {
+        "oneOf": [
+          {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{16,128}$"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "contract_version": {
+        "type": "integer",
+        "const": 10
+      },
+      "contract_url": {
+        "type": "string",
+        "format": "uri"
+      },
+      "submit_url": {
+        "type": "string",
+        "format": "uri"
+      },
+      "status_url": {
+        "type": "string",
+        "format": "uri"
+      },
+      "preview_url": {
+        "type": "string",
+        "format": "uri"
+      },
+      "review_url": {
+        "type": "string",
+        "format": "uri"
+      },
+      "proposal": {
+        "oneOf": [
+          {
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "execution": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "action_summary": {
+        "type": "object",
+        "required": [
+          "total",
+          "by_type"
+        ],
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "by_type": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "maximum": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "original_brief": {
+        "type": [
+          "object",
+          "null"
+        ]
+      }
+    }
+  },
+  "SubmissionReceipt": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "status",
+      "preview_url",
+      "review_url",
+      "status_url",
+      "contract_version",
+      "proposal_fingerprint"
+    ],
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ready",
+          "running",
+          "complete"
+        ]
+      },
+      "preview_url": {
+        "type": "string",
+        "format": "uri"
+      },
+      "review_url": {
+        "type": "string",
+        "format": "uri"
+      },
+      "status_url": {
+        "type": "string",
+        "format": "uri"
+      },
+      "contract_version": {
+        "type": "integer",
+        "const": 10
+      },
+      "action_summary": {
+        "type": "object",
+        "required": [
+          "total",
+          "by_type"
+        ],
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "by_type": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "maximum": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "proposal_fingerprint": {
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "operation": {
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "execution": {
+        "type": "object",
+        "required": [
+          "started"
+        ],
+        "properties": {
+          "started": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "PlanContract": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "contract_version",
+      "current_date",
+      "timezone",
+      "personal_page",
+      "submission_format",
+      "proposal_schema",
+      "file_usage_schema",
+      "schema_scope",
+      "schema_actions",
+      "schema_instructions",
+      "permissions",
+      "required_file_refs",
+      "upload_inventory",
+      "file_checklist",
+      "guidance_requirements",
+      "uploads_supported",
+      "workflow_rules",
+      "reference_rules",
+      "limits",
+      "payload_sizes"
+    ],
+    "properties": {
+      "contract_version": {
+        "type": "integer",
+        "const": 10
+      },
+      "current_date": {
+        "type": "string",
+        "format": "date"
+      },
+      "timezone": {
+        "type": "string"
+      },
+      "personal_page": {
+        "type": "object"
+      },
+      "submission_format": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "method",
+          "url",
+          "contract_version",
+          "body",
+          "rule"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "contract_version": {
+            "type": "integer",
+            "const": 10
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "contract_version",
+              "proposal",
+              "file_usage"
+            ],
+            "properties": {
+              "contract_version": {
+                "type": "integer",
+                "const": 10
+              },
+              "file_usage": {
+                "type": "array",
+                "maxItems": 0
+              },
+              "proposal": {
+                "type": "object",
+                "maxProperties": 0
+              }
+            }
+          },
+          "rule": {
+            "type": "string"
+          }
+        }
+      },
+      "proposal_schema": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "file_usage_schema": {
+        "type": "object"
+      },
+      "schema_scope": {
+        "enum": [
+          "full",
+          "selected",
+          "summary"
+        ]
+      },
+      "schema_actions": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "schema_instructions": {
+        "type": "string"
+      },
+      "permissions": {
+        "type": "object"
+      },
+      "required_file_refs": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "upload_inventory": {
+        "oneOf": [
+          {
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "file_checklist": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "guidance_requirements": {
+        "type": "object"
+      },
+      "uploads_supported": {
+        "type": "boolean"
+      },
+      "workflow_rules": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "reference_rules": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "limits": {
+        "type": "object"
+      },
+      "payload_sizes": {
+        "type": "object"
+      }
+    }
+  },
+  "PlanSchemaContract": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "contract_version",
+      "submission_format",
+      "proposal_schema",
+      "file_usage_schema",
+      "schema_scope",
+      "schema_actions",
+      "schema_instructions"
+    ],
+    "properties": {
+      "contract_version": {
+        "type": "integer",
+        "const": 10
+      },
+      "submission_format": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "method",
+          "url",
+          "contract_version",
+          "body",
+          "rule"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "const": "POST"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "contract_version": {
+            "type": "integer",
+            "const": 10
+          },
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "contract_version",
+              "proposal",
+              "file_usage"
+            ],
+            "properties": {
+              "contract_version": {
+                "type": "integer",
+                "const": 10
+              },
+              "file_usage": {
+                "type": "array",
+                "maxItems": 0
+              },
+              "proposal": {
+                "type": "object",
+                "maxProperties": 0
+              }
+            }
+          },
+          "rule": {
+            "type": "string"
+          }
+        }
+      },
+      "proposal_schema": {
+        "type": "object"
+      },
+      "file_usage_schema": {
+        "type": "object"
+      },
+      "schema_scope": {
+        "enum": [
+          "full",
+          "selected",
+          "summary"
+        ]
+      },
+      "schema_actions": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "schema_instructions": {
+        "type": "string"
+      }
+    }
+  },
+  "createPlan": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [],
+    "properties": {
+      "instructions": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string",
+        "maxLength": 120
+      },
+      "revises_plan_id": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1
+      },
+      "require_review": {
+        "type": "boolean"
+      }
+    }
+  },
+  "submitPlan": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "contract_version",
+      "proposal",
+      "file_usage"
+    ],
+    "properties": {
+      "contract_version": {
+        "type": "integer",
+        "const": 10
+      },
+      "proposal": {
+        "type": "object"
+      },
+      "file_usage": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string"
+            },
+            "usage": {
+              "type": "string",
+              "enum": [
+                "evidence",
+                "organize"
+              ]
+            }
+          },
+          "required": [
+            "file",
+            "usage"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      },
+      "instructions": {
+        "type": "string",
+        "minLength": 1
+      },
+      "require_review": {
+        "type": "boolean"
+      },
+      "execute": {
+        "type": "boolean"
+      },
+      "operation_id": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9._-]{1,128}$"
+      }
+    }
+  },
+  "executePlan": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "proposal_fingerprint",
+      "operation_id"
+    ],
+    "properties": {
+      "proposal_fingerprint": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "operation_id": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9._-]{1,128}$"
+      }
+    }
+  }
+}

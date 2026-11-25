@@ -20,6 +20,8 @@ from lagniappe.core.tools.polling.contract import (
     PollContractError,
     PollRequest,
     parse_poll_request,
+    poll_result,
+    revision_result,
 )
 from lagniappe.core.tools.polling.projections import (
     channel_revisions as _channel_revisions,
@@ -36,16 +38,6 @@ from . import internal
 
 class _NotificationRevisionOptions(TypedDict, total=False):
     notification_state: NotificationState | None
-
-
-POLL_AFTER_MS = {
-    "entity": 15_000,
-    "channel": 15_000,
-    "form-lock": 15_000,
-    "document": 2_000,
-    "operation": 4_000,
-    "ingress": 2_500,
-}
 
 
 def _poll_context():
@@ -70,44 +62,9 @@ def _poll_context():
     }
 
 
-def _result(
-    descriptor,
-    status,
-    *,
-    revision=None,
-    payload=None,
-    poll_after_ms=None,
-):
-    result = {
-        "id": descriptor["id"],
-        "type": descriptor["type"],
-        "status": status,
-        "poll_after_ms": (
-            POLL_AFTER_MS[descriptor["type"]]
-            if poll_after_ms is None
-            else poll_after_ms
-        ),
-    }
-    if revision is not None:
-        result["revision"] = revision
-    if payload is not None:
-        result["payload"] = payload
-    return result
-
-
-def _revision_result(descriptor, revision, payload=None):
-    changed = descriptor["revision"] != revision
-    return _result(
-        descriptor,
-        "changed" if changed else "unchanged",
-        revision=revision,
-        payload=payload if changed else None,
-    )
-
-
 def _entity_result(descriptor, entity, *, ingress=False):
     if not entity or not entity.allowed(Action.VIEW, user=authenticated_user()):
-        return _result(descriptor, "unavailable")
+        return poll_result(descriptor, "unavailable")
     revision = (
         filter_revision(entity, authenticated_user())
         if isinstance(entity, Entities.FILTER) else entity.fingerprint
@@ -120,16 +77,16 @@ def _entity_result(descriptor, entity, *, ingress=False):
             "modified": entity.modified.isoformat() if entity.modified else None,
         }
     )
-    return _revision_result(descriptor, revision, payload)
+    return revision_result(descriptor, revision, payload)
 
 
 def _document_result(descriptor, entity, client_id):
     if not entity or not entity.allowed(Action.VIEW, user=authenticated_user()):
-        return _result(descriptor, "unavailable")
+        return poll_result(descriptor, "unavailable")
     document = entity.sync_ids.get("document")
     document_id = document.get("id") if isinstance(document, dict) else None
     if document_id != descriptor["sync_id"]:
-        return _result(descriptor, "unavailable")
+        return poll_result(descriptor, "unavailable")
     payload = cache.poll_document(
         descriptor["sync_id"],
         seed=lambda: entity.state(descriptor["sync_id"]),
@@ -144,7 +101,7 @@ def _document_result(descriptor, entity, client_id):
         or descriptor["revision"] != payload["revision"]
         or "users" in payload
     )
-    return _result(
+    return poll_result(
         descriptor,
         "changed" if changed else "unchanged",
         revision=payload["revision"],
@@ -289,14 +246,14 @@ def poll() -> ResponseReturnValue:
                 )
             elif descriptor["type"] == "channel":
                 revision = channel_revisions[descriptor["channel"]]
-                result = _revision_result(
+                result = revision_result(
                     descriptor,
                     revision,
                     {"refresh": True},
                 )
             elif descriptor["type"] == "operation":
                 if descriptor["key"] in unchanged_operations:
-                    result = _result(
+                    result = poll_result(
                         descriptor,
                         "unchanged",
                         revision=descriptor["revision"],
@@ -304,13 +261,13 @@ def poll() -> ResponseReturnValue:
                 else:
                     status = operation_statuses.get(descriptor["key"])
                     result = (
-                        _revision_result(
+                        revision_result(
                             descriptor,
                             status["revision"],
                             status,
                         )
                         if status
-                        else _result(descriptor, "unavailable")
+                        else poll_result(descriptor, "unavailable")
                     )
             else:
                 result = _document_result(
@@ -326,7 +283,7 @@ def poll() -> ResponseReturnValue:
                     "subscription_type": descriptor["type"],
                 },
             )
-            result = _result(descriptor, "error", poll_after_ms=15_000)
+            result = poll_result(descriptor, "error", poll_after_ms=15_000)
         results.append(result)
 
     return responses.json_response({"version": parsed.version, "results": results})

@@ -727,8 +727,8 @@ def _read_optional_git_text(
         return None
 
 
-def _browser_endpoint_release_issues(repo_root: Path) -> list[str]:
-    """Compare the staged browser bindings with the staged Flask application."""
+def _wire_contract_release_issues(repo_root: Path) -> list[str]:
+    """Compare generated bindings with their Python sources in the staged release."""
     # Flask registers blueprints and decorators on import. Run the generator
     # in an isolated copy of the index so unstaged edits cannot affect either side.
     with tempfile.TemporaryDirectory(prefix="lagniappe-release-endpoints-") as snapshot:
@@ -739,15 +739,18 @@ def _browser_endpoint_release_issues(repo_root: Path) -> list[str]:
                 f"--prefix={Path(snapshot).as_posix()}/",
             ],
         )
-        result = subprocess.run(
-            [sys.executable, "-EB", "-m", "runner.browser_endpoints", "--check"],
-            cwd=snapshot,
-            capture_output=True,
-            text=True,
-        )
-    if result.returncode:
-        return [f"Browser endpoints: {result.stderr.strip() or result.stdout.strip()}"]
-    return []
+        issues = []
+        for module, label in (
+            ("runner.browser_endpoints", "Browser endpoints"),
+            ("runner.wire_contracts", "Wire schemas"),
+        ):
+            result = subprocess.run(
+                [sys.executable, "-EB", "-m", module, "--check"],
+                cwd=snapshot, capture_output=True, text=True,
+            )
+            if result.returncode:
+                issues.append(f"{label}: {result.stderr.strip() or result.stdout.strip()}")
+        return issues
 
 
 def _migration_catalog_metadata(content: str) -> dict[str, dict]:
@@ -997,7 +1000,7 @@ def release_readiness_issues(
         expected_version=version,
     )
     issues.extend(f"Frontend build: {issue}" for issue in frontend_issues)
-    issues.extend(_browser_endpoint_release_issues(repo_root))
+    issues.extend(_wire_contract_release_issues(repo_root))
 
     release_note = None
     if version:

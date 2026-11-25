@@ -1,15 +1,16 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { b as FormWidget, I as InputElement, T as TextareaElement } from './forms.js?v=b438e48a';
-import { p as primitives } from './ui-controls.js?v=b438e48a';
-import { S as SectionToggle } from './form-sections.js?v=b438e48a';
-import { S as STYLES, s as setIcon } from './ui-resources.js?v=b438e48a';
-import './foundation.js?v=b438e48a';
-import './upstreamUnavailable.js?v=b438e48a';
-import './connectivity.js?v=b438e48a';
-import './modal.js?v=b438e48a';
-import './combobox.js?v=b438e48a';
-import './uploads.js?v=b438e48a';
-import './directUpload.js?v=b438e48a';
+import { b as FormWidget, I as InputElement, T as TextareaElement } from './forms.js?v=b8c49d0d';
+import { p as primitives } from './ui-controls.js?v=b8c49d0d';
+import { S as SectionToggle } from './form-sections.js?v=b8c49d0d';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=b8c49d0d';
+import './foundation.js?v=b8c49d0d';
+import './upstreamUnavailable.js?v=b8c49d0d';
+import './connectivity.js?v=b8c49d0d';
+import './modal.js?v=b8c49d0d';
+import './combobox.js?v=b8c49d0d';
+import './protocol.js?v=b8c49d0d';
+import './uploads.js?v=b8c49d0d';
+import './directUpload.js?v=b8c49d0d';
 
 class FileInfo extends FormWidget {
   constructor(attributes) {

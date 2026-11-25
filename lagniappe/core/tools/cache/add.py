@@ -55,7 +55,7 @@ def invalidate_revisions(*entities: Entity) -> None:
             for index in indexes:
                 pipe.json().set(
                     index, f"$.{entity_hash}",
-                    {"refresh": 1, "id": owners[entity_hash].urlsafe_key},
+                    {"refresh": 1, "id": owners[entity_hash].urlsafe_key, "cache_key": entity_hash},
                     xx=True,
                 )
         pipe.execute()
@@ -177,50 +177,33 @@ def update_json_index(entities: Collection[Entity]) -> None:
     if not entities:
         return
 
-    # Get existing parents that have active indexes
-    entity_hash_map = {e.hash: e for e in entities}
-    existing_parents = filter_cache.get_existing_parents(entity_hash_map.keys())
+    entity_hash_map = {entity.hash: entity for entity in entities}
+    members: dict[str, set[str]] = {}
+    for entity in entities:
+        if entity.kind == "task":
+            if project := getattr(entity, "project", None):
+                members.setdefault(project.hash, set()).add(entity.hash)
+        elif entity.kind == "page":
+            for category in getattr(entity, "categories", ()):
+                members.setdefault(category.hash, set()).add(entity.hash)
 
-    parents = {}
-    for entity_hash, parent_keys in existing_parents.items():
-        for p in parent_keys:
-            parent_hash = p.split(":")[1]
-            parent_ops = parents.setdefault(
-                parent_hash, {"cache_key": p, "remove": [], "update": []}
-            )
-            if parent_hash not in cast(list[str], entity_hash_map[entity_hash].required):
-                parent_ops["remove"].append(entity_hash)
-            else:
-                parent_ops["update"].append(entity_hash)
-
-    # If a parent was added, get the new parents that have active indexes
-    new_parents = {}
-    for e in entities:
-        project = getattr(e, "project", None)
-        if project and project.hash not in parents:
-            new_parents.setdefault(project.hash, []).append(e.hash)
-
-        categories = [c.hash for c in getattr(e, "categories", [])]
-        for h in [h for h in categories if h not in parents]:
-            new_parents.setdefault(h, []).append(e.hash)
-
-    if not new_parents and not parents:
+    existing = filter_cache.get_existing_parents(entity_hash_map.keys())
+    indexes = set(filter_cache.get_new_parents(members))
+    for keys in existing.values():
+        indexes.update(keys)
+    if not indexes:
         return
 
-    for p in filter_cache.get_new_parents(new_parents.keys()):
-        parent_hash = p.split(":")[1]
-        parent_ops = parents.setdefault(parent_hash, {"cache_key": p, "update": []})
-        parent_ops["update"].extend(new_parents[parent_hash])
-
     with cache.pipeline() as pipe:
-        for parent_ops in parents.values():
-            for h in parent_ops["update"]:
-                pipe.json().set(
-                    parent_ops["cache_key"],
-                    f"$.{h}",
-                    {"refresh": 1, "id": entity_hash_map[h].urlsafe_key},
-                )
-            for h in parent_ops.get("remove", []):
-                pipe.json().delete(parent_ops["cache_key"], f"$.{h}")
-
+        for key in indexes:
+            parent_hash = key.rsplit(":", 2)[-2]
+            current = members.get(parent_hash, set())
+            for entity_hash in current:
+                entity = entity_hash_map[entity_hash]
+                pipe.json().set(key, f"$.{entity_hash}", {
+                    "refresh": 1, "id": entity.urlsafe_key, "cache_key": entity_hash,
+                })
+            for entity_hash, keys in existing.items():
+                if key in keys and entity_hash not in current:
+                    pipe.json().delete(key, f"$.{entity_hash}")
         pipe.execute()

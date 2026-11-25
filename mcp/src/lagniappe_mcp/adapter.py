@@ -23,6 +23,8 @@ from .catalog import (
     SAFE_SCHEMA_CONTRACT_SCHEMA,
     SAFE_PLAN_SCHEMA,
     SAFE_RECEIPT_SCHEMA,
+    START_CONTRACT_FIELDS,
+    START_SUBMISSION_INSTRUCTIONS,
     UPLOAD_RESULT_SCHEMA,
     ToolDefinition,
     build_tool_registry,
@@ -191,6 +193,19 @@ def validate_file_result(value: object, *, arguments: Mapping[str, object], bear
                 "invalid_download", "Original download expiration is inconsistent."
             )
     _reject_private_model_data(screened, bearer=bearer)
+
+
+def _start_contract(full: Mapping[str, object]) -> dict[str, object]:
+    """Keep a fresh Plan actionable while deferring the static contract guidance."""
+    working = {key: full[key] for key in START_CONTRACT_FIELDS if key in full}
+    permissions = cast(JsonObject, full["permissions"])
+    working["permissions"] = (
+        {"allowed_actions": permissions["allowed_actions"]} if "allowed_actions" in permissions else {}
+    )
+    working["mcp_submission"] = {
+        **cast(JsonObject, full["mcp_submission"]), "instructions": START_SUBMISSION_INSTRUCTIONS,
+    }
+    return working
 
 
 @dataclass(frozen=True, slots=True)
@@ -374,6 +389,8 @@ class LagniappeAdapter:
             enriched = AdapterResult({**value, "context": context})
             _reject_private_model_data(enriched.value, bearer=self.config.api_key)
             self._enforce_result_limits(enriched)
+            if "upload_inventory" not in value:
+                return AdapterResult({**value, "context": {"contract": _start_contract(result.value)}})
             return enriched
         except AdapterError as exc:
             # Never reflect the failed read's body or error details. The Plan

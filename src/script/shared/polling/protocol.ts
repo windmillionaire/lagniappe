@@ -1,126 +1,51 @@
-import type { DeferredOperationStatus } from "../../types/api.d.ts";
-import type {
-	DocumentCursor,
-	DocumentPollPayload,
-} from "../../types/sync.d.ts";
+import {
+	CHANNELS,
+	type ClientNotificationState,
+	DESCRIPTOR_FIELDS,
+	MAX_CHANNEL_LENGTH,
+	MAX_CLIENT_ID_LENGTH,
+	MAX_CURSOR_LENGTH,
+	MAX_IDENTIFIER_LENGTH,
+	MAX_KEY_LENGTH,
+	MAX_REVISION,
+	MAX_STATE_TOKEN_LENGTH,
+	MAX_SUBSCRIPTIONS_PER_REQUEST,
+	MAX_TYPE_LENGTH,
+	NOTIFICATION_FIELDS,
+	OPTIONAL_REQUEST_FIELDS,
+	POLL_PROTOCOL_VERSION,
+	type PollChannel,
+	type PollDescriptor,
+	type PollRequest,
+	type PollType,
+	REQUEST_FIELDS,
+	RESULT_FIELDS,
+	RESULT_MEMBERS,
+	type PollResult as WirePollResult,
+} from "../../generated/poll.ts";
 
-export const POLL_PROTOCOL_VERSION = 1;
-export const MAX_SUBSCRIPTIONS_PER_REQUEST = 64;
-const MAX_KEY_LENGTH = 512;
-const MAX_IDENTIFIER_LENGTH = MAX_KEY_LENGTH + 128;
-export const MAX_CLIENT_ID_LENGTH = 128;
-const MAX_CURSOR_LENGTH = 512;
-const MAX_STATE_TOKEN_LENGTH = 128;
-const MAX_REVISION = Number.MAX_SAFE_INTEGER;
+export type { PollDescriptor, PollType };
+export {
+	MAX_CLIENT_ID_LENGTH,
+	MAX_SUBSCRIPTIONS_PER_REQUEST,
+	POLL_PROTOCOL_VERSION,
+};
 
-const POLL_TYPES = new Set<PollType>([
-	"entity",
-	"channel",
-	"form-lock",
-	"document",
-	"operation",
-	"ingress",
-]);
-const POLL_CHANNELS = new Set([
-	"categories",
-	"projects",
-	"pages",
-	"tasks",
-	"forms",
-	"users",
-	"ingress",
-	"messages",
-	"home",
-	"home-notes",
-	"starred",
-	"tool-reports",
-] as const);
-const POLL_STATUSES = new Set<PollResult["status"]>([
-	"changed",
-	"unchanged",
-	"unavailable",
-	"error",
-]);
+// A locally synthesized failure has no server-supplied retry interval.
+export type PollResult<T extends PollType = PollType> =
+	| WirePollResult<T>
+	| {
+			id: string;
+			type: T;
+			status: "error";
+			poll_after_ms?: never;
+			revision?: never;
+			payload?: never;
+	  };
 
-type PollChannel =
-	typeof POLL_CHANNELS extends ReadonlySet<infer Channel> ? Channel : never;
-
-interface PollDescriptorFields {
-	entity: { key: string; revision: string | null };
-	channel: { channel: PollChannel; revision: string | null };
-	"form-lock": { key: string; revision: string };
-	document: DocumentCursor & { key: string; sync_id: string };
-	operation: { key: string; revision: number };
-	ingress: { key: string; revision: string | null };
-}
-
-export type PollType = keyof PollDescriptorFields;
-
-export type PollDescriptor<T extends PollType = PollType> = {
-	[K in T]: { id: string; type: K } & PollDescriptorFields[K];
-}[T];
-
-interface PollPayloads {
-	entity: { fingerprint: string; modified: string | null };
-	channel: { refresh: true };
-	"form-lock":
-		| { locked: false }
-		| {
-				key: string;
-				locked: true;
-				scope: string | null;
-				operation: string;
-				revision: number;
-		  };
-	document: DocumentPollPayload;
-	operation: DeferredOperationStatus;
-	ingress: { refresh: true };
-}
-
-type PollRevision<T extends PollType> = NonNullable<
-	PollDescriptorFields[T]["revision"]
->;
-
-export type PollResult<T extends PollType = PollType> = {
-	[K in T]: { id: string; type: K } & (
-		| {
-				status: "changed";
-				revision: PollRevision<K>;
-				payload: PollPayloads[K];
-				poll_after_ms: number;
-		  }
-		| {
-				status: "unchanged";
-				revision: PollRevision<K>;
-				payload?: never;
-				poll_after_ms: number;
-		  }
-		| {
-				status: "unavailable";
-				revision?: never;
-				payload?: never;
-				poll_after_ms: number;
-		  }
-		| {
-				status: "error";
-				revision?: never;
-				payload?: never;
-				poll_after_ms?: number;
-		  }
-	);
-}[T];
-
-type NotificationCursor =
-	| { generation: null; revision: null; seed: true }
-	| { generation: string; revision: number; seed: false };
-
-interface PollRequest {
-	version: typeof POLL_PROTOCOL_VERSION;
-	client_id: string;
-	subscriptions: PollDescriptor[];
-	closed_documents: string[];
-	notification_state?: NotificationCursor;
-}
+const descriptorFields = Object.values(DESCRIPTOR_FIELDS).flat();
+const resultMembers = Object.values(RESULT_MEMBERS).flat();
+const pollChannels = new Set<string>(CHANNELS);
 
 export class PollContractError extends TypeError {
 	declare readonly path: string;
@@ -141,8 +66,8 @@ export function isFieldMap(value: unknown): value is Record<string, unknown> {
 const exactFields = (
 	value: unknown,
 	path: string,
-	required: string[],
-	optional: string[] = [],
+	required: readonly string[],
+	optional: readonly string[] = [],
 ) => {
 	if (!isFieldMap(value)) {
 		throw new PollContractError(path, "type");
@@ -205,21 +130,19 @@ export const normalizedDescriptor = (
 		value,
 		path,
 		["id", "type", "revision"],
-		["key", "channel", "sync_id", "generation", "presence_digest"],
+		descriptorFields,
 	);
 	const id = boundedString(raw.id, `${path}.id`, MAX_IDENTIFIER_LENGTH);
-	const type = boundedString(raw.type, `${path}.type`, 32) as PollType;
-	if (!POLL_TYPES.has(type)) {
+	const type = boundedString(
+		raw.type,
+		`${path}.type`,
+		MAX_TYPE_LENGTH,
+	) as PollType;
+	if (!Object.hasOwn(DESCRIPTOR_FIELDS, type)) {
 		throw new PollContractError(`${path}.type`, "unsupported");
 	}
 
-	const typedFields =
-		type === "channel"
-			? ["channel"]
-			: type === "document"
-				? ["key", "sync_id", "generation", "presence_digest"]
-				: ["key"];
-	exactFields(raw, path, ["id", "type", "revision", ...typedFields]);
+	exactFields(raw, path, DESCRIPTOR_FIELDS[type]);
 	switch (type) {
 		case "channel": {
 			const revision = boundedString(
@@ -231,9 +154,9 @@ export const normalizedDescriptor = (
 			const channel = boundedString(
 				raw.channel,
 				`${path}.channel`,
-				64,
+				MAX_CHANNEL_LENGTH,
 			) as PollChannel;
-			if (!POLL_CHANNELS.has(channel)) {
+			if (!pollChannels.has(channel)) {
 				throw new PollContractError(`${path}.channel`, "unsupported");
 			}
 			return { id, type, revision, channel };
@@ -294,8 +217,8 @@ export const normalizedDescriptor = (
 export const normalizedNotificationState = (
 	value: unknown,
 	path = "notification_state",
-): NotificationCursor => {
-	const raw = exactFields(value, path, ["generation", "revision", "seed"]);
+): ClientNotificationState => {
+	const raw = exactFields(value, path, NOTIFICATION_FIELDS);
 	if (typeof raw.seed !== "boolean") {
 		throw new PollContractError(`${path}.seed`, "type");
 	}
@@ -320,8 +243,8 @@ export const normalizedRequest = (value: unknown): PollRequest => {
 	const raw = exactFields(
 		value,
 		"request",
-		["version", "client_id", "subscriptions", "closed_documents"],
-		["notification_state"],
+		REQUEST_FIELDS,
+		OPTIONAL_REQUEST_FIELDS,
 	);
 	if (raw.version !== POLL_PROTOCOL_VERSION) {
 		throw new PollContractError("request.version", "unsupported");
@@ -387,20 +310,15 @@ export const normalizedResult = (
 	value: unknown,
 	descriptor: PollDescriptor,
 	path: string,
-): PollResult => {
-	const raw = exactFields(
-		value,
-		path,
-		["id", "type", "status", "poll_after_ms"],
-		["revision", "payload"],
-	);
+): WirePollResult => {
+	const raw = exactFields(value, path, RESULT_FIELDS, resultMembers);
 	if (raw.id !== descriptor.id)
 		throw new PollContractError(`${path}.id`, "state");
 	if (raw.type !== descriptor.type) {
 		throw new PollContractError(`${path}.type`, "state");
 	}
 	const status = raw.status as PollResult["status"];
-	if (!POLL_STATUSES.has(status)) {
+	if (!Object.hasOwn(RESULT_MEMBERS, status)) {
 		throw new PollContractError(`${path}.status`, "unsupported");
 	}
 	if (
@@ -413,7 +331,8 @@ export const normalizedResult = (
 		throw new PollContractError(`${path}.poll_after_ms`, "state");
 	}
 
-	const carriesRevision = status === "changed" || status === "unchanged";
+	const members: readonly string[] = RESULT_MEMBERS[status];
+	const carriesRevision = members.includes("revision");
 	if (carriesRevision && !Object.hasOwn(raw, "revision")) {
 		throw new PollContractError(`${path}.revision`, "missing");
 	}
@@ -429,7 +348,7 @@ export const normalizedResult = (
 	}
 
 	let payload: Record<string, unknown> | undefined;
-	if (status === "changed") {
+	if (members.includes("payload")) {
 		if (!Object.hasOwn(raw, "payload")) {
 			throw new PollContractError(`${path}.payload`, "missing");
 		}
@@ -480,5 +399,5 @@ export const normalizedResult = (
 		poll_after_ms: raw.poll_after_ms,
 		...(carriesRevision ? { revision } : {}),
 		...(status === "changed" ? { payload } : {}),
-	} as PollResult;
+	} as WirePollResult;
 };

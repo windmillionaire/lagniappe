@@ -14,7 +14,8 @@ The direct REST API and its downloadable skill remain available separately.
 Questions and task retrieval use `answer_question` guidance and plan-free read
 tools. `start_plan` creates a durable Plan for requested workspace changes or
 an explicitly saved answer. One compact contract advertises all allowed actions;
-load selected schemas with get_plan_contract or get_guidelines. Reuse the same
+pass `actions` to include selected schemas at startup, or load them later with
+`get_plan_contract`. Use `get_plan_contract(view="full")` for workflow and file guidance. Reuse the same
 plan for mixed requests and revisions until execution begins. Mutations require
 browser approval. Files and instructions are individually optional, but publishing
 requires at least one. Classify uploads with file_usage; only organize files need

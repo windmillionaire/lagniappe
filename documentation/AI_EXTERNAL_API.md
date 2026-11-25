@@ -224,7 +224,8 @@ still applies; this is not a promise that the external model retains nothing.
 Starters bundle current workflow context. MCP clients can pass
 `start_plan(actions=["create_task"])` to receive the selected permitted schemas
 in the initial `context.contract`, together with the current version, permissions
-and workflow guidance. Multiple action names are supported; `actions=[]`
+and allowed actions. Read `get_plan_contract(view="full")` on the same Plan for
+workflow rules, file guidance, and detailed permission rules. Multiple action names are supported; `actions=[]`
 returns a compact saved-answer schema that requires an empty `actions` array.
 Startup uses its
 existing contract read, so no additional client schema fetch is needed. The
@@ -553,6 +554,12 @@ for browser confirmation.
 Task updates preserve identity, attachments, history, dates and recurrence unless
 explicitly changed. Completed tasks cannot be restructured. Model-task defaults
 affect future tasks only. Project ordering includes all models exactly once.
+An editable Page's edit view includes `page_document_markdown`, bounded to 64 KiB.
+Use it for a replacement when `page_document_markdown_complete` is true. Rich
+content the replacement renderer cannot preserve, a missing HTML projection,
+or truncation makes that flag false. `page_document_markdown_truncated` identifies
+the size limit. Ordinary reads retain the existing plain-text projection.
+
 Use `get_entity(view="edit")` or paginated `get_page_tasks(view="edit")` for
 complete descriptions, answer IDs, revisions, relationships, and shared schemas.
 Contract 10 removes superseded atomic updates and aliases. Schema migrations,

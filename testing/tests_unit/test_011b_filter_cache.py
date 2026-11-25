@@ -45,7 +45,7 @@ def test_filter_cache_uses_shared_cache_key_without_user_restrictions():
     restricted_cache = FilterCache(parent, user=_user(models=["category-a"]))
 
     assert owner_cache.cache_key == restricted_cache.cache_key
-    assert owner_cache.cache_key.endswith(":all-v2")
+    assert owner_cache.cache_key.endswith(":all-v3")
 
 
 @pytest.mark.unit
@@ -250,4 +250,39 @@ def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filt
             "name": "Task",
             "completed": True,
         }
+    }
+
+
+def test_edits_completion_and_project_moves_keep_actual_filter_members(monkeypatch):
+    from unittest.mock import MagicMock
+    from lagniappe.core.tools.cache import add
+
+    project = _parent("project")
+    current = FilterCache(project, user=_user()).cache_key
+    former = current.replace(project.hash, "former-project")
+    rows = {current: {"edited": {}, "completed": {}}, former: {"moved": {}}}
+    tasks = [
+        SimpleNamespace(kind="task", hash=name, urlsafe_key=f"id-{name}", project=project,
+                        required=["page-hash"], categories=[])
+        for name in ("edited", "completed", "new", "moved")
+    ]
+    tasks[1].completed = True
+    pipe = MagicMock()
+    commands = pipe.__enter__.return_value.json.return_value
+    commands.set.side_effect = lambda key, path, value: rows[key].update({path[2:]: value})
+    commands.delete.side_effect = lambda key, path: rows[key].pop(path[2:])
+    monkeypatch.setattr(add.cache, "pipeline", lambda: pipe)
+    monkeypatch.setattr(add.filter_cache, "get_existing_parents", lambda hashes: {
+        h: [key for key, members in rows.items() if h in members] for h in hashes
+    })
+    monkeypatch.setattr(add.filter_cache, "get_new_parents", lambda parents: [
+        current for h in parents if h == project.hash
+    ])
+
+    add.update_json_index(tasks)
+
+    assert rows[former] == {}
+    assert rows[current] == {
+        name: {"id": f"id-{name}", "cache_key": name, "refresh": 1}
+        for name in ("edited", "completed", "new", "moved")
     }

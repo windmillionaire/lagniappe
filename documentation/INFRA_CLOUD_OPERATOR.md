@@ -57,6 +57,31 @@ venv/bin/python -m runner.cloud_task --project PROJECT --check-connection
 
 The provider guides cover connection claims and version aliases. [Codex Cloud environments](https://learn.chatgpt.com/docs/environments/cloud-environments) · [Google Secret Manager version aliases](https://docs.cloud.google.com/secret-manager/docs/assign-alias-to-secret-version)
 
+## First build and test in a new worktree
+
+From the existing clone, fetch the exact branch even when the clone tracks a
+single branch. Choose an unused worktree path and a new local branch name.
+
+```sh
+branch=next/2.6.0
+git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"
+git worktree add -b work/first-build ../first-build "origin/$branch"
+cd ../first-build
+bash runner/cloud_setup.sh --worktree
+LAGNIAPPE_CONFIG_ROOT="$PWD/testing/fixtures/offline-runtime" npm run build
+LAGNIAPPE_CONFIG_ROOT="$PWD/testing/fixtures/offline-runtime" venv/bin/python run.py test http
+```
+
+This path uses Python 3.14 and the Node version in `.nvmrc`. It creates local
+`venv` and locked `mcp/.venv` directories and uses a writable npm cache under
+`venv`. An existing writable `npm_config_cache` can be reused across worktrees.
+The synthetic settings support credential-free source checks. The production
+build enforces the startup budgets and writes the usual assets in this worktree.
+
+For installation-specific work, use the task launcher below with the selected
+project and numeric settings version. It restores that installation and sets
+up a writable Google Cloud CLI configuration for its child command.
+
 ## Use a fresh task
 
 ```sh

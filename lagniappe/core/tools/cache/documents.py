@@ -26,6 +26,21 @@ class DocumentDelta(TypedDict):
     user_hash: str | None
 
 
+class DocumentAuthor(TypedDict):
+    hash: str
+    name: str
+
+
+class DocumentReader(TypedDict):
+    id: str
+    hash: NotRequired[str]
+    name: NotRequired[str]
+
+
+class PresentReader(DocumentReader):
+    client_id: str
+
+
 class DocumentState(TypedDict):
     generation: str
     revision: int
@@ -34,7 +49,7 @@ class DocumentState(TypedDict):
     markup: str | None
     fingerprint: str | None
     checkpoint_author_hash: str | None
-    authors: dict[str, dict[str, str]]
+    authors: dict[str, DocumentAuthor]
     updates: list[DocumentDelta]
 
 
@@ -55,9 +70,9 @@ class DocumentPoll(TypedDict):
     ydoc: NotRequired[str | None]
     markup: NotRequired[str | None]
     user_hash: NotRequired[str]
-    authors: NotRequired[dict[str, dict[str, str]]]
-    users: NotRequired[list[dict[str, object]]]
-    user: NotRequired[dict[str, object]]
+    authors: NotRequired[dict[str, DocumentAuthor]]
+    users: NotRequired[list[PresentReader]]
+    user: NotRequired[DocumentReader]
     presence_digest: NotRequired[str]
 
 
@@ -126,7 +141,7 @@ def _decode(value):
     return json.loads(value)
 
 
-def _author_projection(author: object) -> dict[str, str] | None:
+def _author_projection(author: object) -> DocumentAuthor | None:
     """Return the minimal identity needed to attribute a transient revision."""
     if not isinstance(author, dict):
         return None
@@ -287,7 +302,7 @@ def poll_document(
         payload.update(
             {
                 "users": users,
-                "user": dict(user or {}),
+                "user": cast(DocumentReader, dict(user or {})),
                 "presence_digest": current_presence_digest,
             }
         )

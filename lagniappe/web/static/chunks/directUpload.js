@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request } from './foundation.js?v=b438e48a';
+import { r as request } from './foundation.js?v=b8c49d0d';
 
 const DEFAULT_DIRECT_UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
 const DEFAULT_DIRECT_UPLOAD_RETRIES = 3;

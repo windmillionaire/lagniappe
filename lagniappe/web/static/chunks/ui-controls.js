@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES, s as setIcon, c as createIcon, i as iconDefinition } from './ui-resources.js?v=b438e48a';
+import { S as STYLES, s as setIcon, c as createIcon, i as iconDefinition } from './ui-resources.js?v=b8c49d0d';
 
 let controlIdCounter = 0;
 const linkLabelToControl = (labelElt, control) => {

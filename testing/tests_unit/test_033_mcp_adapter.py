@@ -150,6 +150,9 @@ def _contract() -> dict[str, Any]:
     return {
         "contract_version": CONTRACT_VERSION_MAX,
         "current_date": "2026-09-04",
+        "schema_scope": "full",
+        "schema_actions": [],
+        "schema_instructions": "Request the action schemas you need.",
         "timezone": "UTC",
         "personal_page": {},
         "file_usage_schema": {"type": "array", "items": {"type": "object"}},
@@ -2943,18 +2946,11 @@ def test_starters_bundle_current_context_without_an_actor_or_inventory_read():
     assert contract["proposal_schema"] == _contract()["proposal_schema"]
     assert "personal_page" in contract
     instructions = contract["mcp_submission"]["instructions"]
-    assert "do not add a separate final contract read" in instructions
-    assert (
-        "Keep this plan_id for investigation, submission, and revisions"
-        in instructions
-    )
-    assert "starting again creates another report" in instructions
-    assert "one complete text or structured representation" in instructions
-    assert (
-        "counts, continuation/truncation flags, and partial errors" in instructions
-    )
-    assert "re-render the retained result in smaller sections" in instructions
-    assert "repeat only the necessary read with the same plan_id" in instructions
+    assert "get_plan_contract" in instructions and "view=full" in instructions
+    assert "view=schema" in instructions
+    assert "workflow_rules" not in contract
+    assert "guidance_requirements" not in contract
+    assert len(compact_json(contract).encode()) < 2200
 
 
 @pytest.mark.parametrize("failure", ["transport", "oversize", "private", "incompatible"])

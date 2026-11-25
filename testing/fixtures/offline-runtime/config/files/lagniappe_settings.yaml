@@ -14,3 +14,7 @@ AI_MODEL: offline-model
 SERVER_NAME: localhost
 SERVER_PORT: 8080
 AI_IMAGE_MODEL: offline-image-model
+APP_URL: https://offline.example.test
+ADMIN_EMAIL: owner@example.test
+GOOGLE_CLIENT_ID: ""
+GOOGLE_LOGIN_URI: https://offline.example.test/users/login-google

@@ -2,12 +2,24 @@
 # Reusable Cloud image setup. Run in a fresh checkout before publishing the image.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-if [[ -d config/files && -n "$(find config/files -type f -print -quit)" ]]; then
+worktree=false
+case "$#:${1:-}" in
+    0:) ;;
+    1:--worktree) worktree=true ;;
+    *) echo 'Usage: bash runner/cloud_setup.sh [--worktree]' >&2; exit 2 ;;
+esac
+if ! "$worktree" && [[ -d config/files && -n "$(find config/files -type f -print -quit)" ]]; then
     echo 'Use a clean checkout for the reusable Cloud image. Installation settings are present.' >&2
     exit 1
 fi
-command -v gcloud >/dev/null
-command -v gh >/dev/null
+if ! "$worktree"; then
+    command -v gcloud >/dev/null
+    command -v gh >/dev/null
+fi
+if [[ -L venv || -L mcp/.venv ]]; then
+    echo 'Create Python and MCP environments inside this worktree. A linked environment cannot be updated safely.' >&2
+    exit 1
+fi
 node_version=$(cat .nvmrc)
 if ! command -v node >/dev/null || [[ "$(node -p 'process.versions.node')" != "$node_version" ]]; then
     nvm_script="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
@@ -27,8 +39,10 @@ elif ! venv/bin/python -c 'import sys; sys.exit(sys.version_info[:2] != (3, 14))
     exit 1
 fi
 venv/bin/python -m pip install -r requirements-dev.txt
-npm ci
-venv/bin/python -m playwright install chromium
-venv/bin/python -c 'from playwright.sync_api import sync_playwright; p = sync_playwright().start(); p.chromium.launch().close(); p.stop()'
+npm ci --cache "${npm_config_cache:-${NPM_CONFIG_CACHE:-$PWD/venv/.npm-cache}}"
+if ! "$worktree"; then
+    venv/bin/python -m playwright install chromium
+    venv/bin/python -c 'from playwright.sync_api import sync_playwright; p = sync_playwright().start(); p.chromium.launch().close(); p.stop()'
+fi
 venv/bin/python -m runner.uv_bootstrap install --non-interactive
 venv/bin/python -c 'from runner.mcp_environment import prepare_environment; prepare_environment()'

@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
 from ..definitions import FieldType, FilterOptions, MutationIntent
 from ..definitions.identifiers import short_uuid
+from ..tools.files.html import strip_tags
 from ..mixins import AIMixin, CacheMixin, FilterMixin
 from .base_property import Property, UNSET
 
@@ -38,6 +39,7 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property["Document", DocumentOw
     _ydoc_id = "snapshot"
     _ydoc = UNSET
     _html = UNSET
+    _source_html = UNSET
     _icon = "document"
     _label = "Page"
 
@@ -74,10 +76,19 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property["Document", DocumentOw
         self._html = html_asset.html() if html_asset else None
         return self._html
 
+    @property
+    def source_html(self) -> str | None:
+        """Return the stored source without display typography for AI projections."""
+        if self._source_html is UNSET:
+            asset = cast("HTMLAsset | None", self.entity.get_asset(self.id))
+            self._source_html = asset.get() if asset else None
+        return cast("str | None", self._source_html)
+
     @html.setter
     def html(self, value: str | None) -> None:
         saved = self.entity.save_asset(value, self.id, "html")
         self._html = value if saved else None
+        self._source_html = self._html
 
     @property
     def ydoc(self) -> str | None:
@@ -101,6 +112,7 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property["Document", DocumentOw
             for name in (self.id, self._ydoc_id)
         }
         self._html = html
+        self._source_html = UNSET
         self._ydoc = ydoc
 
         if self._html == "":
@@ -146,10 +158,8 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property["Document", DocumentOw
 
     @property
     def ai_value(self) -> str | None:
-        asset = self.entity.get_asset(self.id)
-        if not asset:
-            return None
-        return asset.cache_value
+        source = self.source_html
+        return strip_tags(source).strip() if source is not None else None
 
     # Filter Attributes
     _field_type = FieldType.BOOLEAN
