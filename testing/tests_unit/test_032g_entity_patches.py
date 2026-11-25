@@ -1,6 +1,7 @@
 """Cohesive patches validate selected changes and preserve omitted fields."""
 from copy import deepcopy
 from datetime import datetime, UTC
+import json
 from types import SimpleNamespace
 
 from google.cloud.datastore import Key, Entity as DatastoreEntity
@@ -827,6 +828,54 @@ def test_corrections_share_evidence_across_origins_and_fence_source_retries(monk
     assert len(saved) == 2
     store.pop(source.urlsafe_key)
     assert not _other_report_references(file, correction)
+
+
+@pytest.mark.parametrize("owner_kind", ["page", "task"])
+def test_create_correction_preserves_owned_evidence_and_guards(monkeypatch, owner_kind):
+    from lagniappe.core.definitions import MutationEffectType
+    from lagniappe.core.entities.ai_report import AIReport
+    from lagniappe.core.tools.ai.external.plans import create_plan
+    from lagniappe.core.tools.database import get as database_get
+
+    actor = entity("USER", "evidence-owner")
+    page = entity("PAGE", "evidence-page")
+    form = entity("FORM", "evidence-form")
+    form.db["restricted_to"] = ["crew"]
+    page.form = form
+    task = entity("TASK", "evidence-task")
+    task.page = page
+    file = entity("FILE", "owned-evidence")
+    setattr(file, owner_kind, page if owner_kind == "page" else task)
+    file.db.pop("task_page", None)  # Older rows rely on the Task for their Page.
+    file.db["report_refs"] = ["earlier-reference"]
+    monkeypatch.setattr(database_get, "entity", lambda key: None)
+    source = AIReport.create({
+        "user": actor, "status": "complete", "input_files": [file],
+        "proposal": {"summary": "Original", "actions": []},
+        "result": {"status": "complete", "actions": []},
+    }, key=Key("activity", "source", parent=actor.key))
+    source.db["process"] = json.dumps(source.get_process("process"))
+    rows = {item.key: item.db for item in (source, file, page, task, form, actor)}
+    monkeypatch.setattr(database_get, "entities", lambda keys: [deepcopy(rows[key]) for key in keys if key in rows])
+    monkeypatch.setattr(database_utility, "create_key", lambda kind, parent: Key("activity", "correction", parent=parent.key))
+    plans = []
+
+    def capture_plan(plan):
+        plans.append(plan)
+        return SimpleNamespace(post_commit_complete=True)
+
+    monkeypatch.setattr("lagniappe.core.entities.execute_mutation", capture_plan)
+    correction = create_plan(actor, revises_plan_id=source.urlsafe_key)
+
+    writes = {effect.entity.key: effect.entity for effect in plans[0].effects
+              if effect.effect is MutationEffectType.UPSERT}
+    assert correction.input_files == [writes[file.key]]
+    assert writes[file.key].owner.key == (page.key if owner_kind == "page" else task.key)
+    assert writes[file.key].restricted_to == {"page_form": ["crew"]}
+    assert writes[file.key].db["report_refs"] == ["earlier-reference", source.urlsafe_key, correction.urlsafe_key]
+    assert writes[source.key].db["correction_children"] == [correction.urlsafe_key]
+    assert page.key in writes
+    assert dict(correction._form_additional_guards) == {source.key: source.db, file.key: file.db}
 
 
 def test_update_recovery_accepts_later_completion_but_rejects_unrelated_drift(monkeypatch):

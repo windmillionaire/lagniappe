@@ -13,7 +13,7 @@ import json
 
 from google.cloud.datastore import Entity as DatastoreEntity
 
-from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.exceptions import ValidationError
 from lagniappe.core.tools.database.utility import ExactEntityState
@@ -63,20 +63,30 @@ def _check_source(source, user):
         raise ValidationError("Finish or recover the active Form migration before correcting this plan.")
     if any(record.get("status") == "applying" or (record.get("status") == "failed" and record.get("expected")) for record in cast(list[dict[str, object]], source.result.get("actions", []))):
         raise ValidationError("Reconcile the interrupted execution with Retry before creating a correction.")
+
+
 def save_correction(report: models.AIReport, source: models.AIReport) -> None:
+    files = report.input_files
+    owned_files = [file for file in files if file.has_references]
+    if owned_files:
+        # A Task owner's Page and Form supply File permissions even on older rows without task_page.
+        Entities.fetch(
+            *owned_files, *(file.properties.task.key for file in owned_files),
+            request=Fetch.nested(because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION),
+        )
     guards = [(source.key, ExactEntityState(deepcopy(dict(source.db))))]
     children = source.db.get("correction_children", [])
     if not isinstance(children, list):
         raise ValidationError("Stored correction links are invalid.")
     source.db["correction_children"] = list(dict.fromkeys([*children, report.urlsafe_key]))
-    for file in report.input_files:
+    for file in files:
         guards.append((file.key, ExactEntityState(deepcopy(dict(file.db)))))
         references = file.db.get("report_refs", [])
         if not isinstance(references, list):
             raise ValidationError("Stored file report references are invalid.")
         file.db["report_refs"] = list(dict.fromkeys([*references, source.urlsafe_key, report.urlsafe_key]))
     report._form_additional_guards = guards
-    Entities.save(source, report, *report.input_files)
+    Entities.save(source, report, *files)
 
 
 def _unindexed_snapshot(value):

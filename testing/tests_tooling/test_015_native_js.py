@@ -1,6 +1,8 @@
 """Reporter and metadata contracts using supplied inventory data, without Node."""
 
+import errno
 import json
+from unittest.mock import Mock
 
 import pytest
 
@@ -218,3 +220,61 @@ def test_native_js_worker_and_batch_environment_overrides(monkeypatch):
     assert native_js.batch_enabled() is False
     monkeypatch.setenv("LAGNIAPPE_JS_BATCH", "false")
     assert native_js.batch_enabled() is False
+
+
+def reported_case(name, passed=True):
+    event = {"name": name, "type": "test:pass" if passed else "test:fail"}
+    process = Mock(returncode=0 if passed else 1)
+    process.communicate.return_value = (json.dumps(event), "")
+    return process
+
+
+def test_isolated_launch_error_preserves_verified_siblings_and_assertions(tmp_path, monkeypatch):
+    path = tmp_path / "test_mixed.mjs"
+    fault = OSError(errno.EFAULT, "Bad address")
+    launch = Mock(side_effect=[reported_case("test_ok"), fault, reported_case("test_assert", False)])
+    monkeypatch.setattr(native_js, "node_binary", lambda: "/test/node")
+    monkeypatch.setattr(native_js.subprocess, "Popen", launch)
+    monkeypatch.setenv("LAGNIAPPE_JS_BATCH", "1")
+
+    outcomes = native_js.run_file_cases(path, ["test_ok", "test_fault", "test_assert"])
+
+    assert outcomes["test_ok"]["type"] == "test:pass"
+    error = outcomes["test_fault"]
+    assert isinstance(error, native_js.JavaScriptLaunchError)
+    assert error.__cause__ is fault
+    for detail in ("isolated", "test_fault", str(path), "/test/node", str(fault)):
+        assert detail in str(error)
+    assert error.__notes__ == ["Isolated fallback from 3 selected cases: test_ok, test_fault, test_assert"]
+    assert isinstance(outcomes["test_assert"], native_js.JavaScriptFailure)
+    assert launch.call_count == 3
+
+
+@pytest.mark.parametrize("number,attempts", [(errno.EAGAIN, 2), (errno.EINTR, 2), (errno.ENOENT, 1)])
+def test_file_batch_launch_error_identifies_all_affected_cases(tmp_path, monkeypatch, number, attempts):
+    path = tmp_path / "test_batch.mjs"
+    fault = OSError(number, "injected launch failure")
+    launch = Mock(side_effect=fault)
+    monkeypatch.setattr(native_js, "node_binary", lambda: "/test/node")
+    monkeypatch.setattr(native_js.subprocess, "Popen", launch)
+    monkeypatch.setenv("LAGNIAPPE_JS_BATCH", "1")
+
+    names = ["test_first", "test_last"]
+    outcomes = native_js.run_file_cases(path, names)
+
+    assert set(outcomes) == set(names)
+    for error in outcomes.values():
+        assert isinstance(error, native_js.JavaScriptLaunchError)
+        assert error.__cause__ is fault
+        for detail in ("batch", *names, str(path), "/test/node", str(fault)):
+            assert detail in str(error)
+    assert launch.call_count == attempts
+
+
+def test_interrupted_node_launch_can_recover_once(tmp_path, monkeypatch):
+    launch = Mock(side_effect=[InterruptedError(errno.EINTR, "interrupted"), reported_case("test_ok")])
+    monkeypatch.setattr(native_js, "node_binary", lambda: "/test/node")
+    monkeypatch.setattr(native_js.subprocess, "Popen", launch)
+
+    assert native_js.run_case(tmp_path / "test_retry.mjs", "test_ok")["type"] == "test:pass"
+    assert launch.call_count == 2

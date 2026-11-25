@@ -22,8 +22,8 @@ class _JavaScriptSessionRunner:
             resolved = Path(item.path).resolve()
             self._cases_by_file.setdefault(resolved, []).append(item.name)
 
-        self._results: dict[Path, dict[str, dict | native_js.JavaScriptFailure]] = {}
-        self._futures: dict[Path, Future[dict[str, dict | native_js.JavaScriptFailure]]] = {}
+        self._results: dict[Path, dict[str, native_js.CaseOutcome]] = {}
+        self._futures: dict[Path, Future[dict[str, native_js.CaseOutcome]]] = {}
         self._executor: ThreadPoolExecutor | None = None
 
         maxfail = getattr(session.config.option, "maxfail", 0)
@@ -39,7 +39,7 @@ class _JavaScriptSessionRunner:
                     native_js.run_file_cases, file_path, names
                 )
 
-    def run(self, path: Path, name: str) -> dict:
+    def outcome(self, path: Path, name: str) -> native_js.CaseOutcome:
         resolved = path.resolve()
         file_results = self._results.get(resolved)
         if file_results is None:
@@ -51,12 +51,9 @@ class _JavaScriptSessionRunner:
                 file_results = native_js.run_file_cases(resolved, names)
             self._results[resolved] = file_results
 
-        outcome = file_results.get(name)
-        if outcome is None:
-            return native_js.run_case(resolved, name)
-        if isinstance(outcome, native_js.JavaScriptFailure):
-            raise outcome
-        return outcome
+        if name not in file_results:
+            file_results.update(native_js.run_file_cases(resolved, [name]))
+        return file_results[name]
 
     def close(self) -> None:
         executor = self._executor
@@ -94,12 +91,20 @@ class JavaScriptItem(pytest.Item):
         super().__init__(**kwargs)
         self.case = case
 
-    def runtest(self):
+    def setup(self):
         if self.case["status"] in {"skip", "todo"}:
             pytest.skip(f"node:test {self.case['status']}")
-        result = _session_runner(self).run(Path(self.path), self.name)
-        if result.get("skip") or result.get("todo"):
-            pytest.skip(str(result.get("skip") or result.get("todo")))
+        outcome = _session_runner(self).outcome(Path(self.path), self.name)
+        if isinstance(outcome, native_js.JavaScriptLaunchError):
+            # A batch shares one launch error. Keep other items' pytest frames out of its traceback.
+            raise outcome.with_traceback(None)
+        self.result = outcome
+
+    def runtest(self):
+        if isinstance(self.result, native_js.JavaScriptFailure):
+            raise self.result
+        if self.result.get("skip") or self.result.get("todo"):
+            pytest.skip(str(self.result.get("skip") or self.result.get("todo")))
 
     def repr_failure(self, excinfo):
         if isinstance(excinfo.value, native_js.JavaScriptFailure):

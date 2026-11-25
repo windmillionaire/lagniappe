@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from contextlib import suppress
+import errno
 import json
 import os
 from pathlib import Path
@@ -127,6 +128,13 @@ def execution_dependencies(path: Path, repo_root: Path) -> set[str]:
 
 class JavaScriptFailure(Exception):
     """Native assertion, process, or reporter-protocol failure."""
+
+
+class JavaScriptLaunchError(Exception):
+    """The operating system could not start the selected Node test process."""
+
+
+type CaseOutcome = dict | JavaScriptFailure | JavaScriptLaunchError
 
 
 def _parse_reporter_events(output: str, stderr: str) -> list[dict]:
@@ -256,14 +264,23 @@ def _run_node_command(
         if os.name != "nt"
         else {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
     )
-    process = subprocess.Popen(
-        command,
-        cwd=repo_root,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        **options,
-    )
+    attempt = 1
+    while True:
+        try:
+            process = subprocess.Popen(
+                command, cwd=repo_root, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, **options,
+            )
+            break
+        except OSError as error:
+            if attempt == 1 and error.errno in {errno.EAGAIN, errno.EINTR}:
+                attempt += 1
+                continue
+            scope = "file batch" if case_timeout_ms is not None else "isolated case"
+            raise JavaScriptLaunchError(
+                f"Could not launch {command[0]} for {scope} {pattern} in {path} "
+                f"(attempt {attempt}): {error}"
+            ) from error
     try:
         stdout, stderr = process.communicate(timeout=timeout)
     except BaseException:
@@ -307,14 +324,15 @@ def run_file_cases(
     timeout: float | None = None,
     case_timeout: float = 30,
     repo_root: Path = REPO_ROOT,
-) -> dict[str, dict | JavaScriptFailure]:
+) -> dict[str, CaseOutcome]:
     """Run selected cases from one file in a single Node process with isolated fallback."""
     ordered = list(dict.fromkeys(names))
     if not ordered:
         return {}
 
-    outcomes: dict[str, dict | JavaScriptFailure] = {}
-    if len(ordered) == 1 or not batch_enabled():
+    outcomes: dict[str, CaseOutcome] = {}
+    batched = len(ordered) > 1 and batch_enabled()
+    if not batched:
         fallback = ordered
     else:
         batch_timeout = (
@@ -331,6 +349,8 @@ def run_file_cases(
                 case_timeout_ms=int(case_timeout * 1000),
                 repo_root=repo_root,
             )
+        except JavaScriptLaunchError as error:
+            return dict.fromkeys(ordered, error)
         except subprocess.TimeoutExpired:
             verified: dict[str, dict] = {}
             fallback_set = set(ordered)
@@ -346,7 +366,9 @@ def run_file_cases(
             outcomes[name] = run_case(
                 path, name, timeout=case_timeout, repo_root=repo_root
             )
-        except JavaScriptFailure as failure:
+        except (JavaScriptFailure, JavaScriptLaunchError) as failure:
+            if batched and isinstance(failure, JavaScriptLaunchError):
+                failure.add_note(f"Isolated fallback from {len(ordered)} selected cases: {', '.join(ordered)}")
             outcomes[name] = failure
 
     return outcomes

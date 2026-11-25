@@ -9,6 +9,13 @@ misses a case, or hits a hook/runtime error (set `LAGNIAPPE_JS_BATCH=0` to force
 per-case execution directly). Continue using the repo runner for selection,
 failures, reports and recorded outcomes.
 
+If the operating system cannot start Node, pytest reports a setup error with
+the executable, file, case selector, and original OS error. A failed batch
+launch affects every selected case in that file. A failed isolated launch
+affects only that case. The runner retries an interrupted or temporarily
+unavailable launch (`EINTR` or `EAGAIN`) once. JavaScript assertions still
+appear as test failures.
+
 Read [writing tests](TESTING_WRITING_TESTS.md) before adding or reshaping
 a test. `testing/tests_js/test_045_offline_queue.mjs` contains native cases.
 Harness tests in `test_000_native_harness.mjs` and `test_000_native_runner.py`
