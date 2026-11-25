@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES, c as createIcon, s as setIcon } from './ui-resources.js?v=b8e0e957';
-import { E as ENDPOINTS, r as request, w as withTransition } from './foundation.js?v=b8e0e957';
-import './connectivity.js?v=b8e0e957';
-import { p as primitives, b as buttons } from './ui-controls.js?v=b8e0e957';
-import { F as FormController } from './forms.js?v=b8e0e957';
-import { d as directUpload } from './directUpload.js?v=b8e0e957';
-import { D as Dropdown } from './combobox.js?v=b8e0e957';
+import { S as STYLES, c as createIcon, s as setIcon } from './ui-resources.js?v=b438e48a';
+import { E as ENDPOINTS, r as request, w as withTransition } from './foundation.js?v=b438e48a';
+import './connectivity.js?v=b438e48a';
+import { p as primitives, b as buttons } from './ui-controls.js?v=b438e48a';
+import { F as FormController } from './forms.js?v=b438e48a';
+import { d as directUpload } from './directUpload.js?v=b438e48a';
+import { D as Dropdown } from './combobox.js?v=b438e48a';
 
 const DEFAULT_DROPZONE_TEXT = "Drop file here, click to upload, or tap to choose camera/files";
 const visibility = () => {

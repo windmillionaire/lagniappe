@@ -72,7 +72,9 @@ export class IndexTable extends BaseTable<IndexTableView, IndexTableComponent> {
 
 	_clearLoadingState() {
 		this.target.removeAttribute("aria-busy");
-		this.target.querySelector("tr[data-role='loading']")?.remove();
+		for (const row of this.target.querySelectorAll("tr[data-role='loading']")) {
+			row.remove();
+		}
 		this.view.clearTableLoading?.();
 	}
 

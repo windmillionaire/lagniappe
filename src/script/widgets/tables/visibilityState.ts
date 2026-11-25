@@ -113,7 +113,7 @@ export class TableVisibilityState {
 		}
 
 		const id = this.component.elt.id;
-		const rowSelector = `#${id} tr:not([data-widget], [data-embedded], [data-role="empty"], [data-role="loading"]) > td:not([data-column="delete"])`;
+		const rowSelector = `#${id} tr:not([data-widget], [data-embedded], [data-role="empty"]) > td:not([data-column="delete"])`;
 		const thSelector = `#${id} th:not([data-column="selector"], [data-embedded])`;
 		this.stylesheet.replaceSync(
 			this.hiddenColumns

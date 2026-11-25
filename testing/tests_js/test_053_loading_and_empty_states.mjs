@@ -86,12 +86,20 @@ test("test_entity_index_loading_skeleton_skips_fast_loads_and_shows_after_delay"
 			if (tbody.querySelector("tr[data-role='loading']")) break;
 		}
 
-		const loadingRow = tbody.querySelector("tr[data-role='loading']");
-		assert.ok(loadingRow, "Slow load should render a delayed loading skeleton");
-		assert.equal(tbody.getAttribute("aria-busy"), "true");
-		assert.equal(loadingRow.querySelector("td")?.colSpan, 3);
+		const loadingRows = tbody.querySelectorAll("tr[data-role='loading']");
 		assert.equal(
-			loadingRow.querySelector("[role='status']")?.textContent,
+			loadingRows.length,
+			4,
+			"Slow load should render delayed column-aligned skeleton rows",
+		);
+		assert.equal(tbody.getAttribute("aria-busy"), "true");
+		const firstCells = loadingRows[0].querySelectorAll("td");
+		assert.equal(firstCells.length, 3);
+		assert.ok(firstCells[0].querySelector("[aria-hidden='true']"));
+		assert.ok(firstCells[1].querySelector("[aria-hidden='true']"));
+		assert.equal(firstCells[2].querySelector("[aria-hidden='true']"), null);
+		assert.equal(
+			loadingRows[0].querySelector("[role='status']")?.textContent,
 			"Loading rows",
 		);
 

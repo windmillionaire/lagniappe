@@ -73,8 +73,8 @@ STYLES = {
 			"multiple": "dropdown-option-multiple"
 		},
 		"panel": "p-1 scrollbar-thin scrollbar-thumb-base-light scrollbar-track-transparent absolute z-50 hidden max-h-96 min-w-64 overflow-y-auto rounded-md bg-white shadow-lg outline outline-base-light/50",
-		"empty": "px-3 py-2.5 text-sm italic text-base-medium",
-		"emptyWithAction": "mt-1 border-t border-base-light/50 px-3 py-2.5 text-sm italic text-base-medium",
+		"empty": "px-3 py-2 text-sm italic text-base-medium",
+		"emptyWithAction": "mt-1 border-t border-base-light/50 px-3 pt-2.5 pb-1.5 text-sm italic text-base-medium",
 		"history": "text-left px-3 py-1.5 rounded-sm hover:bg-base-bg w-full",
 		"search": {
 			"result": "dropdown-option dropdown-option-flow cursor-default",
@@ -184,7 +184,7 @@ STYLES = {
 		"card": {
 			"item": "flex flex-row items-start justify-between gap-2 px-3 py-2 text-base font-semibold hover:bg-kind-bg group/item",
 			"directory": "flex flex-row items-center gap-2 px-3 py-2 text-base font-semibold hover:bg-kind-bg group/item",
-			"directoryAction": "flex w-full cursor-pointer flex-row items-center gap-2 text-left",
+			"directoryAction": "flex w-full cursor-pointer flex-row items-center gap-2 text-left font-semibold text-kind-default focus-visible:outline-none",
 			"list": "bg-white rounded-md outline-2 outline-kind-default",
 			"actions": "flex flex-row items-center gap-1"
 		},
@@ -214,7 +214,7 @@ STYLES = {
 		"linkIndicator": "shrink-0 text-base-medium",
 		"taskFeedback": "flex flex-wrap sm:flex-nowrap items-center gap-2 rounded-md border border-kind-light bg-kind-bg px-3 py-2 text-sm text-base-dark",
 		"taskFeedbackLink": "shrink-0 font-semibold text-kind-dark hover:underline focus-visible:underline",
-		"taskFeedbackDismiss": "grid size-6 shrink-0 place-items-center rounded-sm text-base-medium hover:bg-white/70 hover:text-base-dark focus-visible:outline-2 focus-visible:outline-kind-default",
+		"taskFeedbackDismiss": "grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-delete-default transition-colors duration-100 hover:bg-delete-bg hover:outline-2 hover:outline-delete-default focus-visible:bg-delete-bg focus-visible:outline-2 focus-visible:outline-delete-default",
 		"view": "grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 w-full p-4 sm:pb-0 sm:pt-6 lg:pt-8 sm:px-6 lg:px-8 mx-auto max-w-7xl"
 	},
 	"note": {
@@ -455,11 +455,9 @@ STYLES = {
 			}
 		},
 		"loading": {
-			"cell": "py-3 px-4 sm:px-0",
-			"list": "flex flex-col gap-3 animate-pulse motion-reduce:animate-none",
-			"item": "flex items-center justify-between gap-4 py-1",
-			"barPrimary": "h-4 w-2/5 max-w-64 rounded bg-base-light/50",
-			"barSecondary": "h-3.5 w-24 rounded bg-base-bg"
+			"cell": "py-3.5 pr-3",
+			"barPrimary": "block h-4 w-44 max-w-full rounded bg-base-light/50 animate-pulse motion-reduce:animate-none",
+			"barSecondary": "block h-3.5 w-24 max-w-full rounded bg-base-light/35 animate-pulse motion-reduce:animate-none"
 		}
 	},
 	"task": {

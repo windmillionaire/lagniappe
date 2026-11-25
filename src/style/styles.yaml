@@ -235,11 +235,11 @@ dropdown:
     intent: panel presentation within dropdown
     surfaces: [frontend]
   empty:
-    classes: px-3 py-2.5 text-sm italic text-base-medium
+    classes: px-3 py-2 text-sm italic text-base-medium
     intent: non-interactive empty-state status row inside a dropdown popover
     surfaces: [frontend]
   emptyWithAction:
-    classes: mt-1 border-t border-base-light/50 px-3 py-2.5 text-sm italic text-base-medium
+    classes: mt-1 border-t border-base-light/50 px-3 pt-2.5 pb-1.5 text-sm italic text-base-medium
     intent: non-interactive empty-state status row below an action option inside a dropdown popover
     surfaces: [frontend]
   history:
@@ -619,7 +619,7 @@ home:
       intent: directory presentation within home card
       surfaces: [server]
     directoryAction:
-      classes: flex w-full cursor-pointer flex-row items-center gap-2 text-left
+      classes: flex w-full cursor-pointer flex-row items-center gap-2 text-left font-semibold text-kind-default focus-visible:outline-none
       intent: full-row button layout for non-link actions inside the Home directory card
       surfaces: [server]
     list:
@@ -729,7 +729,7 @@ home:
     intent: action link inside the Home task confirmation banner pointing to My Page tasks
     surfaces: [server]
   taskFeedbackDismiss:
-    classes: grid size-6 shrink-0 place-items-center rounded-sm text-base-medium hover:bg-white/70 hover:text-base-dark focus-visible:outline-2 focus-visible:outline-kind-default
+    classes: grid size-6 shrink-0 cursor-pointer place-items-center rounded-md text-delete-default transition-colors duration-100 hover:bg-delete-bg hover:outline-2 hover:outline-delete-default focus-visible:bg-delete-bg focus-visible:outline-2 focus-visible:outline-delete-default
     intent: dismiss control for the Home task confirmation banner
     surfaces: [server]
   view:
@@ -1460,24 +1460,16 @@ table:
         surfaces: [server]
   loading:
     cell:
-      classes: py-3 px-4 sm:px-0
-      intent: full-width container cell for delayed entity index loading skeleton
-      surfaces: [frontend]
-    list:
-      classes: flex flex-col gap-3 animate-pulse motion-reduce:animate-none
-      intent: stacked shimmer rows shown when an entity index load exceeds the grace delay
-      surfaces: [frontend]
-    item:
-      classes: flex items-center justify-between gap-4 py-1
-      intent: single placeholder row within an entity index loading skeleton
+      classes: py-3.5 pr-3
+      intent: column-aligned placeholder cell for delayed entity index loading skeleton rows
       surfaces: [frontend]
     barPrimary:
-      classes: h-4 w-2/5 max-w-64 rounded bg-base-light/50
-      intent: primary title shimmer bar within an entity index loading skeleton
+      classes: block h-4 w-44 max-w-full rounded bg-base-light/50 animate-pulse motion-reduce:animate-none
+      intent: primary title shimmer bar within an entity index loading skeleton row
       surfaces: [frontend]
     barSecondary:
-      classes: h-3.5 w-24 rounded bg-base-bg
-      intent: secondary metadata shimmer bar within an entity index loading skeleton
+      classes: block h-3.5 w-24 max-w-full rounded bg-base-light/35 animate-pulse motion-reduce:animate-none
+      intent: secondary metadata shimmer bar within an entity index loading skeleton row
       surfaces: [frontend]
 
 task:

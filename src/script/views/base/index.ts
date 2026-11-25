@@ -369,40 +369,67 @@ export default class EntityIndex extends Core {
 			return;
 		}
 
-		const columnCount =
-			tableElt.querySelectorAll("thead > tr:first-child > th").length || 1;
-		const row = document.createElement("tr");
-		row.dataset.role = "loading";
-		row.dataset.visible = "true";
-		row.setAttribute("aria-live", "polite");
+		const headers = Array.from(
+			tableElt.querySelectorAll<HTMLTableCellElement>(
+				"thead > tr:first-child > th",
+			),
+		);
+		const columns =
+			headers.length > 0
+				? headers.map((th) => ({
+						column: th.dataset.column || "",
+						visible: th.dataset.visible !== "false",
+						hasLabel: Boolean(th.textContent?.trim()),
+					}))
+				: [{ column: "name", visible: true, hasLabel: true }];
+		const utilityColumns = new Set([
+			"selector",
+			"delete",
+			"controls",
+			"actions",
+		]);
+		const fragment = document.createDocumentFragment();
 
-		const cell = document.createElement("td");
-		cell.colSpan = columnCount;
-		cell.className = STYLES.table.loading.cell;
-
-		const srLabel = document.createElement("span");
-		srLabel.className = "sr-only";
-		srLabel.setAttribute("role", "status");
-		srLabel.textContent = "Loading rows";
-		cell.append(srLabel);
-
-		const list = document.createElement("div");
-		list.className = STYLES.table.loading.list;
-		list.setAttribute("aria-hidden", "true");
 		for (let i = 0; i < INDEX_SKELETON_ROWS; i += 1) {
-			const item = document.createElement("div");
-			item.className = STYLES.table.loading.item;
-			const primary = document.createElement("span");
-			primary.className = STYLES.table.loading.barPrimary;
-			const secondary = document.createElement("span");
-			secondary.className = STYLES.table.loading.barSecondary;
-			item.append(primary, secondary);
-			list.append(item);
+			const row = document.createElement("tr");
+			row.dataset.role = "loading";
+			row.dataset.visible = "true";
+			if (i === 0) row.setAttribute("aria-live", "polite");
+
+			let placedPrimary = false;
+			columns.forEach((col, colIndex) => {
+				const cell = document.createElement("td");
+				if (col.column) cell.dataset.column = col.column;
+				if (!col.visible) cell.dataset.visible = "false";
+				cell.className = STYLES.table.loading.cell;
+
+				if (i === 0 && colIndex === 0) {
+					const srLabel = document.createElement("span");
+					srLabel.className = "sr-only";
+					srLabel.setAttribute("role", "status");
+					srLabel.textContent = "Loading rows";
+					cell.append(srLabel);
+				}
+
+				const isUtility = utilityColumns.has(col.column) || !col.hasLabel;
+				if (!isUtility && col.visible) {
+					const bar = document.createElement("span");
+					bar.setAttribute("aria-hidden", "true");
+					if (!placedPrimary) {
+						bar.className = STYLES.table.loading.barPrimary;
+						placedPrimary = true;
+					} else {
+						bar.className = STYLES.table.loading.barSecondary;
+					}
+					cell.append(bar);
+				}
+				row.append(cell);
+			});
+
+			fragment.append(row);
 		}
-		cell.append(list);
-		row.append(cell);
 		tbody.setAttribute("aria-busy", "true");
-		tbody.prepend(row);
+		tbody.prepend(fragment);
 	}
 
 	clearTableLoading() {
@@ -422,7 +449,9 @@ export default class EntityIndex extends Core {
 		this._tableLoadingTarget = null;
 		if (!tbody) return;
 		tbody.removeAttribute("aria-busy");
-		tbody.querySelector("tr[data-role='loading']")?.remove();
+		for (const row of tbody.querySelectorAll("tr[data-role='loading']")) {
+			row.remove();
+		}
 	}
 
 	destroy() {

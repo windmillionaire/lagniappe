@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BaseTable } from './baseTable.js?v=b8e0e957';
-import { c as captureError, w as withTransition, j as sessionStore } from './foundation.js?v=b8e0e957';
-import { p as primitives } from './ui-controls.js?v=b8e0e957';
-import { T as TableVisibilityState } from './index-foundation.js?v=b8e0e957';
+import { B as BaseTable } from './baseTable.js?v=b438e48a';
+import { c as captureError, w as withTransition, j as sessionStore } from './foundation.js?v=b438e48a';
+import { p as primitives } from './ui-controls.js?v=b438e48a';
+import { T as TableVisibilityState } from './index-foundation.js?v=b438e48a';
 
 class IndexTable extends BaseTable {
   constructor(attributes) {
@@ -31,7 +31,9 @@ class IndexTable extends BaseTable {
   }
   _clearLoadingState() {
     this.target.removeAttribute("aria-busy");
-    this.target.querySelector("tr[data-role='loading']")?.remove();
+    for (const row of this.target.querySelectorAll("tr[data-role='loading']")) {
+      row.remove();
+    }
     this.view.clearTableLoading?.();
   }
   setEmptyRowVisibility() {
