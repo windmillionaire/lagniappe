@@ -1458,6 +1458,10 @@ table:
         classes: "[grid-area:1/1] invisible text-kind-default group-data-[sorting=true]/header:visible hover:text-delete-default"
         intent: clear-filter action shown on actively filtered table columns
         surfaces: [server]
+  editStatus:
+    classes: hidden sm:inline-flex items-center gap-1.5 rounded-full border border-kind-light bg-kind-bg px-2.5 py-0.5 text-xs font-medium text-kind-dark whitespace-nowrap
+    intent: zero-jump inline header pill indicating table quick-edit mode is active
+    surfaces: [frontend]
   loading:
     cell:
       classes: py-3.5 pr-3

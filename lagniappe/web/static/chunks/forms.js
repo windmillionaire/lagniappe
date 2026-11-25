@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as createIcon, S as STYLES, s as setIcon } from './ui-resources.js?v=b8c49d0d';
-import { p as primitives, f as formatting } from './ui-controls.js?v=b8c49d0d';
-import { c as captureError, g as generateElementId, w as withTransition, s as showBriefly, E as ENDPOINTS, r as request, f as areEqual } from './foundation.js?v=b8c49d0d';
-import { Modal } from './modal.js?v=b8c49d0d';
-import { R as Results, a as RemoteQueryCombobox, C as Combobox } from './combobox.js?v=b8c49d0d';
-import './connectivity.js?v=b8c49d0d';
-import './protocol.js?v=b8c49d0d';
+import { c as createIcon, S as STYLES, s as setIcon } from './ui-resources.js?v=bcd14aa3';
+import { p as primitives, f as formatting } from './ui-controls.js?v=bcd14aa3';
+import { c as captureError, g as generateElementId, w as withTransition, s as showBriefly, E as ENDPOINTS, r as request, f as areEqual } from './foundation.js?v=bcd14aa3';
+import { Modal } from './modal.js?v=bcd14aa3';
+import { R as Results, a as RemoteQueryCombobox, C as Combobox } from './combobox.js?v=bcd14aa3';
+import './connectivity.js?v=bcd14aa3';
+import './protocol.js?v=bcd14aa3';
 
 function currentReviewOperation(widget, incoming) {
   const current = widget.reviewState?.operation;
@@ -116,7 +116,7 @@ function installReviewBar(widget) {
         if (!operation?.can_cancel) return;
         const data = new FormData();
         data.set("operation-id", String(operation.operation_id));
-        const { request } = await import('./foundation.js?v=b8c49d0d').then(function (n) { return n.p; });
+        const { request } = await import('./foundation.js?v=bcd14aa3').then(function (n) { return n.p; });
         const response = await request.post(
           `/tools/operations/${encodeURIComponent(operation.key)}/cancel`,
           data
@@ -171,8 +171,8 @@ function installReviewBar(widget) {
 }
 
 const CONTROLS = {
-  "permission-sections": () => import('./permissions.js?v=b8c49d0d').then(function (n) { return n.p; }),
-  "access-restrictions": () => import('./permissions.js?v=b8c49d0d').then(function (n) { return n.a; })
+  "permission-sections": () => import('./permissions.js?v=bcd14aa3').then(function (n) { return n.p; }),
+  "access-restrictions": () => import('./permissions.js?v=bcd14aa3').then(function (n) { return n.a; })
 };
 const isFormControl = (name) => name !== void 0 && Object.hasOwn(CONTROLS, name);
 async function initFormControls(form) {
@@ -227,15 +227,15 @@ async function getFormElement(renderer, schema, submission) {
       return new HtmlElement(renderer, schema, submission);
     }
     case "signature": {
-      const { SignatureElement } = await import('./form-complex.js?v=b8c49d0d').then(function (n) { return n.s; });
+      const { SignatureElement } = await import('./form-complex.js?v=bcd14aa3').then(function (n) { return n.s; });
       return new SignatureElement(renderer, schema, submission);
     }
     case "table": {
-      const { TableElement } = await import('./form-complex.js?v=b8c49d0d').then(function (n) { return n.t; });
+      const { TableElement } = await import('./form-complex.js?v=bcd14aa3').then(function (n) { return n.t; });
       return new TableElement(renderer, schema, submission);
     }
     case "todo": {
-      const { TodoElement } = await import('./form-complex.js?v=b8c49d0d').then(function (n) { return n.a; });
+      const { TodoElement } = await import('./form-complex.js?v=bcd14aa3').then(function (n) { return n.a; });
       return new TodoElement(renderer, schema, submission);
     }
     case "link": {
@@ -247,7 +247,7 @@ async function getFormElement(renderer, schema, submission) {
       return new BookmarkElement(renderer, schema, submission);
     }
     case "location": {
-      const { LocationElement } = await import('./location.js?v=b8c49d0d');
+      const { LocationElement } = await import('./location.js?v=bcd14aa3');
       return new LocationElement(renderer, schema, submission);
     }
     case "status": {

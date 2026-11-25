@@ -11,6 +11,7 @@ export class TableVisibilityState {
 	declare columns: TableColumn[];
 	declare columnIndexes: Map<string, number>;
 	declare hiddenColumns: number[];
+	declare temporaryVisible: Set<number>;
 	declare stylesheet: CSSStyleSheet | null;
 	declare initialized: boolean;
 
@@ -26,6 +27,7 @@ export class TableVisibilityState {
 		this.columns = columns;
 		this.columnIndexes = new Map();
 		this.hiddenColumns = [];
+		this.temporaryVisible = new Set();
 		this.stylesheet = null;
 		this.initialized = false;
 		this._toggle = this._toggle.bind(this);
@@ -62,7 +64,11 @@ export class TableVisibilityState {
 			.map((column) => column.field)
 			.filter((field) => {
 				const index = this.columnIndexes.get(field);
-				return index && !this.hiddenColumns.includes(index);
+				return (
+					index !== undefined &&
+					(!this.hiddenColumns.includes(index) ||
+						this.temporaryVisible.has(index))
+				);
 			});
 	}
 
@@ -94,6 +100,7 @@ export class TableVisibilityState {
 		if (column === undefined) return;
 		const index = this.columnIndexes.get(column);
 		if (!index) return;
+		this.temporaryVisible.delete(index);
 		this.hiddenColumns = visible
 			? this.hiddenColumns.filter((value) => value !== index)
 			: [...new Set([...this.hiddenColumns, index])];
@@ -101,11 +108,34 @@ export class TableVisibilityState {
 		void this.component.widgets.TableEditor?.refreshCheckboxes?.();
 	}
 
-	apply() {
-		localStorage.setItem(
-			`columns-${this.view.hash}`,
-			JSON.stringify(this.hiddenColumns),
-		);
+	setTemporaryVisible(column: string | undefined, visible: boolean) {
+		if (column === undefined) return false;
+		const index = this.columnIndexes.get(column);
+		if (!index) return false;
+		if (visible) {
+			if (
+				!this.hiddenColumns.includes(index) ||
+				this.temporaryVisible.has(index)
+			) {
+				return false;
+			}
+			this.temporaryVisible.add(index);
+		} else {
+			if (!this.temporaryVisible.has(index)) return false;
+			this.temporaryVisible.delete(index);
+		}
+		this.apply({ persist: false });
+		this.component.widgets.TableVisibility?.syncCheckboxes?.();
+		return true;
+	}
+
+	apply({ persist = true } = {}) {
+		if (persist) {
+			localStorage.setItem(
+				`columns-${this.view.hash}`,
+				JSON.stringify(this.hiddenColumns),
+			);
+		}
 		if (!this.stylesheet) {
 			// CSSOM keeps dynamic rules compatible with a CSP that blocks <style>.
 			this.stylesheet = new CSSStyleSheet();
@@ -115,8 +145,11 @@ export class TableVisibilityState {
 		const id = this.component.elt.id;
 		const rowSelector = `#${id} tr:not([data-widget], [data-embedded], [data-role="empty"]) > td:not([data-column="delete"])`;
 		const thSelector = `#${id} th:not([data-column="selector"], [data-embedded])`;
+		const effectiveHidden = this.hiddenColumns.filter(
+			(index) => !this.temporaryVisible.has(index),
+		);
 		this.stylesheet.replaceSync(
-			this.hiddenColumns
+			effectiveHidden
 				.map(
 					(index) =>
 						`${rowSelector}:nth-child(${index}), ${thSelector}:nth-child(${index}) { display: none; }`,

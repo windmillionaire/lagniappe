@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { b as FormWidget, I as InputElement, T as TextareaElement, S as SelectBox } from './forms.js?v=b8c49d0d';
-import { s as sections, S as SectionToggle } from './form-sections.js?v=b8c49d0d';
-import { r as request, c as captureError, w as withTransition } from './foundation.js?v=b8c49d0d';
-import './connectivity.js?v=b8c49d0d';
-import './protocol.js?v=b8c49d0d';
-import { S as STYLES, c as createIcon } from './ui-resources.js?v=b8c49d0d';
-import { p as primitives } from './ui-controls.js?v=b8c49d0d';
-import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './uploads.js?v=b8c49d0d';
+import { b as FormWidget, I as InputElement, T as TextareaElement, S as SelectBox } from './forms.js?v=bcd14aa3';
+import { s as sections, S as SectionToggle } from './form-sections.js?v=bcd14aa3';
+import { r as request, c as captureError, w as withTransition } from './foundation.js?v=bcd14aa3';
+import './connectivity.js?v=bcd14aa3';
+import './protocol.js?v=bcd14aa3';
+import { S as STYLES, c as createIcon } from './ui-resources.js?v=bcd14aa3';
+import { p as primitives } from './ui-controls.js?v=bcd14aa3';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './uploads.js?v=bcd14aa3';
 
 class CreateNote extends FormWidget {
   constructor(attributes) {

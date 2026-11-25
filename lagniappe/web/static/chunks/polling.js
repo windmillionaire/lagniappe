@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as captureError, r as request, E as ENDPOINTS } from './foundation.js?v=b8c49d0d';
-import { n as normalizedDescriptor, P as PollContractError, d as documentId, M as MAX_SUBSCRIPTIONS_PER_REQUEST, a as normalizedRequest, b as normalizedNotificationState, c as POLL_PROTOCOL_VERSION, i as isFieldMap, e as normalizedResult, f as MAX_CLIENT_ID_LENGTH } from './protocol.js?v=b8c49d0d';
-import './upstreamUnavailable.js?v=b8c49d0d';
-import './connectivity.js?v=b8c49d0d';
+import { c as captureError, r as request, E as ENDPOINTS } from './foundation.js?v=bcd14aa3';
+import { n as normalizedDescriptor, P as PollContractError, d as documentId, M as MAX_SUBSCRIPTIONS_PER_REQUEST, a as normalizedRequest, b as normalizedNotificationState, c as POLL_PROTOCOL_VERSION, i as isFieldMap, e as normalizedResult, f as MAX_CLIENT_ID_LENGTH } from './protocol.js?v=bcd14aa3';
+import './upstreamUnavailable.js?v=bcd14aa3';
+import './connectivity.js?v=bcd14aa3';
 
 const CLIENT_ID_KEY = "lagniappe-poll-client";
 const VISIBLE_BLUR_POLLING_MS = 10 * 60 * 1e3;

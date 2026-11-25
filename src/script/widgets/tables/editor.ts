@@ -3,6 +3,7 @@ import type {
 	ElementRenderer,
 } from "../../elements/base/baseElement.ts";
 import { getFormElement } from "../../elements/loader.ts";
+import { STYLES } from "../../generated/styles.mjs";
 import { captureError } from "../../shared/errors.ts";
 import { setIcon } from "../../shared/icons.ts";
 import {
@@ -15,7 +16,7 @@ import type { FormFieldSchema } from "../../types/forms.d.ts";
 import type { LoadedWidget } from "../../types/widgets.d.ts";
 import type ViewComponent from "../../views/base/component.ts";
 import type { TableWidgets } from "./types.d.ts";
-import type { TableColumn } from "./visibilityState.ts";
+import type { TableColumn, TableVisibilityState } from "./visibilityState.ts";
 
 const SAVED_STATE_MS = 1200;
 
@@ -32,7 +33,11 @@ type TableEditorColumn = TableColumn & {
 
 interface TableEditorAttributes {
 	component: ViewComponent & { widgets: TableWidgets };
-	view: { elt: HTMLElement; _destroyed?: boolean };
+	view: {
+		elt: HTMLElement;
+		_destroyed?: boolean;
+		TableVisibilityState?: TableVisibilityState | null;
+	};
 	visible?: boolean;
 	kind?: string;
 }
@@ -766,27 +771,62 @@ export class TableEditor {
 		await this._prepareCheckboxes();
 	}
 
+	_syncCompletedColumn(editing: boolean) {
+		if (this.kind !== "task") return;
+		this.view.TableVisibilityState?.setTemporaryVisible?.("completed", editing);
+	}
+
+	_syncEditStatus(editing: boolean) {
+		const buttons = this.view.elt.querySelectorAll<HTMLButtonElement>(
+			'button[lp-show="table:TableEditor"]',
+		);
+		for (const button of buttons) {
+			button.dataset.editing = editing ? "true" : "false";
+			button.setAttribute("aria-pressed", editing ? "true" : "false");
+			const label = editing ? "Done editing table" : "Edit table";
+			button.setAttribute("aria-label", label);
+			button.title = label;
+		}
+
+		for (const pill of this.view.elt.querySelectorAll(
+			"[data-role='table-edit-status']",
+		)) {
+			pill.remove();
+		}
+
+		if (!editing) return;
+		const primaryButton = buttons[0];
+		const actions = primaryButton?.closest<HTMLElement>(
+			"[data-role='actions']",
+		);
+		if (!primaryButton || !actions) return;
+
+		const pill = document.createElement("span");
+		pill.dataset.role = "table-edit-status";
+		pill.setAttribute("role", "status");
+		pill.className = STYLES.table.editStatus;
+		pill.textContent = "Editing — click highlighted cells";
+		actions.insertBefore(pill, primaryButton);
+	}
+
 	postreconcile() {
 		if (this._destroyed || !this.rows) return;
-		if (!this.visible) this._closeEdits();
+		const editing = Boolean(this.visible);
+		if (!editing) this._closeEdits();
 
-		this.rows.target.dataset.editing = this.visible ? "true" : "false";
-		this.view.elt
-			.querySelectorAll<HTMLButtonElement>(
-				'button[lp-show="table:TableEditor"]',
-			)
-			.forEach((button) => {
-				button.dataset.editing = this.visible ? "true" : "false";
-				button.setAttribute("aria-pressed", this.visible ? "true" : "false");
-			});
+		this._syncCompletedColumn(editing);
+		this.rows.target.dataset.editing = editing ? "true" : "false";
+		this._syncEditStatus(editing);
 
-		if (this.visible) this._commitPreparedCheckboxes();
+		if (editing) this._commitPreparedCheckboxes();
 	}
 
 	destroy() {
 		if (this._destroyed) return;
 		this._destroyed = true;
 		this.visible = false;
+		this._syncCompletedColumn(false);
+		this._syncEditStatus(false);
 		this._closeEdits();
 		this._openLifecycle.destroy();
 		this._checkboxLifecycle.destroy();

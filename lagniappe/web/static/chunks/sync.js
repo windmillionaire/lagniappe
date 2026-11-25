@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { i as waitForAttribute, r as request, E as ENDPOINTS } from './foundation.js?v=b8c49d0d';
-import { getSyncRecord, getAllOfflineRecords, deleteSyncRecords, deleteSyncRecord, updateSyncRecord } from './offline.js?v=b8c49d0d';
-import './upstreamUnavailable.js?v=b8c49d0d';
-import './connectivity.js?v=b8c49d0d';
+import { i as waitForAttribute, r as request, E as ENDPOINTS } from './foundation.js?v=bcd14aa3';
+import { getSyncRecord, getAllOfflineRecords, deleteSyncRecords, deleteSyncRecord, updateSyncRecord } from './offline.js?v=bcd14aa3';
+import './upstreamUnavailable.js?v=bcd14aa3';
+import './connectivity.js?v=bcd14aa3';
 
 const HEADLESS_WIDGETS = {
   document: {
-    load: () => import('./document.js?v=b8c49d0d').then(function (n) { return n.b; }),
+    load: () => import('./document.js?v=bcd14aa3').then(function (n) { return n.b; }),
     name: "CollaborativeDocument"
   }
 };

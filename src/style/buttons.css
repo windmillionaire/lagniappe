@@ -103,6 +103,26 @@
 	}
 }
 
+/* @style toggle.container */
+.action-icon-button[lp-control="delete"] {
+	color: var(--color-base-medium);
+	opacity: 0.65;
+	&:focus-visible {
+		color: var(--color-delete-default);
+		background-color: var(--color-delete-bg);
+		outline-color: var(--color-delete-default);
+		opacity: 1;
+	}
+	@media (hover: hover) {
+		&:hover {
+			color: var(--color-delete-default);
+			background-color: var(--color-delete-bg);
+			outline-color: var(--color-delete-default);
+			opacity: 1;
+		}
+	}
+}
+
 /* @style nav.button */
 .action-icon-button[data-role="menu-trigger"] {
 	--action-offset-y: -0.125rem;

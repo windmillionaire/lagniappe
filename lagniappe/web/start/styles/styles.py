@@ -454,6 +454,7 @@ STYLES = {
 				"inactive": "[grid-area:1/1] invisible text-kind-default group-data-[sorting=true]/header:visible hover:text-delete-default"
 			}
 		},
+		"editStatus": "hidden sm:inline-flex items-center gap-1.5 rounded-full border border-kind-light bg-kind-bg px-2.5 py-0.5 text-xs font-medium text-kind-dark whitespace-nowrap",
 		"loading": {
 			"cell": "py-3.5 pr-3",
 			"barPrimary": "block h-4 w-44 max-w-full rounded bg-base-light/50 animate-pulse motion-reduce:animate-none",

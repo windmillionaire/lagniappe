@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from './foundation.js?v=b8c49d0d';
-import { C as Core } from './core-foundation.js?v=b8c49d0d';
+import { w as withTransition } from './foundation.js?v=bcd14aa3';
+import { C as Core } from './core-foundation.js?v=bcd14aa3';
 
 class TableVisibilityState {
   constructor({
@@ -15,6 +15,7 @@ class TableVisibilityState {
     this.columns = columns;
     this.columnIndexes = /* @__PURE__ */ new Map();
     this.hiddenColumns = [];
+    this.temporaryVisible = /* @__PURE__ */ new Set();
     this.stylesheet = null;
     this.initialized = false;
     this._toggle = this._toggle.bind(this);
@@ -40,7 +41,7 @@ class TableVisibilityState {
   get visibleColumns() {
     return this.columns.map((column) => column.field).filter((field) => {
       const index = this.columnIndexes.get(field);
-      return index && !this.hiddenColumns.includes(index);
+      return index !== void 0 && (!this.hiddenColumns.includes(index) || this.temporaryVisible.has(index));
     });
   }
   defaultHiddenColumns() {
@@ -58,15 +59,35 @@ class TableVisibilityState {
     if (column === void 0) return;
     const index = this.columnIndexes.get(column);
     if (!index) return;
+    this.temporaryVisible.delete(index);
     this.hiddenColumns = visible ? this.hiddenColumns.filter((value) => value !== index) : [.../* @__PURE__ */ new Set([...this.hiddenColumns, index])];
     this.apply();
     void this.component.widgets.TableEditor?.refreshCheckboxes?.();
   }
-  apply() {
-    localStorage.setItem(
-      `columns-${this.view.hash}`,
-      JSON.stringify(this.hiddenColumns)
-    );
+  setTemporaryVisible(column, visible) {
+    if (column === void 0) return false;
+    const index = this.columnIndexes.get(column);
+    if (!index) return false;
+    if (visible) {
+      if (!this.hiddenColumns.includes(index) || this.temporaryVisible.has(index)) {
+        return false;
+      }
+      this.temporaryVisible.add(index);
+    } else {
+      if (!this.temporaryVisible.has(index)) return false;
+      this.temporaryVisible.delete(index);
+    }
+    this.apply({ persist: false });
+    this.component.widgets.TableVisibility?.syncCheckboxes?.();
+    return true;
+  }
+  apply({ persist = true } = {}) {
+    if (persist) {
+      localStorage.setItem(
+        `columns-${this.view.hash}`,
+        JSON.stringify(this.hiddenColumns)
+      );
+    }
     if (!this.stylesheet) {
       this.stylesheet = new CSSStyleSheet();
       document.adoptedStyleSheets.push(this.stylesheet);
@@ -74,8 +95,11 @@ class TableVisibilityState {
     const id = this.component.elt.id;
     const rowSelector = `#${id} tr:not([data-widget], [data-embedded], [data-role="empty"]) > td:not([data-column="delete"])`;
     const thSelector = `#${id} th:not([data-column="selector"], [data-embedded])`;
+    const effectiveHidden = this.hiddenColumns.filter(
+      (index) => !this.temporaryVisible.has(index)
+    );
     this.stylesheet.replaceSync(
-      this.hiddenColumns.map(
+      effectiveHidden.map(
         (index) => `${rowSelector}:nth-child(${index}), ${thSelector}:nth-child(${index}) { display: none; }`
       ).join("\n")
     );
@@ -280,8 +304,8 @@ class EntityIndex extends Core {
     );
     if (!trigger) return;
     this._dropdownPromise = Promise.all([
-      import('./combobox.js?v=b8c49d0d').then(function (n) { return n.e; }),
-      import('./ui-resources.js?v=b8c49d0d').then(function (n) { return n.a; })
+      import('./combobox.js?v=bcd14aa3').then(function (n) { return n.e; }),
+      import('./ui-resources.js?v=bcd14aa3').then(function (n) { return n.a; })
     ]).then(([{ Dropdown }, { STYLES }]) => {
       if (this._destroyed || !this.mobile) return null;
       const items = [];
@@ -360,7 +384,7 @@ class EntityIndex extends Core {
     if (this._destroyed || token !== this._tableLoadingToken || !tbody.isConnected || tbody.hasAttribute("loaded") || tbody.querySelector("tr[lp-entity]") || tbody.querySelector("tr[data-role='loading']")) {
       return;
     }
-    const { STYLES } = await import('./ui-resources.js?v=b8c49d0d').then(function (n) { return n.a; });
+    const { STYLES } = await import('./ui-resources.js?v=bcd14aa3').then(function (n) { return n.a; });
     if (this._destroyed || token !== this._tableLoadingToken || !tbody.isConnected || tbody.hasAttribute("loaded") || tbody.querySelector("tr[lp-entity]") || tbody.querySelector("tr[data-role='loading']")) {
       return;
     }

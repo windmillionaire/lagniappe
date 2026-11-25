@@ -1,14 +1,14 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES, s as setIcon } from './ui-resources.js?v=b8c49d0d';
-import { B as BaseElement } from './forms.js?v=b8c49d0d';
-import { E as ENDPOINTS, r as request } from './foundation.js?v=b8c49d0d';
-import { p as primitives } from './ui-controls.js?v=b8c49d0d';
-import { u as updateUserLocation } from './account.js?v=b8c49d0d';
-import { a as RemoteQueryCombobox } from './combobox.js?v=b8c49d0d';
-import './modal.js?v=b8c49d0d';
-import './upstreamUnavailable.js?v=b8c49d0d';
-import './connectivity.js?v=b8c49d0d';
-import './protocol.js?v=b8c49d0d';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=bcd14aa3';
+import { B as BaseElement } from './forms.js?v=bcd14aa3';
+import { E as ENDPOINTS, r as request } from './foundation.js?v=bcd14aa3';
+import { p as primitives } from './ui-controls.js?v=bcd14aa3';
+import { u as updateUserLocation } from './account.js?v=bcd14aa3';
+import { a as RemoteQueryCombobox } from './combobox.js?v=bcd14aa3';
+import './modal.js?v=bcd14aa3';
+import './upstreamUnavailable.js?v=bcd14aa3';
+import './connectivity.js?v=bcd14aa3';
+import './protocol.js?v=bcd14aa3';
 
 class LocationBox extends RemoteQueryCombobox {
   constructor(element, { name = null, onSelect = null } = {}) {

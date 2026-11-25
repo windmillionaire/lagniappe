@@ -1,13 +1,13 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { g as getFormElement } from './forms.js?v=b8c49d0d';
-import { Q as QueryLifecycle, c as captureError, w as withTransition, r as request } from './foundation.js?v=b8c49d0d';
-import { s as setIcon } from './ui-resources.js?v=b8c49d0d';
-import './ui-controls.js?v=b8c49d0d';
-import './modal.js?v=b8c49d0d';
-import './upstreamUnavailable.js?v=b8c49d0d';
-import './connectivity.js?v=b8c49d0d';
-import './combobox.js?v=b8c49d0d';
-import './protocol.js?v=b8c49d0d';
+import { g as getFormElement } from './forms.js?v=bcd14aa3';
+import { s as setIcon, S as STYLES } from './ui-resources.js?v=bcd14aa3';
+import { Q as QueryLifecycle, c as captureError, w as withTransition, r as request } from './foundation.js?v=bcd14aa3';
+import './ui-controls.js?v=bcd14aa3';
+import './modal.js?v=bcd14aa3';
+import './upstreamUnavailable.js?v=bcd14aa3';
+import './connectivity.js?v=bcd14aa3';
+import './combobox.js?v=bcd14aa3';
+import './protocol.js?v=bcd14aa3';
 
 const SAVED_STATE_MS = 1200;
 const ROUTES = {
@@ -560,22 +560,54 @@ class TableEditor {
     }
     await this._prepareCheckboxes();
   }
+  _syncCompletedColumn(editing) {
+    if (this.kind !== "task") return;
+    this.view.TableVisibilityState?.setTemporaryVisible?.("completed", editing);
+  }
+  _syncEditStatus(editing) {
+    const buttons = this.view.elt.querySelectorAll(
+      'button[lp-show="table:TableEditor"]'
+    );
+    for (const button of buttons) {
+      button.dataset.editing = editing ? "true" : "false";
+      button.setAttribute("aria-pressed", editing ? "true" : "false");
+      const label = editing ? "Done editing table" : "Edit table";
+      button.setAttribute("aria-label", label);
+      button.title = label;
+    }
+    for (const pill2 of this.view.elt.querySelectorAll(
+      "[data-role='table-edit-status']"
+    )) {
+      pill2.remove();
+    }
+    if (!editing) return;
+    const primaryButton = buttons[0];
+    const actions = primaryButton?.closest(
+      "[data-role='actions']"
+    );
+    if (!primaryButton || !actions) return;
+    const pill = document.createElement("span");
+    pill.dataset.role = "table-edit-status";
+    pill.setAttribute("role", "status");
+    pill.className = STYLES.table.editStatus;
+    pill.textContent = "Editing \u2014 click highlighted cells";
+    actions.insertBefore(pill, primaryButton);
+  }
   postreconcile() {
     if (this._destroyed || !this.rows) return;
-    if (!this.visible) this._closeEdits();
-    this.rows.target.dataset.editing = this.visible ? "true" : "false";
-    this.view.elt.querySelectorAll(
-      'button[lp-show="table:TableEditor"]'
-    ).forEach((button) => {
-      button.dataset.editing = this.visible ? "true" : "false";
-      button.setAttribute("aria-pressed", this.visible ? "true" : "false");
-    });
-    if (this.visible) this._commitPreparedCheckboxes();
+    const editing = Boolean(this.visible);
+    if (!editing) this._closeEdits();
+    this._syncCompletedColumn(editing);
+    this.rows.target.dataset.editing = editing ? "true" : "false";
+    this._syncEditStatus(editing);
+    if (editing) this._commitPreparedCheckboxes();
   }
   destroy() {
     if (this._destroyed) return;
     this._destroyed = true;
     this.visible = false;
+    this._syncCompletedColumn(false);
+    this._syncEditStatus(false);
     this._closeEdits();
     this._openLifecycle.destroy();
     this._checkboxLifecycle.destroy();

@@ -349,6 +349,11 @@ def test_task_index_quick_edit_keeps_revealed_completed_column_editable(get_admi
 
     body = user.locate("#table tbody")
     expect(body).to_have_attribute("data-editing", "true")
+    expect(completed).to_be_visible()
+    expect(
+        completed.locator("input[type='checkbox'][name='completed']")
+    ).to_be_visible()
+    expect(user.locate("[data-role='table-edit-status']")).to_be_visible()
 
     visibility_toggle = user.locate(
         "button[lp-show='table:TableVisibility'][aria-label='Choose visible columns']"
@@ -360,8 +365,12 @@ def test_task_index_quick_edit_keeps_revealed_completed_column_editable(get_admi
     completed_toggle = visibility.locator(
         "input[type='checkbox'][name='completed']"
     )
-    expect(completed_toggle).not_to_be_checked()
-    completed_toggle.set_checked(True)
+    expect(completed_toggle).to_be_checked()
+
+    description_toggle = visibility.locator(
+        "input[type='checkbox'][name='description']"
+    )
+    description_toggle.set_checked(True)
 
     expect(completed).to_be_visible()
     expect(body).to_have_attribute("data-editing", "true")
@@ -373,6 +382,11 @@ def test_task_index_quick_edit_keeps_revealed_completed_column_editable(get_admi
     expect(visibility).to_have_attribute("data-visible", "false")
     expect(body).to_have_attribute("data-editing", "true")
     expect(edit_toggle).to_have_attribute("data-editing", "true")
+
+    edit_toggle.click()
+    expect(body).to_have_attribute("data-editing", "false")
+    expect(completed).to_be_hidden()
+    expect(user.locate("[data-role='table-edit-status']")).to_have_count(0)
 
 
 def test_task_index_shows_delayed_loading_skeleton_when_rows_are_slow(get_admin, get_user):
@@ -392,8 +406,9 @@ def test_task_index_shows_delayed_loading_skeleton_when_rows_are_slow(get_admin,
                 f"{SETTINGS.test_config['BASE_URL']}/tasks/index",
                 wait_until="domcontentloaded",
             )
-            loading_row = user.locate("#table tbody tr[data-role='loading']")
-            expect(loading_row).to_be_visible(timeout=5000)
+            loading_rows = user.locate("#table tbody tr[data-role='loading']")
+            expect(loading_rows).to_have_count(4, timeout=5000)
+            expect(loading_rows.first).to_be_visible()
             expect(user.locate("#table tbody")).to_have_attribute("aria-busy", "true")
         finally:
             for route in held:

@@ -43,17 +43,27 @@ tr[data-embedded="true"] > td:has(> .table-container[data-embedded="true"]) {
 /* @style form.table.form */
 tbody[data-editing="true"] td {
 	pointer-events: none;
-	background-color: color-mix(in oklch, var(--color-delete-bg) 45%, white);
-	opacity: 0.65;
+	background-color: color-mix(in oklch, var(--color-base-bg) 70%, white);
+	opacity: 0.55;
 }
 
 /* @style form.table.form */
 tbody[data-editing="true"] td[data-editable="true"] {
+	cursor: pointer;
 	pointer-events: auto;
-	background-color: color-mix(in oklch, var(--color-project-bg) 75%, white);
+	background-color: color-mix(
+		in oklch,
+		var(--color-project-bg) 88%,
+		var(--color-project-light) 12%
+	);
+	outline: 1px dashed
+		color-mix(in oklch, var(--color-project-default) 45%, transparent);
+	outline-offset: -3px;
 	opacity: 1;
 	&:hover {
 		background-color: white;
+		outline: 2px solid var(--kind-default);
+		outline-offset: -2px;
 	}
 }
 
@@ -90,6 +100,18 @@ button[lp-show="table:TableEditor"][data-editing="true"] {
 	background-color: var(--kind-bg);
 	outline: 2px solid var(--kind-default);
 	outline-offset: 2px;
+}
+
+/* @style form.table.actionButton */
+[data-role="actions"]:has([data-role="table-edit-status"]) {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+/* @style table.default table.embedded */
+tbody > tr:hover .action-icon-button[lp-control="delete"] {
+	opacity: 0.9;
 }
 
 /* @style form.table.form */

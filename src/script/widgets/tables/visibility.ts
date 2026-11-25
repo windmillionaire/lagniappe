@@ -73,6 +73,15 @@ export class TableVisibility {
 		this.state.toggle(column, visible);
 	}
 
+	syncCheckboxes() {
+		const visibleColumns = this.visibleColumns;
+		this.target
+			.querySelectorAll<HTMLInputElement>("input[type='checkbox'][name]")
+			.forEach((checkbox) => {
+				checkbox.checked = visibleColumns.includes(checkbox.name);
+			});
+	}
+
 	/**
 	 * Keep quick edit active while the column picker is temporarily displayed.
 	 *

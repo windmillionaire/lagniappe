@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BaseTable } from './baseTable.js?v=b8c49d0d';
-import { c as captureError, w as withTransition, j as sessionStore } from './foundation.js?v=b8c49d0d';
-import { p as primitives } from './ui-controls.js?v=b8c49d0d';
-import { T as TableVisibilityState } from './index-foundation.js?v=b8c49d0d';
+import { B as BaseTable } from './baseTable.js?v=bcd14aa3';
+import { c as captureError, w as withTransition, j as sessionStore } from './foundation.js?v=bcd14aa3';
+import { p as primitives } from './ui-controls.js?v=bcd14aa3';
+import { T as TableVisibilityState } from './index-foundation.js?v=bcd14aa3';
 
 class IndexTable extends BaseTable {
   constructor(attributes) {
@@ -994,6 +994,12 @@ class TableVisibility {
   }
   _toggleColumn(column, visible) {
     this.state.toggle(column, visible);
+  }
+  syncCheckboxes() {
+    const visibleColumns = this.visibleColumns;
+    this.target.querySelectorAll("input[type='checkbox'][name]").forEach((checkbox) => {
+      checkbox.checked = visibleColumns.includes(checkbox.name);
+    });
   }
   /**
    * Keep quick edit active while the column picker is temporarily displayed.
