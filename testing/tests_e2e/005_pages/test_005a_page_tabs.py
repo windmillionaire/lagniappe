@@ -7,7 +7,7 @@ import pytest
 from bs4 import BeautifulSoup
 from playwright.sync_api import expect
 
-from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from testing.definitions import Categories, Forms, Pages, Submissions, Uploads
 from testing.elements import (
@@ -385,7 +385,15 @@ def test_add_multiple_files_to_page_without_existing_file_select(get_admin, get_
     }
     assert set(created_keys) == {"sample_notes", "sample_document"}
 
-    files = [Entities.fetch_one(key, request=Fetch.direct()) for key in created_keys.values()]
+    files = [
+        Entities.fetch_one(
+            key,
+            request=Fetch.nested(
+                because=FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION
+            ),
+        )
+        for key in created_keys.values()
+    ]
     retried = False
 
     def check_summaries(number):
