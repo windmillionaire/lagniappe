@@ -89,19 +89,14 @@ test("test_entity_index_loading_skeleton_skips_fast_loads_and_shows_after_delay"
 		const loadingRows = tbody.querySelectorAll("tr[data-role='loading']");
 		assert.equal(
 			loadingRows.length,
-			4,
-			"Slow load should render delayed column-aligned skeleton rows",
+			1,
+			"Slow load should render a single low-key loading row",
 		);
 		assert.equal(tbody.getAttribute("aria-busy"), "true");
-		const firstCells = loadingRows[0].querySelectorAll("td");
-		assert.equal(firstCells.length, 3);
-		assert.ok(firstCells[0].querySelector("[aria-hidden='true']"));
-		assert.ok(firstCells[1].querySelector("[aria-hidden='true']"));
-		assert.equal(firstCells[2].querySelector("[aria-hidden='true']"), null);
-		assert.equal(
-			loadingRows[0].querySelector("[role='status']")?.textContent,
-			"Loading rows",
-		);
+		const loadingCell = loadingRows[0].querySelector("td");
+		assert.equal(loadingCell?.colSpan, 3);
+		assert.equal(loadingCell?.getAttribute("role"), "status");
+		assert.equal(loadingCell?.textContent, "Loading…");
 
 		const lateRow = document.createElement("tr");
 		lateRow.setAttribute("lp-entity", "");

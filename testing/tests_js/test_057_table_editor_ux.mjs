@@ -153,13 +153,19 @@ test("test_task_table_editor_temporarily_reveals_completed_and_shows_header_stat
 		);
 		assert.equal(editBtn.getAttribute("aria-label"), "Done editing table");
 		assert.ok(
-			root.querySelector(
-				"[data-role='actions'] [data-role='table-edit-status']",
-			),
-			"Edit mode should show inline status pill inside header actions",
+			editBtn.textContent.includes("Close"),
+			"Active table-edit toggle should display Close",
 		);
+		const statusChip = root.querySelector(
+			"[data-role='actions'] [data-role='table-edit-status']",
+		);
+		assert.ok(
+			statusChip,
+			"Edit mode should show compact Editable chip inside header actions",
+		);
+		assert.equal(statusChip.textContent, "Editable");
 
-		// Exiting Edit table hides Completed again and removes the status pill.
+		// Exiting Edit table hides Completed again, restores original icon, and removes Editable chip.
 		editor.visible = false;
 		await editor.prereconcile();
 		editor.postreconcile();
@@ -167,6 +173,7 @@ test("test_task_table_editor_temporarily_reveals_completed_and_shows_header_stat
 		assert.deepEqual(visibilityState.visibleColumns, ["name", "due_date"]);
 		assert.equal(completedCheckbox().checked, false);
 		assert.equal(editBtn.getAttribute("aria-label"), "Edit table");
+		assert.equal(editBtn.textContent.includes("Close"), false);
 		assert.equal(root.querySelector("[data-role='table-edit-status']"), null);
 
 		// If the user explicitly enabled Completed in column visibility, exiting edit keeps it visible.

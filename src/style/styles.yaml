@@ -462,7 +462,7 @@ form:
     intent: borderless label-adjacent field action separated by a vertical divider (Edit, Use last, Clear, Add row, Done)
     surfaces: [frontend]
     hooks: [form-field-action]
-    css: [src/style/forms.css]
+    css: [src/style/forms.css, src/style/icons.css]
   linkLabel:
     classes: form-link-label
     intent: form link text whose first-line height matches its leading icon
@@ -537,10 +537,10 @@ form:
       intent: zero-width header companion for the row action anchor cell
       surfaces: [frontend]
     actionButton:
-      classes: grid size-6 place-items-center rounded-sm text-kind-default outline-offset-0 transition-colors duration-100 hover:bg-white hover:text-kind-dark hover:outline hover:outline-kind-default focus-visible:bg-white focus-visible:text-kind-dark focus-visible:outline focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50
+      classes: inline-flex size-6 items-center justify-center rounded-md leading-none text-kind-default transition-colors duration-100 hover:bg-kind-light/25 hover:text-kind-dark focus-visible:bg-kind-light/35 focus-visible:text-kind-dark focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer
       intent: action button presentation within form table
       surfaces: [frontend]
-      css: [src/style/tables.css]
+      css: [src/style/tables.css, src/style/icons.css]
   todo:
     container:
       classes: max-w-full flex min-w-0 flex-col gap-2
@@ -588,8 +588,8 @@ form:
       hooks: [submission-outline]
       css: [src/style/forms.css]
     chip:
-      classes: inline-flex items-center rounded-sm border border-kind-light/40 bg-kind-bg/70 px-2 py-0.5 text-xs font-medium text-kind-dark
-      intent: compact selected option chip inside a full-width multi-value read container
+      classes: inline-flex items-center rounded-md bg-kind-bg px-2.5 py-0.5 sm:text-sm font-medium text-kind-dark
+      intent: borderless tinted selected option chip inside a full-width multi-value read container
       surfaces: [frontend]
 
 help:
@@ -892,7 +892,7 @@ label:
     intent: column presentation within label
     surfaces: [server]
   row:
-    classes: flex flex-row items-center gap-1 sm:text-sm font-semibold text-base-dark
+    classes: flex min-h-6 flex-row items-center gap-1 sm:text-sm font-semibold text-base-dark
     intent: row presentation within label
     surfaces: [frontend]
   sectionHeading:
@@ -1451,21 +1451,15 @@ table:
         intent: clear-filter action shown on actively filtered table columns
         surfaces: [server]
   editStatus:
-    classes: hidden sm:inline-flex items-center gap-1.5 rounded-full border border-kind-light bg-kind-bg px-2.5 py-0.5 text-xs font-medium text-kind-dark whitespace-nowrap
-    intent: zero-jump inline header pill indicating table quick-edit mode is active
+    classes: table-edit-status hidden sm:inline-flex h-8 items-center rounded-md px-2.5 text-xs font-semibold text-project-dark whitespace-nowrap
+    intent: compact borderless green chip matching editable table cells as a visual key
     surfaces: [frontend]
+    hooks: [table-edit-status]
+    css: [src/style/tables.css]
   loading:
     cell:
-      classes: py-3.5 pr-3
-      intent: column-aligned placeholder cell for delayed entity index loading skeleton rows
-      surfaces: [frontend]
-    barPrimary:
-      classes: block h-4 w-44 max-w-full rounded bg-base-light/50 animate-pulse motion-reduce:animate-none
-      intent: primary title shimmer bar within an entity index loading skeleton row
-      surfaces: [frontend]
-    barSecondary:
-      classes: block h-3.5 w-24 max-w-full rounded bg-base-light/35 animate-pulse motion-reduce:animate-none
-      intent: secondary metadata shimmer bar within an entity index loading skeleton row
+      classes: py-4 text-center text-sm italic text-base-medium
+      intent: low-key single-column loading row inside a delayed entity index table
       surfaces: [frontend]
 
 task:

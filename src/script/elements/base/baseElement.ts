@@ -329,7 +329,7 @@ export class BaseElement {
 			setIcon(
 				clearButton.appendChild(document.createElement("span")),
 				"x",
-				"icon-xs",
+				"icon-xs text-delete-default",
 			);
 			const clearText = clearButton.appendChild(document.createElement("span"));
 			clearText.textContent = "Clear";

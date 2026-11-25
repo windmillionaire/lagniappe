@@ -58,11 +58,12 @@ test("test_due_date_and_task_upload_open_panels_render_outside_section_toggle_ro
 	await flush();
 	assert.equal(scheduleButton.getAttribute("aria-expanded"), "true");
 	assert.equal(scheduleRow.nextElementSibling?.dataset.visible, "true");
-	const scheduleClose = scheduleRow.querySelector(
-		":scope > button[data-role='clear']",
+	assert.equal(
+		scheduleRow.querySelector(":scope > button[data-role='clear']"),
+		null,
+		"Open DueDate relies on its chevron toggle instead of an extra Close button",
 	);
-	assert.ok(scheduleClose, "Open DueDate should expose sibling Close button");
-	scheduleClose.click();
+	scheduleButton.click();
 	await flush();
 	assert.equal(scheduleButton.getAttribute("aria-expanded"), "false");
 	assert.equal(scheduleRow.nextElementSibling?.dataset.visible, "false");
@@ -86,11 +87,12 @@ test("test_due_date_and_task_upload_open_panels_render_outside_section_toggle_ro
 	uploadButton.click();
 	assert.equal(upload.open, true);
 	assert.equal(uploadButton.getAttribute("aria-expanded"), "true");
-	const uploadClose = uploadRow.querySelector(
-		":scope > button[data-role='clear']",
+	assert.equal(
+		uploadRow.querySelector(":scope > button[data-role='clear']"),
+		null,
+		"Open TaskUpload relies on its chevron toggle instead of an extra Close button",
 	);
-	assert.ok(uploadClose, "Open TaskUpload should expose sibling Close button");
-	uploadClose.click();
+	uploadButton.click();
 	assert.equal(upload.open, false);
 	assert.equal(uploadButton.getAttribute("aria-expanded"), "false");
 

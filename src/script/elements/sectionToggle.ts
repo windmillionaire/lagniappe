@@ -292,7 +292,11 @@ export class SectionToggle {
 			const link = openLinkButton(this.parent);
 			if (link) row.appendChild(link);
 
-			if (!this.readonly && (this.parent.active || this.parent.open)) {
+			const needsToggleClose = Boolean(this.parent.index);
+			if (
+				!this.readonly &&
+				(this.parent.active || (this.parent.open && needsToggleClose))
+			) {
 				const fieldTitle = button.dataset.title || "selection";
 				const clearLabel = this.parent.open
 					? `Close ${fieldTitle}`

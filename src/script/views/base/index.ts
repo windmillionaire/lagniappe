@@ -12,7 +12,6 @@ import Core from "./core.ts";
 import type { ViewRoot } from "./shell.ts";
 
 export const INDEX_LOADING_DELAY_MS = 200;
-const INDEX_SKELETON_ROWS = 4;
 
 function isTableColumn(value: unknown): value is TableColumn {
 	return Boolean(
@@ -369,67 +368,24 @@ export default class EntityIndex extends Core {
 			return;
 		}
 
-		const headers = Array.from(
-			tableElt.querySelectorAll<HTMLTableCellElement>(
-				"thead > tr:first-child > th",
-			),
+		const colCount = Math.max(
+			1,
+			tableElt.querySelectorAll("thead > tr:first-child > th").length,
 		);
-		const columns =
-			headers.length > 0
-				? headers.map((th) => ({
-						column: th.dataset.column || "",
-						visible: th.dataset.visible !== "false",
-						hasLabel: Boolean(th.textContent?.trim()),
-					}))
-				: [{ column: "name", visible: true, hasLabel: true }];
-		const utilityColumns = new Set([
-			"selector",
-			"delete",
-			"controls",
-			"actions",
-		]);
-		const fragment = document.createDocumentFragment();
+		const row = document.createElement("tr");
+		row.dataset.role = "loading";
+		row.dataset.visible = "true";
+		row.setAttribute("aria-live", "polite");
 
-		for (let i = 0; i < INDEX_SKELETON_ROWS; i += 1) {
-			const row = document.createElement("tr");
-			row.dataset.role = "loading";
-			row.dataset.visible = "true";
-			if (i === 0) row.setAttribute("aria-live", "polite");
+		const cell = document.createElement("td");
+		cell.colSpan = colCount;
+		cell.setAttribute("role", "status");
+		cell.className = STYLES.table.loading.cell;
+		cell.textContent = "Loading…";
+		row.append(cell);
 
-			let placedPrimary = false;
-			columns.forEach((col, colIndex) => {
-				const cell = document.createElement("td");
-				if (col.column) cell.dataset.column = col.column;
-				if (!col.visible) cell.dataset.visible = "false";
-				cell.className = STYLES.table.loading.cell;
-
-				if (i === 0 && colIndex === 0) {
-					const srLabel = document.createElement("span");
-					srLabel.className = "sr-only";
-					srLabel.setAttribute("role", "status");
-					srLabel.textContent = "Loading rows";
-					cell.append(srLabel);
-				}
-
-				const isUtility = utilityColumns.has(col.column) || !col.hasLabel;
-				if (!isUtility && col.visible) {
-					const bar = document.createElement("span");
-					bar.setAttribute("aria-hidden", "true");
-					if (!placedPrimary) {
-						bar.className = STYLES.table.loading.barPrimary;
-						placedPrimary = true;
-					} else {
-						bar.className = STYLES.table.loading.barSecondary;
-					}
-					cell.append(bar);
-				}
-				row.append(cell);
-			});
-
-			fragment.append(row);
-		}
 		tbody.setAttribute("aria-busy", "true");
-		tbody.prepend(fragment);
+		tbody.prepend(row);
 	}
 
 	clearTableLoading() {

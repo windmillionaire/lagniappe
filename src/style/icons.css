@@ -85,6 +85,18 @@
 	--icon-offset-y: -1px;
 }
 
+/* @style form.icon */
+.form-field-action .icon[data-icon="addRow"] {
+	--icon-offset-y: 0;
+}
+
+/* @style form.table.actionButton */
+button[lp-show="table:TableEditor"][data-editing="true"] .icon {
+	--icon-box-size: var(--icon-xs-box-size);
+	--icon-size: var(--icon-xs-glyph-size);
+	--icon-offset-y: 0;
+}
+
 button[data-role="history-fill"] .icon[data-icon="historyFill"] {
 	--icon-offset-y: -1px;
 }

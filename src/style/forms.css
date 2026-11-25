@@ -219,6 +219,10 @@ button[lp-select]:disabled {
 		);
 		pointer-events: none;
 	}
+	& > span:not(.icon) {
+		line-height: 1;
+		transform: translateY(1px);
+	}
 }
 
 /* @style form.submission.default form.submission.grows */

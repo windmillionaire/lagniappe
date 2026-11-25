@@ -95,6 +95,7 @@ export class TableEditor {
 	declare _preparedCheckboxes: CheckboxPreparation | null;
 	declare _saves: Map<Cell, CellSave>;
 	declare _savedTimers: Map<Cell, ReturnType<typeof setTimeout>>;
+	declare _savedToggleIcons: Map<HTMLButtonElement, Node[]>;
 	declare _destroyed: boolean;
 	declare _listenerTarget: HTMLElement | null;
 	declare _onClick: (event: MouseEvent) => void;
@@ -125,6 +126,7 @@ export class TableEditor {
 		this._preparedCheckboxes = null;
 		this._saves = new Map();
 		this._savedTimers = new Map();
+		this._savedToggleIcons = new Map();
 		this._destroyed = false;
 		this._listenerTarget = null;
 		this._onClick = (event) => void this._click(event).catch(captureError);
@@ -786,6 +788,23 @@ export class TableEditor {
 			const label = editing ? "Done editing table" : "Edit table";
 			button.setAttribute("aria-label", label);
 			button.title = label;
+
+			if (editing) {
+				if (!this._savedToggleIcons.has(button)) {
+					this._savedToggleIcons.set(button, Array.from(button.childNodes));
+				}
+				const icon = document.createElement("span");
+				setIcon(icon, "x", "icon-xs text-delete-default");
+				const text = document.createElement("span");
+				text.textContent = "Close";
+				button.replaceChildren(icon, text);
+			} else {
+				const original = this._savedToggleIcons.get(button);
+				if (original) {
+					button.replaceChildren(...original);
+					this._savedToggleIcons.delete(button);
+				}
+			}
 		}
 
 		for (const pill of this.view.elt.querySelectorAll(
@@ -805,7 +824,7 @@ export class TableEditor {
 		pill.dataset.role = "table-edit-status";
 		pill.setAttribute("role", "status");
 		pill.className = STYLES.table.editStatus;
-		pill.textContent = "Editing — click highlighted cells";
+		pill.textContent = "Editable";
 		actions.insertBefore(pill, primaryButton);
 	}
 
@@ -836,6 +855,7 @@ export class TableEditor {
 		this._listenerTarget = null;
 		for (const cell of this._saves.keys()) this._unlockCell(cell);
 		this._saves.clear();
+		this._savedToggleIcons.clear();
 		this.checkboxEdits.clear();
 		this.columns.clear();
 		this.rows = null;

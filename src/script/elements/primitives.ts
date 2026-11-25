@@ -132,7 +132,7 @@ export function label(
 
 	const container = labelElt.appendChild(div({ role }));
 	container.className =
-		styles.container ?? "flex flex-row flex-wrap items-center gap-1";
+		styles.container ?? "flex min-h-6 flex-row flex-wrap items-center gap-1";
 
 	if (icon) {
 		const iconElt = container.appendChild(document.createElement("span"));

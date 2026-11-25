@@ -157,7 +157,7 @@ const STYLES = {
       "rowActions": "table-row-actions absolute top-0 right-0 z-20 m-0 flex h-8 w-max flex-row items-center rounded-bl-md border-b border-l border-kind-bg bg-base-bg px-1",
       "rowActionCell": "sticky right-0 z-20 w-px min-w-px max-w-px p-0 align-top overflow-visible",
       "rowActionHeader": "w-px min-w-px max-w-px p-0",
-      "actionButton": "grid size-6 place-items-center rounded-sm text-kind-default outline-offset-0 transition-colors duration-100 hover:bg-white hover:text-kind-dark hover:outline hover:outline-kind-default focus-visible:bg-white focus-visible:text-kind-dark focus-visible:outline focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50"
+      "actionButton": "inline-flex size-6 items-center justify-center rounded-md leading-none text-kind-default transition-colors duration-100 hover:bg-kind-light/25 hover:text-kind-dark focus-visible:bg-kind-light/35 focus-visible:text-kind-dark focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
     },
     "todo": {
       "container": "max-w-full flex min-w-0 flex-col gap-2",
@@ -172,7 +172,7 @@ const STYLES = {
     "submission": {
       "default": "submission-outline flex min-h-10 min-w-0 w-full flex-row items-center justify-start rounded-md bg-white/60 px-3 py-1.25 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]",
       "grows": "submission-outline min-w-0 w-full rounded-md bg-white/60 px-3 py-2.5 font-medium shadow-xs sm:text-sm [overflow-wrap:anywhere]",
-      "chip": "inline-flex items-center rounded-sm border border-kind-light/40 bg-kind-bg/70 px-2 py-0.5 text-xs font-medium text-kind-dark"
+      "chip": "inline-flex items-center rounded-md bg-kind-bg px-2.5 py-0.5 sm:text-sm font-medium text-kind-dark"
     }
   },
   "help": {
@@ -277,7 +277,7 @@ const STYLES = {
   "label": {
     "default": "sm:text-sm font-semibold text-base-dark",
     "column": "flex flex-col gap-1 sm:text-sm font-semibold text-base-dark",
-    "row": "flex flex-row items-center gap-1 sm:text-sm font-semibold text-base-dark",
+    "row": "flex min-h-6 flex-row items-center gap-1 sm:text-sm font-semibold text-base-dark",
     "sectionHeading": "sm:text-sm font-semibold text-base-dark mb-1"
   },
   "layout": {
@@ -452,11 +452,9 @@ const STYLES = {
         "inactive": "[grid-area:1/1] invisible text-kind-default group-data-[sorting=true]/header:visible hover:text-delete-default"
       }
     },
-    "editStatus": "hidden sm:inline-flex items-center gap-1.5 rounded-full border border-kind-light bg-kind-bg px-2.5 py-0.5 text-xs font-medium text-kind-dark whitespace-nowrap",
+    "editStatus": "table-edit-status hidden sm:inline-flex h-8 items-center rounded-md px-2.5 text-xs font-semibold text-project-dark whitespace-nowrap",
     "loading": {
-      "cell": "py-3.5 pr-3",
-      "barPrimary": "block h-4 w-44 max-w-full rounded bg-base-light/50 animate-pulse motion-reduce:animate-none",
-      "barSecondary": "block h-3.5 w-24 max-w-full rounded bg-base-light/35 animate-pulse motion-reduce:animate-none"
+      "cell": "py-4 text-center text-sm italic text-base-medium"
     }
   },
   "task": {

@@ -407,8 +407,9 @@ def test_task_index_shows_delayed_loading_skeleton_when_rows_are_slow(get_admin,
                 wait_until="domcontentloaded",
             )
             loading_rows = user.locate("#table tbody tr[data-role='loading']")
-            expect(loading_rows).to_have_count(4, timeout=5000)
+            expect(loading_rows).to_have_count(1, timeout=5000)
             expect(loading_rows.first).to_be_visible()
+            expect(loading_rows.first).to_have_text("Loading…")
             expect(user.locate("#table tbody")).to_have_attribute("aria-busy", "true")
         finally:
             for route in held:
