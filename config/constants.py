@@ -1,6 +1,17 @@
+import json
+from pathlib import Path
+
+
 SENTRY_DSN = "https://6ad2f168c5abc9f35de261d98b588633@o4511027028033536.ingest.us.sentry.io/4511218693242880"
 SENTRY_JS_DSN = "https://48fea2b31b65f353ee375b95ffcc6884@o4511027028033536.ingest.us.sentry.io/4511218663292928"
-BUILD_ID = "bcd14aa3"
+# Setup can load configuration before the first frontend install.
+try:
+    BUILD_ID = json.loads(
+        (Path(__file__).resolve().parents[1] / "lagniappe/web/static/build.json")
+        .read_bytes()
+    )["build_id"]
+except (FileNotFoundError, KeyError, TypeError, ValueError):
+    BUILD_ID = None
 RUNTIME = "python314"
 DEFAULT_EXPIRATION = "31536000s"
 DEFAULT_APP_ENGINE_LOCATION = "us-central"

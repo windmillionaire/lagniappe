@@ -9,6 +9,7 @@ import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import Protocol
 
 from runner.context import GIT_CLI
 
@@ -27,6 +28,11 @@ class FrontendBuildValidation:
 
     metadata: dict
     output_fingerprint: str
+
+
+class FrontendReader(Protocol):
+    def read_bytes(self, relative_path: str, /) -> bytes: ...
+    def list_files(self, relative_roots: Sequence[str], /) -> list[str]: ...
 
 
 class FilesystemFrontendBuildReader:
@@ -218,11 +224,22 @@ def _source_digest(reader, contract, issues):
     return digest.hexdigest()
 
 
+def frontend_source_sha256(reader: FrontendReader) -> str:
+    """Return the portable identity of the inputs selected by this revision."""
+    contract = json.loads(reader.read_bytes(PUBLICATION_CONTRACT_PATH))
+    issues = []
+    digest = _source_digest(reader, contract, issues)
+    if issues or digest is None:
+        raise ValueError("Invalid frontend source inputs: " + ", ".join(issues))
+    return digest
+
+
 def inspect_frontend_build(
-    reader: FilesystemFrontendBuildReader | GitFrontendBuildReader,
+    reader: FrontendReader,
     *,
     expected_mode: str | None = None,
     expected_version: str | None = None,
+    source_reader: FrontendReader | None = None,
 ) -> tuple[FrontendBuildValidation | None, list[str]]:
     """Return a validated build and a complete list of publication issues."""
     issues = []
@@ -232,8 +249,9 @@ def inspect_frontend_build(
         issues,
         "Frontend build metadata",
     )
+    source_reader = source_reader or reader
     contract, _ = _read_json(
-        reader,
+        source_reader,
         PUBLICATION_CONTRACT_PATH,
         issues,
         "Frontend publication contract",
@@ -268,7 +286,7 @@ def inspect_frontend_build(
     recorded_source = source.get("sha256") if isinstance(source, dict) else None
     if not isinstance(recorded_source, str) or not SHA256_RE.fullmatch(recorded_source):
         issues.append("Frontend build metadata has an invalid source identity.")
-    current_source = _source_digest(reader, contract, issues)
+    current_source = _source_digest(source_reader, contract, issues)
     if recorded_source and current_source and recorded_source != current_source:
         issues.append("Frontend build was created from different source inputs.")
 
@@ -342,22 +360,23 @@ def inspect_frontend_build(
                 f"Frontend build output is not in the artifact inventory: {normalized}"
             )
 
-    constants = _read(
-        reader,
-        BUILD_CONSTANTS_PATH,
-        issues,
-        "Frontend build constants",
-    )
-    if constants is not None:
-        match = re.search(
-            rb'(?m)^BUILD_ID\s*=\s*"([^"]+)"\s*$',
-            constants,
+    if contract.get("distribution") != "release-zip":
+        constants = _read(
+            reader,
+            BUILD_CONSTANTS_PATH,
+            issues,
+            "Frontend build constants",
         )
-        constants_build_id = match.group(1).decode() if match else None
-        if constants_build_id != build_id:
-            issues.append(
-                "Frontend build metadata and constants have different build IDs."
+        if constants is not None:
+            match = re.search(
+                rb'(?m)^BUILD_ID\s*=\s*"([^"]+)"\s*$',
+                constants,
             )
+            constants_build_id = match.group(1).decode() if match else None
+            if constants_build_id != build_id:
+                issues.append(
+                    "Frontend build metadata and constants have different build IDs."
+                )
 
     service_worker = _read(
         reader,

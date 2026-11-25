@@ -1,3 +1,20 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import * as yaml from "js-yaml";
+
+export const readBuildSettings = () => {
+	const path = resolve(
+		process.env.LAGNIAPPE_CONFIG_ROOT || ".",
+		"config/files/lagniappe_settings.yaml",
+	);
+	try {
+		return yaml.load(readFileSync(path, "utf8")) || {};
+	} catch (error) {
+		if (error.code === "ENOENT") return {};
+		throw error;
+	}
+};
+
 /**
  * Decide whether a production build can generate and upload hidden source maps.
  *

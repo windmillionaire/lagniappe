@@ -11,6 +11,7 @@ from pathlib import Path
 
 from config import APP_DIR, SETTINGS
 from runner.context import GIT_CLI, NPM_CLI
+from runner.frontend_bundle import CACHE, BundleError, release_bundle, sync, uses_bundle
 from runner.frontend_build import GitFrontendBuildReader, inspect_frontend_build
 from runner.process import run_command
 
@@ -86,8 +87,17 @@ def _require_committed_production_build(
 
 
 def _committed_build_id(source: str, repo_root: Path, *, expected_version: str | None = None) -> str:
+    reader = GitFrontendBuildReader(repo_root, revision=source)
+    if uses_bundle(reader):
+        try:
+            target, _, _ = release_bundle(reader, repo_root)
+        except (BundleError, OSError, ValueError) as error:
+            raise HostedE2EError(str(error)) from error
+        if expected_version is not None and expected_version != target.version:
+            raise HostedE2EError(f"Frontend bundle version differs from configured {expected_version}.")
+        return target.build_id
     validation, issues = inspect_frontend_build(
-        GitFrontendBuildReader(repo_root, revision=source),
+        reader,
         expected_mode="production",
         expected_version=expected_version,
     )
@@ -210,4 +220,5 @@ def _committed_source_tree(source, *, repo_root=APP_DIR):
                 detail or "Could not export the committed hosted-E2E source."
             )
         shutil.unpack_archive(archive_path, source_root, format="tar")
+        sync(source_root, cache=Path(repo_root) / CACHE, origin=Path(repo_root), require_pin=True)
         yield source_root

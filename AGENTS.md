@@ -161,9 +161,10 @@ These instructions apply to the whole repository unless a more specific
 - It is okay to run `npm run dev` to rebuild generated frontend assets after
   source changes.
 - Do not hand-edit generated static files as source. Change the corresponding
-  source files and run the normal build or test workflow when relevant. Include
-  generated static files and build-managed `BUILD_ID` changes in commits,
-  including newly generated files that `git commit -a` would not stage.
+  source files and run the normal build or test workflow when relevant. Git
+  ignores the generated web bundle. Commit updated JS/Python style bindings
+  when their definitions change. At release freeze, pin the published archive
+  with `venv/bin/python -m runner.frontend_bundle pin`.
 - When the user asks to write a version message, write a concise release-note
   style summary of what changed. Prefer short entries like "Fixed category
   ownership sync" or "Added build IDs to asset cache busting"; do not write a

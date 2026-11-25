@@ -1,0 +1,115 @@
+name: Frontend bundle
+
+on:
+  push:
+    branches: ["next/**", "hotfix/**"]
+    paths: &bundle_paths
+      - .nvmrc
+      - THIRD_PARTY_LICENSES/**
+      - build/**
+      - src/fonts/**
+      - src/script/**
+      - src/style/**
+      - config/browser_protocol.json
+      - config/frontend-release.json
+      - lagniappe/web/start/styles/**
+      - lagniappe/web/templates/**
+      - package*.json
+      - runner/frontend_*.py
+      - .github/workflows/frontend-bundle.yml
+  pull_request:
+    paths: *bundle_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      source: ${{ steps.pack.outputs.source }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Build and verify the production ZIP
+        id: pack
+        env:
+          LAGNIAPPE_CONFIG_ROOT: ${{ github.workspace }}/testing/fixtures/offline-runtime
+        run: |
+          npm ci
+          npm run build
+          python -m runner.frontend_bundle pack
+          git diff --exit-code
+          source=$(jq -r .source.sha256 lagniappe/web/static/build.json)
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: production-frontend
+          path: reports/frontend-bundles/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  no-node:
+    needs: build
+    runs-on: ubuntu-24.04
+    container: python:3.14-bookworm@sha256:fbaf91204f2758a70a7f7d6cf3c2871851227152a54e6a7b5b59941c4566b6b5
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: production-frontend
+          path: /tmp/frontend-delivery
+      - name: Install the delivered ZIP in a clean owner checkout
+        shell: bash
+        run: |
+          if command -v node || command -v npm; then exit 1; fi
+          test ! -e lagniappe/web/static/script.js
+          ./setup.sh --help
+          venv/bin/python -m runner.frontend_bundle pin --archive /tmp/frontend-delivery/*.zip
+          venv/bin/python -m runner.frontend_bundle sync
+          venv/bin/python -c 'from runner.frontend_build import verify_frontend_build; verify_frontend_build(app_dir=".", expected_mode="production")'
+
+  publish:
+    needs: [build, no-node]
+    if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/heads/next/') || startsWith(github.ref, 'refs/heads/hotfix/'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    concurrency:
+      group: frontend-publish-${{ needs.build.outputs.source }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: production-frontend
+      - name: Publish or verify the immutable branch bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE: ${{ needs.build.outputs.source }}
+        run: |
+          [[ "$SOURCE" =~ ^[0-9a-f]{64}$ ]]
+          tag="frontend-$SOURCE"
+          export ASSET="lagniappe-frontend-$SOURCE.zip"
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$tag" "$ASSET" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --prerelease --latest=false --title "Frontend bundle ${SOURCE:0:12}" \
+              --notes "Production web assets for frontend source $SOURCE."
+          fi
+          remote=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '.assets[] | select(.name == env.ASSET) | .digest')
+          digest=$(sha256sum "$ASSET")
+          test "$remote" = "sha256:${digest%% *}"

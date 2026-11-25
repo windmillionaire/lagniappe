@@ -1,12 +1,17 @@
 """Update configuration or replace and upgrade an existing installation."""
 
 from runner import presentation as ui
+from runner.frontend_build import GitFrontendBuildReader
+from runner.frontend_bundle import (
+    CACHE, BundleError, BundleFiles, BundleTarget, acquire, install_files, uses_bundle,
+)
 from runner.presentation import output as print, read_input as input
 
 import json
 import subprocess
 from datetime import datetime
 from importlib import reload
+from typing import NotRequired, TypedDict
 
 from runner.console import format_prompt, wrap_text
 from runner.context import GIT_CLI, REPOSITORY_ROOT, setup_command
@@ -21,6 +26,14 @@ from .upgrade_notice import (
     print_post_upgrade_maintenance_steps,
 )
 from .verify import activate_installation
+
+
+class UpgradeTarget(TypedDict):
+    branch: str
+    ref: str
+    commit: str
+    version: str
+    frontend: NotRequired[BundleFiles]
 
 
 def update(*, announce: bool = True) -> int:
@@ -96,6 +109,8 @@ def upgrade(branch: str | None = None, *, announce: bool = True) -> int:
             return 1
 
     _refresh_setup_dependencies()
+    if "frontend" in target:
+        install_files(REPOSITORY_ROOT, target["frontend"])
     return _apply_update(
         upgrade=True,
         installed_version=installed_version,
@@ -502,7 +517,7 @@ def _reset_target_for_branch(branch):
     return f"origin/{branch}"
 
 
-def _fetch_upgrade_target(spinner, branch="main"):
+def _fetch_upgrade_target(spinner, branch="main") -> UpgradeTarget | None:
     """Fetch and inspect one exact remote commit without replacing source."""
     from installer import FORMATTER
 
@@ -584,14 +599,20 @@ def _fetch_upgrade_target(spinner, branch="main"):
             spinner.fail()
             return None
 
-        spinner.ok()
-        return {
+        reader = GitFrontendBuildReader(REPOSITORY_ROOT, revision=commit)
+        target: UpgradeTarget = {
             "branch": branch,
             "ref": reset_target,
             "commit": commit,
             "version": str(version),
         }
-    except (OSError, subprocess.SubprocessError) as error:
+        if uses_bundle(reader):
+            release = BundleTarget.read(reader)
+            _, _, files = acquire(reader, release, REPOSITORY_ROOT / CACHE, origin=REPOSITORY_ROOT)
+            target["frontend"] = files
+        spinner.ok()
+        return target
+    except (OSError, ValueError, BundleError, subprocess.SubprocessError) as error:
         spinner.write(
             formatter.error(
                 wrap_text('Failed to inspect upgrade target:'), str(error)

@@ -1,12 +1,18 @@
 """Tooling contracts for coherent frontend build completion metadata."""
 
 import hashlib
+import io
 import json
+import stat
+import zipfile
+from dataclasses import replace
+from urllib.error import HTTPError
 from pathlib import Path
 
 import pytest
 from werkzeug.routing import Map, Rule
 
+from runner import frontend_bundle as bundle
 from runner.browser_endpoints import render_endpoints
 from runner.frontend_build import (
     FilesystemFrontendBuildReader,
@@ -45,7 +51,7 @@ def _sha256(content):
     return hashlib.sha256(content).hexdigest()
 
 
-def _write_completed_build(root, *, mode="production", version="1.2.3"):
+def _write_completed_build(root, *, mode="production", version="1.2.3", packaged=False):
     contract = {
         "schema": 1,
         "source_roots": ["build", "src/script"],
@@ -60,6 +66,8 @@ def _write_completed_build(root, *, mode="production", version="1.2.3"):
             "lagniappe/web/static/chunks/views/",
         ],
     }
+    if packaged:
+        contract["distribution"] = "release-zip"
     sources = {
         "build/publication.json": f"{json.dumps(contract, sort_keys=True)}\n",
         "package.json": f'{{"version": "{version}"}}\n',
@@ -85,9 +93,13 @@ def _write_completed_build(root, *, mode="production", version="1.2.3"):
         digest.update(b"\0")
         digest.update(sources[relative].encode())
         digest.update(b"\0")
+    build_id = f"b{digest.hexdigest()[:7]}" if packaged else "b1234567"
+    worker = "lagniappe/web/static/sw.js"
+    artifacts[worker] = f'const BUILD_ID = "{build_id}";\n'
+    (root / worker).write_text(artifacts[worker], encoding="utf-8")
     metadata = {
         "schema": 1,
-        "build_id": "b1234567",
+        "build_id": build_id,
         "mode": mode,
         "version": version,
         "source": {"sha256": digest.hexdigest()},
@@ -214,3 +226,97 @@ def test_package_json_matches_canonical_config_serialization():
         "package.json must match File.PACKAGE_JSON's sorted JSON serialization "
         "so setup/upgrade saves do not rewrite it and invalidate build.json."
     )
+
+
+def test_frontend_archive_branch_install_then_pinned_offline_repair(tmp_path, monkeypatch):
+    metadata = _write_completed_build(tmp_path, packaged=True)
+    reader = FilesystemFrontendBuildReader(tmp_path)
+    target, archive = bundle.pack(tmp_path, tmp_path / "build-output")
+    data = archive.read_bytes()
+    assert bundle.pack(tmp_path, tmp_path / "second-build")[1].read_bytes() == data
+    for item in metadata["artifacts"]:
+        (tmp_path / item["path"]).unlink()
+    marker = tmp_path / bundle.BUILD_METADATA_PATH
+    marker.unlink()
+    manifest = marker.with_name("manifest.json")
+    manifest.write_text('{"name":"My site"}')
+    old_chunk = marker.parent / "chunks/obsolete.js"
+    old_chunk.touch()
+    requests = []
+
+    def github(url, limit):
+        requests.append(url)
+        if "/releases/download/" in url:
+            return data
+        tag = url.rsplit("/", 1)[1]
+        return json.dumps({"tag_name": tag, "assets": [
+            {"name": target.name, "size": len(data), "digest": f"sha256:{target.digest}"}
+        ]}).encode()
+
+    monkeypatch.setattr(bundle, "_read_url", github)
+    bundle.sync(tmp_path, repo="owner/repo")
+    assert len(requests) == 2 and all(target.tag in url for url in requests)
+    assert json.loads(marker.read_bytes()) == metadata
+    assert not old_chunk.exists()
+    assert manifest.read_text() == '{"name":"My site"}'
+    with pytest.raises(bundle.BundleError, match="Freeze"):
+        bundle.BundleTarget.read(reader, require_pin=True)
+
+    (tmp_path / bundle.PIN_PATH).write_text(json.dumps({
+        "source_sha256": target.source, "archive_sha256": target.digest,
+    }))
+    (marker.parent / "script.js").write_text("broken")
+    bundle.sync(tmp_path)
+    assert len(requests) == 2
+    assert bundle.release_bundle(reader, tmp_path)[0] == target
+    assert verify_frontend_build(app_dir=tmp_path).metadata == metadata
+
+    # An official release is preferred once it exists. A missing official tag
+    # before release is only permission to fetch the same pinned candidate.
+    (tmp_path / bundle.CACHE / target.name).unlink()
+    requests.clear()
+
+    def prerelease_only(url, limit):
+        if url.endswith("/v1.2.3"):
+            requests.append(url)
+            raise HTTPError(url, 404, "not released", {}, None)
+        return github(url, limit)
+
+    monkeypatch.setattr(bundle, "_read_url", prerelease_only)
+    bundle.sync(tmp_path, repo="owner/repo", require_pin=True)
+    assert requests[0].endswith("/v1.2.3") and target.tag in requests[1]
+    (tmp_path / "src/script/main.ts").write_text("new inputs")
+    with pytest.raises(bundle.BundleError, match="Freeze"):
+        bundle.release_bundle(reader, tmp_path)
+
+
+@pytest.mark.parametrize("member", ["../escape", "config/constants.py", "extra.js", "link"])
+def test_frontend_archive_rejects_wrong_or_unlisted_members(tmp_path, member):
+    _write_completed_build(tmp_path, packaged=True)
+    target, archive = bundle.pack(tmp_path, tmp_path / "out")
+    data = io.BytesIO(archive.read_bytes())
+    with zipfile.ZipFile(data, "a") as modified:
+        name = "lagniappe/web/static/chunks/link.js" if member == "link" else member
+        info = zipfile.ZipInfo(name)
+        info.external_attr = ((stat.S_IFLNK if member == "link" else stat.S_IFREG) | 0o644) << 16
+        modified.writestr(info, b"untrusted")
+    reader = FilesystemFrontendBuildReader(tmp_path)
+    with pytest.raises(bundle.BundleError, match="SHA-256"):
+        bundle.unpack(data.getvalue(), reader, target)
+    with pytest.raises(bundle.BundleError, match="Unexpected frontend ZIP member"):
+        bundle.unpack(data.getvalue(), reader, replace(target, digest=_sha256(data.getvalue())))
+
+
+def test_missing_or_corrupt_branch_bundle_preserves_installed_generation(tmp_path, monkeypatch):
+    original = _write_completed_build(tmp_path, packaged=True)
+    target, archive = bundle.pack(tmp_path, tmp_path / "out")
+    marker = tmp_path / bundle.BUILD_METADATA_PATH
+    monkeypatch.setattr(bundle, "_release_digest", lambda *_: None)
+    with pytest.raises(bundle.BundleError, match="not published"):
+        bundle.sync(tmp_path, repo="owner/repo")
+    monkeypatch.setattr(bundle, "_release_digest", lambda *_: target.digest)
+    monkeypatch.setattr(bundle, "_read_url", lambda *_: archive.read_bytes()[:-8])
+    with pytest.raises(bundle.BundleError, match="SHA-256"):
+        bundle.sync(tmp_path, repo="owner/repo")
+    assert json.loads(marker.read_bytes()) == original
+    assert not (tmp_path / bundle.CACHE / target.name).exists()

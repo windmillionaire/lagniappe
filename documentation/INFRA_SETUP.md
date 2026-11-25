@@ -194,6 +194,12 @@ through the normal atomic writer. During update/upgrade, `update_config()`
 reloads the builders and their shared manifest helper's deployment module so
 an older running upgrade process uses the replaced checkout's implementations.
 
+Ordinary setup and software upgrades install the production frontend using
+Python and GitHub Releases. An upgrade checks the exact target commit's bundle
+before replacing tracked source. Release tags and branches use the same ZIP
+format. A cached, pinned ZIP also supports offline frontend installation.
+See [Frontend build](INFRA_BUILD.md#release-boundary).
+
 ## Development installation
 
 Developer onboarding is two-stage:

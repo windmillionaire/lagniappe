@@ -1,15 +1,13 @@
 import { mkdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import replace from "@rollup/plugin-replace";
 import { sentryRollupPlugin } from "@sentry/rollup-plugin";
 import tailwindcss from "@tailwindcss/postcss";
 import cssnano from "cssnano";
-import * as yaml from "js-yaml";
 import { minify } from "rollup-plugin-esbuild";
 import postcss from "rollup-plugin-postcss";
 import { visualizer } from "rollup-plugin-visualizer";
 import { createRollupConfig } from "./rollup.shared.mjs";
-import { resolveSentryBuild } from "./sentry.mjs";
+import { readBuildSettings, resolveSentryBuild } from "./sentry.mjs";
 import { startupBudget } from "./startupBudget.mjs";
 import {
 	buildStyles,
@@ -25,17 +23,8 @@ import {
 const reportsDir = "./reports";
 mkdirSync(reportsDir, { recursive: true });
 const uploadedSourceMaps = "./lagniappe/web/static/**/*.map";
-const settings = yaml.load(
-	readFileSync(
-		resolve(
-			process.env.LAGNIAPPE_CONFIG_ROOT || ".",
-			"config/files/lagniappe_settings.yaml",
-		),
-		"utf8",
-	),
-);
 const packageMetadata = JSON.parse(readFileSync("./package.json", "utf8"));
-const sentry = resolveSentryBuild(settings, packageMetadata);
+const sentry = resolveSentryBuild(readBuildSettings(), packageMetadata);
 const sentryPlugins = (project, sourcemaps) =>
 	sentry.enabled
 		? sentryRollupPlugin({

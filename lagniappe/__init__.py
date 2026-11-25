@@ -203,17 +203,17 @@ class Config:
         self.RUNTIME_SERVICE_ACCOUNT_EMAIL = runtime_email.casefold()
         self.INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL = internal_caller_email.casefold()
         self._google_credentials: Credentials | None = None
-        tracked_build_id = getattr(constants, "BUILD_ID", None) or self.VERSION
+        frontend_build_id = getattr(constants, "BUILD_ID", None) or self.VERSION
         hosted_build_id = (
             getattr(self, "HOSTED_E2E_BUILD_ID", None)
             if self.testing and getattr(self, "HOSTED_E2E", False)
             else None
         )
-        if hosted_build_id and hosted_build_id != tracked_build_id:
+        if hosted_build_id and hosted_build_id != frontend_build_id:
             raise RuntimeError(
                 "Hosted E2E build ID does not match the built source tree."
             )
-        self.BUILD_ID = tracked_build_id
+        self.BUILD_ID = frontend_build_id
 
         self.AI_DEBUG = _env_flag("AI_DEBUG", False)
         self.AI_DEBUG_LOG = (os.environ.get("AI_DEBUG_LOG") or "").strip() or None

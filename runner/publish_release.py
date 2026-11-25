@@ -8,6 +8,9 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
+from runner.frontend_build import GitFrontendBuildReader
+from runner.frontend_bundle import release_bundle, uses_bundle
+
 
 def _run(*args):
     return subprocess.run(
@@ -79,6 +82,13 @@ def verified_version(
 def publish_tag(repo: str, sha: str, version: str, notes: Path) -> None:
     tag = f"v{version}"
     ref = f"refs/tags/{tag}"
+    root = Path.cwd()
+    reader = GitFrontendBuildReader(root, revision=sha)
+    asset = None
+    digest = None
+    if uses_bundle(reader):
+        target, asset, _ = release_bundle(reader, root, repo=repo)
+        digest = target.digest
     remote = _run("git", "ls-remote", "--refs", "origin", ref)
     if remote:
         _run("git", "fetch", "--no-tags", "origin", ref)
@@ -102,13 +112,19 @@ def publish_tag(repo: str, sha: str, version: str, notes: Path) -> None:
             "--repo",
             repo,
             "--json",
-            "tagName,isDraft,isPrerelease",
+            "tagName,isDraft,isPrerelease,assets",
         ],
         capture_output=True,
         text=True,
     )
     if result.returncode == 0:
         record = json.loads(result.stdout)
+        assets = record.pop("assets", [])
+        if asset and not any(
+            item.get("name") == asset.name and item.get("digest") == f"sha256:{digest}"
+            for item in assets
+        ):
+            raise ValueError("Existing release does not contain the tested frontend archive.")
         if record != {"tagName": tag, "isDraft": False, "isPrerelease": False}:
             raise ValueError(
                 "The existing GitHub Release does not match the expected published release."
@@ -128,6 +144,7 @@ def publish_tag(repo: str, sha: str, version: str, notes: Path) -> None:
             f"Lagniappe {version}",
             "--notes-file",
             str(notes),
+            *([str(asset)] if asset else []),
         )
 
 

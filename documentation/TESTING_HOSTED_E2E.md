@@ -8,7 +8,7 @@ the tracked test-result manifest without exposing application secrets to GitHub.
 ## Architecture
 
 ```text
-trusted clean commit with production build
+trusted clean commit with pinned production ZIP
   -> hosted-e2e create
        run source quality, contract and release gates
        export exact commit
@@ -126,14 +126,13 @@ or another checkout's setup record is not the current target configuration.
 Freeze and commit the complete candidate first:
 
 ```bash
-npm ci
-npm run build
-# Commit source and generated release output.
+venv/bin/python -m runner.frontend_bundle pin
+# Commit the reviewed source and config/frontend-release.json.
 venv/bin/python run.py hosted-e2e create --base origin/main
 ```
 
-`create` requires a clean committed production build. It exports that exact
-commit for both artifacts, never rebuilds, never edits canonical
+`create` exports the clean candidate commit, verifies the pinned production
+ZIP, and installs it in the source tree shared by both hosted artifacts. It preserves canonical
 `lagniappe.yaml`, and deploys with `--no-promote`. Before gcloud activation or
 provider mutation, it runs npm source and type checks, Ruff, both Python type checks, tooling tests,
 template, style and mutation contracts, and the release check against the clean local HEAD.

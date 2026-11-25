@@ -1,13 +1,16 @@
 {
 	"schema": 1,
+	"distribution": "release-zip",
 	"source_roots": [
 		"THIRD_PARTY_LICENSES",
 		"build",
+		"lagniappe/web/templates",
 		"src/fonts",
 		"src/script",
 		"src/style"
 	],
 	"source_files": [
+		".nvmrc",
 		"config/browser_protocol.json",
 		"package-lock.json",
 		"package.json"

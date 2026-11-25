@@ -1963,6 +1963,7 @@ def test_upgrade_target_fetches_and_reads_exact_remote_version(monkeypatch, tmp_
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     monkeypatch.setattr(upgrade, "GIT_CLI", "git")
+    monkeypatch.setattr("runner.frontend_build.GIT_CLI", "git")
     monkeypatch.setattr(upgrade, "REPOSITORY_ROOT", tmp_path)
     commit = "a" * 40
     calls = []
@@ -1980,6 +1981,8 @@ def test_upgrade_target_fetches_and_reads_exact_remote_version(monkeypatch, tmp_
             return completed_process(command, stdout=f"{commit}\n")
         if command == ["git", "show", f"{commit}:package.json"]:
             return completed_process(command, stdout='{"version": "2.0.0"}\n')
+        if command == ["git", "show", f"{commit}:build/publication.json"]:
+            return completed_process(command, stdout=b'{"schema": 1}')
         raise AssertionError(f"Unexpected command: {command}")
 
     monkeypatch.setattr(upgrade.subprocess, "run", fake_run)
@@ -2003,6 +2006,7 @@ def test_upgrade_target_fetches_and_reads_exact_remote_version(monkeypatch, tmp_
             "origin/release/candidate^{commit}",
         ],
         ["git", "show", f"{commit}:package.json"],
+        ["git", "show", f"{commit}:build/publication.json"],
     ]
     assert all(kwargs["cwd"] == tmp_path for _command, kwargs in calls)
     assert len(spinner.oks) == 1

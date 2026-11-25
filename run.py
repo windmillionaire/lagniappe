@@ -19,6 +19,7 @@ from runner.context import (
     format_command,
 )
 from runner.gcloud import activate_repository_gcloud
+from runner.frontend_bundle import release_bundle, uses_bundle, BundleError
 from runner.frontend_build import GitFrontendBuildReader, inspect_frontend_build
 from runner.pytest_routing import (
     PYTEST_CONFIG,
@@ -63,9 +64,6 @@ RELEASE_LOCAL_PATHS = (
     "index.yaml",
     "lagniappe.yaml",
 )
-RELEASE_BUILD_ID_PATH = "config/constants.py"
-RELEASE_BUILD_METADATA_PATH = "lagniappe/web/static/build.json"
-RELEASE_SERVICE_WORKER_PATH = "lagniappe/web/static/sw.js"
 RELEASE_MIGRATION_CATALOG_PATH = (
     "lagniappe/core/tools/database/migrations.py"
 )
@@ -73,7 +71,6 @@ RELEASE_MAINTENANCE_HEADING = "## Required post-upgrade maintenance"
 RELEASE_VERSION_PATTERN = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$"
 )
-RELEASE_BUILD_ID_PATTERN = re.compile(r"^b[0-9a-f]{7}$")
 
 
 def pytest_command(pytest_args: list[str]) -> list[str]:
@@ -930,12 +927,6 @@ def release_readiness_issues(
 
     package = _read_release_json(repo_root, "package.json", issues)
     package_lock = _read_release_json(repo_root, "package-lock.json", issues)
-    build_metadata = _read_release_json(
-        repo_root,
-        RELEASE_BUILD_METADATA_PATH,
-        issues,
-    )
-
     version = package.get("version")
     if not isinstance(version, str) or not RELEASE_VERSION_PATTERN.fullmatch(version):
         issues.append("package.json version must use stable X.Y.Z form.")
@@ -984,22 +975,17 @@ def release_readiness_issues(
                 f"{node_version}-bookworm-slim with a SHA-256 digest."
             )
 
-    if version and build_metadata.get("version") != version:
-        issues.append(
-            f"{RELEASE_BUILD_METADATA_PATH} version does not match "
-            f"package.json version {version}."
+    reader = GitFrontendBuildReader(repo_root, index=True)
+    if uses_bundle(reader):
+        try:
+            release_bundle(reader, repo_root)
+        except (BundleError, OSError, ValueError, subprocess.CalledProcessError) as error:
+            issues.append(f"Frontend build: {error}")
+    else:
+        _, frontend_issues = inspect_frontend_build(
+            reader, expected_mode="production", expected_version=version,
         )
-    if build_metadata.get("mode") != "production":
-        issues.append(
-            f"{RELEASE_BUILD_METADATA_PATH} must identify a production build."
-        )
-
-    _frontend_validation, frontend_issues = inspect_frontend_build(
-        GitFrontendBuildReader(repo_root, index=True),
-        expected_mode="production",
-        expected_version=version,
-    )
-    issues.extend(f"Frontend build: {issue}" for issue in frontend_issues)
+        issues.extend(f"Frontend build: {issue}" for issue in frontend_issues)
     issues.extend(_wire_contract_release_issues(repo_root))
 
     release_note = None
@@ -1027,37 +1013,6 @@ def release_readiness_issues(
                 release_note,
             )
         )
-
-    constants_content = (
-        _read_release_text(repo_root, RELEASE_BUILD_ID_PATH, issues) or ""
-    )
-    build_id_match = re.search(
-        r'^BUILD_ID\s*=\s*"([^"]+)"\s*$',
-        constants_content,
-        flags=re.MULTILINE,
-    )
-    build_id = build_id_match.group(1) if build_id_match else None
-    if not build_id or not RELEASE_BUILD_ID_PATTERN.fullmatch(build_id):
-        issues.append(
-            f"{RELEASE_BUILD_ID_PATH} must contain a generated "
-            "eight-character BUILD_ID."
-        )
-    elif build_metadata.get("build_id") != build_id:
-        issues.append(
-            f"{RELEASE_BUILD_METADATA_PATH} build_id does not match "
-            f"{RELEASE_BUILD_ID_PATH}."
-        )
-    else:
-        service_worker = _read_release_text(
-            repo_root,
-            RELEASE_SERVICE_WORKER_PATH,
-            issues,
-        )
-        if service_worker is not None and build_id not in service_worker:
-            issues.append(
-                f"{RELEASE_SERVICE_WORKER_PATH} does not contain "
-                f"the current build ID {build_id}."
-            )
 
     return merge_base, issues
 

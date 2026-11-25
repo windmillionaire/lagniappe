@@ -50,7 +50,10 @@ test("test_sentry_build_uses_package_release_and_requires_upload_token", () => {
 	);
 
 	const rollupConfig = readFileSync("./build/rollup.config.mjs", "utf8");
-	assert.match(rollupConfig, /resolveSentryBuild\(settings, packageMetadata\)/);
+	assert.match(
+		rollupConfig,
+		/resolveSentryBuild\(readBuildSettings\(\), packageMetadata\)/,
+	);
 	assert.match(rollupConfig, /name: sentry\.release/);
 	assert.doesNotMatch(rollupConfig, /name: settings\.VERSION/);
 });

@@ -29,7 +29,6 @@ const ICON_REGISTRY_SCHEMA = JSON.parse(
 const rawStylesYaml = yaml.load(
 	readFileSync(`./${STYLE_PIPELINE.registry.styles}`, "utf8"),
 );
-const constantsPath = "./config/constants.py";
 const BOOT_CONNECTIVITY_MODULE = "shared/connectivity.mjs";
 const INTERACTION_FOUNDATION_MODULES = new Set([
 	"generated/endpoints.mjs",
@@ -679,21 +678,6 @@ const precacheUrls = (bundle, buildId) => {
 
 const generateBuildId = () => `b${randomBytes(4).toString("hex").slice(1)}`;
 
-const updateConstantsBuildId = (buildId) => {
-	let content = readFileSync(constantsPath, "utf8");
-	const line = `BUILD_ID = "${buildId}"`;
-	if (/^BUILD_ID\s*=.*$/m.test(content)) {
-		content = content.replace(/^BUILD_ID\s*=.*$/m, line);
-	} else if (/^SENTRY_DSN = .*$/m.test(content)) {
-		content = content.replace(/^SENTRY_DSN = .*$/m, (match) => {
-			return `${match}\n${line}`;
-		});
-	} else {
-		content = `${content.replace(/\s*$/, "\n")}${line}\n`;
-	}
-	atomicWriteFileSync(constantsPath, content);
-};
-
 const updateServiceWorker = (buildId) => {
 	return {
 		name: "update-service-worker",
@@ -831,7 +815,6 @@ export {
 	pythonStyleModuleSource,
 	resolveFonts,
 	STYLE_PIPELINE,
-	updateConstantsBuildId,
 	updateServiceWorker,
 	versionChunkImports,
 };

@@ -85,11 +85,13 @@ _TEST_FRONTEND_BUNDLE_STATE = Directory.REPORTS.value / "test-frontend-bundle.js
 _TEST_FRONTEND_INPUT_ROOTS = (
     Path("THIRD_PARTY_LICENSES"),
     Path("build"),
+    Path("lagniappe/web/templates"),
     Path("src/fonts"),
     Path("src/script"),
     Path("src/style"),
 )
 _TEST_FRONTEND_INPUT_FILES = (
+    Path(".nvmrc"),
     Path("config/browser_protocol.json"),
     Path("config/files/lagniappe_settings.yaml"),
     Path("package.json"),

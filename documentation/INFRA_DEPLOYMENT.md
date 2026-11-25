@@ -29,11 +29,10 @@ Slow provider lookups and retries can delay that prompt for several minutes;
 the MCP commands run non-interactively with captured output.
 
 `installer/deploy.py` owns the interactive deployment workflow and calls the
-same runner helper in publish-only mode. It uses the
-generated assets already present in the checkout and does not run npm or change
-the application version. The same manifest validation runs before any gcloud
-operation, so a missing, partial, corrupt, or stale prebuilt frontend is
-rejected. Every App Engine deploy command also names the saved target project
+same runner helper in publish-only mode for ordinary owner installations. Python
+installs the verified production archive from the local cache or GitHub Release.
+Branch upgrades can retrieve a candidate archive by its full frontend input digest.
+Manifest verification finishes before deployment. Every App Engine deploy command also names the saved target project
 explicitly. Interactive setup replaces gcloud's verbose successful-deployment
 transcript with one long-running progress line, retains the provider output on
 failure, and finishes with Lagniappe's exact saved application URL.
@@ -55,28 +54,19 @@ upgrade processes that retain their old caller after replacing source.
 
 ## Release preparation
 
-Freeze the release tree and validate its production build. Create a canonical
-build when frontend inputs, outputs, or version changed:
+Once the branch's Frontend bundle workflow publishes the current frontend,
+freeze its archive digest along with the reviewed source.
 
 ```bash
-npm ci
-npm run build
-git add -A
+venv/bin/python -m runner.frontend_bundle pin
+git add config/frontend-release.json
 git commit -m "Release Candidate X.Y.Z"
 venv/bin/python run.py release-check --base origin/main
 ```
 
-Review and commit the complete source and generated release output.
-`release-check` validates the candidate tree independently of the current
-branch, including detached HEAD. It rejects installation-local files
-and checks that package metadata, lockfile, production build metadata,
-`BUILD_ID`, settings version, and release note agree on one `X.Y.Z` version.
-It computes source and artifact digests from the exact Git index, preventing an
-unstaged working-tree build from validating a different committed candidate.
-An unchanged, valid production build can be reused for backend, runner, tests,
-or documentation changes. Generated files and `BUILD_ID` need not differ from
-the comparison commit; stale sources, modified or missing artifacts, and
-inconsistent build IDs still fail validation.
+`release-check` verifies the source digest and archive pin from the exact Git
+index, the production mode and version, and every file in the archive's
+manifest. Backend and documentation changes can reuse the same archive.
 The release workflow enforces the `next/*` or `hotfix/*` branch requirement
 using the pull request/event context and verifies the exact candidate commit.
 Passing the local tree check alone does not establish release eligibility.
@@ -365,9 +355,9 @@ report, fetches the remote, replaces tracked files with `origin/main` or the
 selected remote branch, reconciles setup dependencies, reloads installer
 modules from the new source, and runs the same configuration/update flow.
 
-The command resolves one exact fetched commit and reads its committed
-`package.json` version; release tags are not required, including during branch
-rehearsal. It names that exact replacement target and requires confirmation.
+The command resolves the exact remote commit, reads its package version and
+verifies its matching frontend bundle before replacing source. An unreleased
+branch can use its published frontend prerelease. It names that exact replacement target and requires confirmation.
 Ignored installation configuration and untracked files remain. Maintained
 forks should merge the desired release themselves and run `update`.
 
