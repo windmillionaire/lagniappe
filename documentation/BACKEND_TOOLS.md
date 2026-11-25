@@ -111,8 +111,8 @@ the extraction. Safe traversal ceilings return `OOXMLExtractionResult` with a
 truncation reason once useful text exists; the AI summary prompt includes that
 reason and never exceeds its 200,000-character extracted-context ceiling.
 
-Durable CSV workflow state lives in `tools/ingress.py` and
-`database/ingress.py`, not in the general file utilities. See
+The `tools/ingress/` package manages the CSV workflow and
+`tools/database/ingress.py` persists its state. See
 [BACKEND_INGRESS.md](BACKEND_INGRESS.md).
 
 ## External services

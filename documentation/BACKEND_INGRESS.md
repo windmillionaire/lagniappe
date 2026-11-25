@@ -1,7 +1,7 @@
 # Backend Ingress
 
-CSV ingress is a versioned durable workflow owned by
-`lagniappe/core/tools/ingress.py`. `IngressService` is the only runtime owner of
+CSV ingress is a versioned durable workflow in the
+`lagniappe/core/tools/ingress/` package. `IngressService` is the only runtime owner of
 stage transitions, configuration invalidation, generated-entity planning,
 cursor-checked execution, result progress, and retry/stop behavior. Ingress properties
 are presentation facades, and Flask routes are authorization/transport
@@ -49,14 +49,15 @@ after execution starts.
 
 ## Service boundaries
 
-`IngressService` composes four focused boundaries:
+`lagniappe.core.tools.ingress` exports the classes used by entity properties,
+Flask routes, and workers. Their implementations are grouped by responsibility.
 
-- `IngressParser` validates and parses CSV content into metadata and row data;
-- `IngressMapping` projects canonical form/column/page-match mappings;
-- `IngressMutationPlanner` converts one row into a serializable result and
-  deterministic entity mutations;
-- service execution writes result slots, commits row plans, and stops, fails,
-  or finishes the durable run.
+- `parser.py` contains `IngressParser`, which reads CSV content into metadata and rows.
+- `mapping.py` contains `IngressMapping`, which maps columns to form fields and page matches.
+- `planner.py` contains `IngressMutationPlanner`, which converts one row into a
+  serializable result and deterministic entity mutations.
+- `service.py` contains `IngressService`, which advances the wizard, writes
+  result slots, commits row plans, and manages stop, failure, and restart.
 
 Task imports expose separate special mappings for page name, task name,
 completion date, and due date. Multiple source columns may map to one field;
