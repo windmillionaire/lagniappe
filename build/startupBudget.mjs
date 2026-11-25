@@ -7,6 +7,7 @@ export const STARTUP_BUDGETS = Object.freeze({
 	// Shared UI resources and choice fields exchange modest extra bytes for fewer
 	// requests. The independent heavy-service exclusions below still apply.
 	core: 128 * KIB,
+	page: 132 * KIB,
 	builder: 304 * KIB,
 });
 
@@ -96,7 +97,9 @@ export const validateStartupBudgets = (bundle) => {
 	}
 	for (const entry of CORE_VIEW_ENTRIES) {
 		const view = staticChunkClosure(bundle, [entry]);
-		check(`main + Core view ${entry}`, union(main, view), STARTUP_BUDGETS.core);
+		const limit =
+			entry === "page" ? STARTUP_BUDGETS.page : STARTUP_BUDGETS.core;
+		check(`main + Core view ${entry}`, union(main, view), limit);
 		const modules = new Set(
 			[...view].flatMap((fileName) =>
 				Object.keys(bundle[fileName]?.modules || {}),

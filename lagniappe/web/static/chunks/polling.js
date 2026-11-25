@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as captureError, r as request, E as ENDPOINTS } from './foundation.js?v=bf7d4d98';
-import './upstreamUnavailable.js?v=bf7d4d98';
-import './connectivity.js?v=bf7d4d98';
+import { c as captureError, r as request, E as ENDPOINTS } from './foundation.js?v=bbf4a50a';
+import './upstreamUnavailable.js?v=bbf4a50a';
+import './connectivity.js?v=bbf4a50a';
 
 const POLL_PROTOCOL_VERSION = 1;
 const MAX_SUBSCRIPTIONS_PER_REQUEST = 64;
@@ -11,16 +11,6 @@ const MAX_CLIENT_ID_LENGTH = 128;
 const MAX_CURSOR_LENGTH = 512;
 const MAX_STATE_TOKEN_LENGTH = 128;
 const MAX_REVISION = Number.MAX_SAFE_INTEGER;
-const CLIENT_ID_KEY = "lagniappe-poll-client";
-const VISIBLE_BLUR_POLLING_MS = 10 * 60 * 1e3;
-const ORDINARY_INTERVALS = [15e3, 15e3, 3e4, 3e4, 6e4];
-const TYPE_INTERVALS = Object.freeze({
-  document: 2e3,
-  ingress: 2500,
-  operation: 4e3
-});
-const SUBSCRIPTION_MODES = /* @__PURE__ */ new Set(["periodic", "foreground"]);
-const INITIAL_MODES = /* @__PURE__ */ new Set(["immediate", "scheduled"]);
 const POLL_TYPES = /* @__PURE__ */ new Set([
   "entity",
   "channel",
@@ -350,6 +340,17 @@ const normalizedResult = (value, descriptor, path) => {
     ...status === "changed" ? { payload } : {}
   };
 };
+
+const CLIENT_ID_KEY = "lagniappe-poll-client";
+const VISIBLE_BLUR_POLLING_MS = 10 * 60 * 1e3;
+const ORDINARY_INTERVALS = [15e3, 15e3, 3e4, 3e4, 6e4];
+const TYPE_INTERVALS = Object.freeze({
+  document: 2e3,
+  ingress: 2500,
+  operation: 4e3
+});
+const SUBSCRIPTION_MODES = /* @__PURE__ */ new Set(["periodic", "foreground"]);
+const INITIAL_MODES = /* @__PURE__ */ new Set(["immediate", "scheduled"]);
 function clientId() {
   let value = null;
   try {

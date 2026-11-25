@@ -127,6 +127,27 @@ test("test_frontend_entries_and_startup_budget_contract", () => {
 	oversized["script.js"].code = "x".repeat(STARTUP_BUDGETS.main + 1);
 	assert.throws(() => validateStartupBudgets(oversized), /main boot closure/);
 
+	const pageBudget = structuredClone(bundle);
+	const page = pageBudget["chunks/views/page.js"];
+	page.code = "x".repeat(
+		STARTUP_BUDGETS.page - bundle["script.js"].code.length,
+	);
+	validateStartupBudgets(pageBudget);
+	page.code += "x";
+	assert.throws(
+		() => validateStartupBudgets(pageBudget),
+		/main \+ Core view page/,
+	);
+
+	const otherCore = structuredClone(bundle);
+	otherCore["chunks/views/home.js"].code = "x".repeat(
+		STARTUP_BUDGETS.core - bundle["script.js"].code.length + 1,
+	);
+	assert.throws(
+		() => validateStartupBudgets(otherCore),
+		/main \+ Core view home/,
+	);
+
 	for (const extension of [".mjs", ".ts", ".mts"]) {
 		const forbidden = structuredClone(bundle);
 		const module = CORE_FORBIDDEN_MODULES[0].replace(/\.mjs$/, extension);

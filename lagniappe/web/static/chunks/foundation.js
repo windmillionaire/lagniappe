@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { h as handleUpstreamResponse } from './upstreamUnavailable.js?v=bf7d4d98';
-import { c as connectivity } from './connectivity.js?v=bf7d4d98';
+import { h as handleUpstreamResponse } from './upstreamUnavailable.js?v=bbf4a50a';
+import { c as connectivity } from './connectivity.js?v=bbf4a50a';
 
 const getErrorDetails = (error) => error && (typeof error === "object" || typeof error === "function") ? error : void 0;
 const getElementContext = (element) => {
@@ -1079,7 +1079,7 @@ class ShellView {
       "_pollingPromise",
       "PollingCoordinator",
       async () => {
-        const { PollingCoordinator } = await import('./polling.js?v=bf7d4d98');
+        const { PollingCoordinator } = await import('./polling.js?v=bbf4a50a');
         return this._destroyed ? null : new PollingCoordinator(this).init();
       }
     );
@@ -1088,7 +1088,7 @@ class ShellView {
     return loadViewService(this, "_searchPromise", "SearchBox", async () => {
       const search = document.querySelector("[lp-search]");
       if (!search) return null;
-      const { SearchBox } = await import('./combobox.js?v=bf7d4d98').then(function (n) { return n.d; });
+      const { SearchBox } = await import('./combobox.js?v=bbf4a50a').then(function (n) { return n.d; });
       if (this._destroyed) return null;
       const box = new SearchBox(search);
       await box.init();
@@ -1103,7 +1103,7 @@ class ShellView {
       async () => {
         if (!document.querySelector("[data-role='notifications']")) return null;
         await this.ensurePollingCoordinator();
-        const { Notifications } = await import('./notifications.js?v=bf7d4d98');
+        const { Notifications } = await import('./notifications.js?v=bbf4a50a');
         if (this._destroyed) return null;
         const notifications = new Notifications(this);
         notifications.init();
@@ -1419,4 +1419,4 @@ class QueryLifecycle {
   }
 }
 
-export { ENDPOINTS as E, QueryLifecycle as Q, ShellView as S, clearRecentSearchResults as a, whenIdle as b, captureError as c, debounce as d, localStore as e, areEqual as f, generateElementId as g, base64ToUint8Array as h, waitForAttribute as i, sessionStore as j, applyNotificationStateHeader as k, loadViewService as l, markPerformance as m, renderNotificationBadge as n, errors as o, request$1 as p, storage as q, request as r, showBriefly as s, uint8ArrayToBase64 as u, withTransition as w };
+export { ENDPOINTS as E, QueryLifecycle as Q, ShellView as S, clearRecentSearchResults as a, whenIdle as b, captureError as c, debounce as d, localStore as e, areEqual as f, generateElementId as g, base64ToUint8Array as h, waitForAttribute as i, sessionStore as j, renderNotificationBadge as k, loadViewService as l, markPerformance as m, applyNotificationStateHeader as n, errors as o, request$1 as p, storage as q, request as r, showBriefly as s, uint8ArrayToBase64 as u, withTransition as w };

@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as Entity } from '../entity-foundation.js?v=bf7d4d98';
-import '../core-foundation.js?v=bf7d4d98';
-import '../connectivity.js?v=bf7d4d98';
-import '../foundation.js?v=bf7d4d98';
-import '../upstreamUnavailable.js?v=bf7d4d98';
+import { E as Entity } from '../entity-foundation.js?v=bbf4a50a';
+import '../core-foundation.js?v=bbf4a50a';
+import '../connectivity.js?v=bbf4a50a';
+import '../foundation.js?v=bbf4a50a';
+import '../upstreamUnavailable.js?v=bbf4a50a';
 
 class Admin extends Entity {
   constructor(node) {

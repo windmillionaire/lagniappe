@@ -1,15 +1,15 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { b as FormWidget, I as InputElement, T as TextareaElement } from './forms.js?v=bf7d4d98';
-import { s as sections, S as SectionToggle } from './form-sections.js?v=bf7d4d98';
-import './ui-resources.js?v=bf7d4d98';
-import './ui-controls.js?v=bf7d4d98';
-import './foundation.js?v=bf7d4d98';
-import './upstreamUnavailable.js?v=bf7d4d98';
-import './connectivity.js?v=bf7d4d98';
-import './modal.js?v=bf7d4d98';
-import './combobox.js?v=bf7d4d98';
-import './uploads.js?v=bf7d4d98';
-import './directUpload.js?v=bf7d4d98';
+import { b as FormWidget, I as InputElement, T as TextareaElement } from './forms.js?v=bbf4a50a';
+import { s as sections, S as SectionToggle } from './form-sections.js?v=bbf4a50a';
+import './ui-resources.js?v=bbf4a50a';
+import './ui-controls.js?v=bbf4a50a';
+import './foundation.js?v=bbf4a50a';
+import './upstreamUnavailable.js?v=bbf4a50a';
+import './connectivity.js?v=bbf4a50a';
+import './modal.js?v=bbf4a50a';
+import './combobox.js?v=bbf4a50a';
+import './uploads.js?v=bbf4a50a';
+import './directUpload.js?v=bbf4a50a';
 
 class CategoryForm extends FormWidget {
   get nameElement() {

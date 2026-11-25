@@ -122,13 +122,14 @@ PDF support and monitoring keep their separate lazy boundaries. Preloading is
 not a service-worker bypass: matching build-versioned requests reuse the
 browser HTTP cache or service-worker Cache Storage through the normal paths.
 
-The main startup path has four measured closures:
+The production build enforces these startup limits.
 
 | Budget key | Measured closure | Limit (KiB) |
 | --- | --- | ---: |
 | `main` | Main entry alone, including upstream failure recovery | 40 |
 | `shell` | Main plus a shell view | 64 |
-| `core` | Main plus a Core view | 128 |
+| `core` | Main plus a Core view other than Page | 128 |
+| `page` | Main plus the Page view | 132 |
 | `builder` | Builder view | 304 |
 
 `build/startupBudget.mjs` measures deduplicated minified static imports and

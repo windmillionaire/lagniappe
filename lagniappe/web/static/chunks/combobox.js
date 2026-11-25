@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES, s as setIcon } from './ui-resources.js?v=bf7d4d98';
-import { g as generateElementId, c as captureError, Q as QueryLifecycle, d as debounce, e as localStore, E as ENDPOINTS, r as request } from './foundation.js?v=bf7d4d98';
-import { p as primitives, f as formatting } from './ui-controls.js?v=bf7d4d98';
+import { S as STYLES, s as setIcon } from './ui-resources.js?v=bbf4a50a';
+import { g as generateElementId, c as captureError, Q as QueryLifecycle, d as debounce, e as localStore, E as ENDPOINTS, r as request } from './foundation.js?v=bbf4a50a';
+import { p as primitives, f as formatting } from './ui-controls.js?v=bbf4a50a';
 
 /**
  * Custom positioning reference element.

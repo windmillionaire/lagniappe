@@ -45,8 +45,11 @@ the preloaded records and takes the ordinary authenticated read path.
 
 ## Browser scheduler
 
-`src/script/shared/polling.ts` owns scheduling for one mounted view. Each
-subscription has a stable ID, type-specific fields, and an opaque revision.
+`src/script/shared/polling.ts` exports the coordinator and its public types.
+Under `src/script/shared/polling/`, `coordinator.ts` schedules subscriptions
+for one mounted view and `protocol.ts` validates request bodies, subscription
+descriptors, and individual results. Each subscription has a stable ID,
+type-specific fields, and an opaque revision.
 The coordinator:
 
 - batches at most 64 due subscriptions;

@@ -1,13 +1,13 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { f as areEqual, r as request, c as captureError, w as withTransition } from './foundation.js?v=bf7d4d98';
-import { e as compatibleField, r as renderReviewBar, f as currentReviewOperation, h as incompatibleSchema } from './forms.js?v=bf7d4d98';
-import { b as buttons } from './ui-controls.js?v=bf7d4d98';
-import { S as STYLES } from './ui-resources.js?v=bf7d4d98';
-import { Modal } from './modal.js?v=bf7d4d98';
-import { l as loadWidget } from './core-foundation.js?v=bf7d4d98';
-import './upstreamUnavailable.js?v=bf7d4d98';
-import './connectivity.js?v=bf7d4d98';
-import './combobox.js?v=bf7d4d98';
+import { f as areEqual, r as request, c as captureError, w as withTransition } from './foundation.js?v=bbf4a50a';
+import { d as compatibleField, r as renderReviewBar, e as currentReviewOperation, f as incompatibleSchema } from './forms.js?v=bbf4a50a';
+import { b as buttons } from './ui-controls.js?v=bbf4a50a';
+import { S as STYLES } from './ui-resources.js?v=bbf4a50a';
+import { Modal } from './modal.js?v=bbf4a50a';
+import { l as loadWidget } from './core-foundation.js?v=bbf4a50a';
+import './upstreamUnavailable.js?v=bbf4a50a';
+import './connectivity.js?v=bbf4a50a';
+import './combobox.js?v=bbf4a50a';
 
 async function loadRevisionPreview(liveWidget, response, { readonly = liveWidget.readonly } = {}) {
   const html = response.html;

@@ -163,7 +163,7 @@ def test_home_row_affordances_and_section_persistence(get_admin, get_user):
 
     Direct links render a trailing right arrow, expandable sections render a
     rotating disclosure chevron synchronized with aria-expanded, and the
-    user's open sections persist across reloads via localStorage.
+    user's open sections remain expanded after a reload.
     """
     user = get_admin()
     home = user.go(SitePages.HOME)

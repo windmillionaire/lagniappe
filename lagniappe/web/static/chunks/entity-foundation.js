@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { C as Core, N as NavElement } from './core-foundation.js?v=bf7d4d98';
-import { d as debounce, w as withTransition } from './foundation.js?v=bf7d4d98';
+import { C as Core, N as NavElement } from './core-foundation.js?v=bbf4a50a';
+import { d as debounce, w as withTransition } from './foundation.js?v=bbf4a50a';
 
 class Entity extends Core {
   constructor(node) {

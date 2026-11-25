@@ -173,6 +173,7 @@ test("test_builder_resumes_migration_polling_and_clears_completed_status", async
 		};
 		const { PollingCoordinator } = await esmock.strict(
 			"../../src/script/shared/polling.ts",
+			{},
 			{
 				"../../src/script/shared/endpoints.ts": {
 					ENDPOINTS: { poll: "/l/poll" },
