@@ -3,6 +3,7 @@
 import shutil
 import subprocess
 import sys
+from textwrap import dedent
 
 import pytest
 
@@ -146,3 +147,34 @@ def test_native_pytest_parallel_multi_file_execution(tmp_path):
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "6 passed" in result.stdout
+
+
+def test_native_pytest_reports_launch_error_separately_from_case_failure(tmp_path):
+    target = tmp_path / "test_cases.mjs"
+    shutil.copyfile(FIXTURES / "cases.mjs", target)
+    (tmp_path / "conftest.py").write_text(dedent("""\
+        import errno
+        import subprocess
+        from unittest.mock import patch
+        from testing.utility.native_js_pytest import collect_file as pytest_collect_file
+
+        def pytest_sessionstart(session):
+            popen = subprocess.Popen
+            def launch(command, **kwargs):
+                if "--test-name-pattern=^test_missing_result$" in command:
+                    raise OSError(errno.EFAULT, "Bad address")
+                return popen(command, **kwargs)
+            patcher = patch("subprocess.Popen", launch)
+            patcher.start()
+            session.config.add_cleanup(patcher.stop)
+    """))
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "-c", str(native_js.REPO_ROOT / "testing/pytest.ini"),
+         "-o", f"cache_dir={tmp_path / 'cache'}", "-k", "test_pass or test_fail or test_missing_result", str(target)],
+        cwd=native_js.REPO_ROOT, capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "test_pass PASSED" in result.stdout
+    assert "test_fail FAILED" in result.stdout
+    assert "ERROR at setup of test_missing_result" in result.stdout
+    assert "Bad address" in result.stdout
